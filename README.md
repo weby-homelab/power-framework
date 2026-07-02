@@ -10,7 +10,7 @@
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-00C853?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io/)
 [![Obsidian](https://img.shields.io/badge/Obsidian-Compatible-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md/)
 [![CI](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/weby-homelab/P.O.W.E.R?logo=github)](https://github.com/weby-homelab/P.O.W.E.R/releases)
+[![Release](https://img.shields.io/github/v/release/weby-homelab/P%2EO%2EW%2EE%2ER?logo=github)](https://github.com/weby-homelab/P.O.W.E.R/releases)
 [![Tests: 79](https://img.shields.io/badge/Tests-79_passed-2ECC71?logo=pytest)](https://github.com/weby-homelab/P.O.W.E.R/tree/main/tests)
 
 A hybrid knowledge management system (Obsidian Second Brain) that bridges human-friendly directory organization with strict machine-readability for AI agents.
