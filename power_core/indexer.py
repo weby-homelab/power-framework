@@ -1,11 +1,12 @@
 """
 P.O.W.E.R. Index Generator.
 
-Scans the vault for OKF-annotated notes and generates the catalog index.md.
+Scans the vault for OKF-annotated notes and generates a hierarchical catalog:
+- Main index.md with summary (section headers + counts)
+- Per-folder _index.md files with detailed entries
 
-Supports two modes:
-- flat: Single index.md with all entries (default)
-- hierarchical: Main index.md with summary + _index.md per folder
+This structure keeps the main index small and token-efficient for AI agents,
+while detailed entries are loaded on-demand from sub-index files.
 """
 
 from __future__ import annotations
@@ -41,7 +42,7 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
         dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
 
         for file in files:
-            if not file.endswith(".md") or file in ("index.md", "log.md"):
+            if not file.endswith(".md") or file in ("index.md", "log.md", "_index.md"):
                 continue
 
             filepath = Path(root) / file
@@ -65,38 +66,6 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
     return concepts
 
 
-def generate_index_content(concepts: dict[str, list[tuple[str, str, str]]]) -> str:
-    """Generate the full index.md content from scanned concepts (flat mode)."""
-    lines = [
-        "---",
-        "type: System Guide",
-        'title: "Second Brain Index"',
-        'description: "Registry of all concepts in the Second Brain"',
-        f"timestamp: {datetime.now().isoformat()}",
-        "---",
-        "",
-        "# Knowledge Catalog (OKF Index)",
-        "",
-        "This file is automatically maintained by AI agents and contains "
-        "a registry of all knowledge base pages classified by type.",
-        "",
-    ]
-
-    sorted_types = sorted(
-        concepts.keys(),
-        key=lambda t: NOTE_TYPE_ORDER.index(t) if t in NOTE_TYPE_ORDER else 99,
-    )
-
-    for note_type in sorted_types:
-        lines.append(f"## {note_type}s")
-        items = sorted(concepts[note_type], key=lambda x: x[1])
-        for rel_path, title, desc in items:
-            lines.append(f"- **[{title}]({rel_path})** - {desc}")
-        lines.append("")
-
-    return "\n".join(lines)
-
-
 def generate_hierarchical_index(
     vault_dir: Path,
     concepts: dict[str, list[tuple[str, str, str]]],
@@ -113,12 +82,12 @@ def generate_hierarchical_index(
     by_folder: dict[str, list[tuple[str, str, str]]] = {}
     by_type: dict[str, list[tuple[str, str, str]]] = {}
 
-    for rel_path, title, desc in _normalize_concepts(concepts):
+    for rel_path, title, desc in _flatten_concepts(concepts):
         folder = rel_path.rsplit("/", 1)[0] if "/" in rel_path else ""
         by_folder.setdefault(folder, []).append((rel_path, title, desc))
 
     for note_type, items in concepts.items():
-        by_type[note_type] = items
+        by_type[note_type] = list(items)
 
     # Generate _index.md for each folder that has notes
     for folder, items in sorted(by_folder.items()):
@@ -140,7 +109,6 @@ def generate_hierarchical_index(
         outputs[f"{folder}/_index.md"] = "\n".join(folder_lines)
 
     # Generate main index.md with summary only
-    type_order = NOTE_TYPE_ORDER
     main_lines = [
         "---",
         "type: System Guide",
@@ -156,7 +124,7 @@ def generate_hierarchical_index(
         "",
     ]
 
-    for note_type in type_order:
+    for note_type in NOTE_TYPE_ORDER:
         if note_type not in by_type:
             continue
         folder = FOLDER_MAP.get(note_type, "")
@@ -170,7 +138,7 @@ def generate_hierarchical_index(
     return outputs
 
 
-def _normalize_concepts(
+def _flatten_concepts(
     concepts: dict[str, list[tuple[str, str, str]]],
 ) -> list[tuple[str, str, str]]:
     """Flatten concepts dict into a single list of (rel_path, title, desc)."""
@@ -180,39 +148,29 @@ def _normalize_concepts(
     return result
 
 
-def run_generate_index(vault_dir: Path, mode: str = "flat") -> str:
+def run_generate_index(vault_dir: Path) -> str:
     """
-    Generate index files for the given vault directory.
+    Generate hierarchical index files for the given vault directory.
 
-    Args:
-        vault_dir: Path to the vault root.
-        mode: "flat" (single index.md) or "hierarchical" (summary + per-folder indexes).
+    Creates index.md (summary) + per-folder _index.md files.
 
     Returns a summary message.
     """
     concepts = scan_vault_notes(vault_dir)
     total = sum(len(v) for v in concepts.values())
 
-    if mode == "hierarchical":
-        outputs = generate_hierarchical_index(vault_dir, concepts)
+    outputs = generate_hierarchical_index(vault_dir, concepts)
 
-        # Write all output files atomically
-        for rel_path, content in outputs.items():
-            target = vault_dir / rel_path
-            atomic_write(target, content)
+    # Write all output files atomically
+    for rel_path, content in outputs.items():
+        target = vault_dir / rel_path
+        atomic_write(target, content)
 
-        sub_count = len(outputs) - 1  # exclude index.md
-        return (
-            f"Generated hierarchical index with {total} concepts: "
-            f"index.md + {sub_count} sub-index files at {vault_dir}."
-        )
-
-    # Default: flat mode
-    index_path = vault_dir / "index.md"
-    content = generate_index_content(concepts)
-    atomic_write(index_path, content)
-
-    return f"Generated index.md with {total} concepts at {index_path}."
+    sub_count = len(outputs) - 1  # exclude index.md
+    return (
+        f"Generated hierarchical index with {total} concepts: "
+        f"index.md + {sub_count} sub-index files at {vault_dir}."
+    )
 
 
 def generate_log_initial(vault_dir: Path, note_count: int) -> None:

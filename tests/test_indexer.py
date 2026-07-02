@@ -6,7 +6,6 @@ from pathlib import Path  # noqa: TC003
 
 from power_core.indexer import (
     generate_hierarchical_index,
-    generate_index_content,
     run_generate_index,
     scan_vault_notes,
 )
@@ -44,63 +43,7 @@ class TestScanVaultNotes:
         assert concepts == {}
 
 
-class TestGenerateIndexContent:
-    """Tests for index content generation."""
-
-    def test_generates_sections(self, sample_vault: Path):
-        concepts = scan_vault_notes(sample_vault)
-        content = generate_index_content(concepts)
-        assert "## Projects" in content
-        assert "## Areas" in content
-        assert "## Resources" in content
-
-    def test_contains_frontmatter(self, sample_vault: Path):
-        concepts = scan_vault_notes(sample_vault)
-        content = generate_index_content(concepts)
-        assert content.startswith("---")
-        assert "type: System Guide" in content
-
-    def test_sorted_by_type_order(self, sample_vault: Path):
-        concepts = scan_vault_notes(sample_vault)
-        content = generate_index_content(concepts)
-        project_pos = content.index("## Projects")
-        area_pos = content.index("## Areas")
-        resource_pos = content.index("## Resources")
-        assert project_pos < area_pos < resource_pos
-
-
-class TestRunGenerateIndex:
-    """Tests for full index generation."""
-
-    def test_creates_index_file(self, sample_vault: Path):
-        index_path = sample_vault / "index.md"
-        assert not index_path.exists()
-
-        result = run_generate_index(sample_vault)
-
-        assert index_path.exists()
-        assert "4 concepts" in result
-
-    def test_index_content_valid(self, sample_vault: Path):
-        run_generate_index(sample_vault)
-        index_path = sample_vault / "index.md"
-        content = index_path.read_text(encoding="utf-8")
-        assert "Test Project" in content
-        assert "Test Area" in content
-        assert "Test Resource" in content
-
-    def test_overwrites_existing_index(self, sample_vault: Path):
-        index_path = sample_vault / "index.md"
-        index_path.write_text("Old content")
-
-        run_generate_index(sample_vault)
-
-        content = index_path.read_text(encoding="utf-8")
-        assert "Old content" not in content
-        assert "Test Project" in content
-
-
-class TestHierarchicalIndex:
+class TestGenerateHierarchicalIndex:
     """Tests for hierarchical index generation."""
 
     def test_generates_main_and_sub_indexes(self, sample_vault: Path):
@@ -139,48 +82,7 @@ class TestHierarchicalIndex:
                 assert content.startswith("---")
                 assert "type: System Guide" in content
 
-    def test_hierarchical_mode_creates_files(self, sample_vault: Path):
-        result = run_generate_index(sample_vault, mode="hierarchical")
-
-        assert sample_vault / "index.md"
-        assert "hierarchical" in result.lower()
-        assert "4 concepts" in result
-
-    def test_hierarchical_writes_sub_index_files(self, sample_vault: Path):
-        run_generate_index(sample_vault, mode="hierarchical")
-
-        # Check that sub-index files were actually written
-        project_index = sample_vault / "01_Projects" / "_index.md"
-        assert project_index.exists()
-        content = project_index.read_text(encoding="utf-8")
-        assert "Test Project" in content
-
-    def test_hierarchical_main_smaller_than_flat(self, sample_vault: Path):
-        """Hierarchical main should be smaller than flat at scale (10+ notes per type)."""
-        # Add more notes to make the comparison meaningful
-        for i in range(15):
-            note = sample_vault / "01_Projects" / f"BulkProject_{i:03d}.md"
-            note.write_text(
-                f'---\ntype: Project\ntitle: "Bulk Project {i}"\ndescription: "A bulk project note for testing scale"\ntimestamp: 2026-01-01T00:00:00\n---\n\n# Bulk Project {i}\n'
-            )
-
-        concepts = scan_vault_notes(sample_vault)
-
-        flat_content = generate_index_content(concepts)
-        hier_outputs = generate_hierarchical_index(sample_vault, concepts)
-        main_content = hier_outputs["index.md"]
-
-        # Main hierarchical index should be significantly smaller than flat
-        assert len(main_content) < len(flat_content)
-
-    def test_flat_mode_is_default(self, sample_vault: Path):
-        result = run_generate_index(sample_vault)
-        assert "Generated index.md" in result
-
-        result_hier = run_generate_index(sample_vault, mode="hierarchical")
-        assert "hierarchical" in result_hier.lower()
-
-    def test_hierarchical_all_folders_have_index(self, sample_vault: Path):
+    def test_all_folders_have_index(self, sample_vault: Path):
         concepts = scan_vault_notes(sample_vault)
         outputs = generate_hierarchical_index(sample_vault, concepts)
 
@@ -188,3 +90,55 @@ class TestHierarchicalIndex:
         sub_indexes = [k for k in outputs if k.endswith("/_index.md")]
         # We have notes in 01_Projects, 02_Areas, 03_Resources, 06_Daily_Logs
         assert len(sub_indexes) >= 4
+
+    def test_main_index_has_frontmatter(self, sample_vault: Path):
+        concepts = scan_vault_notes(sample_vault)
+        outputs = generate_hierarchical_index(sample_vault, concepts)
+
+        main_content = outputs["index.md"]
+        assert main_content.startswith("---")
+        assert "type: System Guide" in main_content
+        assert "Hierarchical registry" in main_content
+
+
+class TestRunGenerateIndex:
+    """Tests for full hierarchical index generation."""
+
+    def test_creates_index_file(self, sample_vault: Path):
+        index_path = sample_vault / "index.md"
+        assert not index_path.exists()
+
+        result = run_generate_index(sample_vault)
+
+        assert index_path.exists()
+        assert "hierarchical" in result.lower()
+        assert "4 concepts" in result
+
+    def test_creates_sub_index_files(self, sample_vault: Path):
+        run_generate_index(sample_vault)
+
+        # Check that sub-index files were actually written
+        project_index = sample_vault / "01_Projects" / "_index.md"
+        assert project_index.exists()
+        content = project_index.read_text(encoding="utf-8")
+        assert "Test Project" in content
+
+    def test_overwrites_existing_index(self, sample_vault: Path):
+        index_path = sample_vault / "index.md"
+        index_path.write_text("Old content")
+
+        run_generate_index(sample_vault)
+
+        content = index_path.read_text(encoding="utf-8")
+        assert "Old content" not in content
+        # In hierarchical mode, main index has section headers, not individual entries
+        assert "## Projects" in content
+        assert "01_Projects/_index.md" in content
+
+    def test_index_content_valid(self, sample_vault: Path):
+        run_generate_index(sample_vault)
+        index_path = sample_vault / "index.md"
+        content = index_path.read_text(encoding="utf-8")
+        assert "## Projects" in content
+        assert "## Areas" in content
+        assert "## Resources" in content

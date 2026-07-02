@@ -20,7 +20,7 @@ pip install power-framework
 
 power init ~/my-vault      # Create vault structure
 power lint ~/my-vault      # Check for broken links & missing metadata
-power index ~/my-vault     # Generate catalog index.md
+power index ~/my-vault     # Generate hierarchical catalog index
 ```
 
 ## What's Inside
@@ -30,7 +30,7 @@ power index ~/my-vault     # Generate catalog index.md
 | **CLI** | `power init`, `lint`, `index`, `ingest` — manage your vault from terminal |
 | **MCP Server** | Exposes `lint_vault`, `generate_index`, `ingest_note` to any AI agent (Claude, Cursor, OpenCode) |
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
-| **LLM-Wiki** | Automated catalog indexing, chronological log, and structural link linting (A. Karpathy's philosophy) |
+| **LLM-Wiki** | Hierarchical catalog indexing with summary `index.md` + per-folder `_index.md` files for token-efficient AI access |
 | **Auto-Sync** | Cron-compatible script with GPG-signed commits for continuous backup |
 
 ## Who Is This For
@@ -42,33 +42,11 @@ power index ~/my-vault     # Generate catalog index.md
 ## Commands
 
 ```
-power init <path>                         Create a new vault with P.A.R.A. folder structure
-power lint <path>                         Scan for broken links, missing metadata, orphans
-power index <path>                        Rebuild index.md catalog from all notes (flat mode)
-power index <path> --mode hierarchical    Rebuild with hierarchical indexes (token-efficient)
-power ingest <path> [options]             Create a new note with validated OKF metadata
+power init <path>              Create a new vault with P.A.R.A. folder structure
+power lint <path>              Scan for broken links, missing metadata, orphans
+power index <path>             Generate hierarchical index (summary + per-folder catalogs)
+power ingest <path> [options]  Create a new note with validated OKF metadata
 ```
-
-### Index Modes
-
-P.O.W.E.R. supports two index generation modes to optimize token usage for AI agents:
-
-| Mode | Description | Best for |
-|------|-------------|----------|
-| `flat` (default) | Single `index.md` with all note entries | Vaults under 500 notes |
-| `hierarchical` | Summary `index.md` + `_index.md` per folder | Vaults with 500+ notes |
-
-```bash
-# Flat mode — one file with everything
-power index ~/my-vault --mode flat
-
-# Hierarchical mode — summary + per-folder indexes
-power index ~/my-vault --mode hierarchical
-```
-
-**Why hierarchical?** For large vaults (1000+ notes), a flat `index.md` can exceed 100K tokens — expensive for AI agents to read on every query. Hierarchical mode reduces the main index by **~75%**, with detailed entries loaded on-demand from folder-specific `_index.md` files.
-
-See [Benchmark Results](#index-benchmark) below for detailed token savings.
 
 ### Ingest Examples
 
@@ -111,57 +89,39 @@ pip install power-framework mcp
 }
 ```
 
-The `generate_index` MCP tool accepts an optional `mode` parameter:
-```json
-{
-  "name": "generate_index",
-  "arguments": {
-    "vault_path": "/path/to/vault",
-    "mode": "hierarchical"
-  }
-}
-```
-
 ## Vault Structure
 
-P.O.W.E.R. organizes your vault using the **P.A.R.A.** method with **OKF metadata** on every note:
-
-### Flat Mode (default)
-
-```
-~/my-vault
-├── 00_Inbox/          # Quick captures and raw inputs
-├── 01_Projects/       # Active projects with deadlines
-├── 02_Areas/          # Ongoing responsibilities
-├── 03_Resources/      # Reusable guides and references
-├── 04_Archive/        # Completed or retired notes
-├── 05_Templates/      # Note templates with OKF frontmatter
-├── 06_Daily_Logs/     # Chronological session logs
-├── PROTOCOLS/         # System specs for AI agents
-├── index.md           # Auto-generated catalog (ALL entries)
-└── log.md             # Append-only change log
-```
-
-### Hierarchical Mode
+P.O.W.E.R. organizes your vault using the **P.A.R.A.** method with **OKF metadata** on every note. The index is hierarchical — a lightweight summary plus per-folder detail files:
 
 ```
 ~/my-vault
 ├── 00_Inbox/
+│   └── _index.md      # Catalog of Inbox notes
 ├── 01_Projects/
-│   └── _index.md      # Catalog of Project notes only
+│   └── _index.md      # Catalog of Project notes
 ├── 02_Areas/
-│   └── _index.md      # Catalog of Area notes only
+│   └── _index.md      # Catalog of Area notes
 ├── 03_Resources/
-│   └── _index.md      # Catalog of Resource notes only
+│   └── _index.md      # Catalog of Resource notes
 ├── 04_Archive/
-│   └── _index.md      # Catalog of Archive notes only
+│   └── _index.md      # Catalog of Archive notes
+├── 05_Templates/      # Note templates with OKF frontmatter
 ├── 06_Daily_Logs/
-│   └── _index.md      # Catalog of Daily Log notes only
+│   └── _index.md      # Catalog of Daily Log notes
 ├── PROTOCOLS/
-│   └── _index.md      # Catalog of System Guide notes only
+│   └── _index.md      # Catalog of System Guide notes
 ├── index.md           # Summary only (links to sub-indexes)
-└── log.md
+└── log.md             # Append-only change log
 ```
+
+The main `index.md` contains only section headers with counts:
+
+```markdown
+## Projects (18 notes)
+> See full catalog: [`01_Projects/_index.md`](01_Projects/_index.md)
+```
+
+Detailed entries live in per-folder `_index.md` files, loaded on-demand by AI agents.
 
 Every note starts with validated YAML frontmatter:
 
@@ -184,7 +144,7 @@ The framework combines four complementary methodologies:
 
 - **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — logical folder structure for human cognition
 - **O** — **OKF Overlay** (Open Knowledge Format) — YAML frontmatter on every file for instant AI parsing
-- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — treating your knowledge base as a wiki that LLMs can read, write, and maintain through automated catalog indexing, chronological log, and structural link linting
+- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — treating your knowledge base as a wiki that LLMs can read, write, and maintain through automated hierarchical catalog indexing, chronological log, and structural link linting
 - **E.R.** — **Execution Rules** — GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup
 
 ### Visual Framework Diagram
@@ -200,7 +160,8 @@ graph TB
     end
 
     subgraph Wiki ["📖 LLM-Wiki (Karpathy's Philosophy)"]
-        IndexMD["index.md (Auto Catalog)"]
+        IndexMD["index.md (Summary)"]
+        SubIdx["_index.md (Per Folder)"]
         LogMD["log.md (Change Log)"]
         Lint["Link Linting"]
     end
@@ -219,9 +180,11 @@ graph TB
     Human -- Writes Notes --> YAML
     YAML -- Parsed by --> AI
     AI -- Updates --> IndexMD
+    AI -- Updates --> SubIdx
     AI -- Appends --> LogMD
     AI -- Runs Checks --> Lint
     IndexMD -. Synced via .-> Sync
+    SubIdx -. Synced via .-> Sync
     LogMD -. Synced via .-> Sync
     Sync --> GPG
     GPG --> PR
@@ -233,7 +196,7 @@ graph TB
 |--------|---------|
 | `models.py` | Pydantic v2 schemas for OKF metadata validation |
 | `parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
-| `indexer.py` | Vault scanning and index.md generation |
+| `indexer.py` | Vault scanning and hierarchical index generation |
 | `linter.py` | Health checks: broken links, missing metadata, orphans |
 | `utils.py` | Path traversal protection, atomic writes, backups |
 | `cli.py` | Command-line interface (init, lint, index, ingest) |
@@ -244,23 +207,18 @@ All components share `power_core` as the single source of truth.
 
 ## Index Benchmark
 
-Hierarchical mode reduces token consumption for large vaults by splitting the catalog into a lightweight summary and per-folder detail files.
+Hierarchical indexing reduces token consumption by splitting the catalog into a lightweight summary and per-folder detail files.
 
 ### Token Savings
 
-| Notes | Flat Tokens | Hierarchical Main | Sub-Index Tokens | Savings |
-|------:|------------:|------------------:|-----------------:|--------:|
-| 100 | 2,937 | 901 | 3,082 | 69.3% |
-| 500 | 14,584 | 3,732 | 14,730 | 74.4% |
-| 1,000 | 29,175 | 7,032 | 29,319 | 75.9% |
-| 2,000 | 58,176 | 15,161 | 58,321 | 73.9% |
-| 3,000 | 87,315 | 22,450 | 87,459 | 74.3% |
-| 5,000 | 145,663 | 35,465 | 145,807 | 75.7% |
-
-### How It Works
-
-- **Flat mode**: `index.md` contains every note entry — AI reads the entire file on every query.
-- **Hierarchical mode**: `index.md` contains only section headers with counts (e.g., `## Projects (18 notes)`). Detailed entries live in `01_Projects/_index.md`, read only when needed.
+| Notes | Flat Tokens | Hierarchical Main | Savings |
+|------:|------------:|------------------:|--------:|
+| 100 | 2,937 | 901 | 69.3% |
+| 500 | 14,584 | 3,732 | 74.4% |
+| 1,000 | 29,175 | 7,032 | 75.9% |
+| 2,000 | 58,176 | 15,161 | 73.9% |
+| 3,000 | 87,315 | 22,450 | 74.3% |
+| 5,000 | 145,663 | 35,465 | 75.7% |
 
 ### Cost Comparison (GPT-4o ~$2.50/1M tokens)
 
@@ -269,6 +227,12 @@ Hierarchical mode reduces token consumption for large vaults by splitting the ca
 | 1,000 | $0.073 | $0.018 |
 | 3,000 | $0.218 | $0.056 |
 | 5,000 | $0.364 | $0.089 |
+
+### How It Works
+
+- **`index.md`** — summary only: section headers with counts (e.g., `## Projects (18 notes)`)
+- **`01_Projects/_index.md`** — detailed entries for that folder, read on-demand
+- AI agents read the small main index first, then load specific sub-indexes only when needed
 
 ## Development
 

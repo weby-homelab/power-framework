@@ -115,15 +115,14 @@ def _cmd_lint(args: argparse.Namespace) -> int:
 
 
 def _cmd_index(args: argparse.Namespace) -> int:
-    """Generate index.md from vault notes."""
+    """Generate hierarchical index from vault notes."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
         print(f"Vault not found: {vault_dir}")
         return 1
 
-    mode = getattr(args, "mode", "flat")
-    msg = run_generate_index(vault_dir, mode=mode)
-    print(f"Generated index ({mode} mode): {msg}")
+    msg = run_generate_index(vault_dir)
+    print(f"Generated hierarchical index: {msg}")
     return 0
 
 
@@ -202,14 +201,8 @@ def main() -> None:
     p_lint.set_defaults(func=_cmd_lint)
 
     # power index
-    p_index = subparsers.add_parser("index", help="Generate index.md from vault notes")
+    p_index = subparsers.add_parser("index", help="Generate hierarchical index from vault notes")
     p_index.add_argument("path", help="Path to the vault directory")
-    p_index.add_argument(
-        "--mode",
-        choices=["flat", "hierarchical"],
-        default="flat",
-        help="Index mode: flat (single file) or hierarchical (summary + per-folder indexes)",
-    )
     p_index.set_defaults(func=_cmd_index)
 
     # power ingest

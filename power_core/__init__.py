@@ -17,7 +17,6 @@ from __future__ import annotations
 from .cli import main as cli_main
 from .indexer import (
     generate_hierarchical_index,
-    generate_index_content,
     run_generate_index,
     scan_vault_notes,
 )
