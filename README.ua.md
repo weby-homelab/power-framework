@@ -105,6 +105,22 @@ graph TB
 
 ---
 
+## 🏗️ Архітектура проєкту (power_core)
+
+Фреймворк побудований на спільному Python-пакеті `power_core`, який надає:
+
+| Модуль | Призначення |
+|--------|-------------|
+| `power_core/models.py` | Pydantic v2 схеми для строгої валідації OKF-метаданих |
+| `power_core/parser.py` | Безпечний парсинг YAML frontmatter (на базі PyYAML) |
+| `power_core/indexer.py` | Сканування ваулту та генерація index.md |
+| `power_core/linter.py` | Перевірка здоров'я: биті посилання, відсутні метадані, сироти |
+| `power_core/utils.py` | Захист від Path Traversal, atomic write, управління бекапами |
+
+Усі компоненти (MCP-сервер, CLI-скрипти) використовують `power_core` як єдине джерело істини, що усуває дублювання коду та забезпечує узгодженість.
+
+---
+
 ## 📄 Специфікація метаданих (OKF)
 
 Кожна нотатка повинна містити суворий YAML-блок (frontmatter) на початку файлу. Це дозволяє ШІ-агентам миттєво індексувати та фільтрувати інформацію:
@@ -209,6 +225,42 @@ curl -sSL https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main/install.
      "/шлях/до/простору/.agents/skills/power/SKILL.md"
    ]
    ```
+
+---
+
+## 🛠️ Розробка
+
+### Налаштування
+
+```bash
+git clone https://github.com/weby-homelab/P.O.W.E.R.git
+cd P.O.W.E.R
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+### Перевірка якості
+
+```bash
+# Запуск тестів
+pytest tests/ -v
+
+# Lint
+ruff check power_core/ mcp_servers/ scripts/ tests/
+
+# Форматування
+ruff format power_core/ mcp_servers/ scripts/ tests/
+
+# Перевірка типів
+mypy power_core/
+```
+
+### Скрипти автоматизації
+
+| Скрипт | Призначення |
+|--------|-------------|
+| `scripts/sync-brain.sh` | Cron-сумісний авто-синк з підтримкою GPG-підпису |
+| `scripts/cleanup_branches.py` | Автоматичне очищення злитих гілок через GitHub API |
 
 ---
 

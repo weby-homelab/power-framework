@@ -105,6 +105,22 @@ The Obsidian vault (Second Brain) is organized as follows:
 
 ---
 
+## 🏗️ Project Architecture (power_core)
+
+The framework is built on a shared `power_core` Python package that provides:
+
+| Module | Purpose |
+|--------|---------|
+| `power_core/models.py` | Pydantic v2 schemas for strict OKF metadata validation |
+| `power_core/parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
+| `power_core/indexer.py` | Vault scanning and index.md generation |
+| `power_core/linter.py` | Health checks: broken links, missing metadata, orphans |
+| `power_core/utils.py` | Path traversal protection, atomic writes, backup management |
+
+All components (MCP server, CLI scripts) use `power_core` as the single source of truth, eliminating code duplication and ensuring consistency.
+
+---
+
 ## 📄 Metadata Specification (OKF)
 
 Every note must contain a strict YAML block (frontmatter) at the very top of the file. This allows AI agents to instantly index and filter documents:
@@ -209,6 +225,42 @@ If you prefer to configure the skill manually:
      "/path/to/your/workspace/.agents/skills/power/SKILL.md"
    ]
    ```
+
+---
+
+## 🛠️ Development
+
+### Setup
+
+```bash
+git clone https://github.com/weby-homelab/P.O.W.E.R.git
+cd P.O.W.E.R
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+### Quality Checks
+
+```bash
+# Run tests
+pytest tests/ -v
+
+# Lint
+ruff check power_core/ mcp_servers/ scripts/ tests/
+
+# Format
+ruff format power_core/ mcp_servers/ scripts/ tests/
+
+# Type check
+mypy power_core/
+```
+
+### Automation Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/sync-brain.sh` | Cron-compatible auto-sync with GPG signing support |
+| `scripts/cleanup_branches.py` | Automated merged branch cleanup via GitHub API |
 
 ---
 
