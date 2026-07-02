@@ -142,6 +142,36 @@ The `lint_brain.py` script is used to perform on-demand or automated vault check
 
 ---
 
+## ⚡ P.O.W.E.R. Agent Skill & Installation
+
+We have packaged the entire P.O.W.E.R. framework rules and indexing/linting tools into a reusable AI Agent Custom Skill. This skill works out-of-the-box with Antigravity CLI and OpenCode.
+
+### ⚙️ One-Command Installation
+
+To install the P.O.W.E.R. skill automatically into your active workspace and configure your local agents (Antigravity and OpenCode) with a single command, run:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main/install.sh | bash
+```
+
+Alternatively, you can specify a custom target workspace path:
+```bash
+curl -sSL https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main/install.sh | bash -s -- /path/to/your/workspace
+```
+
+### 🔌 Manual Configuration (Optional)
+If you prefer to configure it manually:
+1. Copy the contents of the `skills/power` directory to your workspace's `.agents/skills/power` folder.
+2. Make the scripts inside `scripts/` executable: `chmod +x .agents/skills/power/scripts/*.py`
+3. Add the skill to your OpenCode system configuration in `~/.config/opencode/opencode.jsonc`:
+   ```json
+   "instructions": [
+     "/path/to/your/workspace/.agents/skills/power/SKILL.md"
+   ]
+   ```
+
+---
+
 ## 📄 License
 
 This framework is distributed under the MIT License. Feel free to use it to build your own personal or enterprise knowledge bases.
