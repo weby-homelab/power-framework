@@ -38,7 +38,7 @@ graph TB
         PARA --> PARA_AR
     end
 
-    subgraph AI ["🤖 AI Agent (OpenCode / Antigravity)"]
+    subgraph AI ["🤖 ШІ-Агент (Локальний / Хмарний)"]
         Ingest["Ingest Note"]
         Lint["Lint Vault (lint_brain.py)"]
         Index["Rebuild Index (generate_index.py)"]
@@ -85,7 +85,7 @@ graph TB
 
 ## 📂 Структура каталогів бази знань
 
-База знань розгортається у репозиторії у наступному вигляді:
+База знань Obsidian (Second Brain) організована наступним чином:
 
 ```text
 /brain

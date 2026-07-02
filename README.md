@@ -38,7 +38,7 @@ graph TB
         PARA --> PARA_AR
     end
 
-    subgraph AI ["🤖 AI Agent (OpenCode / Antigravity)"]
+    subgraph AI ["🤖 AI Agent (Local / Cloud)"]
         Ingest["Ingest Note"]
         Lint["Lint Vault (lint_brain.py)"]
         Index["Rebuild Index (generate_index.py)"]
@@ -85,7 +85,7 @@ graph TB
 
 ## 📂 Vault Directory Structure
 
-The knowledge base is organized in the repository as follows:
+The Obsidian vault (Second Brain) is organized as follows:
 
 ```text
 /brain
