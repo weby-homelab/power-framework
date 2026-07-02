@@ -1,24 +1,28 @@
+<p align="center">
+  <b>ENG</b> | <a href="README.ua.md">UKR</a>
+</p>
+
 # 🚀 P.O.W.E.R. Framework — Hybrid Knowledge Management System
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Format: GFM](https://img.shields.io/badge/Format-GFM-blue.svg)](https://github.github.com/gfm/)
 
-Гібридна система управління знаннями (Obsidian Second Brain), що поєднує зручність структури для людини та строгу машиночитаність для ШІ-агентів. 
+A hybrid knowledge management system (Obsidian Second Brain) that bridges human-friendly directory organization with strict machine-readability for AI agents.
 
-Побудована на поєднанні **P.A.R.A.** + **OKF Overlay** + **LLM-Wiki** + **Execution Rules**.
+Built on the synergy of **P.A.R.A.** + **OKF Overlay** + **LLM-Wiki** + **Execution Rules**.
 
 ---
 
-## 🎯 Архітектура системи (P.O.W.E.R.)
+## 🎯 System Architecture (P.O.W.E.R.)
 
-Фреймворк складається з чотирьох взаємодоповнюючих компонентів:
+The framework consists of four complementary methodologies:
 
-*   **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — логічна структура папок для організації нотаток людиною.
-*   **O** — **OKF Overlay** (Open Knowledge Format) — метадані (YAML frontmatter) у заголовку кожного файлу для парсингу ШІ.
-*   **W** — **LLM-Wiki** (філософія А. Карпати) — автоматичний індекс, журнал змін та лінтінг зв'язків.
-*   **E.R.** — **Execution Rules / Enforced Routines** (авторські правила автоматизації) — суворий GPG-підпис комітів, PR-only workflow, автоматичний 5-хвилинний sync-brain та правила очищення гілок.
+*   **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — a logical folder structure optimized for human cognitive layout.
+*   **O** — **OKF Overlay** (Open Knowledge Format) — metadata (YAML frontmatter) at the top of every file to enable instant AI parsing.
+*   **W** — **LLM-Wiki** (A. Karpathy's philosophy) — automated catalog indexing, chronological log, and structural link linting.
+*   **E.R.** — **Execution Rules / Enforced Routines** (custom automation rules) — GPG-signed commits, PR-only workflow, cron-based 5-minute sync, and branch cleanup policies.
 
-### 📊 Візуальна схема фреймворку
+### 📊 Visual Framework Diagram
 
 ```mermaid
 graph TB
@@ -79,65 +83,65 @@ graph TB
 
 ---
 
-## 📂 Структура каталогів бази знань
+## 📂 Vault Directory Structure
 
-База знань розгортається у репозиторії у наступному вигляді:
+The knowledge base is organized in the repository as follows:
 
 ```text
 /brain
-├── 00_Inbox/                    # Тимчасова папка для швидких нотаток та сирих даних
-├── 01_Projects/                 # Активні проєкти з чіткими дедлайнами та цілями
-├── 02_Areas/                    # Сфери відповідальності (інфраструктура, фінанси, здоров'я)
-├── 03_Resources/                # Загальні ресурси (гайди, інструкції, сниппети, скрипти)
-│   └── lint_brain.py            # Скрипт валідації та очищення зв'язків
-├── 04_Archive/                  # Архів закритих проєктів та застарілих нотаток
-├── 05_Templates/                # Шаблони нотаток із предзаповненим OKF-форматом
-├── 06_Daily_Logs/               # Щоденні звіти ШІ-сесій та уроки (MASTER-LESSONS-LEARNED)
-├── PROTOCOLS/                   # Системні специфікації для ШІ-агентів
-│   └── LLM_WIKI_SCHEMA.md       # Суворі правила форматування та лінтінгу
-├── index.md                     # Автоматично генерований каталог усіх документів
-└── log.md                       # Хронологічний журнал змін бази знань (append-only)
+├── 00_Inbox/                    # Temporary folder for quick scratchnotes and raw inputs
+├── 01_Projects/                 # Active projects with specific deadlines and targets
+├── 02_Areas/                    # Long-term responsibilities (infrastructure, finance, health)
+├── 03_Resources/                # General resources (guides, stack, snippets, scripts)
+│   └── lint_brain.py            # Automated link validation and cleanup script
+├── 04_Archive/                  # Completed projects and stale/outdated notes
+├── 05_Templates/                # Templates with predefined OKF metadata blocks
+├── 06_Daily_Logs/               # Chronological daily logs and lessons (MASTER-LESSONS-LEARNED)
+├── PROTOCOLS/                   # System configurations and specifications for AI agents
+│   └── LLM_WIKI_SCHEMA.md       # Formatting and linting standards for AI operations
+├── index.md                     # Automatically generated catalog index of all notes
+└── log.md                       # Chronological append-only change log of the vault
 ```
 
 ---
 
-## 📄 Специфікація метаданих (OKF)
+## 📄 Metadata Specification (OKF)
 
-Кожна нотатка повинна містити суворий YAML-блок (frontmatter) на початку файлу. Це дозволяє ШІ-агентам миттєво індексувати та фільтрувати інформацію:
+Every note must contain a strict YAML block (frontmatter) at the very top of the file. This allows AI agents to instantly index and filter documents:
 
 ```yaml
 ---
-type: Project | Area | Resource | Daily Log | Archive | System Guide  # Тип документа
-title: "Назва документа"                                               # Візуальний заголовок
-description: "Опис в один рядок (до 150 символів) для каталогу"       # Коротке резюме
-resource: "https://github.com/..."                                    # Посилання на код або джерело
-tags: [active, guide]                                                 # Теги для Obsidian
-timestamp: YYYY-MM-DDTHH:MM:SS+TZ                                      # Мітка останньої зміни
+type: Project | Area | Resource | Daily Log | Archive | System Guide  # Note category
+title: "Document Title"                                                # Human-friendly title
+description: "Single-line summary (up to 150 chars) for the catalog"  # Short description
+resource: "https://github.com/..."                                    # External source code (if any)
+tags: [active, guide]                                                 # Obsidian tags
+timestamp: YYYY-MM-DDTHH:MM:SS+TZ                                      # Last modified date
 ---
 ```
 
 ---
 
-## 🤖 Процес лінтінгу (Health Linting)
+## 🤖 Health Linting Process
 
-Скрипт `lint_brain.py` використовується для періодичної (або за запитом) перевірки цілісності бази знань.
+The `lint_brain.py` script is used to perform on-demand or automated vault checks.
 
-### Можливості перевірки:
-1.  **Биті посилання (Broken Links)**: Виявляє внутрішні лінки `[[Note]]` та `[Title](Path.md)`, які вказують на неіснуючі файли.
-2.  **Валідація метаданих**: Знаходить файли з відсутнім YAML-заголовком або некоректним полем `type`.
-3.  **Виявлення сторінок-сиріт (Orphans)**: Показує сторінки, на які немає жодного вхідного посилання (за винятком індексу).
-
----
-
-## 🔐 Налаштування безпеки та автоматизації (E.R.)
-
-1.  **Zero-Secrets**: Жодних паролів, API-ключів та внутрішніх IP-адрес у репозиторії. Усі чутливі змінні середовища зберігаються в локальному файлі `.env` на сервері та додані до `.gitignore`.
-2.  **Verified Commits (GPG)**: Усі коміти повинні бути підписані персональним GPG-ключем розробника для запобігання підміні авторів у публічному середовищі.
-3.  **PR-only Workflow**: Зміни вносяться в окремі гілки `feature/*`, пушаться на GitHub і зливаються через Pull Request після перевірки.
-4.  **Auto-Sync Cron**: На сервері налаштовано cron-задачу, яка кожні 5 хвилин синхронізує локальні зміни у ваулті з віддаленим репозиторієм GitHub.
+### Features:
+1.  **Broken Links**: Finds internal wikilinks `[[Note]]` and GFM markdown links `[Title](Path.md)` that point to non-existent files.
+2.  **Metadata Validation**: Identifies notes with missing YAML frontmatter or missing required `type` field.
+3.  **Orphan Check**: Reports notes that have no inbound links (excluding core files).
 
 ---
 
-## 📄 Ліцензія
+## 🔐 Security & Automation (E.R.)
 
-Цей проєкт поширюється за ліцензією MIT. Ви можете вільно використовувати його для побудови власних персональних або корпоративних систем знань.
+1.  **Zero-Secrets**: No passwords, API keys, or private IP addresses in the repository. All credentials live in a local `.env` file on the host (added to `.gitignore`).
+2.  **Verified Commits (GPG)**: All commits must be signed with the developer's GPG key to verify the committer identity in public repositories.
+3.  **PR-only Workflow**: Direct pushes to `main` are disabled. All updates are pushed to `feature/*` branches and merged via Pull Requests.
+4.  **Auto-Sync Cron**: A server cron job runs every 5 minutes, automatically committing and pushing vault changes to GitHub.
+
+---
+
+## 📄 License
+
+This framework is distributed under the MIT License. Feel free to use it to build your own personal or enterprise knowledge bases.
