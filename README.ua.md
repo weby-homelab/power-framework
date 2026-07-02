@@ -134,21 +134,30 @@ timestamp: 2026-07-02T19:00:00
 ### Візуальна діаграма
 
 ```mermaid
-graph LR
+graph TB
     subgraph Human ["👤 Human (Obsidian UI)"]
         PARA["P.A.R.A. Directory Structure"]
     end
 
+    subgraph OKF ["📄 OKF Overlay (Metadata Schema)"]
+        YAML["YAML Frontmatter"]
+    end
+
+    subgraph Wiki ["📖 LLM-Wiki (філософія Karpathy)"]
+        IndexMD["index.md (Авто-каталог)"]
+        LogMD["log.md (Лог змін)"]
+        Lint["Лінтинг посилань"]
+    end
+
     subgraph AI ["🤖 AI Agent (Local / Cloud)"]
         Ingest["Ingest Note"]
-        Lint["Lint Vault"]
         Index["Rebuild Index"]
     end
 
-    subgraph OKF ["📄 OKF Overlay (Metadata Schema)"]
-        YAML["YAML Frontmatter"]
-        IndexMD["index.md (Catalog)"]
-        LogMD["log.md (Change Log)"]
+    subgraph ER ["🔐 Execution Rules"]
+        GPG["GPG-підписані коміти"]
+        PR["PR-Only Workflow"]
+        Sync["Cron Auto-Sync"]
     end
 
     Human -- Writes Notes --> YAML
@@ -156,6 +165,10 @@ graph LR
     AI -- Updates --> IndexMD
     AI -- Appends --> LogMD
     AI -- Runs Checks --> Lint
+    IndexMD -. Synced via .-> Sync
+    LogMD -. Synced via .-> Sync
+    Sync --> GPG
+    GPG --> PR
 ```
 
 ### Бібліотека (`power_core`)
