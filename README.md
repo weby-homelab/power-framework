@@ -30,7 +30,7 @@ power index ~/my-vault     # Generate catalog index.md
 | **CLI** | `power init`, `lint`, `index`, `ingest` — manage your vault from terminal |
 | **MCP Server** | Exposes `lint_vault`, `generate_index`, `ingest_note` to any AI agent (Claude, Cursor, OpenCode) |
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
-| **Health Linting** | Finds broken links, missing metadata, and orphan notes |
+| **LLM-Wiki** | Automated catalog indexing, chronological log, and structural link linting (A. Karpathy's philosophy) |
 | **Auto-Sync** | Cron-compatible script with GPG-signed commits for continuous backup |
 
 ## Who Is This For
@@ -128,7 +128,7 @@ The framework combines four complementary methodologies:
 
 - **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — logical folder structure for human cognition
 - **O** — **OKF Overlay** (Open Knowledge Format) — YAML frontmatter on every file for instant AI parsing
-- **W** — **LLM-Wiki** — automated catalog indexing, chronological log, and structural link linting
+- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — treating your knowledge base as a wiki that LLMs can read, write, and maintain through automated catalog indexing, chronological log, and structural link linting
 - **E.R.** — **Execution Rules** — GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup
 
 ### Visual Framework Diagram
