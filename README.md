@@ -139,16 +139,25 @@ graph TB
         PARA["P.A.R.A. Directory Structure"]
     end
 
+    subgraph OKF ["📄 OKF Overlay (Metadata Schema)"]
+        YAML["YAML Frontmatter"]
+    end
+
+    subgraph Wiki ["📖 LLM-Wiki (Karpathy's Philosophy)"]
+        IndexMD["index.md (Auto Catalog)"]
+        LogMD["log.md (Change Log)"]
+        Lint["Link Linting"]
+    end
+
     subgraph AI ["🤖 AI Agent (Local / Cloud)"]
         Ingest["Ingest Note"]
-        Lint["Lint Vault"]
         Index["Rebuild Index"]
     end
 
-    subgraph OKF ["📄 OKF Overlay (Metadata Schema)"]
-        YAML["YAML Frontmatter"]
-        IndexMD["index.md (Catalog)"]
-        LogMD["log.md (Change Log)"]
+    subgraph ER ["🔐 Execution Rules"]
+        GPG["GPG-Signed Commits"]
+        PR["PR-Only Workflow"]
+        Sync["Cron Auto-Sync"]
     end
 
     Human -- Writes Notes --> YAML
@@ -156,6 +165,10 @@ graph TB
     AI -- Updates --> IndexMD
     AI -- Appends --> LogMD
     AI -- Runs Checks --> Lint
+    IndexMD -. Synced via .-> Sync
+    LogMD -. Synced via .-> Sync
+    Sync --> GPG
+    GPG --> PR
 ```
 
 ### Core Library (`power_core`)
