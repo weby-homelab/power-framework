@@ -41,6 +41,7 @@ from .utils import (
     resolve_vault_path,
     validate_vault_path,
 )
+from .cli import main as cli_main
 
 __all__ = [
     "__version__",
@@ -68,4 +69,5 @@ __all__ = [
     "atomic_write",
     "create_backup",
     "clean_note_name",
+    "cli_main",
 ]

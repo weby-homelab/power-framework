@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "1.3.0"
-description = "P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)"
+version = "1.4.0"
+description = "AI-native toolkit for Obsidian knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -29,6 +29,9 @@ dependencies = [
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
 ]
+
+[project.scripts]
+power = "power_core.cli:main"
 
 [project.optional-dependencies]
 dev = [

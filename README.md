@@ -2,52 +2,147 @@
   <b>ENG</b> | <a href="README.ua.md">UKR</a>
 </p>
 
-# 🚀 P.O.W.E.R. Framework — Hybrid Knowledge Management System
+# P.O.W.E.R. — AI-Native Toolkit for Obsidian
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-E74C3C?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-00C853?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io/)
-[![Obsidian](https://img.shields.io/badge/Obsidian-Compatible-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md/)
 [![CI](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/P%2EO%2EW%2EE%2ER?logo=github)](https://github.com/weby-homelab/P.O.W.E.R/releases)
-[![Tests: 79](https://img.shields.io/badge/Tests-79_passed-2ECC71?logo=pytest)](https://github.com/weby-homelab/P.O.W.E.R/tree/main/tests)
 
-A hybrid knowledge management system (Obsidian Second Brain) that bridges human-friendly directory organization with strict machine-readability for AI agents.
+Validate, index, and manage your Obsidian vault from the command line — or let AI agents do it through MCP.
 
-Built on the synergy of **P.A.R.A.** + **OKF Overlay** + **LLM-Wiki** + **Execution Rules**.
+## Quick Start
 
+```bash
+pip install power-framework
+
+power init ~/my-vault      # Create vault structure
+power lint ~/my-vault      # Check for broken links & missing metadata
+power index ~/my-vault     # Generate catalog index.md
+```
+
+## What's Inside
+
+| Feature | What it does |
+|---------|-------------|
+| **CLI** | `power init`, `lint`, `index`, `ingest` — manage your vault from terminal |
+| **MCP Server** | Exposes `lint_vault`, `generate_index`, `ingest_note` to any AI agent (Claude, Cursor, OpenCode) |
+| **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
+| **Health Linting** | Finds broken links, missing metadata, and orphan notes |
+| **Auto-Sync** | Cron-compatible script with GPG-signed commits for continuous backup |
+
+## Who Is This For
+
+- **Obsidian users** who want AI agents to understand and maintain their vault
+- **Developers** building a structured Second Brain with machine-readable metadata
+- **Teams** that need consistent note formatting and automated quality checks
+
+## Commands
+
+```
+power init <path>              Create a new vault with P.A.R.A. folder structure
+power lint <path>              Scan for broken links, missing metadata, orphans
+power index <path>             Rebuild index.md catalog from all notes
+power ingest <path> [options]  Create a new note with validated OKF metadata
+```
+
+### Ingest Examples
+
+```bash
+power ingest ~/my-vault --type Project --title "My App" --description "A new project"
+power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Docker best practices" --tags [devops, docker] --resource "https://docs.docker.com"
+```
+
+## MCP Server Setup
+
+Connect P.O.W.E.R. to any MCP-compatible AI client:
+
+```bash
+pip install power-framework mcp
+```
+
+**Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "power": {
+      "command": "python3",
+      "args": ["-m", "mcp_servers.power_server"],
+      "env": {
+        "POWER_VAULT_DIR": "/path/to/your/obsidian/vault"
+      }
+    }
+  }
+}
+```
+
+**OpenCode** (`~/.config/opencode/opencode.jsonc`):
+```jsonc
+"mcp": {
+  "power": {
+    "type": "local",
+    "command": ["python3", "-m", "mcp_servers.power_server"],
+    "enabled": true
+  }
+}
+```
+
+## Vault Structure
+
+P.O.W.E.R. organizes your vault using the **P.A.R.A.** method with **OKF metadata** on every note:
+
+```
+~/my-vault
+├── 00_Inbox/          # Quick captures and raw inputs
+├── 01_Projects/       # Active projects with deadlines
+├── 02_Areas/          # Ongoing responsibilities
+├── 03_Resources/      # Reusable guides and references
+├── 04_Archive/        # Completed or retired notes
+├── 05_Templates/      # Note templates with OKF frontmatter
+├── 06_Daily_Logs/     # Chronological session logs
+├── PROTOCOLS/         # System specs for AI agents
+├── index.md           # Auto-generated catalog
+└── log.md             # Append-only change log
+```
+
+Every note starts with validated YAML frontmatter:
+
+```yaml
 ---
+type: Project
+title: "My App"
+description: "A new project with clear goals"
+tags: [active, dev]
+timestamp: 2026-07-02T19:00:00
+---
+```
 
-## 🎯 System Architecture (P.O.W.E.R.)
+## Architecture Details
 
-The framework consists of four complementary methodologies:
+<details>
+<summary><strong>P.O.W.E.R. Methodology — click to expand</strong></summary>
 
-*   **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — a logical folder structure optimized for human cognitive layout.
-*   **O** — **OKF Overlay** (Open Knowledge Format) — metadata (YAML frontmatter) at the top of every file to enable instant AI parsing.
-*   **W** — **LLM-Wiki** (A. Karpathy's philosophy) — automated catalog indexing, chronological log, and structural link linting.
-*   **E.R.** — **Execution Rules / Enforced Routines** (custom automation rules) — GPG-signed commits, PR-only workflow, cron-based 5-minute sync, and branch cleanup policies.
+The framework combines four complementary methodologies:
 
-### 📊 Visual Framework Diagram
+- **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — logical folder structure for human cognition
+- **O** — **OKF Overlay** (Open Knowledge Format) — YAML frontmatter on every file for instant AI parsing
+- **W** — **LLM-Wiki** — automated catalog indexing, chronological log, and structural link linting
+- **E.R.** — **Execution Rules** — GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup
+
+### Visual Framework Diagram
 
 ```mermaid
 graph TB
     subgraph Human ["👤 Human (Obsidian UI)"]
         PARA["P.A.R.A. Directory Structure"]
-        PARA_P["01_Projects"]
-        PARA_A["02_Areas"]
-        PARA_R["03_Resources"]
-        PARA_AR["04_Archive"]
-        PARA --> PARA_P
-        PARA --> PARA_A
-        PARA --> PARA_R
-        PARA --> PARA_AR
     end
 
     subgraph AI ["🤖 AI Agent (Local / Cloud)"]
         Ingest["Ingest Note"]
-        Lint["Lint Vault (lint_brain.py)"]
-        Index["Rebuild Index (generate_index.py)"]
+        Lint["Lint Vault"]
+        Index["Rebuild Index"]
     end
 
     subgraph OKF ["📄 OKF Overlay (Metadata Schema)"]
@@ -56,220 +151,52 @@ graph TB
         LogMD["log.md (Change Log)"]
     end
 
-    subgraph ER ["🔐 Execution Rules & Enforced Routines"]
-        GPG["GPG Signature (Verified Commit)"]
-        PR["PR-Only Workflow (GitHub)"]
-        Sync["Cron Autosync (sync-brain.sh)"]
-        Clean["Branch Cleanup (cleanup_branches.py)"]
-    end
-
     Human -- Writes Notes --> YAML
     YAML -- Parsed by --> AI
     AI -- Updates --> IndexMD
     AI -- Appends --> LogMD
     AI -- Runs Checks --> Lint
-    
-    IndexMD -- Synchronized via --> Sync
-    LogMD -- Synchronized via --> Sync
-    
-    Sync -- Requires --> GPG
-    Sync -- Follows --> PR
-    PR -- Triggers --> Clean
-    
-    classDef human fill:#1A365D,stroke:#3182CE,stroke-width:2px,color:#FFF;
-    classDef ai fill:#2C3E50,stroke:#E74C3C,stroke-width:2px,color:#FFF;
-    classDef okf fill:#1B4D3E,stroke:#2ECC71,stroke-width:2px,color:#FFF;
-    classDef er fill:#5D3F6A,stroke:#BB8FCE,stroke-width:2px,color:#FFF;
-    
-    class PARA,PARA_P,PARA_A,PARA_R,PARA_AR human;
-    class Ingest,Lint,Index ai;
-    class YAML,IndexMD,LogMD okf;
-    class GPG,PR,Sync,Clean er;
 ```
 
----
-
-## 📂 Vault Directory Structure
-
-The Obsidian vault (Second Brain) is organized as follows:
-
-```text
-/brain
-├── 00_Inbox/                    # Temporary folder for quick scratchnotes and raw inputs
-├── 01_Projects/                 # Active projects with specific deadlines and targets
-├── 02_Areas/                    # Long-term responsibilities (infrastructure, finance, health)
-├── 03_Resources/                # General resources (guides, stack, snippets, scripts)
-│   └── lint_brain.py            # Automated link validation and cleanup script
-├── 04_Archive/                  # Completed projects and stale/outdated notes
-├── 05_Templates/                # Templates with predefined OKF metadata blocks
-├── 06_Daily_Logs/               # Chronological daily logs and lessons (MASTER-LESSONS-LEARNED)
-├── PROTOCOLS/                   # System configurations and specifications for AI agents
-│   └── LLM_WIKI_SCHEMA.md       # Formatting and linting standards for AI operations
-├── index.md                     # Automatically generated catalog index of all notes
-└── log.md                       # Chronological append-only change log of the vault
-```
-
----
-
-## 🏗️ Project Architecture (power_core)
-
-The framework is built on a shared `power_core` Python package that provides:
+### Core Library (`power_core`)
 
 | Module | Purpose |
 |--------|---------|
-| `power_core/models.py` | Pydantic v2 schemas for strict OKF metadata validation |
-| `power_core/parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
-| `power_core/indexer.py` | Vault scanning and index.md generation |
-| `power_core/linter.py` | Health checks: broken links, missing metadata, orphans |
-| `power_core/utils.py` | Path traversal protection, atomic writes, backup management |
+| `models.py` | Pydantic v2 schemas for OKF metadata validation |
+| `parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
+| `indexer.py` | Vault scanning and index.md generation |
+| `linter.py` | Health checks: broken links, missing metadata, orphans |
+| `utils.py` | Path traversal protection, atomic writes, backups |
+| `cli.py` | Command-line interface (init, lint, index, ingest) |
 
-All components (MCP server, CLI scripts) use `power_core` as the single source of truth, eliminating code duplication and ensuring consistency.
+All components share `power_core` as the single source of truth.
 
----
+</details>
 
-## 📄 Metadata Specification (OKF)
-
-Every note must contain a strict YAML block (frontmatter) at the very top of the file. This allows AI agents to instantly index and filter documents:
-
-```yaml
----
-type: Project | Area | Resource | Daily Log | Archive | System Guide  # Note category
-title: "Document Title"                                                # Human-friendly title
-description: "Single-line summary (up to 150 chars) for the catalog"  # Short description
-resource: "https://github.com/..."                                    # External source code (if any)
-tags: [active, guide]                                                 # Obsidian tags
-timestamp: YYYY-MM-DDTHH:MM:SS+TZ                                      # Last modified date
----
-```
-
----
-
-## 🤖 Health Linting Process
-
-The `lint_brain.py` script is used to perform on-demand or automated vault checks.
-
-### Features:
-1.  **Broken Links**: Finds internal wikilinks `[[Note]]` and GFM markdown links `[Title](Path.md)` that point to non-existent files.
-2.  **Metadata Validation**: Identifies notes with missing YAML frontmatter or missing required `type` field.
-3.  **Orphan Check**: Reports notes that have no inbound links (excluding core files).
-
----
-
-## 🔐 Security & Automation (E.R.)
-
-1.  **Zero-Secrets**: No passwords, API keys, or private IP addresses in the repository. All credentials live in a local `.env` file on the host (added to `.gitignore`).
-2.  **Verified Commits (GPG)**: All commits must be signed with the developer's GPG key to verify the committer identity in public repositories.
-3.  **PR-only Workflow**: Direct pushes to `main` are disabled. All updates are pushed to `feature/*` branches and merged via Pull Requests.
-4.  **Auto-Sync Cron**: A server cron job runs every 5 minutes, automatically committing and pushing vault changes to GitHub.
-
----
-
-## ⚡ P.O.W.E.R. Agent Skill & MCP Server Installation
-
-We have packaged the entire P.O.W.E.R. framework rules and indexing/linting tools into two reusable components:
-1. **AI Agent Custom Skill**: A folder of instructions (`SKILL.md`) and scripts (`scripts/`) that can be loaded into any agentic platform supporting custom prompt or skill injection.
-2. **Model Context Protocol (MCP) Server**: A self-contained, portable python server (`mcp_servers/power_server.py`) that exposes three MCP tools (`lint_vault`, `generate_index`, and `ingest_note`) to any compatible LLM client (Claude Desktop, Cursor, OpenCode, etc.).
-
-These components work universally with any AI agent, whether running locally or in the cloud.
-
-### ⚙️ One-Command Installation
-
-To install the P.O.W.E.R. skill and the MCP server automatically into your active workspace, making them ready to use with any AI agent (local or cloud) with a single command, run:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main/install.sh | bash
-```
-
-Alternatively, you can specify a custom target workspace path:
-```bash
-curl -sSL https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main/install.sh | bash -s -- /path/to/your/workspace
-```
-
-### 🔌 MCP Server Configuration
-
-After running the installer:
-1. Install the required Python dependencies in your target execution environment:
-   ```bash
-   pip install mcp
-   ```
-2. Configure your favorite AI client to load the MCP server:
-   * **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
-     ```json
-     {
-       "mcpServers": {
-         "power": {
-           "command": "python3",
-           "args": ["/path/to/your/workspace/.agents/mcp_servers/power_server.py"],
-           "env": {
-             "POWER_VAULT_DIR": "/path/to/your/obsidian/vault"
-           }
-         }
-       }
-     }
-     ```
-   * **OpenCode** (`~/.config/opencode/opencode.jsonc`):
-     ```json
-     "mcp": {
-       "power": {
-         "type": "local",
-         "command": [
-           "/root/.config/opencode/venv/bin/python",
-           "/path/to/your/workspace/.agents/mcp_servers/power_server.py"
-         ],
-         "enabled": true
-       }
-     }
-     ```
-
-### 🔌 Manual Skill Configuration (Optional)
-If you prefer to configure the skill manually:
-1. Copy the contents of the `skills/power` directory to your workspace's `.agents/skills/power` folder.
-2. Make the scripts inside `scripts/` executable: `chmod +x .agents/skills/power/scripts/*.py`
-3. Add the skill to your OpenCode system configuration in `~/.config/opencode/opencode.jsonc`:
-   ```json
-   "instructions": [
-     "/path/to/your/workspace/.agents/skills/power/SKILL.md"
-   ]
-   ```
-
----
-
-## 🛠️ Development
-
-### Setup
+## Development
 
 ```bash
 git clone https://github.com/weby-homelab/P.O.W.E.R.git
 cd P.O.W.E.R
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-```
 
-### Quality Checks
-
-```bash
 # Run tests
 pytest tests/ -v
 
-# Lint
+# Lint & format
 ruff check power_core/ mcp_servers/ scripts/ tests/
-
-# Format
 ruff format power_core/ mcp_servers/ scripts/ tests/
 
 # Type check
 mypy power_core/
 ```
 
-### Automation Scripts
+## License
 
-| Script | Purpose |
-|--------|---------|
-| `scripts/sync-brain.sh` | Cron-compatible auto-sync with GPG signing support |
-| `scripts/cleanup_branches.py` | Automated merged branch cleanup via GitHub API |
+MIT — use it to build your personal or enterprise knowledge base.
 
----
-
-## 📄 License
-
-This framework is distributed under the MIT License. Feel free to use it to build your own personal or enterprise knowledge bases.
+<p align="center">
+  Built in Ukraine under air raid sirens &amp; blackouts ⚡<br>
+  &copy; 2026 Weby Homelab
+</p>
