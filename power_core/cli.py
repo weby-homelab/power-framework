@@ -182,7 +182,8 @@ def main() -> None:
         description="AI-Native Toolkit for Obsidian — validate, index, and manage your knowledge base.",
     )
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         action="version",
         version=f"power {__version__}",
     )
@@ -208,7 +209,8 @@ def main() -> None:
     p_ingest = subparsers.add_parser("ingest", help="Create a new note with OKF metadata")
     p_ingest.add_argument("path", help="Path to the vault directory")
     p_ingest.add_argument(
-        "--type", "-t",
+        "--type",
+        "-t",
         required=True,
         choices=[t.value for t in NoteType],
         help="OKF note type",
