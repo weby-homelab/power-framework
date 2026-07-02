@@ -134,7 +134,7 @@ timestamp: 2026-07-02T19:00:00
 ### Візуальна діаграма
 
 ```mermaid
-graph TB
+graph LR
     subgraph Human ["👤 Human (Obsidian UI)"]
         PARA["P.A.R.A. Directory Structure"]
     end
