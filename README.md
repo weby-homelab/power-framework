@@ -30,9 +30,15 @@ power index ~/my-vault     # Generate catalog index.md
 | **CLI** | `power init`, `lint`, `index`, `ingest` — manage your vault from terminal |
 | **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note` to any AI agent |
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
-| **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading |
+| **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings) |
 | **LLM-Wiki** | Automated catalog indexing, chronological log, and structural link linting (A. Karpathy's philosophy) |
 | **Auto-Sync** | Cron-compatible script with GPG-signed commits for continuous backup |
+
+## Migration Report
+
+Read the full technical report on the transition from flat to hierarchical indexing:
+- **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
+- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.md)** — повний технічний звіт
 
 ## Who Is This For
 
