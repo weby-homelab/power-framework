@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Secrets & Environment
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Telegram exports (privacy)
+result-*.json
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node (if any)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Temporary
+scratch/
+.system_generated/

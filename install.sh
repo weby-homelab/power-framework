@@ -1,67 +1,160 @@
 #!/bin/bash
-# P.O.W.E.R. Skill Installer for AI Agents
+# P.O.W.E.R. Skill & MCP Server Installer for AI Agents
+# Usage:
+#   curl -sSL https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main/install.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main/install.sh | bash -s -- /path/to/workspace
 
-set -e
+set -euo pipefail
 
-# Target directory is the first argument, defaults to current directory
+VERSION="1.3.0"
 TARGET_DIR="${1:-$PWD}"
+REPO_URL="https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main"
+
 echo "--------------------------------------------------------"
-echo "🚀 Installing P.O.W.E.R. Knowledge Management Skill"
-echo "📍 Target workspace: $TARGET_DIR"
+echo "P.O.W.E.R. Framework Installer v${VERSION}"
+echo "Target workspace: ${TARGET_DIR}"
 echo "--------------------------------------------------------"
 
-# 1. Create directories in the target workspace
-mkdir -p "$TARGET_DIR/.agents/skills/power/scripts"
+# 1. Check prerequisites
+check_prerequisites() {
+    local missing=0
 
-# 2. Download/Copy skill files from github (if running via curl) or copy locally (if running from repo)
+    if ! command -v python3 &>/dev/null; then
+        echo "ERROR: python3 is not installed. Please install Python 3.10+ first."
+        missing=1
+    else
+        local py_version
+        py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        local py_major
+        py_major=$(echo "$py_version" | cut -d. -f1)
+        local py_minor
+        py_minor=$(echo "$py_version" | cut -d. -f2)
+        if [ "$py_major" -lt 3 ] || ([ "$py_major" -eq 3 ] && [ "$py_minor" -lt 10 ]); then
+            echo "ERROR: Python 3.10+ required (found ${py_version})."
+            missing=1
+        else
+            echo "OK: Python ${py_version} found."
+        fi
+    fi
+
+    if ! command -v curl &>/dev/null && [ ! -f "skills/power/SKILL.md" ]; then
+        echo "ERROR: curl is not installed. Required for downloading files."
+        missing=1
+    else
+        echo "OK: curl found."
+    fi
+
+    if [ "$missing" -eq 1 ]; then
+        echo ""
+        echo "Installation aborted. Please install missing prerequisites."
+        exit 1
+    fi
+}
+
+check_prerequisites
+
+# 2. Create directory structure
+echo ""
+echo "Creating directory structure..."
+mkdir -p "${TARGET_DIR}/.agents/skills/power/scripts"
+mkdir -p "${TARGET_DIR}/.agents/mcp_servers"
+mkdir -p "${TARGET_DIR}/power_core"
+
+# 3. Download or copy files
 if [ -f "skills/power/SKILL.md" ]; then
-    echo "📦 Copying files locally..."
-    cp -r skills/power/* "$TARGET_DIR/.agents/skills/power/"
-    mkdir -p "$TARGET_DIR/.agents/mcp_servers"
-    cp mcp_servers/power_server.py "$TARGET_DIR/.agents/mcp_servers/"
+    echo "Copying files locally..."
+    cp -r skills/power/* "${TARGET_DIR}/.agents/skills/power/"
+    cp mcp_servers/power_server.py "${TARGET_DIR}/.agents/mcp_servers/"
+    cp -r power_core/* "${TARGET_DIR}/power_core/"
 else
-    echo "🌐 Downloading files from GitHub repository..."
-    REPO_URL="https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main"
-    curl -sSL "$REPO_URL/skills/power/SKILL.md" -o "$TARGET_DIR/.agents/skills/power/SKILL.md"
-    curl -sSL "$REPO_URL/skills/power/scripts/generate_index.py" -o "$TARGET_DIR/.agents/skills/power/scripts/generate_index.py"
-    curl -sSL "$REPO_URL/skills/power/scripts/lint_brain.py" -o "$TARGET_DIR/.agents/skills/power/scripts/lint_brain.py"
-    mkdir -p "$TARGET_DIR/.agents/mcp_servers"
-    curl -sSL "$REPO_URL/mcp_servers/power_server.py" -o "$TARGET_DIR/.agents/mcp_servers/power_server.py"
+    echo "Downloading files from GitHub..."
+
+    local_files=(
+        "skills/power/SKILL.md"
+        "skills/power/scripts/generate_index.py"
+        "skills/power/scripts/lint_brain.py"
+        "mcp_servers/power_server.py"
+        "power_core/__init__.py"
+        "power_core/models.py"
+        "power_core/parser.py"
+        "power_core/utils.py"
+        "power_core/indexer.py"
+        "power_core/linter.py"
+    )
+
+    for file in "${local_files[@]}"; do
+        echo "  Downloading ${file}..."
+        local dest="${TARGET_DIR}/${file}"
+        mkdir -p "$(dirname "$dest")"
+        if ! curl -sSL "${REPO_URL}/${file}" -o "$dest"; then
+            echo "  WARNING: Failed to download ${file}"
+        fi
+    done
 fi
 
-# 3. Make scripts executable
-chmod +x "$TARGET_DIR/.agents/skills/power/scripts/"*.py
-chmod +x "$TARGET_DIR/.agents/mcp_servers/power_server.py"
+# 4. Make scripts executable
+chmod +x "${TARGET_DIR}/.agents/skills/power/scripts/"*.py 2>/dev/null || true
+chmod +x "${TARGET_DIR}/.agents/mcp_servers/power_server.py" 2>/dev/null || true
 
-# 4. Try to integrate with OpenCode globally
-GLOBAL_SKILLS_DIR="/root/.agents/skills"
+# 5. Install Python dependencies
+echo ""
+echo "Installing Python dependencies..."
+if python3 -m pip install --quiet mcp pydantic pyyaml 2>/dev/null; then
+    echo "OK: Dependencies installed."
+else
+    echo "WARNING: Could not install dependencies automatically."
+    echo "Please run: pip install mcp pydantic pyyaml"
+fi
+
+# 6. Link to global directories (if they exist)
+echo ""
+echo "Checking for global integration points..."
+
+HOME_DIR="${HOME:-/root}"
+
+GLOBAL_SKILLS_DIR="${HOME_DIR}/.agents/skills"
 if [ -d "$GLOBAL_SKILLS_DIR" ]; then
-    echo "🔌 Linking to OpenCode global skills..."
-    rm -f "$GLOBAL_SKILLS_DIR/power"
-    ln -s "$TARGET_DIR/.agents/skills/power" "$GLOBAL_SKILLS_DIR/power"
-    echo "✅ Skill symlinked to OpenCode!"
+    echo "Linking to global skills directory..."
+    rm -f "${GLOBAL_SKILLS_DIR}/power"
+    ln -sf "${TARGET_DIR}/.agents/skills/power" "${GLOBAL_SKILLS_DIR}/power"
+    echo "OK: Skill symlinked."
 fi
 
-# Link MCP server globally
-GLOBAL_MCP_DIR="/root/.config/opencode/mcp_servers"
+GLOBAL_MCP_DIR="${HOME_DIR}/.config/opencode/mcp_servers"
 if [ -d "$GLOBAL_MCP_DIR" ]; then
-    echo "🔌 Linking to OpenCode global MCP servers..."
-    rm -f "$GLOBAL_MCP_DIR/power_server.py"
-    ln -s "$TARGET_DIR/.agents/mcp_servers/power_server.py" "$GLOBAL_MCP_DIR/power_server.py"
-    echo "✅ MCP server symlinked to OpenCode!"
+    echo "Linking to global MCP servers..."
+    rm -f "${GLOBAL_MCP_DIR}/power_server.py"
+    ln -sf "${TARGET_DIR}/.agents/mcp_servers/power_server.py" "${GLOBAL_MCP_DIR}/power_server.py"
+    echo "OK: MCP server symlinked."
 fi
 
+# 7. Print configuration instructions
+echo ""
 echo "--------------------------------------------------------"
-echo "🎉 P.O.W.E.R. skill and MCP server successfully installed!"
-echo "👉 If using OpenCode, add this path to your opencode.jsonc instructions:"
-echo "   \"$TARGET_DIR/.agents/skills/power/SKILL.md\""
-echo "👉 And add this block to your opencode.jsonc \"mcp\" section:"
-echo "   \"power\": {"
-echo "     \"type\": \"local\","
-echo "     \"command\": ["
-echo "       \"/root/.config/opencode/venv/bin/python\","
-echo "       \"$TARGET_DIR/.agents/mcp_servers/power_server.py\""
-echo "     ],"
-echo "     \"enabled\": true"
-echo "   }"
+echo "P.O.W.E.R. v${VERSION} installed successfully!"
+echo "--------------------------------------------------------"
+echo ""
+echo "To configure your AI agent, add the following:"
+echo ""
+echo "OpenCode (opencode.jsonc):"
+echo "  instructions: [\"${TARGET_DIR}/.agents/skills/power/SKILL.md\"]"
+echo ""
+echo "  mcp: {"
+echo "    \"power\": {"
+echo "      \"type\": \"local\","
+echo "      \"command\": [\"python3\", \"${TARGET_DIR}/.agents/mcp_servers/power_server.py\"],"
+echo "      \"enabled\": true"
+echo "    }"
+echo "  }"
+echo ""
+echo "Claude Desktop (claude_desktop_config.json):"
+echo "  \"mcpServers\": {"
+echo "    \"power\": {"
+echo "      \"command\": \"python3\","
+echo "      \"args\": [\"${TARGET_DIR}/.agents/mcp_servers/power_server.py\"],"
+echo "      \"env\": {"
+echo "        \"POWER_VAULT_DIR\": \"/path/to/your/obsidian/vault\""
+echo "      }"
+echo "    }"
+echo "  }"
 echo "--------------------------------------------------------"
