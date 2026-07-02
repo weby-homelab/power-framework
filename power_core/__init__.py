@@ -14,6 +14,7 @@ Usage:
 
 from __future__ import annotations
 
+from .cli import main as cli_main
 from .indexer import generate_index_content, run_generate_index, scan_vault_notes
 from .linter import LintResult, run_lint_report, run_lint_vault
 from .models import (
@@ -41,7 +42,6 @@ from .utils import (
     resolve_vault_path,
     validate_vault_path,
 )
-from .cli import main as cli_main
 
 __all__ = [
     "__version__",
