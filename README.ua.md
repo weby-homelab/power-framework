@@ -25,7 +25,7 @@
 ### 📊 Візуальна схема фреймворку
 
 ```mermaid
-graph TB
+graph RL
     subgraph Human ["👤 Human (Obsidian UI)"]
         PARA["P.A.R.A. Directory Structure"]
         PARA_P["01_Projects"]
