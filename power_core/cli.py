@@ -121,8 +121,9 @@ def _cmd_index(args: argparse.Namespace) -> int:
         print(f"Vault not found: {vault_dir}")
         return 1
 
-    msg = run_generate_index(vault_dir)
-    print(f"Generated index.md: {msg}")
+    mode = getattr(args, "mode", "flat")
+    msg = run_generate_index(vault_dir, mode=mode)
+    print(f"Generated index ({mode} mode): {msg}")
     return 0
 
 
@@ -203,6 +204,12 @@ def main() -> None:
     # power index
     p_index = subparsers.add_parser("index", help="Generate index.md from vault notes")
     p_index.add_argument("path", help="Path to the vault directory")
+    p_index.add_argument(
+        "--mode",
+        choices=["flat", "hierarchical"],
+        default="flat",
+        help="Index mode: flat (single file) or hierarchical (summary + per-folder indexes)",
+    )
     p_index.set_defaults(func=_cmd_index)
 
     # power ingest

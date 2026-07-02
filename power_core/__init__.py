@@ -15,7 +15,12 @@ Usage:
 from __future__ import annotations
 
 from .cli import main as cli_main
-from .indexer import generate_index_content, run_generate_index, scan_vault_notes
+from .indexer import (
+    generate_hierarchical_index,
+    generate_index_content,
+    run_generate_index,
+    scan_vault_notes,
+)
 from .linter import LintResult, run_lint_report, run_lint_vault
 from .models import (
     MAX_DESCRIPTION_LENGTH,
@@ -53,6 +58,7 @@ __all__ = [
     "MAX_DESCRIPTION_LENGTH",
     "LintResult",
     "run_generate_index",
+    "generate_hierarchical_index",
     "run_lint_vault",
     "run_lint_report",
     "scan_vault_notes",

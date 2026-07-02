@@ -70,7 +70,8 @@ async def list_tools() -> list[Tool]:
             name="generate_index",
             description=(
                 "Compile the vault index.md catalog classifying all notes "
-                "by their OKF metadata type."
+                "by their OKF metadata type. Supports flat (single file) or "
+                "hierarchical (summary + per-folder _index.md) modes."
             ),
             inputSchema={
                 "type": "object",
@@ -81,7 +82,17 @@ async def list_tools() -> list[Tool]:
                             "Optional absolute path to the Obsidian vault root "
                             "(defaults to POWER_VAULT_DIR env var or current directory)"
                         ),
-                    }
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["flat", "hierarchical"],
+                        "default": "flat",
+                        "description": (
+                            "Index generation mode. 'flat' creates a single index.md with all entries. "
+                            "'hierarchical' creates a summary index.md plus _index.md files per folder, "
+                            "reducing token usage by ~75%% for large vaults."
+                        ),
+                    },
                 },
             },
         ),
@@ -140,7 +151,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=result)]
 
         elif name == "generate_index":
-            result = run_generate_index(vault_path)
+            mode = arguments.get("mode", "flat")
+            result = run_generate_index(vault_path, mode=mode)
             return [TextContent(type="text", text=result)]
 
         elif name == "ingest_note":
