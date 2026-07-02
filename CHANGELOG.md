@@ -5,6 +5,21 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-02
+
+### Added
+- **CLI entry point** (`power` command): `init`, `lint`, `index`, `ingest` commands for terminal-based vault management
+- **`power init`**: Creates a complete OKF-compliant vault structure with P.A.R.A. folders, templates, index.md, and log.md
+- **`power lint`**: Runs health checks for broken links, missing metadata, and orphan notes
+- **`power index`**: Rebuilds the catalog index.md from all vault notes
+- **`power ingest`**: Creates new notes with validated OKF metadata in the correct P.A.R.A. directory
+
+### Changed
+- **README.md**: Complete rewrite — user-first with Quick Start, feature table, and architecture collapsed into `<details>`
+- **README.ua.md**: Matching Ukrainian rewrite with same structure
+- **Description**: Updated from "Hybrid Knowledge Management Framework" to "AI-native toolkit for Obsidian knowledge bases"
+- **Version**: Bumped to 1.4.0
+
 ## [1.3.0] - 2026-07-02
 
 ### Added
@@ -38,5 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Initial public release with basic MCP server and skill scripts
 
+[1.4.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/weby-homelab/P.O.W.E.R/releases/tag/v1.2.2
