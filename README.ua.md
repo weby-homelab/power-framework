@@ -28,10 +28,17 @@ power index ~/my-vault     # Згенерувати каталог index.md
 | Функція | Що робить |
 |---------|-----------|
 | **CLI** | `power init`, `lint`, `index`, `ingest` — керування vault з терміналу |
-| **MCP Server** | Надає `lint_vault`, `generate_index`, `ingest_note` будь-якому AI-агенту (Claude, Cursor, OpenCode) |
+| **MCP Server** | Надає `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note` будь-якому AI-агенту (Claude, Cursor, OpenCode) |
 | **OKF Validation** | Pydantic v2 схеми забезпечують строгу валідацію метаданих кожної нотатки |
+| **Hierarchical Index** | `index.md` (навігаційна карта) + `*/_index.md` (детальні каталоги) для економії токенів AI-агентів (~75-94%) |
 | **LLM-Wiki** | Автоматична індексація каталогу, хронологічний лог та структурний лінтинг посилань (філософія A. Karpathy) |
 | **Auto-Sync** | Cron-сумісний скрипт з GPG-підписаними комітами для безперервного бекапу |
+
+## Звіт міграції
+
+Повний технічний звіт про перехід від плоского до ієрархічного індексування:
+- **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — метрики продуктивності, архітектура, інсайти
+- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.md)** — детальний технічний звіт з метриками
 
 ## Для кого це
 
