@@ -12,7 +12,7 @@ class TestRunLintVault:
 
     def test_healthy_vault(self, sample_vault: Path):
         result = run_lint_vault(sample_vault)
-        assert result.total_notes == 4
+        assert result.total_notes == 5
         assert len(result.untyped_files) == 0
         assert len(result.broken_links) == 0
 

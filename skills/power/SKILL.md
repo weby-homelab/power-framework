@@ -25,10 +25,45 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
     ```bash
     python3 .agents/skills/power/scripts/lint_brain.py
     ```
-2.  **`generate_index.py`** — скрипт автоматичної побудови індексу:
+2.  **`generate_index.py`** — скрипт автоматичної побудови ієрархічного індексу:
     ```bash
     python3 .agents/skills/power/scripts/generate_index.py
     ```
+
+---
+
+## 📖 Hierarchical Navigation Protocol (On-Demand Sub-Index Reading)
+
+P.O.W.E.R. використовує **ієрархічну індексацію** для оптимізації контексту AI-агентів:
+
+```
+vault/
+├── index.md              # Navigation map (small, ~2KB)
+├── 01_Projects/
+│   └── _index.md         # Detailed entries for Projects
+├── 02_Areas/
+│   └── _index.md         # Detailed entries for Areas
+├── 03_Resources/
+│   └── _index.md         # Detailed entries for Resources
+└── 06_Daily_Logs/
+    └── _index.md         # Detailed entries for Daily Logs
+```
+
+### Step-by-Step Agent Navigation Rules:
+
+1.  **Read `index.md`** — identify the relevant P.A.R.A. category by note counts.
+2.  **Call `read_sub_index` MCP tool** (or read `folder/_index.md` directly) — get detailed entries with paths, descriptions, tags, and timestamps.
+3.  **Read specific notes** — only when the sub-index indicates relevance to the user query.
+4.  **NEVER glob all `.md` files** — this burns tokens. Use sub-indexes as a map.
+
+### Token Efficiency Comparison:
+
+| Approach | Token Cost | Context Quality |
+|----------|-----------|-----------------|
+| Read all `.md` files | 🔴 ~50K+ | Full but wasteful |
+| Read only `index.md` | 🟢 ~2K | Insufficient |
+| `index.md` + relevant `_index.md` | 🟡 ~5-8K | **Optimal balance** |
+| + specific notes | 🟡 ~10-15K | **Precise, targeted** |
 
 ---
 
@@ -47,8 +82,8 @@ timestamp: YYYY-MM-DDTHH:MM:SS+TZ
 ---
 ```
 
-### Крок 2. Автоматична генерація каталогу (Index)
-Після додавання/зміни файлу виконайте скрипт генерації індексу. Він автоматично оновить реєстр у `index.md`:
+### Крок 2. Автоматична генерація ієрархічного каталогу (Index)
+Після додавання/зміни файлу виконайте скрипт генерації індексу. Він автоматично оновить `index.md` та всі `_index.md` файли:
 ```bash
 python3 .agents/skills/power/scripts/generate_index.py
 ```

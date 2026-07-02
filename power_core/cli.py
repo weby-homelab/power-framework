@@ -16,7 +16,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .indexer import generate_log_initial, run_generate_index
+from .indexer import generate_log_initial, run_generate_hierarchical_index
 from .linter import run_lint_report
 from .models import NoteType, OKFMetadata
 from .parser import build_frontmatter
@@ -115,14 +115,14 @@ def _cmd_lint(args: argparse.Namespace) -> int:
 
 
 def _cmd_index(args: argparse.Namespace) -> int:
-    """Generate index.md from vault notes."""
+    """Generate hierarchical index (index.md + _index.md files) from vault notes."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
         print(f"Vault not found: {vault_dir}")
         return 1
 
-    msg = run_generate_index(vault_dir)
-    print(f"Generated index.md: {msg}")
+    msg = run_generate_hierarchical_index(vault_dir)
+    print(f"Generated hierarchical index:\n{msg}")
     return 0
 
 
@@ -201,7 +201,9 @@ def main() -> None:
     p_lint.set_defaults(func=_cmd_lint)
 
     # power index
-    p_index = subparsers.add_parser("index", help="Generate index.md from vault notes")
+    p_index = subparsers.add_parser(
+        "index", help="Generate hierarchical index (index.md + per-folder _index.md)"
+    )
     p_index.add_argument("path", help="Path to the vault directory")
     p_index.set_defaults(func=_cmd_index)
 

@@ -92,6 +92,25 @@ Sample daily log content.
         encoding="utf-8",
     )
 
+    nested_project = vault / "01_Projects" / "Weby-QRank"
+    nested_project.mkdir()
+    nested_note = nested_project / "Architecture.md"
+    nested_note.write_text(
+        """---
+type: Project
+title: "Weby-QRank Architecture"
+description: "Nested project architecture note"
+tags: [architecture, nested]
+timestamp: 2026-01-01T00:00:00
+---
+
+# Weby-QRank Architecture
+
+Nested sub-project note.
+""",
+        encoding="utf-8",
+    )
+
     return vault
 
 

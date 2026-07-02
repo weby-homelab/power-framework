@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-P.O.W.E.R. Index Generator Script.
+P.O.W.E.R. Hierarchical Index Generator Script.
 
 Standalone CLI wrapper around power_core.indexer for generating the vault catalog.
-Can be run directly or imported as a module.
+Generates a navigation map (index.md) plus per-folder _index.md files.
 
 Usage:
     python generate_index.py [vault_path]
@@ -19,7 +19,7 @@ project_root = os.path.dirname(os.path.dirname(script_dir))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from power_core import run_generate_index, generate_log_initial, scan_vault_notes
+from power_core import run_generate_hierarchical_index, generate_log_initial, scan_folder_notes
 from pathlib import Path
 
 
@@ -46,18 +46,18 @@ def resolve_vault_dir() -> Path:
 
 
 def main() -> None:
-    """Generate index.md and optionally initialize log.md."""
+    """Generate hierarchical index (index.md + _index.md files) and optionally initialize log.md."""
     vault_dir = resolve_vault_dir()
 
     if not vault_dir.exists():
         print(f"Error: Vault directory does not exist: {vault_dir}")
         sys.exit(1)
 
-    result = run_generate_index(vault_dir)
+    result = run_generate_hierarchical_index(vault_dir)
     print(result)
 
-    concepts = scan_vault_notes(vault_dir)
-    total = sum(len(v) for v in concepts.values())
+    folder_notes = scan_folder_notes(vault_dir)
+    total = sum(len(notes) for notes in folder_notes.values())
     generate_log_initial(vault_dir, total)
 
 

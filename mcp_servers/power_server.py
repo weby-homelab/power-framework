@@ -2,9 +2,10 @@
 """
 P.O.W.E.R. MCP Server.
 
-Exposes three MCP tools for AI agent interaction with the knowledge vault:
+Exposes MCP tools for AI agent interaction with the knowledge vault:
 - lint_vault: Health check for metadata, links, and orphans
-- generate_index: Compile the catalog index from OKF metadata
+- generate_index: Compile hierarchical catalog (index.md + _index.md files)
+- read_sub_index: Read a specific category sub-index on-demand
 - ingest_note: Create a new note with validated OKF frontmatter
 
 Uses power_core for all business logic, ensuring consistency
@@ -31,9 +32,20 @@ from power_core import (
     atomic_write,
     build_frontmatter,
     resolve_vault_path,
-    run_generate_index,
+    run_generate_hierarchical_index,
+    run_generate_sub_index,
     run_lint_report,
+    scan_folder_notes,
 )
+
+PARA_CATEGORIES = [
+    "00_Inbox",
+    "01_Projects",
+    "02_Areas",
+    "03_Resources",
+    "04_Archive",
+    "06_Daily_Logs",
+]
 
 server = Server("power")
 
@@ -69,8 +81,9 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="generate_index",
             description=(
-                "Compile the vault index.md catalog classifying all notes "
-                "by their OKF metadata type."
+                "Compile the vault hierarchical index: a summary index.md plus "
+                "per-folder _index.md files. This keeps the main index small and "
+                "token-efficient for AI agents (~75%% savings on large vaults)."
             ),
             inputSchema={
                 "type": "object",
@@ -83,6 +96,32 @@ async def list_tools() -> list[Tool]:
                         ),
                     }
                 },
+            },
+        ),
+        Tool(
+            name="read_sub_index",
+            description=(
+                "Read the sub-index (_index.md) for a specific P.A.R.A. category. "
+                "Use this after identifying the relevant category from the main index. "
+                "Agents should call this on-demand instead of scanning all .md files."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "enum": PARA_CATEGORIES,
+                        "description": "P.A.R.A. category folder name (e.g. 01_Projects)",
+                    },
+                    "vault_path": {
+                        "type": "string",
+                        "description": (
+                            "Optional absolute path to the vault root "
+                            "(defaults to POWER_VAULT_DIR env var or current directory)"
+                        ),
+                    },
+                },
+                "required": ["category"],
             },
         ),
         Tool(
@@ -140,8 +179,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=result)]
 
         elif name == "generate_index":
-            result = run_generate_index(vault_path)
+            result = run_generate_hierarchical_index(vault_path)
             return [TextContent(type="text", text=result)]
+
+        elif name == "read_sub_index":
+            return await _handle_read_sub_index(arguments, vault_path)
 
         elif name == "ingest_note":
             return await _handle_ingest(arguments, vault_path)
@@ -155,6 +197,39 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         return [TextContent(type="text", text=f"Not found: {str(e)}")]
     except Exception as e:
         return [TextContent(type="text", text=f"Error occurred: {str(e)}")]
+
+
+async def _handle_read_sub_index(arguments: dict, vault_path: Path) -> list[TextContent]:
+    """Handle the read_sub_index tool call."""
+    category = arguments.get("category", "")
+
+    if category not in PARA_CATEGORIES:
+        return [
+            TextContent(
+                type="text",
+                text=f"Invalid category: {category}. Must be one of: {', '.join(PARA_CATEGORIES)}",
+            )
+        ]
+
+    category_path = vault_path / category
+    if not category_path.is_dir():
+        return [TextContent(type="text", text=f"Category folder not found: {category}")]
+
+    sub_index_path = category_path / "_index.md"
+    if sub_index_path.exists():
+        content = sub_index_path.read_text(encoding="utf-8")
+        return [TextContent(type="text", text=content)]
+
+    folder_notes = scan_folder_notes(vault_path)
+    notes = folder_notes.get(category, [])
+
+    if not notes:
+        return [TextContent(type="text", text=f"No notes found in {category}.")]
+
+    result = run_generate_sub_index(vault_path, category)
+    return [
+        TextContent(type="text", text=f"{result}\n\n{sub_index_path.read_text(encoding='utf-8')}")
+    ]
 
 
 async def _handle_ingest(arguments: dict, vault_path: Path) -> list[TextContent]:
@@ -191,7 +266,7 @@ async def _handle_ingest(arguments: dict, vault_path: Path) -> list[TextContent]
     target_file.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(target_file, full_content)
 
-    index_result = run_generate_index(vault_path)
+    index_result = run_generate_hierarchical_index(vault_path)
 
     log_file = vault_path / "log.md"
     if log_file.exists():
@@ -199,7 +274,7 @@ async def _handle_ingest(arguments: dict, vault_path: Path) -> list[TextContent]
         log_entry = (
             f"\n## [{date_str}] ingest | Created {title}\n"
             f"- **Action:** Created note '{note_name}' of type {note_type} via MCP tool ingest_note.\n"
-            f"- **Result:** Saved note to {note_name} and compiled index.md.\n"
+            f"- **Result:** Saved note to {note_name} and compiled hierarchical index.\n"
         )
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(log_entry)

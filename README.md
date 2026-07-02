@@ -28,8 +28,9 @@ power index ~/my-vault     # Generate catalog index.md
 | Feature | What it does |
 |---------|-------------|
 | **CLI** | `power init`, `lint`, `index`, `ingest` — manage your vault from terminal |
-| **MCP Server** | Exposes `lint_vault`, `generate_index`, `ingest_note` to any AI agent (Claude, Cursor, OpenCode) |
+| **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note` to any AI agent |
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
+| **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading |
 | **LLM-Wiki** | Automated catalog indexing, chronological log, and structural link linting (A. Karpathy's philosophy) |
 | **Auto-Sync** | Cron-compatible script with GPG-signed commits for continuous backup |
 
@@ -44,7 +45,7 @@ power index ~/my-vault     # Generate catalog index.md
 ```
 power init <path>              Create a new vault with P.A.R.A. folder structure
 power lint <path>              Scan for broken links, missing metadata, orphans
-power index <path>             Rebuild index.md catalog from all notes
+power index <path>             Generate hierarchical index (index.md + _index.md files)
 power ingest <path> [options]  Create a new note with validated OKF metadata
 ```
 
@@ -95,17 +96,32 @@ P.O.W.E.R. organizes your vault using the **P.A.R.A.** method with **OKF metadat
 
 ```
 ~/my-vault
-├── 00_Inbox/          # Quick captures and raw inputs
-├── 01_Projects/       # Active projects with deadlines
-├── 02_Areas/          # Ongoing responsibilities
-├── 03_Resources/      # Reusable guides and references
-├── 04_Archive/        # Completed or retired notes
-├── 05_Templates/      # Note templates with OKF frontmatter
-├── 06_Daily_Logs/     # Chronological session logs
-├── PROTOCOLS/         # System specs for AI agents
-├── index.md           # Auto-generated catalog
-└── log.md             # Append-only change log
+├── 00_Inbox/
+│   └── _index.md        # Detailed sub-index for Inbox notes
+├── 01_Projects/
+│   └── _index.md        # Detailed sub-index for Projects
+├── 02_Areas/
+│   └── _index.md        # Detailed sub-index for Areas
+├── 03_Resources/
+│   └── _index.md        # Detailed sub-index for Resources
+├── 04_Archive/
+│   └── _index.md        # Detailed sub-index for Archive
+├── 05_Templates/        # Note templates with OKF frontmatter
+├── 06_Daily_Logs/
+│   └── _index.md        # Detailed sub-index for Daily Logs
+├── PROTOCOLS/           # System specs for AI agents
+├── index.md             # Navigation map (links to sub-indexes)
+└── log.md               # Append-only change log
 ```
+
+### Hierarchical Index Protocol
+
+AI agents read the vault efficiently by following this pattern:
+
+1. **Read `index.md`** — identify the relevant category by note counts
+2. **Call `read_sub_index` MCP tool** — get detailed entries for that category
+3. **Read specific notes** — only when the sub-index indicates relevance
+4. **NEVER glob all `.md` files** — use sub-indexes as a map (~75% token savings)
 
 Every note starts with validated YAML frontmatter:
 
@@ -144,14 +160,16 @@ graph TB
     end
 
     subgraph Wiki ["📖 LLM-Wiki (Karpathy's Philosophy)"]
-        IndexMD["index.md (Auto Catalog)"]
+        IndexMD["index.md (Navigation Map)"]
+        SubIndex["_index.md (Per-Folder Details)"]
         LogMD["log.md (Change Log)"]
         Lint["Link Linting"]
     end
 
     subgraph AI ["🤖 AI Agent (Local / Cloud)"]
         Ingest["Ingest Note"]
-        Index["Rebuild Index"]
+        Index["Rebuild Hierarchical Index"]
+        ReadSub["Read Sub-Index On-Demand"]
     end
 
     subgraph ER ["🔐 Execution Rules"]
@@ -163,9 +181,12 @@ graph TB
     Human -- Writes Notes --> YAML
     YAML -- Parsed by --> AI
     AI -- Updates --> IndexMD
+    AI -- Updates --> SubIndex
     AI -- Appends --> LogMD
     AI -- Runs Checks --> Lint
+    ReadSub -- On-Demand --> SubIndex
     IndexMD -. Synced via .-> Sync
+    SubIndex -. Synced via .-> Sync
     LogMD -. Synced via .-> Sync
     Sync --> GPG
     GPG --> PR
