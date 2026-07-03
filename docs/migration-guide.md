@@ -303,6 +303,20 @@ Set up a synchronization pipeline to preserve history and enable collaboration:
 
 ---
 
+### Step 6j: SQLite FTS5 Full-Text Search (FTS)
+
+The P.O.W.E.R. framework includes a built-in full-text search engine powered by SQLite FTS5. It automatically initializes a local database file named `.power_search.db` in the vault root and incrementally synchronizes it on every search request.
+
+*Search Guidelines for AI Agents:*
+1. **Token Efficiency**: Instead of scanning the filesystem (`glob **/*.md`) or reading multiple files to find references, agents **must** use the MCP tool `search_vault_tool(query, max_results=20)`. This saves up to 95%+ of context tokens.
+2. **Query Syntax**:
+   - **Phrase Search**: Use double quotes for exact phrases, e.g., `search_vault_tool(query='"Docker Compose"')`.
+   - **Prefix Matching**: Words are automatically matched using prefix wildcards (e.g., `dock*` matches `docker`, `docking`, etc.) for flexible discovery.
+   - **Sanitization**: Avoid passing special search query operators (except double quotes) as they can cause syntax errors in SQLite FTS5.
+3. **Git Hygiene**: The database file `.power_search.db` is ignored via `*.db` in `.gitignore` and `.geminiignore`. Under no circumstances should this file be committed to the repository.
+
+---
+
 ## Example: Full Migration Transcript
 
 Here is what a complete migration looks like from the agent's perspective:
