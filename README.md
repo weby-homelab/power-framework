@@ -51,6 +51,13 @@ Read the full technical report on the transition from flat to hierarchical index
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
 
+### AI Agent Migration Guide
+
+Step-by-step protocol for any AI agent (Claude, GPT, Gemini, OpenCode) to autonomously migrate an existing Obsidian vault into P.O.W.E.R. structure:
+
+- **[English: AI Agent Migration Guide](docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
+- **[Українська: Ґайд міграції для AI-агента](docs/migration-guide.ua.md)** — покроковий протокол для будь-якого AI-агента
+
 ## Who Is This For
 
 - **Obsidian users** who want AI agents to understand and maintain their vault

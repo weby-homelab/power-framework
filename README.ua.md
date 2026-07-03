@@ -51,6 +51,13 @@ power index ~/my-vault     # Згенерувати каталог index.md
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — детальний технічний звіт з метриками
 
+### Ґайд міграції для AI-агента
+
+Покроковий протокол для будь-якого AI-агента (Claude, GPT, Gemini, OpenCode) для автономної міграції існуючого Obsidian Vault у структуру P.O.W.E.R.:
+
+- **[English: AI Agent Migration Guide](docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
+- **[Українська: Ґайд міграції для AI-агента](docs/migration-guide.ua.md)** — покроковий протокол з MCP-інструментами, евристиками класифікації та вирішенням проблем
+
 ## Для кого це
 
 - **Користувачі Obsidian**, які хочуть щоб AI-агенти розуміли та підтримували їх vault
