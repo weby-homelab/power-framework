@@ -372,6 +372,23 @@ Before starting work, the agent should:
 4. Read `index.md` to understand current vault state
 5. Read `log.md` tail to see what happened in the last session
 
+### Step 6i: Git Sync & GPG-Signed Publication
+
+Since Obsidian and P.O.W.E.R. vaults are usually version-controlled, the final part of any session or migration is synchronization and publication:
+
+1. **Load Git Credentials**: Always source `GITHUB_USER_NAME` and `GITHUB_USER_EMAIL` from your `.env` file to configure your local Git identity (`git config user.name`/`user.email`). This prevents commits from being attributed to `root` or local hostnames.
+2. **GPG Signing Configuration**:
+   - Verify the availability of the private key using `gpg --list-secret-keys`.
+   - If missing, import the key from `.asc` file (`gpg --import key.asc`) and immediately delete the `.asc` file for security.
+   - Configure Git to sign commits by default: `git config commit.gpgsign true`.
+3. **Branching & Signing**:
+   - Create a feature branch: `git checkout -b feature/migration-name`.
+   - Add modified/new files and commit with a GPG signature: `git commit -S -m "docs: complete migration to P.O.W.E.R."`.
+4. **Push & Pull Request**:
+   - Push the branch: `git push origin feature/migration-name`.
+   - Open and merge a Pull Request on GitHub. If the terminal sandbox prevents `gh` CLI authentication, use raw `curl` API requests with `GITHUB_RELEASE_TOKEN` loaded from `.env`.
+5. **CI/CD Verification**: Check the status of your documentation website deployment workflows (e.g. GitHub Actions executing MkDocs builds).
+
 ---
 
 ## Example: Full Migration Transcript
@@ -404,7 +421,14 @@ Agent: Running lint...
   ✅ Internal Links: 0 broken  
   ✅ Orphans: 3 notes (all in 06_Daily_Logs — exempt)
 
-Agent: Migration complete. Vault is P.O.W.E.R.-compliant.
+Agent: Initiating Phase 6: Sync & Publish...
+Agent: Importing GPG key and configuring Git identity
+Agent: Creating signed commit on branch feature/power-migration
+Agent: Pushing changes to GitHub and opening Pull Request
+Agent: Verifying CI/CD build workflow status...
+  ✅ MkDocs build success: https://weby-homelab.github.io/P.O.W.E.R/
+
+Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-compliant.
 ```
 
 ---
