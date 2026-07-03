@@ -7,7 +7,6 @@ context snippets, and metadata-aware scoring.
 
 from __future__ import annotations
 
-import os
 import re
 import sqlite3
 from dataclasses import dataclass, field
@@ -192,7 +191,7 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
             rel_path = str(filepath.relative_to(vault_dir))
             mtime = filepath.stat().st_mtime
             disk_files[rel_path] = mtime
-        except Exception:
+        except Exception:  # noqa: S112
             continue
 
     # 2. Get files from the database
@@ -204,7 +203,9 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
     to_delete = [rel_path for rel_path in db_files if rel_path not in disk_files]
     if to_delete:
         cursor.executemany("DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete])
-        cursor.executemany("DELETE FROM file_metadata WHERE rel_path = ?", [(r,) for r in to_delete])
+        cursor.executemany(
+            "DELETE FROM file_metadata WHERE rel_path = ?", [(r,) for r in to_delete]
+        )
 
     # 4. Find files to insert or update
     for rel_path, mtime in disk_files.items():
@@ -219,20 +220,27 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
                     continue
 
                 tags_str = " ".join(metadata.tags)
-                
+
                 # Delete existing just in case
                 cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
-                
+
                 # Insert new fts note
                 cursor.execute(
                     "INSERT INTO fts_notes (title, tags, description, content, rel_path, note_type) VALUES (?, ?, ?, ?, ?, ?)",
-                    (metadata.title, tags_str, metadata.description, content, rel_path, metadata.type),
+                    (
+                        metadata.title,
+                        tags_str,
+                        metadata.description,
+                        content,
+                        rel_path,
+                        metadata.type,
+                    ),
                 )
                 cursor.execute(
                     "INSERT OR REPLACE INTO file_metadata (rel_path, mtime) VALUES (?, ?)",
                     (rel_path, mtime),
                 )
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
     conn.commit()
@@ -256,7 +264,7 @@ def search_vault(vault_dir: Path, query: str, max_results: int = 20) -> list[Sea
         return []
 
     # Clean query and tokenize for FTS5 syntax
-    clean_query = re.sub(r'[^\w\s"а-яєіїґ\']', ' ', query, flags=re.IGNORECASE)
+    clean_query = re.sub(r'[^\w\s"а-яєіїґ\']', " ", query, flags=re.IGNORECASE)  # noqa: RUF001
     terms: list[str] = []
     for match in re.finditer(r'"([^"]+)"|(\S+)', clean_query):
         phrase = match.group(1)
@@ -271,7 +279,7 @@ def search_vault(vault_dir: Path, query: str, max_results: int = 20) -> list[Sea
         return []
 
     db_path = vault_dir / ".power_search.db"
-    
+
     try:
         conn = sqlite3.connect(db_path)
         _init_db(conn)
@@ -280,11 +288,11 @@ def search_vault(vault_dir: Path, query: str, max_results: int = 20) -> list[Sea
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT 
-                rel_path, 
-                title, 
-                description, 
-                note_type, 
+            SELECT
+                rel_path,
+                title,
+                description,
+                note_type,
                 -bm25(fts_notes, 10.0, 5.0, 3.0, 1.0) as score,
                 snippet(fts_notes, 3, '...', '...', '...', 15) as snippet_text,
                 tags
@@ -295,7 +303,7 @@ def search_vault(vault_dir: Path, query: str, max_results: int = 20) -> list[Sea
             """,
             (fts_query, max_results),
         )
-        
+
         results: list[SearchResult] = []
         for row in cursor.fetchall():
             rel_path, title, description, note_type, score, snippet, tags_str = row
@@ -313,7 +321,7 @@ def search_vault(vault_dir: Path, query: str, max_results: int = 20) -> list[Sea
                     tags=tags,
                 )
             )
-        
+
         conn.close()
         return results
     except Exception:
@@ -351,4 +359,3 @@ def format_search_results(results: list[SearchResult], query: str) -> str:
         lines.append("")
 
     return "\n".join(lines)
-
