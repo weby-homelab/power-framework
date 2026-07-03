@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path  # noqa: TC003
 
-from power_core.indexer import (
+from power_framework.core.indexer import (
     generate_index_content,
     generate_main_index_content,
     generate_sub_index_content,

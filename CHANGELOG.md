@@ -5,6 +5,41 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-03
+
+### Added
+- **`src/` layout migration**: Project restructured to `src/power_framework/` with proper Python packaging, eliminating import confusion
+- **`power search` CLI command**: Full-text vault search with relevance scoring, snippet display, and tag/type matching
+- **Comprehensive test suite**: 144 tests total (23 new: CLI functional tests, MCP tool tests, full-cycle integration tests)
+- **Codecov threshold**: Enforced minimum 70% coverage via `--cov-fail-under` in pytest configuration
+- **CodeQL SAST workflow**: Weekly security scan with `security-and-quality` query suite
+- **OIDC Trusted Publishing**: PyPI publishing via OpenID Connect — no API tokens needed, zero-secret release pipeline
+- **GitHub Pages docs**: `mkdocs-material` site with `mkdocs.yml`, auto-deployed on every `main` push
+- **MkDocs documentation**: Full API reference (models, parser, indexer, linter, searcher, utils), CLI guide, MCP server guide, architecture overview, and contributing guide
+- **`.editorconfig`**: Consistent editor settings across all contributors
+- **`.pre-commit-config.yaml`**: Pre-commit hooks for ruff linting and formatting
+- **`SECURITY.md`**: Vulnerability disclosure policy with GPG-encrypted contact
+
+### Changed
+- **MCP server**: Migrated from raw `mcp.server.Server` to **FastMCP** — decorator-based tools, ~60% less boilerplate, auto-input-schema from type hints
+- **Package namespace**: All imports changed from `power_core.*` to `power_framework.core.*` and `mcp_servers.*` to `power_framework.mcp.*`
+- **Entry point**: CLI entry point updated from `power_core.cli:main` to `power_framework.core.cli:main`
+- **CI/CD**: Release workflow now publishes to PyPI via Trusted Publishing (OIDC); docs workflow auto-deploys to GitHub Pages
+- **Timestamps**: All `datetime.now()` calls migrated to `datetime.now(timezone.utc)` for DTZ compliance
+- **Ruff config**: Added `per-file-ignores` for test files (DTZ001, S101, T20) and CLI (T20)
+
+### Fixed
+- **MCP server import**: `scan_folder_notes` and `search_vault` were missing from import block — now explicitly imported
+- **MyPy strict compliance**: All 11 source files pass `--strict` with zero errors
+- **`note_type` parameter**: MCP `ingest_note` tool now correctly casts `str` to `NoteType` enum (myPy arg-type fix)
+- **`__main__.py`**: Removed incorrect `asyncio.run()` wrapping around synchronous FastMCP `run()`
+- **Ruff DTZ005/DTZ001**: Timezone-aware `datetime` calls across all modules and tests
+
+### Security
+- **CodeQL integration**: Weekly SAST scans via `github/codeql-action` with `security-and-quality` queries
+- **Dependabot**: Weekly pip dependency updates + monthly GitHub Actions updates
+- **Trusted Publishing**: PyPI releases use OIDC — no secrets, no API tokens, no shared credentials
+
 ## [1.4.0] - 2026-07-02
 
 ### Added
@@ -53,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Initial public release with basic MCP server and skill scripts
 
+[1.5.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/weby-homelab/P.O.W.E.R/releases/tag/v1.2.2

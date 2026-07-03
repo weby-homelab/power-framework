@@ -13,25 +13,15 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .indexer import generate_log_initial, run_generate_hierarchical_index
 from .linter import run_lint_report
-from .models import NoteType, OKFMetadata
+from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .parser import build_frontmatter
+from .searcher import format_search_results, search_vault
 from .utils import __version__, atomic_write
-
-VAULT_STRUCTURE = [
-    "00_Inbox",
-    "01_Projects",
-    "02_Areas",
-    "03_Resources",
-    "04_Archive",
-    "05_Templates",
-    "06_Daily_Logs",
-    "PROTOCOLS",
-]
 
 TEMPLATE_NOTE = """\
 ---
@@ -83,7 +73,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
         type="Resource",
         title="Template Note",
         description="Default OKF template for new notes",
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
     )
     atomic_write(template_path, content)
     created.append("  05_Templates/default.md")
@@ -166,12 +156,28 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         description=description,
         resource=resource,
         tags=tags,
-        timestamp=datetime.now(),
+        timestamp=datetime.now(timezone.utc),
     )
     fm = build_frontmatter(metadata)
     body = f"{fm}\n\n# {title}\n\n"
     atomic_write(note_path, body)
     print(f"Created note: {note_path.relative_to(vault_dir)}")
+    return 0
+
+
+def _cmd_search(args: argparse.Namespace) -> int:
+    """Full-text search across vault notes."""
+    vault_dir = _resolve_path(args.path)
+    if not vault_dir.exists():
+        print(f"Vault not found: {vault_dir}")
+        return 1
+
+    query = args.query
+    max_results = args.max_results
+
+    results = search_vault(vault_dir, query, max_results=max_results)
+    report = format_search_results(results, query)
+    print(report)
     return 0
 
 
@@ -223,6 +229,20 @@ def main() -> None:
     p_ingest.add_argument("--tags", nargs="*", default=[], help="Obsidian tags")
     p_ingest.add_argument("--overwrite", action="store_true", help="Overwrite existing note")
     p_ingest.set_defaults(func=_cmd_ingest)
+
+    # power search
+    p_search = subparsers.add_parser("search", help="Full-text search across vault notes")
+    p_search.add_argument("path", help="Path to the vault directory")
+    p_search.add_argument(
+        "query", help='Search query (supports multiple terms and "quoted phrases")'
+    )
+    p_search.add_argument(
+        "--max-results",
+        type=int,
+        default=20,
+        help="Maximum number of results (default: 20)",
+    )
+    p_search.set_defaults(func=_cmd_search)
 
     args = parser.parse_args()
 

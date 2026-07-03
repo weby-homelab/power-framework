@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from power_core.models import OKFMetadata
-from power_core.parser import (
+from power_framework.core.models import OKFMetadata
+from power_framework.core.parser import (
     build_frontmatter,
     extract_frontmatter_raw,
     has_frontmatter,

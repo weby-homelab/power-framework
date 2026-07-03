@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path  # noqa: TC003
 
-from power_core.linter import LintResult, run_lint_report, run_lint_vault
+from power_framework.core.linter import LintResult, run_lint_report, run_lint_vault
 
 
 class TestRunLintVault:

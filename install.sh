@@ -6,7 +6,12 @@
 
 set -euo pipefail
 
-VERSION="1.3.0"
+# Read version from source if available locally, otherwise use fallback
+if [ -f "power_core/utils.py" ]; then
+    VERSION=$(python3 -c "exec(open('power_core/utils.py').read()); print(__version__)" 2>/dev/null || echo "1.4.0")
+else
+    VERSION="1.4.0"
+fi
 TARGET_DIR="${1:-$PWD}"
 REPO_URL="https://raw.githubusercontent.com/weby-homelab/P.O.W.E.R/main"
 
@@ -63,9 +68,16 @@ mkdir -p "${TARGET_DIR}/power_core"
 # 3. Download or copy files
 if [ -f "skills/power/SKILL.md" ]; then
     echo "Copying files locally..."
-    cp -r skills/power/* "${TARGET_DIR}/.agents/skills/power/"
-    cp mcp_servers/power_server.py "${TARGET_DIR}/.agents/mcp_servers/"
-    cp -r power_core/* "${TARGET_DIR}/power_core/"
+    # Exclude __pycache__ when copying (use rsync or fallback to find+cp)
+    if command -v rsync &>/dev/null; then
+        rsync -a --exclude='__pycache__' skills/power/ "${TARGET_DIR}/.agents/skills/power/"
+        cp mcp_servers/power_server.py "${TARGET_DIR}/.agents/mcp_servers/"
+        rsync -a --exclude='__pycache__' power_core/ "${TARGET_DIR}/power_core/"
+    else
+        find skills/power/ -not -path '*/__pycache__/*' -type f -exec cp --parents {} "${TARGET_DIR}/.agents/" \;
+        cp mcp_servers/power_server.py "${TARGET_DIR}/.agents/mcp_servers/"
+        find power_core/ -not -path '*/__pycache__/*' -type f -exec cp --parents {} "${TARGET_DIR}/" \;
+    fi
 else
     echo "Downloading files from GitHub..."
 
@@ -80,6 +92,7 @@ else
         "power_core/utils.py"
         "power_core/indexer.py"
         "power_core/linter.py"
+        "power_core/searcher.py"
     )
 
     for file in "${local_files[@]}"; do

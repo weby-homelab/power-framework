@@ -6,12 +6,11 @@ Checks for broken links, missing metadata, and orphan notes.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
 from .parser import has_frontmatter, has_type_field, read_file_content
-from .utils import clean_note_name, is_excluded_dir, is_excluded_orphan
+from .utils import EXCLUDED_DIRS, clean_note_name, is_excluded_orphan
 
 WIKI_LINK_PATTERN = re.compile(r"\[\[(.*?)\]\]")
 GFM_LINK_PATTERN = re.compile(r"\[.*?\]\((.*?\.md)(?:#.*?)?\)")
@@ -79,7 +78,7 @@ def _extract_links(content: str) -> list[str]:
             targets.append(clean_note_name(target))
 
     for match in GFM_LINK_PATTERN.findall(content):
-        target = os.path.basename(match)
+        target = Path(match).name
         if target:
             targets.append(clean_note_name(target))
 
@@ -101,19 +100,15 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
     rel_paths: dict[str, str] = {}
     links: dict[str, list[str]] = {}
 
-    for root, dirs, files in os.walk(vault_dir):
-        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
+    for filepath in vault_dir.rglob("*.md"):
+        rel = filepath.relative_to(vault_dir)
+        if any(part in EXCLUDED_DIRS for part in rel.parts):
+            continue
 
-        for file in files:
-            if not file.endswith(".md"):
-                continue
+        clean = clean_note_name(filepath.name)
 
-            abs_path = Path(root) / file
-            rel_path = os.path.relpath(abs_path, vault_dir)
-            clean = clean_note_name(file)
-
-            all_files[clean] = abs_path
-            rel_paths[clean] = rel_path
+        all_files[clean] = filepath
+        rel_paths[clean] = str(filepath.relative_to(vault_dir))
 
     result.total_notes = len(all_files)
 
@@ -140,7 +135,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
                 if not direct_file.exists():
                     result.broken_links.append((rel_path, target))
 
-    inbound_counts: dict[str, int] = {rp: 0 for rp in links}
+    inbound_counts: dict[str, int] = dict.fromkeys(links, 0)
     for _rel_path, targets in links.items():
         for target in targets:
             if target in all_files:
@@ -148,7 +143,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
                 inbound_counts[target_rel] += 1
 
     for rel_path, count in inbound_counts.items():
-        filename = os.path.basename(rel_path)
+        filename = rel_path.rsplit("/", 1)[-1] if "/" in rel_path else rel_path
         if count == 0 and not is_excluded_orphan(filename, rel_path):
             result.orphans.append(rel_path)
 

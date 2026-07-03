@@ -8,22 +8,12 @@ Scans the vault for OKF-annotated notes and generates hierarchical index files:
 
 from __future__ import annotations
 
-import os
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
+from pathlib import Path  # noqa: TC003
 
-from .models import NOTE_TYPE_ORDER, OKFMetadata
+from .models import NOTE_TYPE_ORDER, PARA_FOLDERS, OKFMetadata
 from .parser import read_file_content, validate_metadata
-from .utils import atomic_write, is_excluded_dir
-
-PARA_FOLDERS = [
-    "00_Inbox",
-    "01_Projects",
-    "02_Areas",
-    "03_Resources",
-    "04_Archive",
-    "06_Daily_Logs",
-]
+from .utils import EXCLUDED_DIRS, atomic_write
 
 
 def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
@@ -35,30 +25,28 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
     """
     concepts: dict[str, list[tuple[str, str, str]]] = {}
 
-    for root, dirs, files in os.walk(vault_dir):
-        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
+    for filepath in vault_dir.rglob("*.md"):
+        if filepath.name in ("index.md", "log.md"):
+            continue
+        if any(part in EXCLUDED_DIRS for part in filepath.relative_to(vault_dir).parts):
+            continue
 
-        for file in files:
-            if not file.endswith(".md") or file in ("index.md", "log.md"):
+        try:
+            content = read_file_content(filepath)
+            metadata: OKFMetadata | None = validate_metadata(content)
+            if metadata is None:
                 continue
 
-            filepath = Path(root) / file
-            try:
-                content = read_file_content(filepath)
-                metadata: OKFMetadata | None = validate_metadata(content)
-                if metadata is None:
-                    continue
+            rel_path = str(filepath.relative_to(vault_dir))
+            note_type = metadata.type
+            title = metadata.title
+            desc = metadata.description
 
-                rel_path = os.path.relpath(filepath, vault_dir)
-                note_type = metadata.type
-                title = metadata.title
-                desc = metadata.description
-
-                if note_type not in concepts:
-                    concepts[note_type] = []
-                concepts[note_type].append((rel_path, title, desc))
-            except Exception:
-                continue
+            if note_type not in concepts:
+                concepts[note_type] = []
+            concepts[note_type].append((rel_path, title, desc))
+        except Exception:
+            continue
 
     return concepts
 
@@ -72,45 +60,44 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
     """
     folder_notes: dict[str, list[dict]] = {}
 
-    for root, dirs, files in os.walk(vault_dir):
-        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
+    excluded_names = frozenset({"index.md", "log.md", "_index.md"})
 
-        rel_root = os.path.relpath(root, vault_dir)
-        top_folder = rel_root.split(os.sep)[0]
+    for filepath in vault_dir.rglob("*.md"):
+        if filepath.name in excluded_names:
+            continue
 
+        rel_path = filepath.relative_to(vault_dir)
+        if any(part in EXCLUDED_DIRS for part in rel_path.parts):
+            continue
+
+        top_folder = rel_path.parts[0]
         if top_folder not in PARA_FOLDERS:
             continue
 
-        for file in files:
-            if not file.endswith(".md") or file in ("index.md", "log.md", "_index.md"):
+        try:
+            content = read_file_content(filepath)
+            metadata: OKFMetadata | None = validate_metadata(content)
+            if metadata is None:
                 continue
 
-            filepath = Path(root) / file
-            try:
-                content = read_file_content(filepath)
-                metadata: OKFMetadata | None = validate_metadata(content)
-                if metadata is None:
-                    continue
+            tags = metadata.tags if metadata.tags else []
+            ts = metadata.timestamp.isoformat() if metadata.timestamp else ""
 
-                rel_path = os.path.relpath(filepath, vault_dir)
-                tags = metadata.tags if metadata.tags else []
-                ts = metadata.timestamp.isoformat() if metadata.timestamp else ""
+            note_info = {
+                "rel_path": str(rel_path),
+                "title": metadata.title,
+                "description": metadata.description,
+                "note_type": metadata.type,
+                "tags": tags,
+                "timestamp": ts,
+                "filename": filepath.name,
+            }
 
-                note_info = {
-                    "rel_path": rel_path,
-                    "title": metadata.title,
-                    "description": metadata.description,
-                    "note_type": metadata.type,
-                    "tags": tags,
-                    "timestamp": ts,
-                    "filename": file,
-                }
-
-                if top_folder not in folder_notes:
-                    folder_notes[top_folder] = []
-                folder_notes[top_folder].append(note_info)
-            except Exception:
-                continue
+            if top_folder not in folder_notes:
+                folder_notes[top_folder] = []
+            folder_notes[top_folder].append(note_info)
+        except Exception:
+            continue
 
     return folder_notes
 
@@ -122,7 +109,7 @@ def generate_index_content(concepts: dict[str, list[tuple[str, str, str]]]) -> s
         "type: System Guide",
         'title: "Second Brain Index"',
         'description: "Registry of all concepts in the Second Brain"',
-        f"timestamp: {datetime.now().isoformat()}",
+        f"timestamp: {datetime.now(timezone.utc).isoformat()}",
         "---",
         "",
         "# Knowledge Catalog (OKF Index)",
@@ -154,7 +141,7 @@ def generate_main_index_content(folder_notes: dict[str, list[dict]]) -> str:
         "type: System Guide",
         'title: "Second Brain Index"',
         'description: "Hierarchical navigation map for the knowledge vault"',
-        f"timestamp: {datetime.now().isoformat()}",
+        f"timestamp: {datetime.now(timezone.utc).isoformat()}",
         "---",
         "",
         "# Knowledge Catalog",
@@ -196,7 +183,7 @@ def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
         "type: System Guide",
         f'title: "{display_name} Sub-Index"',
         f'description: "Detailed catalog of all notes in {display_name}"',
-        f"timestamp: {datetime.now().isoformat()}",
+        f"timestamp: {datetime.now(timezone.utc).isoformat()}",
         "---",
         "",
         f"# {display_name} — Detailed Index",
@@ -268,7 +255,7 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
 
     sub_index_results = []
     for folder in PARA_FOLDERS:
-        if folder in folder_notes and folder_notes[folder]:
+        if folder_notes.get(folder):
             sub_index_path = vault_dir / folder / "_index.md"
             sub_content = generate_sub_index_content(folder, folder_notes[folder])
             atomic_write(sub_index_path, sub_content)
@@ -289,8 +276,8 @@ def generate_log_initial(vault_dir: Path, note_count: int) -> None:
     if log_path.exists():
         return
 
-    timestamp = datetime.now().isoformat()
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    timestamp = datetime.now(timezone.utc).isoformat()
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     content = "\n".join(
         [
             "---",

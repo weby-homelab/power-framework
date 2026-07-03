@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from power_core.utils import (
+from power_framework.core.utils import (
     atomic_write,
     clean_note_name,
     create_backup,

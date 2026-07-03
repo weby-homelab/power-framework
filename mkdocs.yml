@@ -1,0 +1,50 @@
+site_name: P.O.W.E.R. Framework
+site_description: AI-native toolkit for Obsidian knowledge bases — validate, index, and manage notes via CLI or MCP
+site_url: "https://weby-homelab.github.io/P.O.W.E.R"
+repo_url: "https://github.com/weby-homelab/P.O.W.E.R"
+repo_name: weby-homelab/P.O.W.E.R
+edit_uri: "edit/main/docs/"
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - content.code.copy
+    - content.tabs.link
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - CLI Reference: cli.md
+  - MCP Server: mcp-server.md
+  - API Reference:
+      - Models: api/models.md
+      - Parser: api/parser.md
+      - Indexer: api/indexer.md
+      - Linter: api/linter.md
+      - Searcher: api/searcher.md
+      - Utils: api/utils.md
+  - Architecture: architecture.md
+  - Contributing: contributing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: "https://github.com/weby-homelab/P.O.W.E.R"
+
+copyright: Built in Ukraine ⚡ &copy; 2026 Weby Homelab

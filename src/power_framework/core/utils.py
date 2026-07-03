@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -101,7 +101,7 @@ def create_backup(filepath: Path, backup_dir: Path | None = None) -> Path | None
 
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     backup_name = f"{filepath.stem}.{timestamp}{filepath.suffix}"
     backup_path = backup_dir / backup_name
 

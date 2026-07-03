@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime  # noqa: TC003
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class NoteType(str, Enum):
@@ -32,6 +32,17 @@ NOTE_TYPE_ORDER: list[str] = [
     "Archive",
 ]
 
+PARA_FOLDERS: tuple[str, ...] = (
+    "00_Inbox",
+    "01_Projects",
+    "02_Areas",
+    "03_Resources",
+    "04_Archive",
+    "06_Daily_Logs",
+)
+
+VAULT_STRUCTURE: tuple[str, ...] = PARA_FOLDERS + ("05_Templates", "PROTOCOLS")
+
 MAX_DESCRIPTION_LENGTH = 150
 MAX_TITLE_LENGTH = 200
 
@@ -52,7 +63,7 @@ class OKFMetadata(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Obsidian tags")
     timestamp: datetime = Field(description="Last modified ISO-8601 timestamp")
 
-    model_config = {"extra": "ignore", "use_enum_values": True}
+    model_config = ConfigDict(extra="ignore", use_enum_values=True)
 
     @field_validator("title")
     @classmethod

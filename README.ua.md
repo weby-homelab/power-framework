@@ -10,6 +10,8 @@
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-00C853?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io/)
 [![CI](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/P%2EO%2EW%2EE%2ER?logo=github)](https://github.com/weby-homelab/P.O.W.E.R/releases)
+[![PyPI](https://img.shields.io/pypi/v/power-framework?logo=pypi&logoColor=white)](https://pypi.org/project/power-framework/)
+[![Downloads](https://img.shields.io/pypi/dm/power-framework?logo=pypi&logoColor=white)](https://pypi.org/project/power-framework/)
 
 Валідуйте, індексуйте та керуйте вашим vault Obsidian з терміналу — або дозвольте AI-агентам робити це через MCP.
 

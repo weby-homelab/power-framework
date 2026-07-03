@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "1.4.0"
+version = "1.5.0"
 description = "AI-native toolkit for Obsidian knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "MIT"
@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
@@ -31,7 +32,7 @@ dependencies = [
 ]
 
 [project.scripts]
-power = "power_core.cli:main"
+power = "power_framework.core.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -41,6 +42,8 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.0.0",
     "types-PyYAML>=6.0.0",
+    "pre-commit>=4.0.0",
+    "pip-audit>=2.7.0",
 ]
 
 [project.urls]
@@ -50,12 +53,12 @@ Repository = "https://github.com/weby-homelab/P.O.W.E.R"
 Issues = "https://github.com/weby-homelab/P.O.W.E.R/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["power_core", "mcp_servers", "scripts"]
+packages = ["src/power_framework"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --cov=power_framework --cov-report=term-missing --cov-fail-under=70"
 
 [tool.ruff]
 target-version = "py310"
@@ -73,8 +76,15 @@ select = [
     "A",
     "SIM",
     "TCH",
+    "S",
+    "C4",
+    "DTZ",
+    "T20",
+    "PT",
+    "RUF",
+    "PERF",
 ]
-ignore = ["E501"]
+ignore = ["E501", "S101"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -83,6 +93,9 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 check_untyped_defs = true
 
-[[tool.mypy.overrides]]
-module = ["mcp.*"]
-ignore_missing_imports = true
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F405"]
+"tests/*" = ["S101", "T20", "DTZ001"]
+"power_framework/core/cli.py" = ["T20"]
+"power_framework/mcp/power_server.py" = ["T201"]
+"scripts/*" = ["T20", "S310"]

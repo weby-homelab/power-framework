@@ -7,7 +7,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from power_core.models import (
+from power_framework.core.models import (
     MAX_DESCRIPTION_LENGTH,
     MAX_TITLE_LENGTH,
     NoteType,
