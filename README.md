@@ -38,7 +38,7 @@ power index ~/my-vault     # Generate catalog index.md
 
 Read the full technical report on the transition from flat to hierarchical indexing:
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
-- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.md)** — повний технічний звіт
+- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
 
 ## Who Is This For
 

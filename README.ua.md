@@ -37,8 +37,8 @@ power index ~/my-vault     # Згенерувати каталог index.md
 ## Звіт міграції
 
 Повний технічний звіт про перехід від плоского до ієрархічного індексування:
-- **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — метрики продуктивності, архітектура, інсайти
-- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.md)** — детальний технічний звіт з метриками
+- **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
+- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — детальний технічний звіт з метриками
 
 ## Для кого це
 
