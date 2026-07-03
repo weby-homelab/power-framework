@@ -188,206 +188,118 @@ For large vaults (>50 notes), group ingests by category. Ingest all `Resource` n
 
 ---
 
-## Phase 6: Post-Migration Self-Maintenance
+## Phase 6: Post-Migration Self-Maintenance & Git Sync
 
-**Goal:** Ensure the vault stays healthy across AI agent sessions without manual intervention.
+**Goal:** Ensure the knowledge base remains healthy between AI agent sessions, and synchronize the changes with a remote repository.
 
-This phase covers what the agent MUST do after migration to guarantee 100% self-sustaining operation.
+---
 
-### Step 6a: Install the Official P.O.W.E.R. Framework
+### Step 6a: Installing P.O.W.E.R. Framework for AI Agents
 
-Do **not** rely on a custom `power_core.py` copy. Install the official package:
+For autonomous operation on the target host, install the P.O.W.E.R. toolkit globally or in the project's virtual environment:
 
 ```bash
 pip install git+https://github.com/weby-homelab/P.O.W.E.R.git
-# Or from the project's venv:
-/path/to/venv/bin/pip install git+https://github.com/weby-homelab/P.O.W.E.R.git
 ```
 
-Configure the MCP server in `opencode.jsonc` (or equivalent agent config):
+Configure the MCP server integration in your AI agent client or IDE configuration file (e.g., `cline_config.json`, `opencode.jsonc`, Cursor/Windsurf settings, etc.):
 
-```jsonc
-"power": {
-  "type": "local",
-  "command": [
-    "/path/to/venv/bin/python",
-    "-m",
-    "power_framework.mcp"
-  ],
-  "enabled": true
+```json
+"mcpServers": {
+  "power": {
+    "command": "python",
+    "args": ["-m", "power_framework.mcp"],
+    "enabled": true
+  }
 }
 ```
 
-This exposes 5 MCP tools: `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault_tool`.
+This grants your agent access to validation (`lint_vault`), automated indexing (`generate_index`, `read_sub_index`), and search (`search_vault_tool`).
 
-### Step 6b: Create `.geminiignore` (Token Optimization)
+---
 
-Without an ignore file, the agent's context fills with `.git/` objects, `node_modules/`, `__pycache__/`, `*.db`, `*.key`, and `.env` files — all unnecessary. Create this at the workspace root:
+### Step 6b: Context Optimization (Ignore Files)
+
+To prevent cluttering the AI agent's context with redundant files (binary assets, caches, Git directory logs), create an ignore configuration file (e.g., `.geminiignore`, `.cursorignore`, or `.gitignore` depending on your IDE) in the workspace root:
 
 ```
-# Context optimization: exclude heavy/unnecessary files
 .git/
 .gitignore
-.gitattributes
 .geminiignore
+.cursorignore
 __pycache__/
 *.pyc
-node_modules/
 .venv/
 venv/
+node_modules/
 *.db
 *.key
 *.pem
 *.crt
 *.log
-dist/
-build/
-.env
-*.bak
-*.swp
-.sass-cache/
-.vite/
 ```
 
-**Estimated savings:** 30-50% of agent context tokens in multi-project workspaces.
+---
 
-### Step 6c: Configure Agent Instructions Array
+### Step 6c: Configure AI Agent Instructions and Rules
 
-Ensure the agent loads critical files at session start via the `instructions` array in `opencode.jsonc`:
+Provide project rules and context to your agent using system rule files (e.g., `.clinerules`, `.cursorrules`, `.windsurfrules`) or an instructions array in the agent's client configuration.
+Recommended instruction file structure:
+- **`RULES.md` / `INSTRUCTIONS.md`** — General agent behavior and guidelines.
+- **`MASTER-LESSONS-LEARNED.md`** — A log of lessons learned and edge-cases to prevent repeat errors.
+- **`power/SKILL.md`** — Guidelines for adhering to the P.A.R.A. methodology.
 
-```jsonc
-"instructions": [
-  "/path/to/AGENTS.md",              // Startup protocol + P.A.R.A. rules
-  "/path/to/brain/README.md",        // Vault overview
-  "/path/to/brain/PROTOCOLS/LLM_WIKI_SCHEMA.md",  // OKF frontmatter spec
-  "/path/to/brain/06_Daily_Logs/MASTER-LESSONS-LEARNED.md",  // Safety
-  "/path/to/.agents/skills/power/SKILL.md"  // P.O.W.E.R. skill
-]
-```
+---
 
-### Step 6d: Fix `[[Home]]` and Other Migrated Wikilinks
+### Step 6d: Fixing Internal Wikilinks
 
-After moving files to P.A.R.A. folders, old wikilinks like `[[Home]]`, `[[Security]]`, `[[Servers]]` break because the target files no longer exist at root level. Run an auto-repair script:
+Since files are moved into P.A.R.A. folders (`01_Projects/`, `02_Areas/`, etc.), old direct wikilinks become broken. The AI agent must verify and update references like `[[Note Name]]` to the relative path format `[[P.A.R.A. folder/Note Name|Alias]]`.
+The P.O.W.E.R. Linter automatically checks for broken links, and corrections can be made using a link repair script or code editing tools.
 
-```python
-import os, re
+---
 
-VAULT = "/path/to/vault"
+### Step 6e: Automating Index Updates (`_index.md`)
 
-# Build basename-to-path mapping
-name_to_path = {}
-for root, dirs, files in os.walk(VAULT):
-    dirs[:] = [d for d in dirs if not d.startswith(".")]
-    for f in files:
-        if f.endswith(".md"):
-            rel = os.path.relpath(os.path.join(root, f), VAULT)
-            name_to_path[f[:-3].lower()] = rel
+The `_index.md` file in each P.A.R.A. folder serves as a navigation map and is generated automatically using the `power index` command.
+*Agent Rule:* After any change to the note structure (adding, moving, or deleting files), always regenerate the indexes using the MCP tool `generate_index` or the CLI `power index`.
 
-# Iterate all .md files and fix broken [[links]]
-for root, dirs, files in os.walk(VAULT):
-    dirs[:] = [d for d in dirs if not d.startswith(".")]
-    for fname in files:
-        if not fname.endswith(".md"):
-            continue
-        fpath = os.path.join(root, fname)
-        with open(fpath) as fh:
-            content = fh.read()
-        new_content = content
-        for m in re.finditer(r"\[\[([^\]]+?)(?:\|([^\]]*))?\]\]", content):
-            target = m.group(1)
-            alias = m.group(2)
-            original = m.group(0)
-            # Skip if file already resolves
-            if os.path.exists(os.path.join(VAULT, f"{target}.md")):
-                continue
-            # Look up by basename
-            key = target.lower().rsplit("/", 1)[-1]
-            if key in name_to_path:
-                new_target = name_to_path[key][:-3]
-                display = alias or target
-                replacement = f"[[{new_target}|{display}]]"
-                new_content = new_content.replace(original, replacement, 1)
-        if new_content != content:
-            with open(fpath, "w") as fh:
-                fh.write(new_content)
-```
+---
 
-**Critical:** The linter's regex MUST handle `[[path|alias]]` syntax — P.O.W.E.R. v1.5.0+ does. If using an older version, update `power_core.py` line:
+### Step 6f: Excluding System Folders
 
-```python
-# Before (broken for aliases):
-wiki_links = re.findall(r"\[\[([^\]]+)\]\]", body)
+Ensure that the vault validator and indexer ignore system and configuration directories (e.g., `.git/`, `.obsidian/`) to prevent false alarms about missing metadata or broken links in temp files.
 
-# After (handles [[path|alias]]):
-wiki_links = re.findall(r"\[\[([^\]]+?)(?:\|[^\]]*)?\]\]", body)
-```
-
-### Step 6e: Understand `_index.md` Behavior
-
-`_index.md` files are **auto-generated** by `generate_index`. They receive OKF frontmatter automatically in P.O.W.E.R. v1.5.0+.
-
-**Important caveat:** If a folder has zero direct `.md` files (e.g., `02_Areas/` when all notes are in `02_Areas/Infrastructure/` and `02_Areas/Deployments/`), the indexer previously skipped it. Since v1.5.0, the generator forces all top-level P.A.R.A. folders + any detected subfolders. Run `generate_index` after every change.
-
-### Step 6f: Exclude `.git/` from All Operations
-
-Both the linter and index generator **must** skip `.git/`. In P.O.W.E.R. v1.5.0+ this is automatic via:
-
-```python
-dirs[:] = [d for d in dirs if not d.startswith(".")]
-```
-
-Without this, the linter will find 200+ `.md` files inside `.git/` (commit objects, ref logs) and report them as notes, inflating the total count and potentially writing `_index.md` files into `.git/` subdirectories.
+---
 
 ### Step 6g: Daily Maintenance Protocol
 
-Every AI agent session should end with:
+Each session working with the vault should conclude with a maintenance cycle:
+1. **Save session log** — Create a note in `06_Daily_Logs/` (type: `Daily Log`) describing the work done.
+2. **Rebuild index** — Run `power index` to update `index.md` and `_index.md`.
+3. **Log the change** — Add a brief entry to the central `log.md`.
+4. **Validate status (Lint)** — Run `power lint` to confirm no regressions are present.
 
-1. **Save session summary** — create a `06_Daily_Logs/YYYY-MM-DD_session-name.md` with `type: Daily Log`
-2. **Regenerate index** — call `generate_index(vault_path)`
-3. **Log the change** — append to `log.md` in the same format
-4. **Run lint** — call `lint_vault(vault_path)` to catch any regressions
-
-```yaml
-# Example Daily Log frontmatter
 ---
-type: Daily Log
-title: "YYYY-MM-DD What was done"
-description: "One-line summary of the session"
-timestamp: 2026-07-03T18:55:00
----
-
-# YYYY-MM-DD Session: What was done
-
-## Summary
-...
-```
 
 ### Step 6h: Cross-Session Continuity Checklist
 
-Before starting work, the agent should:
+Before beginning a new work session, the AI agent should:
+1. Read the general project rules and system instructions.
+2. Read the `MASTER-LESSONS-LEARNED.md` error log.
+3. Run `power lint` to check the current health of the database.
+4. Read the index `index.md` and the change log `log.md`.
 
-1. Read `AGENTS.md` (auto-loaded via `instructions` array)
-2. Read `MASTER-LESSONS-LEARNED.md` (auto-loaded)
-3. Run `lint_vault(vault_path)` to check for regressions since last session
-4. Read `index.md` to understand current vault state
-5. Read `log.md` tail to see what happened in the last session
+---
 
-### Step 6i: Git Sync & GPG-Signed Publication
+### Step 6i: Git Sync & Publication
 
-Since Obsidian and P.O.W.E.R. vaults are usually version-controlled, the final part of any session or migration is synchronization and publication:
-
-1. **Load Git Credentials**: Always source `GITHUB_USER_NAME` and `GITHUB_USER_EMAIL` from your `.env` file to configure your local Git identity (`git config user.name`/`user.email`). This prevents commits from being attributed to `root` or local hostnames.
-2. **GPG Signing Configuration**:
-   - Verify the availability of the private key using `gpg --list-secret-keys`.
-   - If missing, import the key from `.asc` file (`gpg --import key.asc`) and immediately delete the `.asc` file for security.
-   - Configure Git to sign commits by default: `git config commit.gpgsign true`.
-3. **Branching & Signing**:
-   - Create a feature branch: `git checkout -b feature/migration-name`.
-   - Add modified/new files and commit with a GPG signature: `git commit -S -m "docs: complete migration to P.O.W.E.R."`.
-4. **Push & Pull Request**:
-   - Push the branch: `git push origin feature/migration-name`.
-   - Open and merge a Pull Request on GitHub. If the terminal sandbox prevents `gh` CLI authentication, use raw `curl` API requests with `GITHUB_RELEASE_TOKEN` loaded from `.env`.
-5. **CI/CD Verification**: Check the status of your documentation website deployment workflows (e.g. GitHub Actions executing MkDocs builds).
+Set up a synchronization pipeline to preserve history and enable collaboration:
+1. **Committer Identity**: Configure Git's `user.name` and `user.email` to match your developer profile. Avoid committing as system users like `root`.
+2. **Security Configurations**: Add confidential files (keys, passwords, `.env`, temporary export files) to `.gitignore`.
+3. **GPG Signing (If Required)**: Enable GPG-signed commits (`commit.gpgsign=true`) using your personal GPG key.
+4. **Git Workflow (PR Workflow)**:
+   - Perform work on dedicated feature branches (`feature/*`).
+   - Merge changes into the main branch via a Pull Request after all local checks and CI/CD validation builds pass.
 
 ---
 
