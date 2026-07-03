@@ -9,7 +9,6 @@ Validate, index, search, and manage your Obsidian vault from the command line â€
 [![CI](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/P%2EO%2EW%2EE%2ER?logo=github)](https://github.com/weby-homelab/P.O.W.E.R/releases)
-[![PyPI](https://img.shields.io/pypi/v/power-framework?logo=pypi&logoColor=white)](https://pypi.org/project/power-framework/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CodeQL](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/codeql.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/codeql.yml)
