@@ -4,16 +4,25 @@
 
 # P.O.W.E.R. — AI-Native Toolkit для Obsidian
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-E74C3C?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
-[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-00C853?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io/)
+Валідуйте, індексуйте, шукайте та керуйте вашим vault Obsidian з терміналу — або дозвольте AI-агентам робити це через MCP. Створено для людей, які хочуть машиночитабельні нотатки, автоматичну перевірку якості та токен-ефективний AI-доступ до свого Second Brain.
+
 [![CI](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/P%2EO%2EW%2EE%2ER?logo=github)](https://github.com/weby-homelab/P.O.W.E.R/releases)
 [![PyPI](https://img.shields.io/pypi/v/power-framework?logo=pypi&logoColor=white)](https://pypi.org/project/power-framework/)
-[![Downloads](https://img.shields.io/pypi/dm/power-framework?logo=pypi&logoColor=white)](https://pypi.org/project/power-framework/)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CodeQL](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/codeql.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/codeql.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs--material-8A2BE2?logo=materialformkdocs)](https://weby-homelab.github.io/P.O.W.E.R/)
 
-Валідуйте, індексуйте та керуйте вашим vault Obsidian з терміналу — або дозвольте AI-агентам робити це через MCP.
+## Чому P.O.W.E.R.?
+
+На відміну від звичайних Obsidian-інструментів, P.O.W.E.R. спроектовано для **AI-орієнтованого керування знаннями**:
+
+- **AI-нативні метадані** — Pydantic v2 схеми забезпечують строгий OKF frontmatter; кожна нотатка машиночитабельна
+- **Токен-ефективна індексація** — ієрархічний `index.md` + `_index.md` скорочує використання контексту AI-агентів на ~75%
+- **MCP-нативний** — всі інструменти доступні будь-якому MCP-клієнту (Claude, OpenCode, Cursor) без додаткового коду
+- **Продакшн-якість** — 144 тести, 90% покриття, CodeQL сканування, OIDC-підписані PyPI релізи
 
 ## Швидкий старт
 
@@ -29,12 +38,13 @@ power index ~/my-vault     # Згенерувати каталог index.md
 
 | Функція | Що робить |
 |---------|-----------|
-| **CLI** | `power init`, `lint`, `index`, `ingest` — керування vault з терміналу |
-| **MCP Server** | Надає `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note` будь-якому AI-агенту (Claude, Cursor, OpenCode) |
+| **CLI** | `power init`, `lint`, `index`, `ingest`, `search` — повне керування vault з терміналу |
+| **MCP Server** | Надає `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault` будь-якому AI-агенту (Claude, Cursor, OpenCode) |
 | **OKF Validation** | Pydantic v2 схеми забезпечують строгу валідацію метаданих кожної нотатки |
+| **Повнотекстовий пошук** | Пошук з релевантним ранжуванням по заголовку, тілу та тегам з контекстними снипетами |
 | **Hierarchical Index** | `index.md` (навігаційна карта) + `*/_index.md` (детальні каталоги) для економії токенів AI-агентів (~75-94%) |
-| **LLM-Wiki** | Автоматична індексація каталогу, хронологічний лог та структурний лінтинг посилань (філософія A. Karpathy) |
-| **Auto-Sync** | Cron-сумісний скрипт з GPG-підписаними комітами для безперервного бекапу |
+| **CI/CD** | 144 тести, 90% покриття, CodeQL SAST, OIDC Trusted Publishing до PyPI |
+| **Документація** | Повний [mkdocs-material сайт](https://weby-homelab.github.io/P.O.W.E.R/) з API reference та гайдами |
 
 ## Звіт міграції
 
@@ -54,6 +64,7 @@ power index ~/my-vault     # Згенерувати каталог index.md
 power init <path>              Створити новий vault зі структурою P.A.R.A.
 power lint <path>              Сканування на биті посилання, відсутні метадані, сиріт
 power index <path>             Перебудувати каталог index.md з усіх нотаток
+power search <path> <query>    Повнотекстовий пошук з релевантним ранжуванням
 power ingest <path> [опції]    Створити нову нотатку з валідованими OKF метаданими
 ```
 
@@ -61,7 +72,14 @@ power ingest <path> [опції]    Створити нову нотатку з 
 
 ```bash
 power ingest ~/my-vault --type Project --title "Мій Додаток" --description "Новий проєкт"
-power ingest ~/my-vault --type Resource --title "Docker Гайд" --description "Найкращі практики Docker" --tags [devops, docker] --resource "https://docs.docker.com"
+power ingest ~/my-vault --type Resource --title "Docker Гайд" --description "Найкращі практики Docker" --tags devops,docker --resource "https://docs.docker.com"
+```
+
+### Приклади пошуку
+
+```bash
+power search ~/my-vault "api аутентифікація"
+power search ~/my-vault "гайд деплой" --max-results 5
 ```
 
 ## Налаштування MCP Server
@@ -69,7 +87,7 @@ power ingest ~/my-vault --type Resource --title "Docker Гайд" --description 
 Підключіть P.O.W.E.R. до будь-якого MCP-сумісного AI-клієнта:
 
 ```bash
-pip install power-framework mcp
+pip install power-framework
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -78,7 +96,7 @@ pip install power-framework mcp
   "mcpServers": {
     "power": {
       "command": "python3",
-      "args": ["-m", "mcp_servers.power_server"],
+      "args": ["-m", "power_framework.mcp"],
       "env": {
         "POWER_VAULT_DIR": "/path/to/your/obsidian/vault"
       }
@@ -92,7 +110,7 @@ pip install power-framework mcp
 "mcp": {
   "power": {
     "type": "local",
-    "command": ["python3", "-m", "mcp_servers.power_server"],
+    "command": ["python3", "-m", "power_framework.mcp"],
     "enabled": true
   }
 }
@@ -180,18 +198,20 @@ graph TB
     GPG --> PR
 ```
 
-### Бібліотека (`power_core`)
+### Бібліотека (`src/power_framework/`)
 
 | Модуль | Призначення |
 |--------|------------|
-| `models.py` | Pydantic v2 схеми для OKF валідації метаданих |
-| `parser.py` | Безпечний YAML frontmatter парсинг (PyYAML) |
-| `indexer.py` | Сканування vault та генерація index.md |
-| `linter.py` | Перевірки: биті посилання, відсутні метадані, сироти |
-| `utils.py` | Захист від path traversal, атомарний запис, бекапи |
-| `cli.py` | Командний рядок (init, lint, index, ingest) |
+| `core/models.py` | Pydantic v2 схеми для OKF валідації метаданих |
+| `core/parser.py` | Безпечний YAML frontmatter парсинг (PyYAML) |
+| `core/indexer.py` | Сканування vault та генерація index.md |
+| `core/linter.py` | Перевірки: биті посилання, відсутні метадані, сироти |
+| `core/searcher.py` | Повнотекстовий пошук з релевантним ранжуванням |
+| `core/utils.py` | Захист від path traversal, атомарний запис, бекапи |
+| `core/cli.py` | Командний рядок (init, lint, index, ingest, search) |
+| `mcp/server.py` | FastMCP сервер, що надає всі інструменти AI-агентам |
 
-Всі компоненти використовують `power_core` як єдине джерело правди.
+Всі компоненти використовують `power_framework.core` як єдине джерело правди.
 
 </details>
 
@@ -203,15 +223,15 @@ cd P.O.W.E.R
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Запуск тестів
+# Запуск тестів (144 тести, 90%+ покриття)
 pytest tests/ -v
 
 # Лінтинг та форматування
-ruff check power_core/ mcp_servers/ scripts/ tests/
-ruff format power_core/ mcp_servers/ scripts/ tests/
+ruff check src/ tests/
+ruff format src/ tests/
 
 # Перевірка типів
-mypy power_core/
+mypy src/power_framework/
 ```
 
 ## Ліцензія

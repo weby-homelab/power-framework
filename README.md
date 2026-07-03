@@ -4,16 +4,25 @@
 
 # P.O.W.E.R. — AI-Native Toolkit for Obsidian
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-E74C3C?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
-[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-00C853?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io/)
+Validate, index, search, and manage your Obsidian vault from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
+
 [![CI](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/P%2EO%2EW%2EE%2ER?logo=github)](https://github.com/weby-homelab/P.O.W.E.R/releases)
 [![PyPI](https://img.shields.io/pypi/v/power-framework?logo=pypi&logoColor=white)](https://pypi.org/project/power-framework/)
-[![Downloads](https://img.shields.io/pypi/dm/power-framework?logo=pypi&logoColor=white)](https://pypi.org/project/power-framework/)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CodeQL](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/codeql.yml/badge.svg)](https://github.com/weby-homelab/P.O.W.E.R/actions/workflows/codeql.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs--material-8A2BE2?logo=materialformkdocs)](https://weby-homelab.github.io/P.O.W.E.R/)
 
-Validate, index, and manage your Obsidian vault from the command line — or let AI agents do it through MCP.
+## Why P.O.W.E.R.?
+
+Unlike generic Obsidian helpers, P.O.W.E.R. is designed from the ground up for **AI-first knowledge management**:
+
+- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable
+- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
+- **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
+- **Production-grade** — 144 tests, 90% coverage, CodeQL scanning, OIDC-signed PyPI releases
 
 ## Quick Start
 
@@ -29,12 +38,13 @@ power index ~/my-vault     # Generate catalog index.md
 
 | Feature | What it does |
 |---------|-------------|
-| **CLI** | `power init`, `lint`, `index`, `ingest` — manage your vault from terminal |
-| **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note` to any AI agent |
+| **CLI** | `power init`, `lint`, `index`, `ingest`, `search` — full vault management from terminal |
+| **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault` to any AI agent |
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
+| **Full-Text Search** | Relevance-scored search across title, body, and tags with context snippets |
 | **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings) |
-| **LLM-Wiki** | Automated catalog indexing, chronological log, and structural link linting (A. Karpathy's philosophy) |
-| **Auto-Sync** | Cron-compatible script with GPG-signed commits for continuous backup |
+| **CI/CD** | 144 tests, 90% coverage, CodeQL SAST, OIDC Trusted Publishing to PyPI |
+| **Documentation** | Full [mkdocs-material site](https://weby-homelab.github.io/P.O.W.E.R/) with API reference and guides |
 
 ## Migration Report
 
@@ -54,6 +64,7 @@ Read the full technical report on the transition from flat to hierarchical index
 power init <path>              Create a new vault with P.A.R.A. folder structure
 power lint <path>              Scan for broken links, missing metadata, orphans
 power index <path>             Generate hierarchical index (index.md + _index.md files)
+power search <path> <query>    Full-text search with relevance scoring
 power ingest <path> [options]  Create a new note with validated OKF metadata
 ```
 
@@ -61,7 +72,14 @@ power ingest <path> [options]  Create a new note with validated OKF metadata
 
 ```bash
 power ingest ~/my-vault --type Project --title "My App" --description "A new project"
-power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Docker best practices" --tags [devops, docker] --resource "https://docs.docker.com"
+power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Docker best practices" --tags devops,docker --resource "https://docs.docker.com"
+```
+
+### Search Examples
+
+```bash
+power search ~/my-vault "api authentication"
+power search ~/my-vault "deployment guide" --max-results 5
 ```
 
 ## MCP Server Setup
@@ -69,7 +87,7 @@ power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Do
 Connect P.O.W.E.R. to any MCP-compatible AI client:
 
 ```bash
-pip install power-framework mcp
+pip install power-framework
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -78,7 +96,7 @@ pip install power-framework mcp
   "mcpServers": {
     "power": {
       "command": "python3",
-      "args": ["-m", "mcp_servers.power_server"],
+      "args": ["-m", "power_framework.mcp"],
       "env": {
         "POWER_VAULT_DIR": "/path/to/your/obsidian/vault"
       }
@@ -92,7 +110,7 @@ pip install power-framework mcp
 "mcp": {
   "power": {
     "type": "local",
-    "command": ["python3", "-m", "mcp_servers.power_server"],
+    "command": ["python3", "-m", "power_framework.mcp"],
     "enabled": true
   }
 }
@@ -200,18 +218,20 @@ graph TB
     GPG --> PR
 ```
 
-### Core Library (`power_core`)
+### Core Library (`src/power_framework/`)
 
 | Module | Purpose |
 |--------|---------|
-| `models.py` | Pydantic v2 schemas for OKF metadata validation |
-| `parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
-| `indexer.py` | Vault scanning and index.md generation |
-| `linter.py` | Health checks: broken links, missing metadata, orphans |
-| `utils.py` | Path traversal protection, atomic writes, backups |
-| `cli.py` | Command-line interface (init, lint, index, ingest) |
+| `core/models.py` | Pydantic v2 schemas for OKF metadata validation |
+| `core/parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
+| `core/indexer.py` | Vault scanning and index.md generation |
+| `core/linter.py` | Health checks: broken links, missing metadata, orphans |
+| `core/searcher.py` | Full-text search with relevance scoring |
+| `core/utils.py` | Path traversal protection, atomic writes, backups |
+| `core/cli.py` | Command-line interface (init, lint, index, ingest, search) |
+| `mcp/server.py` | FastMCP server exposing all tools to AI agents |
 
-All components share `power_core` as the single source of truth.
+All components share `power_framework.core` as the single source of truth.
 
 </details>
 
@@ -223,15 +243,15 @@ cd P.O.W.E.R
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests
+# Run tests (144 tests, 90%+ coverage)
 pytest tests/ -v
 
 # Lint & format
-ruff check power_core/ mcp_servers/ scripts/ tests/
-ruff format power_core/ mcp_servers/ scripts/ tests/
+ruff check src/ tests/
+ruff format src/ tests/
 
 # Type check
-mypy power_core/
+mypy src/power_framework/
 ```
 
 ## License
