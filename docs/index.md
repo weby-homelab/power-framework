@@ -1,8 +1,6 @@
-# P.O.W.E.R. Framework
+# About P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 
 **P.O.W.E.R.** — AI-native Python toolkit for Obsidian knowledge bases. Validate, index, and manage your vault with the **P.A.R.A. + OKF** methodology.
-
-## About P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 
 P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, automated scripts, and LLM-based autonomous agents. It integrates three distinct architectural frameworks to construct a coherent, self-validating, and token-efficient Second Brain:
 
