@@ -185,23 +185,30 @@ def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
         f"timestamp: {datetime.now(timezone.utc).isoformat()}",
         "---",
         "",
-        f"# {display_name} — Detailed Index",
-        "",
     ]
 
-    sorted_notes = sorted(notes, key=lambda x: x["title"])
-
-    for note in sorted_notes:
-        lines.append(f"## {note['title']}")
-        lines.append(f"- **Path:** `{note['rel_path']}`")
-        lines.append(f"- **Type:** {note['note_type']}")
-        lines.append(f"- **Description:** {note['description']}")
-        if note["tags"]:
-            tags_str = ", ".join(note["tags"])
-            lines.append(f"- **Tags:** [{tags_str}]")
-        if note["timestamp"]:
-            lines.append(f"- **Updated:** {note['timestamp'][:10]}")
+    if not notes:
+        lines.append(f"# {display_name}")
         lines.append("")
+        lines.append("_No notes in this category yet._")
+        lines.append("")
+    else:
+        lines.append(f"# {display_name} — Detailed Index")
+        lines.append("")
+
+        sorted_notes = sorted(notes, key=lambda x: x["title"])
+
+        for note in sorted_notes:
+            lines.append(f"## {note['title']}")
+            lines.append(f"- **Path:** `{note['rel_path']}`")
+            lines.append(f"- **Type:** {note['note_type']}")
+            lines.append(f"- **Description:** {note['description']}")
+            if note["tags"]:
+                tags_str = ", ".join(note["tags"])
+                lines.append(f"- **Tags:** [{tags_str}]")
+            if note["timestamp"]:
+                lines.append(f"- **Updated:** {note['timestamp'][:10]}")
+            lines.append("")
 
     return "\n".join(lines)
 
@@ -252,17 +259,16 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
     main_content = generate_main_index_content(folder_notes)
     atomic_write(main_index_path, main_content)
 
-    sub_index_results = []
+    sub_index_results = ["  index.md (navigation map)"]
     for folder in PARA_FOLDERS:
-        if folder_notes.get(folder):
-            sub_index_path = vault_dir / folder / "_index.md"
-            sub_content = generate_sub_index_content(folder, folder_notes[folder])
-            atomic_write(sub_index_path, sub_content)
-            sub_index_results.append(f"  {folder}/_index.md ({len(folder_notes[folder])} notes)")
+        notes = folder_notes.get(folder, [])
+        sub_index_path = vault_dir / folder / "_index.md"
+        sub_content = generate_sub_index_content(folder, notes)
+        atomic_write(sub_index_path, sub_content)
+        sub_index_results.append(f"  {folder}/_index.md ({len(notes)} notes)")
 
     lines = [
         f"Generated hierarchical index with {total_notes} total notes:",
-        "  index.md (navigation map)",
     ]
     lines.extend(sub_index_results)
 

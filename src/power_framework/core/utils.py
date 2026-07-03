@@ -145,4 +145,4 @@ def is_excluded_orphan(filename: str, rel_path: str) -> bool:
     return filename in EXCLUDED_ORPHAN_FILES or rel_path.startswith("06_Daily_Logs/")
 
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"

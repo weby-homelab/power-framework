@@ -5,6 +5,16 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-07-03
+
+### Added
+- **Phase 6: Post-Migration Self-Maintenance** in `docs/migration-guide.md` (EN) and `docs/migration-guide.ua.md` (UA) — 8-step protocol covering official framework installation, `.geminiignore` token optimization, agent instructions array, wiki-link auto-repair, `_index.md` behavior, `.git/` exclusion, daily maintenance protocol, and cross-session continuity checklist
+- **Empty folder support in hierarchical index**: `run_generate_hierarchical_index()` now generates `_index.md` for ALL P.A.R.A. folders even when they contain zero notes, preventing 404 navigation map links
+- **Descriptive empty state in `_index.md`**: Empty folders display "_No notes in this category yet._" instead of a blank page
+
+### Fixed
+- **Navigation map dead links**: `generate_main_index_content` now correctly lists all P.A.R.A. folders in the navigation table regardless of whether they have notes; each folder's `_index.md` always exists
+
 ## [1.5.0] - 2026-07-03
 
 ### Added
@@ -88,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Initial public release with basic MCP server and skill scripts
 
+[1.5.1]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/weby-homelab/P.O.W.E.R/compare/v1.2.2...v1.3.0
