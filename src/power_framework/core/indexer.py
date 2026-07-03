@@ -45,7 +45,7 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
             if note_type not in concepts:
                 concepts[note_type] = []
             concepts[note_type].append((rel_path, title, desc))
-        except Exception:
+        except Exception:  # noqa: S112
             continue
 
     return concepts
@@ -96,7 +96,7 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
             if top_folder not in folder_notes:
                 folder_notes[top_folder] = []
             folder_notes[top_folder].append(note_info)
-        except Exception:
+        except Exception:  # noqa: S112
             continue
 
     return folder_notes
@@ -114,8 +114,7 @@ def generate_index_content(concepts: dict[str, list[tuple[str, str, str]]]) -> s
         "",
         "# Knowledge Catalog (OKF Index)",
         "",
-        "This file is automatically maintained by AI agents and contains "
-        "a registry of all knowledge base pages classified by type.",
+        "This file is automatically maintained by AI agents and contains a registry of all knowledge base pages classified by type.",
         "",
     ]
 

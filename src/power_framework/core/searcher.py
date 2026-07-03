@@ -39,7 +39,7 @@ class SearchResult:
 
 def _tokenize(text: str) -> list[str]:
     """Split text into lowercase tokens."""
-    return re.findall(r"[a-z0-9а-яєіїґ']+", text.lower())
+    return re.findall(r"[a-z0-9а-яєіїґ']+", text.lower())  # noqa: RUF001
 
 
 def _make_snippet(content: str, terms: list[str]) -> str:
@@ -147,7 +147,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
                     tags=metadata.tags,
                 )
             )
-        except Exception:
+        except Exception:  # noqa: S112
             continue
 
     return results

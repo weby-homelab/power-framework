@@ -35,5 +35,3 @@ __all__ = [
     "__version__",
     "cli_main",
 ]
-
-

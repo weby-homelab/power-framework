@@ -15,9 +15,12 @@ Uses power_core for all business logic, ensuring consistency.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from power_framework.core import (
     PARA_FOLDERS,

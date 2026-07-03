@@ -22,26 +22,31 @@ def test_full_cycle_init_ingest_lint_index(tmp_path: Path) -> None:
     vault = tmp_path / "integration_vault"
 
     # Step 1: init
-    with patch.object(sys, "argv", ["power", "init", str(vault)]):
-        with pytest.raises(SystemExit) as exc:
-            main()
+    with patch.object(sys, "argv", ["power", "init", str(vault)]), pytest.raises(SystemExit) as exc:
+        main()
     assert exc.value.code == 0
     assert vault.exists()
     assert (vault / "01_Projects").is_dir()
 
     # Step 2: ingest a note
-    with patch.object(
-        sys,
-        "argv",
-        [
-            "power",
-            "ingest",
-            str(vault),
-            "--type", "Project",
-            "--title", "Integration Test",
-            "--description", "A project created during integration test",
-        ],
-    ), pytest.raises(SystemExit) as exc:
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "ingest",
+                str(vault),
+                "--type",
+                "Project",
+                "--title",
+                "Integration Test",
+                "--description",
+                "A project created during integration test",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
         main()
     assert exc.value.code == 0
     note = vault / "01_Projects" / "integration_test.md"
@@ -98,9 +103,8 @@ def test_init_then_lint_broken_vault(tmp_path: Path) -> None:
     vault = tmp_path / "broken_integration"
 
     # init
-    with patch.object(sys, "argv", ["power", "init", str(vault)]):
-        with pytest.raises(SystemExit) as exc:
-            main()
+    with patch.object(sys, "argv", ["power", "init", str(vault)]), pytest.raises(SystemExit) as exc:
+        main()
     assert exc.value.code == 0
 
     # Run index first to generate index.md with frontmatter

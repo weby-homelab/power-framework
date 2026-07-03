@@ -53,7 +53,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
     vault_dir = _resolve_path(args.path)
 
     if vault_dir.exists() and any(vault_dir.iterdir()):
-        print(f"⚠️  Directory {vault_dir} is not empty. Use an empty directory or a new path.")
+        print(f"⚠️  Directory {vault_dir} is not empty. Use an empty directory or a new path.")  # noqa: T201
         return 1
 
     created = []
@@ -62,12 +62,10 @@ def _cmd_init(args: argparse.Namespace) -> int:
         dir_path.mkdir(parents=True, exist_ok=True)
         created.append(f"  {entry}/")
 
-    # Create index.md
     index_path = vault_dir / "index.md"
     atomic_write(index_path, "")
     created.append("  index.md")
 
-    # Create a minimal template note
     template_path = vault_dir / "05_Templates" / "default.md"
     content = TEMPLATE_NOTE.format(
         type="Resource",
@@ -78,17 +76,16 @@ def _cmd_init(args: argparse.Namespace) -> int:
     atomic_write(template_path, content)
     created.append("  05_Templates/default.md")
 
-    # Create initial log.md
     generate_log_initial(vault_dir, 0)
     created.append("  log.md")
 
-    print(f"Created vault structure at {vault_dir}")
+    print(f"Created vault structure at {vault_dir}")  # noqa: T201
     for item in created:
-        print(item)
-    print()
-    print("Next steps:")
-    print(f"  power index {args.path}")
-    print(f"  power lint  {args.path}")
+        print(item)  # noqa: T201
+    print()  # noqa: T201
+    print("Next steps:")  # noqa: T201
+    print(f"  power index {args.path}")  # noqa: T201
+    print(f"  power lint  {args.path}")  # noqa: T201
     return 0
 
 
@@ -96,11 +93,11 @@ def _cmd_lint(args: argparse.Namespace) -> int:
     """Run health lint on the vault."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")
+        print(f"Vault not found: {vault_dir}")  # noqa: T201
         return 1
 
     report = run_lint_report(vault_dir)
-    print(report)
+    print(report)  # noqa: T201
     return 0
 
 
@@ -108,11 +105,11 @@ def _cmd_index(args: argparse.Namespace) -> int:
     """Generate hierarchical index (index.md + _index.md files) from vault notes."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")
+        print(f"Vault not found: {vault_dir}")  # noqa: T201
         return 1
 
     msg = run_generate_hierarchical_index(vault_dir)
-    print(f"Generated hierarchical index:\n{msg}")
+    print(f"Generated hierarchical index:\n{msg}")  # noqa: T201
     return 0
 
 
@@ -120,7 +117,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     """Create a new note with OKF metadata."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")
+        print(f"Vault not found: {vault_dir}")  # noqa: T201
         return 1
 
     note_type = args.type
@@ -146,8 +143,8 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     note_path = target_dir / f"{safe_name}.md"
 
     if note_path.exists() and not args.overwrite:
-        print(f"Note already exists: {note_path}")
-        print("Use --overwrite to replace it.")
+        print(f"Note already exists: {note_path}")  # noqa: T201
+        print("Use --overwrite to replace it.")  # noqa: T201
         return 1
 
     metadata = OKFMetadata(
@@ -161,7 +158,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     fm = build_frontmatter(metadata)
     body = f"{fm}\n\n# {title}\n\n"
     atomic_write(note_path, body)
-    print(f"Created note: {note_path.relative_to(vault_dir)}")
+    print(f"Created note: {note_path.relative_to(vault_dir)}")  # noqa: T201
     return 0
 
 
@@ -169,7 +166,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
     """Full-text search across vault notes."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")
+        print(f"Vault not found: {vault_dir}")  # noqa: T201
         return 1
 
     query = args.query
@@ -177,7 +174,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
 
     results = search_vault(vault_dir, query, max_results=max_results)
     report = format_search_results(results, query)
-    print(report)
+    print(report)  # noqa: T201
     return 0
 
 

@@ -41,7 +41,7 @@ PARA_FOLDERS: tuple[str, ...] = (
     "06_Daily_Logs",
 )
 
-VAULT_STRUCTURE: tuple[str, ...] = PARA_FOLDERS + ("05_Templates", "PROTOCOLS")
+VAULT_STRUCTURE: tuple[str, ...] = (*PARA_FOLDERS, "05_Templates", "PROTOCOLS")
 
 MAX_DESCRIPTION_LENGTH = 150
 MAX_TITLE_LENGTH = 200

@@ -53,8 +53,7 @@ class LintResult:
 
         if self.orphans:
             lines.append(f"WARNING: Orphan notes (no inbound links) ({len(self.orphans)}):")
-            for rp in sorted(self.orphans):
-                lines.append(f"  - {rp}")
+            lines.extend(f"  - {rp}" for rp in sorted(self.orphans))
             lines.append("")
 
         if not self.has_issues:
@@ -117,7 +116,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
 
         try:
             content = read_file_content(abs_path)
-        except Exception:
+        except Exception:  # noqa: S112
             continue
 
         if not has_frontmatter(content):
@@ -136,7 +135,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
                     result.broken_links.append((rel_path, target))
 
     inbound_counts: dict[str, int] = dict.fromkeys(links, 0)
-    for _rel_path, targets in links.items():
+    for targets in links.values():
         for target in targets:
             if target in all_files:
                 target_rel = rel_paths[target]
