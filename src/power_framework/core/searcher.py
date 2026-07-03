@@ -1,13 +1,15 @@
 """
 P.O.W.E.R. Full-Text Search Engine.
 
-Zero-dependency search across vault notes with ranked results,
+SQLite FTS5-powered search across vault notes with ranked results,
 context snippets, and metadata-aware scoring.
 """
 
 from __future__ import annotations
 
+import os
 import re
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -38,12 +40,12 @@ class SearchResult:
 
 
 def _tokenize(text: str) -> list[str]:
-    """Split text into lowercase tokens."""
+    """Split text into lowercase tokens (kept for backward compatibility)."""
     return re.findall(r"[a-z0-9а-яєіїґ']+", text.lower())  # noqa: RUF001
 
 
 def _make_snippet(content: str, terms: list[str]) -> str:
-    """Extract a relevant snippet around the first match of any term."""
+    """Extract a relevant snippet around the first match (kept for backward compatibility)."""
     lower = content.lower()
     best_pos = -1
     for term in terms:
@@ -74,7 +76,7 @@ def _score_note(
     metadata: OKFMetadata,
     terms: list[str],
 ) -> tuple[float, int, str]:
-    """Score a single note against search terms using weighted TF matching."""
+    """Score a single note against search terms (kept for backward compatibility)."""
     total_score = 0.0
     total_matches = 0
 
@@ -86,7 +88,7 @@ def _score_note(
     for term in terms:
         term_lower = term.lower()
 
-        # Title match (highest weight)
+        # Title match
         title_count = title_lower.count(term_lower)
         if title_count:
             total_score += title_count * TITLE_WEIGHT
@@ -104,7 +106,7 @@ def _score_note(
             total_score += desc_count * DESCRIPTION_WEIGHT
             total_matches += desc_count
 
-        # Body content match (lowest weight)
+        # Body content match
         body_count = content_lower.count(term_lower)
         if body_count:
             total_score += body_count * CONTENT_WEIGHT
@@ -115,7 +117,7 @@ def _score_note(
 
 
 def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
-    """Scan vault and return scored search results."""
+    """Scan vault and return scored search results (kept for backward compatibility / fallback)."""
     results: list[SearchResult] = []
 
     for filepath in vault_dir.rglob("*.md"):
@@ -153,17 +155,98 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
     return results
 
 
+def _init_db(conn: sqlite3.Connection) -> None:
+    """Initialize the SQLite database schema."""
+    conn.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS fts_notes USING fts5(
+            title,
+            tags,
+            description,
+            content,
+            rel_path UNINDEXED,
+            note_type UNINDEXED,
+            tokenize='unicode61'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS file_metadata (
+            rel_path TEXT PRIMARY KEY,
+            mtime REAL
+        )
+    """)
+    conn.commit()
+
+
+def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
+    """Synchronize the files in the vault with the SQLite database."""
+    # 1. Get all markdown files in the vault
+    disk_files: dict[str, float] = {}
+    for filepath in vault_dir.rglob("*.md"):
+        if filepath.name in ("index.md", "log.md", "_index.md"):
+            continue
+        rel_parts = filepath.relative_to(vault_dir).parts
+        if any(part in EXCLUDED_DIRS for part in rel_parts):
+            continue
+
+        try:
+            rel_path = str(filepath.relative_to(vault_dir))
+            mtime = filepath.stat().st_mtime
+            disk_files[rel_path] = mtime
+        except Exception:
+            continue
+
+    # 2. Get files from the database
+    cursor = conn.cursor()
+    cursor.execute("SELECT rel_path, mtime FROM file_metadata")
+    db_files = {row[0]: row[1] for row in cursor.fetchall()}
+
+    # 3. Find files to delete
+    to_delete = [rel_path for rel_path in db_files if rel_path not in disk_files]
+    if to_delete:
+        cursor.executemany("DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete])
+        cursor.executemany("DELETE FROM file_metadata WHERE rel_path = ?", [(r,) for r in to_delete])
+
+    # 4. Find files to insert or update
+    for rel_path, mtime in disk_files.items():
+        if rel_path not in db_files or db_files[rel_path] != mtime:
+            filepath = vault_dir / rel_path
+            try:
+                content = read_file_content(filepath)
+                metadata = validate_metadata(content)
+                if metadata is None:
+                    cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,))
+                    continue
+
+                tags_str = " ".join(metadata.tags)
+                
+                # Delete existing just in case
+                cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
+                
+                # Insert new fts note
+                cursor.execute(
+                    "INSERT INTO fts_notes (title, tags, description, content, rel_path, note_type) VALUES (?, ?, ?, ?, ?, ?)",
+                    (metadata.title, tags_str, metadata.description, content, rel_path, metadata.type),
+                )
+                cursor.execute(
+                    "INSERT OR REPLACE INTO file_metadata (rel_path, mtime) VALUES (?, ?)",
+                    (rel_path, mtime),
+                )
+            except Exception:
+                continue
+
+    conn.commit()
+
+
 def search_vault(vault_dir: Path, query: str, max_results: int = 20) -> list[SearchResult]:
     """
-    Search the vault for notes matching the query.
+    Search the vault for notes matching the query using SQLite FTS5.
 
     Supports:
-    - Multi-word queries (space-separated terms)
+    - Multi-word queries
     - Phrase matching via double quotes
-    - Case-insensitive matching
-    - Weighted scoring: title > tags > description > body
-
-    Returns ranked results sorted by relevance score.
+    - Prefix wildcard matching
+    - Ranked results sorted by weighted relevance score
     """
     if not query or not query.strip():
         return []
@@ -172,22 +255,79 @@ def search_vault(vault_dir: Path, query: str, max_results: int = 20) -> list[Sea
     if not vault_dir.is_dir():
         return []
 
-    # Parse query into terms (split by whitespace, handle quoted phrases)
+    # Clean query and tokenize for FTS5 syntax
+    clean_query = re.sub(r'[^\w\s"а-яєіїґ\']', ' ', query, flags=re.IGNORECASE)
     terms: list[str] = []
-    for match in re.finditer(r'"([^"]+)"|(\S+)', query.strip()):
-        term = (match.group(1) or match.group(2)).strip().lower()
-        if term:
-            terms.append(term)
+    for match in re.finditer(r'"([^"]+)"|(\S+)', clean_query):
+        phrase = match.group(1)
+        word = match.group(2)
+        if phrase:
+            terms.append(f'"{phrase.strip()}"')
+        elif word:
+            terms.append(f"{word.strip()}*")
 
-    if not terms:
+    fts_query = " AND ".join(terms) if terms else ""
+    if not fts_query:
         return []
 
-    results = _scan_and_search(vault_dir, terms)
+    db_path = vault_dir / ".power_search.db"
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        _init_db(conn)
+        _sync_vault_to_db(vault_dir, conn)
 
-    # Sort by score descending, then by match count
-    results.sort(key=lambda r: (-r.score, -r.match_count, r.title))
-
-    return results[:max_results]
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT 
+                rel_path, 
+                title, 
+                description, 
+                note_type, 
+                -bm25(fts_notes, 10.0, 5.0, 3.0, 1.0) as score,
+                snippet(fts_notes, 3, '...', '...', '...', 15) as snippet_text,
+                tags
+            FROM fts_notes
+            WHERE fts_notes MATCH ?
+            ORDER BY score DESC
+            LIMIT ?
+            """,
+            (fts_query, max_results),
+        )
+        
+        results: list[SearchResult] = []
+        for row in cursor.fetchall():
+            rel_path, title, description, note_type, score, snippet, tags_str = row
+            tags = tags_str.split(" ") if tags_str else []
+            match_count = 1  # FTS5 matches are ranked by score, match_count is 1 as fallback
+            results.append(
+                SearchResult(
+                    rel_path=rel_path,
+                    title=title,
+                    description=description,
+                    note_type=note_type,
+                    score=float(score),
+                    snippet=snippet,
+                    match_count=match_count,
+                    tags=tags,
+                )
+            )
+        
+        conn.close()
+        return results
+    except Exception:
+        # Fallback to in-memory search if SQLite fails
+        terms_fallback: list[str] = []
+        for match in re.finditer(r'"([^"]+)"|(\S+)', query.strip()):
+            term = (match.group(1) or match.group(2)).strip().lower()
+            if term:
+                terms_fallback.append(term)
+        if not terms_fallback:
+            return []
+        fallback_results = _scan_and_search(vault_dir, terms_fallback)
+        fallback_results.sort(key=lambda r: (-r.score, -r.match_count, r.title))
+        return fallback_results[:max_results]
 
 
 def format_search_results(results: list[SearchResult], query: str) -> str:
@@ -211,3 +351,4 @@ def format_search_results(results: list[SearchResult], query: str) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
