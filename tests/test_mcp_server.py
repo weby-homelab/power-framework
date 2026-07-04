@@ -7,6 +7,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from power_framework.mcp.power_server import (
+    generate_index,
+    ingest_note,
     lint_vault,
     read_sub_index,
     search_vault_tool,
@@ -52,3 +54,43 @@ def test_search_vault_no_matches(sample_vault: Path) -> None:
 def test_lint_vault_on_sample(sample_vault: Path) -> None:
     result = lint_vault(vault_path=str(sample_vault))
     assert "P.O.W.E.R. Health Lint Report" in result
+
+
+def test_generate_index_tool(sample_vault: Path) -> None:
+    result = generate_index(vault_path=str(sample_vault))
+    assert "hierarchical index" in result
+    assert (sample_vault / "index.md").exists()
+
+
+def test_ingest_note_tool(sample_vault: Path) -> None:
+    # Prepare a log.md since ingest_note appends to it if it exists
+    log_file = sample_vault / "log.md"
+    log_file.write_text("Change Log\n", encoding="utf-8")
+
+    result = ingest_note(
+        name="01_Projects/NewMcpNote.md",
+        note_type="Project",
+        title="New MCP Note",
+        description="Created via MCP server tool",
+        content="Hello world",
+        vault_path=str(sample_vault),
+    )
+    assert "successfully ingested" in result
+
+    note_path = sample_vault / "01_Projects" / "NewMcpNote.md"
+    assert note_path.exists()
+
+    content = note_path.read_text(encoding="utf-8")
+    assert 'title: "New MCP Note"' in content
+
+    # Test error when already exists
+    result_fail = ingest_note(
+        name="01_Projects/NewMcpNote.md",
+        note_type="Project",
+        title="New MCP Note",
+        description="Created via MCP server tool",
+        content="Hello world",
+        vault_path=str(sample_vault),
+    )
+    assert "Error: Note already exists" in result_fail
+

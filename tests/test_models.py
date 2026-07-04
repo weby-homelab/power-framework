@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from power_framework.core.models import (
     MAX_DESCRIPTION_LENGTH,
     MAX_TITLE_LENGTH,
+    NoteFile,
     NoteType,
     OKFMetadata,
 )
@@ -155,3 +156,40 @@ class TestOKFMetadata:
             timestamp=datetime(2026, 1, 1),
         )
         assert meta.title == "Test Title"
+
+
+class TestNoteFile:
+    """Tests for NoteFile helper class."""
+
+    def test_note_file_properties(self) -> None:
+        meta = OKFMetadata(
+            type="Project",
+            title="My Project",
+            description="Test description",
+            timestamp=datetime(2026, 1, 1),
+        )
+        note = NoteFile(
+            abs_path="/root/vault/01_Projects/MyProject.md",
+            rel_path="01_Projects/MyProject.md",
+            metadata=meta,
+            raw_content="Some content",
+        )
+        assert note.abs_path == "/root/vault/01_Projects/MyProject.md"
+        assert note.rel_path == "01_Projects/MyProject.md"
+        assert note.metadata == meta
+        assert note.raw_content == "Some content"
+        assert note.filename == "MyProject.md"
+        assert note.clean_name == "myproject"
+        assert note.has_valid_metadata is True
+        assert note.note_type == "Project"
+
+    def test_note_file_no_metadata(self) -> None:
+        note = NoteFile(
+            abs_path="/root/vault/01_Projects/MyProject.md",
+            rel_path="01_Projects/MyProject.md",
+            metadata=None,
+            raw_content="Some content",
+        )
+        assert note.has_valid_metadata is False
+        assert note.note_type is None
+

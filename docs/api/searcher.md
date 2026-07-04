@@ -1,19 +1,24 @@
 # Searcher
 
-Full-text search with relevance scoring.
+Full-text search with relevance scoring using SQLite FTS5 (with memory fallback).
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `search_vault(path, query, max_results)` | `list[SearchResult]` | Search vault notes |
-| `tokenize(text)` | `list[str]` | Lowercase, strip punctuation |
-| `score_note(note_path, tokens)` | `float` | Score note by title/body/tag matches |
-| `format_search_results(results)` | `str` | Pretty-print search results |
+| `search_vault(vault_dir, query, max_results)` | `list[SearchResult]` | Search the vault for notes matching the query |
+| `format_search_results(results, query)` | `str` | Format search results into a human-readable report string |
 
 ## `SearchResult`
 
+Class representing a single search result with relevance details.
+
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `path` | `Path` | Note file path |
+| `rel_path` | `str` | Note relative path |
 | `title` | `str` | Note title |
-| `score` | `float` | Relevance score |
+| `description` | `str` | Note description |
+| `note_type` | `str` | Note OKF type |
+| `score` | `float` | Weighted relevance score |
 | `snippet` | `str` | Context window around match |
+| `match_count` | `int` | Match count fallback |
+| `tags` | `list[str]` | List of tags associated with the note |
+

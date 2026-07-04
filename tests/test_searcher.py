@@ -168,3 +168,13 @@ class TestSearchVault:
         results = search_vault(sample_vault, '"Test Project"')
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
+
+    def test_search_vault_fallback_on_sqlite_error(self, sample_vault: Path):
+        import sqlite3
+        from unittest.mock import patch
+        with patch("sqlite3.connect", side_effect=sqlite3.Error("Mocked SQLite Error")):
+
+            results = search_vault(sample_vault, "Test")
+            assert len(results) > 0
+            assert any("Test" in r.title for r in results)
+
