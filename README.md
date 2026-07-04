@@ -2,9 +2,9 @@
   <b>ENG</b> | <a href="README.ua.md">UKR</a>
 </p>
 
-# P.O.W.E.R. — AI-Native Toolkit for Obsidian
+# P.O.W.E.R. — AI-Native Toolkit for Second Brain
 
-Validate, index, search, and manage your Obsidian vault from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
+Validate, index, search, and manage your knowledge base from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
@@ -13,6 +13,15 @@ Validate, index, search, and manage your Obsidian vault from the command line �
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CodeQL](https://github.com/weby-homelab/power-framework/actions/workflows/codeql.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/codeql.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-8A2BE2?logo=materialformkdocs)](https://weby-homelab.github.io/power-framework/)
+
+## About P.O.W.E.R. - Hybrid Knowledge Management Framework
+
+P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, automated scripts, and LLM-based autonomous agents. The name is an acronym representing its core components: **P**.A.R.A., **O**KF, **W**iki, and **E**xecution **R**ules. It integrates these distinct architectural frameworks to construct a coherent, self-validating, and token-efficient Second Brain:
+
+*   **P (P.A.R.A. Method)** — Organizes files based on actionability into **P**rojects, **A**reas, **R**esources, and **A**rchives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
+*   **O (OKF Overlay - Open Knowledge Format)** — Imposes a strict schema layer over standard Markdown files. Built on Pydantic v2 schemas, OKF requires every note to be explicitly typed and validated (containing required frontmatter attributes such as title, description, tags, and timestamps). This turns unstructured markdown folders into a predictable, queryable, and machine-readable local database.
+*   **W (LLM-Wiki)** — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation that slashes AI agent context usage by **75% to 94%**.
+*   **E.R. (Execution Rules)** — Integrates operational rules and guidelines specifically formatted for AI agents (like `AGENTS.md`, `Successor-Hub.md`, and `MASTER-LESSONS-LEARNED.md`), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system.
 
 ## Why P.O.W.E.R.?
 
@@ -60,7 +69,7 @@ Step-by-step protocol for any AI agent (Claude, GPT, Gemini, OpenCode) to autono
 
 ## Who Is This For
 
-- **Obsidian users** who want AI agents to understand and maintain their vault
+- **Knowledge workers** who want AI agents to understand and maintain their knowledge base
 - **Developers** building a structured Second Brain with machine-readable metadata
 - **Teams** that need consistent note formatting and automated quality checks
 
@@ -183,7 +192,7 @@ The framework combines four complementary methodologies:
 
 ```mermaid
 graph TB
-    subgraph Human ["👤 Human (Obsidian UI)"]
+    subgraph Human ["👤 Human (Markdown UI)"]
         PARA["P.A.R.A. Directory Structure"]
     end
 

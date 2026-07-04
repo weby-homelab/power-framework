@@ -2,9 +2,9 @@
   <a href="README.md">ENG</a> | <b>UKR</b>
 </p>
 
-# P.O.W.E.R. — AI-Native Toolkit для Obsidian
+# P.O.W.E.R. — AI-Native Toolkit для Second Brain
 
-Валідуйте, індексуйте, шукайте та керуйте вашим vault Obsidian з терміналу — або дозвольте AI-агентам робити це через MCP. Створено для людей, які хочуть машиночитабельні нотатки, автоматичну перевірку якості та токен-ефективний AI-доступ до свого Second Brain.
+Валідуйте, індексуйте, шукайте та керуйте вашою базою знань з терміналу — або дозвольте AI-агентам робити це через MCP. Створено для людей, які хочуть машиночитабельні нотатки, автоматичну перевірку якості та токен-ефективний AI-доступ до свого Second Brain.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
@@ -13,6 +13,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CodeQL](https://github.com/weby-homelab/power-framework/actions/workflows/codeql.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/codeql.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-8A2BE2?logo=materialformkdocs)](https://weby-homelab.github.io/power-framework/)
+
+## Про P.O.W.E.R. - Hybrid Knowledge Management Framework
+
+P.O.W.E.R. — це гібридна система, створена для подолання прірви між людськими робочими процесами, автоматичними скриптами та автономними ШІ-агентами на базі LLM. Назва є абревіатурою, що розшифровується за її ключовими компонентами: **P**.A.R.A., **O**KF, **W**iki та **E**xecution **R**ules. Вона об'єднує ці архітектурні підходи в цілісний, самовалідований та токен-ефективний Second Brain:
+
+*   **P (Метод P.A.R.A.)** — організовує файли за рівнем їх активності на **P**rojects (Проєкти), **A**reas (Сфери відповідальності), **R**esources (Ресурси) та **A**rchives (Архіви). P.O.W.E.R. використовує цю структуру каталогів для визначення життєвого циклу нотаток. Інформація природним чином перетікає від швидких записів в Inbox до активних проєктів, довгострокових довідників та, зрештою, архівів.
+*   **O (OKF Overlay - Open Knowledge Format)** — накладає строгий рівень схем метаданих поверх стандартних Markdown файлів. Побудований на базі Pydantic v2 схем, OKF вимагає, щоб кожна нотатка мала чітко визначений тип та проходила валідацію метаданих (обов'язкові атрибути YAML frontmatter: заголовок, опис, теги та мітка часу). Це перетворює неструктуровані текстові папки на передбачувану локальну базу знань, придатну для машинного аналізу.
+*   **W (LLM-Wiki)** — перетворює базу знань на ієрархічний каталог, зрозумілий для штучного інтелекту. Завдяки генерації загального навігаційного файлу `index.md` та локальних підкаталогів `_index.md` у кожній папці, система забезпечує токен-ефективну навігацію, яка скорочує використання контексту ШІ-агентами на **75-94%**.
+*   **E.R. (Execution Rules - Правила Виконання)** — впроваджує операційні інструкції та правила безпечної поведінки, розроблені спеціально для ШІ-агентів (наприклад, `AGENTS.md`, `Successor-Hub.md` та `MASTER-LESSONS-LEARNED.md`). Вони встановлюють безпечні межі для автономного редагування та визначають, як саме люди й ШІ мають взаємодіяти з системою.
 
 ## Чому P.O.W.E.R.?
 
@@ -60,7 +69,7 @@ power index ~/my-vault     # Згенерувати каталог index.md
 
 ## Для кого це
 
-- **Користувачі Obsidian**, які хочуть щоб AI-агенти розуміли та підтримували їх vault
+- **Користувачі баз знань**, які хочуть щоб AI-агенти розуміли та підтримували їх базу знань
 - **Розробники**, що будують структурований Second Brain з машиночитабельними метаданими
 - **Команди**, яким потрібне консистентне форматування нотаток та автоматична перевірка якості
 
@@ -168,7 +177,7 @@ timestamp: 2026-07-02T19:00:00
 
 ```mermaid
 graph TB
-    subgraph Human ["👤 Human (Obsidian UI)"]
+    subgraph Human ["👤 Human (Markdown UI)"]
         PARA["P.A.R.A. Directory Structure"]
     end
 
