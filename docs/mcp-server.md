@@ -59,12 +59,12 @@ Create a new note with strict OKF metadata frontmatter.
 | `tags` | `string[]` | No | List of tags |
 | `vault_path` | `string` | No | Path to vault root |
 
-### `search_vault`
+### `search_vault_tool`
 
 Full-text search across vault notes.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `query` | `string` | Yes | Search query |
-| `max_results` | `integer` | No | Max results (default: 10) |
+| `max_results` | `integer` | No | Max results (default: 20) |
 | `vault_path` | `string` | No | Path to vault root |

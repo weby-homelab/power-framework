@@ -17,7 +17,7 @@ src/power_framework/
 └── mcp/
     ├── __init__.py
     ├── __main__.py     # python -m entry point
-    └── server.py       # FastMCP server (5 tools)
+    └── power_server.py # FastMCP server (5 tools)
 
 tests/
 ├── test_cli.py         # CLI functional tests

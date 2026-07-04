@@ -6,9 +6,6 @@ repo_url: "https://github.com/weby-homelab/power-framework"
 repo_name: weby-homelab/power-framework
 edit_uri: "edit/main/docs/"
 
-extra_files:
-  - robots.txt
-
 theme:
   name: material
   palette:
@@ -30,6 +27,7 @@ markdown_extensions:
       alternate_style: true
   - toc:
       permalink: true
+      slugify: !!python/name:pymdownx.slugs.uslugify
 
 nav:
   - Home: index.md

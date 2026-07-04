@@ -41,17 +41,17 @@ power ingest --title "My Note" --type Resource --description "A useful resource"
 ## Run health checks
 
 ```bash
-power lint
+power lint .
 ```
 
 ## Generate index
 
 ```bash
-power index
+power index .
 ```
 
 ## Search
 
 ```bash
-power search "my query"
+power search . "my query"
 ```
