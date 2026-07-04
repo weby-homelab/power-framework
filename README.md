@@ -21,7 +21,7 @@ P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, a
 *   **P (P.A.R.A. Method)** — Organizes files based on actionability into **P**rojects, **A**reas, **R**esources, and **A**rchives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
 *   **O (OKF Overlay - Open Knowledge Format)** — Imposes a strict schema layer over standard Markdown files. Built on Pydantic v2 schemas, OKF requires every note to be explicitly typed and validated (containing required frontmatter attributes such as title, description, tags, and timestamps). This turns unstructured markdown folders into a predictable, queryable, and machine-readable local database.
 *   **W (LLM-Wiki)** — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation that slashes AI agent context usage by **75% to 94%**.
-*   **E.R. (Execution Rules)** — Integrates operational rules and guidelines specifically formatted for AI agents (like `AGENTS.md`, `Successor-Hub.md`, and `MASTER-LESSONS-LEARNED.md`), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system.
+*   **E.R. (Execution Rules)** — Integrates operational rules and guidelines specifically formatted for AI agents (like `RULES.md`, `PROMPTS.md`, and system-level guidelines), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system.
 
 
 
@@ -32,7 +32,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable
 - **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
 - **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
-- **Production-grade** — 144 tests, 86%+ coverage, CodeQL scanning, OIDC-signed PyPI releases
+- **Production-grade** — 144 tests, 86%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
 
 ## Quick Start
 
@@ -53,7 +53,7 @@ power index ~/my-vault     # Generate catalog index.md
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
 | **Full-Text Search** | Relevance-scored search across title, body, and tags with context snippets |
 | **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings) |
-| **CI/CD** | 144 tests, 86%+ coverage, CodeQL SAST, OIDC Trusted Publishing to PyPI |
+| **CI/CD** | 144 tests, 86%+ coverage, CodeQL SAST, Automated GitHub Releases |
 | **Documentation** | Full [mkdocs-material site](https://weby-homelab.github.io/P.O.W.E.R/) with API reference and guides |
 
 ## Migration Report
