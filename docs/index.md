@@ -8,13 +8,14 @@ P.A.R.A. Method (Tiago Forte) — Organizes files based on actionability into Pr
 OKF (Open Knowledge Format) Overlay — Imposes a strict schema layer over standard Markdown files. Built on Pydantic v2 schemas, OKF requires every note to be explicitly typed and validated (containing required frontmatter attributes such as title, description, tags, and timestamps). This turns unstructured markdown folders into a predictable, queryable, and machine-readable local database.
 LLM-Wiki & Execution Rules — Integrates operational rules and guidelines specifically formatted for AI agents (like RULES.md, PROMPTS.md, and system-level guidelines). By coupling these rules with Hierarchical Indexing (generating top-level index.md maps and folder-level _index.md sub-catalogs), it slashes AI agent context usage by 75% to 94% and enforces safe, non-destructive editing boundaries.
 
-Why P.O.W.E.R. is Unique¶
+## Why P.O.W.E.R.?
 
-Most knowledge management frameworks force a trade-off: they are either optimized for human layout (messy folders, visual tags) or strictly formatted for database processing (JSON/databases, zero formatting).
+Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for AI-first knowledge management:
 
-P.O.W.E.R. is unique because it provides a dual-interface hybrid overlay: 1. Human-Friendly Interface — Standard Markdown knowledge base readable by any markdown editor or app. 2. AI-Friendly Interface — Programmatic Model Context Protocol (MCP) server coupled with hierarchical navigation indexes that let LLM agents explore, search, and edit notes with surgical precision and minimal token usage.
-
-It allows human authors and AI agents to securely co-author, co-lint, and co-maintain the same Second Brain as equals.
+- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable
+- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
+- **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
+- **Production-grade** — 144 tests, 86%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
 
 ## Features
 
