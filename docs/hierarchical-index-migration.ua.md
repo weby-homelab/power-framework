@@ -9,7 +9,7 @@ timestamp: 2026-07-03T02:20:00
 # P.O.W.E.R. Звіт міграції на ієрархічний індекс
 
 **Дата:** 03 липня 2026
-**Версія:** P.O.W.E.R. v1.4.0
+**Версія:** P.O.W.E.R. v1.5.1
 **Автор:** Weby Homelab AI Team
 **Статус:** Завершено, Production
 
@@ -484,5 +484,5 @@ run_generate_hierarchical_index(Path('/path/to/vault'))
 ---
 
 *Звіт підготовлено: 2026-07-03T02:20:00Z*
-*P.O.W.E.R. Framework v1.4.0*
+*P.O.W.E.R. Framework v1.5.1*
 *Weby Homelab AI Team*

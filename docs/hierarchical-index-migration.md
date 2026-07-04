@@ -9,7 +9,7 @@ timestamp: 2026-07-03T02:20:00
 # P.O.W.E.R. Hierarchical Index Migration Report
 
 **Date:** July 3, 2026
-**Version:** P.O.W.E.R. v1.4.0
+**Version:** P.O.W.E.R. v1.5.1
 **Author:** Weby Homelab AI Team
 **Status:** Completed, Production
 
@@ -484,5 +484,5 @@ run_generate_hierarchical_index(Path('/path/to/vault'))
 ---
 
 *Report prepared: 2026-07-03T02:20:00Z*
-*P.O.W.E.R. Framework v1.4.0*
+*P.O.W.E.R. Framework v1.5.1*
 *Weby Homelab AI Team*
