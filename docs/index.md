@@ -6,7 +6,7 @@ P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, a
 
 *   **P.A.R.A. Method (Tiago Forte)** — Organizes files based on actionability into **P**rojects, **A**reas, **R**esources, and **A**rchives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
 *   **OKF (Open Knowledge Format) Overlay** — Imposes a strict schema layer over standard Markdown files. Built on Pydantic v2 schemas, OKF requires every note to be explicitly typed and validated (containing required frontmatter attributes such as title, description, tags, and timestamps). This turns unstructured markdown folders into a predictable, queryable, and machine-readable local database.
-*   **LLM-Wiki & Execution Rules** — Integrates operational rules and guidelines specifically formatted for AI agents (like `AGENTS.md`, `Successor-Hub.md`, and `MASTER-LESSONS-LEARNED.md`). By coupling these rules with **Hierarchical Indexing** (generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs), it slashes AI agent context usage by **75% to 94%** and enforces safe, non-destructive editing boundaries.
+*   **LLM-Wiki & Execution Rules** — Integrates operational rules and guidelines specifically formatted for AI agents (like `RULES.md`, `PROMPTS.md`, and system-level guidelines). By coupling these rules with **Hierarchical Indexing** (generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs), it slashes AI agent context usage by **75% to 94%** and enforces safe, non-destructive editing boundaries.
 
 ### Why P.O.W.E.R. is Unique
 
