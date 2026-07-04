@@ -60,7 +60,7 @@ class OKFMetadata(BaseModel):
         description="Single-line summary for the catalog index",
     )
     resource: str | None = Field(default=None, description="External source URL")
-    tags: list[str] = Field(default_factory=list, description="Obsidian tags")
+    tags: list[str] = Field(default_factory=list, description="Markdown tags")
     timestamp: datetime = Field(description="Last modified ISO-8601 timestamp")
 
     model_config = ConfigDict(extra="ignore", use_enum_values=True)

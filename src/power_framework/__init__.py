@@ -1,5 +1,5 @@
 """
-P.O.W.E.R. Framework — AI-native toolkit for Obsidian knowledge bases.
+P.O.W.E.R. Framework — AI-native toolkit for Second Brain knowledge bases.
 
 Modules:
     power_framework.core — Core library (models, parser, linter, searcher, indexer, CLI)

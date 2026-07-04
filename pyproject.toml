@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "power-framework"
 version = "1.5.1"
-description = "AI-native toolkit for Obsidian knowledge bases — validate, index, and manage notes via CLI or MCP"
+description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
 requires-python = ">=3.10"
 authors = [
     { name = "Weby Homelab", email = "rekvizitor.ua@gmail.com" }
 ]
-keywords = ["knowledge-management", "obsidian", "second-brain", "mcp", "ai-agents", "para", "okf"]
+keywords = ["knowledge-management", "second-brain", "mcp", "ai-agents", "para", "okf"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

@@ -1,5 +1,5 @@
 """
-P.O.W.E.R. CLI — AI-Native Toolkit for Obsidian.
+P.O.W.E.R. CLI — AI-Native Toolkit for Second Brain.
 
 Usage:
     power init ~/my-vault
@@ -182,7 +182,7 @@ def main() -> None:
     """P.O.W.E.R. CLI entry point."""
     parser = argparse.ArgumentParser(
         prog="power",
-        description="AI-Native Toolkit for Obsidian — validate, index, and manage your knowledge base.",
+        description="AI-Native Toolkit for Second Brain — validate, index, and manage your knowledge base.",
     )
     parser.add_argument(
         "-v",
@@ -223,7 +223,7 @@ def main() -> None:
     p_ingest.add_argument("--title", required=True, help="Note title")
     p_ingest.add_argument("--description", required=True, help="Short summary (max 150 chars)")
     p_ingest.add_argument("--resource", default=None, help="External URL (optional)")
-    p_ingest.add_argument("--tags", nargs="*", default=[], help="Obsidian tags")
+    p_ingest.add_argument("--tags", nargs="*", default=[], help="Markdown tags")
     p_ingest.add_argument("--overwrite", action="store_true", help="Overwrite existing note")
     p_ingest.set_defaults(func=_cmd_ingest)
 

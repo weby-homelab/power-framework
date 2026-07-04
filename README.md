@@ -7,7 +7,7 @@
 Validate, index, search, and manage your knowledge base from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/power-framework?logo=github)](https://github.com/weby-homelab/power-framework/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -27,12 +27,12 @@ P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, a
 
 ## Why P.O.W.E.R.?
 
-Unlike generic Obsidian helpers, P.O.W.E.R. is designed from the ground up for **AI-first knowledge management**:
+Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for **AI-first knowledge management**:
 
 - **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable
 - **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
 - **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
-- **Production-grade** — 144 tests, 90% coverage, CodeQL scanning, OIDC-signed PyPI releases
+- **Production-grade** — 144 tests, 86%+ coverage, CodeQL scanning, OIDC-signed PyPI releases
 
 ## Quick Start
 
@@ -53,7 +53,7 @@ power index ~/my-vault     # Generate catalog index.md
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
 | **Full-Text Search** | Relevance-scored search across title, body, and tags with context snippets |
 | **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings) |
-| **CI/CD** | 144 tests, 90% coverage, CodeQL SAST, OIDC Trusted Publishing to PyPI |
+| **CI/CD** | 144 tests, 86%+ coverage, CodeQL SAST, OIDC Trusted Publishing to PyPI |
 | **Documentation** | Full [mkdocs-material site](https://weby-homelab.github.io/P.O.W.E.R/) with API reference and guides |
 
 ## Migration Report
@@ -64,7 +64,7 @@ Read the full technical report on the transition from flat to hierarchical index
 
 ### AI Agent Migration Guide
 
-Step-by-step protocol for any AI agent (Claude, GPT, Gemini, OpenCode) to autonomously migrate an existing Obsidian vault into P.O.W.E.R. structure:
+Step-by-step protocol for any AI agent (Claude, GPT, Gemini, OpenCode) to autonomously migrate an existing knowledge base into P.O.W.E.R. structure:
 
 - **[English: AI Agent Migration Guide](docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
 - **[Українська: Ґайд міграції для AI-агента](docs/migration-guide.ua.md)** — покроковий протокол для будь-якого AI-агента
@@ -115,7 +115,7 @@ pip install power-framework
       "command": "python3",
       "args": ["-m", "power_framework.mcp"],
       "env": {
-        "POWER_VAULT_DIR": "/path/to/your/obsidian/vault"
+        "POWER_VAULT_DIR": "/path/to/your/my-vault"
       }
     }
   }
@@ -260,7 +260,7 @@ cd power-framework
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests (144 tests, 90%+ coverage)
+# Run tests (144 tests, 86%+ coverage)
 pytest tests/ -v
 
 # Lint & format
