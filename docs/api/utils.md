@@ -14,6 +14,6 @@ Utility functions for path safety, file I/O, and versioning.
 
 | Name | Value |
 |------|-------|
-| `__version__` | `"1.4.0"` |
+| `__version__` | `"1.5.1"` |
 | `VAULT_STRUCTURE` | `dict[str, str]` of P.A.R.A. folders |
 | `PARA_FOLDERS` | `list[str]` of folder names |

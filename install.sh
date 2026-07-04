@@ -7,10 +7,10 @@
 set -euo pipefail
 
 # Read version from source if available locally, otherwise use fallback
-if [ -f "power_core/utils.py" ]; then
-    VERSION=$(python3 -c "exec(open('power_core/utils.py').read()); print(__version__)" 2>/dev/null || echo "1.4.0")
+if [ -f "src/power_framework/core/utils.py" ]; then
+    VERSION=$(python3 -c "exec(open('src/power_framework/core/utils.py').read()); print(__version__)" 2>/dev/null || echo "1.5.1")
 else
-    VERSION="1.4.0"
+    VERSION="1.5.1"
 fi
 TARGET_DIR="${1:-$PWD}"
 REPO_URL="https://raw.githubusercontent.com/weby-homelab/power-framework/main"
