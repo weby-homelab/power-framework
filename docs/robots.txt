@@ -1,0 +1,8 @@
+# robots.txt for power-framework GitHub Pages
+# Allow all crawlers — AI bots, search engines, documentation indexers
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://weby-homelab.github.io/power-framework/sitemap.xml

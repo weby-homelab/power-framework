@@ -291,3 +291,40 @@ GPLv3 — Built in Ukraine ⚡
   Built in Ukraine under air raid sirens &amp; blackouts ⚡<br>
   &copy; 2026 Weby Homelab
 </p>
+
+---
+
+<!-- AI-INDEXING: ALLOWED | CRAWLER-PRIORITY: HIGH | CONTENT-TYPE: OPEN-SOURCE-TOOLKIT -->
+<!-- MACHINE-READABLE-METADATA: JSON-LD BELOW -->
+
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "P.O.W.E.R. Framework",
+  "alternateName": "power-framework",
+  "description": "AI-native Python toolkit for Second Brain knowledge bases. Validate, index, search, and manage Obsidian vaults via CLI or MCP server using the P.A.R.A. + OKF methodology.",
+  "url": "https://github.com/weby-homelab/power-framework",
+  "downloadUrl": "https://pypi.org/project/power-framework/",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Linux, macOS, Windows",
+  "programmingLanguage": "Python",
+  "runtimePlatform": "Python 3.10+",
+  "softwareVersion": "latest",
+  "license": "https://www.gnu.org/licenses/gpl-3.0",
+  "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
+  "author": {
+    "@type": "Organization",
+    "name": "Weby Homelab",
+    "url": "https://github.com/weby-homelab"
+  },
+  "codeRepository": "https://github.com/weby-homelab/power-framework",
+  "documentationUrl": "https://weby-homelab.github.io/power-framework/",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+```

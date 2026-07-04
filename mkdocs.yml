@@ -1,9 +1,13 @@
 site_name: P.O.W.E.R. Framework
-site_description: AI-native toolkit for Obsidian knowledge bases — validate, index, and manage notes via CLI or MCP
+site_description: AI-native Python toolkit for Second Brain knowledge bases — validate, index, search, and manage Obsidian vaults via CLI or MCP server. Uses P.A.R.A. + OKF methodology.
 site_url: "https://weby-homelab.github.io/power-framework"
+site_author: "Weby Homelab"
 repo_url: "https://github.com/weby-homelab/power-framework"
 repo_name: weby-homelab/power-framework
 edit_uri: "edit/main/docs/"
+
+extra_files:
+  - robots.txt
 
 theme:
   name: material
