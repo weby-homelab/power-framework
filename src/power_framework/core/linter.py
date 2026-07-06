@@ -16,9 +16,10 @@ Checks for:
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from .parser import has_frontmatter, has_type_field, parse_frontmatter, read_file_content
@@ -48,7 +49,7 @@ class LintResult:
 
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable lint report."""
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         lines = [
             "=== P.O.W.E.R. Health Lint Report ===",
             f"Vault scanned: {vault_dir}",
@@ -100,7 +101,9 @@ class ROTResult:
 
     @property
     def has_issues(self) -> bool:
-        return bool(self.redundant or self.outdated or self.trivial or self.content_dedup or self.link_rot)
+        return bool(
+            self.redundant or self.outdated or self.trivial or self.content_dedup or self.link_rot
+        )
 
     @property
     def total_issues(self) -> int:
@@ -114,7 +117,7 @@ class ROTResult:
 
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable ROT audit report, including extended A2 metrics."""
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         lines = [
             "=== P.O.W.E.R. ROT Audit Report ===",
             f"Vault scanned: {vault_dir}",
@@ -150,7 +153,9 @@ class ROTResult:
 
         if self.link_rot:
             total_broken = sum(len(urls) for urls in self.link_rot.values())
-            lines.append(f"LINK ROT: Broken external links ({total_broken}) in {len(self.link_rot)} notes:")
+            lines.append(
+                f"LINK ROT: Broken external links ({total_broken}) in {len(self.link_rot)} notes:"
+            )
             for rp, urls in sorted(self.link_rot.items()):
                 for url, status in urls:
                     status_label = "ERR" if status == -1 else str(status)
@@ -169,8 +174,7 @@ class ROTResult:
             unused = [p for p, c in self.usage_counts.items() if c == 0]
             if unused:
                 lines.append(f"USAGE: Never-accessed notes ({len(unused)}):")
-                for rp in sorted(unused)[:20]:
-                    lines.append(f"  - {rp}")
+                lines.extend(f"  - {rp}" for rp in sorted(unused)[:20])
                 if len(unused) > 20:
                     lines.append(f"  ... and {len(unused) - 20} more")
                 lines.append("")
@@ -183,7 +187,7 @@ class ROTResult:
 
 def _tokenize_for_similarity(text: str) -> set[str]:
     """Split text into lowercase word tokens for similarity comparison."""
-    return set(re.findall(r"[a-z0-9а-яєіїґ']+", text.lower()))
+    return set(re.findall(r"[a-z0-9а-яєіїґ']+", text.lower()))  # noqa: RUF001
 
 
 def _title_similarity(title_a: str, title_b: str) -> float:
@@ -276,12 +280,13 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
         if fm and "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
-                if isinstance(expiry_val, date) and expiry_val < date.today():
+                if isinstance(expiry_val, date) and expiry_val < datetime.now(timezone.utc).date():
                     result.stale_notes.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
-                pass
+                logging.exception("Invalid expiry value in %s", rel_path)
 
         file_links = _extract_links(content)
+
         links[rel_path] = file_links
 
     for rel_path, targets in links.items():
@@ -359,10 +364,10 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
         if "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
-                if isinstance(expiry_val, date) and expiry_val < date.today():
+                if isinstance(expiry_val, date) and expiry_val < datetime.now(timezone.utc).date():
                     stale_list.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
-                pass
+                logging.exception("Invalid expiry value in %s", rel_path)
 
         # Track trivial (body content < threshold)
         body = _get_body_content(content)
@@ -394,26 +399,26 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
         try:
             dedup = ContentDedupDetector()
             result.content_dedup = dedup.detect(vault_dir)
-        except Exception:  # noqa: S112
-            pass
+        except Exception:
+            logging.exception("Content dedup failed")
 
         try:
             link_checker = LinkRotChecker()
             result.link_rot = link_checker.check_all(vault_dir)
-        except Exception:  # noqa: S112
-            pass
+        except Exception:
+            logging.exception("Link rot check failed")
 
         try:
             scorer = FreshnessScorer()
             result.freshness_scores = scorer.score_all(vault_dir)
-        except Exception:  # noqa: S112
-            pass
+        except Exception:
+            logging.exception("Freshness scoring failed")
 
         try:
             tracker = UsageTracker(vault_dir)
             result.usage_counts = tracker.get_all_counts()
-        except Exception:  # noqa: S112
-            pass
+        except Exception:
+            logging.exception("Usage tracking failed")
 
     return result
 
@@ -439,7 +444,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
     Returns: Summary string of actions taken
     """
     archive_dir = vault_dir / "04_Archive"
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     moved: list[str] = []
     errors: list[str] = []
 
@@ -472,7 +477,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
                 if isinstance(expiry_val, date) and expiry_val < today:
                     is_expired = True
             except (ValueError, TypeError):
-                pass
+                logging.exception("Invalid expiry value in %s", rel)
 
         if not is_archived_status and not is_expired:
             continue

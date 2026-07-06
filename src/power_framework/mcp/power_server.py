@@ -18,6 +18,7 @@ Uses power_core for all business logic, ensuring consistency.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -33,11 +34,8 @@ from power_framework.core import (
     archive_stale_notes,
     atomic_write,
     build_frontmatter,
-    check_all as check_markdown,
-    fix_all as fix_markdown,
     format_relation_suggestions,
     format_search_results,
-    heal_frontmatter,
     heal_vault,
     read_file_content,
     resolve_vault_path,
@@ -48,6 +46,9 @@ from power_framework.core import (
     scan_folder_notes,
     search_vault,
     suggest_related,
+)
+from power_framework.core import (
+    check_all as check_markdown,
 )
 
 mcp = FastMCP("power")
@@ -311,6 +312,7 @@ def check_markdown_tool(
         try:
             content = read_file_content(filepath)
         except Exception:
+            logging.exception("Failed to read %s", filepath)
             continue
 
         issues = check_markdown(content)

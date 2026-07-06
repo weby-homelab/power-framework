@@ -120,7 +120,7 @@ class TestArchiveStaleNotes:
     def test_live_move_stale_note(self, vault_with_issues: Path):
         archive_dir = vault_with_issues / "04_Archive"
         assert not archive_dir.exists()
-        result = archive_stale_notes(vault_with_issues, dry_run=False)
+        archive_stale_notes(vault_with_issues, dry_run=False)
         assert archive_dir.exists()
         assert (archive_dir / "StaleNote.md").exists()
         assert not (vault_with_issues / "03_Resources" / "StaleNote.md").exists()

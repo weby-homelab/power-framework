@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -267,6 +268,7 @@ def _cmd_markdown_check(args: argparse.Namespace) -> int:
         try:
             content = read_file_content(filepath)
         except Exception:
+            logging.exception("Failed to read %s", filepath)
             continue
 
         issues = check_markdown_issues(content)

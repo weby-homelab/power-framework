@@ -335,7 +335,7 @@ def _cosine_similarity(vec_a: dict[str, float], vec_b: dict[str, float]) -> floa
     norm_b = sum(v * v for v in vec_b.values()) ** 0.5
     if norm_a == 0 or norm_b == 0:
         return 0.0
-    return dot_product / (norm_a * norm_b)
+    return float(dot_product / (norm_a * norm_b))
 
 
 def _vector_search(

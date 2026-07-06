@@ -22,11 +22,13 @@ def check_trailing_whitespace(content: str) -> list[dict]:
     issues: list[dict] = []
     for i, line in enumerate(content.split("\n"), 1):
         if TRAILING_WS_PATTERN.search(line) and line.strip():
-            issues.append({
-                "line": i,
-                "type": "trailing-whitespace",
-                "context": line.rstrip()[:60],
-            })
+            issues.append(
+                {
+                    "line": i,
+                    "type": "trailing-whitespace",
+                    "context": line.rstrip()[:60],
+                }
+            )
     return issues
 
 
@@ -59,11 +61,13 @@ def check_list_markers(content: str) -> list[dict]:
 
     for indent, markers in indent_markers.items():
         if len(markers) > 1:
-            issues.append({
-                "line": 1,
-                "type": "inconsistent-list-markers",
-                "context": f"Indent level {indent} uses {', '.join(sorted(markers))}",
-            })
+            issues.append(
+                {
+                    "line": 1,
+                    "type": "inconsistent-list-markers",
+                    "context": f"Indent level {indent} uses {', '.join(sorted(markers))}",
+                }
+            )
 
     return issues
 
@@ -101,11 +105,13 @@ def check_header_jumps(content: str) -> list[dict]:
             if seen_levels:
                 prev_max = max(seen_levels)
                 if level > prev_max + 1 and prev_max > 0:
-                    issues.append({
-                        "line": i,
-                        "type": "header-jump",
-                        "context": f"h{prev_max} -> h{level} (skipped h{level - 1})",
-                    })
+                    issues.append(
+                        {
+                            "line": i,
+                            "type": "header-jump",
+                            "context": f"h{prev_max} -> h{level} (skipped h{level - 1})",
+                        }
+                    )
             seen_levels.add(level)
 
     return issues
@@ -121,11 +127,13 @@ def check_code_block_language(content: str) -> list[dict]:
             if not in_code:
                 in_code = True
                 if not match.group(1):
-                    issues.append({
-                        "line": i,
-                        "type": "missing-code-language",
-                        "context": "Code block without language hint",
-                    })
+                    issues.append(
+                        {
+                            "line": i,
+                            "type": "missing-code-language",
+                            "context": "Code block without language hint",
+                        }
+                    )
             else:
                 in_code = False
     return issues

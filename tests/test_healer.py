@@ -49,27 +49,27 @@ class TestExtractFirstParagraph:
 class TestHealFrontmatter:
     def test_no_changes_needed(self, valid_note_content: str, tmp_path: Path):
         fp = tmp_path / "test.md"
-        healed, changes = heal_frontmatter(valid_note_content, fp)
+        _healed, changes = heal_frontmatter(valid_note_content, fp)
         assert changes == []
 
     def test_adds_missing_title(self, tmp_path: Path):
         fp = tmp_path / "my_awesome_note.md"
-        content = "---\ntype: Project\ndescription: \"A test\"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text."
+        content = '---\ntype: Project\ndescription: "A test"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text.'
         healed, changes = heal_frontmatter(content, fp)
         assert "Added missing title: 'My Awesome Note'" in changes
         assert "My Awesome Note" in healed
 
     def test_adds_missing_description(self, tmp_path: Path):
         fp = tmp_path / "test.md"
-        content = "---\ntype: Project\ntitle: \"Test\"\ntimestamp: 2026-01-01T00:00:00\n---\n\n# Header\n\nFirst real paragraph here."
+        content = '---\ntype: Project\ntitle: "Test"\ntimestamp: 2026-01-01T00:00:00\n---\n\n# Header\n\nFirst real paragraph here.'
         healed, changes = heal_frontmatter(content, fp)
         assert any("Added missing description" in c for c in changes)
         assert "First real paragraph here" in healed
 
     def test_adds_missing_timestamp(self, tmp_path: Path):
         fp = tmp_path / "test.md"
-        content = "---\ntype: Project\ntitle: \"Test\"\ndescription: \"Desc\"\n---\n\nBody."
-        healed, changes = heal_frontmatter(content, fp, None)
+        content = '---\ntype: Project\ntitle: "Test"\ndescription: "Desc"\n---\n\nBody.'
+        _healed, changes = heal_frontmatter(content, fp, None)
         assert "Added missing timestamp" in changes
 
     def test_infers_type_from_folder(self, tmp_path: Path):
@@ -77,7 +77,9 @@ class TestHealFrontmatter:
         vault.mkdir()
         (vault / "01_Projects").mkdir()
         fp = vault / "01_Projects" / "note.md"
-        fp.write_text("---\ntitle: \"Test\"\ndescription: \"Desc\"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody.")
+        fp.write_text(
+            '---\ntitle: "Test"\ndescription: "Desc"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody.'
+        )
         content = fp.read_text()
         healed, changes = heal_frontmatter(content, fp, vault)
         assert "Added missing type: Project" in changes
@@ -85,17 +87,17 @@ class TestHealFrontmatter:
 
     def test_fixes_type_casing(self, tmp_path: Path):
         fp = tmp_path / "test.md"
-        content = "---\ntype: project\ntitle: \"Test\"\ndescription: \"Desc\"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody."
+        content = '---\ntype: project\ntitle: "Test"\ndescription: "Desc"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody.'
         healed, changes = heal_frontmatter(content, fp)
         assert any("Fixed type casing" in c for c in changes)
         assert "type: Project" in healed
 
     def test_preserves_existing_fields(self, tmp_path: Path):
         fp = tmp_path / "test.md"
-        content = "---\ntype: Project\ntitle: \"Test\"\ndescription: \"Desc\"\nresource: \"https://example.com\"\ntags: [a, b]\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody."
+        content = '---\ntype: Project\ntitle: "Test"\ndescription: "Desc"\nresource: "https://example.com"\ntags: [a, b]\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody.'
         healed, changes = heal_frontmatter(content, fp)
         assert changes == []
-        assert "resource: \"https://example.com\"" in healed
+        assert 'resource: "https://example.com"' in healed
         assert "tags: [a, b]" in healed
 
     def test_no_frontmatter_at_all(self, tmp_path: Path):
@@ -113,7 +115,9 @@ class TestHealVault:
         vault.mkdir()
         (vault / "01_Projects").mkdir()
         note = vault / "01_Projects" / "my_note.md"
-        note.write_text("---\ndescription: \"Desc\"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text here.")
+        note.write_text(
+            '---\ndescription: "Desc"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text here.'
+        )
         report = heal_vault(vault, dry_run=True)
         assert "DRY RUN" in report
         assert "Changes" in report
@@ -126,7 +130,9 @@ class TestHealVault:
         vault.mkdir()
         (vault / "01_Projects").mkdir()
         note = vault / "01_Projects" / "my_note.md"
-        note.write_text("---\ndescription: \"Desc\"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text here.")
+        note.write_text(
+            '---\ndescription: "Desc"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text here.'
+        )
         report = heal_vault(vault, dry_run=False)
         assert "LIVE" in report
         content = note.read_text()

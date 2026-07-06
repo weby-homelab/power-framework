@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from power_framework.core.rot_scoring import (
     ContentDedupDetector,
@@ -19,7 +22,7 @@ class TestContentDedupDetector:
 
         note_a = vault / "01_Projects" / "note_a.md"
         note_a.write_text(
-            "---\ntype: Project\ntitle: \"Note A\"\n"
+            '---\ntype: Project\ntitle: "Note A"\n'
             'description: "First note"\n'
             "timestamp: 2026-01-01T00:00:00\n---\n\n"
             "This is the body content of note A. It has many words that should be similar "
@@ -28,7 +31,7 @@ class TestContentDedupDetector:
 
         note_b = vault / "01_Projects" / "note_b.md"
         note_b.write_text(
-            "---\ntype: Project\ntitle: \"Note B\"\n"
+            '---\ntype: Project\ntitle: "Note B"\n'
             'description: "Second note"\n'
             "timestamp: 2026-01-01T00:00:00\n---\n\n"
             "This is the body content of note B. It has many words that should be similar "
@@ -47,7 +50,7 @@ class TestContentDedupDetector:
 
         note_a = vault / "01_Projects" / "note_a.md"
         note_a.write_text(
-            "---\ntype: Project\ntitle: \"Note A\"\n"
+            '---\ntype: Project\ntitle: "Note A"\n'
             'description: "First note"\n'
             "timestamp: 2026-01-01T00:00:00\n---\n\n"
             "Python programming language is used for web development and data science."
@@ -55,7 +58,7 @@ class TestContentDedupDetector:
 
         note_b = vault / "01_Projects" / "note_b.md"
         note_b.write_text(
-            "---\ntype: Project\ntitle: \"Note B\"\n"
+            '---\ntype: Project\ntitle: "Note B"\n'
             'description: "Second note"\n'
             "timestamp: 2026-01-01T00:00:00\n---\n\n"
             "Quantum physics explores the behavior of matter at the atomic and subatomic level."
@@ -77,7 +80,7 @@ class TestFreshnessScorer:
 
         now = datetime.now(timezone.utc).isoformat()
         note.write_text(
-            "---\ntype: Daily Log\ntitle: \"Recent Note\"\n"
+            '---\ntype: Daily Log\ntitle: "Recent Note"\n'
             'description: "Fresh note"\n'
             f"timestamp: {now}\n---\n\nFresh content."
         )
@@ -95,7 +98,7 @@ class TestFreshnessScorer:
 
         note = vault / "06_Daily_Logs" / "old.md"
         note.write_text(
-            "---\ntype: Daily Log\ntitle: \"Old Note\"\n"
+            '---\ntype: Daily Log\ntitle: "Old Note"\n'
             'description: "Stale note"\n'
             "timestamp: 2025-01-01T00:00:00\n---\n\nOld content."
         )
@@ -112,7 +115,7 @@ class TestFreshnessScorer:
 
         note = vault / "03_Resources" / "resource.md"
         note.write_text(
-            "---\ntype: Resource\ntitle: \"Old Resource\"\n"
+            '---\ntype: Resource\ntitle: "Old Resource"\n'
             'description: "A resource"\n'
             "timestamp: 2025-06-01T00:00:00\n---\n\nContent."
         )

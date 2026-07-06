@@ -10,9 +10,13 @@ Auto-discovers knowledge graph connections between notes using:
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .models import OKFMetadata
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .models import OKFMetadata
+
 from .parser import read_file_content, validate_metadata
 from .utils import EXCLUDED_DIRS
 
@@ -79,7 +83,7 @@ def _extract_keywords(text: str) -> set[str]:
             "вони",
         }
     )
-    tokens = set(re.findall(r"[a-zA-Zа-яєіїґ]{3,}", text.lower()))
+    tokens = set(re.findall(r"[a-zA-Zа-яєіїґ]{3,}", text.lower()))  # noqa: RUF001
     return {t for t in tokens if t not in stop_words}
 
 
@@ -168,8 +172,8 @@ def suggest_related(
         if not candidates:
             return []
         for src_path in [p for p in notes if p == target_path]:
-            src_kw, src_tags, src_title, _ = notes[src_path]
-            for tgt_path, (tgt_kw, tgt_tags, tgt_title, _) in notes.items():
+            src_kw, src_tags, _src_title, _ = notes[src_path]
+            for tgt_path, (tgt_kw, tgt_tags, _tgt_title, _) in notes.items():
                 if tgt_path == src_path:
                     continue
                 score = _compute_overlap_score(src_kw, tgt_kw, src_tags, tgt_tags)

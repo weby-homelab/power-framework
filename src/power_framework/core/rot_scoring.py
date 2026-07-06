@@ -10,12 +10,16 @@ Implements Track A2 (Smart ROT without embeddings):
 
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 import threading
 import urllib.request
 from datetime import datetime, timezone
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from .parser import extract_frontmatter_raw, read_file_content
 from .searcher import _compute_tf_vector, _cosine_similarity, _tokenize
@@ -66,6 +70,7 @@ class ContentDedupDetector:
             try:
                 content = read_file_content(filepath)
             except Exception:
+                logging.exception("Failed to read %s", filepath)
                 continue
 
             body = self._get_body(content)
@@ -97,7 +102,7 @@ class ContentDedupDetector:
         """Extract body content, stripping frontmatter."""
         raw = extract_frontmatter_raw(content)
         if raw is not None:
-            return content[content.index("---", 3 if content[3] == "\n" else 4) + 4:].strip()
+            return content[content.index("---", 3 if content[3] == "\n" else 4) + 4 :].strip()
         return content.strip()
 
 
@@ -125,6 +130,7 @@ class FreshnessScorer:
             try:
                 content = read_file_content(filepath)
             except Exception:
+                logging.exception("Failed to read %s", filepath)
                 continue
 
             fm = parse_frontmatter(content)
@@ -175,6 +181,7 @@ class LinkRotChecker:
             try:
                 content = read_file_content(filepath)
             except Exception:
+                logging.exception("Failed to read %s", filepath)
                 continue
 
             urls = self.EXTERNAL_LINK_PATTERN.findall(content)
@@ -194,10 +201,13 @@ class LinkRotChecker:
 
     def _head_status(self, url: str) -> int:
         """Perform HTTP HEAD request and return status code. Returns -1 on error."""
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return -1
         try:
-            req = urllib.request.Request(url, method="HEAD")
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                return resp.status
+            req = urllib.request.Request(url, method="HEAD")  # noqa: S310
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310
+                return int(resp.status)  # type: ignore[no-any-return]
         except urllib.error.HTTPError as e:
             return e.code
         except Exception:

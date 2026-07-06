@@ -11,12 +11,21 @@ Auto-heals missing or invalid OKF frontmatter fields:
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from .models import NoteType
-from .parser import FRONTMATTER_PATTERN, extract_frontmatter_raw, parse_frontmatter, read_file_content
+from .parser import (
+    FRONTMATTER_PATTERN,
+    extract_frontmatter_raw,
+    parse_frontmatter,
+    read_file_content,
+)
 from .utils import atomic_write, create_backup
 
 FOLDER_TO_TYPE: dict[str, str] = {
@@ -28,7 +37,19 @@ FOLDER_TO_TYPE: dict[str, str] = {
     "PROTOCOLS": "System Guide",
 }
 
-DEFAULT_EXCLUDED = frozenset({"index.md", "log.md", "_index.md", ".git", ".backups", "05_Templates", "scratch", ".system_generated", ".agents"})
+DEFAULT_EXCLUDED = frozenset(
+    {
+        "index.md",
+        "log.md",
+        "_index.md",
+        ".git",
+        ".backups",
+        "05_Templates",
+        "scratch",
+        ".system_generated",
+        ".agents",
+    }
+)
 
 
 def _infer_title_from_filename(filepath: Path) -> str:
@@ -56,10 +77,15 @@ def _extract_first_paragraph(content: str) -> str:
     if content.startswith("---"):
         match = FRONTMATTER_PATTERN.match(content)
         if match:
-            body = content[match.end():]
+            body = content[match.end() :]
     for line in body.strip().split("\n"):
         line = line.strip()
-        if line and not line.startswith("#") and not line.startswith("![") and not line.startswith("```"):
+        if (
+            line
+            and not line.startswith("#")
+            and not line.startswith("![")
+            and not line.startswith("```")
+        ):
             clean = re.sub(r"\s+", " ", line).strip()
             if clean:
                 return clean[:150]
@@ -192,6 +218,7 @@ def heal_vault(vault_dir: Path, dry_run: bool = True) -> str:
         try:
             content = read_file_content(filepath)
         except Exception:
+            logging.exception("Failed to read %s", filepath)
             continue
         if not content.strip():
             continue
@@ -203,14 +230,12 @@ def heal_vault(vault_dir: Path, dry_run: bool = True) -> str:
         healed_count += 1
         if dry_run:
             changes_log.append(f"  {rel}:")
-            for c in changes:
-                changes_log.append(f"    - {c}")
+            changes_log.extend(f"    - {c}" for c in changes)
         else:
             backup_path = create_backup(filepath)
             atomic_write(filepath, healed)
             changes_log.append(f"  {rel}:")
-            for c in changes:
-                changes_log.append(f"    - {c}")
+            changes_log.extend(f"    - {c}" for c in changes)
             if backup_path:
                 changes_log.append(f"    (backup: {backup_path.name})")
 
