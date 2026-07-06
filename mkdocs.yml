@@ -46,6 +46,7 @@ nav:
       - Linter: api/linter.md
       - Healer: api/healer.md
       - Markdown Checks: api/markdown_checks.md
+      - Constants: api/constants.md
       - ROT Scoring: api/rot_scoring.md
       - Searcher: api/searcher.md
       - Utils: api/utils.md
