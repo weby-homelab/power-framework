@@ -283,7 +283,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
                 if isinstance(expiry_val, date) and expiry_val < datetime.now(timezone.utc).date():
                     result.stale_notes.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
-                pass
+                logging.exception("Invalid expiry value in %s", rel_path)
 
         file_links = _extract_links(content)
 
@@ -367,7 +367,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
                 if isinstance(expiry_val, date) and expiry_val < datetime.now(timezone.utc).date():
                     stale_list.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
-                pass
+                logging.exception("Invalid expiry value in %s", rel_path)
 
         # Track trivial (body content < threshold)
         body = _get_body_content(content)
@@ -477,7 +477,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
                 if isinstance(expiry_val, date) and expiry_val < today:
                     is_expired = True
             except (ValueError, TypeError):
-                pass
+                logging.exception("Invalid expiry value in %s", rel)
 
         if not is_archived_status and not is_expired:
             continue
