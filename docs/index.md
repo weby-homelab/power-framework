@@ -10,19 +10,24 @@ LLM-Wiki & Execution Rules — Integrates operational rules and guidelines speci
 
 Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for AI-first knowledge management:
 
-- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable
+- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`)
 - **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
+- **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
+- **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
+- **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
-- **Production-grade** — 144 tests, 86%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
+- **Production-grade** — 160 tests, 90%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
 
 ## Features
 
 - **`power init`** — Scaffold an OKF-compliant vault directory structure
-- **`power lint`** — Health-check metadata, broken links, and orphans
+- **`power lint`** — Health-check metadata, broken links, orphans, stale/expired notes
 - **`power index`** — Compile hierarchical indexes (`index.md` + per-folder `_index.md`)
-- **`power ingest`** — Create new notes with validated frontmatter
+- **`power ingest`** — Create new notes with validated frontmatter (supports `owner`, `status`, `expiry`, `related`)
 - **`power search`** — Full-text vault search with relevance scoring
-- **MCP Server** — Expose all tools to AI agents via the Model Context Protocol
+- **MCP Server** — 6 tools (`lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault_tool`, `synthesize_session`)
+- **Knowledge Graph** — `related` field for explicit cross-note graph links
+- **Governance** — `owner`, `status`, `expiry` fields tracked in sub-indexes
 
 ## Quick start
 

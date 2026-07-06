@@ -10,14 +10,14 @@ src/power_framework/
 │   ├── cli.py          # CLI entry point (argparse)
 │   ├── models.py       # OKFMetadata, NoteType, constants
 │   ├── parser.py       # YAML frontmatter parsing
-│   ├── linter.py       # Vault health checks
+│   ├── linter.py       # Vault health checks (links, metadata, orphans, stale notes)
 │   ├── indexer.py      # Hierarchical index generation
 │   ├── searcher.py     # Full-text search with scoring
 │   └── utils.py        # Path safety, atomic writes, version
 └── mcp/
     ├── __init__.py
     ├── __main__.py     # python -m entry point
-    └── power_server.py # FastMCP server (5 tools)
+    └── power_server.py # FastMCP server (6 tools)
 
 tests/
 ├── test_cli.py         # CLI functional tests

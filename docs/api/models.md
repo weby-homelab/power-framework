@@ -12,10 +12,18 @@ Pydantic model for Open Knowledge Format frontmatter.
 | `resource` | `str\|None` | No | Valid URL |
 | `tags` | `list[str]` | No | Default: `[]`, elements stripped |
 | `timestamp` | `datetime` | Yes | UTC-aware |
+| `owner` | `str\|None` | No | Responsible person/team for governance *(new in v1.6.0)* |
+| `status` | `NoteStatus\|None` | No | `active` \| `review` \| `archived` *(new in v1.6.0)* |
+| `expiry` | `date\|None` | No | Date after which the note should be reviewed *(new in v1.6.0)* |
+| `related` | `list[str]` | No | Default: `[]`, Graph RAG cross-links to other notes *(new in v1.6.0)* |
 
 ## `NoteType`
 
 Enum of valid OKF note types.
+
+## `NoteStatus` *(new in v1.6.0)*
+
+Enum of governance lifecycle statuses: `active`, `review`, `archived`.
 
 ## `NoteFile`
 
