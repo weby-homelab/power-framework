@@ -16,12 +16,7 @@ Validate, index, search, and manage your knowledge base from the command line �
 
 ## About P.O.W.E.R. - Hybrid Knowledge Management Framework
 
-P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, automated scripts, and LLM-based autonomous agents. The name is an acronym representing its core components: **P**.A.R.A., **O**KF, **W**iki, and **E**xecution **R**ules. It integrates these distinct architectural frameworks to construct a coherent, self-validating, and token-efficient Second Brain:
-
-*   **P (P.A.R.A. Method)** — Organizes files based on actionability into **P**rojects, **A**reas, **R**esources, and **A**rchives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
-*   **O (OKF Overlay - Open Knowledge Format)** — Imposes a strict schema layer over standard Markdown files. Built on Pydantic v2 schemas, OKF requires every note to be explicitly typed and validated (containing required frontmatter attributes such as title, description, tags, and timestamps). This turns unstructured markdown folders into a predictable, queryable, and machine-readable local database.
-*   **W (LLM-Wiki)** — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation that slashes AI agent context usage by **75% to 94%**.
-*   **E.R. (Execution Rules)** — Integrates operational rules and guidelines specifically formatted for AI agents (like `RULES.md`, `PROMPTS.md`, and system-level guidelines), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system.
+P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, automated scripts, and LLM-based autonomous agents. The name is an acronym representing its core components: **P**.A.R.A., **O**KF, **W**iki, and **E**xecution **R**ules. It integrates these distinct architectural frameworks to construct a coherent, self-validating, and token-efficient Second Brain.
 
 
 
@@ -207,10 +202,10 @@ related: [01_Projects/Other.md]        # optional: Graph RAG cross-links
 
 The framework combines four complementary methodologies:
 
-- **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — logical folder structure for human cognition
-- **O** — **OKF Overlay** (Open Knowledge Format) — YAML frontmatter on every file for instant AI parsing
-- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — treating your knowledge base as a wiki that LLMs can read, write, and maintain through automated catalog indexing, chronological log, and structural link linting
-- **E.R.** — **Execution Rules** — GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup
+- **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — Organizes files based on actionability into Projects, Areas, Resources, and Archives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
+- **O** — **OKF Overlay** (Open Knowledge Format) — Imposes a strict schema layer over standard Markdown files. Built on Pydantic v2 schemas, OKF requires every note to be explicitly typed and validated (containing required frontmatter attributes such as title, description, tags, and timestamps). This turns unstructured markdown folders into a predictable, queryable, and machine-readable local database.
+- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation that slashes AI agent context usage by 75% to 94%.
+- **E.R.** — **Execution Rules** — Integrates operational rules and guidelines specifically formatted for AI agents (like `RULES.md`, `PROMPTS.md`, and system-level guidelines), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system. GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup.
 
 ### Visual Framework Diagram
 
