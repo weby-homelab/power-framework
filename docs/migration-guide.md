@@ -303,17 +303,28 @@ Set up a synchronization pipeline to preserve history and enable collaboration:
 
 ---
 
-### Step 6j: SQLite FTS5 Full-Text Search (FTS)
+### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid)
 
-The P.O.W.E.R. framework includes a built-in full-text search engine powered by SQLite FTS5. It automatically initializes a local database file named `.power_search.db` in the vault root and incrementally synchronizes it on every search request.
+The P.O.W.E.R. framework includes a built-in multi-mode search engine. It supports three search strategies:
+
+| Mode | Description | Best for |
+|------|-------------|----------|
+| `fts` (default) | SQLite FTS5 with weighted BM25 scoring | Exact keyword & phrase matching |
+| `vector` | TF-vector cosine similarity (pure Python, zero deps) | Semantic-like discovery |
+| `hybrid` | RRF (Reciprocal Rank Fusion) merge of FTS + Vector | Best overall recall |
 
 *Search Guidelines for AI Agents:*
-1. **Token Efficiency**: Instead of scanning the filesystem (`glob **/*.md`) or reading multiple files to find references, agents **must** use the MCP tool `search_vault_tool(query, max_results=20)`. This saves up to 95%+ of context tokens.
-2. **Query Syntax**:
-   - **Phrase Search**: Use double quotes for exact phrases, e.g., `search_vault_tool(query='"Docker Compose"')`.
-   - **Prefix Matching**: Words are automatically matched using prefix wildcards (e.g., `dock*` matches `docker`, `docking`, etc.) for flexible discovery.
+1. **Token Efficiency**: Use `search_vault_tool(query, max_results=20, search_mode="hybrid")` instead of `glob **/*.md`. This saves up to 95%+ of context tokens.
+2. **Mode Selection**:
+   - **FTS** — for precise queries: `search_vault_tool(query='"Docker Compose"')`
+   - **Vector** — for conceptual searches: `search_vault_tool(query="deployment orchestration", search_mode="vector")`
+   - **Hybrid** — for general discovery: `search_vault_tool(query="server setup", search_mode="hybrid")`
+3. **CLI Usage**: `power search /vault "query" --mode hybrid`
+4. **Query Syntax**:
+   - **Phrase Search**: Use double quotes for exact phrases, e.g., `search_vault_tool(query='"Docker Compose"')`
+   - **Prefix Matching**: Words are automatically matched using prefix wildcards (e.g., `dock*` matches `docker`, `docking`, etc.)
    - **Sanitization**: Avoid passing special search query operators (except double quotes) as they can cause syntax errors in SQLite FTS5.
-3. **Git Hygiene**: The database file `.power_search.db` is ignored via `*.db` in `.gitignore` and `.geminiignore`. Under no circumstances should this file be committed to the repository.
+5. **Git Hygiene**: The database file `.power_search.db` is ignored via `*.db` in `.gitignore` and `.geminiignore`. Under no circumstances should this file be committed to the repository.
 
 ---
 
@@ -396,7 +407,7 @@ Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-com
 | `lint_vault(vault_path?)` | Phase 1, 4, 5, 6 |
 | `generate_index(vault_path?)` | Phase 5, 6 |
 | `read_sub_index(category, vault_path?)` | Phase 4, 6 |
-| `search_vault_tool(query, vault_path?)` | Phase 4, 6 |
+| `search_vault_tool(query, max_results?, search_mode?, vault_path?)` | Phase 4, 6 |
 
 ### C. Quick-Reference: OKF Frontmatter Fields
 
