@@ -56,6 +56,8 @@ power markdown-check ~/my-vault  # Check markdown quality issues
 | **Agent Auto-Ingest** | `synthesize_session` MCP tool — agents autonomously create permanent notes with governance + graph links + full index rebuild |
 | **ROT Audit** | Detects redundant, outdated, and trivial notes — `power rot <path>` keeps your vault lean |
 | **Auto-Archive** | Automatically archives stale notes to `04_Archive/` — `power archive <path>` with dry-run preview |
+| **Healer** | Auto-fixes missing/invalid frontmatter fields (title, description, type, timestamp) — `power heal <path>` |
+| **Markdown Checks** | Detects trailing whitespace, inconsistent list markers, header jumps, missing code language — `power markdown-check <path>` |
 | **Relation Suggestions** | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>` |
 | **Cron Maintenance** | Runs lint + index + rot audit in one command — `power cron <path>` |
 | **Full-Text Search** | 3-mode search: FTS5 (BM25), Vector (TF cosine), Hybrid (RRF fusion) with context snippets |
