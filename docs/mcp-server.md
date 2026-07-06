@@ -68,3 +68,19 @@ Full-text search across vault notes.
 | `query` | `string` | Yes | Search query |
 | `max_results` | `integer` | No | Max results (default: 20) |
 | `vault_path` | `string` | No | Path to vault root |
+
+### `synthesize_session` *(new in v1.6.0)*
+
+Create a session synthesis note with auto-classified OKF frontmatter, governance metadata, Graph RAG links, and full index/log maintenance. Implements the Agent Auto-Ingest Feedback Loop.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | `string` | Yes | Filename (e.g. `2026-07-06_session.md`) |
+| `title` | `string` | Yes | Session title |
+| `description` | `string` | Yes | Short summary |
+| `content` | `string` | Yes | Body content |
+| `note_type` | `string` | No | Default: `Daily Log` |
+| `tags` | `string[]` | No | List of tags |
+| `related` | `string[]` | No | Graph RAG links to related notes |
+| `owner` | `string` | No | Responsible entity |
+| `vault_path` | `string` | No | Path to vault root |
