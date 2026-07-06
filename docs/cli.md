@@ -12,6 +12,7 @@ power [-h] [-v] {init,lint,index,ingest,search,rot,archive,cron,heal,markdown-ch
 |------|-------------|
 | `-h`, `--help` | Show help message |
 | `-v`, `--version` | Show version |
+| `--verbose` | Enable verbose (DEBUG) logging |
 
 ## Commands
 
@@ -96,14 +97,13 @@ power search path query [--max-results MAX_RESULTS]
 ROT Audit — detect redundant, outdated, and trivial notes.
 
 ```
-power rot path [--stale-days STALE_DAYS] [--min-body-chars MIN_BODY_CHARS]
+power rot path [--extended]
 ```
 
 | Argument/Flag | Required | Description |
 |---------------|----------|-------------|
 | `path` | Yes | Path to the vault directory |
-| `--stale-days` | No | Days without change to consider stale (default: 90) |
-| `--min-body-chars` | No | Minimum body characters (default: 50) |
+| `--extended` | No | Enable extended A2 scoring (content dedup, link rot, freshness, usage) |
 
 ### `archive`
 
@@ -133,7 +133,7 @@ power suggest-related path [--target TARGET_PATH] [--max-results MAX_RESULTS]
 | `--target` | No | Analyze relations for a specific note path |
 | `--max-results` | No | Maximum number of suggestions (default: 5) |
 
-### `heal` *(new in v1.7.1)*
+### `heal` *(new in v1.7.1, enhanced in v1.7.2)*
 
 Heal missing/invalid frontmatter in vault notes.
 
@@ -148,7 +148,7 @@ power heal path [--no-dry-run]
 
 Auto-fills: `type` (from folder), `title` (from filename), `description` (from first paragraph), `timestamp` (now), and fixes type casing. Creates timestamped backups before live edits.
 
-### `markdown-check` *(new in v1.7.1)*
+### `markdown-check` *(new in v1.7.1, enhanced in v1.7.2)*
 
 Check markdown quality issues across the vault.
 

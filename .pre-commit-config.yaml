@@ -23,6 +23,6 @@ repos:
     rev: v1.15.0
     hooks:
       - id: mypy
-        args: [power_core/]
+        args: [src/power_framework/]
         additional_dependencies: [types-PyYAML]
         pass_filenames: false

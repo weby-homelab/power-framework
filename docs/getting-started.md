@@ -44,6 +44,19 @@ power ingest --title "My Note" --type Resource --description "A useful resource"
 power lint .
 ```
 
+## Auto-heal frontmatter
+
+```bash
+power heal .                  # Preview changes (dry run)
+power heal . --no-dry-run     # Apply fixes
+```
+
+## Check markdown quality
+
+```bash
+power markdown-check .
+```
+
 ## Generate index
 
 ```bash
@@ -54,4 +67,10 @@ power index .
 
 ```bash
 power search . "my query"
+```
+
+## Run ROT audit with extended scoring
+
+```bash
+power rot . --extended
 ```

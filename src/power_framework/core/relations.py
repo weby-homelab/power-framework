@@ -12,13 +12,13 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from .parser import read_file_content, validate_metadata
+from .utils import EXCLUDED_DIRS
+
 if TYPE_CHECKING:
     from pathlib import Path
 
     from .models import OKFMetadata
-
-from .parser import read_file_content, validate_metadata
-from .utils import EXCLUDED_DIRS
 
 SUGGEST_MIN_KEYWORD_LEN = 3
 SUGGEST_MAX_KEYWORDS = 10
@@ -172,8 +172,8 @@ def suggest_related(
         if not candidates:
             return []
         for src_path in [p for p in notes if p == target_path]:
-            src_kw, src_tags, _src_title, _ = notes[src_path]
-            for tgt_path, (tgt_kw, tgt_tags, _tgt_title, _) in notes.items():
+            src_kw, src_tags, *_ = notes[src_path]
+            for tgt_path, (tgt_kw, tgt_tags, *_) in notes.items():
                 if tgt_path == src_path:
                     continue
                 score = _compute_overlap_score(src_kw, tgt_kw, src_tags, tgt_tags)

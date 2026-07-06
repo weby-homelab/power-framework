@@ -27,6 +27,8 @@ from .relations import format_relation_suggestions, suggest_related
 from .searcher import format_search_results, search_vault
 from .utils import __version__, atomic_write
 
+logger = logging.getLogger("power")
+
 TEMPLATE_NOTE = """\
 ---
 type: {type}
@@ -57,7 +59,9 @@ def _cmd_init(args: argparse.Namespace) -> int:
     vault_dir = _resolve_path(args.path)
 
     if vault_dir.exists() and any(vault_dir.iterdir()):
-        print(f"⚠️  Directory {vault_dir} is not empty. Use an empty directory or a new path.")  # noqa: T201
+        logger.warning(
+            "Directory %s is not empty. Use an empty directory or a new path.", vault_dir
+        )
         return 1
 
     created = []
@@ -83,13 +87,13 @@ def _cmd_init(args: argparse.Namespace) -> int:
     generate_log_initial(vault_dir, 0)
     created.append("  log.md")
 
-    print(f"Created vault structure at {vault_dir}")  # noqa: T201
+    logger.info("Created vault structure at %s", vault_dir)
     for item in created:
-        print(item)  # noqa: T201
-    print()  # noqa: T201
-    print("Next steps:")  # noqa: T201
-    print(f"  power index {args.path}")  # noqa: T201
-    print(f"  power lint  {args.path}")  # noqa: T201
+        logger.info(item)
+    logger.info("")
+    logger.info("Next steps:")
+    logger.info("  power index %s", args.path)
+    logger.info("  power lint  %s", args.path)
     return 0
 
 
@@ -97,11 +101,11 @@ def _cmd_lint(args: argparse.Namespace) -> int:
     """Run health lint on the vault."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
     report = run_lint_report(vault_dir)
-    print(report)  # noqa: T201
+    logger.info(report)
     return 0
 
 
@@ -109,11 +113,11 @@ def _cmd_index(args: argparse.Namespace) -> int:
     """Generate hierarchical index (index.md + _index.md files) from vault notes."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
     msg = run_generate_hierarchical_index(vault_dir)
-    print(f"Generated hierarchical index:\n{msg}")  # noqa: T201
+    logger.info("Generated hierarchical index:\n%s", msg)
     return 0
 
 
@@ -121,7 +125,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     """Create a new note with OKF metadata."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
     note_type = args.type
@@ -130,7 +134,6 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     resource = args.resource
     tags = args.tags or []
 
-    # Determine target directory based on type
     type_dir_map = {
         "Project": "01_Projects",
         "Area": "02_Areas",
@@ -142,13 +145,12 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     target_dir = vault_dir / type_dir_map.get(note_type, "00_Inbox")
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create filename from title
     safe_name = title.lower().replace(" ", "_").replace("/", "-")
     note_path = target_dir / f"{safe_name}.md"
 
     if note_path.exists() and not args.overwrite:
-        print(f"Note already exists: {note_path}")  # noqa: T201
-        print("Use --overwrite to replace it.")  # noqa: T201
+        logger.warning("Note already exists: %s", note_path)
+        logger.warning("Use --overwrite to replace it.")
         return 1
 
     metadata = OKFMetadata(
@@ -162,7 +164,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     fm = build_frontmatter(metadata)
     body = f"{fm}\n\n# {title}\n\n"
     atomic_write(note_path, body)
-    print(f"Created note: {note_path.relative_to(vault_dir)}")  # noqa: T201
+    logger.info("Created note: %s", note_path.relative_to(vault_dir))
     return 0
 
 
@@ -170,7 +172,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
     """Search vault notes with configurable mode (fts/vector/hybrid)."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
     query = args.query
@@ -179,7 +181,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
 
     results = search_vault(vault_dir, query, max_results=max_results, mode=mode)
     report = format_search_results(results, query, mode=mode)
-    print(report)  # noqa: T201
+    logger.info(report)
     return 0
 
 
@@ -187,10 +189,10 @@ def _cmd_rot(args: argparse.Namespace) -> int:
     """Run ROT (Redundant, Outdated, Trivial) audit."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
-    report = run_rot_report(vault_dir)
-    print(report)  # noqa: T201
+    report = run_rot_report(vault_dir, extended=args.extended)
+    logger.info(report)
     return 0
 
 
@@ -198,10 +200,10 @@ def _cmd_archive(args: argparse.Namespace) -> int:
     """Move stale/expired notes to 04_Archive."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
     result = archive_stale_notes(vault_dir, dry_run=args.dry_run)
-    print(result)  # noqa: T201
+    logger.info(result)
     return 0
 
 
@@ -209,29 +211,26 @@ def _cmd_cron(args: argparse.Namespace) -> int:
     """Run automated maintenance: lint + index + rot. Designed for cron/systemd timer."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
-    print("=== P.O.W.E.R. Cron Maintenance ===")  # noqa: T201
-    print(f"Vault: {vault_dir}")  # noqa: T201
-    print()  # noqa: T201
+    logger.info("=== P.O.W.E.R. Cron Maintenance ===")
+    logger.info("Vault: %s", vault_dir)
+    logger.info("")
 
-    # Step 1: Lint
-    print("--- Step 1: Lint ---")  # noqa: T201
+    logger.info("--- Step 1: Lint ---")
     lint_report = run_lint_report(vault_dir)
-    print(lint_report)  # noqa: T201
-    print()  # noqa: T201
+    logger.info(lint_report)
+    logger.info("")
 
-    # Step 2: Index
-    print("--- Step 2: Index ---")  # noqa: T201
+    logger.info("--- Step 2: Index ---")
     index_msg = run_generate_hierarchical_index(vault_dir)
-    print(index_msg)  # noqa: T201
-    print()  # noqa: T201
+    logger.info(index_msg)
+    logger.info("")
 
-    # Step 3: ROT audit
-    print("--- Step 3: ROT Audit ---")  # noqa: T201
+    logger.info("--- Step 3: ROT Audit ---")
     rot_report = run_rot_report(vault_dir)
-    print(rot_report)  # noqa: T201
+    logger.info(rot_report)
 
     return 0
 
@@ -240,13 +239,13 @@ def _cmd_heal(args: argparse.Namespace) -> int:
     """Heal missing/invalid frontmatter in vault notes."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
     dry_run = not args.no_dry_run
 
     report = heal_vault(vault_dir, dry_run=dry_run)
-    print(report)  # noqa: T201
+    logger.info(report)
     return 0
 
 
@@ -254,7 +253,7 @@ def _cmd_markdown_check(args: argparse.Namespace) -> int:
     """Check markdown quality (trailing whitespace, list markers, header jumps, code language)."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
     total_issues = 0
@@ -267,18 +266,18 @@ def _cmd_markdown_check(args: argparse.Namespace) -> int:
 
         try:
             content = read_file_content(filepath)
-        except Exception:
-            logging.exception("Failed to read %s", filepath)
+        except Exception as exc:
+            logger.debug("Cannot read %s: %s", filepath, exc)
             continue
 
         issues = check_markdown_issues(content)
         if issues:
             total_issues += len(issues)
-            print(f"{rel}:")  # noqa: T201
+            logger.info("%s:", rel)
             for issue in issues:
-                print(f"  L{issue['line']}: [{issue['type']}] {issue['context']}")  # noqa: T201
+                logger.info("  L%s: [%s] %s", issue["line"], issue["type"], issue["context"])
 
-    print(f"\nTotal issues found: {total_issues}")  # noqa: T201
+    logger.info("\nTotal issues found: %s", total_issues)
     return 0
 
 
@@ -286,7 +285,7 @@ def _cmd_suggest_related(args: argparse.Namespace) -> int:
     """Auto-suggest related notes via keyword/tag overlap."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
-        print(f"Vault not found: {vault_dir}")  # noqa: T201
+        logger.error("Vault not found: %s", vault_dir)
         return 1
 
     suggestions = suggest_related(
@@ -295,7 +294,7 @@ def _cmd_suggest_related(args: argparse.Namespace) -> int:
         max_results=args.max_results,
     )
     report = format_relation_suggestions(suggestions, vault_dir)
-    print(report)  # noqa: T201
+    logger.info(report)
     return 0
 
 
@@ -311,27 +310,29 @@ def main() -> None:
         action="version",
         version=f"power {__version__}",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="Enable verbose logging (DEBUG level)",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # power init
     p_init = subparsers.add_parser("init", help="Create a new OKF-compliant vault structure")
     p_init.add_argument("path", help="Path to the vault directory")
     p_init.set_defaults(func=_cmd_init)
 
-    # power lint
     p_lint = subparsers.add_parser("lint", help="Run health lint on the vault")
     p_lint.add_argument("path", help="Path to the vault directory")
     p_lint.set_defaults(func=_cmd_lint)
 
-    # power index
     p_index = subparsers.add_parser(
         "index", help="Generate hierarchical index (index.md + per-folder _index.md)"
     )
     p_index.add_argument("path", help="Path to the vault directory")
     p_index.set_defaults(func=_cmd_index)
 
-    # power ingest
     p_ingest = subparsers.add_parser("ingest", help="Create a new note with OKF metadata")
     p_ingest.add_argument("path", help="Path to the vault directory")
     p_ingest.add_argument(
@@ -348,7 +349,6 @@ def main() -> None:
     p_ingest.add_argument("--overwrite", action="store_true", help="Overwrite existing note")
     p_ingest.set_defaults(func=_cmd_ingest)
 
-    # power search
     p_search = subparsers.add_parser("search", help="Full-text search across vault notes")
     p_search.add_argument("path", help="Path to the vault directory")
     p_search.add_argument(
@@ -368,12 +368,16 @@ def main() -> None:
     )
     p_search.set_defaults(func=_cmd_search)
 
-    # power rot
     p_rot = subparsers.add_parser("rot", help="Run ROT (Redundant, Outdated, Trivial) audit")
     p_rot.add_argument("path", help="Path to the vault directory")
+    p_rot.add_argument(
+        "--extended",
+        action="store_true",
+        default=False,
+        help="Enable extended A2 scoring (content dedup, link rot, freshness, usage)",
+    )
     p_rot.set_defaults(func=_cmd_rot)
 
-    # power archive
     p_archive = subparsers.add_parser(
         "archive",
         help="Move stale/expired notes to 04_Archive",
@@ -393,7 +397,6 @@ def main() -> None:
     )
     p_archive.set_defaults(func=_cmd_archive)
 
-    # power cron
     p_cron = subparsers.add_parser(
         "cron",
         help="Run automated maintenance: lint + index + rot audit",
@@ -401,7 +404,6 @@ def main() -> None:
     p_cron.add_argument("path", help="Path to the vault directory")
     p_cron.set_defaults(func=_cmd_cron)
 
-    # power heal
     p_heal = subparsers.add_parser(
         "heal",
         help="Heal missing/invalid frontmatter in vault notes",
@@ -415,7 +417,6 @@ def main() -> None:
     )
     p_heal.set_defaults(func=_cmd_heal)
 
-    # power markdown-check
     p_md = subparsers.add_parser(
         "markdown-check",
         help="Check markdown quality issues across the vault",
@@ -423,7 +424,6 @@ def main() -> None:
     p_md.add_argument("path", help="Path to the vault directory")
     p_md.set_defaults(func=_cmd_markdown_check)
 
-    # power suggest-related
     p_suggest = subparsers.add_parser(
         "suggest-related",
         help="Auto-suggest related notes via keyword/tag overlap",
@@ -443,6 +443,13 @@ def main() -> None:
     p_suggest.set_defaults(func=_cmd_suggest_related)
 
     args = parser.parse_args()
+
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(message)s",
+        stream=sys.stderr,
+    )
 
     if not hasattr(args, "func"):
         parser.print_help()

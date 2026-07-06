@@ -7,7 +7,7 @@
 Validate, index, search, and manage your knowledge base from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-81%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/power-framework?logo=github)](https://github.com/weby-homelab/power-framework/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -35,23 +35,25 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
-- **Production-grade** — 198 tests, 87%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
+- **Production-grade** — 270+ tests, 81%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
 
 ## Quick Start
 
 ```bash
 pip install power-framework
 
-power init ~/my-vault      # Create vault structure
-power lint ~/my-vault      # Check for broken links & missing metadata
-power index ~/my-vault     # Generate catalog index.md
+power init ~/my-vault          # Create vault structure
+power lint ~/my-vault          # Check for broken links & missing metadata
+power index ~/my-vault         # Generate catalog index.md
+power heal ~/my-vault          # Auto-fix missing/invalid frontmatter
+power markdown-check ~/my-vault  # Check markdown quality issues
 ```
 
 ## What's Inside
 
 | Feature | What it does |
 |---------|-------------|
-| **CLI** | `power init`, `lint`, `index`, `ingest`, `search`, `rot`, `archive`, `cron`, `suggest-related` — 9 commands for full vault management |
+| **CLI** | `power init`, `lint`, `index`, `ingest`, `search`, `rot`, `archive`, `cron`, `heal`, `markdown-check`, `suggest-related` — 11 commands for full vault management |
 | **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault`, `synthesize_session`, `run_rot_audit`, `archive_stale_notes`, `suggest_related_notes` to any AI agent |
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`) |
 | **Knowledge Graph (Graph RAG)** | `related` field in OKF frontmatter for explicit cross-note graph links. Rendered in sub-indexes for AI navigation |
@@ -61,9 +63,9 @@ power index ~/my-vault     # Generate catalog index.md
 | **Auto-Archive** | Automatically archives stale notes to `04_Archive/` — `power archive <path>` with dry-run preview |
 | **Relation Suggestions** | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>` |
 | **Cron Maintenance** | Runs lint + index + rot audit in one command — `power cron <path>` |
-| **Full-Text Search** | Relevance-scored search across title, body, and tags with context snippets |
+| **Full-Text Search** | 3-mode search: FTS5 (BM25), Vector (TF cosine), Hybrid (RRF fusion) with context snippets |
 | **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings) |
-| **CI/CD** | 198 tests, 87%+ coverage, CodeQL SAST, Automated GitHub Releases |
+| **CI/CD** | 270+ tests, 81%+ coverage, CodeQL SAST, Automated GitHub Releases |
 | **Documentation** | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides |
 
 ## Migration Report
@@ -94,6 +96,8 @@ power index <path>             Generate hierarchical index (index.md + _index.md
 power search <path> <query>    Full-text search with relevance scoring
 power ingest <path> [options]  Create a new note with validated OKF metadata
 power rot <path>               ROT Audit — detect redundant, outdated, trivial notes
+power heal <path>              Auto-heal missing/invalid frontmatter
+power markdown-check <path>    Check markdown quality issues
 power archive <path>           Auto-archive stale notes to 04_Archive/
 power suggest-related <path>   Suggest cross-note relations for Graph RAG
 power cron <path>              Run automated maintenance (lint + index + rot)

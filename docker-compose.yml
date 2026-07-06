@@ -1,0 +1,11 @@
+services:
+  power-mcp:
+    build: .
+    container_name: power-mcp
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./vault:/vault:ro
+    environment:
+      - POWER_VAULT_DIR=/vault
+    restart: unless-stopped

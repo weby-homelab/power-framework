@@ -19,11 +19,14 @@ from __future__ import annotations
 import logging
 import re
 import shutil
-from datetime import date, datetime, timezone
+from datetime import date as date_type
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .parser import has_frontmatter, has_type_field, parse_frontmatter, read_file_content
 from .utils import EXCLUDED_DIRS, clean_note_name, is_excluded_orphan
+
+logger = logging.getLogger(__name__)
 
 WIKI_LINK_PATTERN = re.compile(r"\[\[(.*?)\]\]")
 GFM_LINK_PATTERN = re.compile(r"\[.*?\]\(((?![a-zA-Z][a-zA-Z0-9+.-]*://)[^)]*\.md)(?:#.*?)?\)")
@@ -280,13 +283,15 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
         if fm and "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
-                if isinstance(expiry_val, date) and expiry_val < datetime.now(timezone.utc).date():
+                if (
+                    isinstance(expiry_val, date_type)
+                    and expiry_val < datetime.now(timezone.utc).date()
+                ):
                     result.stale_notes.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
-                logging.exception("Invalid expiry value in %s", rel_path)
+                pass
 
         file_links = _extract_links(content)
-
         links[rel_path] = file_links
 
     for rel_path, targets in links.items():
@@ -364,10 +369,13 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
         if "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
-                if isinstance(expiry_val, date) and expiry_val < datetime.now(timezone.utc).date():
+                if (
+                    isinstance(expiry_val, date_type)
+                    and expiry_val < datetime.now(timezone.utc).date()
+                ):
                     stale_list.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
-                logging.exception("Invalid expiry value in %s", rel_path)
+                pass
 
         # Track trivial (body content < threshold)
         body = _get_body_content(content)
@@ -399,26 +407,26 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
         try:
             dedup = ContentDedupDetector()
             result.content_dedup = dedup.detect(vault_dir)
-        except Exception:
-            logging.exception("Content dedup failed")
+        except Exception as exc:
+            logger.warning("Content dedup failed: %s", exc)
 
         try:
             link_checker = LinkRotChecker()
             result.link_rot = link_checker.check_all(vault_dir)
-        except Exception:
-            logging.exception("Link rot check failed")
+        except Exception as exc:
+            logger.warning("Link rot check failed: %s", exc)
 
         try:
             scorer = FreshnessScorer()
             result.freshness_scores = scorer.score_all(vault_dir)
-        except Exception:
-            logging.exception("Freshness scoring failed")
+        except Exception as exc:
+            logger.warning("Freshness scoring failed: %s", exc)
 
         try:
             tracker = UsageTracker(vault_dir)
             result.usage_counts = tracker.get_all_counts()
-        except Exception:
-            logging.exception("Usage tracking failed")
+        except Exception as exc:
+            logger.warning("Usage tracking failed: %s", exc)
 
     return result
 
@@ -474,10 +482,10 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
         if "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
-                if isinstance(expiry_val, date) and expiry_val < today:
+                if isinstance(expiry_val, date_type) and expiry_val < today:
                     is_expired = True
             except (ValueError, TypeError):
-                logging.exception("Invalid expiry value in %s", rel)
+                pass
 
         if not is_archived_status and not is_expired:
             continue

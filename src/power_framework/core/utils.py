@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import time
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -145,4 +147,54 @@ def is_excluded_orphan(filename: str, rel_path: str) -> bool:
     return filename in EXCLUDED_ORPHAN_FILES or rel_path.startswith("06_Daily_Logs/")
 
 
-__version__ = "1.7.1"
+class RateLimiter:
+    """Simple sliding-window rate limiter per key."""
+
+    def __init__(self, max_calls: int = 10, period: float = 60.0):
+        self.max_calls = max_calls
+        self.period = period
+        self._windows: dict[str, list[float]] = defaultdict(list)
+
+    def is_allowed(self, key: str) -> bool:
+        now = time.monotonic()
+        window = self._windows[key]
+        cutoff = now - self.period
+        self._windows[key] = [ts for ts in window if ts > cutoff]
+        if len(self._windows[key]) >= self.max_calls:
+            return False
+        self._windows[key].append(now)
+        return True
+
+    def remaining(self, key: str) -> int:
+        now = time.monotonic()
+        window = self._windows.get(key, [])
+        cutoff = now - self.period
+        active = sum(1 for ts in window if ts > cutoff)
+        return max(0, self.max_calls - active)
+
+
+def get_cache_dir() -> Path:
+    """Return the cache directory for power-framework (XDG-compliant)."""
+    cache_home = os.getenv("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+    cache_dir = Path(cache_home) / "power-framework"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def validate_path_in_vault(filepath: Path, vault_dir: Path) -> Path:
+    """Validate that a file path is within the vault directory (path traversal protection).
+
+    Raises ValueError if the path escapes the vault boundary.
+    """
+    resolved_file = filepath.resolve()
+    resolved_vault = vault_dir.resolve()
+    try:
+        resolved_file.relative_to(resolved_vault)
+    except ValueError:
+        raise ValueError(
+            f"Path traversal detected: '{filepath}' is outside the vault '{vault_dir}'"
+        ) from None
+    return resolved_file
+
+
+__version__ = "1.7.2"

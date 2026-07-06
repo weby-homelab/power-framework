@@ -68,3 +68,4 @@ yarn.lock
 # Temporary
 scratch/
 .system_generated/
+site/

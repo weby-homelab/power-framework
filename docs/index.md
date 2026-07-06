@@ -20,7 +20,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Markdown Quality Checks** — detects trailing whitespace, inconsistent list markers, header jumps, missing code language
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — 11 tools exposed to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
-- **Production-grade** — 270 tests, 89%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
+- **Production-grade** — 270 tests, 81%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
 
 ## Features
 

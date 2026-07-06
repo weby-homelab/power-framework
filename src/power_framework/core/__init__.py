@@ -76,11 +76,14 @@ from .rot_scoring import (
 )
 from .searcher import SearchResult, format_search_results, search_vault
 from .utils import (
+    RateLimiter,
     __version__,
     atomic_write,
     clean_note_name,
     create_backup,
+    get_cache_dir,
     resolve_vault_path,
+    validate_path_in_vault,
     validate_vault_path,
 )
 
@@ -100,6 +103,7 @@ __all__ = [
     "NoteType",
     "OKFMetadata",
     "ROTResult",
+    "RateLimiter",
     "RelationSuggestion",
     "SearchResult",
     "UsageTracker",
@@ -125,6 +129,7 @@ __all__ = [
     "generate_log_initial",
     "generate_main_index_content",
     "generate_sub_index_content",
+    "get_cache_dir",
     "has_frontmatter",
     "has_type_field",
     "heal_frontmatter",
@@ -144,5 +149,6 @@ __all__ = [
     "search_vault",
     "suggest_related",
     "validate_metadata",
+    "validate_path_in_vault",
     "validate_vault_path",
 ]

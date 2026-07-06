@@ -49,7 +49,7 @@ class TestExtractFirstParagraph:
 class TestHealFrontmatter:
     def test_no_changes_needed(self, valid_note_content: str, tmp_path: Path):
         fp = tmp_path / "test.md"
-        _healed, changes = heal_frontmatter(valid_note_content, fp)
+        _, changes = heal_frontmatter(valid_note_content, fp)
         assert changes == []
 
     def test_adds_missing_title(self, tmp_path: Path):
@@ -69,7 +69,7 @@ class TestHealFrontmatter:
     def test_adds_missing_timestamp(self, tmp_path: Path):
         fp = tmp_path / "test.md"
         content = '---\ntype: Project\ntitle: "Test"\ndescription: "Desc"\n---\n\nBody.'
-        _healed, changes = heal_frontmatter(content, fp, None)
+        _, changes = heal_frontmatter(content, fp, None)
         assert "Added missing timestamp" in changes
 
     def test_infers_type_from_folder(self, tmp_path: Path):

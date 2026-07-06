@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "1.7.1"
+version = "1.7.2"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -22,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
@@ -83,6 +84,9 @@ select = [
     "PT",
     "RUF",
     "PERF",
+    "RET",
+    "LOG",
+    "FIX",
 ]
 ignore = ["E501", "S101"]
 
@@ -96,6 +100,6 @@ check_untyped_defs = true
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F405"]
 "tests/*" = ["S101", "T20", "DTZ001"]
-"power_framework/core/cli.py" = ["T20"]
+
 "power_framework/mcp/power_server.py" = ["T201"]
 "scripts/*" = ["T20", "S310"]

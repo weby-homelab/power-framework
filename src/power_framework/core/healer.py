@@ -16,10 +16,11 @@ import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from .models import NoteType
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-from .models import NoteType
 from .parser import (
     FRONTMATTER_PATTERN,
     extract_frontmatter_raw,
@@ -27,6 +28,8 @@ from .parser import (
     read_file_content,
 )
 from .utils import atomic_write, create_backup
+
+logger = logging.getLogger(__name__)
 
 FOLDER_TO_TYPE: dict[str, str] = {
     "01_Projects": "Project",
@@ -217,8 +220,8 @@ def heal_vault(vault_dir: Path, dry_run: bool = True) -> str:
 
         try:
             content = read_file_content(filepath)
-        except Exception:
-            logging.exception("Failed to read %s", filepath)
+        except Exception as exc:
+            logger.debug("Cannot read %s: %s", filepath, exc)
             continue
         if not content.strip():
             continue

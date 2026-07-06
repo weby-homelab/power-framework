@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 from power_framework.core.rot_scoring import (
     ContentDedupDetector,
     FreshnessScorer,
     UsageTracker,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestContentDedupDetector:

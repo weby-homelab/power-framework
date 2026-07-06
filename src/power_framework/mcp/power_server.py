@@ -31,6 +31,7 @@ from power_framework.core import (
     PARA_FOLDERS,
     NoteType,
     OKFMetadata,
+    RateLimiter,
     archive_stale_notes,
     atomic_write,
     build_frontmatter,
@@ -51,7 +52,12 @@ from power_framework.core import (
     check_all as check_markdown,
 )
 
+logger = logging.getLogger(__name__)
+
 mcp = FastMCP("power")
+
+_write_limiter = RateLimiter(max_calls=10, period=60.0)
+_index_limiter = RateLimiter(max_calls=5, period=60.0)
 
 
 def _get_vault_path(vault_path: str | None = None) -> Path:
@@ -70,6 +76,10 @@ def lint_vault(vault_path: str | None = None) -> str:
 @mcp.tool()
 def generate_index(vault_path: str | None = None) -> str:
     """Compile the vault hierarchical index: a summary index.md plus per-folder _index.md files."""
+    if not _index_limiter.is_allowed("generate_index"):
+        remaining = _index_limiter.remaining("generate_index")
+        return f"Rate limit exceeded. Try again later. ({remaining} requests remaining in window)"
+
     path = _get_vault_path(vault_path)
     return run_generate_hierarchical_index(path)
 
@@ -112,6 +122,10 @@ def ingest_note(
     vault_path: str | None = None,
 ) -> str:
     """Create a new note with strict OKF metadata frontmatter, regenerate the index, and log the change."""
+    if not _write_limiter.is_allowed("ingest"):
+        remaining = _write_limiter.remaining("ingest")
+        return f"Rate limit exceeded. Try again later. ({remaining} requests remaining in window)"
+
     path = _get_vault_path(vault_path)
     tags = tags or []
 
@@ -199,6 +213,10 @@ def synthesize_session(
     session automatically generates a persistent knowledge artifact with
     governance metadata.
     """
+    if not _write_limiter.is_allowed("synthesize"):
+        remaining = _write_limiter.remaining("synthesize")
+        return f"Rate limit exceeded. Try again later. ({remaining} requests remaining in window)"
+
     path = _get_vault_path(vault_path)
     tags = tags or []
     related = related or []
@@ -311,8 +329,8 @@ def check_markdown_tool(
 
         try:
             content = read_file_content(filepath)
-        except Exception:
-            logging.exception("Failed to read %s", filepath)
+        except Exception as exc:
+            logger.debug("Cannot read %s: %s", filepath, exc)
             continue
 
         issues = check_markdown(content)
