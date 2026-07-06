@@ -142,3 +142,50 @@ class TestBuildFrontmatter:
         )
         result = build_frontmatter(meta)
         assert '\\"quotes\\"' in result
+
+    def test_build_with_governance(self):
+        meta = OKFMetadata(
+            type="Area",
+            title="Governed Area",
+            description="A note with governance",
+            timestamp=datetime(2026, 1, 1, 12, 0, 0),
+            owner="team-alpha",
+            status="review",
+            expiry=datetime(2026, 7, 1).date(),
+        )
+        result = build_frontmatter(meta)
+        assert 'owner: "team-alpha"' in result
+        assert "status: review" in result
+        assert "expiry: 2026-07-01" in result
+
+    def test_build_with_related(self):
+        meta = OKFMetadata(
+            type="Resource",
+            title="RAG Note",
+            description="A note with graph links",
+            timestamp=datetime(2026, 1, 1, 12, 0, 0),
+            related=["01_Projects/Other.md", "02_Areas/Related.md"],
+        )
+        result = build_frontmatter(meta)
+        assert "related: [01_Projects/Other.md, 02_Areas/Related.md]" in result
+
+    def test_build_with_all_new_fields(self):
+        meta = OKFMetadata(
+            type="Project",
+            title="All Fields",
+            description="All new fields present",
+            resource="https://example.com",
+            tags=["test", "governance"],
+            timestamp=datetime(2026, 1, 1, 12, 0, 0),
+            owner="admin",
+            status="active",
+            expiry=datetime(2027, 1, 1).date(),
+            related=["03_Resources/Guide.md"],
+        )
+        result = build_frontmatter(meta)
+        assert 'owner: "admin"' in result
+        assert "status: active" in result
+        assert "expiry: 2027-01-01" in result
+        assert "related: [03_Resources/Guide.md]" in result
+        assert 'resource: "https://example.com"' in result
+        assert "tags: [test, governance]" in result

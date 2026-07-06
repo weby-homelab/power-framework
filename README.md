@@ -7,7 +7,7 @@
 Validate, index, search, and manage your knowledge base from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/power-framework?logo=github)](https://github.com/weby-homelab/power-framework/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -29,10 +29,13 @@ P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, a
 
 Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for **AI-first knowledge management**:
 
-- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable
+- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`)
 - **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
+- **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
+- **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
+- **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
-- **Production-grade** — 144 tests, 86%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
+- **Production-grade** — 160 tests, 90%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
 
 ## Quick Start
 
@@ -49,11 +52,14 @@ power index ~/my-vault     # Generate catalog index.md
 | Feature | What it does |
 |---------|-------------|
 | **CLI** | `power init`, `lint`, `index`, `ingest`, `search` — full vault management from terminal |
-| **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault` to any AI agent |
-| **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note |
+| **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault`, `synthesize_session` to any AI agent |
+| **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`) |
+| **Knowledge Graph (Graph RAG)** | `related` field in OKF frontmatter for explicit cross-note graph links. Rendered in sub-indexes for AI navigation |
+| **Freshness Monitoring** | Linter flags stale/expired notes by checking `expiry` dates, ensuring your vault stays current |
+| **Agent Auto-Ingest** | `synthesize_session` MCP tool — agents autonomously create permanent notes with governance + graph links + full index rebuild |
 | **Full-Text Search** | Relevance-scored search across title, body, and tags with context snippets |
 | **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings) |
-| **CI/CD** | 144 tests, 86%+ coverage, CodeQL SAST, Automated GitHub Releases |
+| **CI/CD** | 160 tests, 90%+ coverage, CodeQL SAST, Automated GitHub Releases |
 | **Documentation** | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides |
 
 ## Migration Report
@@ -166,7 +172,7 @@ AI agents read the vault efficiently by following this pattern:
 3. **Read specific notes** — only when the sub-index indicates relevance
 4. **NEVER glob all `.md` files** — use sub-indexes as a map (~75% token savings)
 
-Every note starts with validated YAML frontmatter:
+Every note starts with validated YAML frontmatter. Core fields + optional governance and graph links:
 
 ```yaml
 ---
@@ -175,6 +181,10 @@ title: "My App"
 description: "A new project with clear goals"
 tags: [active, dev]
 timestamp: 2026-07-02T19:00:00
+owner: "team-alpha"                    # optional: governance — responsible owner
+status: active                         # optional: active | review | archived
+expiry: 2026-12-31                     # optional: freshness management
+related: [01_Projects/Other.md]        # optional: Graph RAG cross-links
 ---
 ```
 
@@ -254,7 +264,7 @@ flowchart TD
 | `core/models.py` | Pydantic v2 schemas for OKF metadata validation |
 | `core/parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
 | `core/indexer.py` | Vault scanning and index.md generation |
-| `core/linter.py` | Health checks: broken links, missing metadata, orphans |
+| `core/linter.py` | Health checks: broken links, missing metadata, orphans, stale/expired notes |
 | `core/searcher.py` | Full-text search with relevance scoring |
 | `core/utils.py` | Path traversal protection, atomic writes, backups |
 | `core/cli.py` | Command-line interface (init, lint, index, ingest, search) |
@@ -272,7 +282,7 @@ cd power-framework
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests (144 tests, 86%+ coverage)
+# Run tests (160 tests, 90%+ coverage)
 pytest tests/ -v
 
 # Lint & format

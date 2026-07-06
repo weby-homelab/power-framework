@@ -40,12 +40,23 @@ class TestRunLintVault:
 
     def test_total_notes_count(self, vault_with_issues: Path):
         result = run_lint_vault(vault_with_issues)
-        assert result.total_notes == 4
+        assert result.total_notes == 5
 
     def test_daily_logs_excluded_from_orphans(self, sample_vault: Path):
         result = run_lint_vault(sample_vault)
         orphan_paths = result.orphans
         assert not any("06_Daily_Logs" in rp for rp in orphan_paths)
+
+    def test_detects_stale_notes(self, vault_with_issues: Path):
+        result = run_lint_vault(vault_with_issues)
+        assert len(result.stale_notes) > 0
+        stale_paths = [rp for rp, _ in result.stale_notes]
+        assert any("StaleNote.md" in rp for rp in stale_paths)
+        assert any("Expired on" in reason for _, reason in result.stale_notes)
+
+    def test_no_stale_in_healthy_vault(self, sample_vault: Path):
+        result = run_lint_vault(sample_vault)
+        assert len(result.stale_notes) == 0
 
 
 class TestLintResult:
@@ -71,6 +82,11 @@ class TestLintResult:
         result.orphans.append("orphan.md")
         assert result.has_issues
 
+    def test_has_stale(self):
+        result = LintResult()
+        result.stale_notes.append(("stale.md", "Expired on 2020-01-01"))
+        assert result.has_issues
+
 
 class TestLintReport:
     """Tests for formatted lint report."""
@@ -85,6 +101,7 @@ class TestLintReport:
         assert "Missing/Invalid OKF Metadata" in report
         assert "Broken links" in report
         assert "Orphan notes" in report
+        assert "Stale / expired notes" in report
 
     def test_report_contains_vault_path(self, sample_vault: Path):
         report = run_lint_report(sample_vault)

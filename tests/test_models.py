@@ -11,6 +11,7 @@ from power_framework.core.models import (
     MAX_DESCRIPTION_LENGTH,
     MAX_TITLE_LENGTH,
     NoteFile,
+    NoteStatus,
     NoteType,
     OKFMetadata,
 )
@@ -29,6 +30,54 @@ class TestNoteType:
 
     def test_type_count(self):
         assert len(NoteType) == 6
+
+
+class TestNoteStatus:
+    """Tests for NoteStatus enum."""
+
+    def test_all_statuses_exist(self):
+        assert NoteStatus.ACTIVE.value == "active"
+        assert NoteStatus.REVIEW.value == "review"
+        assert NoteStatus.ARCHIVED.value == "archived"
+
+    def test_status_count(self):
+        assert len(NoteStatus) == 3
+
+
+class TestNoteFile:
+    """Tests for NoteFile helper class."""
+
+    def test_note_file_properties(self) -> None:
+        meta = OKFMetadata(
+            type="Project",
+            title="My Project",
+            description="Test description",
+            timestamp=datetime(2026, 1, 1),
+        )
+        note = NoteFile(
+            abs_path="/root/vault/01_Projects/MyProject.md",
+            rel_path="01_Projects/MyProject.md",
+            metadata=meta,
+            raw_content="Some content",
+        )
+        assert note.abs_path == "/root/vault/01_Projects/MyProject.md"
+        assert note.rel_path == "01_Projects/MyProject.md"
+        assert note.metadata == meta
+        assert note.raw_content == "Some content"
+        assert note.filename == "MyProject.md"
+        assert note.clean_name == "myproject"
+        assert note.has_valid_metadata is True
+        assert note.note_type == "Project"
+
+    def test_note_file_no_metadata(self) -> None:
+        note = NoteFile(
+            abs_path="/root/vault/01_Projects/MyProject.md",
+            rel_path="01_Projects/MyProject.md",
+            metadata=None,
+            raw_content="Some content",
+        )
+        assert note.has_valid_metadata is False
+        assert note.note_type is None
 
 
 class TestOKFMetadata:
@@ -157,38 +206,91 @@ class TestOKFMetadata:
         )
         assert meta.title == "Test Title"
 
+    def test_related_field(self):
+        meta = OKFMetadata(
+            type="Resource",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            related=["01_Projects/OtherNote.md", "02_Areas/SomeArea.md"],
+        )
+        assert "01_Projects/OtherNote.md" in meta.related
+        assert len(meta.related) == 2
 
-class TestNoteFile:
-    """Tests for NoteFile helper class."""
-
-    def test_note_file_properties(self) -> None:
+    def test_related_empty_by_default(self):
         meta = OKFMetadata(
             type="Project",
-            title="My Project",
-            description="Test description",
+            title="Test",
+            description="Test",
             timestamp=datetime(2026, 1, 1),
         )
-        note = NoteFile(
-            abs_path="/root/vault/01_Projects/MyProject.md",
-            rel_path="01_Projects/MyProject.md",
-            metadata=meta,
-            raw_content="Some content",
-        )
-        assert note.abs_path == "/root/vault/01_Projects/MyProject.md"
-        assert note.rel_path == "01_Projects/MyProject.md"
-        assert note.metadata == meta
-        assert note.raw_content == "Some content"
-        assert note.filename == "MyProject.md"
-        assert note.clean_name == "myproject"
-        assert note.has_valid_metadata is True
-        assert note.note_type == "Project"
+        assert meta.related == []
 
-    def test_note_file_no_metadata(self) -> None:
-        note = NoteFile(
-            abs_path="/root/vault/01_Projects/MyProject.md",
-            rel_path="01_Projects/MyProject.md",
-            metadata=None,
-            raw_content="Some content",
+    def test_related_strips_whitespace(self):
+        meta = OKFMetadata(
+            type="Resource",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            related=["  path/to/note.md  ", "", " other.md "],
         )
-        assert note.has_valid_metadata is False
-        assert note.note_type is None
+        assert meta.related == ["path/to/note.md", "other.md"]
+
+    def test_owner_field(self):
+        meta = OKFMetadata(
+            type="Project",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            owner="weby-homelab",
+        )
+        assert meta.owner == "weby-homelab"
+        assert meta.status is None
+        assert meta.expiry is None
+
+    def test_status_field(self):
+        meta = OKFMetadata(
+            type="Project",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            status="review",
+        )
+        assert meta.status == "review"
+
+    def test_invalid_status_rejected(self):
+        with pytest.raises(ValidationError):
+            OKFMetadata(
+                type="Project",
+                title="Test",
+                description="Test",
+                timestamp=datetime(2026, 1, 1),
+                status="unknown_status",
+            )
+
+    def test_expiry_field(self):
+        meta = OKFMetadata(
+            type="Project",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            expiry=datetime(2026, 7, 1).date(),
+        )
+        assert meta.expiry is not None
+        assert meta.expiry.isoformat() == "2026-07-01"
+
+    def test_all_governance_fields(self):
+        meta = OKFMetadata(
+            type="Area",
+            title="Governed Area",
+            description="A fully governed note",
+            timestamp=datetime(2026, 1, 1),
+            owner="team-alpha",
+            status="active",
+            expiry=datetime(2027, 1, 1).date(),
+            related=["03_Resources/Guide.md"],
+        )
+        assert meta.owner == "team-alpha"
+        assert meta.status == "active"
+        assert meta.expiry.isoformat() == "2027-01-01"
+        assert "03_Resources/Guide.md" in meta.related

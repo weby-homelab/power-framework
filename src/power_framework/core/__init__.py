@@ -33,6 +33,7 @@ from .models import (
     PARA_FOLDERS,
     VAULT_STRUCTURE,
     NoteFile,
+    NoteStatus,
     NoteType,
     OKFMetadata,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "VAULT_STRUCTURE",
     "LintResult",
     "NoteFile",
+    "NoteStatus",
     "NoteType",
     "OKFMetadata",
     "SearchResult",

@@ -2,10 +2,15 @@
 P.O.W.E.R. OKF Metadata Models.
 
 Pydantic v2 schemas for strict validation of Open Knowledge Format (OKF) metadata.
+Supports:
+  - Core: type, title, description, resource, tags, timestamp
+  - Governance: owner, status, expiry
+  - Graph RAG: related (knowledge graph links between notes)
 """
 
 from __future__ import annotations
 
+from datetime import date as date_type  # noqa: TC003
 from datetime import datetime  # noqa: TC003
 from enum import Enum
 
@@ -21,6 +26,14 @@ class NoteType(str, Enum):
     DAILY_LOG = "Daily Log"
     ARCHIVE = "Archive"
     SYSTEM_GUIDE = "System Guide"
+
+
+class NoteStatus(str, Enum):
+    """Lifecycle status for governance tracking."""
+
+    ACTIVE = "active"
+    REVIEW = "review"
+    ARCHIVED = "archived"
 
 
 NOTE_TYPE_ORDER: list[str] = [
@@ -48,7 +61,13 @@ MAX_TITLE_LENGTH = 200
 
 
 class OKFMetadata(BaseModel):
-    """Strict Pydantic model for OKF YAML frontmatter validation."""
+    """Strict Pydantic model for OKF YAML frontmatter validation.
+
+    Fields:
+      type, title, description, resource, tags, timestamp — core OKF
+      owner, status, expiry — governance
+      related — knowledge graph links (Graph RAG)
+    """
 
     type: NoteType = Field(description="OKF note category")
     title: str = Field(
@@ -62,6 +81,24 @@ class OKFMetadata(BaseModel):
     resource: str | None = Field(default=None, description="External source URL")
     tags: list[str] = Field(default_factory=list, description="Markdown tags")
     timestamp: datetime = Field(description="Last modified ISO-8601 timestamp")
+
+    owner: str | None = Field(
+        default=None,
+        description="Responsible person/team for governance tracking",
+    )
+    status: NoteStatus | None = Field(
+        default=None,
+        description="Lifecycle status: active, review, or archived",
+    )
+    expiry: date_type | None = Field(
+        default=None,
+        description="Date after which the note should be reviewed",
+    )
+
+    related: list[str] = Field(
+        default_factory=list,
+        description="Knowledge graph links to related notes (relative paths)",
+    )
 
     model_config = ConfigDict(extra="ignore", use_enum_values=True)
 
@@ -88,6 +125,11 @@ class OKFMetadata(BaseModel):
     @classmethod
     def validate_tags(cls, v: list[str]) -> list[str]:
         return [t.strip() for t in v if t.strip()]
+
+    @field_validator("related")
+    @classmethod
+    def validate_related(cls, v: list[str]) -> list[str]:
+        return [r.strip() for r in v if r.strip()]
 
 
 class NoteFile:

@@ -82,6 +82,10 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
 
             tags = metadata.tags if metadata.tags else []
             ts = metadata.timestamp.isoformat() if metadata.timestamp else ""
+            owner = metadata.owner if metadata.owner else ""
+            status = metadata.status if metadata.status else ""
+            expiry = metadata.expiry.isoformat() if metadata.expiry else ""
+            related = metadata.related if metadata.related else []
 
             note_info = {
                 "rel_path": str(rel_path),
@@ -91,6 +95,10 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
                 "tags": tags,
                 "timestamp": ts,
                 "filename": filepath.name,
+                "owner": owner,
+                "status": status,
+                "expiry": expiry,
+                "related": related,
             }
 
             if top_folder not in folder_notes:
@@ -203,10 +211,19 @@ def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
             lines.append(f"- **Path:** `{note['rel_path']}`")
             lines.append(f"- **Type:** {note['note_type']}")
             lines.append(f"- **Description:** {note['description']}")
-            if note["tags"]:
+            if note.get("tags"):
                 tags_str = ", ".join(note["tags"])
                 lines.append(f"- **Tags:** [{tags_str}]")
-            if note["timestamp"]:
+            if note.get("owner"):
+                lines.append(f"- **Owner:** {note['owner']}")
+            if note.get("status"):
+                lines.append(f"- **Status:** {note['status']}")
+            if note.get("expiry"):
+                lines.append(f"- **Review by:** {note['expiry']}")
+            if note.get("related"):
+                rel_str = ", ".join(note["related"])
+                lines.append(f"- **Related:** {rel_str}")
+            if note.get("timestamp"):
                 lines.append(f"- **Updated:** {note['timestamp'][:10]}")
             lines.append("")
 

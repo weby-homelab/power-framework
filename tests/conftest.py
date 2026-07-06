@@ -170,6 +170,22 @@ Nobody links to this note.
 """
     )
 
+    stale_note = vault / "03_Resources" / "StaleNote.md"
+    stale_note.write_text(
+        """---
+type: Resource
+title: "Stale Note"
+description: "This note has an expiry date in the past"
+timestamp: 2026-01-01T00:00:00
+expiry: 2020-01-01
+---
+
+# Stale Note
+
+This note expired long ago and should be flagged.
+"""
+    )
+
     return vault
 
 

@@ -1,19 +1,24 @@
 """
 P.O.W.E.R. Vault Linter.
 
-Checks for broken links, missing metadata, and orphan notes.
+Checks for:
+  - Broken links (wiki [[link]], GFM, embed)
+  - Missing/invalid OKF frontmatter
+  - Orphan notes (no inbound links)
+  - Stale / expired notes (freshness governance)
 """
 
 from __future__ import annotations
 
 import re
+from datetime import date
 from pathlib import Path
 
-from .parser import has_frontmatter, has_type_field, read_file_content
+from .parser import has_frontmatter, has_type_field, parse_frontmatter, read_file_content
 from .utils import EXCLUDED_DIRS, clean_note_name, is_excluded_orphan
 
 WIKI_LINK_PATTERN = re.compile(r"\[\[(.*?)\]\]")
-GFM_LINK_PATTERN = re.compile(r"\[.*?\]\((.*?\.md)(?:#.*?)?\)")
+GFM_LINK_PATTERN = re.compile(r"\[.*?\]\(((?![a-zA-Z][a-zA-Z0-9+.-]*://)[^)]*\.md)(?:#.*?)?\)")
 EMBED_LINK_PATTERN = re.compile(r"!\[\[(.*?)\]\]")
 
 
@@ -25,16 +30,19 @@ class LintResult:
         self.untyped_files: list[tuple[str, str]] = []
         self.broken_links: list[tuple[str, str]] = []
         self.orphans: list[str] = []
+        self.stale_notes: list[tuple[str, str]] = []
 
     @property
     def has_issues(self) -> bool:
-        return bool(self.untyped_files or self.broken_links or self.orphans)
+        return bool(self.untyped_files or self.broken_links or self.orphans or self.stale_notes)
 
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable lint report."""
+        today = date.today()
         lines = [
             "=== P.O.W.E.R. Health Lint Report ===",
             f"Vault scanned: {vault_dir}",
+            f"Date: {today.isoformat()}",
             f"Total markdown notes: {self.total_notes}",
             "",
         ]
@@ -54,6 +62,12 @@ class LintResult:
         if self.orphans:
             lines.append(f"WARNING: Orphan notes (no inbound links) ({len(self.orphans)}):")
             lines.extend(f"  - {rp}" for rp in sorted(self.orphans))
+            lines.append("")
+
+        if self.stale_notes:
+            lines.append(f"WARNING: Stale / expired notes ({len(self.stale_notes)}):")
+            for rp, reason in sorted(self.stale_notes):
+                lines.append(f"  - {rp}: {reason}")
             lines.append("")
 
         if not self.has_issues:
@@ -121,8 +135,24 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
 
         if not has_frontmatter(content):
             result.untyped_files.append((rel_path, "No YAML frontmatter block"))
-        elif not has_type_field(content):
+            links[rel_path] = _extract_links(content)
+            continue
+        if not has_type_field(content):
             result.untyped_files.append((rel_path, "Missing required 'type' field"))
+            links[rel_path] = _extract_links(content)
+            continue
+
+        # Freshness check — detect stale / expired notes
+        fm = parse_frontmatter(content)
+        if fm and "expiry" in fm:
+            try:
+                expiry_val = fm["expiry"]
+                if isinstance(expiry_val, date) and expiry_val < date.today():
+                    result.stale_notes.append(
+                        (rel_path, f"Expired on {expiry_val.isoformat()}")
+                    )
+            except (ValueError, TypeError):
+                pass
 
         file_links = _extract_links(content)
         links[rel_path] = file_links

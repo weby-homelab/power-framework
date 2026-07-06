@@ -77,6 +77,15 @@ def build_frontmatter(metadata: OKFMetadata) -> str:
     if metadata.tags:
         tags_str = ", ".join(metadata.tags)
         lines.append(f"tags: [{tags_str}]")
+    if metadata.owner:
+        lines.append(f'owner: "{metadata.owner}"')
+    if metadata.status:
+        lines.append(f"status: {metadata.status}")
+    if metadata.expiry:
+        lines.append(f"expiry: {metadata.expiry.isoformat()}")
+    if metadata.related:
+        related_str = ", ".join(metadata.related)
+        lines.append(f"related: [{related_str}]")
     lines.append(f"timestamp: {metadata.timestamp.isoformat()}")
     lines.append("---")
     return "\n".join(lines)

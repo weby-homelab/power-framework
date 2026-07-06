@@ -160,6 +160,79 @@ def search_vault_tool(query: str, max_results: int = 20, vault_path: str | None 
     return format_search_results(results, query)
 
 
+@mcp.tool()
+def synthesize_session(
+    name: str,
+    title: str,
+    description: str,
+    content: str,
+    note_type: str = "Daily Log",
+    tags: list[str] | None = None,
+    related: list[str] | None = None,
+    owner: str | None = None,
+    vault_path: str | None = None,
+) -> str:
+    """
+    Create a new session synthesis note with auto-classified OKF frontmatter,
+    Graph RAG related links, and full index/log maintenance.
+
+    This implements the Agent Auto-Ingest Feedback Loop — every significant
+    session automatically generates a persistent knowledge artifact with
+    governance metadata.
+    """
+    path = _get_vault_path(vault_path)
+    tags = tags or []
+    related = related or []
+
+    if not name.endswith(".md"):
+        name += ".md"
+
+    target_file = path / name
+    if target_file.exists():
+        return f"Error: Note already exists at {name}"
+
+    timestamp = datetime.now(timezone.utc)
+    metadata = OKFMetadata(
+        type=NoteType(note_type),
+        title=title,
+        description=description,
+        tags=tags,
+        related=related,
+        owner=owner,
+        timestamp=timestamp,
+    )
+
+    frontmatter = build_frontmatter(metadata)
+    full_content = f"{frontmatter}\n\n{content}\n"
+
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write(target_file, full_content)
+
+    index_result = run_generate_hierarchical_index(path)
+
+    log_file = path / "log.md"
+    if log_file.exists():
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        log_entry = (
+            f"\n## [{date_str}] synthesize | {title}\n"
+            f"- **Action:** Created session note '{name}' of type {note_type}.\n"
+            f"- **Related:** {', '.join(related) if related else 'none'}\n"
+            f"- **Owner:** {owner or 'unassigned'}\n"
+            f"- **Result:** Saved to {name} and compiled hierarchical index.\n"
+        )
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(log_entry)
+
+    lint_result = run_lint_report(path)
+
+    return (
+        f"Session note '{name}' has been synthesized and ingested!\n"
+        f"{index_result}\n"
+        f"Action appended to log.md.\n\n"
+        f"Linting Check:\n{lint_result}"
+    )
+
+
 def run() -> None:
     """Start the MCP server with stdio transport."""
     mcp.run(transport="stdio")
