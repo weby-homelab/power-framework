@@ -17,6 +17,7 @@ from __future__ import annotations
 from .cli import main as cli_main
 from .indexer import (
     generate_index_content,
+    generate_log_initial,
     generate_main_index_content,
     generate_sub_index_content,
     run_generate_hierarchical_index,
@@ -82,6 +83,7 @@ __all__ = [
     "format_relation_suggestions",
     "format_search_results",
     "generate_index_content",
+    "generate_log_initial",
     "generate_main_index_content",
     "generate_sub_index_content",
     "has_frontmatter",
