@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "1.7.2"
+version = "1.8.0"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
 dependencies = [
-    "mcp>=1.0.0",
+    "fastmcp>=3.2,<4.0",
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
 ]
@@ -35,13 +35,25 @@ dependencies = [
 [project.scripts]
 power = "power_framework.core.cli:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "types-PyYAML>=6.0.0",
+    "pre-commit>=4.0.0",
+    "pip-audit>=2.7.0",
+]
+
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
     "types-PyYAML>=6.0.0",
     "pre-commit>=4.0.0",
     "pip-audit>=2.7.0",
@@ -92,14 +104,23 @@ ignore = ["E501", "S101"]
 
 [tool.mypy]
 python_version = "3.10"
+strict = true
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "power_framework.core.markdown_checks",
+    "power_framework.core.rot_scoring",
+    "power_framework.core.healer",
+    "power_framework.core.indexer",
+    "power_framework.core.parser",
+]
+disable_error_code = ["type-arg"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F405"]
 "tests/*" = ["S101", "T20", "DTZ001"]
-
-"power_framework/mcp/power_server.py" = ["T201"]
 "scripts/*" = ["T20", "S310"]
+"src/power_framework/core/cli.py" = ["T201"]
+"src/power_framework/mcp/power_server.py" = ["S104"]

@@ -13,6 +13,9 @@ import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
+from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES
 
 
 def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Path:
@@ -20,16 +23,19 @@ def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Pat
     Validate and resolve vault path with Path Traversal protection.
 
     Ensures the resolved path is within the allowed root directory.
+    Uses Path.relative_to() for robust boundary checking.
     Raises ValueError if the path escapes the allowed boundary.
     """
     resolved = Path(vault_path).resolve()
 
     if allowed_root:
         allowed = Path(allowed_root).resolve()
-        if not str(resolved).startswith(str(allowed)):
+        try:
+            resolved.relative_to(allowed)
+        except ValueError:
             raise ValueError(
                 f"Path traversal detected: '{vault_path}' resolves outside allowed root '{allowed}'"
-            )
+            ) from None
 
     if not resolved.exists():
         raise FileNotFoundError(f"Vault path does not exist: {resolved}")
@@ -41,14 +47,14 @@ def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Pat
 
 
 def resolve_vault_path(
-    arguments: dict,
+    arguments: dict[str, Any],
     env_var: str = "POWER_VAULT_DIR",
     fallback: str | None = None,
 ) -> Path:
     """
     Resolve vault path from MCP arguments, environment variable, or fallback.
 
-    Applies Path Traversal validation when an explicit path is provided.
+    Applies Path Traversal validation for all resolved paths.
     """
     explicit = arguments.get("vault_path")
     if explicit:
@@ -56,12 +62,10 @@ def resolve_vault_path(
 
     env_val = os.getenv(env_var)
     if env_val:
-        return Path(env_val).resolve()
+        return validate_vault_path(env_val)
 
-    if fallback:
-        return Path(fallback).resolve()
-
-    return Path(os.getcwd()).resolve()
+    cwd = fallback if fallback else os.getcwd()
+    return Path(cwd).resolve()
 
 
 def atomic_write(filepath: Path, content: str, encoding: str = "utf-8") -> None:
@@ -121,25 +125,9 @@ def get_relative_path(filepath: Path, base_dir: Path) -> str:
     return os.path.relpath(filepath, base_dir)
 
 
-EXCLUDED_DIRS = frozenset({".git", "05_Templates", "scratch", ".system_generated", ".agents"})
-
-
 def is_excluded_dir(dirname: str) -> bool:
     """Check if directory should be excluded from scanning."""
     return dirname in EXCLUDED_DIRS
-
-
-EXCLUDED_ORPHAN_FILES = frozenset(
-    {
-        "README.md",
-        "Home.md",
-        "index.md",
-        "log.md",
-        "Successor-Hub.md",
-        "PARA-OKF-LLM_Wiki.md",
-        "Weby_PARA-OKF-LLM_Wiki.md",
-    }
-)
 
 
 def is_excluded_orphan(filename: str, rel_path: str) -> bool:
@@ -197,4 +185,9 @@ def validate_path_in_vault(filepath: Path, vault_dir: Path) -> Path:
     return resolved_file
 
 
-__version__ = "1.7.2"
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("power-framework")
+except Exception:
+    __version__ = "1.8.0"

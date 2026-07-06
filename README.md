@@ -35,12 +35,12 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code
-- **Production-grade** — 270+ tests, 81%+ coverage, CodeQL scanning, OIDC-signed GitHub Releases
+- **Production-grade** — 270+ tests, 81%+ coverage, CodeQL scanning, Automated GitHub Releases
 
 ## Quick Start
 
 ```bash
-pip install power-framework
+pip install git+https://github.com/weby-homelab/power-framework.git@v1.8.0
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -119,10 +119,10 @@ power search ~/my-vault "deployment guide" --max-results 5
 
 ## MCP Server Setup
 
-Connect P.O.W.E.R. to any MCP-compatible AI client:
+Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install power-framework
+pip install git+https://github.com/weby-homelab/power-framework.git@v1.8.0
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -294,7 +294,7 @@ cd power-framework
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests (198 tests, 87%+ coverage)
+# Run tests (270+ tests, 81%+ coverage)
 pytest tests/ -v
 
 # Lint & format

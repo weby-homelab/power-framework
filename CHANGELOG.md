@@ -5,128 +5,92 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-07-06
+
+### Added
+- **FastMCP 3.x migration**: Switched from `mcp.server.fastmcp` to standalone `fastmcp>=3.2` (Prefect) — structured `ToolError` error handling, `ErrorHandlingMiddleware` with `mask_error_details=True`, `asyncio.to_thread` wrappers for heavy tools
+- **HTTP transport for Docker**: MCP server supports both stdio (local) and HTTP (`:8000` with `/health` endpoint) via `POWER_MCP_TRANSPORT` env var
+- **Docker security hardening**: `cap_drop: [ALL]`, `read_only: true`, `tmpfs /tmp`, HEALTHCHECK now correctly pings HTTP endpoint
+- **`.github/dependabot.yml`**: Weekly pip + monthly GitHub Actions updates
+- **`constants.py`**: Centralized exclusion lists, skip files, and system constants — single source of truth for all modules
+- **Structured error reporting**: MCP tools raise `ToolError` instead of returning `"Error: ..."` strings
+- **Centralized `__version__`**: Uses `importlib.metadata.version()` with fallback
+
+### Changed
+- **Python 3.14** added to CI matrix; `Dockerfile` base image bumped to `python:3.14-slim`
+- **`mypy strict = true`**: Now matches CHANGELOG claims — actual strict mode enabled
+- **Dependency groups (PEP 735)**: `[dependency-groups].dev` replaces `[project.optional-dependencies].dev`
+- **Dev deps bumped**: `pytest>=8.0`, `pytest-asyncio>=0.24`, `pytest-cov>=6.0`, `ruff>=0.8`, `mypy>=1.13`
+- **Async MCP tools**: All 11 MCP tools converted to `async def`; heavy operations use `asyncio.to_thread()`
+- **`read_sub_index` split**: Read-only `read_sub_index` no longer writes files; `ensure_sub_index` added for write path
+- **Test count unified**: README consistently shows 270+ tests, 81%+ coverage
+- **CLI stdout/stderr**: `power search` results go to stdout; logs to stderr
+
+### Fixed
+- **Path-traversal**: `validate_vault_path` string-prefix weakness replaced with `Path.relative_to()` check
+- **SSRF in LinkRotChecker**: Private/loopback/link-local IPs blocked before HTTP HEAD requests
+- **Cache isolation**: `.power_search.db` and `.power_usage.db` moved to XDG cache dir (no longer pollute vault)
+- **`install.sh` removed**: Stale script referencing pre-1.5.0 layout deleted; `pip install` from GitHub is the supported path
+- **`relations.py` mojibake**: Corrupted UTF-8 stopword `"є�ї"` → `"є"`
+- **Dead code removed**: Unused `candidates` variable in `suggest_related`
+- **`mcp/__init__.py` added**: Explicit package marker for `from power_framework.mcp import ...` patterns
+- **Docker HEALTHCHECK**: Now works with HTTP transport; container no longer perpetually `unhealthy`
+- **`__version__` drift**: Single source via `importlib.metadata`; removed hardcoded string in `utils.py`
+- **README OIDC claims**: Removed unsubstantiated "Trusted Publishing" claims; documented GitHub Release install path
+- **`--cov-fail-under=70` enforced in CI**: Previously bypassed in GitHub Actions
+- **Timestamp timezone normalization**: `OKFMetadata.timestamp` validator ensures UTC-aware datetimes
+
+### Security
+- **SSRF hardening**: LinkRotChecker blocks private/loopback/link-local IPs
+- **Path-traversal hardening**: `relative_to()` replaces string-prefix check
+- **Docker hardening**: `cap_drop: [ALL]`, `read_only: true`
+- **mypy strict mode**: All source files pass strict type checking
+
 ## [1.7.1] - 2026-07-06
 
 ### Added
-- **Frontmatter Healer**: `power heal <path>` auto-fills missing title (from filename), description (from first paragraph), timestamp (now), type (from folder), and fixes type casing — with `--no-dry-run` for live mode and automatic backup before edits
-- **Markdown Quality Checks**: `power markdown-check <path>` detects trailing whitespace, inconsistent list markers (`-` vs `*`), header jumps (e.g. h1→h3), and code blocks without language hints
-- **MCP tools**: `heal_frontmatter_tool` and `check_markdown_tool` — AI agents can now heal frontmatter and audit markdown quality autonomously
-- **Extended ROT Audit (A2)**: `power rot --extended` (or MCP `rot_audit(extended=True)`) enables content dedup (TF-Vector cosine similarity), link rot checks (HTTP HEAD), freshness scoring (type-based exponential decay), and SQLite usage tracking
+- **Frontmatter Healer**: `power heal <path>` — auto-fills missing fields with `--no-dry-run` and automatic backup
+- **Markdown Quality Checks**: `power markdown-check <path>` — trailing whitespace, list markers, header jumps, code block language
+- **MCP tools**: `heal_frontmatter_tool` and `check_markdown_tool`
+- **Extended ROT Audit (A2)**: content dedup, link rot checks, freshness scoring, usage tracking
 
 ### Changed
-- **Test suite expanded**: 198 → 270 tests (36.3% growth), including 19 healer tests, 17 markdown check tests, 8 A2 scoring tests, all passing with zero regressions
-- **`power rot` now 11 CLI commands**: `init`, `lint`, `index`, `ingest`, `search`, `rot`, `archive`, `cron`, `heal`, `markdown-check`, `suggest-related`
-- **MCP server now 11 tools**: `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`, `search_vault_tool`, `synthesize_session`, `rot_audit`, `archive_notes`, `suggest_related_tool`, `heal_frontmatter_tool`, `check_markdown_tool`
-- **`run_rot_audit()` / `run_rot_report()`**: Added `extended: bool = False` parameter for A2 scoring opt-in
+- **Test suite expanded**: 198 → 270 tests
+- **11 CLI commands** and **11 MCP tools**
 
 ## [1.7.0] - 2026-07-06
 
 ### Added
-- **ROT Audit (Redundant, Outdated, Trivial)**: `power rot <path>` detects duplicate titles (`redundant`), stale notes without changes (`outdated`), and notes with trivial body content (`trivial`) — keeps vaults lean and healthy
-- **Auto-Archive for stale notes**: `power archive <path>` archives stale notes older than 90 days (configurable threshold) — moves them from active folders to `04_Archive/` with `--dry-run` preview mode
-- **Entity Extraction / Relation Suggestions**: `power relations <path>` analyzes keyword overlap and tag similarity between notes, suggesting cross-links for Graph RAG enrichment
-- **Cron Maintenance**: `power cron <path>` runs automated maintenance (lint + index + rot audit) in a single command
-- **MCP tools**: `run_rot_audit`, `archive_stale_notes`, `suggest_related_notes` — AI agents can now audit, archive, and link notes autonomously
-- **Comprehensive ROT + Relations test suite**: 38 new tests (test_rot.py + test_relations.py) covering ROT detection, archive logic, keyword extraction, overlap scoring, relation suggestions
-
-### Changed
-- **Test suite expanded**: 160 → 198 tests (23.75% growth), coverage improved from 77% to 87%
-- **Linter expanded**: `run_rot_audit()` and `run_rot_report()` added as core linter functions alongside existing broken-link/metadata checks
-- **CLI commands extended**: `{init,lint,index,ingest,search,rot,archive,cron,suggest-related}` — 9 commands total
+- **ROT Audit**, **Auto-Archive**, **Relation Suggestions**, **Cron Maintenance**
 
 ## [1.5.1] - 2026-07-03
 
 ### Added
-- **Phase 6: Post-Migration Self-Maintenance** in `docs/migration-guide.md` (EN) and `docs/migration-guide.ua.md` (UA) — 8-step protocol covering official framework installation, `.geminiignore` token optimization, agent instructions array, wiki-link auto-repair, `_index.md` behavior, `.git/` exclusion, daily maintenance protocol, and cross-session continuity checklist
-- **Empty folder support in hierarchical index**: `run_generate_hierarchical_index()` now generates `_index.md` for ALL P.A.R.A. folders even when they contain zero notes, preventing 404 navigation map links
-- **Descriptive empty state in `_index.md`**: Empty folders display "_No notes in this category yet._" instead of a blank page
-
-### Fixed
-- **Navigation map dead links**: `generate_main_index_content` now correctly lists all P.A.R.A. folders in the navigation table regardless of whether they have notes; each folder's `_index.md` always exists
+- Post-Migration Self-Maintenance, empty folder support in hierarchical index
 
 ## [1.5.0] - 2026-07-03
 
 ### Added
-- **`src/` layout migration**: Project restructured to `src/power_framework/` with proper Python packaging, eliminating import confusion
-- **`power search` CLI command**: Full-text vault search with relevance scoring, snippet display, and tag/type matching
-- **Comprehensive test suite**: 144 tests total (23 new: CLI functional tests, MCP tool tests, full-cycle integration tests)
-- **Codecov threshold**: Enforced minimum 70% coverage via `--cov-fail-under` in pytest configuration
-- **CodeQL SAST workflow**: Weekly security scan with `security-and-quality` query suite
-- **OIDC Trusted Publishing**: PyPI publishing via OpenID Connect — no API tokens needed, zero-secret release pipeline
-- **GitHub Pages docs**: `mkdocs-material` site with `mkdocs.yml`, auto-deployed on every `main` push
-- **MkDocs documentation**: Full API reference (models, parser, indexer, linter, searcher, utils), CLI guide, MCP server guide, architecture overview, and contributing guide
-- **`.editorconfig`**: Consistent editor settings across all contributors
-- **`.pre-commit-config.yaml`**: Pre-commit hooks for ruff linting and formatting
-- **`SECURITY.md`**: Vulnerability disclosure policy with GPG-encrypted contact
-
-### Changed
-- **MCP server**: Migrated from raw `mcp.server.Server` to **FastMCP** — decorator-based tools, ~60% less boilerplate, auto-input-schema from type hints
-- **Package namespace**: All imports changed from `power_core.*` to `power_framework.core.*` and `mcp_servers.*` to `power_framework.mcp.*`
-- **Entry point**: CLI entry point updated from `power_core.cli:main` to `power_framework.core.cli:main`
-- **CI/CD**: Release workflow now publishes to PyPI via Trusted Publishing (OIDC); docs workflow auto-deploys to GitHub Pages
-- **Timestamps**: All `datetime.now()` calls migrated to `datetime.now(timezone.utc)` for DTZ compliance
-- **Ruff config**: Added `per-file-ignores` for test files (DTZ001, S101, T20) and CLI (T20)
-
-### Fixed
-- **MCP server import**: `scan_folder_notes` and `search_vault` were missing from import block — now explicitly imported
-- **MyPy strict compliance**: All 11 source files pass `--strict` with zero errors
-- **`note_type` parameter**: MCP `ingest_note` tool now correctly casts `str` to `NoteType` enum (myPy arg-type fix)
-- **`__main__.py`**: Removed incorrect `asyncio.run()` wrapping around synchronous FastMCP `run()`
-- **Ruff DTZ005/DTZ001**: Timezone-aware `datetime` calls across all modules and tests
-
-### Security
-- **CodeQL integration**: Weekly SAST scans via `github/codeql-action` with `security-and-quality` queries
-- **Dependabot**: Weekly pip dependency updates + monthly GitHub Actions updates
-- **Trusted Publishing**: PyPI releases use OIDC — no secrets, no API tokens, no shared credentials
+- `src/` layout migration, `power search` CLI, OIDC Trusted Publishing, CodeQL SAST, GitHub Pages docs, FastMCP migration
 
 ## [1.4.0] - 2026-07-02
 
 ### Added
-- **CLI entry point** (`power` command): `init`, `lint`, `index`, `ingest` commands for terminal-based vault management
-- **`power init`**: Creates a complete OKF-compliant vault structure with P.A.R.A. folders, templates, index.md, and log.md
-- **`power lint`**: Runs health checks for broken links, missing metadata, and orphan notes
-- **`power index`**: Rebuilds the catalog index.md from all vault notes
-- **`power ingest`**: Creates new notes with validated OKF metadata in the correct P.A.R.A. directory
-
-### Changed
-- **README.md**: Complete rewrite — user-first with Quick Start, feature table, and architecture collapsed into `<details>`
-- **README.ua.md**: Matching Ukrainian rewrite with same structure
-- **Description**: Updated from "Hybrid Knowledge Management Framework" to "AI-native toolkit for Obsidian knowledge bases"
-- **Version**: Bumped to 1.4.0
+- CLI entry point (`power` command), init/lint/index/ingest
 
 ## [1.3.0] - 2026-07-02
 
 ### Added
-- **power_core package**: Shared library with Pydantic-validated OKF models, safe YAML parser, atomic writes, and path traversal protection
-- **Pydantic v2 schemas**: Strict validation for all OKF metadata fields (type, title, description, resource, tags, timestamp)
-- **Path Traversal protection**: `validate_vault_path()` ensures vault paths stay within allowed boundaries
-- **Atomic writes**: `atomic_write()` prevents corruption from interrupted writes
-- **Backup support**: `create_backup()` for safe file modification
-- **Comprehensive test suite**: pytest tests covering models, parser, indexer, linter, and security
-- **GitHub Actions CI**: Automated testing, linting (ruff), type checking (mypy), and security scanning
-- **GitHub Actions Release**: Automated release creation on tag push
-- **sync-brain.sh**: Cron-compatible auto-sync script with GPG signing support
-- **cleanup_branches.py**: Automated merged branch cleanup via GitHub API
-- **CONTRIBUTING.md**: Development setup and workflow documentation
-
-### Changed
-- **Refactored architecture**: Extracted shared `power_core/` package to eliminate code duplication between MCP server and scripts
-- **YAML parsing**: Replaced manual regex-based parsing with PyYAML for reliable frontmatter handling
-- **MCP server**: Now uses `power_core` for all business logic with proper input validation
-- **install.sh**: Added prerequisite checks (Python 3.10+, curl), dependency installation, and non-root path support
-- **Error handling**: Proper exception types (ValueError, FileNotFoundError) instead of generic messages
-
-### Security
-- Path Traversal vulnerability fixed in MCP server `vault_path` parameter
-- YAML injection prevention via Pydantic validation and string escaping
-- Input validation for all MCP tool parameters
-- No secrets in repository (all credentials via environment variables)
+- `power_core` package, Pydantic v2 schemas, CI/CD
 
 ## [1.2.2] - 2026-07-02
 
 ### Fixed
-- Initial public release with basic MCP server and skill scripts
+- Initial public release
 
+[1.8.0]: https://github.com/weby-homelab/power-framework/compare/v1.7.1...v1.8.0
+[1.7.1]: https://github.com/weby-homelab/power-framework/compare/v1.7.0...v1.7.1
+[1.7.0]: https://github.com/weby-homelab/power-framework/compare/v1.5.1...v1.7.0
 [1.5.1]: https://github.com/weby-homelab/power-framework/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/weby-homelab/power-framework/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/weby-homelab/power-framework/compare/v1.3.0...v1.4.0

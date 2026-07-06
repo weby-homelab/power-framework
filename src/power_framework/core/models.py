@@ -10,8 +10,8 @@ Supports:
 
 from __future__ import annotations
 
-from datetime import date as date_type  # noqa: TC003
-from datetime import datetime  # noqa: TC003
+from datetime import date as date_type
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -130,6 +130,17 @@ class OKFMetadata(BaseModel):
     @classmethod
     def validate_related(cls, v: list[str]) -> list[str]:
         return [r.strip() for r in v if r.strip()]
+
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def normalize_timestamp(cls, v: object) -> datetime:
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                from datetime import timezone
+
+                v = v.replace(tzinfo=timezone.utc)
+            return v
+        raise ValueError("timestamp must be a datetime")
 
 
 class NoteFile:
