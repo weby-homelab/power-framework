@@ -16,6 +16,7 @@ import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from .constants import SKIP_FILES
 from .models import NoteType
 
 if TYPE_CHECKING:
@@ -41,17 +42,7 @@ FOLDER_TO_TYPE: dict[str, str] = {
 }
 
 DEFAULT_EXCLUDED = frozenset(
-    {
-        "index.md",
-        "log.md",
-        "_index.md",
-        ".git",
-        ".backups",
-        "05_Templates",
-        "scratch",
-        ".system_generated",
-        ".agents",
-    }
+    {*SKIP_FILES, ".git", ".backups", "05_Templates", "scratch", ".system_generated", ".agents"}
 )
 
 

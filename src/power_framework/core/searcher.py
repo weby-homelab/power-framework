@@ -15,9 +15,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .constants import EXCLUDED_DIRS
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
-from .utils import EXCLUDED_DIRS
+from .utils import get_cache_dir
 
 SNIPPET_WINDOW = 40
 MAX_SNIPPET_LENGTH = 120
@@ -259,10 +260,10 @@ def _fts_search(
     if not fts_query:
         return []
 
-    db_path = vault_dir / ".power_search.db"
+    db_path = get_cache_dir() / "power_search.db"
 
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(str(db_path))
         _init_db(conn)
         _sync_vault_to_db(vault_dir, conn)
 

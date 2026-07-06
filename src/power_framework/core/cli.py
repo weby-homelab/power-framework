@@ -17,6 +17,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .constants import SKIP_FILES
 from .healer import heal_vault
 from .indexer import generate_log_initial, run_generate_hierarchical_index
 from .linter import archive_stale_notes, run_lint_report, run_rot_report
@@ -181,7 +182,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
 
     results = search_vault(vault_dir, query, max_results=max_results, mode=mode)
     report = format_search_results(results, query, mode=mode)
-    logger.info(report)
+    print(report)
     return 0
 
 
@@ -261,7 +262,7 @@ def _cmd_markdown_check(args: argparse.Namespace) -> int:
         rel = filepath.relative_to(vault_dir)
         if any(p in (".git", "05_Templates", ".system_generated") for p in rel.parts):
             continue
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+        if filepath.name in SKIP_FILES:
             continue
 
         try:

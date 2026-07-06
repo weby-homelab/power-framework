@@ -23,8 +23,9 @@ from datetime import date as date_type
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .constants import EXCLUDED_DIRS
 from .parser import has_frontmatter, has_type_field, parse_frontmatter, read_file_content
-from .utils import EXCLUDED_DIRS, clean_note_name, is_excluded_orphan
+from .utils import clean_note_name, is_excluded_orphan
 
 logger = logging.getLogger(__name__)
 

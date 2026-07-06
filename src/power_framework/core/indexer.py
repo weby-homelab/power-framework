@@ -11,9 +11,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path  # noqa: TC003
 
+from .constants import EXCLUDED_DIRS
 from .models import NOTE_TYPE_ORDER, PARA_FOLDERS, OKFMetadata
 from .parser import read_file_content, validate_metadata
-from .utils import EXCLUDED_DIRS, atomic_write
+from .utils import atomic_write
 
 
 def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:

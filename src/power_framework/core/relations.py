@@ -12,8 +12,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from .constants import EXCLUDED_DIRS
 from .parser import read_file_content, validate_metadata
-from .utils import EXCLUDED_DIRS
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -74,7 +74,7 @@ def _extract_keywords(text: str) -> set[str]:
             "як",
             "але",
             "його",
-            "є�ї",
+            "є",
             "може",
             "бути",
             "були",
@@ -168,8 +168,7 @@ def suggest_related(
     suggestions: list[RelationSuggestion] = []
 
     if target_path:
-        candidates = [(p, d) for p, d in notes.items() if p == target_path]
-        if not candidates:
+        if target_path not in notes:
             return []
         for src_path in [p for p in notes if p == target_path]:
             src_kw, src_tags, *_ = notes[src_path]

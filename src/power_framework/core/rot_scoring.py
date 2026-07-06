@@ -23,8 +23,8 @@ from .parser import FRONTMATTER_PATTERN, read_file_content
 if TYPE_CHECKING:
     from pathlib import Path
 
+from .constants import EXCLUDED_DIRS
 from .searcher import _compute_tf_vector, _cosine_similarity, _tokenize
-from .utils import EXCLUDED_DIRS
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +207,22 @@ class LinkRotChecker:
         if not url.startswith(("http://", "https://")):
             return -1
         try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(url)
+            host = parsed.hostname
+            if host:
+                try:
+                    import ipaddress
+                    import socket
+
+                    addr = socket.gethostbyname(host)
+                    ip = ipaddress.ip_address(addr)
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                        logger.debug("Skipping private/loopback URL: %s", url)
+                        return -1
+                except (OSError, ValueError):
+                    pass
             req = urllib.request.Request(url, method="HEAD")  # noqa: S310
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310
                 return int(resp.status)
