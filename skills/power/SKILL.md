@@ -13,15 +13,20 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 1.  **Ingest (Імпорт знань)** — додавання або редагування документів у базі знань.
 2.  **Indexing (Переіндексація)** — оновлення змісту та переліку концепцій.
 3.  **Linting (Перевірка здоров'я)** — пошук битих посилань, помилок у метаданих чи сторінок-сиріт.
-4.  **Sync & Commit** — фіксація змін у Git згідно з правилами безпеки хоста.
+4.  **ROT Audit** — виявлення дублікатів, застарілих та тривіальних нотаток.
+5.  **Auto-Archive** — автоматичне архівування застарілих нотаток до `04_Archive/`.
+6.  **Relation Suggestions** — аналіз перетину ключових слів та тегів для Graph RAG.
+7.  **Cron Maintenance** — автоматичне виконання lint + index + rot audit.
+8.  **Sync & Commit** — фіксація змін у Git згідно з правилами безпеки хоста.
 
 ---
 
-## 🛠️ Доступні інструменти (Scripts)
+## 🛠️ Доступні інструменти (Scripts + CLI)
 
-Скілл містить два автоматизовані скрипти у каталозі `scripts/`:
+Скілл містить автоматизовані скрипти у каталозі `scripts/` та CLI:
 
-1.  **`lint_brain.py`** — скрипт лінтера зв'язків та метаданих:
+### Scripts
+1.  **`lint_brain.py`** — скрипт лінтера + ROT аудиту:
     ```bash
     python3 .agents/skills/power/scripts/lint_brain.py
     ```
@@ -29,6 +34,24 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
     ```bash
     python3 .agents/skills/power/scripts/generate_index.py
     ```
+
+### CLI (power, 9 команд)
+1. `power init <path>` — створити структуру vault
+2. `power lint <path>` — перевірка метаданих, посилань, orphan
+3. `power index <path>` — генерація ієрархічного індексу
+4. `power ingest <path>` — створення нотатки з OKF метаданими
+5. `power search <path> <query>` — повнотекстовий пошук
+6. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
+7. `power archive <path>` — архівування застарілих нотаток
+8. `power suggest-related <path>` — пропозиції зв'язків
+9. `power cron <path>` — автоматичне обслуговування
+
+### MCP Tools (9)
+- `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`
+- `search_vault_tool`, `synthesize_session`
+- `rot_audit` (new in v1.7.0)
+- `archive_notes` (new in v1.7.0)
+- `suggest_related_tool` (new in v1.7.0)
 
 ---
 

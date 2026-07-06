@@ -19,7 +19,7 @@ project_root = os.path.dirname(os.path.dirname(script_dir))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from power_core import run_lint_report
+from power_framework.core import run_lint_vault, run_rot_report
 from pathlib import Path
 
 
@@ -46,15 +46,18 @@ def resolve_vault_dir() -> Path:
 
 
 def main() -> None:
-    """Run lint and print health report."""
+    """Run lint + ROT audit and print health report."""
     vault_dir = resolve_vault_dir()
 
     if not vault_dir.exists():
         print(f"Error: Vault directory does not exist: {vault_dir}")
         sys.exit(1)
 
-    report = run_lint_report(vault_dir)
+    report = run_lint_vault(vault_dir)
     print(report)
+    print()
+    rot_report = run_rot_report(vault_dir)
+    print(rot_report)
 
 
 if __name__ == "__main__":
