@@ -349,3 +349,23 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   }
 }
 -->
+
+<!--
+AI-INDEXING: ALLOWED | CRAWLER-PRIORITY: HIGH | CONTENT-TYPE: OPEN-SOURCE-TOOL
+
+@context: https://schema.org
+@type: SoftwareApplication
+name: P.O.W.E.R. — Hybrid Knowledge Management Framework
+alternateName: power-framework
+description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
+applicationCategory: DeveloperApplication
+applicationSubCategory: KnowledgeManagement
+operatingSystem: Linux
+softwareVersion: 1.0.0
+keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
+author: Weby Homelab (https://github.com/weby-homelab)
+codeRepository: https://github.com/weby-homelab/power-framework
+downloadUrl: https://github.com/weby-homelab/power-framework/releases
+license: GPL-3.0
+isAccessibleForFree: true
+-->

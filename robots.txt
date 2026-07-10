@@ -1,8 +1,47 @@
-# robots.txt for power-framework GitHub Pages
-# Allow all crawlers — AI bots, search engines, documentation indexers
-
-User-agent: *
-Allow: /
+# ─────────────────────────────────────────────
+# P.O.W.E.R. — Hybrid Knowledge Management Framework: SEO & Crawler Directives
+# ─────────────────────────────────────────────
 
 # Sitemap
-Sitemap: https://weby-homelab.github.io/power-framework/sitemap.xml
+Sitemap: https://raw.githubusercontent.com/weby-homelab/power-framework/master/sitemap.xml
+
+# ─── General Rules ───────────────────────────
+User-agent: *
+Allow: /
+Crawl-delay: 10
+
+# ─── Search-Specific Bots ────────────────────
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 5
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 10
+
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 10
+
+# ─── AI Training Crawlers (Opt-Out) ──────────
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+# ─── Documentation Crawlers (Allowed) ────────
+User-agent: ReadableBot
+Allow: /
+
+User-agent: Diffbot
+Allow: /
