@@ -17,6 +17,27 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class TypedRelation(BaseModel):
+    """A typed relation between two notes in the knowledge graph.
+
+    Fields:
+      path: Relative path to the related note
+      relation: Semantic relation type (e.g. 'related_to', 'depends_on', 'references')
+      confidence: Confidence score for the relation (0.0 - 1.0)
+    """
+
+    path: str = Field(description="Relative path to the related note")
+    relation: str = Field(default="related_to", description="Semantic relation type")
+    confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score (0.0 - 1.0)",
+    )
+
+    model_config = ConfigDict(extra="ignore")
+
+
 class NoteType(str, Enum):
     """Allowed OKF note types according to P.A.R.A. + LLM-Wiki schema."""
 
@@ -95,9 +116,9 @@ class OKFMetadata(BaseModel):
         description="Date after which the note should be reviewed",
     )
 
-    related: list[str] = Field(
+    related: list[TypedRelation] = Field(
         default_factory=list,
-        description="Knowledge graph links to related notes (relative paths)",
+        description="Typed knowledge graph links to related notes",
     )
 
     model_config = ConfigDict(extra="ignore", use_enum_values=True)
@@ -126,10 +147,30 @@ class OKFMetadata(BaseModel):
     def validate_tags(cls, v: list[str]) -> list[str]:
         return [t.strip() for t in v if t.strip()]
 
-    @field_validator("related")
+    @field_validator("related", mode="before")
     @classmethod
-    def validate_related(cls, v: list[str]) -> list[str]:
-        return [r.strip() for r in v if r.strip()]
+    def coerce_related(cls, v: object) -> list[TypedRelation]:
+        if v is None:
+            return []
+        if isinstance(v, list):
+            result: list[TypedRelation] = []
+            for item in v:
+                if isinstance(item, TypedRelation):
+                    result.append(item)
+                elif isinstance(item, str):
+                    stripped = item.strip()
+                    if stripped:
+                        result.append(
+                            TypedRelation(
+                                path=stripped,
+                                relation="related_to",
+                                confidence=1.0,
+                            )
+                        )
+                else:
+                    raise ValueError(f"Invalid related item: {item!r}")
+            return result
+        raise ValueError("related must be a list")
 
     @field_validator("timestamp", mode="before")
     @classmethod

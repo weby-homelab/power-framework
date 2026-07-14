@@ -84,7 +84,7 @@ def build_frontmatter(metadata: OKFMetadata) -> str:
     if metadata.expiry:
         lines.append(f"expiry: {metadata.expiry.isoformat()}")
     if metadata.related:
-        related_str = ", ".join(metadata.related)
+        related_str = ", ".join(r.path for r in metadata.related)
         lines.append(f"related: [{related_str}]")
     lines.append(f"timestamp: {metadata.timestamp.isoformat()}")
     lines.append("---")

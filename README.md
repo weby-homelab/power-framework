@@ -7,7 +7,7 @@
 Validate, index, search, and manage your knowledge base from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-81%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/power-framework?logo=github)](https://github.com/weby-homelab/power-framework/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -30,7 +30,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code, powered by FastMCP 3.x
-- **Production-grade** — 270+ tests, 81%+ coverage, CodeQL scanning, Automated GitHub Releases
+- **Production-grade** — 360+ tests, 80%+ coverage, CodeQL scanning, Automated GitHub Releases
 
 ## Quick Start
 
@@ -51,16 +51,16 @@ power markdown-check ~/my-vault  # Check markdown quality issues
 | **CLI** | `power init`, `lint`, `index`, `ingest`, `search`, `rot`, `archive`, `cron`, `heal`, `markdown-check`, `suggest-related` — 11 commands for full vault management |
 | **MCP Server** | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`, `search_vault_tool`, `synthesize_session`, `rot_audit`, `archive_notes`, `suggest_related_tool`, `heal_frontmatter_tool`, `check_markdown_tool` — 12 tools for AI agents |
 | **OKF Validation** | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`) |
-| **Knowledge Graph (Graph RAG)** | `related` field in OKF frontmatter for explicit cross-note graph links. Rendered in sub-indexes for AI navigation |
+| **Knowledge Graph (Graph RAG)** | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`) |
 | **Freshness Monitoring** | Linter flags stale/expired notes by checking `expiry` dates, ensuring your vault stays current |
 | **Agent Auto-Ingest** | `synthesize_session` MCP tool — agents autonomously create permanent notes with governance + graph links + full index rebuild |
-| **ROT Audit** | Detects redundant, outdated, and trivial notes — `power rot <path>` keeps your vault lean |
+| **ROT Audit** | Detects redundant, outdated, and trivial notes using dense embedding semantic deduplication and LLM fact contradiction checks |
 | **Auto-Archive** | Automatically archives stale notes to `04_Archive/` — `power archive <path>` with dry-run preview |
 | **Healer** | Auto-fixes missing/invalid frontmatter fields (title, description, type, timestamp) — `power heal <path>` |
 | **Markdown Checks** | Detects trailing whitespace, inconsistent list markers, header jumps, missing code language — `power markdown-check <path>` |
 | **Relation Suggestions** | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>` |
 | **Cron Maintenance** | Runs lint + index + rot audit in one command — `power cron <path>` |
-| **Full-Text Search** | 3-mode search: FTS5 (BM25), Vector (TF cosine), Hybrid (RRF fusion) with context snippets |
+| **Advanced Hybrid Search** | 4-mode search (v2.0): FTS5 (BM25), Dense Vector Semantic (`fastembed` BGE-small-en-v1.5), Hybrid (RRF), and Hybrid Reranked (`cross-encoder` ms-marco-MiniLM-L-6-v2) with synonym & LLM query expansion and Contextual Retrieval chunking (`SemanticChunker`) |
 | **Hierarchical Index** | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings) |
 | **CI/CD** | 270+ tests, 81%+ coverage, CodeQL SAST, Automated GitHub Releases |
 | **Documentation** | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides |
@@ -274,10 +274,14 @@ flowchart TD
 | `core/parser.py` | Safe YAML frontmatter parsing (PyYAML-based) |
 | `core/indexer.py` | Vault scanning and hierarchical index generation |
 | `core/linter.py` | Health checks: broken links, missing metadata, orphans, stale/expired notes |
-| `core/searcher.py` | Full-text search with relevance scoring (FTS5/Vector/Hybrid) |
+| `core/searcher.py` | Full-text search with relevance scoring (FTS5/Vector/Hybrid/Reranked) |
+| `core/embeddings.py` | Dense vector embeddings manager using BGE-small on ONNX Runtime |
+| `core/reranker.py` | Cross-Encoder reranker using ms-marco-MiniLM-L-6-v2 on ONNX Runtime |
+| `core/query_expansion.py` | Synonym map (EN/UK) & OpenRouter Multi-Query expansion |
+| `core/chunker.py` | Semantic & contextual note splitter (Anthropic Contextual Retrieval) |
 | `core/healer.py` | Auto-fix missing/invalid frontmatter fields |
-| `core/relations.py` | Entity extraction & relation suggestions for Graph RAG |
-| `core/rot_scoring.py` | A2 scoring: content dedup, freshness, link rot, usage tracking |
+| `core/relations.py` | KnowledgeGraph builder, BFS traversal, and Mermaid exporter |
+| `core/rot_scoring.py` | A2 scoring: semantic content dedup, freshness, contradiction checks |
 | `core/markdown_checks.py` | Markdown quality checks: trailing whitespace, list markers, header jumps |
 | `core/constants.py` | Centralized exclusion lists and system constants |
 | `core/utils.py` | Path traversal protection, atomic writes, backups, rate limiter |
@@ -296,7 +300,7 @@ cd power-framework
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests (270+ tests, 81%+ coverage)
+# Run tests (360+ tests, 80%+ coverage)
 pytest tests/ -v
 
 # Lint & format

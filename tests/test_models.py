@@ -14,6 +14,7 @@ from power_framework.core.models import (
     NoteStatus,
     NoteType,
     OKFMetadata,
+    TypedRelation,
 )
 
 
@@ -214,8 +215,11 @@ class TestOKFMetadata:
             timestamp=datetime(2026, 1, 1),
             related=["01_Projects/OtherNote.md", "02_Areas/SomeArea.md"],
         )
-        assert "01_Projects/OtherNote.md" in meta.related
         assert len(meta.related) == 2
+        assert meta.related[0].path == "01_Projects/OtherNote.md"
+        assert meta.related[0].relation == "related_to"
+        assert meta.related[0].confidence == 1.0
+        assert meta.related[1].path == "02_Areas/SomeArea.md"
 
     def test_related_empty_by_default(self):
         meta = OKFMetadata(
@@ -226,6 +230,44 @@ class TestOKFMetadata:
         )
         assert meta.related == []
 
+    def test_related_typed_direct(self):
+        meta = OKFMetadata(
+            type="Resource",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            related=[
+                TypedRelation(
+                    path="01_Projects/A.md",
+                    relation="depends_on",
+                    confidence=0.8,
+                ),
+            ],
+        )
+        assert len(meta.related) == 1
+        assert meta.related[0].path == "01_Projects/A.md"
+        assert meta.related[0].relation == "depends_on"
+        assert meta.related[0].confidence == 0.8
+
+    def test_related_mixed_strings_and_typed(self):
+        meta = OKFMetadata(
+            type="Resource",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            related=[
+                "01_Projects/StringRef.md",
+                TypedRelation(
+                    path="02_Areas/TypedRef.md", relation="references", confidence=0.9
+                ),
+            ],
+        )
+        assert len(meta.related) == 2
+        assert meta.related[0].path == "01_Projects/StringRef.md"
+        assert meta.related[0].relation == "related_to"
+        assert meta.related[1].path == "02_Areas/TypedRef.md"
+        assert meta.related[1].relation == "references"
+
     def test_related_strips_whitespace(self):
         meta = OKFMetadata(
             type="Resource",
@@ -234,7 +276,9 @@ class TestOKFMetadata:
             timestamp=datetime(2026, 1, 1),
             related=["  path/to/note.md  ", "", " other.md "],
         )
-        assert meta.related == ["path/to/note.md", "other.md"]
+        assert len(meta.related) == 2
+        assert meta.related[0].path == "path/to/note.md"
+        assert meta.related[1].path == "other.md"
 
     def test_owner_field(self):
         meta = OKFMetadata(
@@ -293,4 +337,4 @@ class TestOKFMetadata:
         assert meta.owner == "team-alpha"
         assert meta.status == "active"
         assert meta.expiry.isoformat() == "2027-01-01"
-        assert "03_Resources/Guide.md" in meta.related
+        assert any(r.path == "03_Resources/Guide.md" for r in meta.related)

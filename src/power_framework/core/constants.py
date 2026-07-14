@@ -17,6 +17,7 @@ EXCLUDED_ORPHAN_FILES: frozenset[str] = frozenset(
         "README.md",
         "Home.md",
         "index.md",
+        "_index.md",
         "log.md",
         "Successor-Hub.md",
         "PARA-OKF-LLM_Wiki.md",

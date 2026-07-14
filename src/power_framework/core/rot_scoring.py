@@ -1,8 +1,9 @@
 """
 P.O.W.E.R. ROT Scoring — Content Dedup, Freshness, Link Rot, Usage Tracking.
 
-Implements Track A2 (Smart ROT without embeddings):
-  - ContentDedupDetector: TF-Vector cosine similarity for body content
+Implements Track A2 (Smart ROT):
+  - ContentDedupDetector: Dense embedding cosine similarity for body content
+  - ContradictionDetector: Flags semantically similar pairs with contradictions
   - FreshnessScorer: Type-based exponential decay
   - LinkRotChecker: HTTP HEAD checks for external URLs
   - UsageTracker: SQLite-based access counter
@@ -10,7 +11,9 @@ Implements Track A2 (Smart ROT without embeddings):
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import sqlite3
 import threading
@@ -18,17 +21,23 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from .parser import FRONTMATTER_PATTERN, read_file_content
+from .embeddings import EmbeddingManager
+from .parser import FRONTMATTER_PATTERN, read_file_content, parse_frontmatter
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 from .constants import EXCLUDED_DIRS
-from .searcher import _compute_tf_vector, _cosine_similarity, _tokenize
+from .ignore import should_skip
 
 logger = logging.getLogger(__name__)
 
 CONTENT_DEDUP_THRESHOLD = 0.75
+CONTRADICTION_SIMILARITY_THRESHOLD = 0.7
+OPENROUTER_MODELS = [
+    "openrouter/google/gemini-2.5-flash",
+    "openrouter/qwen/qwen3.5-flash-02-23",
+]
 
 TYPE_HALF_LIFE_DAYS: dict[str, int] = {
     "Daily Log": 30,
@@ -42,30 +51,40 @@ TYPE_HALF_LIFE_DAYS: dict[str, int] = {
 DEFAULT_HALF_LIFE_DAYS = 180
 
 
+def _dense_cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
+    dot = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = sum(v * v for v in vec_a) ** 0.5
+    norm_b = sum(v * v for v in vec_b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
 class ContentDedupDetector:
-    """Detect content-level duplicates using TF-Vector cosine similarity."""
+    """Detect content-level duplicates using dense embedding cosine similarity."""
 
     def __init__(self, threshold: float = CONTENT_DEDUP_THRESHOLD):
         self.threshold = threshold
+        self.embedder = EmbeddingManager()
 
     def detect(
         self,
         vault_dir: Path,
     ) -> list[tuple[str, str, float]]:
         """
-        Find content-duplicate note pairs using TF-Vector cosine similarity.
+        Find content-duplicate note pairs using dense embedding cosine similarity.
 
         Returns list of (path_a, path_b, similarity_score).
         Lower than threshold = not reported.
         """
-        notes: dict[str, dict[str, float]] = {}
+        notes: dict[str, list[float]] = {}
         paths: list[str] = []
         dedup_pairs: list[tuple[str, str, float]] = []
         checked: set[tuple[str, str]] = set()
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if any(part in EXCLUDED_DIRS for part in rel.parts):
+            if should_skip(vault_dir, str(rel)):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -77,12 +96,16 @@ class ContentDedupDetector:
                 continue
 
             body = self._get_body(content)
-            tokens = _tokenize(body)
-            if len(tokens) < 20:
+            if len(body) < 50:
                 continue
 
-            vec = _compute_tf_vector(tokens)
             rel_path = str(rel)
+            try:
+                vec = self.embedder.embed(body)
+            except Exception as exc:
+                logger.debug("Cannot embed %s: %s", filepath, exc)
+                continue
+
             notes[rel_path] = vec
             paths.append(rel_path)
 
@@ -93,12 +116,195 @@ class ContentDedupDetector:
                 if pair in checked:
                     continue
                 checked.add(pair)
-                sim = _cosine_similarity(notes[a], notes[b])
+                sim = _dense_cosine_similarity(notes[a], notes[b])
                 if sim >= self.threshold:
                     dedup_pairs.append((a, b, sim))
 
         dedup_pairs.sort(key=lambda x: (-x[2], x[0], x[1]))
         return dedup_pairs
+
+    @staticmethod
+    def _get_body(content: str) -> str:
+        """Extract body content, stripping frontmatter."""
+        match = FRONTMATTER_PATTERN.match(content)
+        if match:
+            return content[match.end() :].strip()
+        return content.strip()
+
+
+class ContradictionDetector:
+    """Find semantically similar note pairs that may contain contradictory facts."""
+
+    def __init__(
+        self,
+        similarity_threshold: float = CONTRADICTION_SIMILARITY_THRESHOLD,
+        api_key: str | None = None,
+    ):
+        self.similarity_threshold = similarity_threshold
+        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        self.embedder = EmbeddingManager()
+
+    def detect(self, vault_dir: Path) -> list[tuple[str, str, str]]:
+        """
+        Find pairs of notes that are semantically similar but contradictory.
+
+        Returns list of (path_a, path_b, reason).
+        """
+        notes: dict[str, str] = {}
+        embeddings: dict[str, list[float]] = {}
+        paths: list[str] = []
+        results: list[tuple[str, str, str]] = []
+        checked: set[tuple[str, str]] = set()
+
+        for filepath in vault_dir.rglob("*.md"):
+            rel = filepath.relative_to(vault_dir)
+            if should_skip(vault_dir, str(rel)):
+                continue
+            if filepath.name in ("index.md", "log.md", "_index.md"):
+                continue
+
+            try:
+                content = read_file_content(filepath)
+            except Exception as exc:
+                logger.debug("Cannot read %s: %s", filepath, exc)
+                continue
+
+            body = self._get_body(content)
+            if len(body) < 50:
+                continue
+
+            rel_path = str(rel)
+            notes[rel_path] = body
+            try:
+                embeddings[rel_path] = self.embedder.embed(body)
+            except Exception as exc:
+                logger.debug("Cannot embed %s: %s", filepath, exc)
+                continue
+            paths.append(rel_path)
+
+        for i in range(len(paths)):
+            for j in range(i + 1, len(paths)):
+                a, b = paths[i], paths[j]
+                pair = (a, b) if a < b else (b, a)
+                if pair in checked:
+                    continue
+                checked.add(pair)
+                sim = _dense_cosine_similarity(embeddings[a], embeddings[b])
+                if sim >= self.similarity_threshold:
+                    reason = self._check_contradiction(
+                        notes[a], notes[b], a, b, vault_dir
+                    )
+                    if reason:
+                        results.append((a, b, reason))
+
+        return results
+
+    def _check_contradiction(
+        self,
+        body_a: str,
+        body_b: str,
+        path_a: str,
+        path_b: str,
+        vault_dir: Path,
+    ) -> str | None:
+        """Check if two texts contradict. Returns reason string or None."""
+        if self.api_key:
+            return self._llm_contradiction_check(body_a, body_b)
+        return self._metadata_contradiction_check(path_a, path_b, vault_dir)
+
+    def _llm_contradiction_check(self, body_a: str, body_b: str) -> str | None:
+        """Call LLM via OpenRouter to check for contradictions."""
+        prompt = (
+            "You are a contradiction detection system. Analyze the following two "
+            "texts from a knowledge base and determine if they contain contradictory "
+            "facts, instructions, or statements.\n\n"
+            f"TEXT 1:\n{body_a}\n\n"
+            f"TEXT 2:\n{body_b}\n\n"
+            "Do these texts contradict each other? Answer with either:\n"
+            "YES: <specific reason why they contradict>\n"
+            "NO\n\n"
+            "Only answer YES if there is a clear factual contradiction. "
+            "Differences in wording or complementary information should be marked NO."
+        )
+
+        payload = json.dumps(
+            {
+                "model": OPENROUTER_MODELS[0],
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 100,
+                "temperature": 0.1,
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                content = body["choices"][0]["message"]["content"].strip()
+                if content.upper().startswith("YES"):
+                    reason = content[4:].strip()
+                    return reason or "Semantic contradiction detected"
+        except Exception as exc:
+            logger.debug("LLM contradiction check failed: %s", exc)
+
+        return None
+
+    def _metadata_contradiction_check(
+        self,
+        path_a: str,
+        path_b: str,
+        vault_dir: Path,
+    ) -> str | None:
+        """Fallback: compare metadata fields for contradictions."""
+        try:
+            content_a = read_file_content(vault_dir / path_a)
+            content_b = read_file_content(vault_dir / path_b)
+        except Exception:
+            return None
+
+        fm_a = parse_frontmatter(content_a) or {}
+        fm_b = parse_frontmatter(content_b) or {}
+
+        status_a = str(fm_a.get("status", "")).strip().lower()
+        status_b = str(fm_b.get("status", "")).strip().lower()
+        if status_a and status_b and status_a != status_b:
+            if {"active", "archived", "draft"} & {status_a, status_b}:
+                return f"Conflicting status: '{status_a}' vs '{status_b}'"
+
+        owner_a = str(fm_a.get("owner", "")).strip()
+        owner_b = str(fm_b.get("owner", "")).strip()
+        if owner_a and owner_b and owner_a.lower() != owner_b.lower():
+            return f"Different owners: '{owner_a}' vs '{owner_b}'"
+
+        expiry_a = fm_a.get("expiry")
+        expiry_b = fm_b.get("expiry")
+        if expiry_a and expiry_b:
+            try:
+                from datetime import date as date_type
+
+                now = datetime.now(timezone.utc).date()
+                expired_a = isinstance(expiry_a, date_type) and expiry_a < now
+                expired_b = isinstance(expiry_b, date_type) and expiry_b < now
+                if expired_a != expired_b:
+                    return "Opposite expiry dates: one expired, other not"
+            except (ValueError, TypeError):
+                pass
+
+        priority_a = str(fm_a.get("priority", "")).strip().lower()
+        priority_b = str(fm_b.get("priority", "")).strip().lower()
+        if priority_a and priority_b and priority_a != priority_b:
+            return f"Conflicting priorities: '{priority_a}' vs '{priority_b}'"
+
+        return None
 
     @staticmethod
     def _get_body(content: str) -> str:
@@ -125,7 +331,7 @@ class FreshnessScorer:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if any(part in EXCLUDED_DIRS for part in rel.parts):
+            if should_skip(vault_dir, str(rel)):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -176,7 +382,7 @@ class LinkRotChecker:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if any(part in EXCLUDED_DIRS for part in rel.parts):
+            if should_skip(vault_dir, str(rel)):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -224,7 +430,9 @@ class LinkRotChecker:
                 except (OSError, ValueError):
                     pass
             req = urllib.request.Request(url, method="HEAD")  # noqa: S310
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310
+            with urllib.request.urlopen(
+                req, timeout=self.timeout
+            ) as resp:  # noqa: S310
                 return int(resp.status)
         except urllib.error.HTTPError as e:
             return e.code

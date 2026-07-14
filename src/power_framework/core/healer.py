@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from .constants import SKIP_FILES
+from .ignore import should_skip
 from .models import NoteType
 
 if TYPE_CHECKING:
@@ -204,6 +205,8 @@ def heal_vault(vault_dir: Path, dry_run: bool = True) -> str:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
+        if should_skip(vault_dir, str(rel)):
+            continue
         if any(part in DEFAULT_EXCLUDED for part in rel.parts):
             continue
         if filepath.name in DEFAULT_EXCLUDED:

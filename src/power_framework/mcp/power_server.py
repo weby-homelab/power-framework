@@ -59,6 +59,7 @@ from power_framework.core import (
     check_all as check_markdown,
 )
 from power_framework.core.constants import SKIP_FILES, SYSTEM_SKIP_PARTS
+from power_framework.core.ignore import should_skip
 
 logger = logging.getLogger(__name__)
 
@@ -372,7 +373,7 @@ async def check_markdown_tool(
 
         for filepath in path.rglob("*.md"):
             rel = filepath.relative_to(path)
-            if any(p in SYSTEM_SKIP_PARTS for p in rel.parts):
+            if should_skip(path, str(rel)):
                 continue
             if filepath.name in SKIP_FILES:
                 continue

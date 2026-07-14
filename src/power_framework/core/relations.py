@@ -10,15 +10,17 @@ Auto-discovers knowledge graph connections between notes using:
 from __future__ import annotations
 
 import re
+from collections import deque
 from typing import TYPE_CHECKING
 
 from .constants import EXCLUDED_DIRS
+from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .models import OKFMetadata
+    from .models import NoteFile, OKFMetadata
 
 SUGGEST_MIN_KEYWORD_LEN = 3
 SUGGEST_MAX_KEYWORDS = 10
@@ -144,7 +146,7 @@ def suggest_related(
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
@@ -190,7 +192,11 @@ def suggest_related(
         checked: set[tuple[str, str]] = set()
         for i in range(len(paths)):
             for j in range(i + 1, len(paths)):
-                pair = (paths[i], paths[j]) if paths[i] < paths[j] else (paths[j], paths[i])
+                pair = (
+                    (paths[i], paths[j])
+                    if paths[i] < paths[j]
+                    else (paths[j], paths[i])
+                )
                 if pair in checked:
                     continue
                 checked.add(pair)
@@ -209,6 +215,140 @@ def suggest_related(
 
     suggestions.sort(key=lambda s: (-s.score, s.source_path, s.target_path))
     return suggestions[:max_results]
+
+
+class KnowledgeGraph:
+    """Build a graph from vault notes and traverse it.
+
+    Each node is a note path; edges are TypedRelation entries from metadata.
+    Supports BFS traversal and Mermaid diagram export.
+    """
+
+    def __init__(self) -> None:
+        self._nodes: set[str] = set()
+        self._edges: list[tuple[str, str, str, float]] = []
+        self._adj: dict[str, list[tuple[str, str, float]]] = {}
+
+    def add_note(self, note_path: str) -> None:
+        """Register a note node."""
+        self._nodes.add(note_path)
+        if note_path not in self._adj:
+            self._adj[note_path] = []
+
+    def add_relation(
+        self,
+        source: str,
+        target: str,
+        relation: str = "related_to",
+        confidence: float = 1.0,
+    ) -> None:
+        """Add a directed edge from source to target."""
+        self.add_note(source)
+        self.add_note(target)
+        self._edges.append((source, target, relation, confidence))
+        self._adj[source].append((target, relation, confidence))
+
+    @classmethod
+    def from_notes(
+        cls,
+        notes: list[NoteFile],
+    ) -> KnowledgeGraph:
+        """Build a graph from a list of NoteFile objects using their 'related' metadata."""
+        kg = cls()
+        for note in notes:
+            if note.metadata is None:
+                continue
+            kg.add_note(note.rel_path)
+            for rel in note.metadata.related:
+                kg.add_relation(
+                    source=note.rel_path,
+                    target=rel.path,
+                    relation=rel.relation,
+                    confidence=rel.confidence,
+                )
+        return kg
+
+    def bfs(
+        self,
+        start_path: str,
+        max_hops: int = 2,
+    ) -> list[tuple[str, str, str, float, int]]:
+        """BFS traversal from start_path, returning (source, target, relation, confidence, depth).
+
+        Args:
+            start_path: The note path to start traversal from.
+            max_hops: Maximum traversal depth (number of edges).
+
+        Returns: List of edges reachable within max_hops, each annotated with depth.
+        """
+        if start_path not in self._adj:
+            return []
+
+        visited: set[str] = set()
+        queue: deque[tuple[str, int]] = deque()
+        queue.append((start_path, 0))
+        visited.add(start_path)
+        result: list[tuple[str, str, str, float, int]] = []
+
+        while queue:
+            current, depth = queue.popleft()
+            if depth >= max_hops:
+                continue
+            for target, relation, confidence in self._adj.get(current, []):
+                edge = (current, target, relation, confidence, depth + 1)
+                result.append(edge)
+                if target not in visited:
+                    visited.add(target)
+                    queue.append((target, depth + 1))
+
+        return result
+
+    def to_mermaid(
+        self,
+        center_path: str | None = None,
+        max_depth: int = 2,
+    ) -> str:
+        """Export the graph (or a subgraph around center_path) as a Mermaid flow diagram.
+
+        Args:
+            center_path: If set, only include nodes reachable within max_depth hops.
+            max_depth: Maximum traversal depth from center_path.
+
+        Returns: Mermaid Markdown string (e.g. ```mermaid\\ngraph TD\\n ... ```).
+        """
+        if center_path:
+            reachable_edges = self.bfs(center_path, max_hops=max_depth)
+            if not reachable_edges:
+                return "```mermaid\ngraph TD\n```"
+            included_nodes: set[str] = {center_path}
+            for src, tgt, _rel, _conf, _depth in reachable_edges:
+                included_nodes.add(src)
+                included_nodes.add(tgt)
+            edges = [
+                (src, tgt, rel, conf) for src, tgt, rel, conf, _depth in reachable_edges
+            ]
+        else:
+            edges = self._edges
+            included_nodes = self._nodes
+
+        node_ids: dict[str, str] = {}
+        node_counter = 0
+        for node in sorted(included_nodes):
+            node_ids[node] = f"N{node_counter}"
+            node_counter += 1
+
+        lines: list[str] = ["```mermaid", "graph TD"]
+        for node in sorted(included_nodes):
+            nid = node_ids[node]
+            label = node.split("/")[-1].replace(".md", "")
+            lines.append(f'    {nid}["{label}"]')
+        for src, tgt, rel, _conf in edges:
+            src_id = node_ids[src]
+            tgt_id = node_ids[tgt]
+            lines.append(f"    {src_id} -->|{rel}| {tgt_id}")
+        lines.append("```")
+
+        return "\n".join(lines)
 
 
 def format_relation_suggestions(
