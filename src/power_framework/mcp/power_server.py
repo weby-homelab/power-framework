@@ -39,6 +39,7 @@ from power_framework.core import (
     NoteType,
     OKFMetadata,
     RateLimiter,
+    TypedRelation,
     archive_stale_notes,
     atomic_write,
     build_frontmatter,
@@ -263,7 +264,8 @@ async def synthesize_session(
 
     path = _get_vault_path(vault_path)
     tags = tags or []
-    related = related or []
+    related_list = related or []
+    related_typed = [TypedRelation(path=r) for r in related_list]
 
     if not name.endswith(".md"):
         name += ".md"
@@ -278,7 +280,7 @@ async def synthesize_session(
         title=title,
         description=description,
         tags=tags,
-        related=related,
+        related=related_typed,
         owner=owner,
         timestamp=timestamp,
     )

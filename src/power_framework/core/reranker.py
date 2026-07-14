@@ -31,4 +31,4 @@ class RerankerManager:
         self._lazy_init()
         assert self._model is not None
         pairs = [(query, doc) for doc in documents]
-        return list(self._model.predict(pairs))
+        return list(self._model.predict(pairs))  # type: ignore[attr-defined]

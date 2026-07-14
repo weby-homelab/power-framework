@@ -32,7 +32,7 @@ class EmbeddingManager:
     def embed(self, text: str) -> list[float]:
         self._lazy_init()
         assert self._model is not None
-        return [float(v) for v in next(self._model.embed([text]))]
+        return [float(v) for v in next(iter(self._model.embed([text])))]
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         self._lazy_init()
