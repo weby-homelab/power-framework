@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from power_framework.core.query_expansion import QueryExpander
 
 
@@ -55,7 +53,7 @@ class TestQueryExpander:
         variants = expander.expand("test")
         # "test" has only one synonym: "тест" (and "test" itself)
         # So we should have unique variants only
-        assert len(variants) == len(set(v.strip().lower() for v in variants))
+        assert len(variants) == len({v.strip().lower() for v in variants})
 
     def test_multi_word_query_partial_synonyms(self):
         expander = QueryExpander()
@@ -85,9 +83,7 @@ class TestQueryExpanderLLM:
 
     def test_llm_graceful_on_network_error(self):
         expander = QueryExpander(use_llm=True, api_key="sk-test-key")
-        with patch(
-            "urllib.request.urlopen", side_effect=TimeoutError("network timeout")
-        ):
+        with patch("urllib.request.urlopen", side_effect=TimeoutError("network timeout")):
             variants = expander.expand("docker")
         assert "docker" in variants
 

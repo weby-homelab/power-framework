@@ -103,9 +103,7 @@ def should_skip(vault_dir: Path, rel_path: str) -> bool:
         return True
     if not in_kb_scope(rel_path):
         return True
-    if is_ignored(vault_dir, rel_path):
-        return True
-    return False
+    return bool(is_ignored(vault_dir, rel_path))
 
 
 def iter_markdown(vault_dir: Path):

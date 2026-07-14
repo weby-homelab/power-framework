@@ -67,7 +67,6 @@ class SemanticChunker:
             return [text.strip()] if text.strip() else []
 
         chunks: list[str] = []
-        prev_end = 0
 
         for i, match in enumerate(matches):
             if i == 0 and match.start() > 0:
@@ -79,7 +78,6 @@ class SemanticChunker:
             section = text[start:end].strip()
             if section:
                 chunks.append(section)
-            prev_end = end
 
         return chunks
 

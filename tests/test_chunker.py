@@ -154,9 +154,7 @@ class TestChunkerOutputQuality:
         chunker = SemanticChunker()
         md = "## Section\n\nContent."
         result = chunker.chunk(md, title="My Note", description="A test note")
-        assert all(
-            "[Document: My Note | Description: A test note]" in c for c in result
-        )
+        assert all("[Document: My Note | Description: A test note]" in c for c in result)
 
     def test_chunks_are_non_empty(self):
         chunker = SemanticChunker(mode="headers")
@@ -178,8 +176,6 @@ class TestChunkerOutputQuality:
     def test_different_modes_produce_same_prefix_format(self):
         md = "## H\n\nP1\n\n## H2\n\nP2"
         h_result = SemanticChunker(mode="headers").chunk(md, title="X", description="Y")
-        p_result = SemanticChunker(mode="paragraphs").chunk(
-            md, title="X", description="Y"
-        )
+        p_result = SemanticChunker(mode="paragraphs").chunk(md, title="X", description="Y")
         assert all(c.startswith("[Document: X | Description: Y]") for c in h_result)
         assert all(c.startswith("[Document: X | Description: Y]") for c in p_result)

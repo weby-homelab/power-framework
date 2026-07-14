@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from power_framework.core.rot_scoring import (
-    CONTRADICTION_SIMILARITY_THRESHOLD,
     ContradictionDetector,
     _dense_cosine_similarity,
 )
@@ -159,9 +158,7 @@ class TestContradictionDetectorMetadataFallback:
         assert len(results) >= 1
         assert "expir" in results[0][2].lower()
 
-    def test_conflicting_priorities(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_conflicting_priorities(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         vault = self._make_pair_vault(
             tmp_path,
@@ -243,9 +240,7 @@ class TestContradictionDetectorLLM:
         "and Flask, as well as data science libraries like NumPy."
     )
 
-    def test_llm_detects_contradiction(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_llm_detects_contradiction(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-key")
         vault = self._make_simple_vault(tmp_path, self.LLM_BODY_A, self.LLM_BODY_B)
 
@@ -253,17 +248,15 @@ class TestContradictionDetectorLLM:
 
         import urllib.request
 
-        original = urllib.request.urlopen
-
         def mock_urlopen(req, **kwargs):
             class MockResponse:
-                def __enter__(self2):
-                    return self2
+                def __enter__(self):
+                    return self
 
-                def __exit__(self2, *args):
+                def __exit__(self, *args):
                     pass
 
-                def read(self2):
+                def read(self):
                     import json
 
                     return json.dumps(
@@ -279,7 +272,7 @@ class TestContradictionDetectorLLM:
                     ).encode("utf-8")
 
                 @property
-                def status(self2):
+                def status(self):
                     return 200
 
             return MockResponse()
@@ -289,9 +282,7 @@ class TestContradictionDetectorLLM:
         assert len(results) >= 1
         assert "port" in results[0][2].lower() or "conflict" in results[0][2].lower()
 
-    def test_llm_no_contradiction(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_llm_no_contradiction(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-key")
         vault = self._make_simple_vault(tmp_path, self.LLM_COMPAT_A, self.LLM_COMPAT_B)
 
@@ -301,21 +292,19 @@ class TestContradictionDetectorLLM:
 
         def mock_urlopen(req, **kwargs):
             class MockResponse:
-                def __enter__(self2):
-                    return self2
+                def __enter__(self):
+                    return self
 
-                def __exit__(self2, *args):
+                def __exit__(self, *args):
                     pass
 
-                def read(self2):
+                def read(self):
                     import json
 
-                    return json.dumps(
-                        {"choices": [{"message": {"content": "NO"}}]}
-                    ).encode("utf-8")
+                    return json.dumps({"choices": [{"message": {"content": "NO"}}]}).encode("utf-8")
 
                 @property
-                def status(self2):
+                def status(self):
                     return 200
 
             return MockResponse()

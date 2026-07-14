@@ -58,7 +58,7 @@ from power_framework.core import (
 from power_framework.core import (
     check_all as check_markdown,
 )
-from power_framework.core.constants import SKIP_FILES, SYSTEM_SKIP_PARTS
+from power_framework.core.constants import SKIP_FILES
 from power_framework.core.ignore import should_skip
 
 logger = logging.getLogger(__name__)

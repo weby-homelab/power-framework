@@ -257,9 +257,7 @@ class TestOKFMetadata:
             timestamp=datetime(2026, 1, 1),
             related=[
                 "01_Projects/StringRef.md",
-                TypedRelation(
-                    path="02_Areas/TypedRef.md", relation="references", confidence=0.9
-                ),
+                TypedRelation(path="02_Areas/TypedRef.md", relation="references", confidence=0.9),
             ],
         )
         assert len(meta.related) == 2

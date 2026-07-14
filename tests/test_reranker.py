@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from power_framework.core.reranker import RerankerManager
 
@@ -60,6 +60,4 @@ class TestRerankerManager:
         manager._model = mock_model
 
         manager.rerank("query", ["doc a", "doc b"])
-        mock_model.predict.assert_called_once_with(
-            [("query", "doc a"), ("query", "doc b")]
-        )
+        mock_model.predict.assert_called_once_with([("query", "doc a"), ("query", "doc b")])
