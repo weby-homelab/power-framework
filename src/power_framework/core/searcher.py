@@ -5,17 +5,21 @@ Multi-mode search across vault notes:
 - "fts": SQLite FTS5 full-text search with weighted scoring (default)
 - "vector": TF-vector cosine similarity for semantic-like ranking
 - "hybrid": Reciprocal Rank Fusion merge of FTS + vector results
+- "semantic": Dense embedding cosine similarity via fastembed
 """
 
 from __future__ import annotations
 
 import re
 import sqlite3
+import struct
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .constants import EXCLUDED_DIRS
+from .embeddings import EmbeddingManager, EMBEDDING_DIM
+from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
 from .utils import get_cache_dir
@@ -122,7 +126,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
-        if any(part in EXCLUDED_DIRS for part in filepath.relative_to(vault_dir).parts):
+        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
             continue
 
         try:
@@ -173,6 +177,13 @@ def _init_db(conn: sqlite3.Connection) -> None:
             mtime REAL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS doc_embeddings (
+            rel_path TEXT PRIMARY KEY,
+            embedding BLOB,
+            mtime REAL
+        )
+    """)
     conn.commit()
 
 
@@ -182,8 +193,7 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
-        rel_parts = filepath.relative_to(vault_dir).parts
-        if any(part in EXCLUDED_DIRS for part in rel_parts):
+        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
             continue
 
         try:
@@ -199,10 +209,17 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
 
     to_delete = [rel_path for rel_path in db_files if rel_path not in disk_files]
     if to_delete:
-        cursor.executemany("DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete])
+        cursor.executemany(
+            "DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete]
+        )
         cursor.executemany(
             "DELETE FROM file_metadata WHERE rel_path = ?", [(r,) for r in to_delete]
         )
+        cursor.executemany(
+            "DELETE FROM doc_embeddings WHERE rel_path = ?", [(r,) for r in to_delete]
+        )
+
+    embedder = EmbeddingManager()
 
     for rel_path, mtime in disk_files.items():
         if rel_path not in db_files or db_files[rel_path] != mtime:
@@ -211,8 +228,15 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
                 content = read_file_content(filepath)
                 metadata = validate_metadata(content)
                 if metadata is None:
-                    cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
-                    cursor.execute("DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,))
+                    cursor.execute(
+                        "DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,)
+                    )
+                    cursor.execute(
+                        "DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,)
+                    )
+                    cursor.execute(
+                        "DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,)
+                    )
                     continue
 
                 tags_str = " ".join(metadata.tags)
@@ -234,6 +258,24 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
                     "INSERT OR REPLACE INTO file_metadata (rel_path, mtime) VALUES (?, ?)",
                     (rel_path, mtime),
                 )
+
+                try:
+                    full_text = " ".join(
+                        [
+                            metadata.title,
+                            " ".join(metadata.tags),
+                            metadata.description,
+                            content,
+                        ]
+                    )
+                    vec = embedder.embed(full_text)
+                    blob = struct.pack(f"{len(vec)}f", *vec)
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO doc_embeddings (rel_path, embedding, mtime) VALUES (?, ?, ?)",
+                        (rel_path, blob, mtime),
+                    )
+                except Exception:  # noqa: S112
+                    continue
             except Exception:  # noqa: S112
                 continue
 
@@ -246,7 +288,9 @@ def _fts_search(
     max_results: int = 20,
 ) -> list[SearchResult]:
     """SQLite FTS5 full-text search with weighted BM25 scoring."""
-    clean_query = re.sub(r'[^\w\s"а-яєіїґ\']', " ", query, flags=re.IGNORECASE)  # noqa: RUF001
+    clean_query = re.sub(
+        r'[^\w\s"а-яєіїґ\']', " ", query, flags=re.IGNORECASE
+    )  # noqa: RUF001
     terms: list[str] = []
     for match in re.finditer(r'"([^"]+)"|(\S+)', clean_query):
         phrase = match.group(1)
@@ -360,7 +404,7 @@ def _vector_search(
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
-        if any(part in EXCLUDED_DIRS for part in filepath.relative_to(vault_dir).parts):
+        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
             continue
 
         try:
@@ -420,7 +464,9 @@ def _rrf_merge(
         rrf_scores[result.rel_path] = 1.0 / (k + rank + 1)
 
     for rank, result in enumerate(vector_results):
-        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (k + rank + 1)
+        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (
+            k + rank + 1
+        )
 
     doc_map: dict[str, SearchResult] = {}
     for r in fts_results + vector_results:
@@ -446,6 +492,87 @@ def _rrf_merge(
     return merged
 
 
+def _semantic_search(
+    vault_dir: Path,
+    query: str,
+    max_results: int = 20,
+) -> list[SearchResult]:
+    """Search vault notes using dense embedding cosine similarity."""
+    if not query or not query.strip():
+        return []
+
+    db_path = get_cache_dir() / "power_search.db"
+
+    try:
+        embedder = EmbeddingManager()
+        query_vec = embedder.embed(query)
+
+        conn = sqlite3.connect(str(db_path))
+        _init_db(conn)
+        _sync_vault_to_db(vault_dir, conn)
+
+        cursor = conn.cursor()
+        cursor.execute("SELECT rel_path, embedding, mtime FROM doc_embeddings")
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception:  # noqa: S112
+        return []
+
+    if not rows:
+        return []
+
+    q_norm = sum(v * v for v in query_vec) ** 0.5
+    if q_norm == 0:
+        return []
+
+    scored: list[tuple[float, str]] = []
+    for rel_path, blob, _mtime in rows:
+        try:
+            dim = len(blob) // 4
+            doc_vec = list(struct.unpack(f"{dim}f", blob))
+        except Exception:  # noqa: S112
+            continue
+
+        dot = sum(qv * dv for qv, dv in zip(query_vec, doc_vec))
+        d_norm = sum(v * v for v in doc_vec) ** 0.5
+        if d_norm == 0:
+            continue
+        similarity = dot / (q_norm * d_norm)
+        if similarity <= 0:
+            continue
+        scored.append((similarity, rel_path))
+
+    scored.sort(key=lambda x: -x[0])
+    top_paths = [rel for _, rel in scored[:max_results]]
+
+    results: list[SearchResult] = []
+    for rel_path in top_paths:
+        filepath = vault_dir / rel_path
+        try:
+            content = read_file_content(filepath)
+            metadata = validate_metadata(content)
+            if metadata is None:
+                continue
+            similarity = next(s for s, r in scored if r == rel_path)
+            snippet = _make_snippet(content, _tokenize(query))
+            results.append(
+                SearchResult(
+                    rel_path=rel_path,
+                    title=metadata.title,
+                    description=metadata.description,
+                    note_type=metadata.type,
+                    score=similarity,
+                    snippet=snippet,
+                    match_count=1,
+                    tags=metadata.tags,
+                )
+            )
+        except Exception:  # noqa: S112
+            continue
+
+    return results
+
+
 def search_vault(
     vault_dir: Path,
     query: str,
@@ -461,7 +588,8 @@ def search_vault(
         max_results: Maximum number of results to return.
         mode: Search mode - "fts" (SQLite FTS5, default),
               "vector" (TF cosine similarity),
-              "hybrid" (RRF merge of FTS + vector).
+              "hybrid" (RRF merge of FTS + vector),
+              "semantic" (dense embedding cosine similarity via fastembed).
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -478,6 +606,9 @@ def search_vault(
     if mode == "vector":
         return _vector_search(vault_dir, query, max_results=max_results)
 
+    if mode == "semantic":
+        return _semantic_search(vault_dir, query, max_results=max_results)
+
     if mode == "hybrid":
         fts_results = _fts_search(vault_dir, query, max_results=max_results * 2)
         vector_results = _vector_search(vault_dir, query, max_results=max_results * 2)
@@ -486,14 +617,19 @@ def search_vault(
     return _fts_search(vault_dir, query, max_results=max_results)
 
 
-def format_search_results(results: list[SearchResult], query: str, mode: str = "fts") -> str:
+def format_search_results(
+    results: list[SearchResult], query: str, mode: str = "fts"
+) -> str:
     """Format search results into a human-readable report string."""
     if not results:
         return f"No results found for '{query}'."
 
-    mode_label = {"fts": "FTS", "vector": "Vector", "hybrid": "Hybrid (FTS+Vector)"}.get(
-        mode.lower(), mode.upper()
-    )
+    mode_label = {
+        "fts": "FTS",
+        "vector": "Vector",
+        "hybrid": "Hybrid (FTS+Vector)",
+        "semantic": "Semantic (Dense Embedding)",
+    }.get(mode.lower(), mode.upper())
 
     lines = [
         f"=== Search Results for '{query}' ===",

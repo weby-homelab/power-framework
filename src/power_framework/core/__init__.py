@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 from .cli import main as cli_main
+from .embeddings import EmbeddingManager
 from .healer import heal_frontmatter, heal_vault
 from .indexer import (
     generate_index_content,
@@ -95,6 +96,7 @@ __all__ = [
     "TYPE_HALF_LIFE_DAYS",
     "VAULT_STRUCTURE",
     "ContentDedupDetector",
+    "EmbeddingManager",
     "FreshnessScorer",
     "LinkRotChecker",
     "LintResult",
