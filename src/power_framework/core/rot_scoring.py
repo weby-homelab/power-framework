@@ -140,7 +140,15 @@ class ContradictionDetector:
         api_key: str | None = None,
     ):
         self.similarity_threshold = similarity_threshold
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        self.api_key = (
+            api_key
+            or os.environ.get("POWER_LLM_API_KEY")
+            or os.environ.get("OPENROUTER_API_KEY", "")
+        )
+        self.api_base = os.environ.get("POWER_LLM_API_BASE", "https://openrouter.ai/api/v1").rstrip(
+            "/"
+        )
+        self.model = os.environ.get("POWER_LLM_MODEL", OPENROUTER_MODELS[0])
         self.embedder = EmbeddingManager()
 
     def detect(self, vault_dir: Path) -> list[tuple[str, str, str]]:
@@ -226,15 +234,15 @@ class ContradictionDetector:
 
         payload = json.dumps(
             {
-                "model": OPENROUTER_MODELS[0],
+                "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 100,
                 "temperature": 0.1,
             }
         ).encode("utf-8")
 
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
+        req = urllib.request.Request(  # noqa: S310
+            f"{self.api_base}/chat/completions",
             data=payload,
             headers={
                 "Content-Type": "application/json",

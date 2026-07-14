@@ -57,7 +57,15 @@ class QueryExpander:
 
     def __init__(self, use_llm: bool = False, api_key: str | None = None) -> None:
         self.use_llm = use_llm
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        self.api_key = (
+            api_key
+            or os.environ.get("POWER_LLM_API_KEY")
+            or os.environ.get("OPENROUTER_API_KEY", "")
+        )
+        self.api_base = os.environ.get("POWER_LLM_API_BASE", "https://openrouter.ai/api/v1").rstrip(
+            "/"
+        )
+        self.model = os.environ.get("POWER_LLM_MODEL", OPENROUTER_MODELS[0])
 
     def expand(self, query: str) -> list[str]:
         if not query or not query.strip():
@@ -104,15 +112,15 @@ class QueryExpander:
 
         payload = json.dumps(
             {
-                "model": OPENROUTER_MODELS[0],
+                "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 150,
                 "temperature": 0.7,
             }
         ).encode("utf-8")
 
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
+        req = urllib.request.Request(  # noqa: S310
+            f"{self.api_base}/chat/completions",
             data=payload,
             headers={
                 "Content-Type": "application/json",
