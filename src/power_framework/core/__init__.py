@@ -80,6 +80,7 @@ from .reranker import RerankerManager
 from .rot_scoring import (
     TYPE_HALF_LIFE_DAYS,
     ContentDedupDetector,
+    ContradictionDetector,
     FreshnessScorer,
     LinkRotChecker,
     UsageTracker,
@@ -105,6 +106,7 @@ __all__ = [
     "TYPE_HALF_LIFE_DAYS",
     "VAULT_STRUCTURE",
     "ContentDedupDetector",
+    "ContradictionDetector",
     "EmbeddingManager",
     "FreshnessScorer",
     "LinkRotChecker",
