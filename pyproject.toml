@@ -121,7 +121,7 @@ disable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]
 module = ["numpy", "numpy.*"]
-ignore_errors = true
+follow_imports = "skip"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F405"]
