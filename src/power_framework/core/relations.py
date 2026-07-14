@@ -13,6 +13,7 @@ import re
 from typing import TYPE_CHECKING
 
 from .constants import EXCLUDED_DIRS
+from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 
 if TYPE_CHECKING:
@@ -144,7 +145,7 @@ def suggest_related(
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from .constants import EXCLUDED_DIRS
+from .ignore import should_skip
 from .searcher import _compute_tf_vector, _cosine_similarity, _tokenize
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ class ContentDedupDetector:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if any(part in EXCLUDED_DIRS for part in rel.parts):
+            if should_skip(vault_dir, str(rel)):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -125,7 +126,7 @@ class FreshnessScorer:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if any(part in EXCLUDED_DIRS for part in rel.parts):
+            if should_skip(vault_dir, str(rel)):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -176,7 +177,7 @@ class LinkRotChecker:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if any(part in EXCLUDED_DIRS for part in rel.parts):
+            if should_skip(vault_dir, str(rel)):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue

@@ -22,6 +22,7 @@ from .embeddings import EmbeddingManager, EMBEDDING_DIM
 from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
+from .query_expansion import QueryExpander
 from .reranker import RerankerManager
 from .utils import get_cache_dir
 
@@ -605,21 +606,35 @@ def search_vault(
 
     mode = mode.lower()
 
-    if mode == "vector":
-        return _vector_search(vault_dir, query, max_results=max_results)
+    expander = QueryExpander()
+    variants = expander.expand(query)
 
-    if mode == "semantic":
-        return _semantic_search(vault_dir, query, max_results=max_results)
+    all_results: list[list[SearchResult]] = []
+    for variant in variants:
+        if mode == "vector":
+            results = _vector_search(vault_dir, variant, max_results=max_results)
+        elif mode == "semantic":
+            results = _semantic_search(vault_dir, variant, max_results=max_results)
+        elif mode == "hybrid":
+            fts = _fts_search(vault_dir, variant, max_results=max_results * 2)
+            vec = _vector_search(vault_dir, variant, max_results=max_results * 2)
+            results = _rrf_merge(fts, vec)
+        elif mode == "hybrid_reranked":
+            results = _hybrid_reranked_search(
+                vault_dir, variant, max_results=max_results
+            )
+        else:
+            results = _fts_search(vault_dir, variant, max_results=max_results)
+        all_results.append(results)
 
-    if mode == "hybrid":
-        fts_results = _fts_search(vault_dir, query, max_results=max_results * 2)
-        vector_results = _vector_search(vault_dir, query, max_results=max_results * 2)
-        return _rrf_merge(fts_results, vector_results)[:max_results]
+    if not all_results:
+        return []
 
-    if mode == "hybrid_reranked":
-        return _hybrid_reranked_search(vault_dir, query, max_results=max_results)
+    merged = all_results[0]
+    for next_results in all_results[1:]:
+        merged = _rrf_merge(merged, next_results)
 
-    return _fts_search(vault_dir, query, max_results=max_results)
+    return merged[:max_results]
 
 
 def _hybrid_reranked_search(

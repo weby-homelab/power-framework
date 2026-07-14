@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .constants import EXCLUDED_DIRS
+from .ignore import should_skip
 from .parser import has_frontmatter, has_type_field, parse_frontmatter, read_file_content
 from .utils import clean_note_name, is_excluded_orphan
 
@@ -252,7 +253,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
 
         clean = clean_note_name(filepath.name)
@@ -345,7 +346,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
@@ -459,7 +460,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue

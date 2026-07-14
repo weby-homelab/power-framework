@@ -67,6 +67,7 @@ from .parser import (
     read_file_content,
     validate_metadata,
 )
+from .query_expansion import QueryExpander
 from .relations import RelationSuggestion, format_relation_suggestions, suggest_related
 from .reranker import RerankerManager
 from .rot_scoring import (
@@ -108,6 +109,7 @@ __all__ = [
     "ROTResult",
     "RateLimiter",
     "RelationSuggestion",
+    "QueryExpander",
     "RerankerManager",
     "SearchResult",
     "UsageTracker",

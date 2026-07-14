@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path  # noqa: TC003
 
 from .constants import EXCLUDED_DIRS
+from .ignore import should_skip
 from .models import NOTE_TYPE_ORDER, PARA_FOLDERS, OKFMetadata
 from .parser import read_file_content, validate_metadata
 from .utils import atomic_write
@@ -29,7 +30,7 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md"):
             continue
-        if any(part in EXCLUDED_DIRS for part in filepath.relative_to(vault_dir).parts):
+        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
             continue
 
         try:
@@ -68,7 +69,7 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
             continue
 
         rel_path = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel_path.parts):
+        if should_skip(vault_dir, str(rel_path)):
             continue
 
         top_folder = rel_path.parts[0]
