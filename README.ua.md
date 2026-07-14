@@ -217,6 +217,7 @@ flowchart TD
     classDef human fill:#6366f1,stroke:#4338ca,stroke-width:2px,color:#fff,rx:8
     classDef data fill:#0ea5e9,stroke:#0369a1,stroke-width:2px,color:#fff,rx:8
     classDef wiki fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:8
+    classDef rag fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff,rx:8
     classDef agent fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,rx:8
     classDef security fill:#ef4444,stroke:#b91c1c,stroke-width:2px,color:#fff,rx:8
     
@@ -224,21 +225,29 @@ flowchart TD
         PARA[["📁 Структура каталогів P.A.R.A."]]:::human
     end
 
-    subgraph OKF ["📄 OKF Overlay (Схема Метаданих)"]
-        YAML[/"📝 YAML Frontmatter"\]:::data
+    subgraph OKF ["📄 OKF Overlay (Схема Метаданих & GraphRAG)"]
+        YAML[/"📝 YAML Frontmatter з типізованими зв'язками"\]:::data
     end
 
-    subgraph Wiki ["📖 LLM-Wiki (Філософія Karpathy)"]
+    subgraph RAG ["🔍 Конвеєр RAG & GraphRAG"]
+        Chunker["✂️ Семантичний чанкер (Anthropic Contextual)"]:::rag
+        Embeddings["🧠 Локальні BGE-small ембеддінги"]:::rag
+        SQLite[("🗄️ SQLite (FTS5 + chunk_embeddings)")]:::rag
+        Expander["🔄 Розширювач запитів (Synonyms / LLM)"]:::rag
+        Reranker["🎯 Cross-Encoder реранкер (MiniLM)"]:::rag
+        KG["🕸️ Граф знань (BFS / Mermaid Graph)"]:::rag
+    end
+
+    subgraph Wiki ["📖 LLM-Wiki (Ієрархічний каталог)"]
         IndexMD[("🗂️ index.md (Навігаційна карта)")]:::wiki
         SubIndex[("📂 _index.md (Локальні каталоги)")]:::wiki
         LogMD[("📜 log.md (Лог змін)")]:::wiki
-        Lint{{"🛠️ Лінтинг посилань"}}:::wiki
     end
 
-    subgraph AI ["🤖 AI-Агент (Local / Cloud)"]
-        Ingest>"📥 Створення нотатки"]:::agent
-        Index>"🔄 Перебудова індексу"]:::agent
-        ReadSub>"🔍 Читання під-індексу"]:::agent
+    subgraph AI ["🤖 AI-Агент (FastMCP 3.x)"]
+        Tools[["🔌 12 асинхронних інструментів MCP"]]:::agent
+        Search[["🔍 Гібридний / Reranked пошук"]]:::agent
+        ROT{{"🛠️ Аудит ROT та суперечностей (Semantic/LLM)"}}:::agent
     end
 
     subgraph ER ["🔐 Execution Rules (Правила)"]
@@ -248,15 +257,33 @@ flowchart TD
     end
 
     %% Data Flow
-    Human -- "Пише нотатки" --> YAML
-    YAML -- "Парситься через" --> AI
+    Human -- "Пише нотатки" --> PARA
+    PARA -- "Забезпечує OKF" --> YAML
+    YAML -- "Парситься через" --> Chunker
     
-    %% AI Operations
-    AI -- "Оновлює карту" --> IndexMD
-    AI -- "Оновлює каталог" --> SubIndex
-    AI -- "Дописує в" --> LogMD
-    AI -- "Перевіряє" --> Lint
-    ReadSub -- "На вимогу" --> SubIndex
+    %% RAG Pipeline
+    Chunker -- "Контекстні чанки" --> Embeddings
+    Embeddings -- "Зберігає вектори" --> SQLite
+    
+    %% Search Pipeline
+    Tools -- "Робить запит" --> Expander
+    Expander -- "Мульти-запити" --> SQLite
+    SQLite -- "Кандидати FTS5 + Вектори" --> Reranker
+    Reranker -- "Відсортовані результати" --> Search
+    
+    %% GraphRAG Pipeline
+    YAML -- "Визначає зв'язки" --> KG
+    KG -- "Будує підграфи" --> Tools
+    
+    %% Wiki Operations
+    Tools -- "Авто-імпорт та індексація" --> IndexMD
+    Tools -- "Оновлює" --> SubIndex
+    Tools -- "Дописує лог" --> LogMD
+    
+    %% ROT Audit
+    Tools -- "Запускає аудит" --> ROT
+    ROT -- "Знаходить дублікати" --> Embeddings
+    ROT -- "Шукає суперечності" --> SQLite
     
     %% Sync & Security
     IndexMD -. "Синхронізується" .-> Sync

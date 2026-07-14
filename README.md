@@ -217,6 +217,7 @@ flowchart TD
     classDef human fill:#6366f1,stroke:#4338ca,stroke-width:2px,color:#fff,rx:8
     classDef data fill:#0ea5e9,stroke:#0369a1,stroke-width:2px,color:#fff,rx:8
     classDef wiki fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:8
+    classDef rag fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff,rx:8
     classDef agent fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,rx:8
     classDef security fill:#ef4444,stroke:#b91c1c,stroke-width:2px,color:#fff,rx:8
     
@@ -224,21 +225,29 @@ flowchart TD
         PARA[["📁 P.A.R.A. Directory Structure"]]:::human
     end
 
-    subgraph OKF ["📄 OKF Overlay (Metadata Schema)"]
-        YAML[/"📝 YAML Frontmatter"\]:::data
+    subgraph OKF ["📄 OKF Overlay (Metadata & GraphRAG Schema)"]
+        YAML[/"📝 YAML Frontmatter with Typed Relations"\]:::data
     end
 
-    subgraph Wiki ["📖 LLM-Wiki (Karpathy's Philosophy)"]
+    subgraph RAG ["🔍 RAG & GraphRAG Pipeline"]
+        Chunker["✂️ Semantic Chunker (Anthropic Contextual)"]:::rag
+        Embeddings["🧠 Dense BGE-small Embeddings"]:::rag
+        SQLite[("🗄️ SQLite (FTS5 + chunk_embeddings)")]:::rag
+        Expander["🔄 Query Expander (Synonyms / LLM)"]:::rag
+        Reranker["🎯 Cross-Encoder Reranker (MiniLM)"]:::rag
+        KG["🕸️ Knowledge Graph (BFS / Mermaid Graph)"]:::rag
+    end
+
+    subgraph Wiki ["📖 LLM-Wiki (Hierarchical Catalog)"]
         IndexMD[("🗂️ index.md (Navigation Map)")]:::wiki
         SubIndex[("📂 _index.md (Per-Folder Details)")]:::wiki
         LogMD[("📜 log.md (Change Log)")]:::wiki
-        Lint{{"🛠️ Link Linting"}}:::wiki
     end
 
-    subgraph AI ["🤖 AI Agent (Local / Cloud)"]
-        Ingest>"📥 Ingest Note"]:::agent
-        Index>"🔄 Rebuild Hierarchical Index"]:::agent
-        ReadSub>"🔍 Read Sub-Index On-Demand"]:::agent
+    subgraph AI ["🤖 AI Agent (FastMCP 3.x)"]
+        Tools[["🔌 12 Async MCP Tools (stdio/HTTP)"]]:::agent
+        Search[["🔍 Hybrid / Reranked Search"]]:::agent
+        ROT{{"🛠️ ROT & Contradiction Audit (Semantic/LLM)"}}:::agent
     end
 
     subgraph ER ["🔐 Execution Rules"]
@@ -248,15 +257,33 @@ flowchart TD
     end
 
     %% Data Flow
-    Human -- "Writes Notes" --> YAML
-    YAML -- "Parsed by" --> AI
+    Human -- "Writes Notes" --> PARA
+    PARA -- "Enforces OKF" --> YAML
+    YAML -- "Parsed by" --> Chunker
     
-    %% AI Operations
-    AI -- "Updates Map" --> IndexMD
-    AI -- "Updates Catalog" --> SubIndex
-    AI -- "Appends" --> LogMD
-    AI -- "Runs Checks" --> Lint
-    ReadSub -- "On-Demand" --> SubIndex
+    %% RAG Pipeline
+    Chunker -- "Contextual Chunks" --> Embeddings
+    Embeddings -- "Stores Vectors" --> SQLite
+    
+    %% Search Pipeline
+    Tools -- "Issues Query" --> Expander
+    Expander -- "Multi-Queries" --> SQLite
+    SQLite -- "FTS5 + Vector Candidates" --> Reranker
+    Reranker -- "Top Ranked Results" --> Search
+    
+    %% GraphRAG Pipeline
+    YAML -- "Defines Edges" --> KG
+    KG -- "Renders Subgraphs" --> Tools
+    
+    %% Wiki Operations
+    Tools -- "Auto-Ingests & Indexes" --> IndexMD
+    Tools -- "Updates" --> SubIndex
+    Tools -- "Appends Logs" --> LogMD
+    
+    %% ROT Audit
+    Tools -- "Runs Audit" --> ROT
+    ROT -- "Deduplicates" --> Embeddings
+    ROT -- "Checks Conflicts" --> SQLite
     
     %% Sync & Security
     IndexMD -. "Synced via" .-> Sync
