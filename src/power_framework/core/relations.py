@@ -13,7 +13,6 @@ import re
 from collections import deque
 from typing import TYPE_CHECKING
 
-from .constants import EXCLUDED_DIRS
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 
@@ -192,11 +191,7 @@ def suggest_related(
         checked: set[tuple[str, str]] = set()
         for i in range(len(paths)):
             for j in range(i + 1, len(paths)):
-                pair = (
-                    (paths[i], paths[j])
-                    if paths[i] < paths[j]
-                    else (paths[j], paths[i])
-                )
+                pair = (paths[i], paths[j]) if paths[i] < paths[j] else (paths[j], paths[i])
                 if pair in checked:
                     continue
                 checked.add(pair)
@@ -324,18 +319,14 @@ class KnowledgeGraph:
             for src, tgt, _rel, _conf, _depth in reachable_edges:
                 included_nodes.add(src)
                 included_nodes.add(tgt)
-            edges = [
-                (src, tgt, rel, conf) for src, tgt, rel, conf, _depth in reachable_edges
-            ]
+            edges = [(src, tgt, rel, conf) for src, tgt, rel, conf, _depth in reachable_edges]
         else:
             edges = self._edges
             included_nodes = self._nodes
 
         node_ids: dict[str, str] = {}
-        node_counter = 0
-        for node in sorted(included_nodes):
+        for node_counter, node in enumerate(sorted(included_nodes)):
             node_ids[node] = f"N{node_counter}"
-            node_counter += 1
 
         lines: list[str] = ["```mermaid", "graph TD"]
         for node in sorted(included_nodes):

@@ -11,7 +11,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path  # noqa: TC003
 
-from .constants import EXCLUDED_DIRS
 from .ignore import should_skip
 from .models import NOTE_TYPE_ORDER, PARA_FOLDERS, OKFMetadata
 from .parser import read_file_content, validate_metadata
@@ -175,12 +174,8 @@ def generate_main_index_content(folder_notes: dict[str, list[dict]]) -> str:
     lines.append("## Agent Protocol")
     lines.append("")
     lines.append("1. **Read this file** — identify the relevant category.")
-    lines.append(
-        "2. **Read the sub-index** — load `folder/_index.md` for detailed entries."
-    )
-    lines.append(
-        "3. **Read specific notes** — only when the sub-index indicates relevance."
-    )
+    lines.append("2. **Read the sub-index** — load `folder/_index.md` for detailed entries.")
+    lines.append("3. **Read specific notes** — only when the sub-index indicates relevance.")
     lines.append("4. **NEVER glob all `.md` files** — use sub-indexes as a map.")
     lines.append("")
 

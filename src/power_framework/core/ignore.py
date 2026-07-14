@@ -18,8 +18,12 @@ from __future__ import annotations
 import fnmatch
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .constants import EXCLUDED_DIRS, PARA_FOLDERS_
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 POWERIGNORE_NAME = ".powerignore"
 
@@ -103,12 +107,10 @@ def should_skip(vault_dir: Path, rel_path: str) -> bool:
         return True
     if not in_kb_scope(rel_path):
         return True
-    if is_ignored(vault_dir, rel_path):
-        return True
-    return False
+    return bool(is_ignored(vault_dir, rel_path))
 
 
-def iter_markdown(vault_dir: Path):
+def iter_markdown(vault_dir: Path) -> Iterator[tuple[Path, str]]:
     """Yield ``(filepath, rel_path)`` for every in-scope, non-ignored ``.md`` file."""
     for filepath in vault_dir.rglob("*.md"):
         rel_path = str(filepath.relative_to(vault_dir))

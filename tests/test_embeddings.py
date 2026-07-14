@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from power_framework.core.embeddings import EMBEDDING_DIM, EmbeddingManager
 
 

@@ -18,8 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .constants import SKIP_FILES
-from .ignore import should_skip
 from .healer import heal_vault
+from .ignore import should_skip
 from .indexer import generate_log_initial, run_generate_hierarchical_index
 from .linter import archive_stale_notes, run_lint_report, run_rot_report
 from .markdown_checks import check_all as check_markdown_issues

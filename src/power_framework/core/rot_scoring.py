@@ -22,12 +22,11 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from .embeddings import EmbeddingManager
-from .parser import FRONTMATTER_PATTERN, read_file_content, parse_frontmatter
+from .parser import FRONTMATTER_PATTERN, parse_frontmatter, read_file_content
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-from .constants import EXCLUDED_DIRS
 from .ignore import should_skip
 
 logger = logging.getLogger(__name__)
@@ -52,12 +51,12 @@ DEFAULT_HALF_LIFE_DAYS = 180
 
 
 def _dense_cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
-    dot = sum(a * b for a, b in zip(vec_a, vec_b))
+    dot = sum(a * b for a, b in zip(vec_a, vec_b, strict=False))
     norm_a = sum(v * v for v in vec_a) ** 0.5
     norm_b = sum(v * v for v in vec_b) ** 0.5
     if norm_a == 0 or norm_b == 0:
         return 0.0
-    return dot / (norm_a * norm_b)
+    return float(dot / (norm_a * norm_b))
 
 
 class ContentDedupDetector:
@@ -191,9 +190,7 @@ class ContradictionDetector:
                 checked.add(pair)
                 sim = _dense_cosine_similarity(embeddings[a], embeddings[b])
                 if sim >= self.similarity_threshold:
-                    reason = self._check_contradiction(
-                        notes[a], notes[b], a, b, vault_dir
-                    )
+                    reason = self._check_contradiction(notes[a], notes[b], a, b, vault_dir)
                     if reason:
                         results.append((a, b, reason))
 
@@ -247,7 +244,7 @@ class ContradictionDetector:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
                 body = json.loads(resp.read().decode("utf-8"))
                 content = body["choices"][0]["message"]["content"].strip()
                 if content.upper().startswith("YES"):
@@ -276,9 +273,13 @@ class ContradictionDetector:
 
         status_a = str(fm_a.get("status", "")).strip().lower()
         status_b = str(fm_b.get("status", "")).strip().lower()
-        if status_a and status_b and status_a != status_b:
-            if {"active", "archived", "draft"} & {status_a, status_b}:
-                return f"Conflicting status: '{status_a}' vs '{status_b}'"
+        if (
+            status_a
+            and status_b
+            and status_a != status_b
+            and ({"active", "archived", "draft"} & {status_a, status_b})
+        ):
+            return f"Conflicting status: '{status_a}' vs '{status_b}'"
 
         owner_a = str(fm_a.get("owner", "")).strip()
         owner_b = str(fm_b.get("owner", "")).strip()
@@ -430,9 +431,9 @@ class LinkRotChecker:
                 except (OSError, ValueError):
                     pass
             req = urllib.request.Request(url, method="HEAD")  # noqa: S310
-            with urllib.request.urlopen(
+            with urllib.request.urlopen(  # noqa: S310
                 req, timeout=self.timeout
-            ) as resp:  # noqa: S310
+            ) as resp:
                 return int(resp.status)
         except urllib.error.HTTPError as e:
             return e.code

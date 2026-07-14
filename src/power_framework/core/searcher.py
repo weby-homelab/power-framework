@@ -18,8 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .chunker import SemanticChunker
-from .constants import EXCLUDED_DIRS
-from .embeddings import EmbeddingManager, EMBEDDING_DIM
+from .embeddings import EmbeddingManager
 from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
@@ -221,9 +220,7 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
 
     to_delete = [rel_path for rel_path in db_files if rel_path not in disk_files]
     if to_delete:
-        cursor.executemany(
-            "DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete]
-        )
+        cursor.executemany("DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete])
         cursor.executemany(
             "DELETE FROM file_metadata WHERE rel_path = ?", [(r,) for r in to_delete]
         )
@@ -243,15 +240,9 @@ def _sync_vault_to_db(vault_dir: Path, conn: sqlite3.Connection) -> None:
                 content = read_file_content(filepath)
                 metadata = validate_metadata(content)
                 if metadata is None:
-                    cursor.execute(
-                        "DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,)
-                    )
-                    cursor.execute(
-                        "DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,)
-                    )
-                    cursor.execute(
-                        "DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,)
-                    )
+                    cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,))
                     continue
 
                 tags_str = " ".join(metadata.tags)
@@ -326,8 +317,11 @@ def _fts_search(
 ) -> list[SearchResult]:
     """SQLite FTS5 full-text search with weighted BM25 scoring."""
     clean_query = re.sub(
-        r'[^\w\s"а-яєіїґ\']', " ", query, flags=re.IGNORECASE
-    )  # noqa: RUF001
+        r'[^\w\s"а-яєіїґ\']',  # noqa: RUF001
+        " ",
+        query,
+        flags=re.IGNORECASE,
+    )
     terms: list[str] = []
     for match in re.finditer(r'"([^"]+)"|(\S+)', clean_query):
         phrase = match.group(1)
@@ -501,9 +495,7 @@ def _rrf_merge(
         rrf_scores[result.rel_path] = 1.0 / (k + rank + 1)
 
     for rank, result in enumerate(vector_results):
-        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (
-            k + rank + 1
-        )
+        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (k + rank + 1)
 
     doc_map: dict[str, SearchResult] = {}
     for r in fts_results + vector_results:
@@ -556,7 +548,7 @@ def _semantic_search(
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
         rows = cursor.fetchall()
         conn.close()
-    except Exception:  # noqa: S112
+    except Exception:
         return []
 
     if not rows:
@@ -574,7 +566,7 @@ def _semantic_search(
         except Exception:  # noqa: S112
             continue
 
-        dot = sum(qv * dv for qv, dv in zip(query_vec, chunk_vec))
+        dot = sum(qv * dv for qv, dv in zip(query_vec, chunk_vec, strict=False))
         d_norm = sum(v * v for v in chunk_vec) ** 0.5
         if d_norm == 0:
             continue
@@ -666,9 +658,7 @@ def search_vault(
             vec = _vector_search(vault_dir, variant, max_results=max_results * 2)
             results = _rrf_merge(fts, vec)
         elif mode == "hybrid_reranked":
-            results = _hybrid_reranked_search(
-                vault_dir, variant, max_results=max_results
-            )
+            results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
         else:
             results = _fts_search(vault_dir, variant, max_results=max_results)
         all_results.append(results)
@@ -701,22 +691,20 @@ def _hybrid_reranked_search(
         try:
             content = read_file_content(filepath)
             documents.append(content)
-        except Exception:  # noqa: S112
+        except Exception:
             documents.append("")
 
     reranker = RerankerManager()
     reranked_scores = reranker.rerank(query, documents)
 
-    for result, score in zip(candidates, reranked_scores):
+    for result, score in zip(candidates, reranked_scores, strict=False):
         result.score = score
 
     candidates.sort(key=lambda r: -r.score)
     return candidates[:max_results]
 
 
-def format_search_results(
-    results: list[SearchResult], query: str, mode: str = "fts"
-) -> str:
+def format_search_results(results: list[SearchResult], query: str, mode: str = "fts") -> str:
     """Format search results into a human-readable report string."""
     if not results:
         return f"No results found for '{query}'."

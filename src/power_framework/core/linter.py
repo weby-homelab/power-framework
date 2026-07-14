@@ -23,7 +23,6 @@ from datetime import date as date_type
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .constants import EXCLUDED_DIRS
 from .ignore import should_skip
 from .parser import (
     has_frontmatter,
@@ -36,9 +35,7 @@ from .utils import clean_note_name, is_excluded_orphan
 logger = logging.getLogger(__name__)
 
 WIKI_LINK_PATTERN = re.compile(r"\[\[(.*?)\]\]")
-GFM_LINK_PATTERN = re.compile(
-    r"\[.*?\]\(((?![a-zA-Z][a-zA-Z0-9+.-]*://)[^)]*\.md)(?:#.*?)?\)"
-)
+GFM_LINK_PATTERN = re.compile(r"\[.*?\]\(((?![a-zA-Z][a-zA-Z0-9+.-]*://)[^)]*\.md)(?:#.*?)?\)")
 EMBED_LINK_PATTERN = re.compile(r"!\[\[(.*?)\]\]")
 
 TRIVIAL_BODY_MIN_CHARS = 50
@@ -57,9 +54,7 @@ class LintResult:
 
     @property
     def has_issues(self) -> bool:
-        return bool(
-            self.untyped_files or self.broken_links or self.orphans or self.stale_notes
-        )
+        return bool(self.untyped_files or self.broken_links or self.orphans or self.stale_notes)
 
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable lint report."""
@@ -73,9 +68,7 @@ class LintResult:
         ]
 
         if self.untyped_files:
-            lines.append(
-                f"WARNING: Missing/Invalid OKF Metadata ({len(self.untyped_files)}):"
-            )
+            lines.append(f"WARNING: Missing/Invalid OKF Metadata ({len(self.untyped_files)}):")
             for rp, reason in sorted(self.untyped_files):
                 lines.append(f"  - {rp}: {reason}")
             lines.append("")
@@ -87,9 +80,7 @@ class LintResult:
             lines.append("")
 
         if self.orphans:
-            lines.append(
-                f"WARNING: Orphan notes (no inbound links) ({len(self.orphans)}):"
-            )
+            lines.append(f"WARNING: Orphan notes (no inbound links) ({len(self.orphans)}):")
             lines.extend(f"  - {rp}" for rp in sorted(self.orphans))
             lines.append("")
 
@@ -151,18 +142,14 @@ class ROTResult:
         ]
 
         if self.redundant:
-            lines.append(
-                f"REDUNDANT: Similar / duplicate titles ({len(self.redundant)} pairs):"
-            )
+            lines.append(f"REDUNDANT: Similar / duplicate titles ({len(self.redundant)} pairs):")
             for a, b, score in sorted(self.redundant):
                 pct = int(score * 100)
                 lines.append(f"  - [{pct}% similar] {a} <-> {b}")
             lines.append("")
 
         if self.content_dedup:
-            lines.append(
-                f"CONTENT DEDUP: Similar body content ({len(self.content_dedup)} pairs):"
-            )
+            lines.append(f"CONTENT DEDUP: Similar body content ({len(self.content_dedup)} pairs):")
             for a, b, score in sorted(self.content_dedup):
                 pct = int(score * 100)
                 lines.append(f"  - [{pct}% similar content] {a} <-> {b}")
@@ -175,9 +162,7 @@ class ROTResult:
             lines.append("")
 
         if self.trivial:
-            lines.append(
-                f"TRIVIAL: Notes with very short body content ({len(self.trivial)}):"
-            )
+            lines.append(f"TRIVIAL: Notes with very short body content ({len(self.trivial)}):")
             for rp, length in sorted(self.trivial):
                 lines.append(f"  - {rp}: only {length} chars of body content")
             lines.append("")
@@ -196,17 +181,13 @@ class ROTResult:
         if self.freshness_scores:
             stale_notes = [(p, s) for p, s in self.freshness_scores.items() if s < 0.3]
             if stale_notes:
-                lines.append(
-                    f"FRESHNESS: Stale notes (score < 0.3) ({len(stale_notes)}):"
-                )
+                lines.append(f"FRESHNESS: Stale notes (score < 0.3) ({len(stale_notes)}):")
                 for rp, score in sorted(stale_notes, key=lambda x: x[1]):
                     lines.append(f"  - {rp}: freshness {score:.2f}")
                 lines.append("")
 
         if self.semantic_contradictions:
-            lines.append(
-                f"SEMANTIC CONTRADICTIONS: ({len(self.semantic_contradictions)} pairs):"
-            )
+            lines.append(f"SEMANTIC CONTRADICTIONS: ({len(self.semantic_contradictions)} pairs):")
             for a, b, reason in sorted(self.semantic_contradictions):
                 lines.append(f"  - {a} <-> {b}: {reason}")
             lines.append("")
@@ -325,9 +306,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
                     isinstance(expiry_val, date_type)
                     and expiry_val < datetime.now(timezone.utc).date()
                 ):
-                    result.stale_notes.append(
-                        (rel_path, f"Expired on {expiry_val.isoformat()}")
-                    )
+                    result.stale_notes.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
                 pass
 
@@ -413,9 +392,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
                     isinstance(expiry_val, date_type)
                     and expiry_val < datetime.now(timezone.utc).date()
                 ):
-                    stale_list.append(
-                        (rel_path, f"Expired on {expiry_val.isoformat()}")
-                    )
+                    stale_list.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
                 pass
 

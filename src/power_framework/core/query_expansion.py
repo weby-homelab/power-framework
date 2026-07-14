@@ -71,14 +71,12 @@ class QueryExpander:
                 llm_variants = self._llm_expand(query)
                 variants.extend(llm_variants)
             except Exception:
-                logger.warning(
-                    "LLM query expansion failed, falling back to local synonyms"
-                )
+                logger.warning("LLM query expansion failed, falling back to local synonyms")
 
         return self._deduplicate(variants)
 
     def _synonym_expand(self, query: str) -> list[str]:
-        tokens = re.findall(r"[a-z0-9а-яєіїґ']+", query.lower())
+        tokens = re.findall(r"[a-z0-9а-яєіїґ']+", query.lower())  # noqa: RUF001
         expanded: list[str] = []
         for token in tokens:
             if token in self.SYNONYM_MAP:
@@ -124,7 +122,7 @@ class QueryExpander:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
                 body = json.loads(resp.read().decode("utf-8"))
                 content = body["choices"][0]["message"]["content"]
                 alternatives = json.loads(content)
