@@ -43,6 +43,10 @@ nav:
       - Models: api/models.md
       - Parser: api/parser.md
       - Indexer: api/indexer.md
+      - Embeddings: api/embeddings.md
+      - Reranker: api/reranker.md
+      - Query Expansion: api/query_expansion.md
+      - Chunker: api/chunker.md
       - Linter: api/linter.md
       - Healer: api/healer.md
       - Markdown Checks: api/markdown_checks.md
