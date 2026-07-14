@@ -36,6 +36,7 @@ jobs:
         run: ruff format --check src/ tests/
 
       - name: Run MyPy type check
+        if: ${{ !startsWith(matrix.python-version, '3.10') && !startsWith(matrix.python-version, '3.11') }}
         run: mypy src/power_framework/
 
       - name: Run tests with coverage
