@@ -8,6 +8,8 @@ import urllib.error
 import urllib.request
 from typing import ClassVar
 
+from .utils import run_opencode_cli
+
 logger = logging.getLogger(__name__)
 
 OPENROUTER_MODELS = [
@@ -74,7 +76,7 @@ class QueryExpander:
         variants: list[str] = [query]
         variants.extend(self._synonym_expand(query))
 
-        if self.use_llm and self.api_key:
+        if self.use_llm and (self.api_key or self.api_base == "opencode"):
             try:
                 llm_variants = self._llm_expand(query)
                 variants.extend(llm_variants)
@@ -101,14 +103,31 @@ class QueryExpander:
         return expanded
 
     def _llm_expand(self, query: str) -> list[str]:
-        if not self.api_key:
-            return []
-
         prompt = (
             f"Generate 2 alternative search queries for a knowledge base. "
             f"Original query: '{query}'. "
             f"Return only a JSON array of 2 strings, no other text."
         )
+
+        if self.api_base == "opencode":
+            res_text = run_opencode_cli(prompt)
+            if not res_text:
+                return []
+            try:
+                cleaned = res_text.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                alternatives = json.loads(cleaned.strip())
+                if isinstance(alternatives, list):
+                    return [str(a) for a in alternatives if a]
+            except json.JSONDecodeError as e:
+                logger.warning("Failed to parse local opencode JSON: %s", e)
+            return []
+
+        if not self.api_key:
+            return []
 
         payload = json.dumps(
             {

@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 from .embeddings import EmbeddingManager
 from .parser import FRONTMATTER_PATTERN, parse_frontmatter, read_file_content
+from .utils import run_opencode_cli
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -213,12 +214,12 @@ class ContradictionDetector:
         vault_dir: Path,
     ) -> str | None:
         """Check if two texts contradict. Returns reason string or None."""
-        if self.api_key:
+        if self.api_key or self.api_base == "opencode":
             return self._llm_contradiction_check(body_a, body_b)
         return self._metadata_contradiction_check(path_a, path_b, vault_dir)
 
     def _llm_contradiction_check(self, body_a: str, body_b: str) -> str | None:
-        """Call LLM via OpenRouter to check for contradictions."""
+        """Call LLM to check for contradictions."""
         prompt = (
             "You are a contradiction detection system. Analyze the following two "
             "texts from a knowledge base and determine if they contain contradictory "
@@ -231,6 +232,18 @@ class ContradictionDetector:
             "Only answer YES if there is a clear factual contradiction. "
             "Differences in wording or complementary information should be marked NO."
         )
+
+        if self.api_base == "opencode":
+            res_text = run_opencode_cli(prompt)
+            if not res_text:
+                return None
+            res_text = res_text.strip()
+            if res_text.upper().startswith("YES"):
+                return res_text
+            return None
+
+        if not self.api_key:
+            return None
 
         payload = json.dumps(
             {

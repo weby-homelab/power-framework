@@ -191,3 +191,46 @@ try:
     __version__ = _get_version("power-framework")
 except Exception:
     __version__ = "1.8.0"
+
+
+def run_opencode_cli(prompt: str) -> str:
+    """Run local OpenCode agent CLI tool to get LLM completion."""
+    import logging
+    import subprocess
+
+    local_logger = logging.getLogger(__name__)
+
+    # Locate opencode binary
+    binary = "/root/.opencode/bin/opencode"
+    if not os.path.exists(binary):
+        binary = shutil.which("opencode") or "opencode"
+
+    try:
+        res = subprocess.run(  # noqa: S603
+            [binary, "run", prompt, "--auto"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
+        )
+        stdout = res.stdout
+        lines = stdout.splitlines()
+        content_lines = []
+        started = False
+        for line in lines:
+            if started:
+                content_lines.append(line)
+            elif line.strip().startswith("> "):
+                started = True
+            elif not line.strip():
+                continue
+            else:
+                pass
+
+        if not started:
+            return stdout.strip()
+
+        return "\n".join(content_lines).strip()
+    except Exception as e:
+        local_logger.warning("Failed to run local opencode CLI: %s", e)
+        return ""
