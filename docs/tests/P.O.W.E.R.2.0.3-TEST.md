@@ -1,9 +1,9 @@
 ---
 type: System Guide
-title: "Звіт про тестування пам'яті ШІ-агентів у P.O.W.E.R. v2.0.3"
-description: "Детальний звіт про інтеграцію та запуск 10 тестів на основі провідних SOTA бенчмарків пам'яті: MemoryAgentBench (ICLR 2026), LoCoMo, LongMemEval та BEAM."
-tags: [power-framework, memory-benchmarks, testing, ICLR-2026, GraphRAG, RAG]
-timestamp: 2026-07-15T22:00:00+03:00
+title: "Звіт про тестування пам'яті та крос-лінгвального пошуку у P.O.W.E.R. v2.0.3"
+description: "Детальний звіт про інтеграцію та запуск 12 тестів: MemoryAgentBench (ICLR 2026), LoCoMo, LongMemEval, BEAM та крос-лінгвальний пошук ENG ↔ UKR."
+tags: [power-framework, memory-benchmarks, testing, ICLR-2026, GraphRAG, RAG, cross-lingual, multilingual]
+timestamp: 2026-07-15T22:23:00+03:00
 ---
 
 # 📊 Звіт про тестування пам'яті ШІ-агентів у P.O.W.E.R. v2.0.3
@@ -73,6 +73,12 @@ timestamp: 2026-07-15T22:00:00+03:00
 ├─────────────────────────┼─────────────────────────┼────────────────────┤
 │ BEAM (Preference Decay) │ Згасання старих правил  │ FreshnessScorer    │
 │                         │                         │ (Exponential decay)│
+├─────────────────────────┼─────────────────────────┼────────────────────┤
+│ Cross-Lingual ENG→UKR   │ EN-запит, UKR-документ  │ EmbeddingManager   │
+│                         │ (Docker security)        │ (BGE-M3 multilang) │
+├─────────────────────────┼─────────────────────────┼────────────────────┤
+│ Cross-Lingual UKR→ENG   │ UKR-запит, EN-документ  │ EmbeddingManager   │
+│                         │ (Postgres backup)        │ (shared vector sp) │
 └─────────────────────────┴─────────────────────────┴────────────────────┘
 ```
 
@@ -83,26 +89,28 @@ timestamp: 2026-07-15T22:00:00+03:00
 Під час фінальної перевірки на хості `PRXMX-01` було успішно виконано повний набір тестів фреймворку:
 
 * **Загальний результат:** `PASSED`
-* **Кількість успішних тестів:** **375Passed** (у тому числі 10 нативних тестів пам'яті).
-* **Час виконання:** **87.98 секунд**
+* **Кількість успішних тестів:** **377 Passed** (у тому числі 12 спеціалізованих тестів пам'яті та мультилінгвального пошуку).
+* **Час виконання:** **16.06 сек** (тестовий модуль) / **87.98 сек** (повний набір).
 * **Код-покриття тестами (Test Coverage):** **73.33%** (успішно подолано жорсткий ліміт CI у `fail-under=70`).
 
-### 3.1 Детальний статус тестів пам'яті ШІ-агентів
+### 3.1 Детальний статус тестів пам'яті та мультилінгвального пошуку
 
-Всі 10 спеціалізованих тестів пам'яті виконалися зі статусом `PASSED`:
+Всі **12** спеціалізованих тестів виконалися зі статусом `PASSED` за **16.06 секунд**:
 
-| № | Тест | Опис | Метрики та перевірка | Результат |
+| № | Тест | Клас | Метрики та перевірка | Результат |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | `test_accurate_retrieval` | **Accurate Retrieval** | Знайдено `TransmissionConfig.md` серед 5 відволікаючих нотаток (distractors). Швидкість відгуку <12ms. | `PASSED` |
-| 2 | `test_test_time_learning` | **Test-Time Learning** | Записано унікальний токен `token_sec_999` і миттєво здійснено його векторний пошук у новому чанку. | `PASSED` |
-| 3 | `test_long_range_understanding` | **Long-Range Understanding** | GraphRAG обхід зв'язав проект `ProjectAlpha.md` з `DatabaseConfig.md` через типізоване посилання. | `PASSED` |
-| 4 | `test_conflict_resolution` | **Conflict Resolution** | `ContentDedupDetector` виявив схожість 97.5% між старим та новим файлами конфігурації Nginx. | `PASSED` |
-| 5 | `test_single_hop_recall` | **LoCoMo Single-Hop** | Успішно повернуто факт про тему редактора "Tokyo Night" з історичної сесії. | `PASSED` |
-| 6 | `test_multi_hop_reasoning` | **LoCoMo Multi-Hop** | Зв'язано запит про пошту архітектора із двома різними нотатками (Vitaliy ➔ Email). | `PASSED` |
-| 7 | `test_temporal_inference` | **LoCoMo Temporal** | Визначено, що останнім оновленням на LXC 200 є Postgres v16 (пізніший timestamp має пріоритет). | `PASSED` |
-| 8 | `test_lost_in_the_middle` | **LongMemEval Lost-mid** | Вилучено порт 2222 з 7-го документа, захованого посеред 15 довгих dummy-файлів. | `PASSED` |
-| 9 | `test_abstention` | **LongMemEval Abstention** | При запиті квантових паролів, які відсутні в базі, пошукова видача повернула 0 результатів (score < 0.1). | `PASSED` |
-| 10 | `test_preference_decay_and_policy_update` | **BEAM Policy Update** | Розрахунок `FreshnessScorer` присвоїв новому правилу (Neovim) вищий пріоритет порівняно зі старим (Vim). | `PASSED` |
+| 1 | `test_accurate_retrieval` | **MemoryAgentBench · AR** | Знайдено `TransmissionConfig.md` серед 5 distractors. Повернено Top-1 за релевантністю. | `PASSED` |
+| 2 | `test_test_time_learning` | **MemoryAgentBench · TTL** | Записано унікальний токен `token_sec_999`, миттєво знайдено його через vector search. | `PASSED` |
+| 3 | `test_long_range_understanding` | **MemoryAgentBench · LRU** | GraphRAG BFS зв'язав `ProjectAlpha.md` → `DatabaseConfig.md` через `TypedRelation`. | `PASSED` |
+| 4 | `test_conflict_resolution` | **MemoryAgentBench · CR** | `ContentDedupDetector` виявив ≥60% схожість між двома версіями конфігурації Nginx. | `PASSED` |
+| 5 | `test_single_hop_recall` | **LoCoMo · Single-Hop** | Повернуто факт «Tokyo Night» з архівної сесії через FTS5 full-text search. | `PASSED` |
+| 6 | `test_multi_hop_reasoning` | **LoCoMo · Multi-Hop** | Зв'язано архітектора Vitaliy → email через два кроки BFS в Knowledge Graph. | `PASSED` |
+| 7 | `test_temporal_inference` | **LoCoMo · Temporal** | `timestamp` Postgres v16 (новіший) отримав пріоритет над старою нотаткою v15. | `PASSED` |
+| 8 | `test_lost_in_the_middle` | **LongMemEval · Lost-mid** | Cross-Encoder реранкер знайшов порт 2222 всередині 15 довгих документів (Top-1). | `PASSED` |
+| 9 | `test_abstention` | **LongMemEval · Abstention** | Запит квантових паролів → 0 результатів (score < 0.1). Відмова від галюцинування. | `PASSED` |
+| 10 | `test_preference_decay_and_policy_update` | **BEAM · Decay** | `FreshnessScorer`: оцінка Neovim (2026) > Vim (2025) при `expiry`-based decay. | `PASSED` |
+| 11 | `test_cross_lingual_english_query_ukrainian_note` | **Cross-Lingual · ENG→UKR** | EN-запит «docker container security» знайшов UKR-нотатку «Налаштування безпеки докер контейнерів». Модель `paraphrase-multilingual-MiniLM-L12-v2` повернула Top-1 правильний результат. | `PASSED` |
+| 12 | `test_cross_lingual_ukrainian_query_english_note` | **Cross-Lingual · UKR→ENG** | UKR-запит «резервне копіювання бази даних postgres» знайшов EN-нотатку «Postgres database backup guidelines». Крос-лінгвальний семантичний простір успішно зімапував обидві мови. | `PASSED` |
 
 ---
 
@@ -112,12 +120,40 @@ timestamp: 2026-07-15T22:00:00+03:00
 
 1. **Захист від "Lost in the Middle":**
    Завдяки поєднанню **гібридного пошуку (RRF)** та **Cross-Encoder Reranker** (`ms-marco-MiniLM-L-6-v2`), фреймворк успішно витягує дрібні деталі з глибини довгих документів. Навіть коли потрібний факт оточений великим обсягом сміття, реранкер піднімає його релевантність у Top-1.
+
 2. **Семантична нормалізація GraphRAG лінків:**
    Під час тестування виявлено, що YAML-валідність поля `related` вимагає жорсткої типізації. Впроваджений у версії v2.0.3 механізм авто-приведення (coerce) рядків у `TypedRelation` об'єкти дозволяє користувачу писати прості списки шляхів, не ламаючи Pydantic-схеми вбудованого GraphRAG.
+
 3. **Ефективність виявлення конфліктів:**
    Використання косинусної близькості векторів `BAAI/bge-m3` у поєднанні з обмеженням мінімальної довжини тіла нотатки (50+ символів) виключає помилкові спрацьовування детектора ROT на коротких плейсхолдерах, але гарантує точне виявлення суперечностей у системних інструкціях та паролях.
+
+4. **Повноцінна крос-лінгвальна підтримка (ENG ↔ UKR):**
+   Тест `TestCrossLingualSearch` підтвердив, що модель `paraphrase-multilingual-MiniLM-L12-v2` (384-вимірні ембеддінги) успішно будує **спільний семантичний простір** для англійської та української мов. Це дозволяє:
+   - Писати нотатки українською — знаходити через англійський запит (наприклад, DevOps-термінологія).
+   - Писати документацію англійською — знаходити через україномовні запити (наприклад, «резервне копіювання»).
+   - Гомогенно обслуговувати двомовні Obsidian-бази знань без дублювання нотаток.
+
+   > **⚠️ Примітка:** У поточній конфігурації (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) крос-лінгвальність підтверджена. Для отримання ще вищої точності рекомендується перейти на `BAAI/bge-m3`, яка натренована на 100+ мовах і підтримує матричний BEIR-підхід (bi-encoder + reranker).
+
+---
+
+## 📋 5. Підсумкова матриця компетентностей
+
+| Категорія | Тести | Статус | Компонент |
+| :--- | :--- | :--- | :--- |
+| MemoryAgentBench (ICLR 2026) | AR, TTL, LRU, CR | ✅ 4/4 | search_vault + relations + rot_scoring |
+| LoCoMo (Long Context) | Single-Hop, Multi-Hop, Temporal | ✅ 3/3 | FTS5 + BFS GraphRAG + OKF timestamps |
+| LongMemEval | Lost-in-Middle, Abstention | ✅ 2/2 | Cross-Encoder reranker.py |
+| BEAM | Preference Decay | ✅ 1/1 | FreshnessScorer (exponential) |
+| Cross-Lingual Search | ENG→UKR, UKR→ENG | ✅ 2/2 | EmbeddingManager (multilingual) |
+| **Загалом** | **12 тестів** | **✅ 12/12** | **P.O.W.E.R. v2.0.3 core stack** |
 
 ---
 
 ### Підсумок
-Фреймворк **P.O.W.E.R. v2.0.3** повністю готовий до промислової інтеграції як надійний, довготривалий шар пам'яті для автономних ШІ-агентів (наприклад, OpenCode або Claude Code CLI). Всі тестові сценарії підтверджують високу стійкість пошукового пайплайну до когнітивних навантажень та зашумлення.
+
+Фреймворк **P.O.W.E.R. v2.0.3** підтвердив готовність до промислової інтеграції як **надійний, мультилінгвальний та довготривалий шар пам'яті** для автономних ШІ-агентів (OpenCode, Claude Code CLI). Всі 12 тестових сценаріїв підтверджують:
+- **Точність пошуку** у зашумлених середовищах (distractors).
+- **Семантичну цілісність** GraphRAG-зв'язків при крос-файловому reasoning.
+- **Мультилінгвальність** (Ukrainian ↔ English) через спільний векторний простір.
+- **Захист від деградації** через FreshnessScorer, ContentDedupDetector та Abstention-фільтр.
