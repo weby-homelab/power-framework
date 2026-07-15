@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.2)"
-description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to P.O.W.E.R. OKF-compliant structure under v2.0.2."
+title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.3)"
+description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to P.O.W.E.R. OKF-compliant structure under v2.0.3."
 tags: [power, migration, guide, ai-agents, mcp, multilingual-minilm, graphrag]
 timestamp: 2026-07-15T02:00:00
 ---
 
-# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.2)
+# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.3)
 
 **Target audience:** AI agents (Claude, GPT, Gemini, OpenCode) with MCP access to P.O.W.E.R.
 
@@ -198,17 +198,17 @@ For large vaults (>50 notes), group ingests by category. Ingest all `Resource` n
 
 ---
 
-### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v2.0.2)
+### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v2.0.3)
 
-For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v2.0.2) globally or in the project's virtual environment:
+For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v2.0.3) globally or in the project's virtual environment:
 
 ```bash
 pip install git+https://github.com/weby-homelab/power-framework.git
 ```
 
-#### 🧠 Embedding Model Configuration (v2.0.2 Update)
+#### 🧠 Embedding Model Configuration (v2.0.3 Update)
 
-Starting with version 2.0.2, the default embedding model has been switched to **`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`** (embedding dimension **384**), reducing RAM usage from ~6.3 GB to ~680 MB. This prevents OOM crashes on resource-constrained hosts (e.g. 12GB RAM VPS, Proxmox LXC containers).
+Starting with version 2.0.3, the default embedding model has been switched to **`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`** (embedding dimension **384**), reducing RAM usage from ~6.3 GB to ~680 MB. This prevents OOM crashes on resource-constrained hosts (e.g. 12GB RAM VPS, Proxmox LXC containers).
 
 To customize the model, set the `POWER_EMBEDDING_MODEL` environment variable (loaded automatically from `.env`). For example, to use the heavier bilingual model on a host with sufficient memory:
 
@@ -337,7 +337,7 @@ Set up a synchronization pipeline to preserve history and enable collaboration:
 
 ### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid + Semantic)
 
-The P.O.W.E.R. framework (v2.0.2) includes a built-in search engine supporting five distinct strategies:
+The P.O.W.E.R. framework (v2.0.3) includes a built-in search engine supporting five distinct strategies:
 
 | Mode              | Description                                                                                              | Best for                                    |
 | ----------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
@@ -445,7 +445,7 @@ Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-com
 | `read_sub_index` returns "No notes found"    | Category folder is empty or not indexed       | Run `generate_index(vault_path)` first                        |
 | Too many orphans in `04_Archive/`            | Archived notes by definition have few links   | This is expected — archive orphans are normal                 |
 | Lint reports 200+ extra notes                | `.git/` directory is not excluded             | Update linter to skip hidden dirs (v1.5.0+ does)              |
-| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v2.0.2 or re-run `generate_index`                  |
+| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v2.0.3 or re-run `generate_index`                  |
 | `pip install` fails with PEP 668             | System Python blocks direct install           | Use a venv: `/path/to/venv/bin/pip install ...`               |
 | `External data path escapes model directory` | ONNX Runtime security constraint              | Set `HF_HUB_DISABLE_SYMLINKS=1` in environment before running |
 
