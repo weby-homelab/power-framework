@@ -15,7 +15,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES
+from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES, PARA_FOLDERS_
+
+try:
+    import pathspec
+
+    _HAS_PATHSPEC = True
+except ImportError:  # pragma: no cover - pathspec is a declared dependency
+    pathspec = None  # type: ignore[assignment]
+    _HAS_PATHSPEC = False
+
+# User-configurable ignore file (gitignore syntax) at the vault root.
+POWERIGNORE_FILE = ".powerignore"
 
 
 def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Path:
@@ -133,6 +144,57 @@ def is_excluded_dir(dirname: str) -> bool:
 def is_excluded_orphan(filename: str, rel_path: str) -> bool:
     """Check if file should be excluded from orphan detection."""
     return filename in EXCLUDED_ORPHAN_FILES or rel_path.startswith("06_Daily_Logs/")
+
+
+def load_powerignore(vault_dir: Path) -> Any:
+    """Load the optional `.powerignore` file (gitignore syntax) from the vault root.
+
+    Returns a compiled ``pathspec.PathSpec`` instance, or ``None`` when the file is
+    absent or ``pathspec`` is unavailable. Patterns are matched against POSIX-style
+    relative paths so that vendored trees (``node_modules/``, ``.venv/``, ``.claude/``)
+    can be excluded from OKF metadata / lint scanning without editing source code.
+    """
+    if not _HAS_PATHSPEC:
+        return None
+    ignore_file = vault_dir / POWERIGNORE_FILE
+    if not ignore_file.is_file():
+        return None
+    try:
+        lines = ignore_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    return pathspec.PathSpec.from_lines("gitwildmatch", lines)
+
+
+def is_path_ignored(rel_path: str, spec: Any) -> bool:
+    """Return True if ``rel_path`` (POSIX-style) matches the given ignore spec."""
+    if spec is None:
+        return False
+    posix = rel_path.replace(os.sep, "/")
+    return bool(spec.match_file(posix))
+
+
+# Top-level folders that constitute the OKF knowledge base. Files outside this
+# scope (e.g. the ``projects/`` tree of foreign source repositories, vendor dirs)
+# are never subject to OKF metadata / lint requirements.
+OKF_SCOPE_FOLDERS = frozenset(PARA_FOLDERS_) | {"brain"}
+
+
+def is_in_okf_scope(rel_path: str) -> bool:
+    """Return True if a note lives inside the OKF knowledge base.
+
+    Scope = a PARA folder (``00_Inbox`` .. ``06_Daily_Logs``) or the ``brain/``
+    subtree, plus root-level daily-log notes (``2026-*.md``) and the vault's
+    system index files (``index.md`` / ``log.md`` / ``_index.md``). Everything
+    else (foreign repos under ``projects/``, tool config, repo meta files such
+    as ``GEMINI.md`` / ``LACA.md``) is intentionally outside OKF and must not
+    raise metadata warnings.
+    """
+    parts = Path(rel_path).parts
+    if len(parts) == 1:
+        name = parts[0]
+        return name.startswith("2026-") or name in {"index.md", "log.md", "_index.md"}
+    return parts[0] in OKF_SCOPE_FOLDERS
 
 
 class RateLimiter:

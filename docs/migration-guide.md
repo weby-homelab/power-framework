@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R."
-description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an existing Obsidian vault to P.O.W.E.R. OKF-compliant structure."
-tags: [power, migration, guide, ai-agents, mcp]
-timestamp: 2026-07-03T12:30:00
+title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.1)"
+description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to P.O.W.E.R. OKF-compliant structure under v2.0.1."
+tags: [power, migration, guide, ai-agents, mcp, bge-m3, graphrag]
+timestamp: 2026-07-15T02:00:00
 ---
 
-# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R.
+# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.1)
 
 **Target audience:** AI agents (Claude, GPT, Gemini, OpenCode) with MCP access to P.O.W.E.R.
 
@@ -22,7 +22,7 @@ This protocol enables any LLM-based AI agent to migrate an existing Obsidian vau
 - **Filesystem access** — reading existing `.md` files, moving/cleaning up old files
 - **LLM intelligence** — classifying notes into P.A.R.A. categories, extracting titles, generating descriptions
 
-The agent follows 5 phases. Each phase has clear success criteria.
+The agent follows 6 phases. Each phase has clear success criteria.
 
 ---
 
@@ -75,6 +75,9 @@ Every note must be assigned exactly one `type` from:
 3. **`type`** — the P.A.R.A. category (see table above)
 4. **`tags`** — relevant keywords (optional, list of strings)
 5. **`resource`** — if the note references an external URL (optional)
+6. **`owner`** — owner or responsible developer/agent (optional)
+7. **`status`** — status of the note: `active`, `review`, or `archived` (optional, defaults to `active`)
+8. **`related`** — structured list of relationships to other files for GraphRAG (optional)
 
 ### Classification heuristics
 
@@ -194,21 +197,40 @@ For large vaults (>50 notes), group ingests by category. Ingest all `Resource` n
 
 ---
 
-### Step 6a: Installing P.O.W.E.R. Framework for AI Agents
+### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v2.0.1)
 
-For autonomous operation on the target host, install the P.O.W.E.R. toolkit globally or in the project's virtual environment:
+For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v2.0.1) globally or in the project's virtual environment:
 
 ```bash
 pip install git+https://github.com/weby-homelab/power-framework.git
 ```
 
-Configure the MCP server integration in your AI agent client or IDE configuration file (e.g., `cline_config.json`, `opencode.jsonc`, Cursor/Windsurf settings, etc.):
+#### 🧠 Bilingual & ONNX Configuration (v2.0.1 Update)
+Starting with version 2.0.1, the default embedding model has been upgraded to **`BAAI/bge-m3`** (embedding dimension **1024**) to support robust bilingual (EN + UA) semantic search.
+
+To avoid ONNX Runtime directory escape issues (`External data path escapes model directory`) during model initialization on CPU, the framework implements the following configurations:
+1. **Disable Symlinks**: The agent or environment must set the environment variable:
+   ```bash
+   export HF_HUB_DISABLE_SYMLINKS=1
+   ```
+   This forces Hugging Face to download the actual model weight files instead of symbolic links.
+2. **Model Registration**: The framework automatically registers the model via `TextEmbedding.add_custom_model` targeting `onnx-community/bge-m3-ONNX` and including the required `onnx/model.onnx_data` in the additional files.
+
+Configure the MCP server integration in your AI agent client or IDE configuration file (e.g., `cline_config.json`, `opencode.jsonc`, Cursor/Windsurf settings, etc.).
+
+Starting with v2.0.0, configure LLM endpoints (`POWER_LLM_*`) for automated audits, query expansion, and metadata healing. Use the direct `"opencode"` base option for local OpenCode CLI offloading:
 
 ```json
 "mcpServers": {
   "power": {
     "command": "python",
     "args": ["-m", "power_framework.mcp"],
+    "env": {
+      "POWER_VAULT_PATH": "/absolute/path/to/your/second-brain",
+      "POWER_LLM_API_BASE": "http://localhost:8080/v1", // Set to "opencode" to run local CLI directly
+      "POWER_LLM_API_KEY": "local",
+      "POWER_LLM_MODEL": "opencode/deepseek-v4-flash-free"
+    },
     "enabled": true
   }
 }
@@ -303,28 +325,57 @@ Set up a synchronization pipeline to preserve history and enable collaboration:
 
 ---
 
-### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid)
+### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid + Semantic)
 
-The P.O.W.E.R. framework includes a built-in multi-mode search engine. It supports three search strategies:
+The P.O.W.E.R. framework (v2.0.1) includes a built-in search engine supporting five distinct strategies:
 
 | Mode | Description | Best for |
 |------|-------------|----------|
 | `fts` (default) | SQLite FTS5 with weighted BM25 scoring | Exact keyword & phrase matching |
-| `vector` | TF-vector cosine similarity (pure Python, zero deps) | Semantic-like discovery |
-| `hybrid` | RRF (Reciprocal Rank Fusion) merge of FTS + Vector | Best overall recall |
+| `vector` | TF-vector cosine similarity (pure Python, zero deps) | Lexical similarity comparison |
+| `hybrid` | RRF (Reciprocal Rank Fusion) merge of FTS + Vector | Balanced lexical recall |
+| `semantic` | Dense embedding cosine similarity (`BAAI/bge-m3` on CPU) | Bilingual (EN+UA) semantic discovery |
+| `hybrid_reranked` | RRF merge of FTS + Vector with Cross-Encoder reranking | Highest-precision contextual ranking |
 
 *Search Guidelines for AI Agents:*
-1. **Token Efficiency**: Use `search_vault_tool(query, max_results=20, search_mode="hybrid")` instead of `glob **/*.md`. This saves up to 95%+ of context tokens.
+1. **Token Efficiency**: Use `search_vault_tool(query, max_results=20, search_mode="semantic")` (or `"hybrid"`) instead of listing files. This saves up to 95%+ of context tokens.
 2. **Mode Selection**:
-   - **FTS** — for precise queries: `search_vault_tool(query='"Docker Compose"')`
-   - **Vector** — for conceptual searches: `search_vault_tool(query="deployment orchestration", search_mode="vector")`
-   - **Hybrid** — for general discovery: `search_vault_tool(query="server setup", search_mode="hybrid")`
-3. **CLI Usage**: `power search /vault "query" --mode hybrid`
+   - **FTS** — for precise keyword match: `search_vault_tool(query='"Docker Compose"')`
+   - **Semantic** — for bilingual and conceptual searches: `search_vault_tool(query="оркестрація контейнерів", search_mode="semantic")`
+   - **Hybrid Reranked** — for advanced cross-lingual ranking: `search_vault_tool(query="server deployment", search_mode="hybrid_reranked")`
+3. **CLI Usage**: `power search /vault "query" --mode semantic`
 4. **Query Syntax**:
    - **Phrase Search**: Use double quotes for exact phrases, e.g., `search_vault_tool(query='"Docker Compose"')`
    - **Prefix Matching**: Words are automatically matched using prefix wildcards (e.g., `dock*` matches `docker`, `docking`, etc.)
    - **Sanitization**: Avoid passing special search query operators (except double quotes) as they can cause syntax errors in SQLite FTS5.
 5. **Git Hygiene**: The database file `.power_search.db` is ignored via `*.db` in `.gitignore` and `.geminiignore`. Under no circumstances should this file be committed to the repository.
+
+---
+
+### Step 6k: Typed Relationships for GraphRAG
+
+For semantic indexing, the framework supports typed graph relationships inside the `related` block of OKF metadata:
+- **`extends`** — Current note extends another note's concept.
+- **`depends_on`** — Current note depends on another note/infrastructure.
+- **`governed_by`** — Current note is governed by another protocol/rules.
+- **`contradicts`** — Current note contradicts details in another note (helps linter/ROT audit detect stale data).
+- **`part_of`** — Current note is a sub-module of a larger system.
+
+Example format:
+```yaml
+related:
+  - path: "02_Areas/Infra_Security.md"
+    relation: "depends_on"
+    confidence: 0.95
+```
+
+---
+
+### Step 6l: ROT Audits & Auto-Healing
+
+The framework includes tools to clean up redundant, outdated, and trivial (ROT) notes, and to automatically repair metadata:
+- **`power rot /path/to/vault`** — Detects duplicate notes using dense embedding similarity and checks for logical contradictions using the LLM.
+- **`power heal /path/to/vault`** — Automatically fixes markdown formatting issues and calls the LLM to generate missing `description` or `tags` based on document content.
 
 ---
 
@@ -380,8 +431,9 @@ Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-com
 | `read_sub_index` returns "No notes found" | Category folder is empty or not indexed | Run `generate_index(vault_path)` first |
 | Too many orphans in `04_Archive/` | Archived notes by definition have few links | This is expected — archive orphans are normal |
 | Lint reports 200+ extra notes | `.git/` directory is not excluded | Update linter to skip hidden dirs (v1.5.0+ does) |
-| `_index.md` has no frontmatter | Using an older version of the framework | Upgrade to v1.5.0+ or re-run `generate_index` |
+| `_index.md` has no frontmatter | Using an older version of the framework | Upgrade to v2.0.1 or re-run `generate_index` |
 | `pip install` fails with PEP 668 | System Python blocks direct install | Use a venv: `/path/to/venv/bin/pip install ...` |
+| `External data path escapes model directory` | ONNX Runtime security constraint | Set `HF_HUB_DISABLE_SYMLINKS=1` in environment before running |
 
 ---
 
@@ -418,7 +470,13 @@ title: "Human-readable title (1-200 chars)"
 description: "Single-line summary (1-150 chars)"
 resource: "https://..."          # Optional
 tags: [tag1, tag2]               # Optional
-timestamp: 2026-07-03T12:00:00   # Auto-generated
+owner: "developer-or-agent"      # Optional
+status: active | review | archived # Optional
+timestamp: 2026-07-15T02:00:00   # Auto-generated
+related:                         # Optional GraphRAG links
+  - path: "02_Areas/Infra_Security.md"
+    relation: depends_on
+    confidence: 0.95
 ---
 ```
 

@@ -5,6 +5,11 @@ from __future__ import annotations
 from pathlib import Path  # noqa: TC003
 
 from power_framework.core.linter import LintResult, run_lint_report, run_lint_vault
+from power_framework.core.utils import (
+    is_in_okf_scope,
+    is_path_ignored,
+    load_powerignore,
+)
 
 
 class TestRunLintVault:
@@ -57,6 +62,79 @@ class TestRunLintVault:
     def test_no_stale_in_healthy_vault(self, sample_vault: Path):
         result = run_lint_vault(sample_vault)
         assert len(result.stale_notes) == 0
+
+
+class TestOkfScope:
+    """Foreign files outside the OKF knowledge base must not raise metadata warnings."""
+
+    def test_para_and_brain_in_scope(self):
+        assert is_in_okf_scope("01_Projects/Foo.md")
+        assert is_in_okf_scope("brain/01_Projects/Foo.md")
+        assert is_in_okf_scope("06_Daily_Logs/2026-01-01.md")
+
+    def test_root_daily_log_in_scope(self):
+        assert is_in_okf_scope("2026-07-11_note.md")
+
+    def test_system_index_files_in_scope(self):
+        assert is_in_okf_scope("index.md")
+        assert is_in_okf_scope("log.md")
+        assert is_in_okf_scope("_index.md")
+
+    def test_foreign_repo_out_of_scope(self):
+        assert not is_in_okf_scope("projects/Foo/README.md")
+        assert not is_in_okf_scope("node_modules/lib/docs/guide.md")
+
+    def test_root_repo_meta_out_of_scope(self):
+        assert not is_in_okf_scope("GEMINI.md")
+        assert not is_in_okf_scope("LACA.md")
+
+    def test_foreign_md_not_flagged(self, sample_vault: Path):
+        # A markdown file inside a foreign source repo must not be linted for OKF metadata.
+        foreign = sample_vault / "projects" / "SomeRepo"
+        (foreign / "docs").mkdir(parents=True)
+        (foreign / "README.md").write_text("# Some Repo\n\nNo frontmatter here.\n")
+        (foreign / "docs" / "guide.md").write_text("# Guide\n\nNo frontmatter either.\n")
+        # Subdir of a legitimate PARA note is still OKF (has frontmatter elsewhere) ...
+        nested = sample_vault / "01_Projects" / "Weby-QRank" / "sub"
+        nested.mkdir(parents=True)
+        (nested / "no_frontmatter_here.md").write_text("# Nested\n\nNo frontmatter.\n")
+        result = run_lint_vault(sample_vault)
+        flagged = [rp for rp, _ in result.untyped_files]
+        assert not any("projects/SomeRepo" in rp for rp in flagged)
+        # ... but a genuine OKF note missing frontmatter is still caught
+        assert any("no_frontmatter_here.md" in rp for rp in flagged)
+
+    def test_node_modules_doc_not_flagged(self, sample_vault: Path):
+        vendored = sample_vault / "node_modules" / "@scope" / "pkg" / "README.md"
+        vendored.parent.mkdir(parents=True)
+        vendored.write_text("# Vendored\n\nNo frontmatter.\n")
+        result = run_lint_vault(sample_vault)
+        flagged = [rp for rp, _ in result.untyped_files]
+        assert not any("node_modules" in rp for rp in flagged)
+
+
+class TestPowerignore:
+    """The optional .powerignore file (gitignore syntax) excludes files from linting."""
+
+    def test_load_powerignore_missing_returns_none(self, tmp_path: Path):
+        assert load_powerignore(tmp_path) is None
+
+    def test_powerignore_excludes_matching_paths(self, tmp_path: Path):
+        (tmp_path / ".powerignore").write_text("vendor/\ndocs/**\n")
+        spec = load_powerignore(tmp_path)
+        assert spec is not None
+        assert is_path_ignored("vendor/lib/x.md", spec)
+        assert is_path_ignored("docs/guide.md", spec)
+        assert not is_path_ignored("01_Projects/Foo.md", spec)
+
+    def test_powerignore_applied_by_linter(self, sample_vault: Path):
+        (sample_vault / ".powerignore").write_text("projects/\n")
+        foreign = sample_vault / "projects" / "Repo" / "NOTE.md"
+        foreign.parent.mkdir(parents=True)
+        foreign.write_text("# Repo note\n\nNo frontmatter.\n")
+        result = run_lint_vault(sample_vault)
+        flagged = [rp for rp, _ in result.untyped_files]
+        assert not any("projects/Repo" in rp for rp in flagged)
 
 
 class TestLintResult:

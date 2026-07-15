@@ -25,7 +25,13 @@ from pathlib import Path
 
 from .constants import EXCLUDED_DIRS
 from .parser import has_frontmatter, has_type_field, parse_frontmatter, read_file_content
-from .utils import clean_note_name, is_excluded_orphan
+from .utils import (
+    clean_note_name,
+    is_excluded_orphan,
+    is_in_okf_scope,
+    is_path_ignored,
+    load_powerignore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -250,9 +256,15 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
     rel_paths: dict[str, str] = {}
     links: dict[str, list[str]] = {}
 
+    ignore_spec = load_powerignore(vault_dir)
+
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
         if any(part in EXCLUDED_DIRS for part in rel.parts):
+            continue
+        if is_path_ignored(str(rel), ignore_spec):
+            continue
+        if not is_in_okf_scope(str(rel)):
             continue
 
         clean = clean_note_name(filepath.name)

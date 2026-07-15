@@ -9,7 +9,27 @@ duplicating across modules.
 from __future__ import annotations
 
 EXCLUDED_DIRS: frozenset[str] = frozenset(
-    {".git", "05_Templates", "scratch", ".system_generated", ".agents"}
+    {
+        # System / framework managed directories
+        ".git",
+        "05_Templates",
+        "scratch",
+        ".system_generated",
+        ".agents",
+        # Third-party / vendored dependency trees (never OKF notes)
+        "node_modules",
+        ".venv",
+        "venv",
+        "vendor",
+        "site-packages",
+        "__pycache__",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        # Foreign tool / agent configuration of other projects
+        ".claude",
+        ".github",
+    }
 )
 
 EXCLUDED_ORPHAN_FILES: frozenset[str] = frozenset(
