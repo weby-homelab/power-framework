@@ -193,9 +193,12 @@ def heal_frontmatter(
 
     # 4. Timestamp healing (missing or date/string conversion to datetime)
     from datetime import date as date_type
+
     if timestamp:
         if not isinstance(timestamp, datetime) and isinstance(timestamp, date_type):
-            timestamp = datetime(timestamp.year, timestamp.month, timestamp.day, tzinfo=timezone.utc)
+            timestamp = datetime(
+                timestamp.year, timestamp.month, timestamp.day, tzinfo=timezone.utc
+            )
             changes.append("Converted date timestamp to datetime")
         elif isinstance(timestamp, str):
             try:

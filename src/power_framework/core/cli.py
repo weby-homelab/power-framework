@@ -411,7 +411,9 @@ def main() -> None:
     p_archive.set_defaults(func=_cmd_archive)
 
     p_status = subparsers.add_parser("status", help="Show vault status dashboard")
-    p_status.add_argument("path", nargs="?", default=None, help="Path to the vault directory (optional)")
+    p_status.add_argument(
+        "path", nargs="?", default=None, help="Path to the vault directory (optional)"
+    )
     p_status.set_defaults(func=_cmd_status)
 
     p_cron = subparsers.add_parser(

@@ -50,6 +50,7 @@ def _get_embedding_dim(model_name: str) -> int:
         return 1024
     try:
         from fastembed import TextEmbedding
+
         for m in TextEmbedding.list_supported_models():
             if m["model"] == model_name:
                 return m["dim"]
@@ -109,4 +110,3 @@ class EmbeddingManager:
         self._lazy_init()
         assert self._model is not None
         return [[float(v) for v in vec] for vec in self._model.embed(texts)]
-

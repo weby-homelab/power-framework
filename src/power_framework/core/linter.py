@@ -583,7 +583,7 @@ def run_status_report(vault_dir: Path) -> str:
         "03_Resources": 0,
         "04_Archive": 0,
         "06_Daily_Logs": 0,
-        "Other": 0
+        "Other": 0,
     }
 
     note_files = []
@@ -662,37 +662,43 @@ def run_status_report(vault_dir: Path) -> str:
     if non_compliant > 0:
         lines.append(f"    {yellow}⚠️ Fix using 'power heal' to auto-add frontmatter.{reset}")
 
-    lines.extend([
-        "",
-        f"{cyan}{bold}📊 PARA CATEGORIES:{reset}",
-        f"  • 01_Projects:           {bold}{notes_by_folder['01_Projects']}{reset} notes",
-        f"  • 02_Areas:              {bold}{notes_by_folder['02_Areas']}{reset} notes",
-        f"  • 03_Resources:          {bold}{notes_by_folder['03_Resources']}{reset} notes",
-        f"  • 04_Archive:            {bold}{notes_by_folder['04_Archive']}{reset} notes",
-        f"  • 06_Daily_Logs:         {bold}{notes_by_folder['06_Daily_Logs']}{reset} notes",
-    ])
-    if notes_by_folder['Other'] > 0:
+    lines.extend(
+        [
+            "",
+            f"{cyan}{bold}📊 PARA CATEGORIES:{reset}",
+            f"  • 01_Projects:           {bold}{notes_by_folder['01_Projects']}{reset} notes",
+            f"  • 02_Areas:              {bold}{notes_by_folder['02_Areas']}{reset} notes",
+            f"  • 03_Resources:          {bold}{notes_by_folder['03_Resources']}{reset} notes",
+            f"  • 04_Archive:            {bold}{notes_by_folder['04_Archive']}{reset} notes",
+            f"  • 06_Daily_Logs:         {bold}{notes_by_folder['06_Daily_Logs']}{reset} notes",
+        ]
+    )
+    if notes_by_folder["Other"] > 0:
         lines.append(f"  • Other / Root:          {bold}{notes_by_folder['Other']}{reset} notes")
 
-    lines.extend([
-        "",
-        f"{cyan}{bold}🕸️ KNOWLEDGE GRAPH (Graph RAG):{reset}",
-        f"  • Total Graph Nodes:     {bold}{nodes_count}{reset} note files",
-        f"  • Typed Relations:       {bold}{edges_count}{reset} connections",
-    ])
+    lines.extend(
+        [
+            "",
+            f"{cyan}{bold}🕸️ KNOWLEDGE GRAPH (Graph RAG):{reset}",
+            f"  • Total Graph Nodes:     {bold}{nodes_count}{reset} note files",
+            f"  • Typed Relations:       {bold}{edges_count}{reset} connections",
+        ]
+    )
 
     # Health lint issues
     broken_wiki = len(lint_result.broken_links)
     orphans = len(lint_result.orphans)
     stale = len(lint_result.stale_notes)
 
-    lines.extend([
-        "",
-        f"{cyan}{bold}🏥 HEALTH & STALENESS:{reset}",
-        f"  • Broken Wiki Links:     {red if broken_wiki > 0 else green}{bold}{broken_wiki}{reset}",
-        f"  • Orphan Notes:          {yellow if orphans > 0 else green}{bold}{orphans}{reset}",
-        f"  • Expired / Stale Notes: {yellow if stale > 0 else green}{bold}{stale}{reset}",
-        f"  • External Web Links:    {bold}{total_external_links}{reset} total references",
-    ])
+    lines.extend(
+        [
+            "",
+            f"{cyan}{bold}🏥 HEALTH & STALENESS:{reset}",
+            f"  • Broken Wiki Links:     {red if broken_wiki > 0 else green}{bold}{broken_wiki}{reset}",
+            f"  • Orphan Notes:          {yellow if orphans > 0 else green}{bold}{orphans}{reset}",
+            f"  • Expired / Stale Notes: {yellow if stale > 0 else green}{bold}{stale}{reset}",
+            f"  • External Web Links:    {bold}{total_external_links}{reset} total references",
+        ]
+    )
 
     return "\n".join(lines)
