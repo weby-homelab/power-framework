@@ -21,7 +21,7 @@ from .constants import SKIP_FILES
 from .healer import heal_vault
 from .ignore import should_skip
 from .indexer import generate_log_initial, run_generate_hierarchical_index
-from .linter import archive_stale_notes, run_lint_report, run_rot_report
+from .linter import archive_stale_notes, run_lint_report, run_rot_report, run_status_report
 from .markdown_checks import check_all as check_markdown_issues
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .parser import build_frontmatter, read_file_content
@@ -206,6 +206,17 @@ def _cmd_archive(args: argparse.Namespace) -> int:
         return 1
     result = archive_stale_notes(vault_dir, dry_run=args.dry_run)
     logger.info(result)
+    return 0
+
+
+def _cmd_status(args: argparse.Namespace) -> int:
+    """Show vault status dashboard."""
+    vault_dir = _resolve_path(args.path)
+    if not vault_dir.exists():
+        logger.error("Vault not found: %s", vault_dir)
+        return 1
+    report = run_status_report(vault_dir)
+    print(report)
     return 0
 
 
@@ -398,6 +409,10 @@ def main() -> None:
         help="Actually move files",
     )
     p_archive.set_defaults(func=_cmd_archive)
+
+    p_status = subparsers.add_parser("status", help="Show vault status dashboard")
+    p_status.add_argument("path", nargs="?", default=None, help="Path to the vault directory (optional)")
+    p_status.set_defaults(func=_cmd_status)
 
     p_cron = subparsers.add_parser(
         "cron",

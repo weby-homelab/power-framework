@@ -16,7 +16,7 @@ from .core.indexer import (
     run_generate_sub_index,
     scan_folder_notes,
 )
-from .core.linter import archive_stale_notes, run_lint_report, run_rot_report
+from .core.linter import archive_stale_notes, run_lint_report, run_rot_report, run_status_report
 from .core.markdown_checks import check_all, fix_all
 from .core.models import (
     MAX_DESCRIPTION_LENGTH,
@@ -70,6 +70,7 @@ __all__ = [
     "run_generate_sub_index",
     "run_lint_report",
     "run_rot_report",
+    "run_status_report",
     "scan_folder_notes",
     "search_vault",
     "suggest_related",

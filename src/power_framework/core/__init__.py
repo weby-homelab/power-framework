@@ -37,6 +37,7 @@ from .linter import (
     run_lint_vault,
     run_rot_audit,
     run_rot_report,
+    run_status_report,
 )
 from .markdown_checks import (
     check_all,
@@ -162,6 +163,7 @@ __all__ = [
     "run_lint_vault",
     "run_rot_audit",
     "run_rot_report",
+    "run_status_report",
     "scan_folder_notes",
     "scan_vault_notes",
     "search_vault",
