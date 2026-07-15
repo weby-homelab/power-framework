@@ -463,13 +463,35 @@ class LinkRotChecker:
                         return -1
                 except (OSError, ValueError):
                     pass
-            req = urllib.request.Request(url, method="HEAD")  # noqa: S310
-            with urllib.request.urlopen(  # noqa: S310
-                req, timeout=self.timeout
-            ) as resp:
-                return int(resp.status)
-        except urllib.error.HTTPError as e:
-            return e.code
+
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            }
+
+            try:
+                req = urllib.request.Request(url, method="HEAD", headers=headers)  # noqa: S310
+                with urllib.request.urlopen(  # noqa: S310
+                    req, timeout=self.timeout
+                ) as resp:
+                    return int(resp.status)
+            except Exception as exc:
+                # Fallback to GET for any HEAD error (403, 405, timeouts, connection issues, etc.)
+                try:
+                    req_get = urllib.request.Request(url, method="GET", headers=headers)  # noqa: S310
+                    with urllib.request.urlopen(  # noqa: S310
+                        req_get, timeout=self.timeout
+                    ) as resp:
+                        return int(resp.status)
+                except urllib.error.HTTPError as e_get:
+                    return e_get.code
+                except Exception:
+                    if isinstance(exc, urllib.error.HTTPError):
+                        return exc.code
+                    return -1
         except Exception:
             return -1
 
