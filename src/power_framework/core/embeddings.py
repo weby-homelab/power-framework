@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ def _load_env(env_path: str = "/root/geminicli/.env") -> None:
 
 
 # Load env variables before setting up default model
-import sys
+
 if "pytest" not in sys.modules and "PYTEST_CURRENT_TEST" not in os.environ:
     _load_env()
 
@@ -52,8 +53,8 @@ def _get_embedding_dim(model_name: str) -> int:
         for m in TextEmbedding.list_supported_models():
             if m["model"] == model_name:
                 return m["dim"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to list fastembed models: %s", e)
     return 384
 
 

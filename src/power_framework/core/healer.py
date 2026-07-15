@@ -154,7 +154,6 @@ def heal_frontmatter(
     timestamp: datetime | None = fm_data.get("timestamp")
 
     # 1. Note Type healing (casing & invalid types)
-    valid_note_types = {t.value for t in NoteType}
     if note_type:
         valid_types_lower = {t.value.lower(): t.value for t in NoteType}
         tl = str(note_type).strip().lower()
@@ -211,10 +210,9 @@ def heal_frontmatter(
 
     # 5. Tags list healing (convert non-strings like integers 2026 to strings)
     tags = fm_data.get("tags")
-    if isinstance(tags, list):
-        if any(not isinstance(t, str) for t in tags):
-            fm_data["tags"] = [str(t) for t in tags]
-            changes.append("Converted non-string tags to strings")
+    if isinstance(tags, list) and any(not isinstance(t, str) for t in tags):
+        fm_data["tags"] = [str(t) for t in tags]
+        changes.append("Converted non-string tags to strings")
 
     if not changes:
         return content, []

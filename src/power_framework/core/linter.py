@@ -564,18 +564,19 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
 
 def run_status_report(vault_dir: Path) -> str:
     """Generate a high-density, visual status report of the vault's structure, health, and knowledge graph RAG connectivity."""
-    from .ignore import should_skip
-    from .models import NoteFile, PARA_FOLDERS
-    from .parser import validate_metadata
-    from .relations import KnowledgeGraph
     import re
 
+    from .ignore import should_skip
+    from .models import NoteFile
+    from .parser import validate_metadata
+    from .relations import KnowledgeGraph
+
     today = datetime.now(timezone.utc).date()
-    
+
     total_files = 0
     non_compliant = 0
     non_compliant_list = []
-    
+
     notes_by_folder = {
         "01_Projects": 0,
         "02_Areas": 0,
@@ -584,46 +585,46 @@ def run_status_report(vault_dir: Path) -> str:
         "06_Daily_Logs": 0,
         "Other": 0
     }
-    
+
     note_files = []
     total_external_links = 0
     external_link_pattern = re.compile(r"\[.*?\]\(((?:https?|ftp)://[^\s)]+)\)")
-    
+
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
-            
+
         rel_path = filepath.relative_to(vault_dir)
         rel_path_str = str(rel_path)
-        
+
         if should_skip(vault_dir, rel_path_str):
             continue
-            
+
         total_files += 1
-        
+
         # Categorize by top folder
         top_folder = rel_path.parts[0] if rel_path.parts else ""
         if top_folder in notes_by_folder:
             notes_by_folder[top_folder] += 1
         else:
             notes_by_folder["Other"] += 1
-            
+
         try:
             content = read_file_content(filepath)
             fm = validate_metadata(content)
-            
+
             # Count external links
             urls = external_link_pattern.findall(content)
             total_external_links += len(urls)
-            
+
             if fm is None:
                 non_compliant += 1
                 non_compliant_list.append(rel_path_str)
                 continue
-                
+
             note_obj = NoteFile(str(filepath), rel_path_str, fm, content)
             note_files.append(note_obj)
-            
+
         except Exception:
             non_compliant += 1
             non_compliant_list.append(rel_path_str)
@@ -632,10 +633,10 @@ def run_status_report(vault_dir: Path) -> str:
     kg = KnowledgeGraph.from_notes(note_files)
     nodes_count = len(kg._nodes)
     edges_count = len(kg._edges)
-    
+
     # Run linter
     lint_result = run_lint_vault(vault_dir)
-    
+
     # ANSI color codes
     cyan = "\033[36m"
     green = "\033[32m"
@@ -643,10 +644,10 @@ def run_status_report(vault_dir: Path) -> str:
     red = "\033[31m"
     bold = "\033[1m"
     reset = "\033[0m"
-    
+
     compliant = total_files - non_compliant
     compliance_rate = (compliant / total_files * 100) if total_files > 0 else 0
-    
+
     lines = [
         f"{bold}=== P.O.W.E.R. Obsidian Vault Status ==={reset}",
         f"Vault Root: {vault_dir}",
@@ -657,10 +658,10 @@ def run_status_report(vault_dir: Path) -> str:
         f"  • OKF Compliant Notes:   {green if compliance_rate >= 90 else yellow}{bold}{compliant} ({compliance_rate:.1f}%){reset}",
         f"  • Non-Compliant Notes:   {red if non_compliant > 0 else green}{bold}{non_compliant}{reset}",
     ]
-    
+
     if non_compliant > 0:
         lines.append(f"    {yellow}⚠️ Fix using 'power heal' to auto-add frontmatter.{reset}")
-        
+
     lines.extend([
         "",
         f"{cyan}{bold}📊 PARA CATEGORIES:{reset}",
@@ -672,19 +673,19 @@ def run_status_report(vault_dir: Path) -> str:
     ])
     if notes_by_folder['Other'] > 0:
         lines.append(f"  • Other / Root:          {bold}{notes_by_folder['Other']}{reset} notes")
-        
+
     lines.extend([
         "",
         f"{cyan}{bold}🕸️ KNOWLEDGE GRAPH (Graph RAG):{reset}",
         f"  • Total Graph Nodes:     {bold}{nodes_count}{reset} note files",
         f"  • Typed Relations:       {bold}{edges_count}{reset} connections",
     ])
-    
+
     # Health lint issues
     broken_wiki = len(lint_result.broken_links)
     orphans = len(lint_result.orphans)
     stale = len(lint_result.stale_notes)
-    
+
     lines.extend([
         "",
         f"{cyan}{bold}🏥 HEALTH & STALENESS:{reset}",
@@ -693,5 +694,5 @@ def run_status_report(vault_dir: Path) -> str:
         f"  • Expired / Stale Notes: {yellow if stale > 0 else green}{bold}{stale}{reset}",
         f"  • External Web Links:    {bold}{total_external_links}{reset} total references",
     ])
-    
+
     return "\n".join(lines)

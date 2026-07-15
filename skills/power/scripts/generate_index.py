@@ -19,8 +19,13 @@ project_root = os.path.dirname(os.path.dirname(script_dir))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from power_framework.core import run_generate_hierarchical_index, generate_log_initial, scan_folder_notes
 from pathlib import Path
+
+from power_framework.core import (
+    generate_log_initial,
+    run_generate_hierarchical_index,
+    scan_folder_notes,
+)
 
 
 def resolve_vault_dir() -> Path:
