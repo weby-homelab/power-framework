@@ -15,18 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES, PARA_FOLDERS_
-
-try:
-    import pathspec
-
-    _HAS_PATHSPEC = True
-except ImportError:  # pragma: no cover - pathspec is a declared dependency
-    pathspec = None  # type: ignore[assignment]
-    _HAS_PATHSPEC = False
-
-# User-configurable ignore file (gitignore syntax) at the vault root.
-POWERIGNORE_FILE = ".powerignore"
+from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES
 
 
 def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Path:
@@ -146,57 +135,6 @@ def is_excluded_orphan(filename: str, rel_path: str) -> bool:
     return filename in EXCLUDED_ORPHAN_FILES or rel_path.startswith("06_Daily_Logs/")
 
 
-def load_powerignore(vault_dir: Path) -> Any:
-    """Load the optional `.powerignore` file (gitignore syntax) from the vault root.
-
-    Returns a compiled ``pathspec.PathSpec`` instance, or ``None`` when the file is
-    absent or ``pathspec`` is unavailable. Patterns are matched against POSIX-style
-    relative paths so that vendored trees (``node_modules/``, ``.venv/``, ``.claude/``)
-    can be excluded from OKF metadata / lint scanning without editing source code.
-    """
-    if not _HAS_PATHSPEC:
-        return None
-    ignore_file = vault_dir / POWERIGNORE_FILE
-    if not ignore_file.is_file():
-        return None
-    try:
-        lines = ignore_file.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return None
-    return pathspec.PathSpec.from_lines("gitwildmatch", lines)
-
-
-def is_path_ignored(rel_path: str, spec: Any) -> bool:
-    """Return True if ``rel_path`` (POSIX-style) matches the given ignore spec."""
-    if spec is None:
-        return False
-    posix = rel_path.replace(os.sep, "/")
-    return bool(spec.match_file(posix))
-
-
-# Top-level folders that constitute the OKF knowledge base. Files outside this
-# scope (e.g. the ``projects/`` tree of foreign source repositories, vendor dirs)
-# are never subject to OKF metadata / lint requirements.
-OKF_SCOPE_FOLDERS = frozenset(PARA_FOLDERS_) | {"brain"}
-
-
-def is_in_okf_scope(rel_path: str) -> bool:
-    """Return True if a note lives inside the OKF knowledge base.
-
-    Scope = a PARA folder (``00_Inbox`` .. ``06_Daily_Logs``) or the ``brain/``
-    subtree, plus root-level daily-log notes (``2026-*.md``) and the vault's
-    system index files (``index.md`` / ``log.md`` / ``_index.md``). Everything
-    else (foreign repos under ``projects/``, tool config, repo meta files such
-    as ``GEMINI.md`` / ``LACA.md``) is intentionally outside OKF and must not
-    raise metadata warnings.
-    """
-    parts = Path(rel_path).parts
-    if len(parts) == 1:
-        name = parts[0]
-        return name.startswith("2026-") or name in {"index.md", "log.md", "_index.md"}
-    return parts[0] in OKF_SCOPE_FOLDERS
-
-
 class RateLimiter:
     """Simple sliding-window rate limiter per key."""
 
@@ -252,4 +190,47 @@ try:
 
     __version__ = _get_version("power-framework")
 except Exception:
-    __version__ = "1.8.0"
+    __version__ = "2.0.1"
+
+
+def run_opencode_cli(prompt: str) -> str:
+    """Run local OpenCode agent CLI tool to get LLM completion."""
+    import logging
+    import subprocess
+
+    local_logger = logging.getLogger(__name__)
+
+    # Locate opencode binary
+    binary = "/root/.opencode/bin/opencode"
+    if not os.path.exists(binary):
+        binary = shutil.which("opencode") or "opencode"
+
+    try:
+        res = subprocess.run(  # noqa: S603
+            [binary, "run", prompt, "--auto"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
+        )
+        stdout = res.stdout
+        lines = stdout.splitlines()
+        content_lines = []
+        started = False
+        for line in lines:
+            if started:
+                content_lines.append(line)
+            elif line.strip().startswith("> "):
+                started = True
+            elif not line.strip():
+                continue
+            else:
+                pass
+
+        if not started:
+            return stdout.strip()
+
+        return "\n".join(content_lines).strip()
+    except Exception as e:
+        local_logger.warning("Failed to run local opencode CLI: %s", e)
+        return ""

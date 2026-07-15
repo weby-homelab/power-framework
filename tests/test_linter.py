@@ -4,12 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path  # noqa: TC003
 
+from power_framework.core.ignore import in_kb_scope, is_ignored
 from power_framework.core.linter import LintResult, run_lint_report, run_lint_vault
-from power_framework.core.utils import (
-    is_in_okf_scope,
-    is_path_ignored,
-    load_powerignore,
-)
 
 
 class TestRunLintVault:
@@ -68,25 +64,25 @@ class TestOkfScope:
     """Foreign files outside the OKF knowledge base must not raise metadata warnings."""
 
     def test_para_and_brain_in_scope(self):
-        assert is_in_okf_scope("01_Projects/Foo.md")
-        assert is_in_okf_scope("brain/01_Projects/Foo.md")
-        assert is_in_okf_scope("06_Daily_Logs/2026-01-01.md")
+        assert in_kb_scope("01_Projects/Foo.md")
+        assert in_kb_scope("brain/01_Projects/Foo.md")
+        assert in_kb_scope("06_Daily_Logs/2026-01-01.md")
 
     def test_root_daily_log_in_scope(self):
-        assert is_in_okf_scope("2026-07-11_note.md")
+        assert in_kb_scope("2026-07-11_note.md")
 
-    def test_system_index_files_in_scope(self):
-        assert is_in_okf_scope("index.md")
-        assert is_in_okf_scope("log.md")
-        assert is_in_okf_scope("_index.md")
+    def test_system_index_files_not_in_scope(self):
+        assert not in_kb_scope("index.md")
+        assert not in_kb_scope("log.md")
+        assert not in_kb_scope("_index.md")
 
     def test_foreign_repo_out_of_scope(self):
-        assert not is_in_okf_scope("projects/Foo/README.md")
-        assert not is_in_okf_scope("node_modules/lib/docs/guide.md")
+        assert not in_kb_scope("projects/Foo/README.md")
+        assert not in_kb_scope("node_modules/lib/docs/guide.md")
 
     def test_root_repo_meta_out_of_scope(self):
-        assert not is_in_okf_scope("GEMINI.md")
-        assert not is_in_okf_scope("LACA.md")
+        assert not in_kb_scope("GEMINI.md")
+        assert not in_kb_scope("LACA.md")
 
     def test_foreign_md_not_flagged(self, sample_vault: Path):
         # A markdown file inside a foreign source repo must not be linted for OKF metadata.
@@ -116,16 +112,14 @@ class TestOkfScope:
 class TestPowerignore:
     """The optional .powerignore file (gitignore syntax) excludes files from linting."""
 
-    def test_load_powerignore_missing_returns_none(self, tmp_path: Path):
-        assert load_powerignore(tmp_path) is None
+    def test_is_ignored_missing_returns_false(self, tmp_path: Path):
+        assert not is_ignored(tmp_path, "somefile.md")
 
     def test_powerignore_excludes_matching_paths(self, tmp_path: Path):
-        (tmp_path / ".powerignore").write_text("vendor/\ndocs/**\n")
-        spec = load_powerignore(tmp_path)
-        assert spec is not None
-        assert is_path_ignored("vendor/lib/x.md", spec)
-        assert is_path_ignored("docs/guide.md", spec)
-        assert not is_path_ignored("01_Projects/Foo.md", spec)
+        (tmp_path / ".powerignore").write_text("vendor/\ndocs/\n")
+        assert is_ignored(tmp_path, "vendor/lib/x.md")
+        assert is_ignored(tmp_path, "docs/guide.md")
+        assert not is_ignored(tmp_path, "01_Projects/Foo.md")
 
     def test_powerignore_applied_by_linter(self, sample_vault: Path):
         (sample_vault / ".powerignore").write_text("projects/\n")

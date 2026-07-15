@@ -23,15 +23,14 @@ from datetime import date as date_type
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .constants import EXCLUDED_DIRS
-from .parser import has_frontmatter, has_type_field, parse_frontmatter, read_file_content
-from .utils import (
-    clean_note_name,
-    is_excluded_orphan,
-    is_in_okf_scope,
-    is_path_ignored,
-    load_powerignore,
+from .ignore import should_skip
+from .parser import (
+    has_frontmatter,
+    has_type_field,
+    parse_frontmatter,
+    read_file_content,
 )
+from .utils import clean_note_name, is_excluded_orphan
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +107,17 @@ class ROTResult:
         self.link_rot: dict[str, list[tuple[str, int]]] = {}
         self.freshness_scores: dict[str, float] = {}
         self.usage_counts: dict[str, int] = {}
+        self.semantic_contradictions: list[tuple[str, str, str]] = []
 
     @property
     def has_issues(self) -> bool:
         return bool(
-            self.redundant or self.outdated or self.trivial or self.content_dedup or self.link_rot
+            self.redundant
+            or self.outdated
+            or self.trivial
+            or self.content_dedup
+            or self.link_rot
+            or self.semantic_contradictions
         )
 
     @property
@@ -123,6 +128,7 @@ class ROTResult:
             + len(self.trivial)
             + len(self.content_dedup)
             + len(self.link_rot)
+            + len(self.semantic_contradictions)
         )
 
     def format_report(self, vault_dir: Path) -> str:
@@ -179,6 +185,12 @@ class ROTResult:
                 for rp, score in sorted(stale_notes, key=lambda x: x[1]):
                     lines.append(f"  - {rp}: freshness {score:.2f}")
                 lines.append("")
+
+        if self.semantic_contradictions:
+            lines.append(f"SEMANTIC CONTRADICTIONS: ({len(self.semantic_contradictions)} pairs):")
+            for a, b, reason in sorted(self.semantic_contradictions):
+                lines.append(f"  - {a} <-> {b}: {reason}")
+            lines.append("")
 
         if self.usage_counts:
             unused = [p for p, c in self.usage_counts.items() if c == 0]
@@ -256,15 +268,9 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
     rel_paths: dict[str, str] = {}
     links: dict[str, list[str]] = {}
 
-    ignore_spec = load_powerignore(vault_dir)
-
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
-            continue
-        if is_path_ignored(str(rel), ignore_spec):
-            continue
-        if not is_in_okf_scope(str(rel)):
+        if should_skip(vault_dir, str(rel)):
             continue
 
         clean = clean_note_name(filepath.name)
@@ -357,7 +363,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
@@ -415,13 +421,25 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
 
     # Extended A2 scoring
     if extended:
-        from .rot_scoring import ContentDedupDetector, FreshnessScorer, LinkRotChecker, UsageTracker
+        from .rot_scoring import (
+            ContentDedupDetector,
+            ContradictionDetector,
+            FreshnessScorer,
+            LinkRotChecker,
+            UsageTracker,
+        )
 
         try:
             dedup = ContentDedupDetector()
             result.content_dedup = dedup.detect(vault_dir)
         except Exception as exc:
             logger.warning("Content dedup failed: %s", exc)
+
+        try:
+            contra = ContradictionDetector()
+            result.semantic_contradictions = contra.detect(vault_dir)
+        except Exception as exc:
+            logger.warning("Contradiction detection failed: %s", exc)
 
         try:
             link_checker = LinkRotChecker()
@@ -471,7 +489,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(part in EXCLUDED_DIRS for part in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue

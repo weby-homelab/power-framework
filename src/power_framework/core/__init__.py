@@ -14,7 +14,9 @@ Usage:
 
 from __future__ import annotations
 
+from .chunker import SemanticChunker
 from .cli import main as cli_main
+from .embeddings import EmbeddingManager
 from .healer import heal_frontmatter, heal_vault
 from .indexer import (
     generate_index_content,
@@ -56,6 +58,7 @@ from .models import (
     NoteStatus,
     NoteType,
     OKFMetadata,
+    TypedRelation,
 )
 from .parser import (
     build_frontmatter,
@@ -66,10 +69,18 @@ from .parser import (
     read_file_content,
     validate_metadata,
 )
-from .relations import RelationSuggestion, format_relation_suggestions, suggest_related
+from .query_expansion import QueryExpander
+from .relations import (
+    KnowledgeGraph,
+    RelationSuggestion,
+    format_relation_suggestions,
+    suggest_related,
+)
+from .reranker import RerankerManager
 from .rot_scoring import (
     TYPE_HALF_LIFE_DAYS,
     ContentDedupDetector,
+    ContradictionDetector,
     FreshnessScorer,
     LinkRotChecker,
     UsageTracker,
@@ -95,17 +106,24 @@ __all__ = [
     "TYPE_HALF_LIFE_DAYS",
     "VAULT_STRUCTURE",
     "ContentDedupDetector",
+    "ContradictionDetector",
+    "EmbeddingManager",
     "FreshnessScorer",
+    "KnowledgeGraph",
     "LinkRotChecker",
     "LintResult",
     "NoteFile",
     "NoteStatus",
     "NoteType",
     "OKFMetadata",
+    "QueryExpander",
     "ROTResult",
     "RateLimiter",
     "RelationSuggestion",
+    "RerankerManager",
     "SearchResult",
+    "SemanticChunker",
+    "TypedRelation",
     "UsageTracker",
     "__version__",
     "archive_stale_notes",

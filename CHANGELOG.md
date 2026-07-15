@@ -5,6 +5,23 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-07-14
+
+### Added
+- **Dense Embeddings & Hybrid Search**: Integrated `fastembed` (`BAAI/bge-small-en-v1.5`) for local CPU-optimized dense vector embeddings. Added SQLite `chunk_embeddings` storage and `hybrid_reranked` search mode.
+- **Cross-Encoder Reranking**: Integrated `RerankerManager` (`Xenova/ms-marco-MiniLM-L-6-v2`) to rank search candidates by query-document relevance scores.
+- **Semantic Chunker**: Added `SemanticChunker` implementing the Anthropic Contextual Retrieval pattern, splitting markdown by H2/H3 headers, paragraphs, or fixed size, and prefixing each chunk with parent document context.
+- **Query Expansion**: Added local synonym mappings (EN/UA) and LLM-based expansion via OpenRouter in `QueryExpander`.
+- **GraphRAG Typed Relations**: Upgraded relation linking in OKF metadata with typed schemas (`path`, `relation`, `confidence`) and added a Mermaid export feature for note-level subgraphs.
+- **Semantic ROT & Contradiction Audits**: Enhanced ROT hygiene checks with dense cosine similarity duplicate detection. Added `ContradictionDetector` to identify conflicting metadata or logical contradictions via LLM.
+- **FastMCP Lazy Loading Tool Mapping**: Updated MCP tool registration schemas to support fast lazy-loading.
+- **API Documentation**: Created comprehensive API markdown documentation for all four new RAG modules.
+
+### Changed
+- Bumped version to `2.0.0`
+- Configured MyPy to ignore/skip external `numpy` type stubs, resolving incompatibility of PEP 695 syntax on Python 3.10/3.11 runtimes.
+- Re-formatted codebase and resolved all Ruff linter and MyPy typecheck issues.
+
 ## [1.8.0] - 2026-07-06
 
 ### Added
@@ -31,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SSRF in LinkRotChecker**: Private/loopback/link-local IPs blocked before HTTP HEAD requests
 - **Cache isolation**: `.power_search.db` and `.power_usage.db` moved to XDG cache dir (no longer pollute vault)
 - **`install.sh` removed**: Stale script referencing pre-1.5.0 layout deleted; `pip install` from GitHub is the supported path
-- **`relations.py` mojibake**: Corrupted UTF-8 stopword `"є�ї"` → `"є"`
+- **`relations.py` mojibake**: Corrupted UTF-8 stopword `"єї"` → `"є"`
 - **Dead code removed**: Unused `candidates` variable in `suggest_related`
 - **`mcp/__init__.py` added**: Explicit package marker for `from power_framework.mcp import ...` patterns
 - **Docker HEALTHCHECK**: Now works with HTTP transport; container no longer perpetually `unhealthy`
@@ -88,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Initial public release
 
+[2.0.0]: https://github.com/weby-homelab/power-framework/compare/v1.8.0...v2.0.0
 [1.8.0]: https://github.com/weby-homelab/power-framework/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/weby-homelab/power-framework/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/weby-homelab/power-framework/compare/v1.5.1...v1.7.0

@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .constants import SKIP_FILES
 from .healer import heal_vault
+from .ignore import should_skip
 from .indexer import generate_log_initial, run_generate_hierarchical_index
 from .linter import archive_stale_notes, run_lint_report, run_rot_report
 from .markdown_checks import check_all as check_markdown_issues
@@ -260,7 +261,7 @@ def _cmd_markdown_check(args: argparse.Namespace) -> int:
     total_issues = 0
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if any(p in (".git", "05_Templates", ".system_generated") for p in rel.parts):
+        if should_skip(vault_dir, str(rel)):
             continue
         if filepath.name in SKIP_FILES:
             continue
