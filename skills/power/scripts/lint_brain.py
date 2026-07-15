@@ -19,8 +19,9 @@ project_root = os.path.dirname(os.path.dirname(script_dir))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from power_framework.core import run_lint_vault, run_rot_report
 from pathlib import Path
+
+from power_framework.core import run_lint_vault, run_rot_report
 
 
 def resolve_vault_dir() -> Path:

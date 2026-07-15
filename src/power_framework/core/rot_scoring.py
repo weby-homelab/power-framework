@@ -419,8 +419,7 @@ class LinkRotChecker:
                 continue
 
             urls = self.EXTERNAL_LINK_PATTERN.findall(content)
-            for url in urls:
-                to_check.append((str(rel), url))
+            to_check.extend((str(rel), url) for url in urls)
 
         if not to_check:
             return results
