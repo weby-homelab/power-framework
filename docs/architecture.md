@@ -9,7 +9,7 @@ src/power_framework/
 ├── core/
 │   ├── __init__.py     # Re-exports all core modules
 │   ├── cli.py          # CLI entry point (argparse) — 11 commands
-│   ├── constants.py    # Centralized constants (v1.8.0)
+│   ├── constants.py    # Centralized constants (v2.0.1)
 │   ├── healer.py       # Frontmatter Healer
 │   ├── markdown_checks.py  # Markdown quality checks
 │   ├── models.py       # OKFMetadata, NoteType, NoteStatus

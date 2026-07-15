@@ -16,7 +16,7 @@ Utility functions for path safety, file I/O, and security.
 ## Constants
 | Name | Source Module | Value / Description |
 |------|---------------|---------------------|
-| `__version__` | `utils.py` | `"1.8.0"` |
+| `__version__` | `utils.py` | `"2.0.1"` |
 | `EXCLUDED_DIRS` | `constants.py` | `frozenset` of directory names excluded from scanning |
 | `EXCLUDED_ORPHAN_FILES` | `constants.py` | `frozenset` of filenames excluded from orphan checks |
 | `PARA_FOLDERS` | `models.py` | `tuple` of standard P.A.R.A. category folder names |

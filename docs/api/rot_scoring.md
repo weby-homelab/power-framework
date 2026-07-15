@@ -1,10 +1,11 @@
 # ROT Scoring
 
-Track A2 scoring: content deduplication, freshness monitoring, link rot detection, and usage tracking (all without external embeddings).
+Track A2 scoring: content deduplication (via dense embeddings), semantic contradiction detection, freshness monitoring, link rot detection, and usage tracking.
 
 | Class / Function | Description |
 |------------------|-------------|
-| `ContentDedupDetector` | TF-Vector cosine similarity for body content |
+| `ContentDedupDetector` | Dense embedding cosine similarity for body content |
+| `ContradictionDetector` | Semantic contradiction check for similar notes (LLM/Metadata) |
 | `FreshnessScorer` | Type-based exponential decay freshness scoring |
 | `LinkRotChecker` | HTTP HEAD checks for external URL health |
 | `UsageTracker` | SQLite-based access counter (thread-safe) |
@@ -16,10 +17,22 @@ detector = ContentDedupDetector(threshold=0.75)
 pairs: list[tuple[str, str, float]] = detector.detect(vault_dir)
 ```
 
-- Uses `_compute_tf_vector` and `_cosine_similarity` from `searcher.py` (no external embeddings)
+- Uses dense embedding cosine similarity (via `EmbeddingManager` with `BAAI/bge-m3`)
 - Threshold defaults to `0.75` — pairs below threshold are not reported
-- Skips notes with fewer than 20 body tokens
+- Skips notes with body length less than 50 characters
 - Returns sorted list of `(path_a, path_b, similarity_score)`
+
+## `ContradictionDetector`
+
+```python
+detector = ContradictionDetector(similarity_threshold=0.7, api_key=None)
+contradicting: list[tuple[str, str, str]] = detector.detect(vault_dir)
+```
+
+- Find semantically similar note pairs that may contain contradictory facts, instructions, or statements
+- Identifies similar notes using dense embedding similarity (threshold: `0.7`)
+- Checks for factual contradictions using a Local LLM (OpenCode) or OpenRouter API. If no API key or local model is configured, falls back to comparing metadata fields (`status`, `owner`, `expiry`, `priority`)
+- Returns a list of tuples: `(path_a, path_b, reason_for_contradiction)`
 
 ## `FreshnessScorer`
 

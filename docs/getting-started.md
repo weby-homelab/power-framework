@@ -3,13 +3,13 @@
 ## Installation
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v1.8.0
+pip install git+https://github.com/weby-homelab/power-framework.git@v2.0.1
 ```
 
 Alternatively, install from a GitHub Release:
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v1.8.0/power_framework-1.8.0-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v2.0.1/power_framework-2.0.1-py3-none-any.whl
 ```
 
 Verify:

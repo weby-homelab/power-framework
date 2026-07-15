@@ -12,7 +12,7 @@ python -m power_framework.mcp
 
 The server starts with **stdio** transport — ideal for local AI clients like Claude Desktop or OpenCode.
 
-### HTTP (Docker / remote) — v1.8.0
+### HTTP (Docker / remote) — v2.0.1
 
 Set `POWER_MCP_TRANSPORT=http` for HTTP mode with `/health` endpoint on port 8000:
 
@@ -25,7 +25,7 @@ Docker Compose example:
 ```yaml
 services:
   power-mcp:
-    image: weby-homelab/power-framework:v1.8.0
+    image: weby-homelab/power-framework:v2.0.1
     ports:
       - "8000:8000"
     volumes:
@@ -70,7 +70,7 @@ Health check: `GET http://localhost:8000/health`
 }
 ```
 
-## Error handling (v1.8.0)
+## Error handling (v2.0.1)
 
 All tools raise structured `ToolError` exceptions with descriptive messages. The server uses `mask_error_details=True` and `ErrorHandlingMiddleware` — internal stack traces are hidden from clients, only user-facing messages are exposed.
 
@@ -94,7 +94,7 @@ Compile hierarchical index (`index.md` + per-folder `_index.md` files). Rate lim
 |-----------|------|----------|-------------|
 | `vault_path` | `string` | No | Path to vault root |
 
-### `read_sub_index` *(read-only since v1.8.0)*
+### `read_sub_index`
 
 Read a specific P.A.R.A. category sub-index. Read-only — does not generate files.
 
@@ -103,7 +103,7 @@ Read a specific P.A.R.A. category sub-index. Read-only — does not generate fil
 | `category` | `string` | Yes | Folder name (e.g. `01_Projects`) |
 | `vault_path` | `string` | No | Path to vault root |
 
-### `ensure_sub_index` *(new in v1.8.0)*
+### `ensure_sub_index`
 
 Generate and read a sub-index for a category. Write path — use when `_index.md` is missing.
 

@@ -38,7 +38,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 ## Quick start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v1.8.0
+pip install git+https://github.com/weby-homelab/power-framework.git@v2.0.1
 
 power init ~/my-vault
 power lint ~/my-vault

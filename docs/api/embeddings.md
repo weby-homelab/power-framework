@@ -7,10 +7,10 @@ Class for managing local dense vector embeddings using the `fastembed` library. 
 ### Constructor
 
 ```python
-EmbeddingManager(model_name: str = "BAAI/bge-small-en-v1.5")
+EmbeddingManager(model_name: str = "BAAI/bge-m3")
 ```
 
-- `model_name`: The name of the fastembed model to load. Default is `"BAAI/bge-small-en-v1.5"` (384-dimensional).
+- `model_name`: The name of the fastembed model to load. Default is `"BAAI/bge-m3"` (1024-dimensional) to support robust bilingual (EN + UA) semantic search.
 
 ### Methods
 

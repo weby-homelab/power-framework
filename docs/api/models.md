@@ -12,16 +12,26 @@ Pydantic model for Open Knowledge Format frontmatter.
 | `resource` | `str\|None` | No | Valid URL |
 | `tags` | `list[str]` | No | Default: `[]`, elements stripped |
 | `timestamp` | `datetime` | Yes | UTC-aware |
-| `owner` | `str\|None` | No | Responsible person/team for governance *(new in v1.6.0)* |
-| `status` | `NoteStatus\|None` | No | `active` \| `review` \| `archived` *(new in v1.6.0)* |
-| `expiry` | `date\|None` | No | Date after which the note should be reviewed *(new in v1.6.0)* |
-| `related` | `list[str]` | No | Default: `[]`, Graph RAG cross-links to other notes *(new in v1.6.0)* |
+| `owner` | `str\|None` | No | Responsible person/team for governance |
+| `status` | `NoteStatus\|None` | No | `active` \| `review` \| `archived` |
+| `expiry` | `date\|None` | No | Date after which the note should be reviewed |
+| `related` | `list[TypedRelation]` | No | Default: `[]`, Typed knowledge graph links to other notes (Graph RAG) |
+
+## `TypedRelation`
+
+Class representing a semantic link to another note.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `path` | `str` | Relative path to the related note |
+| `relation` | `str` | Semantic relation type (e.g., `related_to`, `depends_on`, `contradicts`, `extends`, `part_of`, `governed_by`) |
+| `confidence` | `float` | Confidence score for the relation (0.0 to 1.0, default 1.0) |
 
 ## `NoteType`
 
 Enum of valid OKF note types.
 
-## `NoteStatus` *(new in v1.6.0)*
+## `NoteStatus`
 
 Enum of governance lifecycle statuses: `active`, `review`, `archived`.
 
