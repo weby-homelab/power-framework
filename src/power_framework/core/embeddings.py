@@ -53,7 +53,7 @@ def _get_embedding_dim(model_name: str) -> int:
 
         for m in TextEmbedding.list_supported_models():
             if m["model"] == model_name:
-                return m["dim"]
+                return int(m["dim"])
     except Exception as e:
         logger.debug("Failed to list fastembed models: %s", e)
     return 384
