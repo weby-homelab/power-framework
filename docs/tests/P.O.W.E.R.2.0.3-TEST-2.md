@@ -97,17 +97,17 @@ Max results:     10 per query
 
 | Метрика | FTS (BM25) | Vector (MiniLM) | Hybrid (RRF) | Переможець |
 |---------|:----------:|:---------------:|:------------:|:----------:|
-| **MRR** | 0.311 | 0.377 | 0.374 | 🥇 Vector |
-| **MAP@3** | 0.311 | 0.378 | 0.378 | 🥇 Vector/Hybrid |
-| **MAP@5** | 0.387 | **0.520** | 0.427 | 🥇 Vector |
-| **MAR@5** | 0.567 | **0.733** | 0.611 | 🥇 Vector |
-| **MAR@10** | 1.339 | **1.622** | 1.339 | 🥇 Vector |
-| **MnDCG@5** | 0.189 | 0.264 | **0.294** | 🥇 Hybrid |
-| **MnDCG@10** | 0.390 | **0.510** | 0.506 | 🥇 Vector |
-| **Avg Latency (s)** | 16.141 | **3.544** | 4.194 | 🥇 Vector |
-| **P95 Latency (s)** | 46.743 | **8.727** | 30.167 | 🥇 Vector |
+| **MRR** | 0.619 | 0.750 | **0.754** | 🥇 Hybrid |
+| **MAP@3** | 0.422 | **0.556** | 0.489 | 🥇 Vector |
+| **MAP@5** | 0.267 | **0.467** | 0.453 | 🥇 Vector |
+| **MAR@5** | 0.367 | **0.650** | 0.633 | 🥇 Vector |
+| **MAR@10** | 0.467 | **1.133** | 1.044 | 🥇 Vector |
+| **MnDCG@5** | 0.419 | 0.376 | **0.491** | 🥇 Hybrid |
+| **MnDCG@10** | 0.459 | 0.517 | **0.654** | 🥇 Hybrid |
+| **Avg Latency (s)** | **0.559** | 2.208 | 2.270 | 🥇 FTS |
+| **P95 Latency (s)** | **0.889** | 5.878 | 5.294 | 🥇 FTS |
 
-> **Висновок:** Vector домінує за більшістю метрик якості (+34% MAP@5, +29% MAR@5 vs FTS) та є **4.5x швидшим** за FTS. Hybrid показує найкращий MnDCG@5 (+55% vs FTS), що означає кращу якість ранжування при наявності оцінених результатів.
+> **Висновок:** Vector і Hybrid домінують за якістю пошуку (MAR@5 ~0.63-0.65 vs FTS 0.36). У теплому стані FTS є найшвидшим (Avg 0.56s), а Vector/Hybrid виконуються за ~2.2s.
 
 ---
 
@@ -115,21 +115,21 @@ Max results:     10 per query
 
 | ID | Опис | FTS | Vector | Hybrid | Аналіз |
 |----|------|:---:|:------:|:------:|--------|
-| TC-01 | Docker & container | **0.00** | **1.00** | **1.00** | FTS не знаходить — повільний скан 46.74s, тема покрита в Archive |
-| TC-02 | GPG & Git security | 0.25 | **0.00** | 0.25 | FTS і Hybrid рівні; Vector не вловлює "GPG signing" семантично |
-| TC-03 | LLM benchmarking | 0.75 | **1.00** | 0.75 | Vector краще розуміє "inference speed benchmark GPU" |
-| TC-04 | Proxmox/LXC infra | **0.00** | 0.50 | 0.50 | FTS fail (44s!); Vector і Hybrid знаходять через семантику |
-| TC-05 | FastAPI security | 0.25 | **0.75** | **0.75** | Vector/Hybrid краще за "authentication endpoint" |
-| TC-06 | Pydantic validation | **0.67** | **0.00** | 0.33 | FTS виграє — точне ключове слово "Pydantic"; Vector не знає |
-| TC-07 | Second Brain PKM | **1.00** | 0.50 | 0.25 | FTS точно знаходить "Second Brain"; Vector розпорошується |
-| TC-08 | GitHub Actions CI/CD | **0.00** | 0.50 | **0.75** | Hybrid найкращий; FTS fail через повільний індекс |
-| TC-09 | VPN / Tailscale | 0.25 | **0.75** | **0.75** | Vector і Hybrid краще розуміють "network tunnel" |
-| TC-10 | Security hardening | **1.00** | **1.00** | 0.75 | FTS і Vector рівні; Hybrid трохи гірше |
-| TC-11 | MCP agent integration | **1.00** | **1.00** | **0.00** | Hybrid повний fail! RRF злив обидва сигнали |
-| TC-12 | Backup & storage | **1.00** | **1.00** | 0.75 | Все добре крім Hybrid |
-| TC-13 | Power-Safety-UA | **2.00** | **2.00** | **2.00** | Всі режими знаходять проект ідеально |
-| TC-14 | Embedding / RAG | 0.33 | **1.00** | 0.33 | Vector чудово розуміє "embedding semantic RAG" |
-| TC-15 | SSH hardening | **0.00** | **0.00** | **0.00** | ❌ Повний fail для всіх режимів — системна проблема |
+| TC-01 | Docker & container | 0.50 | **0.75** | 0.50 | Vector дає найкращий recall для докер-контейнерів |
+| TC-02 | GPG & Git security | 0.00 | **0.50** | 0.00 | FTS та Hybrid не влучають в точний документ |
+| TC-03 | LLM benchmarking | 0.25 | **1.00** | **1.00** | Vector і Hybrid знаходять всі релевантні нотатки |
+| TC-04 | Proxmox/LXC infra | 0.00 | **0.25** | **0.25** | FTS повністю пропускає через семантичні розбіжності |
+| TC-05 | FastAPI security | 0.50 | 0.25 | 0.50 | FTS і Hybrid краще за чистий Vector |
+| TC-06 | Pydantic validation | **0.67** | 0.33 | **0.67** | FTS і Hybrid виграють завдяки точній термінології |
+| TC-07 | Second Brain PKM | 0.25 | **0.50** | **0.50** | Vector і Hybrid краще за FTS |
+| TC-08 | GitHub Actions CI/CD | 0.50 | 0.50 | **0.75** | Hybrid показує найкращий результат |
+| TC-09 | VPN / Tailscale | 0.25 | 0.75 | **1.00** | Hybrid знаходить всі 4 релевантні нотатки |
+| TC-10 | Security hardening | 0.50 | 0.50 | 0.50 | Усі три режими показують однакову якість |
+| TC-11 | MCP agent integration | 0.25 | **1.00** | 0.75 | Vector та Hybrid успішно знаходять MCP документацію |
+| TC-12 | Backup & storage | 0.50 | **0.75** | **0.75** | Vector і Hybrid виграють |
+| TC-13 | Power-Safety-UA | 0.00 | **1.00** | **1.00** | Vector і Hybrid відпрацьовують на 100% |
+| TC-14 | Embedding / RAG | 0.67 | **1.33** | 1.00 | Vector дає найкращий результат |
+| TC-15 | SSH hardening | **0.67** | 0.33 | 0.33 | FTS виграє завдяки точним ключам |
 
 ---
 
