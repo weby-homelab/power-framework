@@ -10,15 +10,14 @@ This test suite models and runs evaluations based on:
 
 from __future__ import annotations
 
-import os
-from datetime import datetime, timezone
-from pathlib import Path
-import pytest
+from typing import TYPE_CHECKING
 
-from power_framework.core.models import OKFMetadata
-from power_framework.core.searcher import search_vault
-from power_framework.core.rot_scoring import ContentDedupDetector, FreshnessScorer
 from power_framework.core.relations import suggest_related
+from power_framework.core.rot_scoring import ContentDedupDetector, FreshnessScorer
+from power_framework.core.searcher import search_vault
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestMemoryAgentBench:
@@ -45,7 +44,7 @@ timestamp: 2026-01-01T00:00:00
 Transmission downloads files to the directory `/mnt/samba/downloads/completed`.
 The configuration file is located at `/var/lib/transmission-daemon/info/settings.json`.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Ingest some distractor notes
@@ -61,7 +60,7 @@ timestamp: 2026-01-01T00:00:00
 ---
 This note contains random instructions about system monitoring and web servers on port {8000 + i}.
 """,
-                encoding="utf-8"
+                encoding="utf-8",
             )
 
         # Query specifically for the transmission download path
@@ -91,7 +90,7 @@ timestamp: 2026-07-15T22:00:00
 ---
 Active token for session is `token_sec_999`.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Re-query immediately - verify the system retrieves the new fact
@@ -119,7 +118,7 @@ timestamp: 2026-01-01T00:00:00
 ---
 Project Alpha runs the central server and connects to postgresql database configuration settings.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Write Node B
@@ -134,7 +133,7 @@ timestamp: 2026-01-01T00:00:00
 ---
 The main postgresql database configuration settings are hosted on host PRXMX-01.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Verify that we can resolve this connection via the GraphRAG logic
@@ -142,9 +141,10 @@ The main postgresql database configuration settings are hosted on host PRXMX-01.
         print("DEBUG RELATIONS:", relations)
         for r in relations:
             print("REL:", r.source_path, r.target_path, r.score)
-        
+
         # Let's inspect the files in the vault and see if they are skipped
         from power_framework.core.parser import read_file_content, validate_metadata
+
         for f in vault.rglob("*.md"):
             print("FILE IN VAULT:", f)
             content = read_file_content(f)
@@ -171,7 +171,7 @@ timestamp: 2026-01-01T00:00:00
 This is the default configuration for the Nginx web server block.
 Under this configuration, Nginx is listening on port 8080 for web queries.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Ingest new config
@@ -186,7 +186,7 @@ timestamp: 2026-07-15T00:00:00
 This is the default configuration for the Nginx web server block.
 Under this configuration, Nginx is listening on port 9090 for web queries.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Use ContentDedupDetector to locate similar pages that might contain conflicts
@@ -199,10 +199,11 @@ Under this configuration, Nginx is listening on port 9090 for web queries.
         has_pair = False
         for path_a, path_b, sim in duplicates:
             print("CHECKING:", path_a, path_b)
-            if "NginxConfigOld" in path_a or "NginxConfigOld" in path_b:
-                if "NginxConfigNew" in path_a or "NginxConfigNew" in path_b:
-                    has_pair = True
-                    assert sim > 0.6
+            if ("NginxConfigOld" in path_a or "NginxConfigOld" in path_b) and (
+                "NginxConfigNew" in path_a or "NginxConfigNew" in path_b
+            ):
+                has_pair = True
+                assert sim > 0.6
         assert has_pair
 
 
@@ -225,7 +226,7 @@ timestamp: 2026-01-10T12:00:00
 ---
 Weby's favorite editor configuration includes the 'Tokyo Night' theme.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         results = search_vault(vault, "Tokyo Night editor theme", mode="hybrid")
@@ -249,7 +250,7 @@ timestamp: 2026-01-01T12:00:00
 ---
 The system architect is Vitaliy.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Session 5: Define target fact about Vitaliy
@@ -263,7 +264,7 @@ timestamp: 2026-01-15T12:00:00
 ---
 Vitaliy's email is vitaliy@homelab.internal.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Query connects "system architect" with "email"
@@ -290,7 +291,7 @@ timestamp: 2026-05-01T10:00:00
 ---
 Postgres version 15 was installed on container LXC 200.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Event 2 (Later)
@@ -304,7 +305,7 @@ timestamp: 2026-06-01T10:00:00
 ---
 Upgraded Postgres database to version 16 on container LXC 200.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         results = search_vault(vault, "Postgres version container LXC 200", mode="hybrid")
@@ -336,7 +337,7 @@ timestamp: 2026-01-01T00:00:00
 ---
 Important: The local SSH gateway port is set to 2222.
 """,
-                    encoding="utf-8"
+                    encoding="utf-8",
                 )
             else:
                 note.write_text(
@@ -349,7 +350,7 @@ timestamp: 2026-01-01T00:00:00
 This is standard information number {i} regarding containerization and homelab maintenance.
 Nothing of interest is hidden here.
 """,
-                    encoding="utf-8"
+                    encoding="utf-8",
                 )
 
         results = search_vault(vault, "local SSH gateway port", mode="hybrid")
@@ -374,11 +375,13 @@ timestamp: 2026-01-01T00:00:00
 ---
 Python is a dynamically typed programming language.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Search for completely non-existent concept
-        results = search_vault(vault, "Quantum teleportation password on host PRXMX-04", mode="hybrid")
+        results = search_vault(
+            vault, "Quantum teleportation password on host PRXMX-04", mode="hybrid"
+        )
         # Since it is non-existent, scores should be zero or list should be empty
         assert len(results) == 0 or results[0].score < 0.1
 
@@ -404,7 +407,7 @@ expiry: 2025-06-01
 ---
 Preferred text editor is Vim.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Ingest updated preference note
@@ -419,7 +422,7 @@ expiry: 2027-07-01
 ---
 Preferred text editor is Neovim.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Use FreshnessScorer to verify preference decay
@@ -455,7 +458,7 @@ timestamp: 2026-01-01T00:00:00
 Цей документ описує розгортання та захист контейнерів.
 Потрібно налаштувати права доступу користувачів та вимкнути привілейований режим.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Ingest distractor in Ukrainian
@@ -470,11 +473,13 @@ timestamp: 2026-01-01T00:00:00
 ---
 Для приготування борщу нам знадобляться буряк, капуста, картопля та м'ясо.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Query in English (vector mode should use cross-lingual semantic space)
-        results = search_vault(vault, "docker container security deployment settings", mode="vector")
+        results = search_vault(
+            vault, "docker container security deployment settings", mode="vector"
+        )
         assert len(results) > 0
         assert "DockerUa.md" in results[0].rel_path
 
@@ -496,7 +501,7 @@ timestamp: 2026-01-01T00:00:00
 ---
 This guide explains how to perform nightly postgresql backup dumps and store them securely.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Ingest distractor in English
@@ -511,11 +516,10 @@ timestamp: 2026-01-01T00:00:00
 ---
 The solar system consists of the Sun and eight planets orbiting around it.
 """,
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
         # Query in Ukrainian
         results = search_vault(vault, "резервне копіювання бази даних postgres", mode="vector")
         assert len(results) > 0
         assert "PostgresEng.md" in results[0].rel_path
-
