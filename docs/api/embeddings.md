@@ -7,10 +7,10 @@ Class for managing local dense vector embeddings using the `fastembed` library. 
 ### Constructor
 
 ```python
-EmbeddingManager(model_name: str = "BAAI/bge-m3")
+EmbeddingManager(model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 ```
 
-- `model_name`: The name of the fastembed model to load. Default is `"BAAI/bge-m3"` (1024-dimensional) to support robust bilingual (EN + UA) semantic search.
+- `model_name`: The name of the fastembed model to load. Default is `"sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"` (384-dimensional) for lightweight multilingual semantic search. Can be customized via `POWER_EMBEDDING_MODEL` environment variable.
 
 ### Methods
 

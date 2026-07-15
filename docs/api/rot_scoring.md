@@ -2,13 +2,13 @@
 
 Track A2 scoring: content deduplication (via dense embeddings), semantic contradiction detection, freshness monitoring, link rot detection, and usage tracking.
 
-| Class / Function | Description |
-|------------------|-------------|
-| `ContentDedupDetector` | Dense embedding cosine similarity for body content |
+| Class / Function        | Description                                                   |
+| ----------------------- | ------------------------------------------------------------- |
+| `ContentDedupDetector`  | Dense embedding cosine similarity for body content            |
 | `ContradictionDetector` | Semantic contradiction check for similar notes (LLM/Metadata) |
-| `FreshnessScorer` | Type-based exponential decay freshness scoring |
-| `LinkRotChecker` | HTTP HEAD checks for external URL health |
-| `UsageTracker` | SQLite-based access counter (thread-safe) |
+| `FreshnessScorer`       | Type-based exponential decay freshness scoring                |
+| `LinkRotChecker`        | HTTP HEAD checks for external URL health                      |
+| `UsageTracker`          | SQLite-based access counter (thread-safe)                     |
 
 ## `ContentDedupDetector`
 
@@ -17,7 +17,7 @@ detector = ContentDedupDetector(threshold=0.75)
 pairs: list[tuple[str, str, float]] = detector.detect(vault_dir)
 ```
 
-- Uses dense embedding cosine similarity (via `EmbeddingManager` with `BAAI/bge-m3`)
+- Uses dense embedding cosine similarity (via `EmbeddingManager` with `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`)
 - Threshold defaults to `0.75` — pairs below threshold are not reported
 - Skips notes with body length less than 50 characters
 - Returns sorted list of `(path_a, path_b, similarity_score)`
@@ -45,14 +45,14 @@ scores: dict[str, float] = scorer.score_all(vault_dir)
 - Uses exponential decay: `score = 2^(-age_days / half_life_days)`
 - Half-life depends on note type:
 
-| Type | Half-life |
-|------|-----------|
-| Daily Log | 30 days |
-| Project | 180 days |
-| Area | 365 days |
-| Resource | 365 days |
-| System Guide | 365 days |
-| Archive | 730 days |
+| Type         | Half-life |
+| ------------ | --------- |
+| Daily Log    | 30 days   |
+| Project      | 180 days  |
+| Area         | 365 days  |
+| Resource     | 365 days  |
+| System Guide | 365 days  |
+| Archive      | 730 days  |
 
 ## `LinkRotChecker`
 
