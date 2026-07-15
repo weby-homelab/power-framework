@@ -431,3 +431,91 @@ Preferred text editor is Neovim.
 
         # Newer preferences must have higher freshness score than the stale ones
         assert scores[new_rel] > scores[old_rel]
+
+
+class TestCrossLingualSearch:
+    """Evaluates cross-lingual semantic search capabilities (ENG ↔ UKR)."""
+
+    def test_cross_lingual_english_query_ukrainian_note(self, tmp_path: Path):
+        """Query in English, find note in Ukrainian using cross-lingual embeddings."""
+        vault = tmp_path / "cross_lingual_vault"
+        vault.mkdir()
+        (vault / "03_Resources").mkdir()
+
+        # Ingest note in Ukrainian
+        note = vault / "03_Resources" / "DockerUa.md"
+        note.write_text(
+            """---
+type: Resource
+title: "Налаштування безпеки докер контейнерів"
+description: "Інструкція з конфігурації безпеки daemon"
+tags: [docker, security]
+timestamp: 2026-01-01T00:00:00
+---
+Цей документ описує розгортання та захист контейнерів.
+Потрібно налаштувати права доступу користувачів та вимкнути привілейований режим.
+""",
+            encoding="utf-8"
+        )
+
+        # Ingest distractor in Ukrainian
+        distractor = vault / "03_Resources" / "DistractorUa.md"
+        distractor.write_text(
+            """---
+type: Resource
+title: "Рецепт смачного борщу"
+description: "Класична українська кухня"
+tags: [кулінарія]
+timestamp: 2026-01-01T00:00:00
+---
+Для приготування борщу нам знадобляться буряк, капуста, картопля та м'ясо.
+""",
+            encoding="utf-8"
+        )
+
+        # Query in English (vector mode should use cross-lingual semantic space)
+        results = search_vault(vault, "docker container security deployment settings", mode="vector")
+        assert len(results) > 0
+        assert "DockerUa.md" in results[0].rel_path
+
+    def test_cross_lingual_ukrainian_query_english_note(self, tmp_path: Path):
+        """Query in Ukrainian, find note in English using cross-lingual embeddings."""
+        vault = tmp_path / "cross_lingual_vault"
+        vault.mkdir()
+        (vault / "03_Resources").mkdir()
+
+        # Ingest note in English
+        note = vault / "03_Resources" / "PostgresEng.md"
+        note.write_text(
+            """---
+type: Resource
+title: "Postgres database backup guidelines"
+description: "How to run pg_dump for backup restoration"
+tags: [database, postgres]
+timestamp: 2026-01-01T00:00:00
+---
+This guide explains how to perform nightly postgresql backup dumps and store them securely.
+""",
+            encoding="utf-8"
+        )
+
+        # Ingest distractor in English
+        distractor = vault / "03_Resources" / "DistractorEng.md"
+        distractor.write_text(
+            """---
+type: Resource
+title: "Astronomy basics"
+description: "Overview of solar system planets"
+tags: [science]
+timestamp: 2026-01-01T00:00:00
+---
+The solar system consists of the Sun and eight planets orbiting around it.
+""",
+            encoding="utf-8"
+        )
+
+        # Query in Ukrainian
+        results = search_vault(vault, "резервне копіювання бази даних postgres", mode="vector")
+        assert len(results) > 0
+        assert "PostgresEng.md" in results[0].rel_path
+
