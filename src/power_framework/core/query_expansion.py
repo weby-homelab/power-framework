@@ -59,11 +59,13 @@ class QueryExpander:
 
     def __init__(self, use_llm: bool = False, api_key: str | None = None) -> None:
         self.use_llm = use_llm
-        self.api_key = (
-            api_key
-            or os.environ.get("POWER_LLM_API_KEY")
-            or os.environ.get("OPENROUTER_API_KEY", "")
-        )
+        if api_key is not None:
+            self.api_key = api_key
+        else:
+            self.api_key = (
+                os.environ.get("POWER_LLM_API_KEY")
+                or os.environ.get("OPENROUTER_API_KEY", "")
+            )
         self.api_base = os.environ.get("POWER_LLM_API_BASE", "https://openrouter.ai/api/v1").rstrip(
             "/"
         )

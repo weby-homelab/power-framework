@@ -5,6 +5,19 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-07-15
+
+### Fixed
+- **Memory OOM Prevention**: Switched default embedding model to `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions) reducing RSS RAM usage from ~6.3 GB to ~680 MB, preventing OOM crashes on low-resource hosts (e.g. 12GB RAM VPS/proxmox nodes).
+- **Link Checker Parallelization**: Optimized `LinkRotChecker` using `ThreadPoolExecutor` to check external links in parallel, accelerating extended ROT audit (A2) from minutes to seconds.
+- **Configurable Embedding Model**: Added environment variable `POWER_EMBEDDING_MODEL` to customize the model, with support for automatic `.env` loading and test suite isolation.
+- **QueryExpander Empty Key Fallback**: Fixed fallback logic in `QueryExpander` to correctly respect explicitly passed empty `api_key=""` strings.
+
+## [2.0.1] - 2026-07-15
+
+### Changed
+- **BAAI/bge-m3 default model**: Bumped default embedding model to `BAAI/bge-m3` (1024 dimensions) with custom ONNX community source registration.
+
 ## [2.0.0] - 2026-07-14
 
 ### Added
@@ -105,6 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Initial public release
 
+[2.0.2]: https://github.com/weby-homelab/power-framework/compare/v2.0.1...v2.0.2
+[2.0.1]: https://github.com/weby-homelab/power-framework/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/weby-homelab/power-framework/compare/v1.8.0...v2.0.0
 [1.8.0]: https://github.com/weby-homelab/power-framework/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/weby-homelab/power-framework/compare/v1.7.0...v1.7.1

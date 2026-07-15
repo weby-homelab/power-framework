@@ -400,7 +400,10 @@ class LinkRotChecker:
         Returns dict: rel_path -> list of (url, status_code)
         Only includes broken links (status >= 400 or connection error).
         """
+        from concurrent.futures import ThreadPoolExecutor
+
         results: dict[str, list[tuple[str, int]]] = {}
+        to_check: list[tuple[str, str]] = []
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
@@ -416,17 +419,26 @@ class LinkRotChecker:
                 continue
 
             urls = self.EXTERNAL_LINK_PATTERN.findall(content)
-            if not urls:
-                continue
-
-            broken: list[tuple[str, int]] = []
             for url in urls:
-                status = self._head_status(url)
-                if status >= 400 or status == -1:
-                    broken.append((url, status))
+                to_check.append((str(rel), url))
 
-            if broken:
-                results[str(rel)] = broken
+        if not to_check:
+            return results
+
+        # Parallelize check using ThreadPoolExecutor (max 16 workers)
+        def check_url(item: tuple[str, str]) -> tuple[str, str, int]:
+            rel_path, url = item
+            status = self._head_status(url)
+            return rel_path, url, status
+
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            check_results = list(executor.map(check_url, to_check))
+
+        for rel_path, url, status in check_results:
+            if status >= 400 or status == -1:
+                if rel_path not in results:
+                    results[rel_path] = []
+                results[rel_path].append((url, status))
 
         return results
 

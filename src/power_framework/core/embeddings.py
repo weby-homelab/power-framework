@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,8 +9,55 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "BAAI/bge-m3"
-EMBEDDING_DIM = 1024
+
+def _load_env(env_path: str = "/root/geminicli/.env") -> None:
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" in line:
+                        key, val = line.split("=", 1)
+                        key = key.strip()
+                        val = val.strip().strip('"').strip("'")
+                        if key and key not in os.environ:
+                            os.environ[key] = val
+        except Exception as e:
+            logger.debug("Failed to load .env file from %s: %s", env_path, e)
+
+
+# Load env variables before setting up default model
+import sys
+if "pytest" not in sys.modules and "PYTEST_CURRENT_TEST" not in os.environ:
+    _load_env()
+
+DEFAULT_MODEL = os.getenv(
+    "POWER_EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+)
+
+
+def _get_embedding_dim(model_name: str) -> int:
+    if model_name == "BAAI/bge-m3":
+        return 1024
+    if "minilm" in model_name.lower() or "small" in model_name.lower():
+        return 384
+    if "base" in model_name.lower():
+        return 768
+    if "large" in model_name.lower():
+        return 1024
+    try:
+        from fastembed import TextEmbedding
+        for m in TextEmbedding.list_supported_models():
+            if m["model"] == model_name:
+                return m["dim"]
+    except Exception:
+        pass
+    return 384
+
+
+EMBEDDING_DIM = _get_embedding_dim(DEFAULT_MODEL)
 
 
 class EmbeddingManager:
@@ -21,8 +69,6 @@ class EmbeddingManager:
         if self._model is not None:
             return
         try:
-            import os
-
             # Disable symlinks for HF downloads to prevent ONNX Runtime directory escape errors
             os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 
@@ -62,3 +108,4 @@ class EmbeddingManager:
         self._lazy_init()
         assert self._model is not None
         return [[float(v) for v in vec] for vec in self._model.embed(texts)]
+
