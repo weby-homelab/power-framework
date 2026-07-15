@@ -12,7 +12,7 @@ python -m power_framework.mcp
 
 The server starts with **stdio** transport — ideal for local AI clients like Claude Desktop or OpenCode.
 
-### HTTP (Docker / remote) — v2.0.2
+### HTTP (Docker / remote) — v2.0.3
 
 Set `POWER_MCP_TRANSPORT=http` for HTTP mode with `/health` endpoint on port 8000:
 
@@ -25,7 +25,7 @@ Docker Compose example:
 ```yaml
 services:
     power-mcp:
-        image: weby-homelab/power-framework:v2.0.2
+        image: weby-homelab/power-framework:v2.0.3
         ports:
             - "8000:8000"
         volumes:
@@ -70,7 +70,7 @@ Health check: `GET http://localhost:8000/health`
 }
 ```
 
-## Error handling (v2.0.2)
+## Error handling (v2.0.3)
 
 All tools raise structured `ToolError` exceptions with descriptive messages. The server uses `mask_error_details=True` and `ErrorHandlingMiddleware` — internal stack traces are hidden from clients, only user-facing messages are exposed.
 
