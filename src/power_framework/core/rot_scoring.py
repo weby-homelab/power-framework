@@ -21,7 +21,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from .embeddings import EmbeddingManager
+from .embeddings import get_embedding_manager
 from .parser import FRONTMATTER_PATTERN, parse_frontmatter, read_file_content
 from .utils import run_opencode_cli
 
@@ -65,7 +65,7 @@ class ContentDedupDetector:
 
     def __init__(self, threshold: float = CONTENT_DEDUP_THRESHOLD):
         self.threshold = threshold
-        self.embedder = EmbeddingManager()
+        self.embedder = get_embedding_manager()
 
     def detect(
         self,
@@ -150,7 +150,7 @@ class ContradictionDetector:
             "/"
         )
         self.model = os.environ.get("POWER_LLM_MODEL", OPENROUTER_MODELS[0])
-        self.embedder = EmbeddingManager()
+        self.embedder = get_embedding_manager()
 
     def detect(self, vault_dir: Path) -> list[tuple[str, str, str]]:
         """
@@ -472,7 +472,9 @@ class LinkRotChecker:
             }
 
             try:
-                req = urllib.request.Request(url, method="HEAD", headers=headers)  # noqa: S310
+                req = urllib.request.Request(  # noqa: S310
+                    url, method="HEAD", headers=headers
+                )
                 with urllib.request.urlopen(  # noqa: S310
                     req, timeout=self.timeout
                 ) as resp:
@@ -480,7 +482,9 @@ class LinkRotChecker:
             except Exception as exc:
                 # Fallback to GET for any HEAD error (403, 405, timeouts, connection issues, etc.)
                 try:
-                    req_get = urllib.request.Request(url, method="GET", headers=headers)  # noqa: S310
+                    req_get = urllib.request.Request(  # noqa: S310
+                        url, method="GET", headers=headers
+                    )
                     with urllib.request.urlopen(  # noqa: S310
                         req_get, timeout=self.timeout
                     ) as resp:

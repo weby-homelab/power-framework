@@ -18,16 +18,16 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from .chunker import SemanticChunker
-from .embeddings import EmbeddingManager
+from .embeddings import get_embedding_manager
 from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
 from .query_expansion import QueryExpander
 from .reranker import RerankerManager
 from .utils import get_cache_dir
+
+logger = logging.getLogger(__name__)
 
 SNIPPET_WINDOW = 40
 MAX_SNIPPET_LENGTH = 120
@@ -238,9 +238,7 @@ def _sync_vault_to_db(
 
     to_delete = [rel_path for rel_path in db_files if rel_path not in disk_files]
     if to_delete:
-        cursor.executemany(
-            "DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete]
-        )
+        cursor.executemany("DELETE FROM fts_notes WHERE rel_path = ?", [(r,) for r in to_delete])
         cursor.executemany(
             "DELETE FROM file_metadata WHERE rel_path = ?", [(r,) for r in to_delete]
         )
@@ -251,7 +249,7 @@ def _sync_vault_to_db(
             "DELETE FROM chunk_embeddings WHERE rel_path = ?", [(r,) for r in to_delete]
         )
 
-    embedder = EmbeddingManager() if sync_embeddings else None
+    embedder = get_embedding_manager() if sync_embeddings else None
     logger.info(
         "Starting sync loop over %d files (embeddings=%s)",
         len(disk_files),
@@ -267,15 +265,9 @@ def _sync_vault_to_db(
                 content = read_file_content(filepath)
                 metadata = validate_metadata(content)
                 if metadata is None:
-                    cursor.execute(
-                        "DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,)
-                    )
-                    cursor.execute(
-                        "DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,)
-                    )
-                    cursor.execute(
-                        "DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,)
-                    )
+                    cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,))
                     continue
 
                 tags_str = " ".join(metadata.tags)
@@ -314,7 +306,7 @@ def _sync_vault_to_db(
                             "INSERT OR REPLACE INTO doc_embeddings (rel_path, embedding, mtime) VALUES (?, ?, ?)",
                             (rel_path, blob, mtime),
                         )
-                    except Exception as e:  # noqa: S112
+                    except Exception as e:
                         logger.warning("Embedding doc failed for %s: %s", rel_path, e)
                         continue
 
@@ -337,10 +329,10 @@ def _sync_vault_to_db(
                             "INSERT OR REPLACE INTO chunk_embeddings (chunk_id, rel_path, embedding, content, mtime) VALUES (?, ?, ?, ?, ?)",
                             (chunk_id, rel_path, chunk_blob, chunk_text, mtime),
                         )
-                except Exception as e:  # noqa: S112
+                except Exception as e:
                     logger.warning("Chunk embedding failed for %s: %s", rel_path, e)
                     continue
-            except Exception as e:  # noqa: S112
+            except Exception as e:
                 logger.warning("Processing failed for %s: %s", rel_path, e)
                 continue
 
@@ -534,9 +526,7 @@ def _rrf_merge(
         rrf_scores[result.rel_path] = 1.0 / (k + rank + 1)
 
     for rank, result in enumerate(vector_results):
-        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (
-            k + rank + 1
-        )
+        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (k + rank + 1)
 
     doc_map: dict[str, SearchResult] = {}
     for r in fts_results + vector_results:
@@ -578,7 +568,7 @@ def _semantic_search(
     db_path = get_cache_dir() / "power_search.db"
 
     try:
-        embedder = EmbeddingManager()
+        embedder = get_embedding_manager()
         query_vec = embedder.embed(query)
 
         conn = sqlite3.connect(str(db_path), timeout=30)
@@ -701,9 +691,7 @@ def search_vault(
             vec = _vector_search(vault_dir, variant, max_results=max_results * 2)
             results = _rrf_merge(fts, vec)
         elif mode == "hybrid_reranked":
-            results = _hybrid_reranked_search(
-                vault_dir, variant, max_results=max_results
-            )
+            results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
         else:
             results = _fts_search(vault_dir, variant, max_results=max_results)
         all_results.append(results)
@@ -749,9 +737,7 @@ def _hybrid_reranked_search(
     return candidates[:max_results]
 
 
-def format_search_results(
-    results: list[SearchResult], query: str, mode: str = "fts"
-) -> str:
+def format_search_results(results: list[SearchResult], query: str, mode: str = "fts") -> str:
     """Format search results into a human-readable report string."""
     if not results:
         return f"No results found for '{query}'."

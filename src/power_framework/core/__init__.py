@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from .chunker import SemanticChunker
 from .cli import main as cli_main
-from .embeddings import EmbeddingManager
+from .embeddings import get_embedding_manager
 from .healer import heal_frontmatter, heal_vault
 from .indexer import (
     generate_index_content,
@@ -98,6 +98,8 @@ from .utils import (
     validate_path_in_vault,
     validate_vault_path,
 )
+
+EmbeddingManager = get_embedding_manager  # backward compat alias
 
 __all__ = [
     "MAX_DESCRIPTION_LENGTH",

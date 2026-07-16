@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from fastembed import TextEmbedding
 
 logger = logging.getLogger(__name__)
@@ -44,9 +46,7 @@ FASTEMBED_MODEL = os.getenv(
 )
 
 # Qwen3 ONNX backend (qwen3-embed, no torch / no Ollama) — TEST-4 default.
-QWEN3_EMBED_MODEL = os.getenv(
-    "POWER_QWEN3_EMBED_MODEL", "n24q02m/Qwen3-Embedding-0.6B-ONNX"
-)
+QWEN3_EMBED_MODEL = os.getenv("POWER_QWEN3_EMBED_MODEL", "n24q02m/Qwen3-Embedding-0.6B-ONNX")
 # q4f16 ONNX by default; set to "n24q02m/Qwen3-Embedding-0.6B-ONNX" with
 # POWER_QWEN3_EMBED_VARIANT to control which onnx file is used if needed.
 
@@ -67,17 +67,13 @@ def _get_embedding_dim(model_name: str) -> int:
             import ollama
 
             result = ollama.show(OLLAMA_EMBED_MODEL)
-            mi = (
-                result.modelinfo
-                if hasattr(result, "modelinfo")
-                else result.get("model_info", {})
-            )
+            mi = result.modelinfo if hasattr(result, "modelinfo") else result.get("model_info", {})
             if "general.embedding_dim" in mi:
                 return int(mi["general.embedding_dim"])
             if "qwen3.embedding_length" in mi:
                 return int(mi["qwen3.embedding_length"])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to get embedding dim from Ollama: %s", e)
         return 1024
     try:
         from fastembed import TextEmbedding
@@ -123,40 +119,44 @@ class OllamaEmbeddingManager:
                 self._dim = 1024
         return self._dim
 
-    def _safe_call(self, fn):
-        import signal
-
+    def _safe_call(self, fn: Callable[[], Any]) -> Any:
         last_err: Exception | None = None
         for attempt in range(self._retries + 1):
-            try:
-
-                def _handler(signum, frame):
-                    raise TimeoutError("ollama embed timed out")
-
-                old = signal.signal(signal.SIGALRM, _handler)
-                signal.alarm(self._timeout)
-                try:
-                    return fn()
-                finally:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old)
-            except TimeoutError as e:
-                last_err = e
+            result, exc = self._do_attempt(fn)
+            if exc is None:
+                return result
+            last_err = exc
+            if isinstance(exc, TimeoutError):
                 logger.warning(
                     "Ollama embed attempt %d/%d timed out after %ds",
                     attempt + 1,
                     self._retries + 1,
                     self._timeout,
                 )
-            except Exception as e:  # noqa: BLE001
-                last_err = e
+            else:
                 logger.warning(
                     "Ollama embed attempt %d/%d failed: %s",
                     attempt + 1,
                     self._retries + 1,
-                    e,
+                    exc,
                 )
         raise RuntimeError(f"Ollama embed failed after retries: {last_err}")
+
+    def _do_attempt(self, fn: Callable[[], Any]) -> tuple[Any, Exception | None]:
+        import signal
+
+        def _handler(signum, frame):
+            raise TimeoutError("ollama embed timed out")
+
+        old = signal.signal(signal.SIGALRM, _handler)
+        signal.alarm(self._timeout)
+        try:
+            return fn(), None
+        except (TimeoutError, Exception) as e:
+            return None, e
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old)
 
     def embed(self, text: str) -> list[float]:
         import ollama
@@ -285,23 +285,19 @@ class Qwen3EmbeddingManager:
 _EMBED_MANAGER_CACHE: dict[str, object] = {}
 
 
-def EmbeddingManager(
+def get_embedding_manager(
     model_name: str | None = None,
 ) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager:
     provider = os.getenv("POWER_EMBED_PROVIDER", "fastembed").lower()
     if provider == "ollama":
         key = f"ollama:{model_name or OLLAMA_EMBED_MODEL}"
         if key not in _EMBED_MANAGER_CACHE:
-            _EMBED_MANAGER_CACHE[key] = OllamaEmbeddingManager(
-                model_name or OLLAMA_EMBED_MODEL
-            )
+            _EMBED_MANAGER_CACHE[key] = OllamaEmbeddingManager(model_name or OLLAMA_EMBED_MODEL)
         return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
     if provider == "qwen3":
         key = f"qwen3:{model_name or QWEN3_EMBED_MODEL}"
         if key not in _EMBED_MANAGER_CACHE:
-            _EMBED_MANAGER_CACHE[key] = Qwen3EmbeddingManager(
-                model_name or QWEN3_EMBED_MODEL
-            )
+            _EMBED_MANAGER_CACHE[key] = Qwen3EmbeddingManager(model_name or QWEN3_EMBED_MODEL)
         return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
     key = f"fastembed:{model_name or FASTEMBED_MODEL}"
     if key not in _EMBED_MANAGER_CACHE:
