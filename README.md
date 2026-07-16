@@ -7,7 +7,7 @@
 Validate, index, search, and manage your knowledge base from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-73%25-yellow?logo=pytest)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/power-framework?logo=github)](https://github.com/weby-homelab/power-framework/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -28,12 +28,12 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code, powered by FastMCP 3.x
-- **Production-grade** — 360+ tests, 80%+ coverage, CodeQL scanning, Automated GitHub Releases
+- **Production-grade** — 377 tests, 73%+ coverage (CI `fail-under=70`), CodeQL scanning, Automated GitHub Releases
 
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v2.0.3
+pip install git+https://github.com/weby-homelab/power-framework.git@v2.0.4
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -44,24 +44,25 @@ power markdown-check ~/my-vault  # Check markdown quality issues
 
 ## What's Inside
 
-| Feature                         | What it does                                                                                                                                                                                                                                                                      |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI**                         | `power init`, `lint`, `index`, `ingest`, `search`, `rot`, `status`, `archive`, `cron`, `heal`, `markdown-check`, `suggest-related` — 12 commands for full vault management                                                                                                                  |
-| **MCP Server**                  | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`, `search_vault_tool`, `synthesize_session`, `rot_audit`, `archive_notes`, `suggest_related_tool`, `heal_frontmatter_tool`, `check_markdown_tool` — 12 tools for AI agents             |
-| **OKF Validation**              | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                           |
-| **Knowledge Graph (Graph RAG)** | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                           |
-| **Freshness Monitoring**        | Linter flags stale/expired notes by checking `expiry` dates, ensuring your vault stays current                                                                                                                                                                                    |
-| **Agent Auto-Ingest**           | `synthesize_session` MCP tool — agents autonomously create permanent notes with governance + graph links + full index rebuild                                                                                                                                                     |
-| **ROT Audit**                   | Detects redundant, outdated, and trivial notes using dense embedding semantic deduplication and LLM fact contradiction checks                                                                                                                                                     |
-| **Auto-Archive**                | Automatically archives stale notes to `04_Archive/` — `power archive <path>` with dry-run preview                                                                                                                                                                                 |
-| **Healer**                      | Auto-fixes missing/invalid frontmatter fields (title, description, type, timestamp) — `power heal <path>`                                                                                                                                                                         |
-| **Markdown Checks**             | Detects trailing whitespace, inconsistent list markers, header jumps, missing code language — `power markdown-check <path>`                                                                                                                                                       |
-| **Relation Suggestions**        | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>`                                                                                                                                                                                          |
-| **Cron Maintenance**            | Runs lint + index + rot audit in one command — `power cron <path>`                                                                                                                                                                                                                |
-| **Advanced Hybrid Search**      | 4-mode search (v2.0): FTS5 (BM25), Dense Vector Semantic (`fastembed` paraphrase-multilingual-MiniLM-L12-v2), Hybrid (RRF), and Hybrid Reranked (`cross-encoder` ms-marco-MiniLM-L-6-v2) with synonym & LLM query expansion and Contextual Retrieval chunking (`SemanticChunker`) |
-| **Hierarchical Index**          | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings)                                                                                                                                                   |
-| **CI/CD**                       | 360+ tests, 80%+ coverage, CodeQL SAST, Automated GitHub Releases                                                                                                                                                                                                                 |
-| **Documentation**               | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                        |
+| Feature                         | What it does                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **CLI**                         | `power init`, `lint`, `index`, `ingest`, `search`, `rot`, `status`, `archive`, `cron`, `heal`, `markdown-check`, `suggest-related` — 12 commands for full vault management                                                                                                                                                                                                                                                     |
+| **MCP Server**                  | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`, `search_vault_tool`, `synthesize_session`, `rot_audit`, `archive_notes`, `suggest_related_tool`, `heal_frontmatter_tool`, `check_markdown_tool` — 12 tools for AI agents                                                                                                                                                          |
+| **OKF Validation**              | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                        |
+| **Knowledge Graph (Graph RAG)** | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                        |
+| **Freshness Monitoring**        | Linter flags stale/expired notes by checking `expiry` dates, ensuring your vault stays current                                                                                                                                                                                                                                                                                                                                 |
+| **Agent Auto-Ingest**           | `synthesize_session` MCP tool — agents autonomously create permanent notes with governance + graph links + full index rebuild                                                                                                                                                                                                                                                                                                  |
+| **ROT Audit**                   | Detects redundant, outdated, and trivial notes using dense embedding semantic deduplication and LLM fact contradiction checks                                                                                                                                                                                                                                                                                                  |
+| **Auto-Archive**                | Automatically archives stale notes to `04_Archive/` — `power archive <path>` with dry-run preview                                                                                                                                                                                                                                                                                                                              |
+| **Healer**                      | Auto-fixes missing/invalid frontmatter fields (title, description, type, timestamp) — `power heal <path>`                                                                                                                                                                                                                                                                                                                      |
+| **Markdown Checks**             | Detects trailing whitespace, inconsistent list markers, header jumps, missing code language — `power markdown-check <path>`                                                                                                                                                                                                                                                                                                    |
+| **Relation Suggestions**        | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>`                                                                                                                                                                                                                                                                                                                                       |
+| **Cron Maintenance**            | Runs lint + index + rot audit in one command — `power cron <path>`                                                                                                                                                                                                                                                                                                                                                             |
+| **Advanced Hybrid Search**      | 4-mode search (v2.0): FTS5 (BM25), Dense Vector Semantic, Hybrid (RRF fusion), and Hybrid Reranked. Embeddings are **pluggable**: default `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384d, light, ~680 MB RAM) or `BAAI/bge-m3` / `Qwen3-Embedding-0.6B` (1024d, multilingual, recommended for UA↔EN vaults). Includes synonym & LLM query expansion and Contextual Retrieval chunking (`SemanticChunker`) |
+| **Cross-Encoder Reranker**      | Optional `hybrid_reranked` mode using `ms-marco-MiniLM-L-6-v2` cross-encoder (ONNX). ⚠️ On mix-lingual UA+EN vaults the MiniLM reranker **degrades** quality (MAR@5 −22%, ×8 latency) — use `hybrid` without reranker, or a multilingual reranker (`bge-reranker-v2-m3`)                                                                                                                                                       |
+| **Hierarchical Index**          | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings)                                                                                                                                                                                                                                                                                                |
+| **CI/CD**                       | 377 tests, 73%+ coverage, CodeQL SAST, Automated GitHub Releases                                                                                                                                                                                                                                                                                                                                                               |
+| **Documentation**               | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                     |
 
 ## Migration Report
 
@@ -119,7 +120,7 @@ power search ~/my-vault "deployment guide" --max-results 5
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v2.0.3
+pip install git+https://github.com/weby-homelab/power-framework.git@v2.0.4
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -196,9 +197,9 @@ owner: "team-alpha" # optional: governance — responsible owner
 status: active # optional: active | review | archived
 expiry: 2026-12-31 # optional: freshness management
 related:
-  - path: 01_Projects/Other.md
-    relation: depends_on # optional: relation type
-    confidence: 1.0 # optional: confidence score
+    - path: 01_Projects/Other.md
+      relation: depends_on # optional: relation type
+      confidence: 1.0 # optional: confidence score
 ---
 ```
 
@@ -236,10 +237,10 @@ flowchart TD
 
     subgraph RAG ["🔍 RAG & GraphRAG Pipeline"]
         Chunker["✂️ Semantic Chunker (Anthropic Contextual)"]:::rag
-        Embeddings["🧠 Dense Multilingual MiniLM Embeddings"]:::rag
+        Embeddings["🧠 Pluggable Dense Embeddings<br/>(MiniLM / BGE-M3 / Qwen3)"]:::rag
         SQLite[("🗄️ SQLite (FTS5 + chunk_embeddings)")]:::rag
         Expander["🔄 Query Expander (Synonyms / LLM)"]:::rag
-        Reranker["🎯 Cross-Encoder Reranker (MiniLM)"]:::rag
+        Reranker["🎯 Cross-Encoder Reranker (MiniLM)<br/>⚠️ off for mix-lingual"]:::rag
         KG["🕸️ Knowledge Graph (BFS / Mermaid Graph)"]:::rag
     end
 
@@ -300,25 +301,25 @@ flowchart TD
 
 ### Core Library (`src/power_framework/`)
 
-| Module                    | Purpose                                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `core/models.py`          | Pydantic v2 schemas for OKF metadata validation                                                               |
-| `core/parser.py`          | Safe YAML frontmatter parsing (PyYAML-based)                                                                  |
-| `core/indexer.py`         | Vault scanning and hierarchical index generation                                                              |
-| `core/linter.py`          | Health checks: broken links, missing metadata, orphans, stale/expired notes                                   |
-| `core/searcher.py`        | Full-text search with relevance scoring (FTS5/Vector/Hybrid/Reranked)                                         |
-| `core/embeddings.py`      | Dense vector embeddings manager (multilingual MiniLM on ONNX Runtime, customizable via POWER_EMBEDDING_MODEL) |
-| `core/reranker.py`        | Cross-Encoder reranker using ms-marco-MiniLM-L-6-v2 on ONNX Runtime                                           |
-| `core/query_expansion.py` | Synonym map (EN/UK) & OpenRouter Multi-Query expansion                                                        |
-| `core/chunker.py`         | Semantic & contextual note splitter (Anthropic Contextual Retrieval)                                          |
-| `core/healer.py`          | Auto-fix missing/invalid frontmatter fields                                                                   |
-| `core/relations.py`       | KnowledgeGraph builder, BFS traversal, and Mermaid exporter                                                   |
-| `core/rot_scoring.py`     | A2 scoring: semantic content dedup, freshness, contradiction checks                                           |
-| `core/markdown_checks.py` | Markdown quality checks: trailing whitespace, list markers, header jumps                                      |
-| `core/constants.py`       | Centralized exclusion lists and system constants                                                              |
-| `core/utils.py`           | Path traversal protection, atomic writes, backups, rate limiter                                               |
-| `core/cli.py`             | Command-line interface (12 commands via argparse)                                                             |
-| `mcp/power_server.py`     | FastMCP 3.x server with 12 async tools + HTTP transport + /health                                             |
+| Module                    | Purpose                                                                                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/models.py`          | Pydantic v2 schemas for OKF metadata validation                                                                                                                         |
+| `core/parser.py`          | Safe YAML frontmatter parsing (PyYAML-based)                                                                                                                            |
+| `core/indexer.py`         | Vault scanning and hierarchical index generation                                                                                                                        |
+| `core/linter.py`          | Health checks: broken links, missing metadata, orphans, stale/expired notes                                                                                             |
+| `core/searcher.py`        | Full-text search with relevance scoring (FTS5/Vector/Hybrid/Reranked); WAL mode + `busy_timeout` for parallel access                                                    |
+| `core/embeddings.py`      | Pluggable dense embedding manager: MiniLM-L12-v2 (default, 384d) / BGE-M3 / Qwen3-0.6B (1024d) via `POWER_EMBED_BACKEND` + `POWER_EMBED_MODEL`, ONNX Runtime, lazy init |
+| `core/reranker.py`        | Optional Cross-Encoder reranker (`ms-marco-MiniLM-L-6-v2` on ONNX, or `bge-reranker-v2-m3`); degrades mix-lingual quality — off by default                              |
+| `core/query_expansion.py` | Synonym map (EN/UK) & OpenRouter Multi-Query expansion                                                                                                                  |
+| `core/chunker.py`         | Semantic & contextual note splitter (Anthropic Contextual Retrieval)                                                                                                    |
+| `core/healer.py`          | Auto-fix missing/invalid frontmatter fields                                                                                                                             |
+| `core/relations.py`       | KnowledgeGraph builder, BFS traversal, and Mermaid exporter                                                                                                             |
+| `core/rot_scoring.py`     | A2 scoring: semantic content dedup, freshness, contradiction checks                                                                                                     |
+| `core/markdown_checks.py` | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                |
+| `core/constants.py`       | Centralized exclusion lists and system constants                                                                                                                        |
+| `core/utils.py`           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                         |
+| `core/cli.py`             | Command-line interface (12 commands via argparse)                                                                                                                       |
+| `mcp/power_server.py`     | FastMCP 3.x server with 12 async tools + HTTP transport + /health                                                                                                       |
 
 All components share `power_framework.core` as the single source of truth.
 
@@ -332,7 +333,7 @@ cd power-framework
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests (360+ tests, 80%+ coverage)
+# Run tests (377 tests, 73%+ coverage)
 pytest tests/ -v
 
 # Lint & format
@@ -346,6 +347,7 @@ mypy src/power_framework/
 ### Test Reports & Benchmarks
 
 For detailed analysis and benchmarks of the P.O.W.E.R. framework:
+
 - [P.O.W.E.R. v2.0.1 Test Report & Speed Benchmarks](docs/tests/P.O.W.E.R.2.0.1-TEST-1.md) — Multi-lingual (UA/EN) embeddings via `BAAI/bge-m3`, test run outputs, and memory overhead optimization.
 - [Vector Search Degradation & Scalability Limits Analysis](docs/tests/P.O.W.E.R.2.0.1-TEST-2.md) — Comparison of linear NumPy search vs SIMD C `sqlite-vec`, graph-based HNSW, and Qdrant database.
 - [AI Agent Memory Benchmark & SOTA Competency Report (v2.0.3-TEST)](docs/tests/P.O.W.E.R.2.0.3-TEST.md) — Multi-turn incremental evaluations covering MemoryAgentBench (ICLR 2026), LoCoMo, LongMemEval, and BEAM.
@@ -404,7 +406,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 2.0.3
+softwareVersion: 2.0.4
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

@@ -5,6 +5,18 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.5] - 2026-07-17
+
+### Documentation
+
+- **README / README.ua.md accuracy pass** — aligned docs with actual v2.0.4 behavior and TEST-2/3/4 results:
+    - Coverage badge and test count corrected to **377 tests, 73%+ coverage** (was "360+, 80%").
+    - Embeddings documented as **pluggable** (`MiniLM-L12-v2` default / `BGE-M3` / `Qwen3-0.6B`) instead of hardcoded MiniLM.
+    - Added **reranker caveat**: `hybrid_reranked` (MiniLM ms-marco) degrades mix-lingual UA+EN quality (MAR@5 −22%, ×8 latency); use `hybrid` without reranker.
+    - Added **Known Issues** section: RRF fusion edge case (TEST-2 TC-11), FTS5 ~46 s latency spikes, reranker mix-lingual regression.
+    - Test Reports section now links TEST-2 (IR), TEST-3 (cross-lingual), TEST-4 (BGE-M3 vs Qwen3 + reranker).
+    - Install/pin references bumped to `v2.0.4`; JSON-LD `softwareVersion` updated.
+
 ## [2.0.4] - 2026-07-17
 
 ### Fixed
