@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_RERANKER_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"
+DEFAULT_RERANKER_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
 
 QWEN3_RERANKER_MODEL = os.getenv(
     "POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX"
@@ -48,5 +48,4 @@ class RerankerManager:
         assert self._model is not None
         if self._use_qwen3:
             return [float(s) for s in self._model.rerank(query, documents)]  # type: ignore[attr-defined]
-        pairs = [(query, doc) for doc in documents]
-        return list(self._model.predict(pairs))  # type: ignore[attr-defined]
+        return [float(s) for s in self._model.rerank(query, documents)]

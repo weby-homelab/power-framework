@@ -290,3 +290,86 @@ def heal_vault(vault_dir: Path, dry_run: bool = True) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def propagate_rename(
+    vault_dir: Path, old_rel_path: str, new_rel_path: str, dry_run: bool = False
+) -> tuple[int, list[str]]:
+    """Scan all notes in the vault and update references to a renamed note in the 'related' field."""
+    updated_count = 0
+    changes_log = []
+
+    old_rel = old_rel_path.replace("\\", "/").strip()
+    new_rel = new_rel_path.replace("\\", "/").strip()
+
+    for filepath in vault_dir.rglob("*.md"):
+        rel = str(filepath.relative_to(vault_dir)).replace("\\", "/")
+        if any(part in DEFAULT_EXCLUDED for part in filepath.relative_to(vault_dir).parts):
+            continue
+        if filepath.name in DEFAULT_EXCLUDED:
+            continue
+        if rel in (old_rel, new_rel):
+            continue
+
+        try:
+            content = read_file_content(filepath)
+        except Exception:
+            continue
+
+        raw_fm = extract_frontmatter_raw(content)
+        if raw_fm is None:
+            continue
+
+        fm_data = parse_frontmatter(content)
+        if not fm_data or "related" not in fm_data:
+            continue
+
+        related = fm_data["related"]
+        if not isinstance(related, list):
+            continue
+
+        changed = False
+        new_related = []
+        for item in related:
+            if isinstance(item, str):
+                item_clean = item.replace("\\", "/").strip()
+                if item_clean == old_rel:
+                    item = new_rel
+                    changed = True
+            elif isinstance(item, dict) and "path" in item:
+                item_path_clean = str(item["path"]).replace("\\", "/").strip()
+                if item_path_clean == old_rel:
+                    item["path"] = new_rel
+                    changed = True
+            new_related.append(item)
+
+        if changed:
+            fm_data["related"] = new_related
+            updated_count += 1
+
+            note_type = fm_data.get("type")
+            title = fm_data.get("title")
+            description = fm_data.get("description")
+            timestamp = fm_data.get("timestamp")
+
+            if isinstance(timestamp, str):
+                try:
+                    timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+
+            new_fm = _format_frontmatter(fm_data, note_type, title, description, timestamp)
+            healed = re.sub(
+                r"^---.*?\n---\n?",
+                new_fm + "\n",
+                content,
+                count=1,
+                flags=re.DOTALL,
+            )
+
+            changes_log.append(f"  {rel}: updated related path '{old_rel}' -> '{new_rel}'")
+            if not dry_run:
+                create_backup(filepath)
+                atomic_write(filepath, healed)
+
+    return updated_count, changes_log

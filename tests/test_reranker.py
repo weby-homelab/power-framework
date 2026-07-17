@@ -13,7 +13,7 @@ class TestRerankerManager:
     def test_rerank_returns_scores(self):
         manager = RerankerManager()
         mock_model = MagicMock()
-        mock_model.predict.return_value = [0.9, 0.3, 0.7]
+        mock_model.rerank.return_value = [0.9, 0.3, 0.7]
         manager._model = mock_model
 
         scores = manager.rerank("test query", ["doc1", "doc2", "doc3"])
@@ -23,7 +23,7 @@ class TestRerankerManager:
     def test_rerank_orders_by_relevance(self):
         manager = RerankerManager()
         mock_model = MagicMock()
-        mock_model.predict.return_value = [0.3, 0.9, 0.7]
+        mock_model.rerank.return_value = [0.3, 0.9, 0.7]
         manager._model = mock_model
 
         scores = manager.rerank("test query", ["doc1", "doc2", "doc3"])
@@ -33,7 +33,7 @@ class TestRerankerManager:
     def test_rerank_single_document(self):
         manager = RerankerManager()
         mock_model = MagicMock()
-        mock_model.predict.return_value = [0.85]
+        mock_model.rerank.return_value = [0.85]
         manager._model = mock_model
 
         scores = manager.rerank("test query", ["single doc"])
@@ -43,7 +43,7 @@ class TestRerankerManager:
     def test_rerank_empty_documents(self):
         manager = RerankerManager()
         mock_model = MagicMock()
-        mock_model.predict.return_value = []
+        mock_model.rerank.return_value = []
         manager._model = mock_model
 
         scores = manager.rerank("test query", [])
@@ -53,11 +53,11 @@ class TestRerankerManager:
         manager = RerankerManager()
         assert manager._model is None
 
-    def test_rerank_calls_predict_with_pairs(self):
+    def test_rerank_calls_model_rerank_with_args(self):
         manager = RerankerManager()
         mock_model = MagicMock()
-        mock_model.predict.return_value = [0.5, 0.8]
+        mock_model.rerank.return_value = [0.5, 0.8]
         manager._model = mock_model
 
         manager.rerank("query", ["doc a", "doc b"])
-        mock_model.predict.assert_called_once_with([("query", "doc a"), ("query", "doc b")])
+        mock_model.rerank.assert_called_once_with("query", ["doc a", "doc b"])
