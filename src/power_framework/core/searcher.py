@@ -202,6 +202,13 @@ def _init_db(conn: sqlite3.Connection) -> None:
             mtime REAL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tf_vectors (
+            rel_path TEXT PRIMARY KEY,
+            tf_data TEXT,
+            mtime REAL
+        )
+    """)
     conn.commit()
 
 
@@ -248,6 +255,9 @@ def _sync_vault_to_db(
         cursor.executemany(
             "DELETE FROM chunk_embeddings WHERE rel_path = ?", [(r,) for r in to_delete]
         )
+        cursor.executemany(
+            "DELETE FROM tf_vectors WHERE rel_path = ?", [(r,) for r in to_delete]
+        )
 
     embedder = get_embedding_manager() if sync_embeddings else None
     logger.info(
@@ -288,6 +298,23 @@ def _sync_vault_to_db(
                 cursor.execute(
                     "INSERT OR REPLACE INTO file_metadata (rel_path, mtime) VALUES (?, ?)",
                     (rel_path, mtime),
+                )
+
+                # Save pre-computed TF-vector to database
+                import json
+                full_text = " ".join(
+                    [
+                        metadata.title,
+                        " ".join(metadata.tags),
+                        metadata.description,
+                        content,
+                    ]
+                )
+                tokens = _tokenize(full_text)
+                tf_vec = _compute_tf_vector(tokens)
+                cursor.execute(
+                    "INSERT OR REPLACE INTO tf_vectors (rel_path, tf_data, mtime) VALUES (?, ?, ?)",
+                    (rel_path, json.dumps(tf_vec), mtime),
                 )
 
                 if sync_embeddings and embedder is not None:
@@ -371,7 +398,6 @@ def _fts_search(
         conn.execute("PRAGMA busy_timeout=30000")
         conn.execute("PRAGMA journal_mode=WAL")
         _init_db(conn)
-        _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
 
         cursor = conn.cursor()
         cursor.execute(
@@ -453,57 +479,64 @@ def _vector_search(
     """
     Search vault notes using TF vector cosine similarity.
 
-    Computes a term-frequency vector for the query and each document,
-    then ranks by cosine similarity.  Pure-Python, no external deps.
+    Loads pre-computed term-frequency vectors from SQLite,
+    then ranks by cosine similarity.
     """
     query_tokens = _tokenize(query)
     if not query_tokens:
         return []
 
     query_vec = _compute_tf_vector(query_tokens)
+    db_path = get_cache_dir() / "power_search.db"
+
+    import json
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=30)
+        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        _init_db(conn)
+        
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT t.rel_path, t.tf_data, f.title, f.description, f.note_type, f.tags, f.content
+            FROM tf_vectors t
+            JOIN fts_notes f ON t.rel_path = f.rel_path
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception:
+        return []
+
     scored: list[tuple[float, SearchResult]] = []
 
-    for filepath in vault_dir.rglob("*.md"):
-        if filepath.name in ("index.md", "log.md", "_index.md"):
-            continue
-        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
-            continue
-
+    for rel_path, tf_data_str, title, description, note_type, tags_str, content in rows:
         try:
-            content = read_file_content(filepath)
-            metadata = validate_metadata(content)
-            if metadata is None:
+            filepath = vault_dir / rel_path
+            if not filepath.is_file():
+                continue
+            if should_skip(vault_dir, rel_path):
                 continue
 
-            full_text = " ".join(
-                [
-                    metadata.title,
-                    " ".join(metadata.tags),
-                    metadata.description,
-                    content,
-                ]
-            )
-            doc_tokens = _tokenize(full_text)
-            doc_vec = _compute_tf_vector(doc_tokens)
+            doc_vec = json.loads(tf_data_str)
             similarity = _cosine_similarity(query_vec, doc_vec)
 
             if similarity == 0:
                 continue
 
-            rel_path = str(filepath.relative_to(vault_dir))
+            tags = tags_str.split(" ") if tags_str else []
             snippet = _make_snippet(content, query_tokens)
             scored.append(
                 (
                     similarity,
                     SearchResult(
                         rel_path=rel_path,
-                        title=metadata.title,
-                        description=metadata.description,
-                        note_type=metadata.type,
+                        title=title,
+                        description=description,
+                        note_type=note_type,
                         score=similarity,
                         snippet=snippet,
                         match_count=len(query_tokens),
-                        tags=metadata.tags,
+                        tags=tags,
                     ),
                 )
             )
@@ -575,7 +608,6 @@ def _semantic_search(
         conn.execute("PRAGMA busy_timeout=30000")
         conn.execute("PRAGMA journal_mode=WAL")
         _init_db(conn)
-        _sync_vault_to_db(vault_dir, conn, sync_embeddings=True)
 
         cursor = conn.cursor()
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
@@ -668,42 +700,66 @@ def search_vault(
     Returns:
         List of SearchResult sorted by relevance (highest first).
     """
-    if not query or not query.strip():
-        return []
-
-    vault_dir = Path(vault_dir).resolve()
-    if not vault_dir.is_dir():
-        return []
-
-    mode = mode.lower()
+    # 1. Run DB synchronization exactly once per search session
+    db_path = get_cache_dir() / "power_search.db"
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=30)
+        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        _init_db(conn)
+        sync_emb = (mode in ("semantic", "hybrid_reranked"))
+        _sync_vault_to_db(vault_dir, conn, sync_embeddings=sync_emb)
+        conn.close()
+    except Exception as e:
+        logger.warning("Session-level DB sync failed: %s", e)
 
     expander = QueryExpander()
     variants = expander.expand(query)
 
-    all_results: list[list[SearchResult]] = []
+    if mode == "hybrid":
+        fts_all: list[SearchResult] = []
+        vec_all: list[SearchResult] = []
+        for variant in variants:
+            fts_all.extend(_fts_search(vault_dir, variant, max_results=max_results * 2))
+            vec_all.extend(_vector_search(vault_dir, variant, max_results=max_results * 2))
+
+        # Deduplicate FTS by rel_path (keeping max score) and sort
+        fts_map: dict[str, SearchResult] = {}
+        for r in fts_all:
+            if r.rel_path not in fts_map or r.score > fts_map[r.rel_path].score:
+                fts_map[r.rel_path] = r
+        fts_dedup = sorted(fts_map.values(), key=lambda x: -x.score)
+
+        # Deduplicate Vector by rel_path (keeping max score) and sort
+        vec_map: dict[str, SearchResult] = {}
+        for r in vec_all:
+            if r.rel_path not in vec_map or r.score > vec_map[r.rel_path].score:
+                vec_map[r.rel_path] = r
+        vec_dedup = sorted(vec_map.values(), key=lambda x: -x.score)
+
+        # Single RRF fusion at the end
+        return _rrf_merge(fts_dedup, vec_dedup)[:max_results]
+
+    # For non-hybrid modes, gather results, dedup by rel_path keeping max score, and sort
+    all_results: list[SearchResult] = []
     for variant in variants:
         if mode == "vector":
             results = _vector_search(vault_dir, variant, max_results=max_results)
         elif mode == "semantic":
             results = _semantic_search(vault_dir, variant, max_results=max_results)
-        elif mode == "hybrid":
-            fts = _fts_search(vault_dir, variant, max_results=max_results * 2)
-            vec = _vector_search(vault_dir, variant, max_results=max_results * 2)
-            results = _rrf_merge(fts, vec)
         elif mode == "hybrid_reranked":
             results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
         else:
             results = _fts_search(vault_dir, variant, max_results=max_results)
-        all_results.append(results)
+        all_results.extend(results)
 
-    if not all_results:
-        return []
+    res_map: dict[str, SearchResult] = {}
+    for r in all_results:
+        if r.rel_path not in res_map or r.score > res_map[r.rel_path].score:
+            res_map[r.rel_path] = r
 
-    merged = all_results[0]
-    for next_results in all_results[1:]:
-        merged = _rrf_merge(merged, next_results)
-
-    return merged[:max_results]
+    final_results = sorted(res_map.values(), key=lambda x: (-x.score, x.title))
+    return final_results[:max_results]
 
 
 def _hybrid_reranked_search(

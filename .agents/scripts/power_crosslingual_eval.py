@@ -12,7 +12,7 @@ import math
 from pathlib import Path
 
 VAULT_PATH = "/root/geminicli/brain"
-MODES = ["fts", "vector", "hybrid"]
+MODES = ["fts", "vector", "hybrid", "semantic", "hybrid_reranked"]
 K_VALUES = [1, 3, 5, 10]
 
 # ─── Cross-lingual Test Dataset ──────────────────────────────────────────────

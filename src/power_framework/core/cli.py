@@ -375,9 +375,9 @@ def main() -> None:
     )
     p_search.add_argument(
         "--mode",
-        choices=["fts", "vector", "hybrid"],
+        choices=["fts", "vector", "hybrid", "semantic", "hybrid_reranked"],
         default="fts",
-        help='Search mode: "fts" (BM25, default), "vector" (TF cosine), "hybrid" (RRF merged)',
+        help='Search mode: "fts" (BM25, default), "vector" (TF cosine), "hybrid" (RRF merged), "semantic" (dense embedding), "hybrid_reranked" (RRF + cross-encoder)',
     )
     p_search.set_defaults(func=_cmd_search)
 

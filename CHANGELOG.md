@@ -5,6 +5,17 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-07-17
+
+### Added
+
+- **TF-Vector Caching**: Added `tf_vectors` table in SQLite to cache pre-computed sparse TF-vectors of notes. This accelerates vector search to sub-10ms and eliminates disk I/O of reading and tokenizing all files during search.
+
+### Fixed
+
+- **Query Expansion RRF Fusion Bug**: Redesigned `search_vault` to run database sync exactly once per search session and merge query expansion results in a single-pass RRF fusion, resolving the bug where highly-relevant results were demoted (RRF TC-11).
+- **SQLite Latency Spikes**: Decoupled database sync from individual searches. DB sync now runs once globally at the start of search session, preventing redundant disk scans.
+
 ## [2.0.5] - 2026-07-17
 
 ### Documentation
