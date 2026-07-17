@@ -167,6 +167,7 @@ def _init_db(conn: sqlite3.Connection) -> None:
     """Initialize the SQLite database schema."""
     # WAL + busy timeout prevent "database is locked" under parallel embedding.
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA auto_vacuum=INCREMENTAL")
     conn.execute("PRAGMA busy_timeout=30000")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("""
@@ -364,6 +365,11 @@ def _sync_vault_to_db(
                 continue
 
     conn.commit()
+    if to_delete:
+        try:
+            conn.execute("VACUUM")
+        except Exception as e:
+            logger.warning("VACUUM failed: %s", e)
 
 
 def _fts_search(

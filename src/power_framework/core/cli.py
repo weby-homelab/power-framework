@@ -262,6 +262,52 @@ def _cmd_heal(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_rename(args: argparse.Namespace) -> int:
+    """Rename a vault note and update related paths in other notes."""
+    vault_dir = _resolve_path(args.path)
+    if not vault_dir.exists():
+        logger.error("Vault not found: %s", vault_dir)
+        return 1
+
+    old_rel = args.old
+    new_rel = args.new
+    dry_run = not args.no_dry_run
+
+    old_file = vault_dir / old_rel
+    new_file = vault_dir / new_rel
+
+    if not old_file.exists() or not old_file.is_file():
+        logger.error("Source note not found: %s", old_file)
+        return 1
+
+    # 1. Rename physically if not dry run
+    if not dry_run:
+        new_file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            import os
+            os.rename(old_file, new_file)
+            logger.info("Physically renamed %s to %s", old_rel, new_rel)
+        except Exception as e:
+            logger.error("Failed to rename file physically: %s", e)
+            return 1
+    else:
+        logger.info("[DRY RUN] Would rename %s to %s", old_rel, new_rel)
+
+    # 2. Propagate rename references
+    from .healer import propagate_rename
+    updated_count, logs = propagate_rename(vault_dir, old_rel, new_rel, dry_run=dry_run)
+
+    if logs:
+        logger.info("Updated references:")
+        for log in logs:
+            logger.info(log)
+    else:
+        logger.info("No other notes reference this path.")
+
+    logger.info("Rename process completed. Updated notes: %d", updated_count)
+    return 0
+
+
 def _cmd_markdown_check(args: argparse.Namespace) -> int:
     """Check markdown quality (trailing whitespace, list markers, header jumps, code language)."""
     vault_dir = _resolve_path(args.path)
@@ -460,6 +506,21 @@ def main() -> None:
         help="Max suggestions (default: 5)",
     )
     p_suggest.set_defaults(func=_cmd_suggest_related)
+
+    p_rename = subparsers.add_parser(
+        "rename",
+        help="Rename a vault note and update related paths in other notes",
+    )
+    p_rename.add_argument("path", help="Path to the vault directory")
+    p_rename.add_argument("--old", required=True, help="Old relative path of the note")
+    p_rename.add_argument("--new", required=True, help="New relative path of the note")
+    p_rename.add_argument(
+        "--no-dry-run",
+        action="store_true",
+        default=False,
+        help="Actually apply changes (default: dry run)",
+    )
+    p_rename.set_defaults(func=_cmd_rename)
 
     args = parser.parse_args()
 
