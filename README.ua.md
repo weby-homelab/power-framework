@@ -42,6 +42,47 @@ power heal ~/my-vault      # Автовиправлення відсутньог
 power markdown-check ~/my-vault  # Перевірка якості Markdown
 ```
 
+## Розробницька установка (editable + легке оновлення)
+
+Для **постійного, завжди оновлюваного** CLI на робочій станції (WS) встановіть
+у _editable_ режимі з локальної копії. Це прив'язує `power` до репо, тож зміни
+коду набирають чинності одразу — перевстановлення не потрібне.
+
+```bash
+# 1. Клонуйте одного разу
+git clone https://github.com/weby-homelab/power-framework.git /tmp/power-framework
+cd /tmp/power-framework
+
+# 2. Editable-встановлення у user-site (переживає reboot, без venv)
+pip install --user --break-system-packages -e ".[dev]"
+
+# 3. Перевірка — `power` тепер у PATH (через ~/.local/bin)
+power --version
+```
+
+Оновити до останнього коду будь-коли:
+
+```bash
+cd /tmp/power-framework && git pull origin main && power --version
+# Якщо змінився pyproject.toml (нові залежності/версія) — перевстановіть:
+pip install --user --break-system-packages -e ".[dev]"
+```
+
+> 💡 **Оновлювач в один рядок.** Збережіть це як `/root/.local/bin/power-update`,
+> зробіть `chmod +x`, і просто запускайте `power-update` для авто-pull + reinstall:
+>
+> ```bash
+> #!/usr/bin/env bash
+> set -euo pipefail
+> REPO="/tmp/power-framework"
+> cd "$REPO"
+> git fetch origin main && git reset --hard origin/main
+> if git diff --name-only HEAD@{1} HEAD | grep -q pyproject.toml; then
+>   pip install --user --break-system-packages -e ".[dev]" >/dev/null 2>&1
+> fi
+> power --version
+> ```
+
 ## Що всередині
 
 | Функція                         | Що робить                                                                                                                                                                                                                                                                                                                                                                                                                   |

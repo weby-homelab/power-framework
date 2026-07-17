@@ -42,6 +42,47 @@ power heal ~/my-vault          # Auto-fix missing/invalid frontmatter
 power markdown-check ~/my-vault  # Check markdown quality issues
 ```
 
+## Development Install (editable + easy update)
+
+For a **permanent, always-updatable** CLI on your workstation (WS), install in
+_editable_ mode from a local clone. This binds `power` to the repo so code
+changes take effect immediately — no reinstall needed.
+
+```bash
+# 1. Clone once
+git clone https://github.com/weby-homelab/power-framework.git /tmp/power-framework
+cd /tmp/power-framework
+
+# 2. Editable install into user-site (survives reboots, no venv required)
+pip install --user --break-system-packages -e ".[dev]"
+
+# 3. Verify — `power` is now on PATH (via ~/.local/bin)
+power --version
+```
+
+Update to the latest code anytime with:
+
+```bash
+cd /tmp/power-framework && git pull origin main && power --version
+# If pyproject.toml changed (new deps/version), reinstall:
+pip install --user --break-system-packages -e ".[dev]"
+```
+
+> 💡 **One-liner updater.** Save this as `/root/.local/bin/power-update` and
+> `chmod +x` it, then just run `power-update` to pull + reinstall automatically:
+>
+> ```bash
+> #!/usr/bin/env bash
+> set -euo pipefail
+> REPO="/tmp/power-framework"
+> cd "$REPO"
+> git fetch origin main && git reset --hard origin/main
+> if git diff --name-only HEAD@{1} HEAD | grep -q pyproject.toml; then
+>   pip install --user --break-system-packages -e ".[dev]" >/dev/null 2>&1
+> fi
+> power --version
+> ```
+
 ## What's Inside
 
 | Feature                         | What it does                                                                                                                                                                                                                                                                                                                                                                                                                   |
