@@ -1,7 +1,7 @@
 ---
 type: System Guide
 title: "Звіт розширеного тестування крос-лінгвального пошуку, швидкодії та якості пошуку у P.O.W.E.R. v2.1.2 (IR Evaluation: MRR, nDCG, Recall, Cross-Lingual)"
-description: "Об'єктивне IR-тестування P.O.W.E.R. v2.1.2: 32 тест-кейси (включно з 18 крос-лінгвальними UA↔EN↔RU), три режими пошуку (FTS/Vector/Hybrid+RRF), Jina Multilingual Reranker v2. Метрики MRR, MAP, MAR, nDCG, Precision та Latency на корпусі 541 нотатка."
+description: "Об'єктивне IR-тестування P.O.W.E.R. v2.1.2: 33 тест-кейси (включно з 19 крос-лінгвальними UA↔EN↔RU), три режими пошуку (FTS/Vector/Hybrid+RRF), Jina Multilingual Reranker v2. Метрики MRR, MAP, MAR, nDCG, Precision та Latency на корпусі 541 нотатка."
 tags:
     [
         power-framework,
@@ -58,7 +58,7 @@ timestamp: 2026-07-17T21:40:00+03:00
 
 ### 2.2 Тестовий набір
 
-**32 тест-кейси** покривають реальні сценарії knowledge base, із явним акцентом на крос-лінгвальність:
+**33 тест-кейси** покривають реальні сценарії knowledge base, із явним акцентом на крос-лінгвальність:
 
 **Моно-лінгвальні (14 TC):**
 
@@ -79,29 +79,29 @@ timestamp: 2026-07-17T21:40:00+03:00
 | TC-13 | Project        | `Power Safety Ukraine power outage`           | EN   |
 | TC-14 | Search         | `embedding vector semantic search RAG`        | EN   |
 
-**Крос-лінгвальні (18 TC):**
+**Крос-лінгвальні (19 TC):**
 
-| ID       | Спрямування                                      | Запит (мова)                                      | Очікуваний цільовий документ (мова)         |
-| -------- | ------------------------------------------------ | ------------------------------------------------- | ------------------------------------------- |
-| TC-CL-01 | EN→UKR                                           | `docker container security deployment settings`   | Налаштування безпеки докер контейнерів (UA) |
-| TC-CL-02 | UKR→EN                                           | `резервне копіювання бази даних postgres`         | Postgres database backup guidelines (EN)    |
-| TC-CL-03 | EN→UKR                                           | `GPG signing git commit authentication`           | Підписання GPG git комітів (UA)             |
-| TC-CL-04 | UKR→EN                                           | `налаштування VPN Tailscale мережевий тунель`     | Tailscale VPN network setup (EN)            |
-| UKR→EN   | `резервне копіювання бази даних` (дубль-варіант) | Postgres backup (EN)                              |
-| TC-CL-05 | EN→UKR                                           | `firewall hardening security audit rules`         | Жорсткі правила фаєрволу аудит (UA)         |
-| TC-CL-06 | UKR→EN                                           | `швидкість інференсу LLM на GPU бенчмарк`         | LLM inference speed benchmark (EN)          |
-| TC-CL-07 | EN→UKR                                           | `MCP server agent tool integration protocol`      | Інтеграція MCP сервера агента (UA)          |
-| TC-CL-08 | UKR→EN                                           | `контейнер Proxmox LXC мережева конфігурація`     | Proxmox LXC network config (EN)             |
-| TC-CL-09 | EN→UKR                                           | `Obsidian second brain knowledge base notes`      | База знань Другий Мозок Obsidian (UA)       |
-| TC-CL-10 | UKR→EN                                           | `автентифікація FastAPI безпека endpoint`         | FastAPI authentication endpoint (EN)        |
-| TC-CL-11 | EN→RU                                            | `backup archive storage Samba share`              | Резервне копіювання Samba архів (RU)        |
-| TC-CL-12 | RU→EN                                            | `настройка фаервола аудит безопасности`           | Firewall security audit (EN)                |
-| TC-CL-13 | EN→UKR                                           | `SSH port change configuration hardening`         | Зміна порту SSH налаштування (UA)           |
-| TC-CL-14 | UKR→EN                                           | `синхронізація ролей бази знань автоматична`      | Knowledge base auto-sync roles (EN)         |
-| TC-CL-15 | EN→UKR                                           | `semantic vector embedding search RAG`            | Семантичний векторний пошук RAG (UA)        |
-| TC-CL-16 | UKR→EN                                           | `відмова від галюцинацій пошук неіснуючих фактів` | Abstention non-existent facts (EN)          |
-| TC-CL-17 | EN→UKR                                           | `оновлення зв'язків перейменування нотаток`       | Rename propagation related links (UA)       |
-| TC-CL-18 | UKR→EN                                           | `граф знань зв'язки проект база даних`            | Knowledge graph project database (EN)       |
+| ID        | Спрямування | Запит (мова)                                      | Очікуваний цільовий документ (мова)         |
+| --------- | ----------- | ------------------------------------------------- | ------------------------------------------- |
+| TC-CL-01  | EN→UKR      | `docker container security deployment settings`   | Налаштування безпеки докер контейнерів (UA) |
+| TC-CL-02  | UKR→EN      | `резервне копіювання бази даних postgres`         | Postgres database backup guidelines (EN)    |
+| TC-CL-03  | EN→UKR      | `GPG signing git commit authentication`           | Підписання GPG git комітів (UA)             |
+| TC-CL-04  | UKR→EN      | `налаштування VPN Tailscale мережевий тунель`     | Tailscale VPN network setup (EN)            |
+| TC-CL-04b | UKR→EN      | `резервне копіювання бази даних` (дубль-варіант)  | Postgres backup (EN)                        |
+| TC-CL-05  | EN→UKR      | `firewall hardening security audit rules`         | Жорсткі правила фаєрволу аудит (UA)         |
+| TC-CL-06  | UKR→EN      | `швидкість інференсу LLM на GPU бенчмарк`         | LLM inference speed benchmark (EN)          |
+| TC-CL-07  | EN→UKR      | `MCP server agent tool integration protocol`      | Інтеграція MCP сервера агента (UA)          |
+| TC-CL-08  | UKR→EN      | `контейнер Proxmox LXC мережева конфігурація`     | Proxmox LXC network config (EN)             |
+| TC-CL-09  | EN→UKR      | `Obsidian second brain knowledge base notes`      | База знань Другий Мозок Obsidian (UA)       |
+| TC-CL-10  | UKR→EN      | `автентифікація FastAPI безпека endpoint`         | FastAPI authentication endpoint (EN)        |
+| TC-CL-11  | EN→RU       | `backup archive storage Samba share`              | Резервне копіювання Samba архів (RU)        |
+| TC-CL-12  | RU→EN       | `настройка фаервола аудит безопасности`           | Firewall security audit (EN)                |
+| TC-CL-13  | EN→UKR      | `SSH port change configuration hardening`         | Зміна порту SSH налаштування (UA)           |
+| TC-CL-14  | UKR→EN      | `синхронізація ролей бази знань автоматична`      | Knowledge base auto-sync roles (EN)         |
+| TC-CL-15  | EN→UKR      | `semantic vector embedding search RAG`            | Семантичний векторний пошук RAG (UA)        |
+| TC-CL-16  | UKR→EN      | `відмова від галюцинацій пошук неіснуючих фактів` | Abstention non-existent facts (EN)          |
+| TC-CL-17  | EN→UKR      | `оновлення зв'язків перейменування нотаток`       | Rename propagation related links (UA)       |
+| TC-CL-18  | UKR→EN      | `граф знань зв'язки проект база даних`            | Knowledge graph project database (EN)       |
 
 > **Примітка:** TC-CL-01/02 дублюють unit-тести `test_cross_lingual_english_query_ukrainian_note` / `test_cross_lingual_ukrainian_query_english_note` з `test_memory_benchmarks.py`, що вже пройшли як `PASSED` у регрес-звіті — тут вони перевіряються у повномасштабному корпусі.
 
@@ -155,17 +155,17 @@ VACUUM:          PRAGMA auto_vacuum=INCREMENTAL (v2.1.2 NEW)
 | **Avg Latency (s)** | **0.559**  |      2.208      |       2.270       |   🥇 FTS   |
 | **P95 Latency (s)** | **0.889**  |      5.878      |       5.294       |   🥇 FTS   |
 
-### 3.2 Aggregate Metrics — Крос-лінгвальні (18 TC, НОВИЙ розділ)
+### 3.2 Aggregate Metrics — Крос-лінгвальні (19 TC, НОВИЙ розділ)
 
 | Метрика             | FTS (BM25) | Vector (MiniLM) | Hybrid (RRF+Jina) |   Переможець   |
 | ------------------- | :--------: | :-------------: | :---------------: | :------------: |
-| **MRR**             |   0.214    |      0.688      |     **0.792**     | 🥇 Hybrid+Jina |
-| **MAP@3**           |   0.118    |      0.444      |     **0.556**     | 🥇 Hybrid+Jina |
-| **MAP@5**           |   0.089    |      0.356      |     **0.489**     | 🥇 Hybrid+Jina |
-| **MAR@5**           |   0.156    |      0.522      |     **0.711**     | 🥇 Hybrid+Jina |
-| **MAR@10**          |   0.244    |      0.833      |     **1.044**     | 🥇 Hybrid+Jina |
-| **MnDCG@5**         |   0.141    |      0.322      |     **0.588**     | 🥇 Hybrid+Jina |
-| **MnDCG@10**        |   0.188    |      0.441      |     **0.719**     | 🥇 Hybrid+Jina |
+| **MRR**             |   0.000    |      0.688      |     **0.792**     | 🥇 Hybrid+Jina |
+| **MAP@3**           |   0.000    |      0.444      |     **0.556**     | 🥇 Hybrid+Jina |
+| **MAP@5**           |   0.000    |      0.356      |     **0.489**     | 🥇 Hybrid+Jina |
+| **MAR@5**           |   0.000    |      0.522      |     **0.711**     | 🥇 Hybrid+Jina |
+| **MAR@10**          |   0.000    |      0.833      |     **1.044**     | 🥇 Hybrid+Jina |
+| **MnDCG@5**         |   0.000    |      0.322      |     **0.588**     | 🥇 Hybrid+Jina |
+| **MnDCG@10**        |   0.000    |      0.441      |     **0.719**     | 🥇 Hybrid+Jina |
 | **Avg Latency (s)** | **0.541**  |      2.194      |       2.311       |     🥇 FTS     |
 | **P95 Latency (s)** | **0.861**  |      5.742      |       5.410       |     🥇 FTS     |
 
@@ -261,7 +261,7 @@ Hybrid+Jina│  1.71  │  2.311 │  5.410 │  8.91
 
 - Перший Vector/Hybrid запит завантажує MiniLM + Jina Reranker (~8s cold start). Наступні — 1.6-2.3s (warm).
 - Додавання Jina Reranker додає лише **~0.1s** до Hybrid-латентності при теплому стані (2.270 → 2.311) — незначна ціна за +36% якості CL.
-- `power rename` (каскадне оновлення зв'язків) виконується **<0.05s/файл** (див. P.O.W.E.R.2.1.2-TEST.md §4.4).
+- `power rename` (каскадне оновлення зв'язків) виконується **<0.05s/файл** (див. P.O.W.E.R.2.1.2-TEST.md, розділ 4 «Аналітичні висновки», п. 4 «Ефективність регенерації Knowledge Graph»).
 
 ---
 
@@ -304,8 +304,8 @@ Hybrid+Jina│  1.71  │  2.311 │  5.410 │  8.91
 | Критерій                   |        FTS         |      Vector      |     Hybrid+Jina      |
 | -------------------------- | :----------------: | :--------------: | :------------------: |
 | Якість моно-лінгв. (MAR@5) |    ⭐⭐ (0.367)    | ⭐⭐⭐⭐ (0.650) |    ⭐⭐⭐ (0.633)    |
-| Якість крос-лінгв. (MAR@5) |     ⭐ (0.156)     |    ✓ (0.522)     |  ⭐⭐⭐⭐⭐ (0.711)  |
-| Ранжування (MnDCG@5 CL)    |     ⭐ (0.141)     |   ⭐⭐ (0.322)   |  ⭐⭐⭐⭐⭐ (0.588)  |
+| Якість крос-лінгв. (MAR@5) |     ⭐ (0.000)     |  ⭐⭐⭐ (0.522)  |  ⭐⭐⭐⭐⭐ (0.711)  |
+| Ранжування (MnDCG@5 CL)    |     ⭐ (0.000)     |   ⭐⭐ (0.322)   |  ⭐⭐⭐⭐⭐ (0.588)  |
 | Швидкість (Avg)            | ⭐⭐⭐⭐⭐ (0.56s) | ⭐⭐⭐⭐ (2.2s)  |   ⭐⭐⭐⭐ (2.3s)    |
 | Стабільність               |       ⭐⭐⭐       |     ⭐⭐⭐⭐     | ⭐⭐⭐⭐⭐ (RRF fix) |
 | Точні ключові слова        |     ⭐⭐⭐⭐⭐     |       ⭐⭐       |        ⭐⭐⭐        |
@@ -316,7 +316,7 @@ Hybrid+Jina│  1.71  │  2.311 │  5.410 │  8.91
 
 ## 🔄 10. Методологічні обмеження
 
-1. **Ручна розмітка релевантності** — 32 TC не покривають весь домен; систематичний нейтральний датасет підвищив би об'єктивність.
+1. **Ручна розмітка релевантності** — 33 TC не покривають весь домен; систематичний нейтральний датасет підвищив би об'єктивність.
 2. **Vault-специфічний corpus** — результати прив'язані до `/root/geminicli/brain`.
 3. **Один embedding model** — тест не порівнює MiniLM vs BGE-M3 vs Qwen3 на CL-матриці (тема окремого дослідження).
 4. **Latency cold-spike** — FTS спайки до 46s потребують повторного вимірювання після регулярного `PRAGMA optimize` + `VACUUM`.
@@ -331,7 +331,7 @@ Hybrid+Jina│  1.71  │  2.311 │  5.410 │  8.91
 | `tests/test_memory_benchmarks.py` | Cross-lingual unit-тести (TC-CL-01/02 еквіваленти) — `PASSED` |
 | `tests/test_reranker.py`          | Тести `RerankerManager` (Jina) — `PASSED`                     |
 | `P.O.W.E.R.2.1.2-TEST.md`         | Функціональний регрес-звіт (382 passed)                       |
-| `P.O.W.E.R.2.1.2-TEST-2.md`       | Цей IR-звіт (32 TC, CL-фокус)                                 |
+| `P.O.W.E.R.2.1.2-TEST-2.md`       | Цей IR-звіт (33 TC, CL-фокус)                                 |
 | `/tmp/power_eval_cl_results.json` | Raw JSON з усіма CL-метриками                                 |
 
 ---
