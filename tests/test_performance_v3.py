@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from power_framework.core.searcher import (
-    _init_db,
-    _vector_search,
     search_vault,
 )
 from power_framework.core.utils import get_cache_dir
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_tf_vectors_caching(sample_vault: Path):
@@ -23,7 +24,7 @@ def test_tf_vectors_caching(sample_vault: Path):
     db_path = get_cache_dir() / "power_search.db"
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT count(*) FROM tf_vectors")
     count = cursor.fetchone()[0]
     assert count > 0
@@ -44,7 +45,7 @@ def test_query_expansion_deduplication(sample_vault: Path):
     """Verify that Query Expansion fusion returns unique results without duplicate paths."""
     # Mode = hybrid which triggers Query Expansion with variants
     results = search_vault(sample_vault, "deploy docker container", mode="hybrid")
-    
+
     # Ensure there are no duplicate rel_paths
     seen_paths = set()
     for r in results:

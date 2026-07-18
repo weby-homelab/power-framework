@@ -11,6 +11,7 @@ Auto-heals missing or invalid OKF frontmatter fields:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from datetime import datetime, timezone
@@ -313,7 +314,8 @@ def propagate_rename(
 
         try:
             content = read_file_content(filepath)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Skipping unreadable note %s: %s", filepath, exc)
             continue
 
         raw_fm = extract_frontmatter_raw(content)
@@ -353,10 +355,8 @@ def propagate_rename(
             timestamp = fm_data.get("timestamp")
 
             if isinstance(timestamp, str):
-                try:
+                with contextlib.suppress(ValueError):
                     timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                except ValueError:
-                    pass
 
             new_fm = _format_frontmatter(fm_data, note_type, title, description, timestamp)
             healed = re.sub(

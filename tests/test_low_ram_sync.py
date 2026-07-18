@@ -10,11 +10,12 @@ i5-5200U). After the fix, embeddings are produced in batches via
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from power_framework.core import searcher
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 # searcher imports get_embedding_manager directly, so patch it there.
