@@ -5,6 +5,35 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-07-18
+
+### Fixed
+
+- **Critical silent failure in dense/hybrid search modes (BUG-01)**: passing a
+  string `vault_dir` (as the CLI, tests, FastAPI and MCP integrations do)
+  crashed `vector`, `semantic` and `hybrid_reranked` modes via
+  `TypeError: unsupported operand type(s) for /: 'str' and 'str'`. The error was
+  swallowed by a per-row `try/except`, so the modes returned **0 results with no
+  error**. `search_vault` now coerces `vault_dir` to a resolved `Path` on entry.
+- **Reranker reloaded on every query (BUG-03)**: `_hybrid_reranked_search`
+  instantiated a fresh `RerankerManager` per call, re-loading the cross-encoder
+  model (up to 40 s first call). The model is now cached as a module-level
+  singleton (`_get_reranker()`), so only the first call pays the load cost.
+- **Semantic single-query latency spikes (BUG-04)**: `FastEmbedManager.embed()`
+  used fastembed's default `parallel=0`, spawning ONNX subprocess pools on every
+  call (intermittent 10–30 s latency). It now bounds `parallel` to
+  `POWER_EMBED_NUM_THREADS`, dropping warm latency to ~2 s.
+- **Pre-existing CI blockers**: fixed Ruff (S112/SIM105/TC003/PT022) and MyPy
+  strict errors (healer/reranker/searcher type annotations) that prevented the
+  required lint/type checks from passing.
+
+### Added
+
+- **IR benchmark report** `docs/tests/P.O.W.E.R.2.2.1-TEST.md`: comparative
+  evaluation of all 5 search modes (fts/vector/hybrid/semantic/hybrid_reranked)
+  on the real vault (565 `.md` files). Key results: FTS MRR=0.889, hybrid
+  MRR=0.792, semantic MRR=0.096, hybrid_reranked MRR=0.286.
+
 ## [2.2.1] - 2026-07-18
 
 ### Fixed
