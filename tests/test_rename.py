@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from power_framework.core.cli import main
 from power_framework.core.healer import propagate_rename
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from power_framework.core.parser import read_file_content
 
 
@@ -20,8 +23,8 @@ def test_propagate_rename_dry_run(tmp_path: Path):
     note_a.write_text(
         "---\n"
         "type: Project\n"
-        "title: \"Note A\"\n"
-        "description: \"A test note\"\n"
+        'title: "Note A"\n'
+        'description: "A test note"\n'
         "related: [02_Areas/NoteB.md]\n"
         "timestamp: 2026-07-17T12:00:00Z\n"
         "---\n"
@@ -36,7 +39,7 @@ def test_propagate_rename_dry_run(tmp_path: Path):
     assert updated_count == 1
     assert len(logs) == 1
     assert "NoteA.md" in logs[0]
-    
+
     # Read NoteA again and verify it hasn't changed on disk
     content = read_file_content(note_a)
     assert "02_Areas/NoteB.md" in content
@@ -50,8 +53,8 @@ def test_propagate_rename_live(tmp_path: Path):
     note_a.write_text(
         "---\n"
         "type: Project\n"
-        "title: \"Note A\"\n"
-        "description: \"A test note\"\n"
+        'title: "Note A"\n'
+        'description: "A test note"\n'
         "related: [02_Areas/NoteB.md, {path: 02_Areas/NoteB.md, relation: depends_on}]\n"
         "timestamp: 2026-07-17T12:00:00Z\n"
         "---\n"
@@ -70,7 +73,7 @@ def test_propagate_rename_live(tmp_path: Path):
     content = read_file_content(note_a)
     assert "02_Areas/NoteB.md" not in content
     assert "02_Areas/NoteB_new.md" in content
-    assert "path: \"02_Areas/NoteB_new.md\"" in content or "02_Areas/NoteB_new.md" in content
+    assert 'path: "02_Areas/NoteB_new.md"' in content or "02_Areas/NoteB_new.md" in content
 
 
 def test_cli_rename_command(tmp_path: Path):
@@ -81,8 +84,8 @@ def test_cli_rename_command(tmp_path: Path):
     note_b.write_text(
         "---\n"
         "type: Area\n"
-        "title: \"Note B\"\n"
-        "description: \"Target note\"\n"
+        'title: "Note B"\n'
+        'description: "Target note"\n'
         "timestamp: 2026-07-17T12:00:00Z\n"
         "---\n"
         "Content of target note\n"
@@ -92,8 +95,8 @@ def test_cli_rename_command(tmp_path: Path):
     note_a.write_text(
         "---\n"
         "type: Project\n"
-        "title: \"Note A\"\n"
-        "description: \"Referencing note\"\n"
+        'title: "Note A"\n'
+        'description: "Referencing note"\n'
         "related: [02_Areas/NoteB.md]\n"
         "timestamp: 2026-07-17T12:00:00Z\n"
         "---\n"
@@ -101,43 +104,49 @@ def test_cli_rename_command(tmp_path: Path):
     )
 
     # Test Dry-Run CLI command
-    with patch.object(
-        sys,
-        "argv",
-        [
-            "power",
-            "rename",
-            str(tmp_path),
-            "--old",
-            "02_Areas/NoteB.md",
-            "--new",
-            "02_Areas/NoteB_new.md",
-        ],
-    ), pytest.raises(SystemExit) as exc:
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "rename",
+                str(tmp_path),
+                "--old",
+                "02_Areas/NoteB.md",
+                "--new",
+                "02_Areas/NoteB_new.md",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
         main()
-    
+
     assert exc.value.code == 0
     # Dry run should not rename physically
     assert note_b.exists()
     assert not (tmp_path / "02_Areas" / "NoteB_new.md").exists()
 
     # Test Live CLI command
-    with patch.object(
-        sys,
-        "argv",
-        [
-            "power",
-            "rename",
-            str(tmp_path),
-            "--old",
-            "02_Areas/NoteB.md",
-            "--new",
-            "02_Areas/NoteB_new.md",
-            "--no-dry-run",
-        ],
-    ), pytest.raises(SystemExit) as exc:
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "rename",
+                str(tmp_path),
+                "--old",
+                "02_Areas/NoteB.md",
+                "--new",
+                "02_Areas/NoteB_new.md",
+                "--no-dry-run",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
         main()
-    
+
     assert exc.value.code == 0
     # Live run should rename physically
     assert not note_b.exists()

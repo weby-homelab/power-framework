@@ -30,6 +30,20 @@ from .utils import get_cache_dir
 
 logger = logging.getLogger(__name__)
 
+# Module-level cross-encoder reranker singleton. The fastembed/qwen3 cross-encoder
+# model is expensive to load (~seconds); constructing a fresh RerankerManager per
+# query (as the old code did) reloaded the model on every call, inflating
+# hybrid_reranked latency to 5-40s per query. Caching it here keeps the model
+# resident across queries within a process.
+_reranker_singleton: RerankerManager | None = None
+
+
+def _get_reranker() -> RerankerManager:
+    global _reranker_singleton
+    if _reranker_singleton is None:
+        _reranker_singleton = RerankerManager()
+    return _reranker_singleton
+
 
 def _db_path() -> Path:
     """Resolve the search index DB path, honoring POWER_SEARCH_DB override.
@@ -300,7 +314,7 @@ def _sync_vault_to_db(
 
     # v2.2.0: collect changed files first, then embed in batches. This avoids
     # holding the embedding model AND all vectors in memory at once.
-    changed: list[tuple[str, str, object, str]] = []  # (rel_path, content, metadata, mtime)
+    changed: list[tuple[str, str, OKFMetadata, float]] = []  # (rel_path, content, metadata, mtime)
     for idx, (rel_path, mtime) in enumerate(disk_files.items()):
         if idx % 50 == 0:
             logger.info("Sync scan: %d/%d (%s)", idx, len(disk_files), rel_path)
@@ -410,7 +424,7 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
     batch_size = int(os.getenv("POWER_EMBED_BATCH_SIZE", "8"))
     commit_every = int(os.getenv("POWER_EMBED_COMMIT_EVERY", "50"))
 
-    def _embed_retry(texts: list[str], bs: int) -> list | None:
+    def _embed_retry(texts: list[str], bs: int) -> list[list[float]] | None:
         """Embed ``texts`` with adaptive halving on any allocation failure.
 
         Returns the vectors, or ``None`` if even ``batch_size=1`` cannot be
@@ -843,6 +857,11 @@ def search_vault(
     Returns:
         List of SearchResult sorted by relevance (highest first).
     """
+    # Defensive: callers (CLI, tests, external integrations) may pass a string
+    # path; downstream code uses Path operators (vault_dir / rel_path), so
+    # coerce to a resolved Path once here.
+    vault_dir = Path(vault_dir).expanduser().resolve()
+
     # 1. Background indexer (Performance Plan §1): dense-embedding synchronization
     #    (the 176s cold-start root cause) is NO LONGER done synchronously here.
     #    We still run a lightweight FTS-only sync (cheap: no model load, <1s for
@@ -948,7 +967,7 @@ def _hybrid_reranked_search(
         except Exception:
             documents.append("")
 
-    reranker = RerankerManager()
+    reranker = _get_reranker()
     reranked_scores = reranker.rerank(query, documents)
 
     for result, score in zip(rerank_pool, reranked_scores, strict=False):

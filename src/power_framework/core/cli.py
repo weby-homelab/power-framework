@@ -230,10 +230,9 @@ def _cmd_sync(args: argparse.Namespace) -> int:
 
 
 def _open_conn() -> sqlite3.Connection:
-    from .searcher import _init_db
-    from .utils import get_cache_dir
+    from .searcher import _db_path, _init_db
 
-    db_path = get_cache_dir() / "power_search.db"
+    db_path = _db_path()
     conn = sqlite3.connect(str(db_path), timeout=30)
     conn.execute("PRAGMA busy_timeout=30000")
     conn.execute("PRAGMA journal_mode=WAL")

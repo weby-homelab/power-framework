@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "2.2.1"
+version = "2.2.2"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -125,6 +125,7 @@ module = [
     "power_framework.core.embeddings",
     "power_framework.core.searcher",
     "power_framework.core.index_worker",
+    "power_framework.core.reranker",
 ]
 disable_error_code = [
     "import-not-found",

@@ -2,24 +2,18 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from fastembed.rerank.cross_encoder import TextCrossEncoder
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_RERANKER_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
 
-QWEN3_RERANKER_MODEL = os.getenv(
-    "POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX"
-)
+QWEN3_RERANKER_MODEL = os.getenv("POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX")
 
 
 class RerankerManager:
     def __init__(self, model_name: str = DEFAULT_RERANKER_MODEL) -> None:
         self.model_name = model_name
-        self._model: TextCrossEncoder | None = None
+        self._model: object | None = None
         self._use_qwen3 = os.getenv("POWER_EMBED_PROVIDER", "").lower() == "qwen3"
 
     def _lazy_init(self) -> None:
@@ -33,7 +27,7 @@ class RerankerManager:
                     "qwen3-embed is required for Qwen3 reranking. "
                     "Install it with: pip install qwen3-embed"
                 ) from None
-            self._model = Qwen3TextCrossEncoder(model_name=QWEN3_RERANKER_MODEL)  # type: ignore[assignment]
+            self._model = Qwen3TextCrossEncoder(model_name=QWEN3_RERANKER_MODEL)
             return
         try:
             from fastembed.rerank.cross_encoder import TextCrossEncoder
@@ -46,6 +40,5 @@ class RerankerManager:
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         self._lazy_init()
         assert self._model is not None
-        if self._use_qwen3:
-            return [float(s) for s in self._model.rerank(query, documents)]  # type: ignore[attr-defined]
-        return [float(s) for s in self._model.rerank(query, documents)]
+        scores = self._model.rerank(query, documents)
+        return [float(s) for s in scores]

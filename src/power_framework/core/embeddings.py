@@ -258,7 +258,12 @@ class FastEmbedManager:
     def embed(self, text: str) -> list[float]:
         self._lazy_init()
         assert self._model is not None
-        return [float(v) for v in next(iter(self._model.embed([text])))]
+        # Bound parallel to EMBED_NUM_THREADS (default 1). Leaving it at
+        # fastembed's default (0 = one subprocess per CPU core) makes a *single*
+        # query embedding spawn many short-lived ONNX subprocesses, adding
+        # 10-30s of fork/startup latency to every semantic/hybrid_reranked call.
+        parallel = max(1, EMBED_NUM_THREADS)
+        return [float(v) for v in next(iter(self._model.embed([text], parallel=parallel)))]
 
     def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         self._lazy_init()
