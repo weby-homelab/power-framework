@@ -20,7 +20,7 @@ def isolated_search_db(tmp_path: Path, monkeypatch):
     """
     db = tmp_path / "power_search.db"
     monkeypatch.setenv("POWER_SEARCH_DB", str(db))
-    yield db
+    return db
 
 
 @pytest.fixture
