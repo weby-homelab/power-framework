@@ -162,12 +162,10 @@ def evaluate(query: str, relevants: dict[str, int], results: list, k: int) -> di
     """Return per-query metrics at rank k."""
     grades = []
     hit_ranks = []
-    found_any = False
     for i, r in enumerate(results[:k], 1):
         g = float(relevants.get(r.rel_path, 0))
         grades.append(g)
         if g > 0:
-            found_any = True
             if g >= 2:  # "relevant" or "highly relevant" counts for MRR/hit
                 hit_ranks.append(i)
     # MRR: first hit of grade>=2

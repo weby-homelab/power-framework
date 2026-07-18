@@ -15,7 +15,11 @@ import os
 import sys
 from pathlib import Path
 
-from power_framework.core import run_generate_hierarchical_index, generate_log_initial, scan_folder_notes
+from power_framework.core import (
+    run_generate_hierarchical_index,
+    generate_log_initial,
+    scan_folder_notes,
+)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 

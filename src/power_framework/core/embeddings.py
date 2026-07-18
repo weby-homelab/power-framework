@@ -244,6 +244,7 @@ class FastEmbedManager:
                     additional_files=["onnx/model.onnx_data"],
                 )
             except ValueError:
+                # Custom model already registered; safe to ignore.
                 pass
             except Exception as e:
                 logger.warning("Could not register custom model BAAI/bge-m3: %s", e)

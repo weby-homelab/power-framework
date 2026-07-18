@@ -14,7 +14,6 @@ The script exits non-zero if any threshold is breached.
 from __future__ import annotations
 
 import json
-import shutil
 import statistics
 import tempfile
 import time

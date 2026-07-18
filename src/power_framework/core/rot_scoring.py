@@ -319,6 +319,7 @@ class ContradictionDetector:
                 if expired_a != expired_b:
                     return "Opposite expiry dates: one expired, other not"
             except (ValueError, TypeError):
+                # Invalid date formats; handled during normal schema validation.
                 pass
 
         priority_a = str(fm_a.get("priority", "")).strip().lower()
@@ -461,6 +462,7 @@ class LinkRotChecker:
                         logger.debug("Skipping private/loopback URL: %s", url)
                         return -1
                 except (OSError, ValueError):
+                    # Host resolution failed or invalid IP; fall back to standard HTTP check.
                     pass
 
             headers = {

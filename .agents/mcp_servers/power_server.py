@@ -6,7 +6,7 @@ This script launches the FastMCP 3.x server from power_framework.mcp.
 Version: 2.0.2
 Updated: 2026-07-15
 """
-import sys
+
 import os
 
 # Load .env from geminicli workspace

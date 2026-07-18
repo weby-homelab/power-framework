@@ -308,6 +308,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
                 ):
                     result.stale_notes.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
+                # Ignore invalid date formats; handled by schema validation.
                 pass
 
         file_links = _extract_links(content)
@@ -394,6 +395,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
                 ):
                     stale_list.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
+                # Ignore invalid date formats; handled by schema validation.
                 pass
 
         # Track trivial (body content < threshold)
@@ -516,6 +518,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
                 if isinstance(expiry_val, date_type) and expiry_val < today:
                     is_expired = True
             except (ValueError, TypeError):
+                # Ignore invalid date formats; handled by schema validation.
                 pass
 
         if not is_archived_status and not is_expired:
@@ -564,7 +567,6 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
 
 def run_status_report(vault_dir: Path) -> str:
     """Generate a high-density, visual status report of the vault's structure, health, and knowledge graph RAG connectivity."""
-    import re
 
     from .ignore import should_skip
     from .models import NoteFile

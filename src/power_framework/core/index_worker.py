@@ -17,16 +17,14 @@ Design (Roy Zhu, 2026-06 pattern):
 from __future__ import annotations
 
 import logging
+import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from .db import _init_db
 from .ignore import should_skip
 from .utils import get_cache_dir
-
-if TYPE_CHECKING:
-    import sqlite3
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +87,6 @@ def request_sync(vault_dir: Path, mode: str = "fts") -> None:
 
 
 def _connect() -> sqlite3.Connection:
-    import sqlite3
-
-    from .searcher import _init_db
-
     conn = sqlite3.connect(str(_db_path()), timeout=30)
     conn.execute("PRAGMA busy_timeout=30000")
     conn.execute("PRAGMA journal_mode=WAL")

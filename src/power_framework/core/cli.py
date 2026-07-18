@@ -230,7 +230,8 @@ def _cmd_sync(args: argparse.Namespace) -> int:
 
 
 def _open_conn() -> sqlite3.Connection:
-    from .searcher import _db_path, _init_db
+    from .db import _init_db
+    from .searcher import _db_path
 
     db_path = _db_path()
     conn = sqlite3.connect(str(db_path), timeout=30)

@@ -3,13 +3,12 @@
 P.O.W.E.R. 2.0.3 Search Quality Evaluation Script
 Measures: Recall@K, MRR@K, nDCG@K, Precision@K across all 3 search modes
 """
+
 import subprocess
 import json
 import time
 import sys
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional
 import math
 
 VAULT_PATH = "/root/geminicli/brain"
@@ -33,7 +32,7 @@ TEST_CASES = [
             "POWER_Framework": 2,
             "docker": 2,
         },
-        "description": "Docker & container management"
+        "description": "Docker & container management",
     },
     {
         "id": "TC-02",
@@ -49,7 +48,7 @@ TEST_CASES = [
             "Successor-Hub": 2,
             "security": 2,
         },
-        "description": "GPG & Git security"
+        "description": "GPG & Git security",
     },
     {
         "id": "TC-03",
@@ -64,7 +63,7 @@ TEST_CASES = [
             "MASTER-LESSONS-LEARNED": 3,
             "AI-HomeLab": 2,
         },
-        "description": "LLM benchmarking"
+        "description": "LLM benchmarking",
     },
     {
         "id": "TC-04",
@@ -79,7 +78,7 @@ TEST_CASES = [
             "Successor-Hub": 3,
             "MASTER-LESSONS-LEARNED": 2,
         },
-        "description": "Proxmox/LXC infrastructure"
+        "description": "Proxmox/LXC infrastructure",
     },
     {
         "id": "TC-05",
@@ -94,7 +93,7 @@ TEST_CASES = [
             "MASTER-LESSONS-LEARNED": 3,
             "security": 2,
         },
-        "description": "FastAPI security"
+        "description": "FastAPI security",
     },
     {
         "id": "TC-06",
@@ -108,7 +107,7 @@ TEST_CASES = [
             "POWER_Framework": 3,
             "MASTER-LESSONS-LEARNED": 2,
         },
-        "description": "Pydantic/schema validation"
+        "description": "Pydantic/schema validation",
     },
     {
         "id": "TC-07",
@@ -123,7 +122,7 @@ TEST_CASES = [
             "POWER_Framework": 3,
             "AI-HomeLab": 2,
         },
-        "description": "Second Brain / PKM"
+        "description": "Second Brain / PKM",
     },
     {
         "id": "TC-08",
@@ -138,7 +137,7 @@ TEST_CASES = [
             "MASTER-LESSONS-LEARNED": 3,
             "Power_Framework_v1.8.0_Deployment": 2,
         },
-        "description": "GitHub Actions CI/CD"
+        "description": "GitHub Actions CI/CD",
     },
     {
         "id": "TC-09",
@@ -153,7 +152,7 @@ TEST_CASES = [
             "Successor-Hub": 3,
             "network": 2,
         },
-        "description": "VPN / Tailscale networking"
+        "description": "VPN / Tailscale networking",
     },
     {
         "id": "TC-10",
@@ -169,7 +168,7 @@ TEST_CASES = [
             "MASTER-LESSONS-LEARNED": 2,
             "security": 2,
         },
-        "description": "Security hardening"
+        "description": "Security hardening",
     },
     {
         "id": "TC-11",
@@ -184,7 +183,7 @@ TEST_CASES = [
             "POWER_Framework": 3,
             "AI-HomeLab": 2,
         },
-        "description": "MCP / AI agent integration"
+        "description": "MCP / AI agent integration",
     },
     {
         "id": "TC-12",
@@ -199,7 +198,7 @@ TEST_CASES = [
             "Successor-Hub": 3,
             "archive": 1,
         },
-        "description": "Backup & storage"
+        "description": "Backup & storage",
     },
     {
         "id": "TC-13",
@@ -212,7 +211,7 @@ TEST_CASES = [
             "Power-Safety-UA": 3,
             "Release": 2,
         },
-        "description": "Domain-specific: Power-Safety-UA project"
+        "description": "Domain-specific: Power-Safety-UA project",
     },
     {
         "id": "TC-14",
@@ -226,7 +225,7 @@ TEST_CASES = [
             "POWER_Framework": 3,
             "AI-HomeLab": 2,
         },
-        "description": "Embedding / RAG search"
+        "description": "Embedding / RAG search",
     },
     {
         "id": "TC-15",
@@ -241,7 +240,7 @@ TEST_CASES = [
             "Global_Hardening": 2,
             "MASTER-LESSONS-LEARNED": 1,
         },
-        "description": "SSH hardening"
+        "description": "SSH hardening",
     },
 ]
 
@@ -251,19 +250,13 @@ K_VALUES = [1, 3, 5, 10]
 
 def run_search(vault_path: str, query: str, mode: str, max_results: int = 10) -> list[dict]:
     """Run power search and return list of results with file paths."""
-    cmd = [
-        "power", "search", vault_path, query,
-        "--mode", mode,
-        "--max-results", str(max_results)
-    ]
+    cmd = ["power", "search", vault_path, query, "--mode", mode, "--max-results", str(max_results)]
     try:
         t0 = time.perf_counter()
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=60
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         elapsed = time.perf_counter() - t0
 
-        lines = result.stdout.strip().split('\n') if result.stdout else []
+        lines = result.stdout.strip().split("\n") if result.stdout else []
         results = []
         for line in lines:
             line_stripped = line.strip()
@@ -345,18 +338,18 @@ def ndcg_at_k(results: list, grades: dict, k: int) -> float:
 
 def evaluate_mode(mode: str, test_cases: list) -> dict:
     """Evaluate all test cases for a given mode."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Evaluating mode: {mode.upper()}")
-    print(f"{'='*60}")
-    
+    print(f"{'=' * 60}")
+
     results_by_tc = {}
     total_latencies = []
-    
+
     for tc in test_cases:
         print(f"  [{tc['id']}] {tc['description'][:50]}...", end=" ", flush=True)
         results, latency = run_search(VAULT_PATH, tc["query"], mode, max_results=10)
         total_latencies.append(latency)
-        
+
         metrics = {}
         for k in K_VALUES:
             metrics[f"P@{k}"] = precision_at_k(results, tc["relevant"], k)
@@ -366,12 +359,14 @@ def evaluate_mode(mode: str, test_cases: list) -> dict:
         metrics["latency"] = latency
         metrics["results_count"] = len(results)
         metrics["results"] = [r["path"] for r in results[:5]]
-        
+
         results_by_tc[tc["id"]] = metrics
-        
+
         hit_marker = "✓" if metrics["R@5"] > 0 else "✗"
-        print(f"{hit_marker} R@5={metrics['R@5']:.2f} MRR={metrics['RR']:.2f} nDCG@5={metrics['nDCG@5']:.2f} ({latency:.2f}s)")
-    
+        print(
+            f"{hit_marker} R@5={metrics['R@5']:.2f} MRR={metrics['RR']:.2f} nDCG@5={metrics['nDCG@5']:.2f} ({latency:.2f}s)"
+        )
+
     # Aggregate metrics
     agg = {}
     for k in K_VALUES:
@@ -381,7 +376,7 @@ def evaluate_mode(mode: str, test_cases: list) -> dict:
     agg["MRR"] = sum(m["RR"] for m in results_by_tc.values()) / len(test_cases)
     agg["avg_latency"] = sum(total_latencies) / len(total_latencies)
     agg["p95_latency"] = sorted(total_latencies)[int(len(total_latencies) * 0.95)]
-    
+
     return {"per_tc": results_by_tc, "aggregate": agg}
 
 
@@ -392,30 +387,30 @@ def main():
     print(f"  Test cases: {len(TEST_CASES)}")
     print(f"  Modes: {MODES}")
     print("=" * 60)
-    
+
     # Check vault is accessible
     vault = Path(VAULT_PATH)
     if not vault.exists():
         print(f"ERROR: Vault not found at {VAULT_PATH}", file=sys.stderr)
         sys.exit(1)
-    
+
     md_files = list(vault.rglob("*.md"))
     print(f"  Total .md files in vault: {len(md_files)}")
-    
+
     all_results = {}
-    
+
     for mode in MODES:
         all_results[mode] = evaluate_mode(mode, TEST_CASES)
-    
+
     # ─── Print Summary Table ──────────────────────────────────────────────────
     print("\n" + "=" * 80)
     print("  SUMMARY — Aggregate Metrics")
     print("=" * 80)
-    
+
     header = f"{'Metric':<20}" + "".join(f"{m.upper():>15}" for m in MODES)
     print(header)
     print("-" * 80)
-    
+
     metrics_to_show = [
         ("MRR", "MRR"),
         ("MAP@3", "MAP@3"),
@@ -427,55 +422,59 @@ def main():
         ("Avg Latency(s)", "avg_latency"),
         ("P95 Latency(s)", "p95_latency"),
     ]
-    
+
     for label, key in metrics_to_show:
         row = f"{label:<20}"
         for mode in MODES:
             val = all_results[mode]["aggregate"].get(key, 0)
             row += f"{val:>15.3f}"
         print(row)
-    
+
     # ─── Per-TC Table ────────────────────────────────────────────────────────
     print("\n" + "=" * 80)
     print("  PER-QUERY R@5 (Recall at 5)")
     print("=" * 80)
-    
+
     header2 = f"{'Test ID':<10}{'Description':<35}" + "".join(f"{m.upper():>12}" for m in MODES)
     print(header2)
     print("-" * 80)
-    
+
     for tc in TEST_CASES:
         row = f"{tc['id']:<10}{tc['description'][:34]:<35}"
         for mode in MODES:
             val = all_results[mode]["per_tc"][tc["id"]]["R@5"]
             row += f"{val:>12.2f}"
         print(row)
-    
+
     # Save raw results as JSON
     output_path = "/tmp/power_eval_results.json"
     with open(output_path, "w") as f:
-        json.dump({
-            "vault_files": len(md_files),
-            "test_cases": len(TEST_CASES),
-            "modes": MODES,
-            "results": {
-                mode: {
-                    "aggregate": data["aggregate"],
-                    "per_tc": {
-                        tc_id: {
-                            "metrics": {k: v for k, v in m.items() if k != "results"},
-                            "top5": m["results"]
-                        }
-                        for tc_id, m in data["per_tc"].items()
+        json.dump(
+            {
+                "vault_files": len(md_files),
+                "test_cases": len(TEST_CASES),
+                "modes": MODES,
+                "results": {
+                    mode: {
+                        "aggregate": data["aggregate"],
+                        "per_tc": {
+                            tc_id: {
+                                "metrics": {k: v for k, v in m.items() if k != "results"},
+                                "top5": m["results"],
+                            }
+                            for tc_id, m in data["per_tc"].items()
+                        },
                     }
-                }
-                for mode, data in all_results.items()
-            }
-        }, f, indent=2)
-    
+                    for mode, data in all_results.items()
+                },
+            },
+            f,
+            indent=2,
+        )
+
     print(f"\n  ✓ Raw results saved to: {output_path}")
     print("  Evaluation complete.")
-    
+
     return all_results
 
 
