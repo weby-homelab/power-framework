@@ -66,7 +66,7 @@ QWEN3_EMBED_MODEL = os.getenv("POWER_QWEN3_EMBED_MODEL", "n24q02m/Qwen3-Embeddin
 
 
 def _get_embedding_dim(model_name: str) -> int:
-    if os.getenv("POWER_EMBED_PROVIDER", "fastembed").lower() == "qwen3":
+    if "qwen3" in model_name.lower() or "qwen" in model_name.lower():
         return 1024
     if "minilm" in model_name.lower() or "small" in model_name.lower():
         return 384
@@ -109,6 +109,12 @@ class OllamaEmbeddingManager:
         self._dim: int | None = None
         self._timeout: int = int(os.getenv("POWER_OLLAMA_EMBED_TIMEOUT", "30"))
         self._retries: int = int(os.getenv("POWER_OLLAMA_EMBED_RETRIES", "2"))
+
+    @property
+    def dimension(self) -> int:
+        if self._dim is None:
+            self._dim = self._get_dim()
+        return self._dim
 
     def _get_dim(self) -> int:
         if self._dim is None:
@@ -204,6 +210,20 @@ class FastEmbedManager:
         self.model_name = model_name
         self._model: TextEmbedding | None = None
 
+    @property
+    def dimension(self) -> int:
+        # Derive the true dimensionality from the actual model rather than the
+        # provider-level default (which may be qwen3=1024 while we fell back to
+        # a 384-d MiniLM). Embed one probe token to learn the real size.
+        if self._model is None:
+            self._lazy_init()
+        assert self._model is not None
+        try:
+            probe = next(iter(self._model.embed(["dim"])))
+            return len(probe)
+        except Exception:
+            return _get_embedding_dim(self.model_name)
+
     def _lazy_init(self) -> None:
         if self._model is not None:
             return
@@ -269,6 +289,10 @@ class Qwen3EmbeddingManager:
         self._model = None
         self._dim = 1024
 
+    @property
+    def dimension(self) -> int:
+        return self._dim
+
     def _lazy_init(self) -> None:
         if self._model is not None:
             return
@@ -287,6 +311,20 @@ class Qwen3EmbeddingManager:
             EMBED_NUM_THREADS,
         )
         self._model = Qwen3TextEmbedding(model_name=self.model_name)
+        # Probe: ONNXRuntime's BFCArena can request a multi-GB (or, on some
+        # hosts, tens-of-GB) buffer for a single MatMul node and fail to
+        # allocate even batch_size=1. Detect this eagerly so callers can fall
+        # back instead of silently returning zero embeddings (FP-7).
+        try:
+            _ = next(iter(self._model.embed(["probe"])))
+        except Exception as e:
+            logger.error(
+                "Qwen3 ONNX backend failed to allocate on this host (%s). "
+                "Falling back to fastembed for embeddings.",
+                type(e).__name__,
+            )
+            self._model = None
+            raise RuntimeError("qwen3_onnx_alloc_failed") from e
 
     def embed(self, text: str) -> list[float]:
         self._lazy_init()
@@ -314,10 +352,16 @@ class Qwen3EmbeddingManager:
 
 _EMBED_MANAGER_CACHE: dict[str, object] = {}
 
+# Set True when the qwen3 ONNX backend fails to allocate on this host, so we
+# permanently fall back to fastembed for the process (avoids re-probing on
+# every manager fetch and silently producing empty vector indices).
+_QWEN3_DISABLED = False
+
 
 def get_embedding_manager(
     model_name: str | None = None,
 ) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager:
+    global _QWEN3_DISABLED
     # Respect the module-level default (v2.2.3: qwen3) unless explicitly
     # overridden via the environment variable.
     provider = os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower()
@@ -338,6 +382,11 @@ def get_embedding_manager(
             )
             effective_provider = "fastembed"
 
+    # Permanent in-process fallback: if the qwen3 ONNX backend already proved it
+    # cannot allocate on this host, don't keep re-probing — use fastembed.
+    if effective_provider == "qwen3" and _QWEN3_DISABLED:
+        effective_provider = "fastembed"
+
     if effective_provider == "ollama":
         key = f"ollama:{model_name or OLLAMA_EMBED_MODEL}"
         if key not in _EMBED_MANAGER_CACHE:
@@ -346,7 +395,21 @@ def get_embedding_manager(
     if effective_provider == "qwen3":
         key = f"qwen3:{model_name or QWEN3_EMBED_MODEL}"
         if key not in _EMBED_MANAGER_CACHE:
-            _EMBED_MANAGER_CACHE[key] = Qwen3EmbeddingManager(model_name or QWEN3_EMBED_MODEL)
+            try:
+                mgr = Qwen3EmbeddingManager(model_name or QWEN3_EMBED_MODEL)
+                mgr._lazy_init()  # probe allocation eagerly
+                _EMBED_MANAGER_CACHE[key] = mgr
+            except RuntimeError as e:
+                if "qwen3_onnx_alloc_failed" in str(e):
+                    _QWEN3_DISABLED = True
+                    logger.warning("Disabling qwen3 provider for this process; using fastembed.")
+                    effective_provider = "fastembed"
+                else:
+                    raise
+    if effective_provider == "fastembed":
+        key = f"fastembed:{model_name or FASTEMBED_MODEL}"
+        if key not in _EMBED_MANAGER_CACHE:
+            _EMBED_MANAGER_CACHE[key] = FastEmbedManager(model_name or FASTEMBED_MODEL)
         return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
     key = f"fastembed:{model_name or FASTEMBED_MODEL}"
     if key not in _EMBED_MANAGER_CACHE:
