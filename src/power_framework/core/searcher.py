@@ -269,6 +269,26 @@ def _sync_vault_to_db(
 
     embedder = get_embedding_manager() if sync_embeddings else None
 
+    # Recovery guard (fixes silent FP-7): if embeddings were requested but the
+    # embedding tables are empty while FTS metadata exists, a prior sync must
+    # have failed mid-embedding (e.g. OOM under a RAM limit). Don't trust the
+    # mtime cache in that case — re-embed every file so the index isn't left
+    # silently empty. Otherwise semantic search returns [] for valid queries.
+    if sync_embeddings and embedder is not None:
+        try:
+            existing_chunks = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+            existing_meta = cursor.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0]
+            if existing_chunks == 0 and existing_meta > 0:
+                logger.warning(
+                    "Embedding tables empty but %d files indexed; forcing re-embed",
+                    existing_meta,
+                )
+                cursor.execute("UPDATE file_metadata SET mtime = 0")
+                conn.commit()
+                db_files = dict.fromkeys(db_files, 0.0)
+        except Exception as e:
+            logger.warning("Embedding recovery check failed: %s", e)
+
     # v2.2.0: collect changed files first, then embed in batches. This avoids
     # holding the embedding model AND all vectors in memory at once.
     changed: list[tuple[str, str, OKFMetadata, float]] = []  # (rel_path, content, metadata, mtime)
@@ -713,10 +733,31 @@ def _semantic_search(
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM chunk_embeddings")
         if cursor.fetchone()[0] == 0:
-            # Materialize FTS + request background embedding sync so a later
-            # call (or concurrent session) will have chunk embeddings.
-            _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
-            request_sync(vault_dir, mode="semantic")
+            # Embeddings are not materialized yet. Previously we fired a
+            # non-blocking background sync and returned [] immediately — that is
+            # a silent failure (FP-7): the search *looks* like it ran but returns
+            # nothing, even though relevant docs exist. Instead, perform a
+            # synchronous (one-time, batched) embedding sync so the query returns
+            # real results. Batching inside _sync_vault_to_db bounds peak RAM.
+            # Close our read connection first so the writer doesn't contend on
+            # the same SQLite lock (avoids "database is locked" under load).
+            logger.info("Semantic index empty; running synchronous embedding sync")
+            conn.close()
+            try:
+                sync_conn = sqlite3.connect(str(db_path), timeout=60)
+                sync_conn.execute("PRAGMA busy_timeout=60000")
+                sync_conn.execute("PRAGMA journal_mode=WAL")
+                _init_db(sync_conn)
+                _sync_vault_to_db(vault_dir, sync_conn, sync_embeddings=True)
+                sync_conn.close()
+            except sqlite3.OperationalError as e:
+                if "locked" not in str(e):
+                    raise
+                logger.warning("Embedding sync deferred (db locked); retry later")
+            conn = sqlite3.connect(str(db_path), timeout=60)
+            conn.execute("PRAGMA busy_timeout=60000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            _init_db(conn)
 
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
         rows = cursor.fetchall()

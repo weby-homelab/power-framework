@@ -10,7 +10,7 @@ class TestEmbeddingManager:
         manager = get_embedding_manager()
         vec = manager.embed("Hello world")
         assert isinstance(vec, list)
-        assert len(vec) == EMBEDDING_DIM
+        assert len(vec) == manager.dimension
         assert all(isinstance(v, float) for v in vec)
 
     def test_embed_batch(self):
@@ -20,14 +20,14 @@ class TestEmbeddingManager:
         assert len(vectors) == 3
         for vec in vectors:
             assert isinstance(vec, list)
-            assert len(vec) == EMBEDDING_DIM
+            assert len(vec) == manager.dimension
             assert all(isinstance(v, float) for v in vec)
 
     def test_embed_empty_string(self):
         manager = get_embedding_manager()
         vec = manager.embed("")
         assert isinstance(vec, list)
-        assert len(vec) == EMBEDDING_DIM
+        assert len(vec) == manager.dimension
 
     def test_embed_batch_empty(self):
         manager = get_embedding_manager()
