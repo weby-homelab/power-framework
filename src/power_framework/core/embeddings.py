@@ -329,9 +329,7 @@ def get_embedding_manager(
     effective_provider = provider
     if effective_provider == "qwen3":
         try:
-            from qwen3_embed import TextEmbedding as _Q  # noqa: F401
-
-            _ = _Q
+            import qwen3_embed  # noqa: F401
         except ImportError:
             logger.warning(
                 "POWER_EMBED_PROVIDER=qwen3 but `qwen3-embed` is not installed. "
