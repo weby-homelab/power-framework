@@ -237,8 +237,15 @@ def heal_frontmatter(
     return healed, changes
 
 
-def heal_vault(vault_dir: Path, dry_run: bool = True) -> str:
-    """Scan vault and heal all notes with missing/invalid frontmatter. Returns formatted report."""
+def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) -> str:
+    """Scan vault and heal all notes with missing/invalid frontmatter. Returns formatted report.
+
+    Args:
+        vault_dir: Path to the vault root.
+        dry_run: When True (default) report only, no writes.
+        limit: When set, stop after healing at most ``limit`` notes. Useful for
+            large vaults / batch processing.
+    """
     healed_count = 0
     changes_log: list[str] = []
 
@@ -262,6 +269,9 @@ def heal_vault(vault_dir: Path, dry_run: bool = True) -> str:
         healed, changes = heal_frontmatter(content, filepath, vault_dir)
         if not changes:
             continue
+
+        if limit is not None and healed_count >= limit:
+            break
 
         healed_count += 1
         if dry_run:

@@ -201,7 +201,10 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
 
 
 def _sync_vault_to_db(
-    vault_dir: Path, conn: sqlite3.Connection, sync_embeddings: bool = False
+    vault_dir: Path,
+    conn: sqlite3.Connection,
+    sync_embeddings: bool = False,
+    force_rebuild: bool = False,
 ) -> None:
     """Synchronize the files in the vault with the SQLite database.
 
@@ -210,8 +213,13 @@ def _sync_vault_to_db(
         conn: An open SQLite connection (WAL mode, busy_timeout set).
         sync_embeddings: When False (default) only the lightweight FTS index and
             file metadata are refreshed. This avoids loading the embedding model
-            (bge-m3, ~6GB) on every FTS search/index. Set True only when vector
-            or semantic search actually needs the dense embeddings.
+            on every FTS search/index. Set True only when vector or semantic
+            search actually needs the dense embeddings.
+        force_rebuild: Wipe the dense-embedding tables before the pass so every
+            note is re-embedded. Required after a provider / dimension change
+            (e.g. MiniLM 384d -> Qwen3 1024d) because the incremental sync
+            only revisits files whose ``mtime`` changed and would otherwise keep
+            stale vectors of the old dimensionality.
 
     Memory note (v2.2.0): when ``sync_embeddings`` is True the dense embeddings
     are computed in **batches** via ``embedder.embed_batch`` instead of one
@@ -220,6 +228,13 @@ def _sync_vault_to_db(
     the DB with periodic commits so the working set never holds the whole vault.
     """
     import json
+
+    cursor = conn.cursor()
+    if force_rebuild and sync_embeddings:
+        logger.info("Force rebuild: clearing dense-embedding tables ...")
+        cursor.execute("DELETE FROM doc_embeddings")
+        cursor.execute("DELETE FROM chunk_embeddings")
+        conn.commit()
 
     disk_files: dict[str, float] = {}
     for filepath in vault_dir.rglob("*.md"):
@@ -235,7 +250,6 @@ def _sync_vault_to_db(
         except Exception:  # noqa: S112
             continue
 
-    cursor = conn.cursor()
     cursor.execute("SELECT rel_path, mtime FROM file_metadata")
     db_files = {row[0]: row[1] for row in cursor.fetchall()}
 

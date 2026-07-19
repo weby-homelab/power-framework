@@ -36,16 +36,16 @@ def _load_env(env_path: str = "/root/geminicli/.env") -> None:
 if "pytest" not in sys.modules and "PYTEST_CURRENT_TEST" not in os.environ:
     _load_env()
 
-# Default embedding provider (v2.2.0 low-RAM work).
+# Default embedding provider.
 #
-# We default to ``fastembed`` with the multilingual MiniLM-L12 model. It is a
-# small ONNX model (~470 MB weights + tiny runtime) that, with the batched
-# sync path added in v2.2.0, stays well under 8 GB peak RSS. The ``qwen3``
-# ONNX backend (Qwen3-Embedding-0.6B) gives better cross-lingual quality but
-# allocates a ~2.3 GB ONNXRuntime arena per matmul node on CPU, so it needs
-# >=12 GB and is opt-in via POWER_EMBED_PROVIDER=qwen3. See
-# OOM_RECOVERY_PROTOCOL.md for the matrix.
-EMBED_PROVIDER = os.getenv("POWER_EMBED_PROVIDER", "fastembed").lower()
+# v2.2.3: the default provider is now ``qwen3`` (Qwen3-Embedding-0.6B-ONNX,
+# 1024d, ONNX Runtime, no PyTorch). It gives materially better cross-lingual
+# quality than the old MiniLM-L12 (384d) and is the recommended backend for
+# mixed UA/EN vaults (fixes FP-3/FP-4: UA→EN MAR@5 0.208 -> ~0.35+).
+# The Qwen3 ONNX backend allocates a ~2.3 GB arena per matmul node on CPU, so
+# on tight 8 GB hosts set POWER_EMBED_PROVIDER=fastembed or raise
+# POWER_SYNC_VMEM_LIMIT_MB. See OOM_RECOVERY_PROTOCOL.md for the matrix.
+EMBED_PROVIDER = os.getenv("POWER_EMBED_PROVIDER", "qwen3").lower()
 
 # Number of threads used by the embedding engine. On small / low-core CPUs
 # (e.g. i5-5200U, 4 threads) leaving this unset lets ONNX/PyTorch saturate all
@@ -66,8 +66,6 @@ QWEN3_EMBED_MODEL = os.getenv("POWER_QWEN3_EMBED_MODEL", "n24q02m/Qwen3-Embeddin
 
 
 def _get_embedding_dim(model_name: str) -> int:
-    if model_name == "BAAI/bge-m3":
-        return 1024
     if os.getenv("POWER_EMBED_PROVIDER", "fastembed").lower() == "qwen3":
         return 1024
     if "minilm" in model_name.lower() or "small" in model_name.lower():
@@ -223,31 +221,10 @@ class FastEmbedManager:
                 os.environ["OMP_NUM_THREADS"] = str(EMBED_NUM_THREADS)
                 os.environ["OPENBLAS_NUM_THREADS"] = str(EMBED_NUM_THREADS)
                 from fastembed import TextEmbedding
-                from fastembed.common.model_description import (
-                    ModelSource,
-                    PoolingType,
-                )
             except ImportError:
                 raise ImportError(
                     "fastembed is required. Install it with: pip install fastembed"
                 ) from None
-
-        if self.model_name == "BAAI/bge-m3":
-            try:
-                TextEmbedding.add_custom_model(
-                    model="BAAI/bge-m3",
-                    pooling=PoolingType.CLS,
-                    normalization=True,
-                    sources=ModelSource(hf="onnx-community/bge-m3-ONNX"),
-                    dim=1024,
-                    model_file="onnx/model.onnx",
-                    additional_files=["onnx/model.onnx_data"],
-                )
-            except ValueError:
-                # Custom model already registered; safe to ignore.
-                pass
-            except Exception as e:
-                logger.warning("Could not register custom model BAAI/bge-m3: %s", e)
 
         logger.info(
             "Loading embedding model %s (threads=%d) ...",
@@ -314,12 +291,25 @@ class Qwen3EmbeddingManager:
     def embed(self, text: str) -> list[float]:
         self._lazy_init()
         assert self._model is not None
+        if not text or not text.strip():
+            return [0.0] * self._dim
         return [float(v) for v in next(iter(self._model.embed([text])))]
 
     def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         self._lazy_init()
         assert self._model is not None
-        return [[float(v) for v in vec] for vec in self._model.embed(texts, batch_size=batch_size)]
+        if not texts:
+            return []
+        # Guard against empty strings which ONNX backends reject; emit a
+        # zero vector so callers (e.g. sync) never crash on a blank note.
+        cleaned: list[str] = [t if t and t.strip() else " " for t in texts]
+        vecs = [
+            [float(v) for v in vec] for vec in self._model.embed(cleaned, batch_size=batch_size)
+        ]
+        return [
+            ([0.0] * self._dim) if not t or not t.strip() else v
+            for t, v in zip(texts, vecs, strict=True)
+        ]
 
 
 _EMBED_MANAGER_CACHE: dict[str, object] = {}
@@ -328,15 +318,32 @@ _EMBED_MANAGER_CACHE: dict[str, object] = {}
 def get_embedding_manager(
     model_name: str | None = None,
 ) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager:
-    # Respect the module-level default (v2.2.0: qwen3) unless explicitly
+    # Respect the module-level default (v2.2.3: qwen3) unless explicitly
     # overridden via the environment variable.
     provider = os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower()
-    if provider == "ollama":
+
+    # Graceful fallback: if the qwen3 backend is selected but `qwen3-embed`
+    # is not installed (e.g. minimal install / CI without the extra), fall
+    # back to fastembed instead of raising at import time. This keeps the CLI
+    # and tests working everywhere.
+    effective_provider = provider
+    if effective_provider == "qwen3":
+        try:
+            import qwen3_embed  # noqa: F401
+        except ImportError:
+            logger.warning(
+                "POWER_EMBED_PROVIDER=qwen3 but `qwen3-embed` is not installed. "
+                "Falling back to fastembed (MiniLM). Install with: pip install "
+                "'power-framework[qwen3]'."
+            )
+            effective_provider = "fastembed"
+
+    if effective_provider == "ollama":
         key = f"ollama:{model_name or OLLAMA_EMBED_MODEL}"
         if key not in _EMBED_MANAGER_CACHE:
             _EMBED_MANAGER_CACHE[key] = OllamaEmbeddingManager(model_name or OLLAMA_EMBED_MODEL)
         return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
-    if provider == "qwen3":
+    if effective_provider == "qwen3":
         key = f"qwen3:{model_name or QWEN3_EMBED_MODEL}"
         if key not in _EMBED_MANAGER_CACHE:
             _EMBED_MANAGER_CACHE[key] = Qwen3EmbeddingManager(model_name or QWEN3_EMBED_MODEL)

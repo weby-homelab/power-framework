@@ -224,7 +224,13 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         "semantic" if sync_embeddings else "fts",
         vault_dir,
     )
-    _sync_vault_to_db(vault_dir, _open_conn(), sync_embeddings=sync_embeddings)
+    force_rebuild = getattr(args, "force", False)
+    _sync_vault_to_db(
+        vault_dir,
+        _open_conn(),
+        sync_embeddings=sync_embeddings,
+        force_rebuild=force_rebuild,
+    )
     logger.info("Index build complete.")
     return 0
 
@@ -310,8 +316,9 @@ def _cmd_heal(args: argparse.Namespace) -> int:
         return 1
 
     dry_run = not args.no_dry_run
+    limit = getattr(args, "limit", None)
 
-    report = heal_vault(vault_dir, dry_run=dry_run)
+    report = heal_vault(vault_dir, dry_run=dry_run, limit=limit)
     logger.info(report)
     return 0
 
@@ -493,6 +500,12 @@ def main() -> None:
         default=False,
         help="Only build the lightweight FTS index (skip embedding generation)",
     )
+    p_sync.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Force a full rebuild of dense embeddings (required after changing the embedding model/dimension)",
+    )
     p_sync.set_defaults(func=_cmd_sync)
 
     p_rot = subparsers.add_parser("rot", help="Run ROT (Redundant, Outdated, Trivial) audit")
@@ -547,6 +560,12 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Actually apply fixes (default: dry run)",
+    )
+    p_heal.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Heal at most N notes then stop (useful for large vaults)",
     )
     p_heal.set_defaults(func=_cmd_heal)
 

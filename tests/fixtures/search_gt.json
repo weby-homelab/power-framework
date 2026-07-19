@@ -1,0 +1,61 @@
+{
+    "version": "1.0",
+    "description": "Frozen ground-truth for POWER search benchmarks. Fixes FP-6 (GT instability) from v2.2.2 failure-pattern analysis. Utilities are in [0,1]: 1.0 = directly answers, 0.6 = strongly relevant, 0.3 = partially relevant, 0.0 = irrelevant.",
+    "queries": {
+        "GT-LEXICAL": [
+            {
+                "query": "GPG signing commit",
+                "mode": "fts",
+                "utilities": {
+                    "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 1.0,
+                    "02_Areas/Infrastructure/PROD_Safety_Mandate.md": 0.6,
+                    "01_Projects/Power_Framework_v1.8.0_Deployment_Checklist.md": 0.3
+                }
+            },
+            {
+                "query": "ZFS storage pool",
+                "mode": "fts",
+                "utilities": {
+                    "02_Areas/Infrastructure/Server_Inventory.md": 1.0,
+                    "PROTOCOLS/Successor-Hub.md": 0.6
+                }
+            },
+            {
+                "query": "Docker compose healthcheck",
+                "mode": "fts",
+                "utilities": {
+                    "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 1.0,
+                    "01_Projects/Power_Safety_UA_Complete_Architecture.md": 0.6
+                }
+            }
+        ],
+        "GT-SEMANTIC": [
+            {
+                "query": "how to verify a commit was made by the right identity",
+                "mode": "semantic",
+                "utilities": {
+                    "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 1.0,
+                    "02_Areas/Infrastructure/PROD_Safety_Mandate.md": 0.6
+                }
+            },
+            {
+                "query": "rendering mermaid graph of related notes",
+                "mode": "semantic",
+                "utilities": {
+                    "03_Resources/P.O.W.E.R.2.0.md": 1.0
+                }
+            }
+        ],
+        "GT-RAG": [
+            {
+                "query": "what embedding model should I use for a Ukrainian-English vault",
+                "mode": "hybrid_reranked",
+                "utilities": {
+                    "01_Projects/POWER_v2.3+_Detailed_Implementation_Plan.md": 1.0,
+                    "01_Projects/POWER_v2.3+_roadmap_plan.md": 0.6,
+                    "03_Resources/DRAPASS-vs-P.O.W.E.R.2.0.4.md": 0.3
+                }
+            }
+        ]
+    }
+}

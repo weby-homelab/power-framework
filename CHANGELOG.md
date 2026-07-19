@@ -5,6 +5,39 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.3] - 2026-07-19
+
+### Added
+
+- **Qwen3 embedding backend as default provider**: `power sync` now defaults to
+  `POWER_EMBED_PROVIDER=qwen3` (`Qwen3-Embedding-0.6B-ONNX`, 1024d, ONNX
+  Runtime, no PyTorch). Resolves FP-3/FP-4 (MiniLM 384d was cross-lingual
+  blind: UA→EN MAR@5=0.208). Verified on `ws` (123 GB RAM): full vault sync
+  completes with peak RSS ~14 GB; VMEM cap is opt-in via
+  `POWER_SYNC_VMEM_LIMIT_MB` (0 = disabled, recommended on large hosts).
+- **`power sync --force`**: full rebuild of dense-embedding tables. Required after
+  a provider / dimension change so stale 384d vectors are not kept alongside
+  1024d ones (incremental sync only revisits files whose `mtime` changed).
+- **Multilingual Qwen3 reranker**: `RerankerManager` now prefers
+  `Qwen3-Reranker-0.6B-ONNX` (via `qwen3-embed`) whenever the embed provider
+  is `qwen3`, eliminating the PyTorch/Jina dependency and fixing FP-5
+  (reranker degraded quality on cross-lingual queries).
+- **`power heal --limit N`**: cap the number of healed notes per run for large
+  vaults / batch processing.
+- **UDCG retrieval metric (EACL 2026)**: `power_framework.core.metrics.udcg`
+  computes Utility-Discounted Cumulative Gain — a utility-aware replacement for
+  MRR/nDCG that predicts LLM RAG usefulness. Includes `normalized_udcg` and
+  `utilities_from_relevance`.
+- **Frozen ground-truth fixture**: `tests/fixtures/search_gt.json` with
+  `GT-LEXICAL` / `GT-SEMANTIC` / `GT-RAG` query sets to make benchmark results
+  reproducible and fix FP-6 (GT instability).
+
+### Changed
+
+- Default reranker model constant documented as `QWEN3_RERANKER_MODEL` env
+  override; `DEFAULT_RERANKER_MODEL` retained as fallback for non-qwen3 hosts.
+- `heal_vault` accepts an optional `limit` parameter.
+
 ## [2.2.2] - 2026-07-18
 
 ### Fixed

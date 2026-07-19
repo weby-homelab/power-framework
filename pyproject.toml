@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "2.2.2"
+version = "2.2.3"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -60,6 +60,11 @@ dev = [
     "types-PyYAML>=6.0.0",
     "pre-commit>=4.0.0",
     "pip-audit>=2.7.0",
+]
+# Qwen3 ONNX backend (1024d, no PyTorch). Optional so minimal installs and
+# CI on small runners keep the light fastembed/MiniLM path available.
+qwen3 = [
+    "qwen3-embed>=1.12.0",
 ]
 
 [project.urls]
