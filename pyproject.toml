@@ -27,6 +27,17 @@ classifiers = [
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
 dependencies = [
+    # POWER 3.0 canonical embedding stack: BGE-M3 (1024d) via DIRECT
+    # onnxruntime + tokenizers. This deliberately does NOT go through fastembed,
+    # whose custom-model registry (0.6.x-0.8.x) cannot resolve BGE-M3's ONNX
+    # external-data files ("External data path does not exist") and repeatedly
+    # broke the embedder across 15 releases. onnxruntime loads the co-located
+    # model.onnx + model.onnx.data cleanly with a tamed BFCArena.
+    "onnxruntime>=1.17.0",
+    "tokenizers>=0.15.0",
+    "huggingface-hub>=0.20.0",
+    # fastembed retained ONLY for the cross-encoder reranker and the light
+    # opt-in fallback path; it is no longer the canonical dense backend.
     "fastembed>=0.5.0,<1.0.0",
     "fastmcp>=3.2,<4.0",
     "numpy>=1.24.0",

@@ -24,10 +24,45 @@ from power_framework.core.utils import get_cache_dir
 
 @pytest.fixture
 def indexed_vault(sample_vault: Path, monkeypatch):
-    """Build a full FTS + embedding index for the sample vault once."""
+    """Build an FTS index (no embeddings) for the sample vault once.
+
+    Phase 1 (POWER 3.0) decoupled semantic embeddings from the core FTS
+    index: the canonical embedder (BGE-M3) is a heavyweight, network/model
+    download that must NOT be a hard dependency of the FTS path or of CI.
+    So the test fixture builds an FTS-only index and relies on the B7
+    fallback (semantic -> FTS) for semantic-style queries in tests.
+    """
 
     monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
+    from power_framework.core.searcher import _db_path, _sync_vault_to_db
+
+    db_path = _db_path()  # honors POWER_SEARCH_DB isolation
+    conn = sqlite3.connect(str(db_path), timeout=30)
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    _init_db(conn)
+    _sync_vault_to_db(sample_vault, conn, sync_embeddings=False)
+    conn.close()
+    return sample_vault
+
+
+@pytest.fixture
+def semantic_indexed_vault(sample_vault: Path, monkeypatch):
+    """Build a full FTS + embedding index, skipping if no embedder is available.
+
+    This is environment-gated: if BGE-M3 cannot be loaded (offline CI), the
+    fixture is skipped rather than failing — Phase 1 guarantees FTS works
+    regardless of the embedder.
+    """
+
+    monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
+    import pytest as _pytest
+
+    from power_framework.core import embeddings as _emb
     from power_framework.core.searcher import _sync_vault_to_db
+
+    if not _emb._embeddings_available():
+        _pytest.skip("BGE-M3 embedder unavailable in this environment")
 
     db_path = get_cache_dir() / "power_search.db"
     conn = sqlite3.connect(str(db_path), timeout=30)
@@ -57,6 +92,7 @@ class TestBackgroundIndexer:
 
     def test_request_sync_enqueues(self, sample_vault, monkeypatch):
         monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
+        index_worker.stop_indexer()  # prevent the worker from clearing the queue
         index_worker.request_sync(sample_vault, mode="fts")
         conn = sqlite3.connect(str(get_cache_dir() / "power_search.db"), timeout=30)
         index_worker._ensure_queue_table(conn)
@@ -138,10 +174,49 @@ class TestCoverageFooter:
 
 
 class TestEmbeddingCacheDir:
-    """§2: fastembed cache dir is pinned to a persistent location."""
+    """§2: BGE-M3 ONNX model cache dir is pinned to a persistent location."""
 
-    def test_fastembed_cache_env_set(self):
-        import os
+    def test_embedding_cache_dir_persistent(self):
+        from power_framework.core.utils import get_embedding_cache_dir
 
-        assert "FASTEMBED_CACHE_DIR" in os.environ
-        assert "tmp" not in os.environ["FASTEMBED_CACHE_DIR"]
+        cache = get_embedding_cache_dir()
+        assert cache is not None
+        # Must NOT live under a transient /tmp path (persistent across runs
+        # per Phase 1 §2); it should resolve under the XDG cache dir.
+        assert "/tmp/" not in str(cache)
+        assert cache.exists() or cache.parent.exists()
+
+
+class TestSemanticFallback:
+    """B7 / FP-7: semantic search must never silently return [].
+
+    When the embedder is unavailable or the embedding store is empty,
+    _semantic_search must degrade to FTS and return real results (or an
+    honest empty list only when the FTS index is genuinely empty too).
+    """
+
+    def test_falls_back_to_fts_on_dead_embedder(self, indexed_vault, monkeypatch):
+        from power_framework.core import searcher as S
+
+        class _Dead:
+            def embed(self, text):
+                raise RuntimeError("simulated dead embedder")
+
+            def embed_batch(self, texts, batch_size=8):
+                raise RuntimeError("simulated dead embedder")
+
+        monkeypatch.setattr(S, "get_embedding_manager", lambda *a, **k: _Dead())
+        # Query uses terms present in the indexed sample notes ("test", "project")
+        # so the FTS fallback can return real hits (FTS is a strict AND of terms,
+        # unlike fuzzy semantic matching).
+        res = S._semantic_search(indexed_vault, "test project", max_results=5)
+        # Not a silent empty list; FTS fallback returns the indexed notes.
+        assert isinstance(res, list)
+        assert len(res) > 0
+
+    def test_no_silent_empty_on_empty_vault(self, tmp_path):
+        from power_framework.core import searcher as S
+
+        # An empty vault has neither embeddings nor FTS hits -> honest [].
+        res = S._semantic_search(tmp_path, "anything", max_results=5)
+        assert res == []

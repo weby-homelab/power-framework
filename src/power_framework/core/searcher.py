@@ -455,16 +455,42 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
                 (chunk_id, rel_path, blob, _, mtime),
             )
 
+    def _safe_commit() -> None:
+        """Commit, but surface disk I/O errors LOUDLY instead of silently
+        corrupting chunk_embeddings (fixes B8).
+
+        A ``sqlite3.OperationalError: disk I/O error`` mid-embedding used to be
+        swallowed by a broad ``except`` upstream, leaving the embedding tables
+        half-written and the semantic index quietly broken. We roll back the
+        pending transaction and re-raise so ``_sync_vault_to_db`` can abort the
+        pass cleanly (the mtime cache is only advanced on a successful commit,
+        so the next sync re-embeds the missed files rather than trusting a
+        corrupt partial index).
+        """
+        try:
+            conn.commit()
+        except sqlite3.OperationalError as e:
+            logger.error(
+                "DB commit failed during embedding pass (%s) — rolling back "
+                "partial chunk_embeddings to avoid a silently corrupt index.",
+                e,
+            )
+            try:
+                conn.rollback()
+            except Exception:  # noqa: BLE001, S110
+                pass
+            raise
+
     total = len(doc_items) + len(chunk_items)
     for i in range(0, len(doc_items), batch_size):
         _store_docs(doc_items[i : i + batch_size])
         if (i // batch_size) % commit_every == 0:
-            conn.commit()
+            _safe_commit()
     for i in range(0, len(chunk_items), batch_size):
         _store_chunks(chunk_items[i : i + batch_size])
         if (i // batch_size) % commit_every == 0:
-            conn.commit()
-    conn.commit()
+            _safe_commit()
+    _safe_commit()
     logger.info("Embedding pass complete: %d vector(s) written", total)
 
 
@@ -721,10 +747,41 @@ def _semantic_search(
 
     db_path = _db_path()
 
+    # B7/FP-7 (POWER 3.0 Sync-or-FTS-Fallback): NEVER return a silent [] when
+    # the dense index is unavailable. If embeddings cannot be produced or the
+    # chunk_embeddings table is empty/broken, degrade to FTS with an explicit
+    # warning so callers get real results and operators see WHY dense was
+    # skipped — instead of an empty list that looks like "no matches".
+    def _fts_fallback(reason: str) -> list[SearchResult]:
+        logger.warning(
+            "Semantic search unavailable (%s); falling back to FTS for query %r",
+            reason,
+            query,
+        )
+        # Ensure the (cheap, no-model) FTS index exists so the fallback returns
+        # real results even on a cold index — otherwise the "fallback" would
+        # itself be a silent [] (defeats B7/FP-7).
+        try:
+            fconn = sqlite3.connect(str(db_path), timeout=30)
+            fconn.execute("PRAGMA busy_timeout=30000")
+            fconn.execute("PRAGMA journal_mode=WAL")
+            _init_db(fconn)
+            fcur = fconn.cursor()
+            fcur.execute("SELECT COUNT(*) FROM file_metadata")
+            if fcur.fetchone()[0] == 0:
+                _sync_vault_to_db(vault_dir, fconn, sync_embeddings=False)
+            fconn.close()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("FTS fallback index refresh failed: %s", e)
+        return _fts_search(vault_dir, query, max_results=max_results)
+
     try:
         embedder = get_embedding_manager()
         query_vec = embedder.embed(query)
+    except Exception as e:  # noqa: BLE001
+        return _fts_fallback(f"embedder error: {type(e).__name__}")
 
+    try:
         conn = sqlite3.connect(str(db_path), timeout=30)
         conn.execute("PRAGMA busy_timeout=30000")
         conn.execute("PRAGMA journal_mode=WAL")
@@ -733,12 +790,9 @@ def _semantic_search(
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM chunk_embeddings")
         if cursor.fetchone()[0] == 0:
-            # Embeddings are not materialized yet. Previously we fired a
-            # non-blocking background sync and returned [] immediately — that is
-            # a silent failure (FP-7): the search *looks* like it ran but returns
-            # nothing, even though relevant docs exist. Instead, perform a
-            # synchronous (one-time, batched) embedding sync so the query returns
-            # real results. Batching inside _sync_vault_to_db bounds peak RAM.
+            # Embeddings are not materialized yet. Perform a synchronous
+            # (one-time, batched) embedding sync so the query returns real
+            # results. Batching inside _sync_vault_to_db bounds peak RAM.
             # Close our read connection first so the writer doesn't contend on
             # the same SQLite lock (avoids "database is locked" under load).
             logger.info("Semantic index empty; running synchronous embedding sync")
@@ -751,29 +805,36 @@ def _semantic_search(
                 _sync_vault_to_db(vault_dir, sync_conn, sync_embeddings=True)
                 sync_conn.close()
             except sqlite3.OperationalError as e:
-                if "locked" not in str(e):
-                    raise
-                logger.warning("Embedding sync deferred (db locked); retry later")
+                if "locked" in str(e):
+                    return _fts_fallback("embedding sync deferred (db locked)")
+                # disk I/O error or similar: the dense index is unusable this
+                # call — fall back rather than raising into a silent [].
+                return _fts_fallback(f"embedding sync failed: {e}")
             conn = sqlite3.connect(str(db_path), timeout=60)
             conn.execute("PRAGMA busy_timeout=60000")
             conn.execute("PRAGMA journal_mode=WAL")
             _init_db(conn)
 
+        cursor = conn.cursor()
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
         rows = cursor.fetchall()
         conn.close()
-    except Exception:
-        return []
+    except Exception as e:  # noqa: BLE001
+        return _fts_fallback(f"db error: {type(e).__name__}")
 
     if not rows:
-        return []
+        # Sync ran but produced no chunk_embeddings (e.g. every batch skipped
+        # under memory pressure). Fall back to FTS instead of silent [].
+        return _fts_fallback("no dense vectors after sync")
 
     import numpy as np
 
     q_arr = np.asarray(query_vec, dtype=np.float32)
     q_norm = float(np.linalg.norm(q_arr))
     if q_norm == 0:
-        return []
+        # Zero query vector = broken/degenerate embedding. Don't return a silent
+        # [] — degrade to FTS (B7/FP-7).
+        return _fts_fallback("zero query embedding")
 
     chunk_scores: list[tuple[float, str, str]] = []
     for rel_path, blob, content in rows:
@@ -796,7 +857,10 @@ def _semantic_search(
         chunk_scores.append((similarity, rel_path, content))
 
     if not chunk_scores:
-        return []
+        # Dense index present but nothing scored positive for this query (a
+        # classic symptom of a dead cross-lingual embedder, e.g. Granite's
+        # 0.000 UA↔EN recall). Fall back to FTS rather than a silent [] (B7).
+        return _fts_fallback("no positive dense matches")
 
     doc_best: dict[str, tuple[float, str]] = {}
     for similarity, rel_path, content in chunk_scores:

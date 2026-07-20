@@ -38,14 +38,25 @@ if "pytest" not in sys.modules and "PYTEST_CURRENT_TEST" not in os.environ:
 
 # Default embedding provider.
 #
-# v2.2.3: the default provider is now ``qwen3`` (Qwen3-Embedding-0.6B-ONNX,
-# 1024d, ONNX Runtime, no PyTorch). It gives materially better cross-lingual
-# quality than the old MiniLM-L12 (384d) and is the recommended backend for
-# mixed UA/EN vaults (fixes FP-3/FP-4: UA→EN MAR@5 0.208 -> ~0.35+).
-# The Qwen3 ONNX backend allocates a ~2.3 GB arena per matmul node on CPU, so
-# on tight 8 GB hosts set POWER_EMBED_PROVIDER=fastembed or raise
-# POWER_SYNC_VMEM_LIMIT_MB. See OOM_RECOVERY_PROTOCOL.md for the matrix.
-EMBED_PROVIDER = os.getenv("POWER_EMBED_PROVIDER", "qwen3").lower()
+# POWER 3.0: the ONE canonical backend is **bge-m3** — BAAI/bge-m3 (1024d)
+# served through DIRECT onnxruntime + tokenizers (class BGEM3OnnxManager),
+# NOT through fastembed.
+#
+# Why direct onnxruntime and not fastembed?
+#   * BGE-M3 is the only backend that ever produced strong UA<->EN retrieval
+#     (MAR@5 = 0.573, v2.0.3-TEST-4; cross-lingual cosine ~0.64), vs MiniLM
+#     0.208, Granite 0.000 (dead), Qwen3 (multi-GB arena / segfault).
+#   * fastembed's custom-model registry (0.6.x-0.8.x) CANNOT resolve BGE-M3's
+#     ONNX external-data layout — it raises "External data path does not exist"
+#     and silently broke the embedder across 15 releases (DOC-DRIFT / B10).
+#   * onnxruntime (a first-class dep now) loads the co-located
+#     model.onnx + model.onnx.data with a TAMED BFCArena (R2 fix) at peak RSS
+#     ~1.6 GB — inside the POWER 3.0 <=2 GB contract — and exposes
+#     dense/sparse/colbert vectors for the Phase 3 late-interaction reranker.
+#
+# Legacy providers (fastembed / qwen3 / ollama) remain reachable via
+# POWER_EMBED_PROVIDER for debugging only; none are the default anymore.
+EMBED_PROVIDER = os.getenv("POWER_EMBED_PROVIDER", "bge-m3").lower()
 
 # Number of threads used by the embedding engine. On small / low-core CPUs
 # (e.g. i5-5200U, 4 threads) leaving this unset lets ONNX/PyTorch saturate all
@@ -59,14 +70,23 @@ FASTEMBED_MODEL = os.getenv(
     "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
 )
 
-# Qwen3 ONNX backend (qwen3-embed, no torch / no Ollama) — low-RAM default.
+# Qwen3 ONNX backend (qwen3-embed, no torch / no Ollama) — legacy opt-in.
 QWEN3_EMBED_MODEL = os.getenv("POWER_QWEN3_EMBED_MODEL", "n24q02m/Qwen3-Embedding-0.6B-ONNX")
 # q4f16 ONNX by default; set to "n24q02m/Qwen3-Embedding-0.6B-ONNX" with
 # POWER_QWEN3_EMBED_VARIANT to control which onnx file is used if needed.
 
+# POWER 3.0 canonical BGE-M3 ONNX backend (direct onnxruntime, no fastembed).
+# `aapot/bge-m3-onnx` ships a co-located model.onnx + model.onnx.data that
+# onnxruntime resolves cleanly (unlike fastembed's registry). Dim is fixed 1024.
+BGE_M3_ONNX_REPO = os.getenv("POWER_BGE_M3_ONNX_REPO", "aapot/bge-m3-onnx")
+BGE_M3_DIM = 1024
+
 
 def _get_embedding_dim(model_name: str) -> int:
-    if "qwen3" in model_name.lower() or "qwen" in model_name.lower():
+    n = model_name.lower()
+    if "bge-m3" in n or "bge_m3" in n:
+        return 1024
+    if "qwen3" in n or "qwen" in n:
         return 1024
     if "minilm" in model_name.lower() or "small" in model_name.lower():
         return 384
@@ -98,9 +118,17 @@ def _get_embedding_dim(model_name: str) -> int:
     return 384
 
 
-EMBEDDING_DIM = _get_embedding_dim(
-    OLLAMA_EMBED_MODEL if EMBED_PROVIDER == "ollama" else FASTEMBED_MODEL
-)
+def _default_dim() -> int:
+    if EMBED_PROVIDER == "bge-m3":
+        return BGE_M3_DIM
+    if EMBED_PROVIDER == "ollama":
+        return _get_embedding_dim(OLLAMA_EMBED_MODEL)
+    if EMBED_PROVIDER == "qwen3":
+        return _get_embedding_dim(QWEN3_EMBED_MODEL)
+    return _get_embedding_dim(FASTEMBED_MODEL)
+
+
+EMBEDDING_DIM = _default_dim()
 
 
 class OllamaEmbeddingManager:
@@ -350,6 +378,139 @@ class Qwen3EmbeddingManager:
         ]
 
 
+class BGEM3OnnxManager:
+    """POWER 3.0 canonical embedder: BAAI/bge-m3 via DIRECT onnxruntime.
+
+    Bypasses fastembed entirely (whose custom-model registry cannot resolve
+    BGE-M3's ONNX external-data files). Uses ``huggingface_hub`` to fetch the
+    co-located ``model.onnx`` + ``model.onnx.data`` and a Rust ``tokenizers``
+    fast tokenizer. No PyTorch, no transformers.
+
+    R2 (ONNX Arena Taming): the ONNXRuntime BFCArena is disabled
+    (``enable_cpu_mem_arena=False``) and extended only on demand
+    (``arena_extend_strategy=kSameAsRequested``) with ``intra_op_num_threads``
+    bounded by ``POWER_EMBED_NUM_THREADS``. This keeps peak RSS at ~1.6 GB for
+    a full vault, inside the POWER 3.0 <=2 GB contract, and prevents the
+    38.6 GB blowups observed with the fastembed/Granite and Qwen3 paths.
+    """
+
+    _MAX_TOKENS = int(os.getenv("POWER_BGE_M3_MAX_TOKENS", "512"))
+
+    def __init__(self, repo: str = BGE_M3_ONNX_REPO) -> None:
+        self.repo = repo
+        self._session: Any | None = None
+        self._tokenizer: Any | None = None
+        self._dim = BGE_M3_DIM
+
+    @property
+    def dimension(self) -> int:
+        return self._dim
+
+    def _lazy_init(self) -> None:
+        if self._session is not None:
+            return
+        import threading
+
+        _lock = getattr(type(self), "_init_lock", None)
+        if _lock is None:
+            _lock = threading.Lock()
+            type(self)._init_lock = _lock
+        with _lock:
+            if self._session is not None:
+                return
+            try:
+                import onnxruntime as ort
+                from huggingface_hub import hf_hub_download
+                from tokenizers import Tokenizer
+            except ImportError as e:
+                raise ImportError(
+                    "bge-m3 provider requires onnxruntime, tokenizers and "
+                    "huggingface-hub. Install with: pip install power-framework"
+                ) from e
+
+            os.environ["OMP_NUM_THREADS"] = str(EMBED_NUM_THREADS)
+            os.environ["OPENBLAS_NUM_THREADS"] = str(EMBED_NUM_THREADS)
+
+            logger.info(
+                "Loading BGE-M3 ONNX embedder from %s (threads=%d, tamed arena) ...",
+                self.repo,
+                EMBED_NUM_THREADS,
+            )
+            model_path = hf_hub_download(self.repo, "model.onnx")
+            # External-data sidecar MUST be co-located next to model.onnx so
+            # ONNXRuntime resolves the initializers. hf_hub_download places it
+            # in the same snapshot dir; missing sidecar is tolerated for repos
+            # that ship a single-file model.
+            try:
+                hf_hub_download(self.repo, "model.onnx.data")
+            except Exception as e:  # noqa: BLE001
+                logger.debug("No model.onnx.data sidecar in %s: %s", self.repo, e)
+            tok_path = hf_hub_download(self.repo, "tokenizer.json")
+
+            so = ort.SessionOptions()
+            # R2 arena taming: no persistent CPU mem arena; grow only on demand.
+            so.enable_cpu_mem_arena = False
+            so.intra_op_num_threads = max(1, EMBED_NUM_THREADS)
+            so.inter_op_num_threads = 1
+            providers = [
+                (
+                    "CPUExecutionProvider",
+                    {"arena_extend_strategy": "kSameAsRequested"},
+                )
+            ]
+            self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            self._tokenizer = Tokenizer.from_file(tok_path)
+            self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
+            # Probe: eagerly verify the backend can allocate and produce a
+            # dense vector, so callers fail loudly here rather than silently
+            # returning [] later (FP-7).
+            probe = self._embed_raw(["probe"])
+            if probe is None or len(probe) != 1 or len(probe[0]) != self._dim:
+                self._session = None
+                raise RuntimeError("bge_m3_onnx_probe_failed")
+
+    def _embed_raw(self, texts: list[str]) -> list[list[float]] | None:
+        import numpy as np
+
+        assert self._session is not None
+        assert self._tokenizer is not None
+        self._tokenizer.enable_padding()
+        encs = self._tokenizer.encode_batch(texts)
+        ids = np.array([e.ids for e in encs], dtype=np.int64)
+        mask = np.array([e.attention_mask for e in encs], dtype=np.int64)
+        out = self._session.run(["dense_vecs"], {"input_ids": ids, "attention_mask": mask})[0]
+        arr = np.asarray(out, dtype=np.float32)
+        # BGE-M3 dense_vecs are already L2-normalized by the exported graph, but
+        # normalize defensively so cosine == dot downstream.
+        norms = np.linalg.norm(arr, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        arr = arr / norms
+        return [[float(v) for v in row] for row in arr]
+
+    def embed(self, text: str) -> list[float]:
+        self._lazy_init()
+        if not text or not text.strip():
+            return [0.0] * self._dim
+        vecs = self._embed_raw([text])
+        return vecs[0] if vecs else [0.0] * self._dim
+
+    def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
+        self._lazy_init()
+        if not texts:
+            return []
+        results: list[list[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            cleaned = [t if t and t.strip() else " " for t in batch]
+            vecs = self._embed_raw(cleaned)
+            if vecs is None:
+                results.extend([[0.0] * self._dim] * len(batch))
+                continue
+            for t, v in zip(batch, vecs, strict=True):
+                results.append([0.0] * self._dim if not t or not t.strip() else v)
+        return results
+
+
 _EMBED_MANAGER_CACHE: dict[str, object] = {}
 
 # Set True when the qwen3 ONNX backend fails to allocate on this host, so we
@@ -360,17 +521,38 @@ _QWEN3_DISABLED = False
 
 def get_embedding_manager(
     model_name: str | None = None,
-) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager:
+) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager | BGEM3OnnxManager:
     global _QWEN3_DISABLED
-    # Respect the module-level default (v2.2.3: qwen3) unless explicitly
+    # Respect the module-level default (POWER 3.0: bge-m3) unless explicitly
     # overridden via the environment variable.
     provider = os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower()
+
+    effective_provider = provider
+
+    # POWER 3.0 canonical path: BGE-M3 via direct onnxruntime. If the backend
+    # cannot initialize on this host (missing deps / alloc failure), fall back
+    # to fastembed instead of returning a silently empty index (FP-7).
+    if effective_provider == "bge-m3":
+        key = f"bge-m3:{BGE_M3_ONNX_REPO}"
+        if key in _EMBED_MANAGER_CACHE:
+            return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
+        try:
+            mgr = BGEM3OnnxManager(BGE_M3_ONNX_REPO)
+            mgr._lazy_init()  # eager probe: fail loudly, not silently
+            _EMBED_MANAGER_CACHE[key] = mgr
+            return mgr
+        except Exception as e:  # noqa: BLE001
+            logger.error(
+                "BGE-M3 canonical backend failed to initialize (%s); "
+                "falling back to fastembed. Search quality WILL degrade.",
+                type(e).__name__,
+            )
+            effective_provider = "fastembed"
 
     # Graceful fallback: if the qwen3 backend is selected but `qwen3-embed`
     # is not installed (e.g. minimal install / CI without the extra), fall
     # back to fastembed instead of raising at import time. This keeps the CLI
     # and tests working everywhere.
-    effective_provider = provider
     if effective_provider == "qwen3":
         try:
             import qwen3_embed  # noqa: F401

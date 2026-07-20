@@ -34,6 +34,19 @@ _indexer_stop = threading.Event()
 
 
 def _db_path() -> Path:
+    """Resolve the search index DB path, honoring POWER_SEARCH_DB override.
+
+    Must match ``searcher._db_path`` so the background indexer and the
+    synchronous searcher operate on the same database — and so the
+    ``isolated_search_db`` test fixture (which sets POWER_SEARCH_DB) actually
+    isolates the indexer too. A prior version ignored the override, causing
+    silent cross-test contamination via the shared default DB.
+    """
+    import os
+
+    override = os.getenv("POWER_SEARCH_DB")
+    if override:
+        return Path(override)
     return get_cache_dir() / "power_search.db"
 
 
