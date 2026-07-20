@@ -221,7 +221,94 @@ python3 scripts/check_search_quality.py --vault /root/gemma/brain --mode reranke
 - `.cache/bench_3_0_0_prov.json`, `bench_3_0_0_qwen3.json` — порівняння постачальників.
 - Харнесс: `scripts/check_search_quality.py` (UDCG@5 primary, nDCG@5 ≥ 0.50 secondary gate).
 
+---
+
+## 9. Еволюція версій та архітектури POWER
+
+Цей розділ реконструює траєкторію стеку POWER від v2.0.1 до v3.0.0 на основі звітів у `docs/tests/`,
+виділяючи **архітектурні зсуви** (embedder → reranker → режими → метрики → Graph RAG) та **повторювані
+уроки**, що сформували фінальний дизайн 3.0.0.
+
+### 9.1 Хронологія версій
+
+| Версія     | Embedder (dense)                                          | Reranker (cross-encoder)                 | Доступні режими                         | Ключові компоненти / події                                                                                           | Ключовий висновок тестів                                                                                    |
+| :--------- | :-------------------------------------------------------- | :--------------------------------------- | :-------------------------------------- | :------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| **v2.0.1** | `BAAI/bge-m3` (sentence-transformers, XLM-RoBERTa)        | `Xenova/ms-marco-MiniLM-L-6-v2`          | fts, vector, hybrid, hybrid_reranked    | `embeddings.py`, `reranker.py`, `searcher.py`, `chunker.py`, `cli.py`                                                | Морфологічна гнучкість UA (відмінки); BGE-M3 розуміє семантику без лематизації                              |
+| **v2.0.3** | `paraphrase-multilingual-MiniLM-L12-v2` (fastembed, 384d) | `ms-marco-MiniLM-L-6-v2` (onnx)          | + `semantic` (dense)                    | Graph RAG v1 (`relations.py`), `linter.py` (ROT/контрадикції)                                                        | **MiniLM сліпий до UA→EN** (MAR@5=0.208, TEST-3); BGE-M3 ≡ Qwen3 (TEST-4)                                   |
+| **v2.1.x** | MiniLM-L12 (fastembed)                                    | **`jina-reranker-v2-base-multilingual`** | ті ж                                    | `RerankerManager`, мультимовний reranker                                                                             | Крос-лінгв. ENG↔UKR підтверджено (TEST-2/3); Jina v2 +5% MAR@5 поверх vector                                |
+| **v2.2.1** | MiniLM-L12 (fastembed)                                    | ms-marco-MiniLM                          | ті ж                                    | Паралельний ембед (`EMBED_NUM_THREADS`), RSS MiniLM ~680 МБ                                                          | Стабілізація latency на keyword-важкому vault-і                                                             |
+| **v2.2.3** | **Qwen3-ONNX (1024d, MRL)** → відступ на fastembed MiniLM | ms-marco-MiniLM                          | ті ж                                    | Провайдер `qwen3_embed`, ланцюг безпечного відступу                                                                  | **BUG B3:** Qwen3 ONNX ~97.5 ГБ → OOM на ≤14 ГБ (FP-3/4: MiniLM blind до UA↔EN; FP-5: reranker→0 точності)  |
+| **v2.3.0** | Qwen3 (дефолт) / fastembed fallback                       | Jina v2 multilingual                     | ті ж                                    | Стабілізація абстракції провайдерів                                                                                  | Стабільний базис; поведінка reranker на UA не виміряна                                                      |
+| **v3.0.0** | **`BAAI/bge-m3` (direct ONNX, 1024d, 100+ мов)**          | **Jina v2 + ColBERT opt-in**             | fts, vector, hybrid, semantic, reranked | `metrics/udcg.py`, `colbert_reranker.py`, Graph RAG v2 (`WeightedKnowledgeGraph`), `synthesize.py`, `get_reranker()` | **Англомовний reranker шкодить UA** (§3, §6); UDCG@5 primary gate; hybrid — найстійкіший мультимовний режим |
+
+### 9.2 Архітектура компонентів (стан на v3.0.0)
+
+```
+                         power_framework.core
+                         ┌─────────────────────────────────────────────┐
+  CLI (cli.py)           │                                               │
+   power search          │   embeddings.py  ── Embedder abstraction      │
+   power suggest-related │     • BGE-M3 (direct ONNX, canonical)        │
+   power synthesize      │     • qwen3_embed (opt-in, ≥RAM)             │
+        │                │     • fastembed fallback (MiniLM)            │
+        ▼                │     • EMBED_PROVIDER, thread-pool sync       │
+   searcher.search_vault │                                               │
+        ├─ fts/vector ───► index_worker.request_sync (background embed)  │
+        ├─ hybrid (RRF)   │                                               │
+        └─ reranked ─────► reranker.get_reranker()  ── RerankerProtocol  │
+                               ├─ Jina v2 (multilingual, default)        │
+                               └─ ColBERT (late-interaction, opt-in ≥16GB)│
+                                                                         │
+   relations.suggest_related_v2 ── Graph RAG v2                          │
+        • WeightedKnowledgeGraph (weighted BFS + centrality)             │
+                                                                         │
+   metrics.udcg  ── UDCG@5 (primary gate)   nDCG@5 (secondary gate)      │
+   synthesize    ── synthesize_session_ingest (auto-ingest loop)         │
+   linter/rot_scoring ── ROT audit, ContradictionDetector, orphan check │
+                         └─────────────────────────────────────────────┘
+        ▲
+   scripts/check_search_quality.py  (harness: UDCG@5 primary, nDCG@5≥0.50)
+```
+
+**Відповідальність модулів:**
+
+- **`embeddings.py`** — абстракція ембедера: `BGE-M3` (direct ONNX, без PyTorch/RAM-вибуху), `qwen3_embed`
+  (opt-in, MRL 1024d), `fastembed` MiniLM (fallback). Експонує `.dimension`, паралельний sync.
+- **`index_worker.py`** — фоновий `request_sync`, mode-based ембедінг (`fts` vs `semantic`), атомарні записи БД.
+- **`searcher.py`** — `search_vault` з режимами `fts`/`vector`/`hybrid`(RRF)/`semantic`/`reranked`
+  (hybrid_reranked); singleton reranker; опційний semantic-fallback.
+- **`reranker.py`** — `RerankerProtocol` + фабрика `get_reranker()`; `RerankerManager` (Jina v2 / локальний);
+  `ColBERTUnavailableError` для граційної деградації.
+- **`colbert_reranker.py`** — ColBERT late-interaction (opt-in, ≥16 ГБ RAM).
+- **`relations.py`** — **Graph RAG v2**: `WeightedKnowledgeGraph`, зважений BFS, centrality, `suggest_related_v2`.
+- **`metrics/udcg.py`** — UDCG (utility-discounted CG, graded relevance 0..3).
+- **`synthesize.py`** — `synthesize_session_ingest` + CLI `power synthesize` (замикання циклу знань).
+- **`chunker.py`** — семантичне розбиття (headers/paragraphs) з контекстом документа.
+- **`linter.py` / `rot_scoring.py`** — аудит бази знань: ROT, `ContradictionDetector`, orphan-нотатки.
+
+### 9.3 Повторювані уроки, що сформували 3.0.0
+
+1. **Embedder-цикл замикається на BGE-M3, але кращим шляхом.**
+   `BGE-M3 (sbert)` → `MiniLM (fastembed)` → `Qwen3 (ONNX, заблоковано RAM)` → **`BGE-M3 (direct ONNX)`**.
+   Версія 3.0.0 повертається до BGE-M3, усуваючи недоліки: прямий ONNX (без PyTorch/RAM-вибуху),
+   MIT-ліцензія, нативна мультимовність (100+ мов, UA включно).
+2. **Англомовний cross-encoder reranker — системна слабкість для UA.** Виявлено ще у v2.0.3 (MiniLM,
+   MAR@5 UA→EN=0.208) і підтверджено у v2.2.3 (FP-5: precision→0) та v3.0.0 (§3.2: UA ndcg@5=0.438).
+   Незмінний висновок: `hybrid` (без reranker) — найстійкіший мультимовний режим.
+3. **RAM-безпека понад якість.** Qwen3-ONNX (~97 ГБ, B3) та ColBERT (≥16 ГБ) перетворені на **opt-in**
+   з граційним відступом (Jina v2 / fastembed), щоб фреймворк не падав на обмежених хостах.
+4. **Метрика еволюціонувала від чистого nDCG до утилітарної UDCG.** v3.0.0 додає UDCG@5 як primary gate
+   (корисність агенту), зберігаючи nDCG@5 як дискримінуючий secondary gate.
+5. **Graph RAG пройшов від v1 (базовий) до v2 (зважений граф)** з centrality та weighted BFS — краща
+   якість пов'язаних нотаток без додаткового ембедінгу.
+6. **Автономність агента** — `synthesize.py` замикає цикл «сесія → знання → індекс», реалізуючи
+   self-ingest без людського втручання.
+
+---
+
 > **Висновок:** Стек 3.0.0 (BGE-M3 canonical + UDCG@5 gate + Graph RAG v2 + ColBERT opt-in) забезпечує
 > стійку білінгвальну UA↔EN якість retrieval. Критичний інсайт, що **узгоджується з усіма попередніми
-> тестами**: англомовний cross-encoder reranker погіршує українську вибірку, тому `hybrid` (без reranker)
-> — найнадійніший мультимовний режим, а `reranked` залишається семантичним спеціалістом для EN.
+> тестами** (§4, §9.1): англомовний cross-encoder reranker погіршує українську вибірку, тому `hybrid`
+> (без reranker) — найнадійніший мультимовний режим, а `reranked` залишається семантичним спеціалістом для
+> EN. Еволюція (§9) показує, що фінальний дизайн — це не стрибок, а **конвергенція повторюваних уроків**
+> про мультимовність, RAM-безпеку та утилітарність метрик.
