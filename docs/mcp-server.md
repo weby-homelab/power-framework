@@ -12,7 +12,7 @@ python -m power_framework.mcp
 
 The server starts with **stdio** transport — ideal for local AI clients like Claude Desktop or OpenCode.
 
-### HTTP (Docker / remote) — v2.0.4
+### HTTP (Docker / remote) — v3.0.0
 
 Set `POWER_MCP_TRANSPORT=http` for HTTP mode with `/health` endpoint on port 8000:
 
@@ -25,7 +25,7 @@ Docker Compose example:
 ```yaml
 services:
     power-mcp:
-        image: weby-homelab/power-framework:v2.0.4
+        image: weby-homelab/power-framework:v3.0.0
         ports:
             - "8000:8000"
         volumes:
@@ -70,7 +70,7 @@ Health check: `GET http://localhost:8000/health`
 }
 ```
 
-## Error handling (v2.0.4)
+## Error handling (v3.0.0)
 
 All tools raise structured `ToolError` exceptions with descriptive messages. The server uses `mask_error_details=True` and `ErrorHandlingMiddleware` — internal stack traces are hidden from clients, only user-facing messages are exposed.
 
@@ -129,14 +129,14 @@ Create a new note with strict OKF metadata. Rebuilds index + appends to log.md. 
 
 ### `search_vault_tool`
 
-Full-text search across all vault notes. Three modes: `fts` (BM25, default), `vector` (TF cosine), `hybrid` (RRF fusion).
+Full-text search across all vault notes. Four modes: `reranked` (canonical, default — FTS5 → cross-encoder rerank → top results), `fts` (BM25), `vector` (dense cosine via BGE-M3), `hybrid` (RRF fusion).
 
-| Parameter     | Type      | Required | Description                                   |
-| ------------- | --------- | -------- | --------------------------------------------- |
-| `query`       | `string`  | Yes      | Search query                                  |
-| `max_results` | `integer` | No       | Max results (default: 20)                     |
-| `search_mode` | `string`  | No       | `fts`, `vector`, or `hybrid` (default: `fts`) |
-| `vault_path`  | `string`  | No       | Path to vault root                            |
+| Parameter     | Type      | Required | Description                                                    |
+| ------------- | --------- | -------- | -------------------------------------------------------------- |
+| `query`       | `string`  | Yes      | Search query                                                   |
+| `max_results` | `integer` | No       | Max results (default: 20)                                      |
+| `search_mode` | `string`  | No       | `reranked`, `fts`, `vector`, or `hybrid` (default: `reranked`) |
+| `vault_path`  | `string`  | No       | Path to vault root                                             |
 
 ### `synthesize_session`
 

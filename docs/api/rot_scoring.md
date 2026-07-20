@@ -17,7 +17,7 @@ detector = ContentDedupDetector(threshold=0.75)
 pairs: list[tuple[str, str, float]] = detector.detect(vault_dir)
 ```
 
-- Uses dense embedding cosine similarity (via `EmbeddingManager` with `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`)
+- Uses dense embedding cosine similarity via the embedding manager (canonical `BAAI/bge-m3` served through direct ONNX Runtime)
 - Threshold defaults to `0.75` — pairs below threshold are not reported
 - Skips notes with body length less than 50 characters
 - Returns sorted list of `(path_a, path_b, similarity_score)`
