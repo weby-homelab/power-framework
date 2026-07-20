@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from typing import TYPE_CHECKING
 
@@ -20,8 +21,10 @@ def test_tf_vectors_caching(sample_vault: Path):
     results = search_vault(sample_vault, "Weby-QRank", mode="vector")
     assert len(results) > 0
 
-    # Connect to the database and verify the tf_vectors table has data
-    db_path = get_cache_dir() / "power_search.db"
+    # Connect to the database and verify the tf_vectors table has data.
+    # Honor POWER_SEARCH_DB (set by the test fixture) so we read the same DB
+    # that search_vault populated, not the default shared cache path.
+    db_path = os.environ.get("POWER_SEARCH_DB", str(get_cache_dir() / "power_search.db"))
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
 
