@@ -5,6 +5,59 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-07-20
+
+### Changed
+
+- **Embedding default reverted to fastembed Granite**: `POWER_EMBED_PROVIDER`
+  default is now `fastembed` with
+  `ibm-granite/granite-embedding-97m-multilingual-r2` (384d, ~90 MB, 200+
+  languages incl. Ukrainian, 32K context). This **reverts** the v2.2.3 default
+  (`Qwen3-Embedding-0.6B-ONNX`, 1024d) because Qwen3 has a known CPU
+  memory-spike / segfault bug on documents >8K tokens
+  (QwenLM/Qwen3-Embedding#154, text-embeddings-inference#667) — common in this
+  vault. Qwen3-0.6B-Q4F16 remains OPT-IN for hosts >32 GB RAM.
+- Default reranker falls back to `jina-reranker-v2-base-multilingual` when the
+  embed provider is not `qwen3`.
+
+### Added
+
+- **Comparative UA↔EN search-quality benchmark** (`bench_230.py` /
+  `bench_230_ip.py`) and validated ground truth (`search_gt_uaeu.json`,
+  grep-verified against the live vault) — extends the 2.2.3 quality test, fixes
+  the B5 (hand-written GT) failure.
+
+### Known Issues (measured, 2.3.0-TEST.md)
+
+- **RAM contract violated**: Granite peaks at **38.6 GB** during sync of a
+  132-file sub-vault (code comment claims "well under 1 GB"). Qwen3-opt-in
+  attempts a **~400 GB** MatMul allocation and hangs on CPU. Neither backend
+  honors the ≤12 GB target on constrained hosts.
+- **Dense semantic search contributes ~0 on UA↔EN**: `semantic` recall@5 = 0.000
+  on the validated GT; `hybrid` is identical to `fts` (RRF fuses an empty dense
+  path). All useful signal comes from FTS + the Jina reranker (`hybrid_reranked`
+  reaches recall@5 0.492 / nDCG@5 0.597).
+- **Silent failures (FP-7)**: `semantic` / `hybrid_reranked` sync embeddings
+  asynchronously in the background and return empty results (no error) when
+  vectors are absent. A concurrent `disk I/O error` during background sync
+  silently corrupts the `chunk_embeddings` table.
+- **Documentation drift**: README / CHANGELOG still state Qwen3 as the default;
+  the code default is Granite. Must be corrected.
+
+### Evolution Summary (1.8.0 → 2.3.0)
+
+- **Improved (engineering)**: search grew from a single mode (1.8) to **5 modes**
+  (FTS5/BM25, Dense, Hybrid-RRF, Semantic, Hybrid-Reranked); FTS latency cut from
+  46 s spikes to 14–17 ms; test suite grew **198 → 413 tests** (75%+ coverage);
+  critical bugs BUG-01..04 fixed; UDCG metric (EACL 2026) added; SSRF / path-
+  traversal / Docker hardening shipped in 1.8.
+- **Regressed / unresolved (search quality)**: cross-lingual UA↔EN retrieval is
+  **not solved**. MiniLM (2.2.x) scored MRR_S 0.298; Granite default (2.3.0)
+  scores **0.000** semantic — a quality regression. The embedding stack was
+  rewritten three times (MiniLM → Qwen3 → Granite) yet the only real quality gain
+  comes from the **reranker**, not the dense encoder. **v2.3.0 is NOT recommended
+  for production on UA↔EN vaults without an FTS + reranker fallback.**
+
 ## [2.2.3] - 2026-07-19
 
 ### Added
