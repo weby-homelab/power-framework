@@ -3,8 +3,12 @@
 
 This script builds a deterministic ground-truth (GT) relevance set from a vault
 using grep-style content validation (NO LLM / NO API), runs the canonical
-``search_vault`` reranked pipeline over a curated query set, and scores the run
-with ``ranx`` (ndcg@5, recall@5, mrr@5).
+``search_vault`` reranked pipeline over a curated query set, and scores the run.
+
+PRIMARY metric (POWER 3.0 Phase 3): **UDCG@5** — Utility-Discounted Cumulative
+Gain (see ``power_framework.core.metrics.udcg``), which captures *utility* for an
+LLM RAG reader rather than just graded relevance. SECONDARY: ndcg@5 / recall@5 /
+mrr@5 (via ``ranx``).
 
 The GT rule mirrors the project convention "each GT doc MUST contain the query
 terms": a markdown file is GT-relevant for a query iff its (lowercased,
@@ -13,9 +17,9 @@ makes the qrels fully reproducible and API-free.
 
 Usage:
     python scripts/check_search_quality.py \
-        --vault /root/gemma/brain --mode reranked --gate 0.50
+        --vault /root/gemma/brain --mode reranked --gate 0.50 --udcg-gate 0.45
 
-Exit code 0 = gate passed (ndcg@5 >= gate), 1 = gate failed.
+Exit code 0 = gate passed (ndcg@5 >= gate AND udcg@5 >= udcg_gate), 1 = failed.
 
 This harness ONLY creates new files (the qrels cache under .cache/); it never
 modifies any source under src/power_framework/.
@@ -401,43 +405,15 @@ def load_or_build_qrels(
     return qrels
 
 
-def _patch_reranked_bug() -> None:
-    """Work around a pre-existing source bug WITHOUT editing any source file.
-
-    ``_hybrid_reranked_search`` references an undefined local ``rerank_query``
-    (it should be ``query``), which raises NameError on every reranked query.
-    We recompile the function in-memory only (the on-disk source is untouched)
-    so the canonical evaluation path can actually execute. Controlled by
-    ``--no-patch`` for debugging against an already-fixed tree.
-    """
-    import inspect
-
-    from power_framework.core import searcher
-
-    if getattr(searcher, "_rerank_patch_applied", False):
-        return
-    src = inspect.getsource(searcher._hybrid_reranked_search)
-    if "rerank_query" not in src:
-        return
-    fixed = src.replace("rerank_query", "query")
-    g = dict(vars(searcher))
-    exec(compile(fixed, "searcher._hybrid_reranked_search", "exec"), g)  # noqa: S102
-    searcher._hybrid_reranked_search = g["_hybrid_reranked_search"]
-    searcher._rerank_patch_applied = True
-
-
 def run_search(
     vault: Path,
     queries: list[str],
     mode: str,
     max_results: int = 20,
-    patch: bool = True,
 ) -> dict[str, dict[str, int]]:
     """Run search_vault for each query, returning query -> {doc: score}."""
     from power_framework.core.searcher import search_vault
 
-    if patch and mode in ("reranked", "hybrid_reranked"):
-        _patch_reranked_bug()
     run: dict[str, dict[str, int]] = {}
     for q in queries:
         results = search_vault(Path(vault), q, max_results=max_results, mode=mode)
@@ -449,16 +425,31 @@ def evaluate(
     vault: Path,
     mode: str = "reranked",
     gate: float = 0.50,
+    udcg_gate: float = 0.45,
     max_results: int = 20,
     overrides: dict[str, list[str]] | None = None,
     force_qrels: bool = False,
-    patch: bool = True,
 ) -> dict[str, float]:
-    """Build qrels + run, compute metrics, print, and return the metric dict."""
+    """Build qrels + run, compute metrics, print, and return the metric dict.
+
+    POWER 3.0 Phase 3: UDCG (Utility-Discounted Cumulative Gain) is now the
+    PRIMARY quality metric (see ``power_framework.core.metrics.udcg``). nDCG@5
+    remains the secondary, historically-gated metric.
+    """
     ranx = _ensure_ranx()
+    from power_framework.core.metrics.udcg import normalized_udcg, utilities_from_relevance
+
     queries = list((overrides or {}).keys()) or DEFAULT_QUERIES
     qrels = load_or_build_qrels(vault, force=force_qrels, overrides=overrides)
-    run = run_search(vault, queries, mode=mode, max_results=max_results, patch=patch)
+    run = run_search(vault, queries, mode=mode, max_results=max_results)
+
+    # Pre-load doc contents once (for graded-utility / UDCG computation).
+    contents: dict[str, str] = {}
+    for f in _iter_md_files(Path(vault)):
+        try:
+            contents[_rel(f, Path(vault))] = f.read_text(encoding="utf-8", errors="ignore").lower()
+        except OSError:
+            continue
 
     # ranx wants qrels/run as dict[str, dict[str, int]].
     ranx_qrels = {q: qrels.get(q, {}) for q in queries}
@@ -484,23 +475,48 @@ def evaluate(
     nd = float(metrics["ndcg@5"])
     rc = float(metrics["recall@5"])
     mr = float(metrics["mrr@5"])
-    passed = nd >= gate
+
+    # UDCG@5: per-doc utility = graded relevance (fraction of query terms present)
+    # mapped to [0,1]; normalized against the ideal ordering of retrieved utils.
+    per_query_udcg: list[float] = []
+    for q in eval_queries:
+        terms = _tokenize_query(q)
+        n_terms = max(len(terms), 1)
+        ranked_docs = list(ranx_run[q].keys())[:5]
+        utilities: list[float] = []
+        for doc in ranked_docs:
+            text = contents.get(doc, "")
+            matched = sum(1 for t in terms if t in text)
+            grade = int(round(matched / n_terms * 3))  # 0..3 graded relevance
+            utilities.extend(utilities_from_relevance([grade], max_relevance=3))
+        per_query_udcg.append(normalized_udcg(utilities, k=5))
+    udcg5 = sum(per_query_udcg) / len(per_query_udcg) if per_query_udcg else 0.0
+
+    passed = nd >= gate and udcg5 >= udcg_gate
 
     print(f"vault   : {vault}")
     print(f"mode    : {mode}")
     print(f"queries : {len(eval_queries)} (with GT relevance)")
-    print(f"ndcg@5  : {nd:.4f}")
+    print(f"ndcg@5  : {nd:.4f}   (secondary gate >= {gate:.2f})")
+    print(f"udcg@5  : {udcg5:.4f}   (PRIMARY gate >= {udcg_gate:.2f})")
     print(f"recall@5: {rc:.4f}")
     print(f"mrr@5   : {mr:.4f}")
-    print(f"gate    : ndcg@5 >= {gate:.2f} -> {'PASS' if passed else 'FAIL'}")
-    return {"ndcg@5": nd, "recall@5": rc, "mrr@5": mr, "passed": passed}
+    print(f"gate    : -> {'PASS' if passed else 'FAIL'}")
+    return {
+        "ndcg@5": nd,
+        "udcg@5": udcg5,
+        "recall@5": rc,
+        "mrr@5": mr,
+        "passed": passed,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="POWER search-quality gate.")
     parser.add_argument("--vault", default="/root/gemma/brain", type=str)
     parser.add_argument("--mode", default="reranked", type=str)
-    parser.add_argument("--gate", default=0.50, type=float)
+    parser.add_argument("--gate", default=0.50, type=float, help="ndcg@5 secondary gate.")
+    parser.add_argument("--udcg-gate", default=0.45, type=float, help="UDCG@5 primary gate.")
     parser.add_argument("--max-results", default=20, type=int)
     parser.add_argument(
         "--queries",
@@ -510,11 +526,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--force-qrels", action="store_true", help="Rebuild the qrels cache even if present."
-    )
-    parser.add_argument(
-        "--no-patch",
-        action="store_true",
-        help="Disable the in-memory workaround for the known source reranker bug.",
     )
     args = parser.parse_args(argv)
 
@@ -526,10 +537,10 @@ def main(argv: list[str] | None = None) -> int:
         vault=Path(args.vault),
         mode=args.mode,
         gate=args.gate,
+        udcg_gate=args.udcg_gate,
         max_results=args.max_results,
         overrides=overrides,
         force_qrels=args.force_qrels,
-        patch=not args.no_patch,
     )
     if not metrics:
         return 1

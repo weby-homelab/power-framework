@@ -364,3 +364,198 @@ def format_relation_suggestions(
         lines.append("")
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Graph RAG v2 (POWER 3.0 Phase 3 — Uniqueness)
+#
+# v2 extends v1 with:
+#   * weighted, bidirectional edges (explicit OKF ``related`` links are strong
+#     signals, not just keyword/tag overlap),
+#   * graph-distance awareness via a weighted BFS over the knowledge graph,
+#   * node centrality so the most-connected notes surface as hub suggestions.
+# ---------------------------------------------------------------------------
+
+# Weight contributions for the v2 composite edge score.
+_W_KW = 0.55
+_W_TAG = 0.20
+_W_EXPLICIT = 0.25  # explicit OKF ``related`` link bonus (saturates the score)
+
+
+def _compute_overlap_score_v2(
+    keywords_a: set[str],
+    tags_a: list[str],
+    keywords_b: set[str],
+    tags_b: list[str],
+    explicit_link: bool = False,
+) -> float:
+    """v2 composite relationship score in [0, 1].
+
+    Combines keyword overlap (0.55), tag intersection (0.20), and an explicit
+    OKF ``related`` link bonus (0.25). An explicit link saturates the score
+    toward 1.0 because it is a curated, high-precision signal.
+    """
+    if not keywords_a or not keywords_b:
+        base = 0.0
+    else:
+        kw_inter = keywords_a & keywords_b
+        kw_union = keywords_a | keywords_b
+        kw_score = len(kw_inter) / len(kw_union) if kw_union else 0.0
+        tag_inter = set(tags_a) & set(tags_b)
+        tag_score = len(tag_inter) / max(len(set(tags_a) | set(tags_b)), 1)
+        base = min(1.0, kw_score * _W_KW + tag_score * _W_TAG)
+
+    if explicit_link:
+        return min(1.0, base + _W_EXPLICIT)
+    return base
+
+
+def suggest_related_v2(
+    vault_dir: Path,
+    target_path: str | None = None,
+    max_results: int = SUGGEST_MAX_RESULTS,
+    score_threshold: float = SUGGEST_RELATION_SCORE_THRESHOLD,
+) -> list[RelationSuggestion]:
+    """Graph RAG v2 relation suggester.
+
+    Builds a weighted, bidirectional similarity graph over the vault. Explicit
+    OKF ``related`` links contribute a strong, curated signal; keyword/tag
+    overlap contributes the rest. Returns suggestions sorted by descending
+    composite score.
+
+    Args:
+        vault_dir: Vault root.
+        target_path: If set, only suggest relations for this note.
+        max_results: Max suggestions.
+        score_threshold: Minimum composite score.
+    """
+    # rel_path -> (keywords, tags, explicit_related_paths:set[str])
+    notes: dict[str, tuple[set[str], list[str], set[str]]] = {}
+    explicit_links: dict[str, set[str]] = {}
+
+    for filepath in vault_dir.rglob("*.md"):
+        rel = filepath.relative_to(vault_dir)
+        if should_skip(vault_dir, str(rel)):
+            continue
+        if filepath.name in ("index.md", "log.md", "_index.md"):
+            continue
+        try:
+            content = read_file_content(filepath)
+        except Exception:  # noqa: S112
+            continue
+        metadata: OKFMetadata | None = validate_metadata(content)
+        if metadata is None:
+            continue
+
+        rel_path = str(rel)
+        kw_text = f"{metadata.title} {metadata.description} {content}"
+        keywords = _extract_keywords(kw_text)
+        tags = metadata.tags or []
+        expl = {r.path for r in metadata.related}
+        notes[rel_path] = (keywords, tags, expl)
+        explicit_links[rel_path] = expl
+
+    suggestions: list[RelationSuggestion] = []
+    paths = list(notes.keys())
+
+    def _emit(src: str, tgt: str) -> None:
+        if src == tgt:
+            return
+        explicit = tgt in explicit_links.get(src, set()) or src in explicit_links.get(tgt, set())
+        kw_a, tags_a, _ = notes[src]
+        kw_b, tags_b, _ = notes[tgt]
+        score = _compute_overlap_score_v2(kw_a, tags_a, kw_b, tags_b, explicit_link=explicit)
+        if score >= score_threshold:
+            reason = (
+                "Explicit OKF 'related' link"
+                if explicit
+                else f"Keyword/tag overlap ({int(score * 100)}%)"
+            )
+            suggestions.append(
+                RelationSuggestion(
+                    source_path=src,
+                    target_path=tgt,
+                    score=score,
+                    reason=reason,
+                )
+            )
+
+    if target_path:
+        if target_path not in notes:
+            return []
+        for tgt in paths:
+            _emit(target_path, tgt)
+    else:
+        seen: set[tuple[str, str]] = set()
+        for i in range(len(paths)):
+            for j in range(i + 1, len(paths)):
+                a, b = paths[i], paths[j]
+                key = (a, b) if a < b else (b, a)
+                if key in seen:
+                    continue
+                seen.add(key)
+                _emit(a, b)
+
+    suggestions.sort(key=lambda s: (-s.score, s.source_path, s.target_path))
+    return suggestions[:max_results]
+
+
+# Graph RAG v2 — weighted knowledge graph with centrality.
+class WeightedKnowledgeGraph:
+    """Knowledge graph whose edges carry float weights in [0, 1].
+
+    Built from OKF ``related`` links (weighted by their confidence) plus
+    computed v2 overlap scores. Supports weighted BFS (accumulated edge weight
+    as a relevance proxy) and degree/weight centrality for hub detection.
+    """
+
+    def __init__(self) -> None:
+        self._adj: dict[str, list[tuple[str, float]]] = {}
+        self._nodes: set[str] = set()
+
+    def add_weighted_relation(self, source: str, target: str, weight: float) -> None:
+        self._nodes.add(source)
+        self._nodes.add(target)
+        self._adj.setdefault(source, []).append((target, float(weight)))
+        # Bidirectional: knowledge links are symmetric for traversal purposes.
+        self._adj.setdefault(target, []).append((source, float(weight)))
+
+    @classmethod
+    def from_suggestions(cls, suggestions: list[RelationSuggestion]) -> WeightedKnowledgeGraph:
+        g = cls()
+        for s in suggestions:
+            g.add_weighted_relation(s.source_path, s.target_path, s.score)
+        return g
+
+    def weighted_bfs(self, start: str, max_hops: int = 2) -> list[tuple[str, float, int]]:
+        """BFS returning (node, accumulated_weight, depth) within max_hops.
+
+        ``accumulated_weight`` is the product of edge weights along the path
+        (a belief-propagation style relevance score: longer / weaker paths
+        decay). Used to rank related notes beyond direct neighbours.
+        """
+        if start not in self._adj:
+            return []
+        result: list[tuple[str, float, int]] = []
+        visited: set[str] = {start}
+        queue: deque[tuple[str, float, int]] = deque([(start, 1.0, 0)])
+        while queue:
+            node, acc, depth = queue.popleft()
+            if depth >= max_hops:
+                continue
+            for nxt, w in self._adj.get(node, []):
+                new_acc = acc * w
+                result.append((nxt, new_acc, depth + 1))
+                if nxt not in visited:
+                    visited.add(nxt)
+                    queue.append((nxt, new_acc, depth + 1))
+        return result
+
+    def centrality(self, top_k: int = 10) -> list[tuple[str, float]]:
+        """Degree/weight centrality: sum of incident edge weights per node."""
+        scores: dict[str, float] = {n: 0.0 for n in self._nodes}
+        for src, edges in self._adj.items():
+            for _tgt, w in edges:
+                scores[src] += w
+        ranked = sorted(scores.items(), key=lambda kv: -kv[1])
+        return ranked[:top_k]

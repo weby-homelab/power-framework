@@ -36,13 +36,27 @@ logger = logging.getLogger(__name__)
 # query (as the old code did) reloaded the model on every call, inflating
 # hybrid_reranked latency to 5-40s per query. Caching it here keeps the model
 # resident across queries within a process.
-_reranker_singleton: RerankerManager | None = None
+_reranker_singleton: object | None = None
 
 
-def _get_reranker() -> RerankerManager:
+def _get_reranker():
+    """Return the active reranker (cached), falling back Jina <- ColBERT if needed.
+
+    POWER 3.0 Phase 3: ColBERT is opt-in; if it is requested but unavailable we
+    transparently fall back to the canonical Jina v2 cross-encoder so search
+    never breaks on a misconfigured host.
+    """
     global _reranker_singleton
     if _reranker_singleton is None:
-        _reranker_singleton = RerankerManager()
+        from .reranker import get_reranker
+
+        try:
+            _reranker_singleton = get_reranker()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Reranker init failed (%s); retrying with Jina v2 default.", e)
+            from .reranker import RerankerManager
+
+            _reranker_singleton = RerankerManager()
     return _reranker_singleton
 
 

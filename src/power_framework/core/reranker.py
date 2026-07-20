@@ -42,3 +42,24 @@ class RerankerManager:
         assert self._model is not None
         scores = self._model.rerank(query, documents)
         return [float(s) for s in scores]
+
+
+def get_reranker():
+    """Return the active reranker backend.
+
+    POWER 3.0 Phase 3: ColBERT late-interaction is an opt-in, RAM-gated backend
+    (``POWER_RERANKER=colbert``). When unavailable it raises ``ColBERTUnavailable``
+    and the caller must fall back to the canonical Jina v2 cross-encoder.
+    """
+    from .colbert_reranker import (
+        ColBERTLateInteractionReranker,
+        ColBERTUnavailable,
+        is_colbert_enabled,
+    )
+
+    if is_colbert_enabled():
+        try:
+            return ColBERTLateInteractionReranker()
+        except ColBERTUnavailable as e:
+            logger.warning("ColBERT reranker unavailable (%s); falling back to Jina v2.", e)
+    return RerankerManager()

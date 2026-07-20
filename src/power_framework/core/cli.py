@@ -28,8 +28,14 @@ from .linter import archive_stale_notes, run_lint_report, run_rot_report, run_st
 from .markdown_checks import check_all as check_markdown_issues
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .parser import build_frontmatter, read_file_content
-from .relations import format_relation_suggestions, suggest_related
+from .relations import (
+    WeightedKnowledgeGraph,
+    format_relation_suggestions,
+    suggest_related,
+    suggest_related_v2,
+)
 from .searcher import format_search_results, search_vault
+from .synthesize import synthesize_session_ingest
 from .utils import __version__, atomic_write
 
 logger = logging.getLogger("power")
@@ -410,12 +416,38 @@ def _cmd_suggest_related(args: argparse.Namespace) -> int:
         logger.error("Vault not found: %s", vault_dir)
         return 1
 
-    suggestions = suggest_related(
+    suggest_fn = suggest_related_v2 if getattr(args, "v2", False) else suggest_related
+    suggestions = suggest_fn(
         vault_dir,
         target_path=args.target,
         max_results=args.max_results,
     )
     report = format_relation_suggestions(suggestions, vault_dir)
+    logger.info(report)
+    return 0
+
+
+def _cmd_synthesize(args: argparse.Namespace) -> int:
+    """Synthesize a session note and auto-ingest it into the vault (Phase 3)."""
+    vault_dir = _resolve_path(args.path)
+    if not vault_dir.exists():
+        logger.error("Vault not found: %s", vault_dir)
+        return 1
+    try:
+        report = synthesize_session_ingest(
+            name=args.name,
+            title=args.title,
+            description=args.description,
+            content=args.content,
+            note_type=args.note_type,
+            tags=args.tags,
+            related=args.related,
+            owner=args.owner,
+            vault_path=str(vault_dir),
+        )
+    except FileExistsError as e:
+        logger.error(str(e))
+        return 1
     logger.info(report)
     return 0
 
@@ -592,7 +624,34 @@ def main() -> None:
         default=5,
         help="Max suggestions (default: 5)",
     )
+    p_suggest.add_argument(
+        "--v2",
+        action="store_true",
+        default=False,
+        help="Use Graph RAG v2 (weighted, explicit-link-aware) suggester",
+    )
     p_suggest.set_defaults(func=_cmd_suggest_related)
+
+    p_synth = subparsers.add_parser(
+        "synthesize",
+        help="Auto-ingest a session synthesis note (Phase 3 Auto-Ingest Loop)",
+    )
+    p_synth.add_argument("path", help="Path to the vault directory")
+    p_synth.add_argument("--name", required=True, help="Note filename (e.g. session_2026.md)")
+    p_synth.add_argument("--title", required=True, help="Note title")
+    p_synth.add_argument("--description", required=True, help="Note description")
+    p_synth.add_argument("--content", required=True, help="Note body content")
+    p_synth.add_argument(
+        "--note-type",
+        default="Daily Log",
+        help="OKF note type (default: Daily Log)",
+    )
+    p_synth.add_argument("--tags", nargs="*", default=[], help="Space-separated tags")
+    p_synth.add_argument(
+        "--related", nargs="*", default=[], help="Space-separated related note paths"
+    )
+    p_synth.add_argument("--owner", default=None, help="Note owner")
+    p_synth.set_defaults(func=_cmd_synthesize)
 
     p_rename = subparsers.add_parser(
         "rename",

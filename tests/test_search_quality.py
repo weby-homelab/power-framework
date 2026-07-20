@@ -1,9 +1,11 @@
-"""POWER 3.0 Phase 2 — Search-quality benchmark (deterministic + ranx-scored).
+"""POWER 3.0 Phase 3 — Search-quality benchmark (deterministic + ranx + UDCG).
 
 This test wraps the standalone harness in ``scripts/check_search_quality.py`` so
-the same deterministic GT qrels + run logic is reused. It asserts the Phase 2
-regression gate (ndcg@5 >= 0.50) on the real ``/root/gemma/brain`` vault using
-the canonical "reranked" mode.
+the same deterministic GT qrels + run logic is reused. It asserts the Phase 3
+regression gates on the real ``/root/gemma/brain`` vault using the canonical
+"reranked" mode:
+  * PRIMARY: UDCG@5 >= 0.45 (Utility-Discounted Cumulative Gain)
+  * SECONDARY: ndcg@5 >= 0.50
 
 Robustness:
   * If ``ranx`` is unavailable, the test is SKIPPED (not failed), so environments
@@ -77,7 +79,12 @@ def test_search_quality_gate():
     if not metrics:
         pytest.skip("no GT-relevant documents found; qrels empty for this vault")
 
+    UDCG_GATE = 0.45
     assert metrics["ndcg@5"] >= GATE, (
-        f"Phase 2 regression gate FAILED: ndcg@5={metrics['ndcg@5']:.4f} "
+        f"Phase 3 secondary gate FAILED: ndcg@5={metrics['ndcg@5']:.4f} "
         f"< {GATE}; recall@5={metrics['recall@5']:.4f} mrr@5={metrics['mrr@5']:.4f}"
+    )
+    assert metrics["udcg@5"] >= UDCG_GATE, (
+        f"Phase 3 PRIMARY gate FAILED: udcg@5={metrics['udcg@5']:.4f} "
+        f"< {UDCG_GATE}; ndcg@5={metrics['ndcg@5']:.4f}"
     )
