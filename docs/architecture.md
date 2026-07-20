@@ -8,8 +8,8 @@ src/power_framework/
 ├── py.typed            # PEP 561 marker
 ├── core/
 │   ├── __init__.py     # Re-exports all core modules
-│   ├── cli.py          # CLI entry point (argparse) — 11 commands
-│   ├── constants.py    # Centralized constants (v2.0.4)
+│   ├── cli.py          # CLI entry point (argparse) — 12 commands
+│   ├── constants.py    # Centralized constants (exclusion lists, skip files, system dirs)
 │   ├── healer.py       # Frontmatter Healer
 │   ├── markdown_checks.py  # Markdown quality checks
 │   ├── models.py       # OKFMetadata, NoteType, NoteStatus
@@ -18,7 +18,12 @@ src/power_framework/
 │   ├── indexer.py      # Hierarchical index generation
 │   ├── relations.py    # Entity extraction + relation suggestions (Graph RAG)
 │   ├── rot_scoring.py  # A2 scoring: dedup, freshness, link rot, usage
-│   ├── searcher.py     # Full-text search (FTS5/Vector/Hybrid)
+│   ├── searcher.py     # Full-text search (FTS5/Vector/Hybrid/Reranked)
+│   ├── embeddings.py   # Dense embedding managers (BGEM3OnnxManager canonical; fastembed/qwen3/ollama opt-in)
+│   ├── reranker.py     # Cross-Encoder reranker (Jina v2 multilingual default)
+│   ├── query_expansion.py # Synonym map (EN/UK) + OpenRouter Multi-Query expansion
+│   ├── chunker.py      # Semantic & contextual chunker (Anthropic Contextual Retrieval)
+│   ├── metrics/        # Retrieval metrics (udcg.py — UDCG@5 search-quality gate)
 │   └── utils.py        # Path safety, atomic writes, version, rate limiter
 └── mcp/
     ├── __init__.py     # Package marker
@@ -52,7 +57,7 @@ tests/
 - **SSRF hardening** — LinkRotChecker blocks private/loopback/link-local IPs
 - **XDG cache dir** — `.power_search.db` stored in `~/.cache/power-framework/`, not inside vault
 - **Centralized constants** — `core/constants.py` as single source for all exclusion lists, skip files, system dirs
-- **Strict mypy** — All 17 source files pass `--strict` type checking
+- **Strict mypy** — All core source modules pass `--strict` type checking
 - **Transport flexibility** — stdio (local) or HTTP (Docker) via `POWER_MCP_TRANSPORT` env var
 
 ## API boundaries

@@ -11,14 +11,14 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field; A2 scoring adds type-based exponential decay freshness
 - **Content Deduplication** — TF-Vector cosine similarity detects near-duplicate notes without external embeddings
-- **Pluggable Embeddings** — hot-swappable backends: MiniLM-L12-v2 (default, 384d, ~680 MB), BGE-M3 (1024d), Qwen3-0.6B (ONNX); selected via `POWER_EMBED_PROVIDER` env var
+- **Pluggable Embeddings** — canonical backend **`BAAI/bge-m3`** (1024d, direct ONNX Runtime + tokenizers, ~1.6 GB peak, strong UA↔EN). Legacy `fastembed` (MiniLM-L12-v2), `qwen3` (Qwen3-0.6B ONNX), and `ollama` backends remain opt-in via `POWER_EMBED_PROVIDER`
 - **WAL-mode parallel safety** — all SQLite connections use `journal_mode=WAL` + `busy_timeout=30000` for lock-free concurrent FTS / vector search
 - **Link Rot Detection** — HTTP HEAD checks for broken external links (SSRF-protected)
 - **Frontmatter Healer** — auto-fills missing title, description, type, and timestamp across the vault
 - **Markdown Quality Checks** — detects trailing whitespace, inconsistent list markers, header jumps, missing code language
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — all 12 tools exposed to any MCP-compatible AI client (Claude, OpenCode, Cursor), powered by FastMCP 3.x
-- **Production-grade** — 386 tests, 73%+ coverage, CodeQL scanning, Automated GitHub Releases
+- **Production-grade** — 416 tests, 73%+ coverage, CodeQL scanning, Automated GitHub Releases
 
 ## Features
 
@@ -27,7 +27,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **`power lint`** — Health-check metadata, broken links, orphans, stale/expired notes
 - **`power index`** — Compile hierarchical indexes (`index.md` + per-folder `_index.md`)
 - **`power ingest`** — Create new notes with validated frontmatter (supports `owner`, `status`, `expiry`, `related`)
-- **`power search`** — Full-text vault search with relevance scoring (FTS5/Vector/Hybrid)
+- **`power search`** — Full-text vault search with relevance scoring (FTS5 / Vector / Hybrid / Reranked modes; `reranked` is canonical)
 - **`power rot`** — ROT Audit: detect redundant, outdated, trivial notes; `--extended` for A2 scoring
 - **`power archive`** — Auto-archive stale notes to `04_Archive/` with dry-run preview
 - **`power heal`** — Auto-fill missing frontmatter fields (title, description, type, timestamp)
@@ -38,10 +38,17 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Knowledge Graph** — `related` field for explicit cross-note graph links
 - **Governance** — `owner`, `status`, `expiry` fields tracked in sub-indexes
 
+!!! note "Bilingual UA/EN vaults"
+For Ukrainian/English vaults, prefer the `hybrid` search mode over the canonical
+`reranked` mode: the English-centric Jina v2 cross-encoder reranker degrades
+Ukrainian retrieval (UA nDCG@5 ≈ 0.44 vs hybrid ≈ 0.82). The dense `bge-m3`
+backend itself is strong cross-lingually. See the
+[P.O.W.E.R. 3.0.0 search-quality report](https://github.com/weby-homelab/power-framework/blob/main/docs/tests/P.O.W.E.R.3.0.0-TEST.md).
+
 ## Quick start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v2.1.2
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.0.0
 
 power init ~/my-vault
 power lint ~/my-vault
