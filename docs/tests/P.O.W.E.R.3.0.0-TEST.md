@@ -306,39 +306,58 @@ python3 scripts/check_search_quality.py --vault /root/gemma/brain --mode reranke
 
 ---
 
-## 10. Порівняння архітектур: DRAPAS vs POWER 3.0.0
+## 10. Порівняння архітектур: DRAPAS 1.0 vs POWER 3.0.0
 
 Попередній порівняльний аналіз збережено у другому мозку
 (`brain/03_Resources/DRAPASS-vs-P.O.W.E.R.2.1.0.md`, `…2.0.4.md`, сесія
-`2026-07-17_drapas_power_v3_planning.md`). Нижче — оновлення того порівняння під
-фінальний стек 3.0.0 (див. §9.2), з урахуванням дорожньої карти POWER v2.1.0 (§3
-того звіту) та нюансу валідації графа DRAPAS.
+`2026-07-17_drapas_power_v3_planning.md`) та розширено у повному звіті
+`projects/DRAPAS1.0_vs_POWER3.0.md`. Нижче — оновлення того порівняння під фінальний
+стек 3.0.0 (див. §9.2), з урахуванням дорожньої карти POWER v2.1.0 (§3 того звіту),
+нюансу валідації графа DRAPAS, а також **сильних/слабких сторін POWER 3.0.0** та
+**перспектив розвитку POWER 3.0+** (див. §10.4–§10.7).
 
-### 10.1 DRAPAS — коротко (архітектурний профіль)
+### 10.1 DRAPAS 1.0 — коротко (архітектурний профіль)
 
-**DRAPAS** (Dynamic RAG with Pluggable Agent Storage) — Enterprise-scale концепція довготривалої пам'яті:
+У цьому звіті **DRAPAS 1.0** розуміється як конкретна реалізація концепції _Dynamic RAG
+with Pluggable Agent Storage_ — документ `DRAPAS1.0.md` є архітектурною картою проєкту
+**ObsidianDistil** (підтримуваний персональний Obsidian-вольт + локальний стек
+ретривлу/індексації). Це Enterprise-scale концепція довготривалої пам'яті:
 
-- **SQLite (FTS5)** — лексична навігація по метаданих/коротких текстах.
-- **LightRAG (GraphRAG)** — повністю автоматичний граф знань: сутності (Entities) та зв'язки (Relations)
-  **екстрагуються LLM** на етапі запису; дво­рівневий пошук — _Local_ (точні факти) + _Global_ (огляди/теми).
-- **Qdrant** — векторне сховище на мільйони щільних/розріджених векторів з нативним гібридом та
-  **DBSF** (Distribution-Based Score Fusion).
+- **SQLite (FTS5)** — лексична навігація по метаданих/коротких текстах (`vault_fts` ladder:
+  strict AND → OR-terms → LIKE).
+- **LightRAG (GraphRAG)** — повністю автоматичний граф знань: сутності (Entities) та зв'язки
+  (Relations) **екстрагуються LLM** на етапі запису; дво­рівневий пошук — _Local_ (точні факти)
+    - _Global_ (огляди/теми).
+- **Qdrant sidecar** — рівневий векторний індекс (секції) для semantic/fused (RRF) ретривлу.
+- **Generations & GC** — кожен домен версіонується як _generation_; індексація будує нову
+  генерацію, валідує, і лише тоді перемикає active pointer (append-only GC ledger, rollback-вікно).
+- **Local model sidecars** (llama.cpp, `127.0.0.1`) — embedder (Qwen3-Embedding-0.6B /
+  embeddinggemma-300m), reranker (Qwen3-Reranker-0.6B), query-expansion (qmd). **Query-time
+  нуль egress** — все на локалхості (хмара лише на index-time LLM-екстракції).
+- **Read-only MCP** (`vault_mcp_server.py`, stdio) — 14 read-only інструментів.
 
-### 10.2 Порівняльна таблиця (DRAPAS vs POWER 3.0.0)
+### 10.2 Порівняльна таблиця (DRAPAS 1.0 vs POWER 3.0.0)
 
-| Критерій                  | DRAPAS                                                                                     | POWER 3.0.0                                                                                  |
-| :------------------------ | :----------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- |
-| **Конструкція графа**     | LLM-екстракція (LightRAG), автоматична                                                     | Детермінований typed-relation граф (YAML `related`), Graph RAG v2 (`WeightedKnowledgeGraph`) |
-| **Галюцинації графа**     | Можливі без валідації; пом'якшені **бідирекційною** перевіркою кінців зв'язку (див. §10.3) | **Неможливі за визначенням** — граф валідовано конструкцією (типізовані зв'язки)             |
-| **Lexical search**        | SQLite FTS5                                                                                | SQLite FTS5 (`search_vault`)                                                                 |
-| **Dense / hybrid**        | Qdrant + DBSF fusion                                                                       | BGE-M3 direct ONNX + RRF `hybrid` / `reranked`                                               |
-| **Масштаб**               | 1M+ документів (Qdrant)                                                                    | ~100–300K (edge/SQLite)                                                                      |
-| **Global Retrieval**      | Так (LightRAG Global)                                                                      | Обмежений (weighted BFS + centrality v2)                                                     |
-| **Write-path cost**       | Високий (LLM на записі)                                                                    | Низький (детермінований індекс + опційний `synthesize`)                                      |
-| **Інфраструктура**        | Qdrant + LLM API (Docker/сервіси)                                                          | **Zero-infra / edge** (локальний ONNX)                                                       |
-| **Data Governance**       | —                                                                                          | ROT audit, `ContradictionDetector`, orphan-check (`linter`/`rot_scoring`)                    |
-| **Мультимовний reranker** | залежить від ембедера/reranker                                                             | Jina v2 multilingual + ColBERT opt-in (R2: `bge-reranker-v2-m3`)                             |
-| **Утилітарна метрика**    | —                                                                                          | UDCG@5 primary gate (§5.3)                                                                   |
+| Критерій                 | DRAPAS 1.0 (ObsidianDistil)                                              | P.O.W.E.R. 3.0.0                                                                                 |
+| :----------------------- | :----------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
+| **Філософія**            | Збереження знання + знахідність за контекстом (адаптований Zettelkasten) | AI-native гібридна пам'ять (P.A.R.A.+OKF+Wiki+Rules)                                             |
+| **Конструкція графа**    | LLM-екстракція (LightRAG), автоматична                                   | Детермінований typed-relation граф (OKF `related`), Graph RAG v2 (`WeightedKnowledgeGraph`)      |
+| **Галюцинації графа**    | Можливі без валідації; пом'якшені **бідирекційною** перевіркою (§10.3)   | **Неможливі за визначенням** — граф валідовано конструкцією (типізовані зв'язки = реальні файли) |
+| **Lexical search**       | SQLite FTS5 (`vault_fts` ladder)                                         | SQLite FTS5 (`search_vault`)                                                                     |
+| **Dense / hybrid**       | Qdrant sidecar + DBSF/RRF fusion                                         | BGE-M3 direct ONNX + RRF `hybrid` / `reranked`                                                   |
+| **Embedder (local)**     | Qwen3-Embedding-0.6B / embeddinggemma-300m (llama.cpp sidecar)           | BGE-M3 1024d (direct ONNX); qwen3/fastembed opt-in                                               |
+| **Reranker**             | Qwen3-Reranker-0.6B sidecar (local, no egress)                           | Jina v2 multilingual + ColBERT opt-in (⚠️ шкодить UA, §10.5)                                     |
+| **Query-time egress**    | **Нульовий** (все на 127.0.0.1; хмара лише на index-time)                | Ембед/реренк — локально (ONNX); query-expansion має опційний OpenRouter egress                   |
+| **Global Retrieval**     | Так (LightRAG Global: огляди/теми)                                       | Обмежений (weighted BFS + centrality v2)                                                         |
+| **Write-path cost**      | Високий (LLM-екстракція на записі)                                       | Низький (детермінований індекс + опційний `synthesize`)                                          |
+| **Масштаб**              | 1M+ документів (Qdrant)                                                  | ~100–300K (edge/SQLite)                                                                          |
+| **Generations & GC**     | Так (generations, append-only ledger, rollback-вікно)                    | Ні (single live SQLite + atomic tmp→rename)                                                      |
+| **Інфраструктура**       | Qdrant + LLM API (Docker/сервіси)                                        | **Zero-infra / edge** (локальний ONNX)                                                           |
+| **Data Governance**      | partial (ROT audit, tags_registry, frontmatter_guard)                    | ROT audit, `ContradictionDetector`, orphan-check, `expiry`                                       |
+| **Мультимовність UA↔EN** | Залежить від ембедера (Qwen3 — сильний)                                  | BGE-M3 сильний; але англомовний reranker шкодить UA (§10.5)                                      |
+| **Утилітарна метрика**   | Немає (health/status/validate)                                           | UDCG@5 primary gate + nDCG@5 ≥ 0.50                                                              |
+| **CI / doc-drift gate**  | Немає явного                                                             | `check_doc_drift.py` + ranx regression gate в CI                                                 |
+| **Auto-ingest**          | Manual prompts + offline extraction telemetry                            | `synthesize` auto-ingest (напів-автоматичне замикання циклу)                                     |
 
 ### 10.3 Галюцинації графа DRAPAS — нюанс валідації
 
@@ -355,19 +374,89 @@ python3 scripts/check_search_quality.py --vault /root/gemma/brain --mode reranke
 якщо явно прописані у самих документах-сутностях, і кожен кінець — це реальний файл vault-у. Тобто POWER
 обирає шлях «відсутність галюцинацій за конструкцією» замість «LLM-автоматизація + валідація» (DRAPAS).
 
-### 10.4 Що POWER 3.0.0 перейняв з дорожньої карти DRAPAS (v2.1.0 §3), а що — ні
+### 10.4 🟢 Сильні сторони P.O.W.E.R. 3.0.0
 
-| Ідея з дорожньої карти DRAPAS                                            | Статус у 3.0.0 | Обґрунтування                                                                                                                                                                                             |
-| :----------------------------------------------------------------------- | :------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **§3.1 Qdrant backend** (`POWER_VECTOR_BACKEND=qdrant` + DBSF)           | ❌ Не прийнято | Збережено edge/zero-infra та RAM-безпеку (§5.1, §9.3). Для vault-ів ≤300K SQLite+ONNX достатньо; Qdrant додає інфру без пропорційного виграшу для локального агента.                                      |
-| **§3.2 Automatic Dual-Level GraphRAG** (LLM-екстракція + `global` пошук) | 🟡 Частково    | Graph RAG v2 реалізовано (weighted BFS + centrality), але **не через LLM-екстракцію** — навмисно, щоб уникнути галюцинацій (§10.3). `global`-подібний огляд — через centrality, не через LightRAG Global. |
-| **§3.3 Мультимовний reranker** (`bge-reranker-v2-m3`)                    | 🟡 Частково    | Прийнято Jina v2 multilingual + ColBERT opt-in; R2 (§7) рекомендує перехід на `bge-reranker-v2-m3` для усунення падіння UA (§3.2).                                                                        |
+1. **Edge/zero-infra ефективність.** Прямий ONNX (без PyTorch/RAM-вибуху Qwen3 чи fastembed-процесів),
+   peak RSS ≈ 1.6 ГБ — вписується в контракт ≤2 ГБ. DRAPAS вимагає Qdrant + llama.cpp sidecars (важча інфра).
+2. **Детермінований граф без галюцинацій за конструкцією.** Typed `related` у OKF frontmatter = реальні
+   файли vault-у; Graph RAG v2 (weighted BFS + centrality) дає пов'язані нотатки без LLM-екстракції.
+3. **Виміряна білінгвальна якість retrieval.** UDCG@5 primary gate + nDCG@5 secondary (≥0.50). `hybrid` дає
+   EN ndcg@5 = 1.0 / UA = 0.818; FTS — EN 1.0 / UA 0.865. Жоден запит без топікального результату (UDCG@5 ≥ 0.95).
+4. **BGE-M3 — правильний канонічний вибір.** MIT-ліцензія, direct ONNX, сильний UA↔EN cosine (0.771),
+   еквівалентний якості Qwen3 на цьому корпусі, але без RAM-вибуху (~97 ГБ у Qwen3-ONNX).
+5. **RAM-безпека через opt-in.** Qwen3 та ColBERT перетворені на opt-in з граційним відступом — фреймворк
+   не падає на обмежених хостах (урок BUG B3 / INCIDENT-42GB).
+6. **Governance-шар.** ROT audit, `ContradictionDetector`, orphan-check, `expiry`-моніторинг свіжості —
+   DRAPAS має лише partial аналоги.
+7. **Synthesize auto-ingest.** Напів-автоматичне замикання циклу «сесія → знання → індекс» без тотальної
+   LLM-екстракції на write-path.
+8. **Інженерна надійність.** Doc-drift CI gate, ranx regression gate (жоден embedder/reranker-свап не мержиться
+   без бенчу), atomic writes, GPG-підпис, 416 тестів + CodeQL.
+9. **Простота оператора.** Один canonical шлях `power search <vault> <query>`; debug-режими — лише для
+   розробників (філософія «Unique, Simple, Effective»).
 
-**Висновок порівняння:** DRAPAS робить ставку на **depth/scale** (LightRAG graph-depth + Qdrant scale) з
-автоматизацією на write-path (ціною LLM-латентності та інфри) і пом'якшує галюцинації бідирекційною
-валідацією. POWER 3.0.0 робить ставку на **edge-ефективність, governance та виміряну якість** (UDCG@5,
-детермінований граф без галюцинацій, BGE-M3 direct ONNX, RAM-safe opt-in). Вибір — це depth/scale (DRAPAS)
-чи efficiency/governance/measured-quality (POWER), і для локального агента друге є кращим trade-off-ом.
+### 10.5 🔴 Слабкі сторони P.O.W.E.R. 3.0.0
+
+1. **❌ Англомовний cross-encoder reranker шкодить українській.** `reranked` UA ndcg@5 = **0.438** проти
+   `hybrid` **0.818** (−46%) — системна властивість Jina v2 (підтверджено ще TEST-4, v2.0.3). Головний шрам
+   3.0.0: canonical mode `reranked` фактично _гірший_ для UA-важких vault-ів, ніж `hybrid`.
+2. **❌ Обмежений Global Retrieval.** Weighted BFS + centrality v2 не дають повноцінного LightRAG Global
+   (огляди/теми «що обговорювалося в липні»). DRAPAS через LightRAG Global сильніший у агрегуючих запитах.
+3. **❌ Масштаб обмежений SQLite.** ~100–300K документів. DRAPAS (Qdrant) масштабується до 1M+. Для великих
+   корпоративних вольтів POWER потребує зовнішнього бекенду.
+4. **⚠️ Ручний GraphRAG.** Користувач/агент мусить прописувати `related` у YAML вручну (або через
+   `suggest-related`). DRAPAS автоматизує це через LLM на index-time — менше ручної праці, але з ризиком галюцинацій.
+5. **⚠️ Немає Generations & GC.** POWER тримає один live SQLite-індекс; немає rollback-вікна чи append-only
+   ledger генерацій, як у DRAPAS. Регресія індексу важче відкочується.
+6. **⚠️ Query-expansion має опційний OpenRouter egress.** На відміну від DRAPAS (нуль egress query-time),
+   POWER `query_expansion` може йти в хмару (multi-query через OpenRouter) — порушує zero-egress для приватних
+   vault-ів, якщо не вимкнено.
+7. **⚠️ Dense solo слабкий на keyword-важкому корпусі.** `vector` ndcg@5 = 0.513 (3.0.0). Потрібен FTS- або
+   hybrid-баланс; pure-semantic сценарії вразливі.
+8. **⚠️ CI-gate GT — лексичний (term-AND).** Не вимірює крос-лінгвальну перевагу (UA→EN/EN→UA), тому абсолютні
+   цифри не прямо порівняльні з кураторським GT попередніх тестів (методологічна прогалина, див. §2.3).
+
+### 10.6 Що POWER 3.0.0 перейняв з дорожньої карти DRAPAS (v2.1.0 §3), а що — ні
+
+| Ідея з дорожньої карти DRAPAS                                            | Статус у 3.0.0 | Обґрунтування                                                                                                                                                                                                                             |
+| :----------------------------------------------------------------------- | :------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **§3.1 Qdrant backend** (`POWER_VECTOR_BACKEND=qdrant` + DBSF)           | ❌ Не прийнято | Збережено edge/zero-infra та RAM-безпеку (§5.1, §9.3). Для vault-ів ≤300K SQLite+ONNX достатньо; Qdrant додає інфру без пропорційного виграшу для локального агента. **Повертається як R4 у §10.7.**                                      |
+| **§3.2 Automatic Dual-Level GraphRAG** (LLM-екстракція + `global` пошук) | 🟡 Частково    | Graph RAG v2 реалізовано (weighted BFS + centrality), але **не через LLM-екстракцію** — навмисно, щоб уникнути галюцинацій (§10.3). `global`-подібний огляд — через centrality, не через LightRAG Global. **Розширюється як R7 у §10.7.** |
+| **§3.3 Мультимовний reranker** (`bge-reranker-v2-m3`)                    | 🟡 Частково    | Прийнято Jina v2 multilingual + ColBERT opt-in; R2 (§7) рекомендує перехід на `bge-reranker-v2-m3` для усунення падіння UA (§3.2, §10.5).                                                                                                 |
+
+### 10.7 🔭 Перспективи розвитку POWER 3.0+
+
+На основі слабких сторін (§10.5), уроків MASTER-LESSONS-LEARNED та дорожньої карти DRAPAS (§3
+`DRAPASS-vs-P.O.W.E.R.2.1.0.md`), пропонується еволюція POWER 3.0 → 3.5/4.0 (повний звіт:
+`projects/DRAPAS1.0_vs_POWER3.0.md`).
+
+| #      | Пріоритет | Рекомендація                                                                                | Джерело             | Очікуваний ефект                 |
+| :----- | :-------- | :------------------------------------------------------------------------------------------ | :------------------ | :------------------------------- |
+| **R1** | 🔴 P0     | Конфігурований canonical mode; дефолт `hybrid` для UA-важких vault-ів (`POWER_SEARCH_MODE`) | §10.5.1, §5.2       | Усуває суперечність canonical/UA |
+| **R2** | 🔴 P0     | Мультимовний reranker `bge-reranker-v2-m3` (ONNX) замість Jina v2                           | §10.5.1, §7         | UA ndcg@5: 0.438 → ≥0.80         |
+| **R3** | 🟠 P1     | Крос-лінгвальний GT у харнесс (UA→EN/EN→UA сценарії) поряд з лексичним                      | §10.5.8, §2.3       | Чесна UA↔EN оцінка               |
+| **R4** | 🟠 P1     | `POWER_VECTOR_BACKEND=qdrant` + DBSF (плагіновий бекенд)                                    | §10.5.3, §10.6 §3.1 | Масштаб >1M доків                |
+| **R5** | 🟡 P2     | Generations & GC ledger + rollback-вікно                                                    | §10.5.5             | Надійний відкат індексу          |
+| **R6** | 🟡 P2     | Локальний query-expansion sidecar (повний zero-egress)                                      | §10.5.6             | Приватність query-time           |
+| **R7** | 🟡 P2     | Легкий auto GraphRAG (локальний, бідирекційно-валідований)                                  | §10.5.2, §10.6 §3.2 | Global Retrieval без галюцинацій |
+| **R8** | 🟢 P3     | Per-domain fusion knobs (RRF/score, `domain_overrides`)                                     | §5.6                | Тонке мовне налаштування         |
+| **R9** | 🟢 P3     | Warm-start map (cross-session навігаційний entry-point)                                     | §5.7                | Швидший старт агента             |
+
+**Траєкторія POWER 3.0+** — не відмова від філософії «Simple, Effective», а _вибіркове запозичення_
+сильних сторін DRAPAS: плагіновий Qdrant-бекенд (scale, R4), generations/GC (reliability, R5),
+локальний auto-GraphRAG з бідирекційною валідацією (global retrieval без галюцинацій, R7) і повний
+zero-egress (R6). Це перетворить POWER на гібрид, що поєднує edge-простоту з enterprise-глибиною —
+без втрати детермінованості та governance.
+
+**Висновок порівняння:** DRAPAS 1.0 робить ставку на **depth/scale** (LightRAG graph-depth + Qdrant scale
+
+- zero-egress sidecars) з автоматизацією на write-path (ціною LLM-латентності, інфри та ризику галюцинацій,
+  пом'якшених бідирекційною валідацією). POWER 3.0.0 робить ставку на **edge-ефективність, governance та
+  виміряну якість** (UDCG@5, детермінований граф без галюцинацій, BGE-M3 direct ONNX, RAM-safe opt-in).
+  **Головний шрам 3.0.0** — англомовний reranker, що шкодить українській (R2/R1). **Головна прогалина** —
+  масштаб і Global Retrieval (R4/R7). Вибір — це depth/scale (DRAPAS) чи efficiency/governance/measured-quality
+  (POWER), і для локального агента друге є кращим trade-off-ом, але POWER 3.0+ має стати **конфігуровано-глибоким**:
+  edge за замовчуванням, depth — opt-in для тих, кому потрібно.
 
 ---
 
@@ -376,6 +465,7 @@ python3 scripts/check_search_quality.py --vault /root/gemma/brain --mode reranke
 > тестами** (§4, §9): англомовний cross-encoder reranker погіршує українську вибірку, тому `hybrid`
 > (без reranker) — найнадійніший мультимовний режим, а `reranked` залишається семантичним спеціалістом для
 > EN. Еволюція (§9) показує, що фінальний дизайн — це не стрибок, а **конвергенція повторюваних уроків**
-> про мультимовність, RAM-безпеку та утилітарність метрик. Порівняння з DRAPAS (§10) фіксує свідомий вибір
-> POWER на користь детермінованого графа (без галюцинацій за конструкцією) та edge-ефективності замість
-> LLM-автоматизації й зовнішньої інфраструктури.
+> про мультимовність, RAM-безпеку та утилітарність метрик. Порівняння з DRAPAS 1.0 (§10) фіксує свідомий
+> вибір POWER на користь детермінованого графа (без галюцинацій за конструкцією) та edge-ефективності замість
+> LLM-автоматизації й зовнішньої інфраструктури, а перспективи POWER 3.0+ (§10.7) вказують шлях до поєднання
+> цієї простоти з enterprise-глибиною DRAPAS через вибіркове opt-in запозичення.
