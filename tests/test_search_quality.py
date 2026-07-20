@@ -79,12 +79,12 @@ def test_search_quality_gate():
     if not metrics:
         pytest.skip("no GT-relevant documents found; qrels empty for this vault")
 
-    UDCG_GATE = 0.45
+    udcg_gate = 0.45
     assert metrics["ndcg@5"] >= GATE, (
         f"Phase 3 secondary gate FAILED: ndcg@5={metrics['ndcg@5']:.4f} "
         f"< {GATE}; recall@5={metrics['recall@5']:.4f} mrr@5={metrics['mrr@5']:.4f}"
     )
-    assert metrics["udcg@5"] >= UDCG_GATE, (
+    assert metrics["udcg@5"] >= udcg_gate, (
         f"Phase 3 PRIMARY gate FAILED: udcg@5={metrics['udcg@5']:.4f} "
-        f"< {UDCG_GATE}; ndcg@5={metrics['ndcg@5']:.4f}"
+        f"< {udcg_gate}; ndcg@5={metrics['ndcg@5']:.4f}"
     )

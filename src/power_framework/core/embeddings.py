@@ -443,7 +443,7 @@ class BGEM3OnnxManager:
             # that ship a single-file model.
             try:
                 hf_hub_download(self.repo, "model.onnx.data")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug("No model.onnx.data sidecar in %s: %s", self.repo, e)
             tok_path = hf_hub_download(self.repo, "tokenizer.json")
 
@@ -541,7 +541,7 @@ def get_embedding_manager(
             mgr._lazy_init()  # eager probe: fail loudly, not silently
             _EMBED_MANAGER_CACHE[key] = mgr
             return mgr
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(
                 "BGE-M3 canonical backend failed to initialize (%s); "
                 "falling back to fastembed. Search quality WILL degrade.",

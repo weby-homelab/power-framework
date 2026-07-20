@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import tempfile
 from typing import TYPE_CHECKING
 
 import pytest
@@ -56,13 +57,12 @@ def semantic_indexed_vault(sample_vault: Path, monkeypatch):
     """
 
     monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
-    import pytest as _pytest
 
     from power_framework.core import embeddings as _emb
     from power_framework.core.searcher import _sync_vault_to_db
 
     if not _emb._embeddings_available():
-        _pytest.skip("BGE-M3 embedder unavailable in this environment")
+        pytest.skip("BGE-M3 embedder unavailable in this environment")
 
     db_path = get_cache_dir() / "power_search.db"
     conn = sqlite3.connect(str(db_path), timeout=30)
@@ -187,7 +187,7 @@ class TestEmbeddingCacheDir:
         assert cache is not None
         # Must NOT live under a transient /tmp path (persistent across runs
         # per Phase 1 §2); it should resolve under the XDG cache dir.
-        assert "/tmp/" not in str(cache)
+        assert tempfile.gettempdir() not in str(cache)
         assert cache.exists() or cache.parent.exists()
 
 
@@ -200,7 +200,7 @@ class TestSemanticFallback:
     """
 
     def test_falls_back_to_fts_on_dead_embedder(self, indexed_vault, monkeypatch):
-        from power_framework.core import searcher as S
+        from power_framework.core import searcher
 
         class _Dead:
             def embed(self, text):
@@ -209,18 +209,18 @@ class TestSemanticFallback:
             def embed_batch(self, texts, batch_size=8):
                 raise RuntimeError("simulated dead embedder")
 
-        monkeypatch.setattr(S, "get_embedding_manager", lambda *a, **k: _Dead())
+        monkeypatch.setattr(searcher, "get_embedding_manager", lambda *a, **k: _Dead())
         # Query uses terms present in the indexed sample notes ("test", "project")
         # so the FTS fallback can return real hits (FTS is a strict AND of terms,
         # unlike fuzzy semantic matching).
-        res = S._semantic_search(indexed_vault, "test project", max_results=5)
+        res = searcher._semantic_search(indexed_vault, "test project", max_results=5)
         # Not a silent empty list; FTS fallback returns the indexed notes.
         assert isinstance(res, list)
         assert len(res) > 0
 
     def test_no_silent_empty_on_empty_vault(self, tmp_path):
-        from power_framework.core import searcher as S
+        from power_framework.core import searcher
 
         # An empty vault has neither embeddings nor FTS hits -> honest [].
-        res = S._semantic_search(tmp_path, "anything", max_results=5)
+        res = searcher._semantic_search(tmp_path, "anything", max_results=5)
         assert res == []

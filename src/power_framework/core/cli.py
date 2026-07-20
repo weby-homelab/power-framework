@@ -29,7 +29,6 @@ from .markdown_checks import check_all as check_markdown_issues
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .parser import build_frontmatter, read_file_content
 from .relations import (
-    WeightedKnowledgeGraph,
     format_relation_suggestions,
     suggest_related,
     suggest_related_v2,

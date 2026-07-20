@@ -16,16 +16,12 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from .indexer import run_generate_hierarchical_index
 from .linter import run_lint_report
 from .models import NoteType, OKFMetadata, TypedRelation
 from .parser import build_frontmatter
 from .utils import atomic_write
-
-if TYPE_CHECKING:
-    from zoneinfo import ZoneInfo
 
 _DEFAULT_TZ = datetime.timezone.utc
 

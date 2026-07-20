@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from power_framework.core.embeddings import EMBEDDING_DIM, get_embedding_manager
+from power_framework.core.embeddings import get_embedding_manager
 
 
 class TestEmbeddingManager:

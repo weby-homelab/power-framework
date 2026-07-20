@@ -10,6 +10,7 @@ Multi-mode search across vault notes:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
@@ -26,7 +27,6 @@ from .index_worker import request_sync, set_vault_dir
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
 from .query_expansion import QueryExpander
-from .reranker import RerankerManager
 from .utils import get_cache_dir
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def _get_reranker():
 
         try:
             _reranker_singleton = get_reranker()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("Reranker init failed (%s); retrying with Jina v2 default.", e)
             from .reranker import RerankerManager
 
@@ -502,10 +502,8 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
                 "partial chunk_embeddings to avoid a silently corrupt index.",
                 e,
             )
-            try:
+            with contextlib.suppress(Exception):
                 conn.rollback()
-            except Exception:  # noqa: BLE001, S110
-                pass
             raise
 
     total = len(doc_items) + len(chunk_items)
@@ -798,14 +796,14 @@ def _semantic_search(
             if fcur.fetchone()[0] == 0:
                 _sync_vault_to_db(vault_dir, fconn, sync_embeddings=False)
             fconn.close()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("FTS fallback index refresh failed: %s", e)
         return _fts_search(vault_dir, query, max_results=max_results)
 
     try:
         embedder = get_embedding_manager()
         query_vec = embedder.embed(query)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _fts_fallback(f"embedder error: {type(e).__name__}")
 
     try:
@@ -846,7 +844,7 @@ def _semantic_search(
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
         rows = cursor.fetchall()
         conn.close()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return _fts_fallback(f"db error: {type(e).__name__}")
 
     if not rows:

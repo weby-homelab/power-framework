@@ -553,7 +553,7 @@ class WeightedKnowledgeGraph:
 
     def centrality(self, top_k: int = 10) -> list[tuple[str, float]]:
         """Degree/weight centrality: sum of incident edge weights per node."""
-        scores: dict[str, float] = {n: 0.0 for n in self._nodes}
+        scores: dict[str, float] = dict.fromkeys(self._nodes, 0.0)
         for src, edges in self._adj.items():
             for _tgt, w in edges:
                 scores[src] += w

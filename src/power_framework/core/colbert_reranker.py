@@ -8,7 +8,7 @@ heavy: it needs ~16+ GB of RAM/VRAM and a multi-GB model download.
 Therefore this backend is **opt-in and OFF by default**. It is only engaged
 when ``POWER_RERANKER=colbert`` is set, and it refuses to load unless the host
 has at least ``POWER_COLBERT_MIN_RAM_GB`` (default 16) of available RAM. On any
-unavailability it raises a clear ``ColBERTUnavailable`` so the caller can fall
+unavailability it raises a clear ``ColBERTUnavailableError`` so the caller can fall
 back to the canonical Jina v2 reranker (never silently degrade search quality).
 """
 
@@ -29,7 +29,7 @@ COLBERT_MIN_RAM_GB = float(os.getenv("POWER_COLBERT_MIN_RAM_GB", "16"))
 COLBERT_DEFAULT_MODEL = os.getenv("POWER_COLBERT_MODEL", "colbert-ir/colbertv2.0")
 
 
-class ColBERTUnavailable(Exception):
+class ColBERTUnavailableError(Exception):
     """Raised when the ColBERT backend cannot be engaged (disabled / no RAM / no pkg)."""
 
 
@@ -62,11 +62,11 @@ class ColBERTLateInteractionReranker:
         self.model_name = model_name
         self._model: object | None = None
         if not is_colbert_enabled():
-            raise ColBERTUnavailable(
+            raise ColBERTUnavailableError(
                 "ColBERT backend is opt-in; set POWER_RERANKER=colbert to enable."
             )
         if _available_ram_gb() < COLBERT_MIN_RAM_GB:
-            raise ColBERTUnavailable(
+            raise ColBERTUnavailableError(
                 f"ColBERT requires >= {COLBERT_MIN_RAM_GB:.0f} GB available RAM; "
                 f"only {_available_ram_gb():.1f} GB available."
             )
@@ -75,10 +75,10 @@ class ColBERTLateInteractionReranker:
         if self._model is not None:
             return
         try:
-            from colbert.modeling.checkpoint import Checkpoint  # type: ignore
             from colbert.infra import ColBERTConfig  # type: ignore
+            from colbert.modeling.checkpoint import Checkpoint  # type: ignore
         except ModuleNotFoundError as e:  # pragma: no cover - depends on env
-            raise ColBERTUnavailable(
+            raise ColBERTUnavailableError(
                 "The 'colbert' package is not installed. Install with: pip install colbert-ai"
             ) from e
         # Late-interaction scoring reuses ColBERT's checkpoint scorer; the heavy
