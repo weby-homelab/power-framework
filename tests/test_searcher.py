@@ -155,8 +155,14 @@ class TestSearchVault:
         assert results == []
 
     def test_search_nonexistent_query(self, sample_vault: Path):
-        results = search_vault(sample_vault, "xyznonexistent12345")
+        # In FTS mode a query with no token matches returns an honest empty list.
+        results = search_vault(sample_vault, "xyznonexistent12345", mode="fts")
         assert results == []
+        # In the canonical "reranked" mode, a no-FTS-hit query falls back to the
+        # dense embedder (R5), which always returns approximate matches — so we
+        # assert it returns *something* rather than a silent empty list (B7/FP-7).
+        results = search_vault(sample_vault, "xyznonexistent12345", mode="reranked")
+        assert len(results) > 0
 
     def test_max_results(self, sample_vault: Path):
         results = search_vault(sample_vault, "test", max_results=1)

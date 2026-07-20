@@ -69,3 +69,6 @@ yarn.lock
 scratch/
 .system_generated/
 site/
+
+# Search-quality bench qrels cache
+.cache/

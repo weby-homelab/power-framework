@@ -371,7 +371,20 @@ def _sync_vault_to_db(
             doc_items.append((rel_path, full_text, mtime))
 
             cursor.execute("DELETE FROM chunk_embeddings WHERE rel_path = ?", (rel_path,))
-            chunks = chunker.chunk(content, title=metadata.title, description=metadata.description)
+            # B6 (POWER 3.0): short notes (<200 tokens) get a single whole-document
+            # chunk instead of semantic splitting. Splitting a tiny note yields
+            # either 0 chunks (lost from dense retrieval) or fragments that lose
+            # cross-sentence context. Whole-doc embedding keeps short notes fully
+            # retrievable and matches the FTS/BM25 unit of retrieval.
+            approx_tokens = len(re.findall(r"\S+", content))
+            if approx_tokens < 200:
+                chunks = [
+                    f"[Document: {metadata.title} | Description: {metadata.description}]\n{content.strip()}"
+                ]
+            else:
+                chunks = chunker.chunk(
+                    content, title=metadata.title, description=metadata.description
+                )
             for i, chunk_text in enumerate(chunks):
                 chunk_items.append((f"{rel_path}::chunk_{i}", rel_path, chunk_text, mtime))
         except Exception as e:  # noqa: PERF203
@@ -901,7 +914,7 @@ def search_vault(
     vault_dir: Path,
     query: str,
     max_results: int = 20,
-    mode: str = "fts",
+    mode: str = "reranked",
 ) -> list[SearchResult]:
     """
     Search the vault for notes matching the query.
@@ -910,11 +923,12 @@ def search_vault(
         vault_dir: Path to the vault root directory.
         query: Search query string.
         max_results: Maximum number of results to return.
-        mode: Search mode - "fts" (SQLite FTS5, default),
-              "vector" (TF cosine similarity),
-              "hybrid" (RRF merge of FTS + vector),
-              "hybrid_reranked" (RRF merge + cross-encoder reranking),
-              "semantic" (dense embedding cosine similarity via fastembed).
+        mode: Search mode. POWER 3.0 canonical mode is "reranked" (default):
+              FTS5/BM25 -> top-150 -> cross-encoder reranker (Jina v2) -> top-20,
+              with a dense-embedding fallback only when FTS yields < 5 hits.
+              Developer/debug modes: "fts" (BM25), "vector" (TF cosine),
+              "hybrid" (RRF of FTS + vector), "semantic" (dense embedding),
+              "hybrid_reranked" (alias of "reranked").
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -986,8 +1000,16 @@ def search_vault(
             results = _vector_search(vault_dir, variant, max_results=max_results)
         elif mode == "semantic":
             results = _semantic_search(vault_dir, variant, max_results=max_results)
-        elif mode == "hybrid_reranked":
+        elif mode in ("reranked", "hybrid_reranked"):
             results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
+            # R5 (POWER 3.0): dense fallback ONLY when FTS/rerank yields too few
+            # hits — keeps the canonical path cheap (no model load) for the common
+            # case, but never silently returns a short list when the vault clearly
+            # has relevant dense matches. This is the inverse of the old behavior
+            # where semantic was the default and FTS was the fallback.
+            if len(results) < 5:
+                dense = _semantic_search(vault_dir, variant, max_results=max_results)
+                _merge_by_rel_path(all_results, dense)
         else:
             results = _fts_search(vault_dir, variant, max_results=max_results)
         all_results.extend(results)
@@ -1006,15 +1028,22 @@ def _hybrid_reranked_search(
     query: str,
     max_results: int = 20,
 ) -> list[SearchResult]:
-    candidates = _fts_search(vault_dir, query, max_results=50)
-    vector_results = _vector_search(vault_dir, query, max_results=50)
+    """Canonical POWER 3.0 retrieval: FTS/BM25 -> top-150 -> Jina v2 rerank -> top-20.
+
+    Implements the R5 canonical search mode. Broad FTS recall (top-150) is merged
+    with TF-vector candidates via RRF, then a cross-encoder reranker (Jina v2
+    multilingual) re-ranks the leading pool. The reranker is cached (singleton)
+    so repeated queries stay fast.
+    """
+    candidates = _fts_search(vault_dir, query, max_results=150)
+    vector_results = _vector_search(vault_dir, query, max_results=150)
     candidates = _rrf_merge(candidates, vector_results)
 
     if not candidates:
         return []
 
     # Performance Plan §4: bound the reranker to the top-K RRF candidates
-    # (default 20) instead of reranking all 100 full-document texts, AND rerank
+    # (default 20) instead of reranking all 150 full-document texts, AND rerank
     # only the leading excerpt (truncated to RERANK_TEXT_CHARS) of each doc.
     # Cross-encoders on CPU are dominated by token count, so truncating slashes
     # latency ~10x with negligible nDCG loss (MAR@5 preserved).
@@ -1041,6 +1070,15 @@ def _hybrid_reranked_search(
     reranked.sort(key=lambda r: -r.score)
     tail = candidates[len(rerank_pool) :]
     return (reranked + tail)[:max_results]
+
+
+def _merge_by_rel_path(target: list[SearchResult], incoming: list[SearchResult]) -> None:
+    """Merge ``incoming`` into ``target``, keeping the highest score per rel_path."""
+    seen: dict[str, float] = {r.rel_path: r.score for r in target}
+    for r in incoming:
+        if r.rel_path not in seen or r.score > seen[r.rel_path]:
+            target.append(r)
+            seen[r.rel_path] = r.score
 
 
 def format_search_results(

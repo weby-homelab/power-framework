@@ -16,6 +16,7 @@ Usage:
 Checks:
     embedder  — README must name the canonical dense backend (EMBED_PROVIDER)
     reranker  — README must name the canonical reranker model
+    mode      — README must name the canonical search mode ("reranked")
     version   — README/CHANGELOG must not reference a stale default provider
 
 Exit code 0 = in sync, 1 = drift detected.
@@ -56,10 +57,18 @@ def _load_code_facts() -> dict[str, str]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from power_framework.core import reranker
     from power_framework.core.embeddings import EMBED_PROVIDER
+    from power_framework.core.searcher import search_vault
+
+    # The canonical search mode is the default argument of search_vault.
+    import inspect
+
+    sig = inspect.signature(search_vault)
+    default_mode = sig.parameters["mode"].default
 
     return {
         "embedder": EMBED_PROVIDER,
         "reranker": reranker.DEFAULT_RERANKER_MODEL,
+        "mode": default_mode,
     }
 
 
@@ -111,9 +120,22 @@ def check_version(readme: str, provider: str) -> list[str]:
     return errors
 
 
+def check_mode(readme: str, mode: str) -> list[str]:
+    # The canonical search mode declared in code (search_vault default) must be
+    # advertised in the README, and a stale "5 modes" / old default must not
+    # linger. Prevents the classic "mode claim outlived the code" doc-drift.
+    if mode not in readme and f"`{mode}`" not in readme:
+        return [
+            f"README does not name the canonical search mode '{mode}' "
+            f"(the code default for search_vault). Update the search section."
+        ]
+    return []
+
+
 CHECKS = {
     "embedder": lambda r, f: check_embedder(r, f["embedder"]),
     "reranker": lambda r, f: check_reranker(r, f["reranker"]),
+    "mode": lambda r, f: check_mode(r, f["mode"]),
     "version": lambda r, f: check_version(r, f["embedder"]),
 }
 
@@ -151,7 +173,8 @@ def main() -> int:
 
     print(
         f"Doc-drift check passed: README matches code "
-        f"(embedder={facts['embedder']}, reranker={facts['reranker'].rsplit('/', 1)[-1]})."
+        f"(embedder={facts['embedder']}, reranker={facts['reranker'].rsplit('/', 1)[-1]}, "
+        f"mode={facts['mode']})."
     )
     return 0
 

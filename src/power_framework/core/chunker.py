@@ -37,8 +37,9 @@ class SemanticChunker:
     ) -> list[str]:
         """Split markdown content into contextualized chunks.
 
-        Each chunk is prefixed with:
-            [Document: {title} | Description: {description}]
+        Each chunk is prefixed with document-level context
+        (R6 Contextual Retrieval):
+            [Document: {title} | Description: {description} | Section: {section}]
 
         Args:
             content: Raw markdown content (with or without YAML frontmatter).
@@ -49,22 +50,26 @@ class SemanticChunker:
             List of chunk strings, each with the document context prefix.
         """
         body = _strip_frontmatter(content)
-        prefix = f"[Document: {title} | Description: {description}]\n"
+        doc_prefix = f"[Document: {title} | Description: {description}]"
 
         if self.mode == "headers":
-            raw_chunks = self._split_by_headers(body)
+            raw_chunks = self._split_by_headers(body, doc_prefix)
         elif self.mode == "paragraphs":
             raw_chunks = self._split_by_paragraphs(body)
+            # R6 Contextual Retrieval: every chunk carries document context.
+            raw_chunks = [f"{doc_prefix} | Section: (paragraph)\n{p}" for p in raw_chunks]
         else:
             raw_chunks = self._split_fixed(body, self.chunk_size, self.chunk_overlap)
+            raw_chunks = [f"{doc_prefix} | Section: (fixed)\n{c}" for c in raw_chunks]
 
-        return [prefix + chunk.strip() for chunk in raw_chunks if chunk.strip()]
+        return [chunk.strip() for chunk in raw_chunks if chunk.strip()]
 
-    def _split_by_headers(self, text: str) -> list[str]:
-        """Split on H2 (##) and H3 (###) headers."""
+    def _split_by_headers(self, text: str, doc_prefix: str = "") -> list[str]:
+        """Split on H2 (##) and H3 (###) headers, each chunk carrying its
+        section name in the contextual prefix (R6 Contextual Retrieval)."""
         matches = list(HEADER_PATTERN.finditer(text))
         if not matches:
-            return [text.strip()] if text.strip() else []
+            return [f"{doc_prefix}\n{text.strip()}"] if text.strip() else []
 
         chunks: list[str] = []
 
@@ -72,12 +77,15 @@ class SemanticChunker:
             if i == 0 and match.start() > 0:
                 preamble = text[: match.start()].strip()
                 if preamble:
-                    chunks.append(preamble)
+                    chunks.append(f"{doc_prefix} | Section: (preamble)\n{preamble}")
             start = match.start()
             end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
             section = text[start:end].strip()
+            # The first line of the section is the header itself — extract the
+            # section name to surface it in the prefix for retrieval context.
+            section_name = match.group(2).strip()
             if section:
-                chunks.append(section)
+                chunks.append(f"{doc_prefix} | Section: {section_name}\n{section}")
 
         return chunks
 

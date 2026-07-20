@@ -92,9 +92,13 @@ class TestBackgroundIndexer:
 
     def test_request_sync_enqueues(self, sample_vault, monkeypatch):
         monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
-        index_worker.stop_indexer()  # prevent the worker from clearing the queue
+        # Prevent the background worker from draining/clearing the queue so the
+        # assertion is deterministic (the worker runs in a separate thread).
+        monkeypatch.setattr(index_worker, "ensure_indexer_running", lambda: None)
+        index_worker._clear_queue()
         index_worker.request_sync(sample_vault, mode="fts")
-        conn = sqlite3.connect(str(get_cache_dir() / "power_search.db"), timeout=30)
+        # Read from the same (POWER_SEARCH_DB-isolated) path the worker uses.
+        conn = sqlite3.connect(str(index_worker._db_path()), timeout=30)
         index_worker._ensure_queue_table(conn)
         row = conn.execute("SELECT mode FROM sync_queue WHERE id = 1").fetchone()
         conn.close()
