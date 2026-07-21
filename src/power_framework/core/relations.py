@@ -223,6 +223,7 @@ class KnowledgeGraph:
         self._nodes: set[str] = set()
         self._edges: list[tuple[str, str, str, float]] = []
         self._adj: dict[str, list[tuple[str, str, float]]] = {}
+        self.quarantined_edges: list[tuple[str, str, str, float]] = []
 
     def add_note(self, note_path: str) -> None:
         """Register a note node."""
@@ -250,11 +251,17 @@ class KnowledgeGraph:
     ) -> KnowledgeGraph:
         """Build a graph from a list of NoteFile objects using their 'related' metadata."""
         kg = cls()
+        valid_notes = {note.rel_path for note in notes if note.metadata is not None}
         for note in notes:
             if note.metadata is None:
                 continue
             kg.add_note(note.rel_path)
             for rel in note.metadata.related:
+                if rel.path not in valid_notes:
+                    kg.quarantined_edges.append(
+                        (note.rel_path, rel.path, rel.relation, rel.confidence)
+                    )
+                    continue
                 kg.add_relation(
                     source=note.rel_path,
                     target=rel.path,

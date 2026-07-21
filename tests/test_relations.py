@@ -4,9 +4,12 @@ Tests for entity extraction and relation suggestions.
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
+from power_framework.core.models import NoteFile, OKFMetadata, TypedRelation
 from power_framework.core.relations import (
+    KnowledgeGraph,
     RelationSuggestion,
     _compute_overlap_score,
     _extract_keywords,
@@ -105,6 +108,39 @@ class TestRelationSuggestion:
         assert rs.target_path == "b.md"
         assert rs.score == 0.75
         assert rs.reason == "Overlap"
+
+
+class TestKnowledgeGraphIntegrity:
+    def test_from_notes_quarantines_missing_relation_target(self):
+        source = NoteFile(
+            abs_path="/vault/source.md",
+            rel_path="01_Projects/source.md",
+            metadata=OKFMetadata(
+                type="Project",
+                title="Source",
+                description="Source note",
+                timestamp=datetime(2026, 1, 1),
+                related=[TypedRelation(path="01_Projects/missing.md")],
+            ),
+        )
+        target = NoteFile(
+            abs_path="/vault/target.md",
+            rel_path="01_Projects/target.md",
+            metadata=OKFMetadata(
+                type="Project",
+                title="Target",
+                description="Target note",
+                timestamp=datetime(2026, 1, 1),
+            ),
+        )
+
+        graph = KnowledgeGraph.from_notes([source, target])
+
+        assert graph._nodes == {"01_Projects/source.md", "01_Projects/target.md"}
+        assert graph._edges == []
+        assert graph.quarantined_edges == [
+            ("01_Projects/source.md", "01_Projects/missing.md", "related_to", 1.0)
+        ]
 
 
 class TestFormatRelationSuggestions:
