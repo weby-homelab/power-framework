@@ -7,6 +7,7 @@ from typing import Protocol
 logger = logging.getLogger(__name__)
 
 DEFAULT_RERANKER_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
+ALLOW_NONCOMMERCIAL_MODELS_ENV = "POWER_ALLOW_NONCOMMERCIAL_MODELS"
 
 QWEN3_RERANKER_MODEL = os.getenv("POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX")
 
@@ -17,6 +18,10 @@ class RerankerProtocol(Protocol):
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         """Return a relevance score per document (higher = more relevant)."""
         ...
+
+
+class NonCommercialModelDisabledError(RuntimeError):
+    """Raised when local Jina CC-BY-NC-4.0 use was not explicitly approved."""
 
 
 class RerankerManager:
@@ -38,6 +43,12 @@ class RerankerManager:
                 ) from None
             self._model = Qwen3TextCrossEncoder(model_name=QWEN3_RERANKER_MODEL)
             return
+        if os.getenv(ALLOW_NONCOMMERCIAL_MODELS_ENV, "").lower() not in {"1", "true", "yes"}:
+            raise NonCommercialModelDisabledError(
+                f"{DEFAULT_RERANKER_MODEL} is CC-BY-NC-4.0. Set "
+                f"{ALLOW_NONCOMMERCIAL_MODELS_ENV}=1 only for permitted non-commercial use, "
+                "or configure a licensed reranker."
+            )
         try:
             from fastembed.rerank.cross_encoder import TextCrossEncoder
         except ImportError:

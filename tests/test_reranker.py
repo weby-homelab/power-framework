@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from power_framework.core.reranker import RerankerManager
+import pytest
+
+from power_framework.core.reranker import (
+    ALLOW_NONCOMMERCIAL_MODELS_ENV,
+    NonCommercialModelDisabledError,
+    RerankerManager,
+)
 
 
 class TestRerankerManager:
@@ -52,6 +58,13 @@ class TestRerankerManager:
     def test_lazy_init_does_not_load_on_construction(self):
         manager = RerankerManager()
         assert manager._model is None
+
+    def test_jina_requires_explicit_noncommercial_opt_in(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.delenv(ALLOW_NONCOMMERCIAL_MODELS_ENV, raising=False)
+        manager = RerankerManager()
+
+        with pytest.raises(NonCommercialModelDisabledError, match=r"CC-BY-NC-4\.0"):
+            manager._lazy_init()
 
     def test_rerank_calls_model_rerank_with_args(self):
         manager = RerankerManager()
