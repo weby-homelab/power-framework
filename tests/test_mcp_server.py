@@ -57,6 +57,53 @@ async def test_search_vault_empty_query(sample_vault: Path) -> None:
         await search_vault_tool(query="", vault_path=str(sample_vault))
 
 
+async def test_search_vault_uses_canonical_default_mode(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_search(_path: Path, _query: str, *, max_results: int, mode: str):
+        captured["mode"] = mode
+        return []
+
+    monkeypatch.setattr(power_server, "search_vault", fake_search)
+    monkeypatch.setattr(power_server, "ensure_indexer_running", lambda: None)
+
+    envelope = json.loads(await search_vault_tool(query="Test", vault_path=str(sample_vault)))
+
+    assert captured["mode"] == "reranked"
+    assert envelope["mode"] == "reranked"
+
+
+async def test_search_vault_keeps_explicit_fts_mode_compatible(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_search(_path: Path, _query: str, *, max_results: int, mode: str):
+        captured["mode"] = mode
+        return []
+
+    monkeypatch.setattr(power_server, "search_vault", fake_search)
+    monkeypatch.setattr(power_server, "ensure_indexer_running", lambda: None)
+
+    envelope = json.loads(
+        await search_vault_tool(query="Test", search_mode="fts", vault_path=str(sample_vault))
+    )
+
+    assert captured["mode"] == "fts"
+    assert envelope["mode"] == "fts"
+
+
+async def test_search_vault_rejects_unknown_mode(sample_vault: Path) -> None:
+    with pytest.raises(ToolError, match="Unsupported search mode"):
+        await search_vault_tool(
+            query="Test",
+            search_mode="silent-fallback",
+            vault_path=str(sample_vault),
+        )
+
+
 @pytest.mark.parametrize("max_results", [0, 21])
 async def test_search_vault_rejects_result_budget_overrides(
     sample_vault: Path,

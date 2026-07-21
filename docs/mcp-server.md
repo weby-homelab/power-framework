@@ -145,13 +145,16 @@ Create a new note with strict OKF metadata. Rebuilds index + appends to log.md. 
 
 ### `search_vault_tool`
 
-Full-text search across all vault notes. Four modes: `reranked` (canonical, default — FTS5 → cross-encoder rerank → top results), `fts` (BM25), `vector` (dense cosine via BGE-M3), `hybrid` (RRF fusion).
+Full-text search across all vault notes. Canonical modes are `reranked` (default —
+FTS5 → cross-encoder rerank → top results), `fts` (BM25), `vector` (dense cosine
+via BGE-M3), `hybrid` (RRF fusion), and `semantic` (dense embedding). The legacy
+`hybrid_reranked` value remains accepted as a deprecated alias for `reranked`.
 
 | Parameter     | Type      | Required | Description                                                    |
 | ------------- | --------- | -------- | -------------------------------------------------------------- |
 | `query`       | `string`  | Yes      | Search query                                                   |
 | `max_results` | `integer` | No       | 1–20 results (default: 20)                                    |
-| `search_mode` | `string`  | No       | `reranked`, `fts`, `vector`, or `hybrid` (default: `reranked`) |
+| `search_mode` | `string`  | No       | `reranked`, `fts`, `vector`, `hybrid`, or `semantic` (default: `reranked`); `hybrid_reranked` is a deprecated alias |
 | `vault_path`  | `string`  | No       | Path to vault root                                             |
 
 ### `synthesize_session`

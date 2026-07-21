@@ -7,8 +7,12 @@ import json
 from datetime import datetime
 from pathlib import Path  # noqa: TC003
 
+import pytest
+
 from power_framework.core.models import OKFMetadata
 from power_framework.core.searcher import (
+    CANONICAL_SEARCH_MODES,
+    DEFAULT_SEARCH_MODE,
     SearchResult,
     _compute_tf_vector,
     _cosine_similarity,
@@ -19,6 +23,7 @@ from power_framework.core.searcher import (
     _vector_search,
     format_search_results,
     format_untrusted_search_envelope,
+    normalize_search_mode,
     search_vault,
 )
 
@@ -39,6 +44,26 @@ class TestTokenize:
 
     def test_lowercase(self):
         assert _tokenize("Hello World") == ["hello", "world"]
+
+
+class TestSearchModeContract:
+    """Tests for the shared core/CLI/MCP retrieval mode contract."""
+
+    def test_default_mode_is_canonical(self):
+        assert DEFAULT_SEARCH_MODE == "reranked"
+        assert DEFAULT_SEARCH_MODE in CANONICAL_SEARCH_MODES
+
+    def test_normalize_mode_accepts_case_and_legacy_alias(self):
+        assert normalize_search_mode("RERANKED") == "reranked"
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            assert normalize_search_mode("hybrid_reranked") == "reranked"
+
+    def test_normalize_mode_keeps_explicit_legacy_compatible_mode(self):
+        assert normalize_search_mode("fts") == "fts"
+
+    def test_normalize_mode_rejects_unknown_value(self):
+        with pytest.raises(ValueError, match="Unsupported search mode"):
+            normalize_search_mode("silent-fallback")
 
 
 class TestScoreNote:

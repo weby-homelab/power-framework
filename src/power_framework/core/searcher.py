@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sqlite3
+import warnings
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -92,6 +93,9 @@ RERANK_CANDIDATE_LIMIT = 20
 # Max characters of each candidate doc fed to the reranker (truncated excerpt).
 # Keeps cross-encoder token cost bounded on CPU (Performance Plan §4).
 RERANK_TEXT_CHARS = 800
+DEFAULT_SEARCH_MODE = "reranked"
+CANONICAL_SEARCH_MODES = frozenset({"fts", "vector", "hybrid", "semantic", "reranked"})
+SEARCH_MODE_ALIASES = {"hybrid_reranked": "reranked"}
 
 
 @dataclass
@@ -106,6 +110,22 @@ class SearchResult:
     snippet: str
     match_count: int
     tags: list[str] = field(default_factory=list)
+
+
+def normalize_search_mode(mode: str) -> str:
+    """Return a canonical retrieval mode or reject an unsupported request."""
+    requested_mode = mode.lower()
+    normalized = SEARCH_MODE_ALIASES.get(requested_mode, requested_mode)
+    if requested_mode in SEARCH_MODE_ALIASES:
+        warnings.warn(
+            f"Search mode '{mode}' is deprecated; use '{normalized}' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    if normalized not in CANONICAL_SEARCH_MODES:
+        supported = ", ".join(sorted(CANONICAL_SEARCH_MODES | set(SEARCH_MODE_ALIASES)))
+        raise ValueError(f"Unsupported search mode '{mode}'. Supported modes: {supported}")
+    return normalized
 
 
 def _tokenize(text: str) -> list[str]:
@@ -932,7 +952,7 @@ def search_vault(
     vault_dir: Path,
     query: str,
     max_results: int = 20,
-    mode: str = "reranked",
+    mode: str = DEFAULT_SEARCH_MODE,
 ) -> list[SearchResult]:
     """
     Search the vault for notes matching the query.
@@ -946,7 +966,7 @@ def search_vault(
               with a dense-embedding fallback only when FTS yields < 5 hits.
               Developer/debug modes: "fts" (BM25), "vector" (TF cosine),
               "hybrid" (RRF of FTS + vector), "semantic" (dense embedding),
-              "hybrid_reranked" (alias of "reranked").
+              "hybrid_reranked" is a deprecated alias of "reranked".
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -955,6 +975,7 @@ def search_vault(
     # path; downstream code uses Path operators (vault_dir / rel_path), so
     # coerce to a resolved Path once here.
     vault_dir = Path(vault_dir).expanduser().resolve()
+    mode = normalize_search_mode(mode)
 
     # 1. Background indexer (Performance Plan §1): dense-embedding synchronization
     #    (the 176s cold-start root cause) is NO LONGER done synchronously here.

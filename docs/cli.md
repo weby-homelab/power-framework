@@ -92,7 +92,7 @@ power search path query [--max-results MAX_RESULTS]
 | `path`          | Yes      | Path to the vault directory                                             |
 | `query`         | Yes      | Search query (supports multiple terms and "quoted phrases")             |
 | `--max-results` | No       | Maximum number of results (default: 20)                                 |
-| `--mode`        | No       | Search mode: `reranked` (canonical, default), `fts`, `vector`, `hybrid` |
+| `--mode`        | No       | Search mode: `reranked` (canonical, default), `fts`, `vector`, `hybrid`, or `semantic`; legacy `hybrid_reranked` is accepted as an alias for `reranked` |
 
 ### `status`
 

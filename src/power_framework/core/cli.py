@@ -33,7 +33,13 @@ from .relations import (
     suggest_related,
     suggest_related_v2,
 )
-from .searcher import format_search_results, search_vault
+from .searcher import (
+    CANONICAL_SEARCH_MODES,
+    DEFAULT_SEARCH_MODE,
+    SEARCH_MODE_ALIASES,
+    format_search_results,
+    search_vault,
+)
 from .synthesize import synthesize_session_ingest
 from .utils import __version__, atomic_write
 
@@ -515,9 +521,13 @@ def main() -> None:
     )
     p_search.add_argument(
         "--mode",
-        choices=["fts", "vector", "hybrid", "semantic", "hybrid_reranked"],
-        default="fts",
-        help='Search mode: "fts" (BM25, default), "vector" (TF cosine), "hybrid" (RRF merged), "semantic" (dense embedding), "hybrid_reranked" (RRF + cross-encoder)',
+        choices=sorted(CANONICAL_SEARCH_MODES | set(SEARCH_MODE_ALIASES)),
+        default=DEFAULT_SEARCH_MODE,
+        help=(
+            'Search mode: "reranked" (canonical default), "fts" (BM25), '
+            '"vector" (TF cosine), "hybrid" (RRF merged), or "semantic" '
+            '(dense embedding). "hybrid_reranked" is a deprecated alias.'
+        ),
     )
     p_search.set_defaults(func=_cmd_search)
 

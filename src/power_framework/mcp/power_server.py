@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from power_framework.core import (
+    DEFAULT_SEARCH_MODE,
     PARA_FOLDERS,
     NoteType,
     OKFMetadata,
@@ -46,6 +47,7 @@ from power_framework.core import (
     format_relation_suggestions,
     format_untrusted_search_envelope,
     heal_vault,
+    normalize_search_mode,
     read_file_content,
     resolve_path_in_vault,
     resolve_vault_path,
@@ -278,7 +280,7 @@ async def ingest_note(
 async def search_vault_tool(
     query: str,
     max_results: int = 20,
-    search_mode: str = "fts",
+    search_mode: str = DEFAULT_SEARCH_MODE,
     vault_path: str | None = None,
 ) -> str:
     """Search vault notes and return provenance-bearing untrusted data only.
@@ -292,6 +294,10 @@ async def search_vault_tool(
         raise ToolError("Search query cannot be empty.")
     if not 1 <= max_results <= _MAX_MCP_SEARCH_RESULTS:
         raise ToolError(f"max_results must be between 1 and {_MAX_MCP_SEARCH_RESULTS}")
+    try:
+        search_mode = normalize_search_mode(search_mode)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
 
     def _do_search() -> str:
         results = search_vault(path, query, max_results=max_results, mode=search_mode)
