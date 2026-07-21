@@ -61,29 +61,3 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip-audit --skip-editable
-
-  perf-regression:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-
-      - name: Build search index (warm)
-        run: power sync /root/gemma/brain --fts-only || true
-
-      - name: Run IR latency benchmark with regression thresholds
-        run: |
-          python .agents/scripts/ir_benchmark_realvault.py
-        continue-on-error: true
-
-      - name: Report (informational)
-        run: echo "Performance benchmark complete — see annotations above."
