@@ -491,6 +491,20 @@ def _sync_vault_to_db(
             continue
 
     _embed_and_store(embedder, cursor, conn, doc_items, chunk_items)
+    dense_row = cursor.execute(
+        "SELECT COUNT(*), MIN(LENGTH(embedding)) FROM chunk_embeddings"
+    ).fetchone()
+    dense_count, embedding_bytes = dense_row
+    if dense_count and embedding_bytes and embedding_bytes % 4 == 0:
+        cursor.executemany(
+            "INSERT OR REPLACE INTO dense_index_manifest (manifest_key, manifest_value) VALUES (?, ?)",
+            [
+                ("schema_version", "1"),
+                ("embedding_dimension", str(embedding_bytes // 4)),
+                ("chunk_count", str(dense_count)),
+            ],
+        )
+        conn.commit()
     _maybe_vacuum(conn, to_delete, db_files)
 
 

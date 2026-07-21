@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from datetime import datetime
 from pathlib import Path  # noqa: TC003
 
 import pytest
 
+from power_framework.core.db import _init_db
 from power_framework.core.models import OKFMetadata
 from power_framework.core.searcher import (
     CANONICAL_SEARCH_MODES,
@@ -99,6 +101,12 @@ class TestSearchModeContract:
 
         with pytest.raises(DenseIndexUnavailableError, match="power sync"):
             _semantic_search(tmp_path, "semantic query")
+
+    def test_dense_index_manifest_schema_is_created(self, tmp_path: Path):
+        with sqlite3.connect(tmp_path / "index.db") as conn:
+            _init_db(conn)
+            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master")}
+        assert "dense_index_manifest" in tables
 
 
 class TestScoreNote:

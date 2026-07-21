@@ -57,6 +57,12 @@ def _init_db(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS dense_index_manifest (
+            manifest_key TEXT PRIMARY KEY,
+            manifest_value TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS tf_vectors (
             rel_path TEXT PRIMARY KEY,
             tf_data TEXT,
