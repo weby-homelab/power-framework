@@ -27,7 +27,7 @@ from .chunker import SemanticChunker
 from .db import _init_db
 from .embeddings import get_embedding_manager
 from .ignore import should_skip
-from .index_worker import request_sync, set_vault_dir
+from .index_worker import set_vault_dir
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
 from .query_expansion import QueryExpander
@@ -983,18 +983,15 @@ def search_vault(
     # coerce to a resolved Path once here.
     vault_dir = Path(vault_dir).expanduser().resolve()
     mode = normalize_search_mode(mode)
+    mode_spec = get_search_mode_spec(mode)
+    if mode_spec.requires_dense_index:
+        validate_dense_index(vault_dir)
 
-    # 1. Background indexer (Performance Plan §1): dense-embedding synchronization
-    #    (the 176s cold-start root cause) is NO LONGER done synchronously here.
-    #    We still run a lightweight FTS-only sync (cheap: no model load, <1s for
-    #    hundreds of files) so FTS/vector/hybrid stay fresh, and enqueue a
-    #    non-blocking background sync for embeddings when a semantic mode is
-    #    requested. Staleness is reported via the coverage footer (§6).
+    # Dense-capable modes never create or refresh embeddings from a read request:
+    # the caller must explicitly run ``power sync``. Sparse modes retain their
+    # lightweight first-use FTS refresh.
     set_vault_dir(vault_dir)
-    sync_emb = mode in ("semantic", "hybrid_reranked")
-    if sync_emb:
-        request_sync(vault_dir, mode="semantic")
-    else:
+    if not mode_spec.requires_dense_index:
         # Cheap synchronous FTS refresh ONLY when the index is empty/missing,
         # so non-semantic modes stay correct on first use without re-syncing
         # the whole vault on every query (Performance Plan §1). Incremental
