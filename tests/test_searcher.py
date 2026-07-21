@@ -125,6 +125,29 @@ class TestSearchModeContract:
         with pytest.raises(DenseIndexUnavailableError, match="manifest"):
             validate_dense_index(tmp_path)
 
+    def test_dense_index_validation_accepts_matching_manifest(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        db_path = tmp_path / "index.db"
+        monkeypatch.setattr("power_framework.core.searcher._db_path", lambda: db_path)
+        with sqlite3.connect(db_path) as conn:
+            _init_db(conn)
+            conn.execute(
+                "INSERT INTO chunk_embeddings VALUES (?, ?, ?, ?, ?)",
+                ("chunk", "note.md", b"\0" * 16, "text", 0.0),
+            )
+            conn.executemany(
+                "INSERT INTO dense_index_manifest VALUES (?, ?)",
+                [
+                    ("schema_version", "1"),
+                    ("embedding_dimension", "4"),
+                    ("chunk_count", "1"),
+                ],
+            )
+            conn.commit()
+
+        assert validate_dense_index(tmp_path) == 4
+
     def test_embedding_manifest_identity_uses_provider_and_model(self):
         class FakeEmbedder:
             model_name = "example/model"
