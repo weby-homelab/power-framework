@@ -98,6 +98,10 @@ CANONICAL_SEARCH_MODES = frozenset({"fts", "vector", "hybrid", "semantic", "rera
 SEARCH_MODE_ALIASES = {"hybrid_reranked": "reranked"}
 
 
+class DenseIndexUnavailableError(RuntimeError):
+    """Raised when a request explicitly requires a usable dense index."""
+
+
 @dataclass
 class SearchResult:
     """A single search result with relevance info."""
@@ -126,6 +130,37 @@ def normalize_search_mode(mode: str) -> str:
         supported = ", ".join(sorted(CANONICAL_SEARCH_MODES | set(SEARCH_MODE_ALIASES)))
         raise ValueError(f"Unsupported search mode '{mode}'. Supported modes: {supported}")
     return normalized
+
+
+def validate_dense_index(vault_dir: Path) -> int:
+    """Validate dense-index presence before an embedding model is loaded.
+
+    The check deliberately never creates or rebuilds an index. A caller that
+    requested dense retrieval must run ``power sync`` first instead of silently
+    receiving FTS results from a different retrieval contract.
+    """
+    db_path = _db_path()
+    if not db_path.exists():
+        raise DenseIndexUnavailableError(
+            f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
+        )
+
+    try:
+        with sqlite3.connect(str(db_path), timeout=30) as conn:
+            rows, min_size, max_size = conn.execute(
+                "SELECT COUNT(*), MIN(LENGTH(embedding)), MAX(LENGTH(embedding)) "
+                "FROM chunk_embeddings"
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise DenseIndexUnavailableError(
+            f"Dense index cannot be read for {vault_dir}: {exc}. Run 'power sync {vault_dir}'."
+        ) from exc
+
+    if not rows or not min_size or min_size != max_size or min_size % 4:
+        raise DenseIndexUnavailableError(
+            f"Dense index is empty or inconsistent for {vault_dir}. Run 'power sync {vault_dir}'."
+        )
+    return min_size // 4
 
 
 def _tokenize(text: str) -> list[str]:
@@ -797,40 +832,23 @@ def _semantic_search(
         return []
 
     db_path = _db_path()
+    index_dimension = validate_dense_index(vault_dir)
 
-    # B7/FP-7 (POWER 3.0 Sync-or-FTS-Fallback): NEVER return a silent [] when
-    # the dense index is unavailable. If embeddings cannot be produced or the
-    # chunk_embeddings table is empty/broken, degrade to FTS with an explicit
-    # warning so callers get real results and operators see WHY dense was
-    # skipped — instead of an empty list that looks like "no matches".
-    def _fts_fallback(reason: str) -> list[SearchResult]:
-        logger.warning(
-            "Semantic search unavailable (%s); falling back to FTS for query %r",
-            reason,
-            query,
+    def _dense_failure(reason: str) -> None:
+        raise DenseIndexUnavailableError(
+            f"Dense search is unavailable ({reason}). Run 'power sync {vault_dir}' and retry."
         )
-        # Ensure the (cheap, no-model) FTS index exists so the fallback returns
-        # real results even on a cold index — otherwise the "fallback" would
-        # itself be a silent [] (defeats B7/FP-7).
-        try:
-            fconn = sqlite3.connect(str(db_path), timeout=30)
-            fconn.execute("PRAGMA busy_timeout=30000")
-            fconn.execute("PRAGMA journal_mode=WAL")
-            _init_db(fconn)
-            fcur = fconn.cursor()
-            fcur.execute("SELECT COUNT(*) FROM file_metadata")
-            if fcur.fetchone()[0] == 0:
-                _sync_vault_to_db(vault_dir, fconn, sync_embeddings=False)
-            fconn.close()
-        except Exception as e:
-            logger.warning("FTS fallback index refresh failed: %s", e)
-        return _fts_search(vault_dir, query, max_results=max_results)
 
     try:
         embedder = get_embedding_manager()
         query_vec = embedder.embed(query)
-    except Exception as e:
-        return _fts_fallback(f"embedder error: {type(e).__name__}")
+    except Exception as exc:
+        _dense_failure(f"embedder error: {type(exc).__name__}")
+
+    if len(query_vec) != index_dimension:
+        _dense_failure(
+            f"index dimension {index_dimension} does not match query dimension {len(query_vec)}"
+        )
 
     try:
         conn = sqlite3.connect(str(db_path), timeout=30)
@@ -839,53 +857,21 @@ def _semantic_search(
         _init_db(conn)
 
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM chunk_embeddings")
-        if cursor.fetchone()[0] == 0:
-            # Embeddings are not materialized yet. Perform a synchronous
-            # (one-time, batched) embedding sync so the query returns real
-            # results. Batching inside _sync_vault_to_db bounds peak RAM.
-            # Close our read connection first so the writer doesn't contend on
-            # the same SQLite lock (avoids "database is locked" under load).
-            logger.info("Semantic index empty; running synchronous embedding sync")
-            conn.close()
-            try:
-                sync_conn = sqlite3.connect(str(db_path), timeout=60)
-                sync_conn.execute("PRAGMA busy_timeout=60000")
-                sync_conn.execute("PRAGMA journal_mode=WAL")
-                _init_db(sync_conn)
-                _sync_vault_to_db(vault_dir, sync_conn, sync_embeddings=True)
-                sync_conn.close()
-            except sqlite3.OperationalError as e:
-                if "locked" in str(e):
-                    return _fts_fallback("embedding sync deferred (db locked)")
-                # disk I/O error or similar: the dense index is unusable this
-                # call — fall back rather than raising into a silent [].
-                return _fts_fallback(f"embedding sync failed: {e}")
-            conn = sqlite3.connect(str(db_path), timeout=60)
-            conn.execute("PRAGMA busy_timeout=60000")
-            conn.execute("PRAGMA journal_mode=WAL")
-            _init_db(conn)
-
-        cursor = conn.cursor()
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
         rows = cursor.fetchall()
         conn.close()
-    except Exception as e:
-        return _fts_fallback(f"db error: {type(e).__name__}")
+    except Exception as exc:
+        _dense_failure(f"db error: {type(exc).__name__}")
 
     if not rows:
-        # Sync ran but produced no chunk_embeddings (e.g. every batch skipped
-        # under memory pressure). Fall back to FTS instead of silent [].
-        return _fts_fallback("no dense vectors after sync")
+        _dense_failure("no dense vectors")
 
     import numpy as np
 
     q_arr = np.asarray(query_vec, dtype=np.float32)
     q_norm = float(np.linalg.norm(q_arr))
     if q_norm == 0:
-        # Zero query vector = broken/degenerate embedding. Don't return a silent
-        # [] — degrade to FTS (B7/FP-7).
-        return _fts_fallback("zero query embedding")
+        _dense_failure("zero query embedding")
 
     chunk_scores: list[tuple[float, str, str]] = []
     for rel_path, blob, content in rows:
@@ -908,10 +894,7 @@ def _semantic_search(
         chunk_scores.append((similarity, rel_path, content))
 
     if not chunk_scores:
-        # Dense index present but nothing scored positive for this query (a
-        # classic symptom of a dead cross-lingual embedder, e.g. Granite's
-        # 0.000 UA↔EN recall). Fall back to FTS rather than a silent [] (B7).
-        return _fts_fallback("no positive dense matches")
+        return []
 
     doc_best: dict[str, tuple[float, str]] = {}
     for similarity, rel_path, content in chunk_scores:

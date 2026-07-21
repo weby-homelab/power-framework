@@ -13,18 +13,21 @@ from power_framework.core.models import OKFMetadata
 from power_framework.core.searcher import (
     CANONICAL_SEARCH_MODES,
     DEFAULT_SEARCH_MODE,
+    DenseIndexUnavailableError,
     SearchResult,
     _compute_tf_vector,
     _cosine_similarity,
     _make_snippet,
     _rrf_merge,
     _score_note,
+    _semantic_search,
     _tokenize,
     _vector_search,
     format_search_results,
     format_untrusted_search_envelope,
     normalize_search_mode,
     search_vault,
+    validate_dense_index,
 )
 
 
@@ -64,6 +67,30 @@ class TestSearchModeContract:
     def test_normalize_mode_rejects_unknown_value(self):
         with pytest.raises(ValueError, match="Unsupported search mode"):
             normalize_search_mode("silent-fallback")
+
+    def test_dense_index_validation_fails_closed_when_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(
+            "power_framework.core.searcher._db_path", lambda: tmp_path / "missing.db"
+        )
+
+        with pytest.raises(DenseIndexUnavailableError, match="power sync"):
+            validate_dense_index(tmp_path)
+
+    def test_semantic_search_validates_index_before_loading_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(
+            "power_framework.core.searcher._db_path", lambda: tmp_path / "missing.db"
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher.get_embedding_manager",
+            lambda: pytest.fail("embedding model must not load before index validation"),
+        )
+
+        with pytest.raises(DenseIndexUnavailableError, match="power sync"):
+            _semantic_search(tmp_path, "semantic query")
 
 
 class TestScoreNote:
