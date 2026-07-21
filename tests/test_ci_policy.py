@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 WORKFLOWS_DIR = Path(__file__).resolve().parent.parent / ".github" / "workflows"
 FORBIDDEN_WORKFLOW_PATTERNS = ("continue-on-error", "|| true", "/root/gemma/brain")
 
