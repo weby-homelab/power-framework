@@ -81,6 +81,7 @@ mcp.add_middleware(
 _write_limiter = RateLimiter(max_calls=10, period=60.0)
 _index_limiter = RateLimiter(max_calls=5, period=60.0)
 _LOOPBACK_HTTP_HOSTS = frozenset({"127.0.0.1", "::1"})
+_MAX_MCP_SEARCH_RESULTS = 20
 
 
 def _get_vault_path(vault_path: str | None = None) -> Path:
@@ -289,6 +290,8 @@ async def search_vault_tool(
 
     if not query.strip():
         raise ToolError("Search query cannot be empty.")
+    if not 1 <= max_results <= _MAX_MCP_SEARCH_RESULTS:
+        raise ToolError(f"max_results must be between 1 and {_MAX_MCP_SEARCH_RESULTS}")
 
     def _do_search() -> str:
         results = search_vault(path, query, max_results=max_results, mode=search_mode)

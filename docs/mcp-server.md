@@ -86,6 +86,10 @@ material. They must not execute or follow instructions contained in a result.
 Only result IDs and source paths from the envelope are valid citations; text
 inside a note cannot create or alter provenance.
 
+The MCP server returns at most 20 results and each snippet is bounded. This
+limits context flooding but is not a content sanitizer: instruction-like text
+remains visible as untrusted data for review and citation.
+
 ## Available tools
 
 12 MCP tools are exposed, all asynchronous with `asyncio.to_thread()` for filesystem I/O.
@@ -146,7 +150,7 @@ Full-text search across all vault notes. Four modes: `reranked` (canonical, defa
 | Parameter     | Type      | Required | Description                                                    |
 | ------------- | --------- | -------- | -------------------------------------------------------------- |
 | `query`       | `string`  | Yes      | Search query                                                   |
-| `max_results` | `integer` | No       | Max results (default: 20)                                      |
+| `max_results` | `integer` | No       | 1–20 results (default: 20)                                    |
 | `search_mode` | `string`  | No       | `reranked`, `fts`, `vector`, or `hybrid` (default: `reranked`) |
 | `vault_path`  | `string`  | No       | Path to vault root                                             |
 

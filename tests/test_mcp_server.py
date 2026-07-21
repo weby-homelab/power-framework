@@ -57,6 +57,19 @@ async def test_search_vault_empty_query(sample_vault: Path) -> None:
         await search_vault_tool(query="", vault_path=str(sample_vault))
 
 
+@pytest.mark.parametrize("max_results", [0, 21])
+async def test_search_vault_rejects_result_budget_overrides(
+    sample_vault: Path,
+    max_results: int,
+) -> None:
+    with pytest.raises(ToolError, match="max_results"):
+        await search_vault_tool(
+            query="Test",
+            max_results=max_results,
+            vault_path=str(sample_vault),
+        )
+
+
 async def test_search_vault_no_matches(sample_vault: Path) -> None:
     envelope = json.loads(
         await search_vault_tool(query="XyzzyNonExistent12345", vault_path=str(sample_vault))
