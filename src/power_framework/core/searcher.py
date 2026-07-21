@@ -190,16 +190,24 @@ def validate_dense_index(vault_dir: Path) -> int:
             f"Dense index is empty or inconsistent for {vault_dir}. Run 'power sync {vault_dir}'."
         )
     dimension = min_size // 4
-    if manifest != {
+    required_manifest = {
         "schema_version": "1",
         "embedding_dimension": str(dimension),
         "chunk_count": str(rows),
-    }:
+    }
+    if any(manifest.get(key) != value for key, value in required_manifest.items()):
         raise DenseIndexUnavailableError(
             f"Dense index manifest is missing or incompatible for {vault_dir}. "
             f"Run 'power sync {vault_dir}'."
         )
     return dimension
+
+
+def _embedding_manifest_identity(embedder: object) -> tuple[str, str]:
+    """Return stable provider and model identifiers without loading the model."""
+    provider = type(embedder).__name__
+    model = str(getattr(embedder, "model_name", getattr(embedder, "repo", "unknown")))
+    return provider, model
 
 
 def _tokenize(text: str) -> list[str]:
@@ -511,12 +519,15 @@ def _sync_vault_to_db(
     ).fetchone()
     dense_count, embedding_bytes = dense_row
     if dense_count and embedding_bytes and embedding_bytes % 4 == 0:
+        provider, model = _embedding_manifest_identity(embedder)
         cursor.executemany(
             "INSERT OR REPLACE INTO dense_index_manifest (manifest_key, manifest_value) VALUES (?, ?)",
             [
                 ("schema_version", "1"),
                 ("embedding_dimension", str(embedding_bytes // 4)),
                 ("chunk_count", str(dense_count)),
+                ("embedding_provider", provider),
+                ("embedding_model", model),
             ],
         )
         conn.commit()

@@ -20,6 +20,7 @@ from power_framework.core.searcher import (
     SearchResult,
     _compute_tf_vector,
     _cosine_similarity,
+    _embedding_manifest_identity,
     _make_snippet,
     _rrf_merge,
     _score_note,
@@ -123,6 +124,12 @@ class TestSearchModeContract:
 
         with pytest.raises(DenseIndexUnavailableError, match="manifest"):
             validate_dense_index(tmp_path)
+
+    def test_embedding_manifest_identity_uses_provider_and_model(self):
+        class FakeEmbedder:
+            model_name = "example/model"
+
+        assert _embedding_manifest_identity(FakeEmbedder()) == ("FakeEmbedder", "example/model")
 
 
 class TestScoreNote:
