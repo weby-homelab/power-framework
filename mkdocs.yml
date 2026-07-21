@@ -55,6 +55,8 @@ nav:
       - Searcher: api/searcher.md
       - Utils: api/utils.md
   - Architecture: architecture.md
+  - Architecture Decisions:
+      - POWER 3.1 Trust-Release Baseline: adr/0001-power-3.1-trust-release-baseline.md
   - Changelog: CHANGELOG.md
   - Contributing: contributing.md
 

@@ -28,7 +28,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code, powered by FastMCP 3.x
-- **Production-grade** — 416 tests, 73%+ coverage (CI `fail-under=70`), CodeQL scanning, Automated GitHub Releases
+- **Beta with explicit release gates** — 416 tests, 73%+ coverage (CI `fail-under=70`), CodeQL scanning, and a tracked [P.O.W.E.R. 3.1 trust-release baseline](docs/adr/0001-power-3.1-trust-release-baseline.md)
 
 ## Quick Start
 
