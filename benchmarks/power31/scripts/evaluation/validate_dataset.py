@@ -395,7 +395,8 @@ def main() -> int:
         answers = load_jsonl(ANSWERS_FILE)
         print(f"  [PASS] Loaded {len(answers)} expected answers")
     except Exception as e:
-        errors.append(f"Answers load failed: {e}")
+        print(f"  [FAIL] Answers load: {e}")
+        return 1
 
     try:
         corpus = {f.name: f.read_text(encoding="utf-8") for f in CORPUS_DIR.glob("*.md")}

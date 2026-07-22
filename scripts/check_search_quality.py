@@ -378,6 +378,7 @@ def load_or_build_qrels(
             if cached.get("vault") == str(Path(vault).resolve()) and "qrels" in cached:
                 return cached["qrels"]
         except (json.JSONDecodeError, OSError):
+            # An unreadable or stale cache is intentionally rebuilt below.
             pass
     qrels = build_qrels(vault, overrides=overrides)
     QRELS_CACHE.write_text(

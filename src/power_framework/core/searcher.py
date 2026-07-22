@@ -352,8 +352,6 @@ def _sync_vault_to_db(
     hosts) and is ~5-10x faster than per-item embedding. Results are streamed to
     the DB with periodic commits so the working set never holds the whole vault.
     """
-    import json
-
     cursor = conn.cursor()
     if force_rebuild and sync_embeddings:
         logger.info("Force rebuild: clearing dense-embedding tables ...")
@@ -781,8 +779,6 @@ def _vector_search(
 
     query_vec = _compute_tf_vector(query_tokens)
     db_path = _db_path()
-
-    import json
 
     try:
         conn = sqlite3.connect(str(db_path), timeout=30)

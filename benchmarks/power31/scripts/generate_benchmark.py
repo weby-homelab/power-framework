@@ -1184,15 +1184,12 @@ def generate_expected_answers(
                         continue
                     break
                 else:
-                    atomic = q["query"]
                     expected = f"Information about {q['query']} is available."
                     facts = [expected]
             else:
-                atomic = q["query"]
                 expected = f"Information about {q['query']} is available."
                 facts = [expected]
         else:
-            atomic = q["query"]
             expected = f"Information about {q['query']} is available."
             facts = [expected]
 

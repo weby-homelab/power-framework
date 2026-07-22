@@ -555,16 +555,10 @@ class BGEM3OnnxManager:
 
 _EMBED_MANAGER_CACHE: dict[str, object] = {}
 
-# Set True when the qwen3 ONNX backend fails to allocate on this host, so we
-# permanently fall back to fastembed for the process (avoids re-probing on
-# every manager fetch and silently producing empty vector indices).
-_QWEN3_DISABLED = False
-
 
 def get_embedding_manager(
     model_name: str | None = None,
 ) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager | BGEM3OnnxManager:
-    global _QWEN3_DISABLED
     # Respect the module-level default (POWER 3.0: bge-m3) unless explicitly
     # overridden via the environment variable.
     provider = os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower()
