@@ -692,8 +692,8 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
     no_answer_entries = [
         r for r in per_query_results if r["query_class"] == "no_answer"
     ]
-    baseline_fp = sum(1 for r in no_answer_entries if r["baseline"]["retrieved"])
-    candidate_fp = sum(1 for r in no_answer_entries if r["candidate"]["retrieved"])
+    baseline_fp = sum(1 for r in no_answer_entries if not r["baseline"]["rag"].get("abstained"))
+    candidate_fp = sum(1 for r in no_answer_entries if not r["candidate"]["rag"].get("abstained"))
     no_answer_count = len(no_answer_entries) or 1
 
     # ── Paired comparison ─────────────────────────────────────────────────

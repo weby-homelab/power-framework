@@ -18,7 +18,7 @@ strata:
   - en_to_ua
 
 retrieval_mode: "semantic"
-rag_abstention_threshold: 0.50
+rag_abstention_threshold: 0.40
 embedding_model: "aapot/bge-m3-onnx"
 embedding_model_revision: "76a603396f5eb9f03ed51bbab8f4893fcea7b2fe"
 reranker_model: null

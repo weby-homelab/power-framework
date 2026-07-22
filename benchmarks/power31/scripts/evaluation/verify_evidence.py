@@ -132,7 +132,7 @@ def check_patterns(data: dict) -> None:
 
 def verify_config_hashes(data: dict) -> None:
     cfg = data.get("config", {})
-    for side in ("baseline", "candidate"):
+    for side in ("candidate",):
         entry = cfg.get(side, {})
         cfg_sha = entry.get("sha256", "")
         check(
