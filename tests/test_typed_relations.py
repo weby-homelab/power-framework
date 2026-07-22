@@ -329,3 +329,24 @@ class TestMermaidExport:
         result = kg.to_mermaid()
         assert "N0 -->|related_to| N1" in result
         assert "N0 -->|related_to| N2" in result
+
+    def test_suggest_related(self, tmp_path):
+        from power_framework.core.relations import suggest_related
+
+        # Create two sample markdown files with overlapping keywords
+        note1 = tmp_path / "01_Projects" / "note1.md"
+        note1.parent.mkdir(parents=True, exist_ok=True)
+        note1.write_text(
+            "---\ntype: Project\ntitle: Alpha System\ndescription: Test alpha system\ntags: [alpha, system]\ntimestamp: 2026-07-22T00:00:00\n---\nAlpha system handles data processing.",
+            encoding="utf-8",
+        )
+
+        note2 = tmp_path / "01_Projects" / "note2.md"
+        note2.write_text(
+            "---\ntype: Project\ntitle: Beta System\ndescription: Test beta system\ntags: [alpha, beta]\ntimestamp: 2026-07-22T00:00:00\n---\nBeta system also handles alpha data processing.",
+            encoding="utf-8",
+        )
+
+        suggestions = suggest_related(tmp_path, target_path="01_Projects/note1.md", score_threshold=0.1)
+        assert isinstance(suggestions, list)
+

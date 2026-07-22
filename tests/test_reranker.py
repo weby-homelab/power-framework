@@ -74,3 +74,86 @@ class TestRerankerManager:
 
         manager.rerank("query", ["doc a", "doc b"])
         mock_model.rerank.assert_called_once_with("query", ["doc a", "doc b"])
+
+    def test_colbert_helpers(self):
+        from unittest.mock import patch
+        from power_framework.core.colbert_reranker import _available_ram_gb, is_colbert_enabled
+
+        ram = _available_ram_gb()
+        assert isinstance(ram, float)
+
+        with patch("builtins.open", side_effect=OSError("File not found")):
+            assert _available_ram_gb() == 0.0
+
+        assert isinstance(is_colbert_enabled(), bool)
+
+    def test_colbert_reranker_exceptions(self):
+        import pytest
+        from unittest.mock import patch
+        from power_framework.core.colbert_reranker import (
+            ColBERTLateInteractionReranker,
+            ColBERTUnavailableError,
+        )
+
+        with patch.dict("os.environ", {"POWER_RERANKER": ""}):
+            with pytest.raises(ColBERTUnavailableError, match="opt-in"):
+                ColBERTLateInteractionReranker()
+
+        with patch.dict("os.environ", {"POWER_RERANKER": "colbert"}):
+            with patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=1.0):
+                with pytest.raises(ColBERTUnavailableError, match="requires >="):
+                    ColBERTLateInteractionReranker()
+
+        with patch.dict("os.environ", {"POWER_RERANKER": "colbert"}):
+            with patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=16.0):
+                colbert = ColBERTLateInteractionReranker()
+                assert colbert.model_name is not None
+
+    def test_lazy_init_already_initialized(self):
+        manager = RerankerManager()
+        mock_model = MagicMock()
+        manager._model = mock_model
+        manager._lazy_init()
+    def test_get_reranker_fallback(self):
+        from unittest.mock import patch
+        from power_framework.core.reranker import get_reranker, RerankerManager
+
+        with patch("power_framework.core.colbert_reranker.is_colbert_enabled", return_value=False):
+            r = get_reranker()
+            assert isinstance(r, RerankerManager)
+
+        with patch("power_framework.core.colbert_reranker.is_colbert_enabled", return_value=True):
+            with patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=1.0):
+                r = get_reranker()
+                assert isinstance(r, RerankerManager)
+
+    def test_qwen3_reranker_import_error(self):
+        import sys
+        import pytest
+        from unittest.mock import patch
+        from power_framework.core.reranker import RerankerManager
+
+        with patch.dict("os.environ", {"POWER_EMBED_PROVIDER": "qwen3"}):
+            with patch.dict(sys.modules, {"qwen3_embed": None}):
+                mgr = RerankerManager()
+                with pytest.raises(ImportError, match="qwen3-embed is required"):
+                    mgr._lazy_init()
+
+    def test_fastembed_reranker_import_error(self):
+        import sys
+        import pytest
+        from unittest.mock import patch
+        from power_framework.core.reranker import RerankerManager
+
+        with patch.dict(sys.modules, {"fastembed.rerank.cross_encoder": None}):
+            mgr = RerankerManager()
+            assert mgr._use_qwen3 is False
+            with pytest.raises(ImportError, match="fastembed is required"):
+                mgr._lazy_init()
+
+
+
+
+
+
+

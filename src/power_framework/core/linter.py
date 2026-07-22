@@ -56,6 +56,11 @@ class LintResult:
     def has_issues(self) -> bool:
         return bool(self.untyped_files or self.broken_links or self.orphans or self.stale_notes)
 
+    @property
+    def has_blocking_issues(self) -> bool:
+        """Return whether lint found invalid metadata, broken links, or expired notes."""
+        return bool(self.untyped_files or self.broken_links or self.stale_notes)
+
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable lint report."""
         today = datetime.now(timezone.utc).date()
@@ -238,12 +243,12 @@ def _extract_links(content: str) -> list[str]:
     for match in WIKI_LINK_PATTERN.findall(content):
         target = match.split("|")[0].split("#")[0].strip()
         if target:
-            targets.append(clean_note_name(target))
+            targets.append(clean_note_name(Path(target).name))
 
     for match in EMBED_LINK_PATTERN.findall(content):
         target = match.split("|")[0].split("#")[0].strip()
         if target:
-            targets.append(clean_note_name(target))
+            targets.append(clean_note_name(Path(target).name))
 
     for match in GFM_LINK_PATTERN.findall(content):
         target = Path(match).name
@@ -267,6 +272,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
     all_files: dict[str, Path] = {}
     rel_paths: dict[str, str] = {}
     links: dict[str, list[str]] = {}
+    orphan_exempt_paths: set[str] = set()
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
@@ -299,6 +305,8 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
 
         # Freshness check — detect stale / expired notes
         fm = parse_frontmatter(content)
+        if fm and str(fm.get("status", "")).strip().lower() == "archived":
+            orphan_exempt_paths.add(rel_path)
         if fm and "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
@@ -330,7 +338,11 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
 
     for rel_path, count in inbound_counts.items():
         filename = rel_path.rsplit("/", 1)[-1] if "/" in rel_path else rel_path
-        if count == 0 and not is_excluded_orphan(filename, rel_path):
+        if (
+            count == 0
+            and rel_path not in orphan_exempt_paths
+            and not is_excluded_orphan(filename, rel_path)
+        ):
             result.orphans.append(rel_path)
 
     return result

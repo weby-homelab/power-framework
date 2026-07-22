@@ -606,10 +606,6 @@ def get_embedding_manager(
             )
             effective_provider = "fastembed"
 
-    # Permanent in-process fallback: if the qwen3 ONNX backend already proved it
-    # cannot allocate on this host, don't keep re-probing — use fastembed.
-    if effective_provider == "qwen3" and _QWEN3_DISABLED:
-        effective_provider = "fastembed"
 
     if effective_provider == "ollama":
         key = f"ollama:{model_name or OLLAMA_EMBED_MODEL}"
@@ -625,8 +621,7 @@ def get_embedding_manager(
                 _EMBED_MANAGER_CACHE[key] = mgr
             except RuntimeError as e:
                 if "qwen3_onnx_alloc_failed" in str(e):
-                    _QWEN3_DISABLED = True
-                    logger.warning("Disabling qwen3 provider for this process; using fastembed.")
+                    logger.warning("Qwen3 ONNX allocation failed; falling back to fastembed.")
                     effective_provider = "fastembed"
                 else:
                     raise

@@ -17,7 +17,6 @@ class RerankerProtocol(Protocol):
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         """Return a relevance score per document (higher = more relevant)."""
-        ...
 
 
 class NonCommercialModelDisabledError(RuntimeError):

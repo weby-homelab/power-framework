@@ -3,8 +3,8 @@
 P.O.W.E.R. MCP Server entry-point for OpenCode/Antigravity CLI.
 This script launches the FastMCP 3.x server from power_framework.mcp.
 
-Version: 2.0.2
-Updated: 2026-07-15
+Version: 3.0.0
+Updated: 2026-07-21
 """
 
 import os

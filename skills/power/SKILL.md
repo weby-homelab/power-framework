@@ -1,5 +1,6 @@
 ---
 name: power
+version: 3.0.0
 description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules).
 ---
 
@@ -35,23 +36,35 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
     python3 .agents/skills/power/scripts/generate_index.py
     ```
 
-### CLI (power, 9 команд)
+### CLI (power, 15 команд)
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
 3. `power index <path>` — генерація ієрархічного індексу
 4. `power ingest <path>` — створення нотатки з OKF метаданими
 5. `power search <path> <query>` — повнотекстовий пошук
-6. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
-7. `power archive <path>` — архівування застарілих нотаток
-8. `power suggest-related <path>` — пропозиції зв'язків
-9. `power cron <path>` — автоматичне обслуговування
+6. `power sync <path>` — побудова FTS і dense-індексу
+7. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
+8. `power archive <path>` — архівування застарілих нотаток
+9. `power status <path>` — панель стану vault
+10. `power cron <path>` — автоматичне обслуговування
+11. `power heal <path>` — автовиправлення frontmatter
+12. `power markdown-check <path>` — перевірка якості Markdown
+13. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
+14. `power synthesize <path>` — створення підсумкової нотатки сесії
+15. `power rename <path> --old <old_path> --new <new_path>` — перейменування нотатки з оновленням зв'язків
 
-### MCP Tools (9)
+### MCP Tools (12) — FastMCP 3.x (v3.0.0)
 - `lint_vault`, `generate_index`, `read_sub_index`, `ingest_note`
 - `search_vault_tool`, `synthesize_session`
 - `rot_audit` (new in v1.7.0)
 - `archive_notes` (new in v1.7.0)
 - `suggest_related_tool` (new in v1.7.0)
+- `ensure_sub_index`, `heal_frontmatter_tool`, `check_markdown_tool`
+
+### Конфігурація (v3.0.0)
+- Канонічний dense backend: `BAAI/bge-m3` (1024 dim) через direct ONNX Runtime; `POWER_EMBED_PROVIDER=fastembed` вмикає полегшений MiniLM fallback.
+- `POWER_EMBED_NUM_THREADS=2` та `POWER_EMBED_BATCH_SIZE=8` обмежують CPU і пікове споживання RAM.
+- Для двомовних UA/EN vault рекомендовано режим пошуку `hybrid`; `reranked` лишається стандартним CLI-режимом.
 
 ---
 

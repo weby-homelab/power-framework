@@ -59,6 +59,53 @@ class TestRunLintVault:
         result = run_lint_vault(sample_vault)
         assert len(result.stale_notes) == 0
 
+    def test_protocol_path_link_resolves(self, tmp_path: Path):
+        protocols = tmp_path / "PROTOCOLS"
+        projects = tmp_path / "01_Projects"
+        protocols.mkdir()
+        projects.mkdir()
+        (protocols / "Home.md").write_text(
+            '---\ntype: System Guide\ntitle: "Home"\ndescription: "Vault home"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Home\n"
+        )
+        (projects / "Project.md").write_text(
+            '---\ntype: Project\ntitle: "Project"\ndescription: "Project note"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n[[PROTOCOLS/Home|Home]]\n"
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.total_notes == 2
+        assert result.broken_links == []
+
+    def test_archive_and_root_daily_log_are_not_orphans(self, tmp_path: Path):
+        archive = tmp_path / "04_Archive"
+        archive.mkdir()
+        (archive / "Old.md").write_text(
+            '---\ntype: Archive\ntitle: "Old"\ndescription: "Archived note"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Old\n"
+        )
+        (tmp_path / "2026-07-21_session.md").write_text(
+            '---\ntype: Daily Log\ntitle: "Session"\ndescription: "Root daily log"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Session\n"
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.orphans == []
+
+    def test_archived_status_is_not_orphan(self, tmp_path: Path):
+        projects = tmp_path / "01_Projects"
+        projects.mkdir()
+        (projects / "Completed.md").write_text(
+            '---\ntype: Project\ntitle: "Completed"\ndescription: "Completed project"\n'
+            "status: archived\ntimestamp: 2026-07-21T00:00:00Z\n---\n\n# Completed\n"
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.orphans == []
+
 
 class TestOkfScope:
     """Foreign files outside the OKF knowledge base must not raise metadata warnings."""
@@ -66,6 +113,7 @@ class TestOkfScope:
     def test_para_and_brain_in_scope(self):
         assert in_kb_scope("01_Projects/Foo.md")
         assert in_kb_scope("brain/01_Projects/Foo.md")
+        assert in_kb_scope("PROTOCOLS/Home.md")
         assert in_kb_scope("06_Daily_Logs/2026-01-01.md")
 
     def test_root_daily_log_in_scope(self):

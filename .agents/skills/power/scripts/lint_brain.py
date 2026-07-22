@@ -15,7 +15,7 @@ import os
 import sys
 from pathlib import Path
 
-from power_framework.core import run_lint_report
+from power_framework.core import run_lint_vault
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -50,8 +50,9 @@ def main() -> None:
         print(f"Error: Vault directory does not exist: {vault_dir}")
         sys.exit(1)
 
-    report = run_lint_report(vault_dir)
-    print(report)
+    result = run_lint_vault(vault_dir)
+    print(result.format_report(vault_dir))
+    sys.exit(1 if result.has_blocking_issues else 0)
 
 
 if __name__ == "__main__":

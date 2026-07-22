@@ -43,6 +43,7 @@ def _available_ram_gb() -> float:
                     kb = int(line.split()[1])
                     return kb / (1024.0**2)
     except OSError:
+        # /proc/meminfo is not available on non-Linux platforms or inside restricted sandboxes
         pass
     return 0.0
 

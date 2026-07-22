@@ -54,11 +54,12 @@ def main() -> None:
         print(f"Error: Vault directory does not exist: {vault_dir}")
         sys.exit(1)
 
-    report = run_lint_vault(vault_dir)
-    print(report)
+    result = run_lint_vault(vault_dir)
+    print(result.format_report(vault_dir))
     print()
     rot_report = run_rot_report(vault_dir)
     print(rot_report)
+    sys.exit(1 if result.has_blocking_issues else 0)
 
 
 if __name__ == "__main__":

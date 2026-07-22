@@ -47,6 +47,15 @@ def test_lint_valid_vault(sample_vault: Path) -> None:
     assert exc.value.code == 0
 
 
+def test_lint_issues_return_nonzero(vault_with_issues: Path) -> None:
+    with (
+        patch.object(sys, "argv", ["power", "lint", str(vault_with_issues)]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 1
+
+
 def test_lint_missing_vault(tmp_path: Path) -> None:
     missing = tmp_path / "nonexistent"
     with (
@@ -223,3 +232,34 @@ def test_no_command_shows_help(capsys: pytest.CaptureFixture) -> None:
     with patch.object(sys, "argv", ["power"]), pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 1
+
+
+def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    with patch.object(sys, "argv", ["power", "init", str(vault)]), pytest.raises(SystemExit):
+        main()
+
+    # First ingest
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["power", "ingest", str(vault), "--title", "Duplicate Test", "--type", "Project", "--description", "Desc"],
+        ),
+        pytest.raises(SystemExit) as exc1,
+    ):
+        main()
+    assert exc1.value.code == 0
+
+    # Second ingest without --overwrite
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["power", "ingest", str(vault), "--title", "Duplicate Test", "--type", "Project", "--description", "Desc"],
+        ),
+        pytest.raises(SystemExit) as exc2,
+    ):
+        main()
+    assert exc2.value.code == 1
+

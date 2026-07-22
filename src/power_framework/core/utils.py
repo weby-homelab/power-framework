@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import re
 import shutil
 import tempfile
 import time
@@ -225,7 +226,14 @@ def is_excluded_dir(dirname: str) -> bool:
 
 def is_excluded_orphan(filename: str, rel_path: str) -> bool:
     """Check if file should be excluded from orphan detection."""
-    return filename in EXCLUDED_ORPHAN_FILES or rel_path.startswith("06_Daily_Logs/")
+    is_root_daily_log = "/" not in rel_path and bool(
+        re.match(r"^\d{4}-\d{2}-\d{2}_.*\.md$", filename)
+    )
+    return (
+        filename in EXCLUDED_ORPHAN_FILES
+        or rel_path.startswith(("04_Archive/", "06_Daily_Logs/"))
+        or is_root_daily_log
+    )
 
 
 class RateLimiter:

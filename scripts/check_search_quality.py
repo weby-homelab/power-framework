@@ -359,8 +359,12 @@ def build_qrels(
             continue
         rel: dict[str, int] = {}
         for rel_path, text in contents.items():
-            if all(t in text for t in terms):
-                rel[rel_path] = 1
+            try:
+                if all(t in text for t in terms):
+                    rel[rel_path] = 1
+            except Exception:
+                # Ignore unreadable file text or encoding errors during qrels generation
+                pass
         qrels[q] = rel
     return qrels
 

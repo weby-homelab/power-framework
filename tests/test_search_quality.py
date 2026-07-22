@@ -78,7 +78,7 @@ def test_search_quality_gate():
     except Exception as exc:  # pragma: no cover - import guard
         pytest.skip(f"searcher import failed: {exc}")
 
-    metrics: dict
+    metrics: dict = {}
     try:
         metrics = harness.evaluate(
             vault=REAL_VAULT,

@@ -1,6 +1,6 @@
 ---
 name: power
-version: 2.0.2
+version: 3.0.0
 description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules).
 ---
 
@@ -27,7 +27,7 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 Скілл містить автоматизовані скрипти у каталозі `scripts/` та CLI:
 
 ### Scripts
-1.  **`lint_brain.py`** — скрипт лінтера + ROT аудиту (v2.0.2):
+1.  **`lint_brain.py`** — скрипт лінтера + ROT аудиту (v3.0.0):
     ```bash
     python3 .agents/skills/power/scripts/lint_brain.py
     ```
@@ -36,27 +36,31 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
     python3 .agents/skills/power/scripts/generate_index.py
     ```
 
-### CLI (power, 11 команд)
+### CLI (power, 15 команд)
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
 3. `power index <path>` — генерація ієрархічного індексу
 4. `power ingest <path>` — створення нотатки з OKF метаданими
 5. `power search <path> <query>` — повнотекстовий пошук
-6. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
-7. `power archive <path>` — архівування застарілих нотаток
-8. `power heal <path>` — автовиправлення frontmatter (новe в v1.7.1)
-9. `power markdown-check <path>` — перевірка якості Markdown (новe в v1.7.1)
-10. `power suggest-related <path>` — пропозиції зв'язків (Graph RAG)
-11. `power cron <path>` — автоматичне обслуговування (lint + index + rot)
+6. `power sync <path>` — побудова FTS і dense-індексу
+7. `power rot <path>` — ROT аудит
+8. `power archive <path>` — архівування застарілих нотаток
+9. `power status <path>` — панель стану vault
+10. `power cron <path>` — автоматичне обслуговування
+11. `power heal <path>` — автовиправлення frontmatter
+12. `power markdown-check <path>` — перевірка якості Markdown
+13. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
+14. `power synthesize <path>` — створення підсумкової нотатки сесії
+15. `power rename <path> --old <old_path> --new <new_path>` — перейменування з оновленням зв'язків
 
-### MCP Tools (12) — FastMCP 3.x (v2.0.2)
+### MCP Tools (12) — FastMCP 3.x (v3.0.0)
 - `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`
 - `search_vault_tool`, `synthesize_session`
 - `rot_audit`, `archive_notes`, `suggest_related_tool`
 - `heal_frontmatter_tool`, `check_markdown_tool`
 
-### Конфігурація (v2.0.2+)
-- **Модель ембеддінгів** — за замовчуванням `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dim, ~680MB RAM). Підтримує українську + англійську мову. Змінювати через `POWER_EMBEDDING_MODEL` у `.env`.
+### Конфігурація (v3.0.0)
+- **Модель ембеддінгів** — канонічно `BAAI/bge-m3` (1024 dim) через direct ONNX Runtime. `POWER_EMBED_PROVIDER=fastembed` вмикає полегшений MiniLM fallback.
 - **ROT аудит (A2)** — перевірка external-лінків тепер паралельна через `ThreadPoolExecutor(max_workers=16)`, що прискорює час виконання з кількох хвилин до секунд.
 - **MCP ентрі-поінт** — `/root/geminicli/.agents/mcp_servers/power_server.py` → `power_framework.mcp`
 

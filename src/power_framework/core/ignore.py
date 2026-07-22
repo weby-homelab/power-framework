@@ -3,7 +3,7 @@ P.O.W.E.R. Vault Ignore + Knowledge-Base Scope Resolution.
 
 Realizes the documented lint behavior:
   * ``OKF`` metadata / broken-link / orphan checks are scoped to the
-    knowledge base (PARA folders + ``brain/`` + root-level daily logs).
+    knowledge base (PARA folders + ``PROTOCOLS/`` + ``brain/`` + root-level daily logs).
   * Files matched by the ``.powerignore`` file at the vault root (gitignore
     semantics) are skipped entirely — this keeps third-party dependency
     trees, build caches and foreign project repositories (e.g. ``projects/``)
@@ -27,8 +27,8 @@ if TYPE_CHECKING:
 
 POWERIGNORE_NAME = ".powerignore"
 
-# Knowledge-base scope: PARA folders + the brain/ subtree.
-KB_SCOPE_PREFIXES: frozenset[str] = frozenset(PARA_FOLDERS_) | {"brain"}
+# Knowledge-base scope: PARA folders, protocol notes, and nested brain/ vaults.
+KB_SCOPE_PREFIXES: frozenset[str] = frozenset(PARA_FOLDERS_) | {"PROTOCOLS", "brain"}
 
 # Root-level daily logs (YYYY-MM-DD_*.md) are part of the knowledge base.
 _DAILY_LOG_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_.*\.md$")

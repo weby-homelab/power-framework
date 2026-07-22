@@ -24,7 +24,13 @@ from .healer import heal_vault
 from .ignore import should_skip
 from .index_worker import set_vault_dir
 from .indexer import generate_log_initial, run_generate_hierarchical_index
-from .linter import archive_stale_notes, run_lint_report, run_rot_report, run_status_report
+from .linter import (
+    archive_stale_notes,
+    run_lint_report,
+    run_lint_vault,
+    run_rot_report,
+    run_status_report,
+)
 from .markdown_checks import check_all as check_markdown_issues
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .parser import build_frontmatter, read_file_content
@@ -120,9 +126,9 @@ def _cmd_lint(args: argparse.Namespace) -> int:
         logger.error("Vault not found: %s", vault_dir)
         return 1
 
-    report = run_lint_report(vault_dir)
-    logger.info(report)
-    return 0
+    result = run_lint_vault(vault_dir)
+    logger.info(result.format_report(vault_dir))
+    return 1 if result.has_blocking_issues else 0
 
 
 def _cmd_index(args: argparse.Namespace) -> int:
