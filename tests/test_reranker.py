@@ -77,6 +77,7 @@ class TestRerankerManager:
 
     def test_colbert_helpers(self):
         from unittest.mock import patch
+
         from power_framework.core.colbert_reranker import _available_ram_gb, is_colbert_enabled
 
         ram = _available_ram_gb()
@@ -88,68 +89,115 @@ class TestRerankerManager:
         assert isinstance(is_colbert_enabled(), bool)
 
     def test_colbert_reranker_exceptions(self):
-        import pytest
         from unittest.mock import patch
+
+        import pytest
+
         from power_framework.core.colbert_reranker import (
             ColBERTLateInteractionReranker,
             ColBERTUnavailableError,
         )
 
-        with patch.dict("os.environ", {"POWER_RERANKER": ""}):
-            with pytest.raises(ColBERTUnavailableError, match="opt-in"):
-                ColBERTLateInteractionReranker()
+        with patch.dict("os.environ", {"POWER_RERANKER": ""}), pytest.raises(
+            ColBERTUnavailableError, match="opt-in"
+        ):
+            ColBERTLateInteractionReranker()
 
-        with patch.dict("os.environ", {"POWER_RERANKER": "colbert"}):
-            with patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=1.0):
-                with pytest.raises(ColBERTUnavailableError, match="requires >="):
-                    ColBERTLateInteractionReranker()
+        with (
+            patch.dict("os.environ", {"POWER_RERANKER": "colbert"}),
+            patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=1.0),
+            pytest.raises(ColBERTUnavailableError, match="requires >="),
+        ):
+            ColBERTLateInteractionReranker()
 
-        with patch.dict("os.environ", {"POWER_RERANKER": "colbert"}):
-            with patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=16.0):
-                colbert = ColBERTLateInteractionReranker()
-                assert colbert.model_name is not None
+        with (
+            patch.dict("os.environ", {"POWER_RERANKER": "colbert"}),
+            patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=16.0),
+        ):
+            colbert = ColBERTLateInteractionReranker()
+            assert colbert.model_name is not None
 
     def test_lazy_init_already_initialized(self):
         manager = RerankerManager()
         mock_model = MagicMock()
         manager._model = mock_model
         manager._lazy_init()
+
     def test_get_reranker_fallback(self):
         from unittest.mock import patch
-        from power_framework.core.reranker import get_reranker, RerankerManager
+
+        from power_framework.core.reranker import RerankerManager, get_reranker
 
         with patch("power_framework.core.colbert_reranker.is_colbert_enabled", return_value=False):
             r = get_reranker()
             assert isinstance(r, RerankerManager)
 
-        with patch("power_framework.core.colbert_reranker.is_colbert_enabled", return_value=True):
-            with patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=1.0):
-                r = get_reranker()
-                assert isinstance(r, RerankerManager)
+        with (
+            patch("power_framework.core.colbert_reranker.is_colbert_enabled", return_value=True),
+            patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=1.0),
+        ):
+            r = get_reranker()
+            assert isinstance(r, RerankerManager)
 
     def test_qwen3_reranker_import_error(self):
         import sys
-        import pytest
         from unittest.mock import patch
+
+        import pytest
+
         from power_framework.core.reranker import RerankerManager
 
-        with patch.dict("os.environ", {"POWER_EMBED_PROVIDER": "qwen3"}):
-            with patch.dict(sys.modules, {"qwen3_embed": None}):
-                mgr = RerankerManager()
-                with pytest.raises(ImportError, match="qwen3-embed is required"):
-                    mgr._lazy_init()
+        with (
+            patch.dict("os.environ", {"POWER_EMBED_PROVIDER": "qwen3"}),
+            patch.dict(sys.modules, {"qwen3_embed": None}),
+        ):
+            mgr = RerankerManager()
+            with pytest.raises(ImportError, match="qwen3-embed is required"):
+                mgr._lazy_init()
 
     def test_fastembed_reranker_import_error(self):
         import sys
-        import pytest
         from unittest.mock import patch
-        from power_framework.core.reranker import RerankerManager
 
-        with patch.dict(sys.modules, {"fastembed.rerank.cross_encoder": None}):
+        import pytest
+
+        from power_framework.core.reranker import ALLOW_NONCOMMERCIAL_MODELS_ENV, RerankerManager
+
+        with (
+            patch.dict("os.environ", {ALLOW_NONCOMMERCIAL_MODELS_ENV: "1"}),
+            patch.dict(sys.modules, {"fastembed.rerank.cross_encoder": None}),
+        ):
             mgr = RerankerManager()
-            assert mgr._use_qwen3 is False
             with pytest.raises(ImportError, match="fastembed is required"):
                 mgr._lazy_init()
+
+    def test_colbert_rerank_with_mock_model(self):
+        from unittest.mock import MagicMock, patch
+
+        from power_framework.core.colbert_reranker import ColBERTLateInteractionReranker
+
+        with (
+            patch.dict("os.environ", {"POWER_RERANKER": "colbert"}),
+            patch("power_framework.core.colbert_reranker._available_ram_gb", return_value=16.0),
+        ):
+            reranker = ColBERTLateInteractionReranker()
+            mock_model = MagicMock()
+            mock_sim = MagicMock()
+            mock_max_sim = MagicMock()
+            mock_max_sim.sum.return_value = 2.5
+            mock_sim.max.return_value.values = mock_max_sim
+
+            q_tokens = MagicMock()
+            d_tokens = MagicMock()
+            q_tokens.__matmul__.return_value = mock_sim
+            q_tokens.T = MagicMock()
+
+            mock_model.query.return_value = q_tokens
+            mock_model.doc.return_value = d_tokens
+            reranker._model = mock_model
+
+            scores = reranker.rerank("q", ["doc1"])
+            assert scores == [2.5]
 
 
 

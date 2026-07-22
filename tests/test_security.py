@@ -240,3 +240,22 @@ class TestExclusionHelpers:
         assert is_excluded_orphan("log.md", "log.md")
         assert is_excluded_orphan("test.md", "06_Daily_Logs/test.md")
         assert not is_excluded_orphan("test.md", "01_Projects/test.md")
+
+
+def test_atomic_write_exception(tmp_path: Path):
+    from unittest.mock import patch
+
+    target = tmp_path / "test.txt"
+    with (
+        patch("os.fdopen", side_effect=OSError("Disk write error")),
+        pytest.raises(OSError, match="Disk write error"),
+    ):
+        atomic_write(target, "content")
+
+
+def test_resolve_path_in_vault_extra_checks(tmp_path: Path):
+    with pytest.raises(ValueError, match="Invalid vault-relative path"):
+        resolve_path_in_vault(tmp_path, "note\x01.md")
+
+    with pytest.raises(ValueError, match="Path is outside the allowed vault directories"):
+        resolve_path_in_vault(tmp_path, "02_Areas/note.md", allowed_directories=("01_Projects",))

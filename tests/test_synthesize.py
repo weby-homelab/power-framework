@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from power_framework.core.synthesize import synthesize_session_ingest
 
 
@@ -37,3 +39,19 @@ def test_synthesize_session_ingest_exists_error(tmp_path):
             content="Content",
             vault_path=tmp_path,
         )
+
+
+def test_synthesize_session_ingest_adds_md_extension(tmp_path):
+    with (
+        patch("power_framework.core.synthesize.run_generate_hierarchical_index", return_value="Index updated"),
+        patch("power_framework.core.synthesize.run_lint_report", return_value="Lint clean"),
+    ):
+        report = synthesize_session_ingest(
+            name="session_no_ext",
+            title="Session No Ext",
+            description="Synthesis without ext",
+            content="Content",
+            vault_path=tmp_path,
+        )
+        assert (tmp_path / "session_no_ext.md").exists()
+        assert "synthesized and ingested" in report
