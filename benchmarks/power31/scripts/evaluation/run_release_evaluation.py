@@ -396,9 +396,10 @@ def run_extractive_rag(
             "distractor_sensitivity": None,
         }
 
-    top_result = retrieved[0]
-    cited_doc = top_result["doc_id"]
-    answer_text = corpus_content.get(cited_doc, "")
+    top_docs = retrieved[:RAG_TOP_K]
+    retrieved_doc_ids = [r["doc_id"] for r in top_docs]
+    cited_doc = retrieved_doc_ids[0]
+    answer_text = "\n\n".join(corpus_content.get(did, "") for did in retrieved_doc_ids)
 
     if not answer_text:
         return {
@@ -430,11 +431,14 @@ def run_extractive_rag(
     correctness = 1.0 if all_facts_found else 0.0
 
     groundedness = sum(facts_found) / len(facts_found) if facts_found else 1.0
-    citation_accuracy = 1.0 if cited_doc in citation_ids else 0.0
+    cited_docs = set(retrieved_doc_ids) & citation_ids
+    citation_accuracy = len(cited_docs) / len(citation_ids) if citation_ids else 1.0
 
     distractor_sensitivity = None
     if distractor_doc_ids:
-        distractor_sensitivity = 0.0 if cited_doc in distractor_doc_ids else 1.0
+        distractor_sensitivity = (
+            0.0 if set(retrieved_doc_ids) <= distractor_doc_ids else 1.0
+        )
 
     if not all_facts_found:
         return {
