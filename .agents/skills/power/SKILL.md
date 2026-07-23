@@ -1,6 +1,6 @@
 ---
 name: power
-version: 3.1.0
+version: 3.2.0
 description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules).
 ---
 
