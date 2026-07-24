@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.4)"
-description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to P.O.W.E.R. OKF-compliant structure under v2.0.4."
-tags: [power, migration, guide, ai-agents, mcp, multilingual-minilm, graphrag]
-timestamp: 2026-07-15T02:00:00
+title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.1)"
+description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to P.O.W.E.R. OKF-compliant structure under v3.2.1."
+tags: [power, migration, guide, ai-agents, mcp, bge-m3, graphrag]
+timestamp: 2026-07-24T16:00:00
 ---
 
-# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v2.0.4)
+# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.1)
 
 **Target audience:** AI agents (Claude, GPT, Gemini, OpenCode) with MCP access to P.O.W.E.R.
 
@@ -198,25 +198,29 @@ For large vaults (>50 notes), group ingests by category. Ingest all `Resource` n
 
 ---
 
-### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v2.0.4)
+### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v3.2.1)
 
-For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v2.0.4) globally or in the project's virtual environment:
+For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v3.2.1) globally or in the project's virtual environment:
 
 ```bash
 pip install git+https://github.com/weby-homelab/power-framework.git
 ```
 
-#### 🧠 Embedding Model Configuration (v2.0.4 Update)
+#### 🧠 Embedding & Reranker Stack Configuration (v3.2.1 Canonical Stack)
 
-Starting with version 2.0.4, the default embedding model is **`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`** (embedding dimension **384**), reducing RAM usage from ~6.3 GB to ~680 MB. This prevents OOM crashes on resource-constrained hosts (e.g. 12GB RAM VPS, Proxmox LXC containers).
+Starting with version 3.0+, the canonical default embedding engine is **`bge-m3`** (`aapot/bge-m3-onnx`, embedding dimension **1024**), running on direct **ONNX Runtime** + `tokenizers` (`BGEM3OnnxManager`). This is paired with the Apache-2.0 **`onnx-community/bge-reranker-v2-m3-ONNX`** cross-encoder reranker.
 
-To customize the model, set the `POWER_EMBEDDING_MODEL` environment variable (loaded automatically from `.env`). For example, to use the heavier bilingual model on a host with sufficient memory:
+Direct ONNX loading resolves fastembed registry issues, tames the BFCArena memory allocator, and enables adaptive batch halving to prevent OOM spikes on 8–12 GB RAM hosts.
+
+To configure thread bounds and memory limits, set environment variables (loaded automatically from `.env`):
 
 ```bash
-export POWER_EMBEDDING_MODEL=BAAI/bge-m3
+export POWER_EMBED_PROVIDER=bge-m3           # Canonical default provider (aapot/bge-m3-onnx)
+export POWER_EMBED_NUM_THREADS=2             # Cap CPU execution threads
+export POWER_EMBED_BATCH_SIZE=8              # Batch size for embedding generation
 ```
 
-When using `BAAI/bge-m3` or other custom ONNX models, set the following to avoid `External data path escapes model directory` errors:
+When using `bge-m3` or other ONNX models from HuggingFace, set the following to prevent symlink traversal issues:
 
 ```bash
 export HF_HUB_DISABLE_SYMLINKS=1
@@ -335,17 +339,17 @@ Set up a synchronization pipeline to preserve history and enable collaboration:
 
 ---
 
-### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid + Semantic)
+### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid + Semantic + Reranked)
 
-The P.O.W.E.R. framework (v2.0.4) includes a built-in search engine supporting five distinct strategies:
+The P.O.W.E.R. framework (v3.2.1) includes a built-in search engine supporting distinct search strategies:
 
-| Mode              | Description                                                                                              | Best for                                    |
-| ----------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `fts` (default)   | SQLite FTS5 with weighted BM25 scoring                                                                   | Exact keyword & phrase matching             |
-| `vector`          | TF-vector cosine similarity (pure Python, zero deps)                                                     | Lexical similarity comparison               |
-| `hybrid`          | RRF (Reciprocal Rank Fusion) merge of FTS + Vector                                                       | Balanced lexical recall                     |
-| `semantic`        | Dense embedding cosine similarity (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` on CPU) | Lightweight multilingual semantic discovery |
-| `hybrid_reranked` | RRF merge of FTS + Vector with Cross-Encoder reranking                                                   | Highest-precision contextual ranking        |
+| Mode                 | Description                                                                                              | Best for                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `reranked` (default) | Canonical POWER 3.2 pipeline: RRF merge of FTS5 + BGE-M3 Dense + BGE Reranker v2 M3                      | Highest-precision multilingual ranking      |
+| `fts`                | SQLite FTS5 with weighted BM25 scoring                                                                   | Exact keyword & phrase matching             |
+| `vector`             | TF-vector cosine similarity (pure Python, zero deps)                                                     | Lexical similarity comparison               |
+| `hybrid`             | RRF (Reciprocal Rank Fusion) merge of FTS + Vector                                                       | Balanced lexical recall                     |
+| `semantic`           | Dense embedding cosine similarity (**BGE-M3** 1024d via direct ONNX Runtime)                             | Fast multilingual semantic discovery        |
 
 _Search Guidelines for AI Agents:_
 
@@ -445,7 +449,7 @@ Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-com
 | `read_sub_index` returns "No notes found"    | Category folder is empty or not indexed       | Run `generate_index(vault_path)` first                        |
 | Too many orphans in `04_Archive/`            | Archived notes by definition have few links   | This is expected — archive orphans are normal                 |
 | Lint reports 200+ extra notes                | `.git/` directory is not excluded             | Update linter to skip hidden dirs (v1.5.0+ does)              |
-| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v2.0.4 or re-run `generate_index`                  |
+| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v3.2.1 or re-run `generate_index`                  |
 | `pip install` fails with PEP 668             | System Python blocks direct install           | Use a venv: `/path/to/venv/bin/pip install ...`               |
 | `External data path escapes model directory` | ONNX Runtime security constraint              | Set `HF_HUB_DISABLE_SYMLINKS=1` in environment before running |
 
