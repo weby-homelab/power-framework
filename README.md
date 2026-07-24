@@ -23,12 +23,12 @@ P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, a
 Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for **AI-first knowledge management**:
 
 - **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`)
-- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
+- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by up to **95%**
 - **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
-- **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Claude, OpenCode, Cursor) with zero glue code, powered by FastMCP 3.x
-- **Beta with explicit release gates** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.1 trust-release baseline](docs/adr/0001-power-3.1-trust-release-baseline.md) records the remaining gates.
+- **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) with zero glue code, powered by FastMCP 3.x
+- **Stable 3.2.1 release** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.2.1 release](https://github.com/weby-homelab/power-framework/releases) records all completed gates.
 
 Detailed breakdown and technical comparison matrix with competing frameworks:
 
