@@ -47,7 +47,13 @@ The agent follows 6 phases. Each phase has clear success criteria.
 
 4. **Run `lint_vault(vault_path)`** — baseline health check. Record how many notes are missing metadata and broken links.
 
-**Success criteria:** You have a complete inventory of all notes and their current state.
+5. **🛡️ Create Mandatory Safety Backup (Zero Data Loss Rule)** — BEFORE modifying, moving, or ingesting files, create an intact tarball or snapshot of the vault:
+   ```bash
+   tar -czf vault_backup_$(date +%Y%m%d_%H%M%S).tar.gz /path/to/vault
+   ```
+   *Never proceed with destructive operations without a verified backup.*
+
+**Success criteria:** You have a complete inventory of all notes, baseline lint metrics, and an intact raw backup archive.
 
 ---
 
@@ -147,7 +153,16 @@ For every classified note, call the MCP tool `ingest_note`:
 
 For large vaults (>50 notes), group ingests by category. Ingest all `Resource` notes first, then `Area`, then `Project`, etc. This keeps the index regenerations predictable.
 
-**Success criteria:** All notes are recreated in P.A.R.A. folders with valid OKF frontmatter. Index is up to date.
+### Step 3d: Vector Embedding Indexing (`power sync`)
+
+After completing note ingests, compute BGE-M3 dense vector embeddings to enable `reranked` and `semantic` search modes:
+
+```bash
+power sync /path/to/vault
+```
+*Note:* Running `power sync` chunks documents, extracts GraphRAG entity connections, and generates 1024d dense embeddings into `.power_search.db`.
+
+**Success criteria:** All notes are recreated in P.A.R.A. folders with valid OKF frontmatter. Navigation indexes and vector embedding databases (`.power_search.db`) are synchronized.
 
 ---
 
@@ -169,9 +184,9 @@ For large vaults (>50 notes), group ingests by category. Ingest all `Resource` n
 
 3. **Test hierarchical indexing** — call `read_sub_index(category="01_Projects", vault_path=...)` and verify it returns a valid sub-index.
 
-4. **Test search** — call `search_vault_tool(query="test", vault_path=...)` and verify results look correct.
+4. **Verify Vector & Reranked Search** — call `search_vault_tool(query="test", search_mode="reranked", vault_path=...)` and verify results return without `power sync` warnings.
 
-**Success criteria:** Lint passes with zero errors. Spot checks pass.
+**Success criteria:** Lint passes with zero errors. Vector search operates cleanly without warnings. Spot checks pass.
 
 ---
 
@@ -310,8 +325,9 @@ Each session working with the vault should conclude with a maintenance cycle:
 
 1. **Save session log** — Create a note in `06_Daily_Logs/` (type: `Daily Log`) describing the work done.
 2. **Rebuild index** — Run `power index` to update `index.md` and `_index.md`.
-3. **Log the change** — Add a brief entry to the central `log.md`.
-4. **Validate status (Lint)** — Run `power lint` to confirm no regressions are present.
+3. **Synchronize Vector Database** — Run `power sync` to compute BGE-M3 embeddings and refresh GraphRAG links.
+4. **Log the change** — Add a brief entry to the central `log.md`.
+5. **Validate status (Lint)** — Run `power lint` to confirm no regressions are present (zero errors required).
 
 ---
 
@@ -326,16 +342,19 @@ Before beginning a new work session, the AI agent should:
 
 ---
 
-### Step 6i: Git Sync & Publication
+### Step 6i: Git Sync, Credentials Purge & GPG Signing
 
-Set up a synchronization pipeline to preserve history and enable collaboration:
+Set up a synchronization pipeline to preserve history and enable collaboration without risking credential leaks:
 
-1. **Committer Identity**: Configure Git's `user.name` and `user.email` to match your developer profile. Avoid committing as system users like `root`.
-2. **Security Configurations**: Add confidential files (keys, passwords, `.env`, temporary export files) to `.gitignore`.
-3. **GPG Signing (If Required)**: Enable GPG-signed commits (`commit.gpgsign=true`) using your personal GPG key.
-4. **Git Workflow (PR Workflow)**:
-    - Perform work on dedicated feature branches (`feature/*`).
-    - Merge changes into the main branch via a Pull Request after all local checks and CI/CD validation builds pass.
+1. **🔒 Credentials Purge Mandate (CRITICAL)**: Never hardcode or commit tokens, passwords, API keys, private keys (`.pem`, `.key`), or `.env` files into Git. Verify `git diff --cached` before committing to ensure no credentials are stage-exposed.
+2. **Committer Identity**: Configure Git's `user.name` and `user.email` to match your developer profile. Avoid committing as unconfigured system users like `root`.
+3. **Security Configurations**: Add confidential files (keys, passwords, `.env`, temporary export files, `.power_search.db`) to `.gitignore`.
+4. **GPG Signing**: Enable GPG-signed commits (`commit -S`) using your configured GPG key fingerprint (`2D49E810C7F2527E` or personal key).
+5. **Git Workflow (PR Workflow)**:
+    - Perform work on dedicated feature branches (`feature/*` or `fix/*`).
+    - Audit changes via dual-side `git diff` inspection (verify added `+` and removed `-` lines).
+    - Merge changes into the main branch via a Pull Request after local tests (`verify.sh`, `pytest`) pass.
+    - Clean up merged branches post-merge via GitHub API/scripts without deleting unmerged branches with active PRs.
 
 ---
 
