@@ -122,7 +122,7 @@ pip install --user --break-system-packages -e ".[dev]"
 
 ### Ґайд міграції для AI-агента
 
-Покроковий протокол для будь-якого AI-агента (Antigravity 2.0, OpenCode, Claude Code CLI, Gemini 2.5 Pro, DeepSeek-R1 Agent, Devin 2.0) для автономної міграції існуючої бази знань у структуру P.O.W.E.R.:
+Покроковий протокол для будь-якого AI-агента (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) для автономної міграції існуючої бази знань у структуру P.O.W.E.R.:
 
 - **[English: AI Agent Migration Guide](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
 - **[Українська: Ґайд міграції для AI-агента](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.ua.md)** — покроковий протокол з MCP-інструментами, евристиками класифікації та вирішенням проблем

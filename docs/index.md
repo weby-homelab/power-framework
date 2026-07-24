@@ -17,7 +17,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Frontmatter Healer** — auto-fills missing title, description, type, and timestamp across the vault
 - **Markdown Quality Checks** — detects trailing whitespace, inconsistent list markers, header jumps, missing code language
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
-- **MCP-native** — all 12 tools exposed to any MCP-compatible AI client (Antigravity 2.0, OpenCode, Claude Code CLI, Gemini 2.5 Pro, DeepSeek-R1 Agent, Cursor 2.0), powered by FastMCP 3.x
+- **MCP-native** — all 12 tools exposed to any MCP-compatible AI client (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor), powered by FastMCP 3.x
 - **3.1 release preparation with explicit gates** — hermetic tests, CodeQL scanning, a pinned model manifest (`release/models.lock.json`), and the tracked [P.O.W.E.R. 3.1 trust-release baseline](adr/0001-power-3.1-trust-release-baseline.md). The project remains beta/research until all P0/P1 gates and reproducible model-backed evidence are closed.
 
 ## Features

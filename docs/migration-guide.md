@@ -8,7 +8,7 @@ timestamp: 2026-07-24T16:00:00
 
 # AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.1)
 
-**Target audience:** AI agents (Antigravity 2.0, OpenCode, Claude Code CLI, Gemini 2.5 Pro, DeepSeek-R1 Agent, Devin 2.0) with MCP access to P.O.W.E.R.
+**Target audience:** AI agents (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) with MCP access to P.O.W.E.R.
 
 **Goal:** Transform any unstructured Obsidian vault into a P.O.W.E.R.-compliant knowledge base with validated OKF metadata, P.A.R.A. folder structure, and hierarchical indexes — fully autonomously.
 

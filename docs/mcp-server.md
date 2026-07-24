@@ -1,6 +1,6 @@
 # MCP Server (FastMCP 3.x)
 
-The P.O.W.E.R. Framework exposes its full functionality via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), powered by [FastMCP 3.x](https://gofastmcp.com) (Prefect). This enables AI agents (Antigravity 2.0, OpenCode, Claude Code CLI, Gemini 2.5 Pro, DeepSeek-R1 Agent, Cursor 2.0) to interact with your knowledge vault directly.
+The P.O.W.E.R. Framework exposes its full functionality via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), powered by [FastMCP 3.x](https://gofastmcp.com) (Prefect). This enables AI agents (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) to interact with your knowledge vault directly.
 
 ## Transport modes
 
