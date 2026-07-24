@@ -123,7 +123,7 @@ Read the full technical report on the transition from flat to hierarchical index
 
 ### AI Agent Migration Guide
 
-Step-by-step protocol for any AI agent (Antigravity 2.0, OpenCode, Claude Code CLI, Gemini 2.5 Pro, DeepSeek-R1 Agent, Devin 2.0) to autonomously migrate an existing knowledge base into P.O.W.E.R. structure:
+Step-by-step protocol for any AI agent (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) to autonomously migrate an existing knowledge base into P.O.W.E.R. structure:
 
 - **[English: AI Agent Migration Guide](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
 - **[Українська: Ґайд міграції для AI-агента](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.ua.md)** — покроковий протокол для будь-якого AI-агента

@@ -8,7 +8,7 @@ timestamp: 2026-07-24T16:00:00
 
 # Ґайд міграції для AI-агента: як перенести будь-який Obsidian Vault у структуру P.O.W.E.R. (v3.2.1)
 
-**Цільова аудиторія:** AI-агенти (Antigravity 2.0, OpenCode, Claude Code CLI, Gemini 2.5 Pro, DeepSeek-R1 Agent, Devin 2.0) з MCP-доступом до P.O.W.E.R.
+**Цільова аудиторія:** AI-агенти (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) з MCP-доступом до P.O.W.E.R.
 
 **Мета:** Перетворити будь-який неструктурований Obsidian Vault на P.O.W.E.R.-сумісну базу знань з валідованими OKF-метаданими, P.A.R.A. структурою папок та ієрархічними індексами — повністю автономно.
 
