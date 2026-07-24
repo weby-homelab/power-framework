@@ -134,6 +134,30 @@ pip install --user --break-system-packages -e ".[dev]"
 - **[English: Why P.O.W.E.R. 3.2.1](https://github.com/weby-homelab/power-framework/blob/main/WHY_POWER_3.2.1.en.md)** — comparison matrix, 5 super features, token economy, P.A.R.A. flexibility FAQ
 - **[Українська: Чому P.O.W.E.R. 3.2.1](https://github.com/weby-homelab/power-framework/blob/main/WHY_POWER_3.2.1.md)** — огляд, порівняльна таблиця, 5 супер фішок, економія токенів, FAQ по гнучкості P.A.R.A.
 
+## 🗂️ Підтримка Методологій: Оберіть Свою Систему
+
+P.O.W.E.R. не прив'язує вас до однієї методології. Ініціалізуйте сховище з будь-якою популярною системою організації знань однією командою:
+
+```bash
+power init /шлях/до/vault --template para          # P.A.R.A. — орієнтація на проєкти та дедлайни
+power init /шлях/до/vault --template code          # C.O.D.E. — синтез та дистиляція контенту
+power init /шлях/до/vault --template gtd           # GTD — обробка задач і Inbox Zero
+power init /шлях/до/vault --template zettelkasten  # Zettelkasten — атомарні нотатки з UID-графом
+power init /шлях/до/vault --template lyt           # LYT — карти контенту MOC / Hubs
+power init /шлях/до/vault --template johnny-decimal # Johnny.Decimal — сувора десяткова ієрархія
+```
+
+| Методологія      | Головний Фокус              | Скелет Папок за замовчуванням                              | Основна Метрика         |
+| :--------------- | :-------------------------- | :--------------------------------------------------------- | :---------------------- |
+| **P.A.R.A.**     | Дії та Дедлайни             | `01_Projects`, `02_Areas`, `03_Resources`, `04_Archive`   | Завершення проєктів     |
+| **C.O.D.E.**     | Дистиляція контенту         | `01_Capture`, `02_Organize`, `03_Distill`, `04_Express`   | Швидкість генерації ідей|
+| **GTD**          | Опрацювання задач           | `00_Inbox`, `01_Next_Actions`, `02_Waiting_For`, `03_Someday` | Inbox Zero & Потік  |
+| **Zettelkasten** | Атомарний граф ідей         | `fleeting/`, `literature/`, `permanent/`, `index/`        | Густота зв'язків та UID |
+| **LYT**          | Карти контенту (MOC)        | `Home.md`, `MOCs/`, `Notes/`, `Archives/`                 | Покриття MOC-картами    |
+| **Johnny.Decimal** | Суворий десятичний індекс | `10-19_Admin/`, `20-29_Engineering/`, `30-39_Ops/`        | Десятична адресація     |
+
+OKF-валідація метаданих, векторний пошук BGE-M3, лінтер та всі 12 MCP-інструментів працюють **незалежно від обраної методології** — без компромісів!
+
 ## Для кого це
 
 - **Користувачі баз знань**, які хочуть щоб AI-агенти розуміли та підтримували їх базу знань
