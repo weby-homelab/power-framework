@@ -5,24 +5,24 @@ description: Cleans up obsolete, merged git branches in the local repository and
 
 # 🗑️ Git Branch Cleanup Skill
 
-Цей скілл призначений для автоматичного очищення застарілих та вже злитих гілок з локального середовища та віддаленого репозиторію на GitHub.
+This skill is designed for automatically cleaning up obsolete and already merged branches from the local environment and remote repository on GitHub.
 
-## 🚀 Як використовувати
+## 🚀 How to Use
 
-Скілл автоматично активується, коли:
-1. Завершено роботу над Pull Request (PR) або злиттям змін.
-2. Запущено процес розгортання/деплою.
-3. Користувач просить видалити зайві гілки або навести лад у репозиторії.
+The skill automatically activates when:
+1. Work on a Pull Request (PR) or merging changes is complete.
+2. A deployment process has been initiated.
+3. The user requests deleting extra branches or tidying up the repository.
 
-Ви можете запустити скрипт очищення безпосередньо з терміналу:
+You can run the cleanup script directly from the terminal:
 ```bash
 /root/geminicli/.agents/skills/cleanup-branches/scripts/cleanup_branches.py
 ```
 
-Скрипт самостійно:
-- Перевірить, чи перебуваєте ви в Git репозиторії.
-- Отримає токен `GITHUB_RELEASE_TOKEN` з файлу `.env`.
-- Отримає назву репозиторію та його власника.
-- Визначить список гілок, які вже злиті в `main` або `master`.
-- Видалить ці гілки на GitHub через API.
-- Виконає команду `git fetch origin --prune` для очищення локальних посилань.
+The script on its own:
+- Checks whether you are in a Git repository.
+- Retrieves the `GITHUB_RELEASE_TOKEN` token from the `.env` file.
+- Retrieves the repository name and its owner.
+- Determines the list of branches that have already been merged into `main` or `master`.
+- Deletes these branches on GitHub via the API.
+- Runs the `git fetch origin --prune` command to clean up local references.
