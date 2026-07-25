@@ -128,17 +128,25 @@ class TestVaultRelativeWritePaths:
             "01_Projects/outside.txt",
         ],
     )
-    def test_rejects_unsafe_untrusted_paths(self, sample_vault: Path, untrusted_path: str):
+    def test_rejects_unsafe_untrusted_paths(
+        self, sample_vault: Path, untrusted_path: str
+    ):
         with pytest.raises(ValueError, match=r"path|Path|Markdown|Symlink|Target"):
-            resolve_path_in_vault(sample_vault, untrusted_path, self._allowed_directories)
+            resolve_path_in_vault(
+                sample_vault, untrusted_path, self._allowed_directories
+            )
 
     def test_rejects_absolute_path(self, sample_vault: Path, tmp_path: Path):
         outside_path = tmp_path.parent / "outside.md"
 
         with pytest.raises(ValueError, match="Absolute"):
-            resolve_path_in_vault(sample_vault, str(outside_path), self._allowed_directories)
+            resolve_path_in_vault(
+                sample_vault, str(outside_path), self._allowed_directories
+            )
 
-    def test_rejects_symlinked_parent_that_escapes_vault(self, sample_vault: Path, tmp_path: Path):
+    def test_rejects_symlinked_parent_that_escapes_vault(
+        self, sample_vault: Path, tmp_path: Path
+    ):
         outside_directory = tmp_path / "outside"
         outside_directory.mkdir()
         escape_link = sample_vault / "01_Projects" / "escape"
@@ -148,6 +156,51 @@ class TestVaultRelativeWritePaths:
             resolve_path_in_vault(
                 sample_vault,
                 "01_Projects/escape/Outside.md",
+                self._allowed_directories,
+            )
+
+    @pytest.mark.parametrize(
+        "traversal_path",
+        [
+            "../outside.md",
+            "../../etc/passwd",
+            "%2e%2e/outside.md",
+            "/etc/passwd",
+            "C:\\Windows\\system.ini",
+            "..\\outside.md",
+            "01_Projects/../../outside.md",
+            "01_Projects/\x00note.md",
+        ],
+    )
+    def test_resolve_path_rejects_escape(self, sample_vault: Path, traversal_path: str):
+        with pytest.raises((ValueError, FileNotFoundError)):
+            resolve_path_in_vault(
+                sample_vault, traversal_path, self._allowed_directories
+            )
+
+    def test_rejects_symlink_parent_escape(self, sample_vault: Path, tmp_path: Path):
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        symlink_parent = sample_vault / "01_Projects" / "symlink_dir"
+        symlink_parent.symlink_to(outside_dir, target_is_directory=True)
+        with pytest.raises(ValueError, match="Target"):
+            resolve_path_in_vault(
+                sample_vault,
+                "01_Projects/symlink_dir/evil.md",
+                self._allowed_directories,
+            )
+
+    def test_rejects_symlink_target_to_external_file(
+        self, sample_vault: Path, tmp_path: Path
+    ):
+        outside_file = tmp_path / "outside.md"
+        outside_file.write_text("hack")
+        symlink = sample_vault / "01_Projects" / "symlink.md"
+        symlink.symlink_to(outside_file)
+        with pytest.raises(ValueError, match=r"Symlink|Target"):
+            resolve_path_in_vault(
+                sample_vault,
+                "01_Projects/symlink.md",
                 self._allowed_directories,
             )
 
@@ -257,5 +310,9 @@ def test_resolve_path_in_vault_extra_checks(tmp_path: Path):
     with pytest.raises(ValueError, match="Invalid vault-relative path"):
         resolve_path_in_vault(tmp_path, "note\x01.md")
 
-    with pytest.raises(ValueError, match="Path is outside the allowed vault directories"):
-        resolve_path_in_vault(tmp_path, "02_Areas/note.md", allowed_directories=("01_Projects",))
+    with pytest.raises(
+        ValueError, match="Path is outside the allowed vault directories"
+    ):
+        resolve_path_in_vault(
+            tmp_path, "02_Areas/note.md", allowed_directories=("01_Projects",)
+        )

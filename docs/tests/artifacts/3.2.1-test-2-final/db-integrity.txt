@@ -1,0 +1,6 @@
+integrity_check: ok
+wal_checkpoint(TRUNCATE): ok
+documents: 560
+chunks: 1608
+chunk_embeddings_dim: 1024
+manifest_schema_version: 2

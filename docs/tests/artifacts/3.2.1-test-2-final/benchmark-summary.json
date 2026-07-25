@@ -1,0 +1,51 @@
+{
+    "git_commit": "407515cf026c25ca8a0666b099a4b316c366498a",
+    "git_dirty": true,
+    "git_dirty_files": ["src/power_framework/core/reranker.py"],
+    "db": {
+        "documents": 560,
+        "chunks": 1608
+    },
+    "tests": {
+        "passed": 540,
+        "skipped": 1,
+        "coverage": 74.14
+    },
+    "cold_latency_ms": {
+        "fts": { "p50": 274.0 },
+        "vector": { "p50": 1844.13 },
+        "hybrid": { "p50": 1123.71 },
+        "semantic": { "p50": 8040.0 },
+        "reranked": { "p50": 28947.0 }
+    },
+    "warm_latency_ms": {
+        "fts": { "p50": 5.9, "p95": 166.0 },
+        "vector": { "p50": 146.7, "p95": 2788.24 },
+        "hybrid": { "p50": 148.3, "p95": 2252.56 },
+        "semantic": { "p50": 67.1, "p95": 200.0 },
+        "reranked": { "p50": 6733.6, "p95": 15000.0 }
+    },
+    "quality": {
+        "semantic": {
+            "ndcg@5": 0.435,
+            "recall@5": 0.0,
+            "mrr@5": 0.0
+        },
+        "reranked_old": {
+            "ndcg@5": 0.2859
+        },
+        "reranked_new": {
+            "ndcg@5": 0.4244,
+            "recall@5": 0.0,
+            "mrr@5": 0.0
+        }
+    },
+    "memory_mib": {
+        "fts": 345.52,
+        "vector": 345.52,
+        "hybrid": 345.52,
+        "semantic": 1560.0,
+        "reranked": 2260.0,
+        "full_sync": 2810.0
+    }
+}

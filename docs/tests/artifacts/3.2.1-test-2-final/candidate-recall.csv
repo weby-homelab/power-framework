@@ -1,0 +1,2 @@
+query,relevant_docs,fts_top150,tf_top150,dense_top60,union_before_rrf,rrf_top20,reranked_top5,first_relevant_rank
+"how to verify gpg commit signature before merge",3,150,150,60,210,20,5,1

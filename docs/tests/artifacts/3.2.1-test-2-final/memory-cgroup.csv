@@ -1,0 +1,9 @@
+mode,memory_max_mib,result,peak_mib,swap_current,oom
+semantic,1800,PASS,1560,0,no
+semantic,2048,PASS,1560,0,no
+reranked,2300,PASS,2260,0,no
+reranked,2560,PASS,2260,0,no
+reranked,3072,PASS,2260,0,no
+full_sync,3072,PASS,2810,0,no
+full_sync,3584,PASS,2810,0,no
+full_sync,4096,PASS,2810,0,no
