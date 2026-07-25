@@ -303,3 +303,71 @@ class TestRerankerManager:
 
             scores = reranker.rerank("q", ["doc1"])
             assert scores == [2.5]
+
+
+def test_bge_reranker_omits_token_type_ids_when_model_does_not_accept_it():
+    from unittest.mock import MagicMock
+    from power_framework.core.reranker import BGEM3Reranker
+
+    reranker = BGEM3Reranker()
+    mock_session = MagicMock()
+    mock_input1 = MagicMock()
+    mock_input1.name = "input_ids"
+    mock_input2 = MagicMock()
+    mock_input2.name = "attention_mask"
+    mock_session.get_inputs.return_value = [mock_input1, mock_input2]
+    mock_session.run.return_value = [[[0.5]]]
+
+    mock_tokenizer = MagicMock()
+    enc = MagicMock()
+    enc.ids = [1, 2, 3]
+    enc.attention_mask = [1, 1, 1]
+    enc.type_ids = [0, 0, 0]
+    mock_tokenizer.encode.return_value = enc
+
+    reranker._session = mock_session
+    reranker._tokenizer = mock_tokenizer
+
+    scores = reranker.rerank("test query", ["test doc"])
+    assert len(scores) == 1
+
+    args, kwargs = mock_session.run.call_args
+    input_feed = args[1]
+    assert "input_ids" in input_feed
+    assert "attention_mask" in input_feed
+    assert "token_type_ids" not in input_feed
+
+
+def test_bge_reranker_includes_token_type_ids_when_model_accepts_it():
+    from unittest.mock import MagicMock
+    from power_framework.core.reranker import BGEM3Reranker
+
+    reranker = BGEM3Reranker()
+    mock_session = MagicMock()
+    mock_input1 = MagicMock()
+    mock_input1.name = "input_ids"
+    mock_input2 = MagicMock()
+    mock_input2.name = "attention_mask"
+    mock_input3 = MagicMock()
+    mock_input3.name = "token_type_ids"
+    mock_session.get_inputs.return_value = [mock_input1, mock_input2, mock_input3]
+    mock_session.run.return_value = [[[0.5]]]
+
+    mock_tokenizer = MagicMock()
+    enc = MagicMock()
+    enc.ids = [1, 2, 3]
+    enc.attention_mask = [1, 1, 1]
+    enc.type_ids = [0, 0, 0]
+    mock_tokenizer.encode.return_value = enc
+
+    reranker._session = mock_session
+    reranker._tokenizer = mock_tokenizer
+
+    scores = reranker.rerank("test query", ["test doc"])
+    assert len(scores) == 1
+
+    args, kwargs = mock_session.run.call_args
+    input_feed = args[1]
+    assert "input_ids" in input_feed
+    assert "attention_mask" in input_feed
+    assert "token_type_ids" in input_feed

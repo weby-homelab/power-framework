@@ -4,6 +4,7 @@ import hashlib
 import logging
 import math
 import os
+import time
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
@@ -154,24 +155,16 @@ class BGEM3Reranker:
                     "Install with: pip install power-framework"
                 ) from e
 
-            model_path = hf_hub_download(
-                self.repo,
-                "onnx/model.onnx",
-                revision=self.revision,
-                local_files_only=False,
-            )
-            data_path = hf_hub_download(
-                self.repo,
-                "onnx/model.onnx_data",
-                revision=self.revision,
-                local_files_only=False,
-            )
-            tok_path = hf_hub_download(
-                self.repo,
-                "tokenizer.json",
-                revision=self.revision,
-                local_files_only=False,
-            )
+            offline = os.getenv("HF_HUB_OFFLINE", "0") == "1" or os.getenv("TRANSFORMERS_OFFLINE", "0") == "1"
+            local_only = offline
+            try:
+                model_path = hf_hub_download(self.repo, "onnx/model.onnx", revision=self.revision, local_files_only=local_only)
+                data_path = hf_hub_download(self.repo, "onnx/model.onnx_data", revision=self.revision, local_files_only=local_only)
+                tok_path = hf_hub_download(self.repo, "tokenizer.json", revision=self.revision, local_files_only=local_only)
+            except Exception:
+                model_path = hf_hub_download(self.repo, "onnx/model.onnx", revision=self.revision, local_files_only=True)
+                data_path = hf_hub_download(self.repo, "onnx/model.onnx_data", revision=self.revision, local_files_only=True)
+                tok_path = hf_hub_download(self.repo, "tokenizer.json", revision=self.revision, local_files_only=True)
 
             if (
                 self.repo == BGE_RERANKER_PINNED_REPO
@@ -205,15 +198,47 @@ class BGEM3Reranker:
                 self._session = None
                 raise RuntimeError("bge_reranker_onnx_probe_failed")
 
-    def _rerank_raw(self, query: str, document: str) -> list[float] | None:
+    def _rerank_batch(self, query: str, documents: list[str]) -> list[float] | None:
+        import math
         import numpy as np
 
         assert self._session is not None
         assert self._tokenizer is not None
-        enc = self._tokenizer.encode(query, document)
-        input_ids = np.array([enc.ids], dtype=np.int64)
-        attention_mask = np.array([enc.attention_mask], dtype=np.int64)
-        token_type_ids = np.array([enc.type_ids], dtype=np.int64)
+        if not documents:
+            return []
+
+        pairs = [(query, doc) for doc in documents]
+        try:
+            encodings = self._tokenizer.encode_batch(pairs)
+            if not isinstance(encodings, (list, tuple)) or len(encodings) == 0:
+                encodings = [self._tokenizer.encode(q, d) for q, d in pairs]
+        except Exception:
+            encodings = [self._tokenizer.encode(q, d) for q, d in pairs]
+
+        max_len = max(len(enc.ids) for enc in encodings)
+
+        padded_ids = []
+        padded_mask = []
+        padded_types = []
+        pad_id = self._tokenizer.token_to_id("[PAD]") or 0
+
+        for enc in encodings:
+            ids = list(enc.ids)
+            mask = list(enc.attention_mask)
+            types = list(enc.type_ids)
+            pad_len = max_len - len(ids)
+            if pad_len > 0:
+                ids.extend([pad_id] * pad_len)
+                mask.extend([0] * pad_len)
+                types.extend([0] * pad_len)
+            padded_ids.append(ids)
+            padded_mask.append(mask)
+            padded_types.append(types)
+
+        input_ids = np.array(padded_ids, dtype=np.int64)
+        attention_mask = np.array(padded_mask, dtype=np.int64)
+        token_type_ids = np.array(padded_types, dtype=np.int64)
+
         input_feed = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -221,18 +246,48 @@ class BGEM3Reranker:
         input_names = {inp.name for inp in self._session.get_inputs()}
         if "token_type_ids" in input_names:
             input_feed["token_type_ids"] = token_type_ids
+
         logits = self._session.run(None, input_feed)[0]
-        score = float(1.0 / (1.0 + math.exp(-float(logits[0][0]))))  # sigmoid
-        return [score]
+        scores: list[float] = []
+        for i in range(len(documents)):
+            val = logits[i]
+            while hasattr(val, "__getitem__") and not isinstance(val, (float, int)):
+                try:
+                    val = val[0]
+                except (IndexError, TypeError):
+                    break
+            raw_val = float(val)
+            score = float(1.0 / (1.0 + math.exp(-raw_val)))
+            scores.append(score)
+        return scores
+
+    def _rerank_raw(self, query: str, document: str) -> list[float] | None:
+        return self._rerank_batch(query, [document])
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         self._lazy_init()
         if not documents:
             return []
+        batch_size = int(os.getenv("POWER_RERANKER_BATCH_SIZE", "8"))
+        if batch_size <= 0:
+            batch_size = 8
+
         scores: list[float] = []
-        for doc in documents:
-            vec = self._rerank_raw(query, doc)
-            scores.append(vec[0] if vec else 0.0)
+        t0 = time.perf_counter()
+        for i in range(0, len(documents), batch_size):
+            chunk = documents[i : i + batch_size]
+            batch_scores = self._rerank_batch(query, chunk)
+            if batch_scores:
+                scores.extend(batch_scores)
+            else:
+                scores.extend([0.0] * len(chunk))
+        rerank_ms = (time.perf_counter() - t0) * 1000
+        logger.debug(
+            "BGEM3Reranker reranked %d docs in %.2f ms (batch_size=%d)",
+            len(documents),
+            rerank_ms,
+            batch_size,
+        )
         return scores
 
 

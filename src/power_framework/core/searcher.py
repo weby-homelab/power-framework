@@ -9,7 +9,7 @@ Multi-mode search across vault notes:
 """
 
 from __future__ import annotations
-
+import time
 import contextlib
 import hashlib
 import json
@@ -349,11 +349,18 @@ def _sync_vault_to_db(
     the DB with periodic commits so the working set never holds the whole vault.
     """
     cursor = conn.cursor()
-    if force_rebuild and sync_embeddings:
-        logger.info("Force rebuild: clearing dense-embedding tables ...")
-        cursor.execute("DELETE FROM doc_embeddings")
-        cursor.execute("DELETE FROM chunk_embeddings")
-        conn.commit()
+    if sync_embeddings:
+        chunk_cnt = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+        if force_rebuild or chunk_cnt == 0:
+            logger.info("Dense embeddings missing or force rebuild requested: resetting mtime ...")
+            try:
+                cursor.execute("DELETE FROM doc_embeddings")
+                cursor.execute("DELETE FROM chunk_embeddings")
+                cursor.execute("UPDATE file_metadata SET mtime = 0")
+                conn.commit()
+            except sqlite3.OperationalError:
+                logger.warning("Embedding tables locked (concurrent sync?), skipping reset")
+                conn.rollback()
 
     disk_files: dict[str, float] = {}
     for filepath in vault_dir.rglob("*.md"):
@@ -435,6 +442,7 @@ def _sync_vault_to_db(
         len(disk_files),
         sync_embeddings,
     )
+    sync_start_time = time.perf_counter()
 
     # --- Lightweight pass: FTS + TF-vector (cheap, no model load) ---
     for rel_path, content, metadata, mtime in changed:
@@ -529,6 +537,7 @@ def _sync_vault_to_db(
         )
         conn.commit()
     _maybe_vacuum(conn, to_delete, db_files)
+    conn.commit()
 
 
 def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
@@ -597,11 +606,11 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
         vecs = _embed_retry(texts, batch_size)
         if vecs is None:
             return
-        for (chunk_id, rel_path, _, mtime), vec in zip(items, vecs, strict=True):
+        for (chunk_id, rel_path, chunk_content, mtime), vec in zip(items, vecs, strict=True):
             blob = struct.pack(f"{len(vec)}f", *vec)
             cursor.execute(
                 "INSERT OR REPLACE INTO chunk_embeddings (chunk_id, rel_path, embedding, content, mtime) VALUES (?, ?, ?, ?, ?)",
-                (chunk_id, rel_path, blob, _, mtime),
+                (chunk_id, rel_path, blob, chunk_content, mtime),
             )
 
     def _safe_commit() -> None:
@@ -639,6 +648,8 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
             _safe_commit()
     _safe_commit()
     logger.info("Embedding pass complete: %d vector(s) written", total)
+    rowc = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+    logger.info("DEBUG AT END OF EMBED_AND_STORE: chunk_embeddings=%d", rowc)
 
 
 def _maybe_vacuum(conn, to_delete, db_files) -> None:

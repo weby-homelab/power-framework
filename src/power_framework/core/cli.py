@@ -242,12 +242,39 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         vault_dir,
     )
     force_rebuild = getattr(args, "force", False)
-    _sync_vault_to_db(
-        vault_dir,
-        _open_conn(),
-        sync_embeddings=sync_embeddings,
-        force_rebuild=force_rebuild,
-    )
+    # Prevent concurrent syncs via PID lock file
+    from .utils import get_cache_dir
+    _lock_p = get_cache_dir() / "sync.pid"
+    _lock_p.parent.mkdir(parents=True, exist_ok=True)
+    if _lock_p.exists():
+        try:
+            _pid = int(_lock_p.read_text().strip())
+            os.kill(_pid, 0)
+            logger.error("Sync already running (PID %d), exiting.", _pid)
+            return 1
+        except (OSError, ValueError):
+            pass
+    _lock_p.write_text(str(os.getpid()))
+    try:
+        conn = _open_conn()
+        try:
+            _sync_vault_to_db(
+                vault_dir,
+                conn,
+                sync_embeddings=sync_embeddings,
+                force_rebuild=force_rebuild,
+            )
+        finally:
+            try:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except Exception:
+                pass
+            conn.close()
+    finally:
+        try:
+            _lock_p.unlink()
+        except OSError:
+            pass
     logger.info("Index build complete.")
     return 0
 
