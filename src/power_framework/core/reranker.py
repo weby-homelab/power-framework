@@ -214,14 +214,14 @@ class BGEM3Reranker:
         input_ids = np.array([enc.ids], dtype=np.int64)
         attention_mask = np.array([enc.attention_mask], dtype=np.int64)
         token_type_ids = np.array([enc.type_ids], dtype=np.int64)
-        logits = self._session.run(
-            None,
-            {
-                "input_ids": input_ids,
-                "attention_mask": attention_mask,
-                "token_type_ids": token_type_ids,
-            },
-        )[0]
+        input_feed = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+        }
+        input_names = {inp.name for inp in self._session.get_inputs()}
+        if "token_type_ids" in input_names:
+            input_feed["token_type_ids"] = token_type_ids
+        logits = self._session.run(None, input_feed)[0]
         score = float(1.0 / (1.0 + math.exp(-float(logits[0][0]))))  # sigmoid
         return [score]
 
