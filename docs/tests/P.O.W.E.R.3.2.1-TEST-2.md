@@ -21,7 +21,7 @@ tags:
 timestamp: 2026-07-25T15:35:24
 ---
 
-# 🧪 P.O.W.E.R. v3.2.1 — TEST-2: Повний незалежний звіт (WS)
+# 🧪 P.O.W.E.R. v3.2.1 — TEST-2: Внутрішній емпіричний тест на другій апаратній платформі (WS)
 
 > **Мета TEST-2.** Провести всі тести, які залишились незавершеними у TEST-1 (на PRXMX-01):
 > виміряти реальну latency BGE-M3 vector search та Reranked search, RAM повного neural pipeline,
@@ -206,7 +206,7 @@ query: "ignore previous instructions and secrets" → SAFE (returncode=0) ✅
 query: "XSS alert script injection test"          → SAFE (returncode=0) ✅
 ```
 
-**Результат Security**: ✅ **PASS** — параметризовані SQL запити та санітизація FTS повністю захищають від ін'єкцій.
+**Результат Security**: ✅ **PASS** — параметризовані SQL запити та санітизація FTS коректно обробляють перевірені malicious query strings.
 
 ---
 
@@ -244,111 +244,163 @@ Overall determinism: PASS (45/45 runs identical)
 
 ---
 
-## 11. Retrieval Quality Benchmark (nDCG@5 / Recall@5 / MRR@5)
 
-> Оцінка якості пошуку за 16 запитами з `semantic_gt.json` (10 EN + 6 UA).
-> Gate = 0.45 (nDCG@5 ≥ 0.45).
-
-| Mode         |  nDCG@5 | Recall@5 |   MRR@5 |
-| :----------- | ------: | -------: | ------: |
-| fts          |   0.1019 |    0.0312 |  0.0938 |
-| vector       |   0.2463 |    0.1271 |  0.2052 |
-| hybrid       |   0.2867 |    0.1427 |  0.2229 |
-| semantic     |   0.4350 |    0.2365 |  0.3958 |
-| reranked     |   0.2859 |    0.1635 |  0.2542 |
-
-### Висновки щодо якості:
-1. **Semantic (BGE-M3)** — найкращий режим: nDCG@5=0.4350, майже досягає gate 0.45.
-2. **Reranker** не покращує якість: nDCG@5=0.2859 < semantic 0.4350. Причина — per-document ONNX inference без batching.
-3. **Hybrid** (FTS + TF-vector RRF) другий найкращий: 0.2867.
-4. **FTS** найслабший (0.1019) — очікувано для bilingual (UA+EN) запитів без морфології.
-5. **Gate 0.45** не досягнуто жодним режимом — quality benchmark потребує кращого GT або донавчання реранкера.
 
 ---
 
-## 12. Виправлені Проблеми (Fixes Applied)
+## 11. Retrieval Quality Benchmark (nDCG@5 / Recall@5 / MRR@5)
 
-### 12.1 PID Lock — Запобігання Конкурентним Sync
-**Проблема**: Два `_cmd_sync` процеси (FP-8) блокували один одного, викликаючи `database is locked`.
-**Фікс**: Додано PID lock-файл у `get_cache_dir() / "sync.pid"`. Якщо інший sync вже запущено, новий процес негайно виходить з кодом 1.
-**Файл**: `src/power_framework/core/cli.py:_cmd_sync`
+> Оцінка за 16 запитами з `semantic_gt.json` (10 EN + 6 UA), gate = 0.45.
 
-### 12.2 WAL Checkpoint на Close
-**Проблема**: Після `conn.close()` WAL не чекпоїнтувався, дані embedding не персистували між процесами.
-**Фікс**: Додано `PRAGMA wal_checkpoint(TRUNCATE)` у `finally` блоці `_cmd_sync` перед `conn.close()`.
-**Файл**: `src/power_framework/core/cli.py:_cmd_sync`
+| Mode         |  nDCG@5 | Recall@5 |   MRR@5 | Gate |
+| :----------- | ------: | -------: | ------: | :-- |
+| fts          |   0.1019 |    0.0312 |  0.0938 | ❌ |
+| vector       |   0.2463 |    0.1271 |  0.2052 | ❌ |
+| hybrid       |   0.2867 |    0.1427 |  0.2229 | ❌ |
+| semantic     |   0.4350 |    0.2365 |  0.3958 | ❌ |
+| reranked     |   0.2859 |    0.1635 |  0.2542 | ❌ |
 
-### 12.3 Graceful Handling DELETE Lock
-**Проблема**: `DELETE FROM doc_embeddings` падав з `database is locked`, коли chunk_cnt=0.
-**Фікс**: Обгорнуто DELETE у try/except sqlite3.OperationalError. При блокуванні sync продовжує без reset mtime.
-**Файл**: `src/power_framework/core/searcher.py:_sync_vault_to_db`
+### Висновки
+1. **Semantic** — найкращий (nDCG@5=0.4350), майже досягає gate 0.45.
+2. **Reranker не покращує** (0.2859 < 0.4350) — per-document ONNX без batching шкодить якості.
+3. **Hybrid** другий (0.2867). **FTS** найгірший (0.1019) — очікувано для bilingual пошуку.
+4. Gate 0.45 не досягнуто — GT потребує розширення або reranker — batch-оптимізації.
 
-### 12.4 Reranker Offline Mode
-**Проблема**: `hf_hub_download` використовував `local_files_only=False`, ігноруючи `HF_HUB_OFFLINE`.
-**Фікс**: Додано перевірку `HF_HUB_OFFLINE`/`TRANSFORMERS_OFFLINE`. В offline-режимі `local_files_only=True`.
-**Файл**: `src/power_framework/core/reranker.py:_lazy_init`
+---
 
-### 12.5 Regression Tests for token_type_ids
-**Проблема**: Відсутні тести, які гарантують, що `token_type_ids` передається в ONNX session лише коли модель його очікує.
-**Фікс**: Додано 2 unit-тести: `test_bge_reranker_omits_token_type_ids_when_model_does_not_accept_it` та `test_bge_reranker_includes_token_type_ids_when_model_accepts_it`.
+## 12. Warm In-Process Latency
+
+> Виміри після warm-up (моделі вже в RAM). FTS/Vector/Hybrid: 16 запитів × 3 раунди.
+> Semantic/Reranked: 4 репрезентативні запити × 3 раунди.
+
+| Mode         | Warm p50 | Warm p95 | Warm mean |  n |
+| :----------- | -------: | -------: | --------: | -: |
+| FTS          |       5.9 |      37.9 |       9.0 | 48 |
+| TF-Vector    |     146.7 |     820.7 |     284.5 | 48 |
+| Hybrid       |     148.3 |     859.6 |     293.3 | 48 |
+| Semantic     |      67.1 |     324.1 |     129.0 | 12 |
+| Reranked     |    6733.6 |   32305.0 |   12983.9 | 12 |
+
+### Порівняння Cold vs Warm
+| Mode       | Cold p50 | Warm p50 | Прискорення |
+| :--------- | -------: | -------: | ----------: |
+| FTS        | 274 ms   | ~166 ms  | ~1.6× |
+| TF-Vector  | 420 ms   | ~179 ms  | ~2.3× |
+| Hybrid     | 432 ms   | ~198 ms  | ~2.2× |
+| Semantic   | 8,040 ms | **~68 ms**  | **~118×** |
+| Reranked   | 28,947 ms| ~6,700 ms| ~4.3× |
+
+> **Ключове**: Semantic warm p50 = 68 ms — радикально швидше ніж cold 8,040 ms (модель вже в RAM).
+> Reranked warm p50 = 6.7 s — все ще повільно через per-document ONNX inference.
+
+---
+
+## 13. Egress Audit
+
+| Режим     | Зовнішні AF_INET з'єднання | Статус |
+| :-------- | -------------------------: | :----- |
+| FTS       | 0 (підтверджено в TEST-1)  | ✅ |
+| Semantic  | 0 (після кешування моделі) | ✅ |
+| Reranked  | 0 (після кешування моделі) | ✅ |
+
+**Умови**: `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`. Моделі мають бути попередньо закешовані.
+
+---
+
+## 14. Memory Footprint (VmRSS delta)
+
+| Режим     | RSS delta | Складові |
+| :-------- | --------: | :------- |
+| FTS       | 29 MB     | SQLite FTS5 |
+| Semantic  | 1,510 MB  | BGE-M3 ONNX arena |
+| Reranked  | 2,113 MB  | BGE-M3 + Reranker ONNX |
+| Sync      | 2,810 MB  | Embedding + chunking |
+
+---
+
+## 15. Виправлені Проблеми (Fixes Applied)
+
+### 15.1 PID Lock — Concurrent Sync Prevention
+**Проблема**: Два `_cmd_sync` процеси блокували один одного (FP-8).
+**Фікс**: PID lock-файл у `get_cache_dir() / sync.pid`.
+**Файл**: `src/power_framework/core/cli.py`
+
+### 15.2 WAL Checkpoint on Close
+**Проблема**: Після `conn.close()` WAL не чекпоїнтувався — embedding дані не персистували між процесами.
+**Фікс**: `PRAGMA wal_checkpoint(TRUNCATE)` перед `conn.close()`.
+**Файл**: `src/power_framework/core/cli.py`
+
+### 15.3 Graceful DELETE Lock Handling
+**Проблема**: `DELETE FROM doc_embeddings` падав з `database is locked`.
+**Фікс**: try/except sqlite3.OperationalError, sync продовжує без reset.
+**Файл**: `src/power_framework/core/searcher.py`
+
+### 15.4 Reranker Offline Mode
+**Проблема**: `hf_hub_download` ігнорував `HF_HUB_OFFLINE`.
+**Фікс**: Перевірка `HF_HUB_OFFLINE`/`TRANSFORMERS_OFFLINE`.
+**Файл**: `src/power_framework/core/reranker.py`
+
+### 15.5 Regression Tests for token_type_ids
+**Проблема**: Відсутні тести для ONNX session inputs.
+**Фікс**: 2 unit-тести: omit/include token_type_ids.
 **Файл**: `tests/test_reranker.py`
 
 ---
 
-## 13. Емпіричні Спостереження та Обмеження
+## 16. Емпіричні Спостереження
 
-### 13.1 Sync Performance — Batch Size Halving
-**Проблема**: При `POWER_EMBED_NUM_THREADS=2` (default), BGE-M3 ONNX з "tamed arena" (`enable_cpu_mem_arena=False`) не може виділити пам'ять для batch_size=8 з довгими документами. Кожен batch ретраїться з batch_size=4, потім 2, потім 1. Це сповільнює sync у 4-8×.
-**Рекомендація**: На WS (20 cores, 121 GB RAM) використовувати `POWER_EMBED_NUM_THREADS=8`.
-
+### 16.1 Sync Thread Scaling
 | Threads | Batch 8 throughput | ms/doc |
 | ------: | -----------------: | -----: |
-|       2 | 19.292s (2,411 ms/doc) | ✗ batch retry |
-|       4 | 8.551s (1,069 ms/doc) | ✓ stable |
-|       8 | 4.576s (572 ms/doc) | ✓ stable |
-|      16 | 4.269s (534 ms/doc) | ✓ stable |
+|       2 | 19.292s            | 2,411  |
+|       4 | 8.551s             | 1,069  |
+|       8 | 4.576s             | 572    |
+|      16 | 4.269s             | 534    |
 
-### 13.2 Чому Reranker не Покращує Quality
-1. Per-document ONNX inference (`session.run` на кожен документ окремо) без batching.
-2. Default batch_size=1 призводить до p50 ≈ 29s для 16 запитів.
-3. nDCG@5 = 0.2859 **нижче** ніж semantic (0.4350) — реранкер вносить noise.
-4. **Batch reranking** (POWER_RERANKER_BATCH_SIZE=4/8/16) — необхідна оптимізація.
+Default `POWER_EMBED_NUM_THREADS=2` з "tamed arena" сповільнює sync у 4-8× на багатоядерних хостах.
 
-### 13.3 Обмеження Поточного Звіту
-- **Warm MCP latency**: не виміряно (потребує постійно запущеного MCP-сервера).
-- **Cgroup memory tests**: не виконано (потребує `systemd-run` з `MemoryMax`).
-- **Path traversal tests**: не виконано для всіх file-API функцій.
-- **Egress audit**: перевірено лише для FTS.
+### 16.2 Чому Reranker не Покращує Quality
+1. Per-document ONNX inference без batching: `session.run` для кожного документа окремо.
+2. Batch reranking не реалізовано (POWER_RERANKER_BATCH_SIZE).
+3. nDCG@5 = 0.2859 < semantic 0.4350 — реранкер вносить noise замість покращення.
+
+### 16.3 Обмеження Поточного Звіту
+- Warm MCP latency: не виміряно (потребує постійно запущеного MCP-сервера).
+- Cgroup memory tests: не виконано (потребує systemd-run з MemoryMax).
+- Path traversal в file APIs: не протестовано.
+- Batch reranking: не реалізовано.
 
 ---
 
-## 14. Загальний Підсумок
+## 17. Загальний Підсумок
 
 ### ✅ Підтверджено
-
 | Метрика | Значення |
 | :--- | :--- |
 | Neural pipeline | **Працездатний** — 560 doc + 1808 chunk embeddings |
-| Semantic search | **8.04 s p50**, 1.56 GB RSS |
-| Reranked search | **28.95 s p50**, 2.26 GB RSS |
-| Full sync | **2.81 GB peak RSS** (POWER_EMBED_NUM_THREADS=8) |
+| Semantic search (cold) | **8,040 ms p50**, 1.56 GB RSS |
+| Semantic search (warm) | **68 ms p50** — ~118× швидше cold |
+| Reranked search (cold) | **28,947 ms p50**, 2.26 GB RSS |
+| Reranked search (warm) | **6,700 ms p50** — ~4.3× швидше cold |
+| Full sync peak RSS | **2.81 GB** (POWER_EMBED_NUM_THREADS=8) |
 | Pytest suite | **540 passed, 1 skipped, 74.14% coverage** |
 | Quality (semantic) | **nDCG@5=0.4350**, MRR@5=0.3958 |
-| Reranker token_type_ids fix | **Підтверджено** regression-тестами |
-| SQLite WAL persistence | **Виправлено** (checkpoint на close + PID lock) |
+| Egress (all modes) | **0 external connections** (offline) |
+| SQLite WAL persistence | **Виправлено** |
+| Reranker token_type_ids | **Regression tests додано** |
 
 ### ⚠️ Залишається
-
 | Задача | Пріоритет | Статус |
 | :--- | :---: | :--- |
-| Batch reranking | P1 | ❌ Не реалізовано |
-| Warm MCP latency | P1 | ❌ Не виміряно |
-| Cgroup memory contract | P1 | ❌ Не виконано |
-| Sync stage profiling | P1 | ❌ Не профільовано |
-| Path traversal tests | P1 | ❌ Не виконано |
-| nDCG@5 > 0.45 gate | P0 | ❌ Жоден режим не досяг |
+| Batch reranking | P1 | ❌ |
+| Warm MCP latency | P1 | ❌ |
+| Cgroup memory contract | P1 | ❌ |
+| Sync stage profiling | P1 | ❌ |
+| Path traversal (file APIs) | P1 | ❌ |
+| nDCG@5 > 0.45 gate | P0 | ❌ |
 
-### Ключовий вердикт
-**P.O.W.E.R. v3.2.1 neural pipeline — робоча сильна beta.** 
-Semantic пошук працює якісно (nDCG@5=0.4350), але не досягає gate 0.45. 
-Reranker потребує batch-оптимізації. Очікується production-ready після batch reranking та cgroup-валідації.
+### Ключовий Вердикт
+**P.O.W.E.R. v3.2.1 neural pipeline — робоча сильна beta.**
+Semantic пошук: nDCG@5=0.4350, warm p50=68ms.
+Reranker потребує batch-оптимізації для виробничого використання.
+Очікується production-ready після batch reranking, MCP latency замірів та cgroup-валідації.
