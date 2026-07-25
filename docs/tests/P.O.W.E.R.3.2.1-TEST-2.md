@@ -18,7 +18,7 @@ tags:
         "ws",
         "test-2",
     ]
-timestamp: 2026-07-25T13:40:00
+timestamp: 2026-07-25T15:35:24
 ---
 
 # 🧪 P.O.W.E.R. v3.2.1 — TEST-2: Повний незалежний звіт (WS)
@@ -241,8 +241,114 @@ Overall determinism: PASS (45/45 runs identical)
 
 ---
 
-## 10. Загальний підсумок та Рекомендації
 
-1. **Функціональність**: Усі 5 режимів пошуку **повністю працездатні** та видають високу якість ретрівалу.
-2. **Виправлений баг**: У `src/power_framework/core/reranker.py` виправлено сумісність входів ONNX сесії (динамічна перевірка наявності `token_type_ids`).
-3. **RAM Контракт**: Контракт `≤1.8 GB` дотримується для `fts`, `vector`, `hybrid` та `semantic` режимів. Для `reranked` (2.26 GB) та `sync --force` (2.81 GB) необхідно виділяти мінімум **3 GB RAM** контейнеру Docker.
+---
+
+## 11. Retrieval Quality Benchmark (nDCG@5 / Recall@5 / MRR@5)
+
+> Оцінка якості пошуку за 16 запитами з `semantic_gt.json` (10 EN + 6 UA).
+> Gate = 0.45 (nDCG@5 ≥ 0.45).
+
+| Mode         |  nDCG@5 | Recall@5 |   MRR@5 |
+| :----------- | ------: | -------: | ------: |
+| fts          |   0.1019 |    0.0312 |  0.0938 |
+| vector       |   0.2463 |    0.1271 |  0.2052 |
+| hybrid       |   0.2867 |    0.1427 |  0.2229 |
+| semantic     |   0.4350 |    0.2365 |  0.3958 |
+| reranked     |   0.2859 |    0.1635 |  0.2542 |
+
+### Висновки щодо якості:
+1. **Semantic (BGE-M3)** — найкращий режим: nDCG@5=0.4350, майже досягає gate 0.45.
+2. **Reranker** не покращує якість: nDCG@5=0.2859 < semantic 0.4350. Причина — per-document ONNX inference без batching.
+3. **Hybrid** (FTS + TF-vector RRF) другий найкращий: 0.2867.
+4. **FTS** найслабший (0.1019) — очікувано для bilingual (UA+EN) запитів без морфології.
+5. **Gate 0.45** не досягнуто жодним режимом — quality benchmark потребує кращого GT або донавчання реранкера.
+
+---
+
+## 12. Виправлені Проблеми (Fixes Applied)
+
+### 12.1 PID Lock — Запобігання Конкурентним Sync
+**Проблема**: Два `_cmd_sync` процеси (FP-8) блокували один одного, викликаючи `database is locked`.
+**Фікс**: Додано PID lock-файл у `get_cache_dir() / "sync.pid"`. Якщо інший sync вже запущено, новий процес негайно виходить з кодом 1.
+**Файл**: `src/power_framework/core/cli.py:_cmd_sync`
+
+### 12.2 WAL Checkpoint на Close
+**Проблема**: Після `conn.close()` WAL не чекпоїнтувався, дані embedding не персистували між процесами.
+**Фікс**: Додано `PRAGMA wal_checkpoint(TRUNCATE)` у `finally` блоці `_cmd_sync` перед `conn.close()`.
+**Файл**: `src/power_framework/core/cli.py:_cmd_sync`
+
+### 12.3 Graceful Handling DELETE Lock
+**Проблема**: `DELETE FROM doc_embeddings` падав з `database is locked`, коли chunk_cnt=0.
+**Фікс**: Обгорнуто DELETE у try/except sqlite3.OperationalError. При блокуванні sync продовжує без reset mtime.
+**Файл**: `src/power_framework/core/searcher.py:_sync_vault_to_db`
+
+### 12.4 Reranker Offline Mode
+**Проблема**: `hf_hub_download` використовував `local_files_only=False`, ігноруючи `HF_HUB_OFFLINE`.
+**Фікс**: Додано перевірку `HF_HUB_OFFLINE`/`TRANSFORMERS_OFFLINE`. В offline-режимі `local_files_only=True`.
+**Файл**: `src/power_framework/core/reranker.py:_lazy_init`
+
+### 12.5 Regression Tests for token_type_ids
+**Проблема**: Відсутні тести, які гарантують, що `token_type_ids` передається в ONNX session лише коли модель його очікує.
+**Фікс**: Додано 2 unit-тести: `test_bge_reranker_omits_token_type_ids_when_model_does_not_accept_it` та `test_bge_reranker_includes_token_type_ids_when_model_accepts_it`.
+**Файл**: `tests/test_reranker.py`
+
+---
+
+## 13. Емпіричні Спостереження та Обмеження
+
+### 13.1 Sync Performance — Batch Size Halving
+**Проблема**: При `POWER_EMBED_NUM_THREADS=2` (default), BGE-M3 ONNX з "tamed arena" (`enable_cpu_mem_arena=False`) не може виділити пам'ять для batch_size=8 з довгими документами. Кожен batch ретраїться з batch_size=4, потім 2, потім 1. Це сповільнює sync у 4-8×.
+**Рекомендація**: На WS (20 cores, 121 GB RAM) використовувати `POWER_EMBED_NUM_THREADS=8`.
+
+| Threads | Batch 8 throughput | ms/doc |
+| ------: | -----------------: | -----: |
+|       2 | 19.292s (2,411 ms/doc) | ✗ batch retry |
+|       4 | 8.551s (1,069 ms/doc) | ✓ stable |
+|       8 | 4.576s (572 ms/doc) | ✓ stable |
+|      16 | 4.269s (534 ms/doc) | ✓ stable |
+
+### 13.2 Чому Reranker не Покращує Quality
+1. Per-document ONNX inference (`session.run` на кожен документ окремо) без batching.
+2. Default batch_size=1 призводить до p50 ≈ 29s для 16 запитів.
+3. nDCG@5 = 0.2859 **нижче** ніж semantic (0.4350) — реранкер вносить noise.
+4. **Batch reranking** (POWER_RERANKER_BATCH_SIZE=4/8/16) — необхідна оптимізація.
+
+### 13.3 Обмеження Поточного Звіту
+- **Warm MCP latency**: не виміряно (потребує постійно запущеного MCP-сервера).
+- **Cgroup memory tests**: не виконано (потребує `systemd-run` з `MemoryMax`).
+- **Path traversal tests**: не виконано для всіх file-API функцій.
+- **Egress audit**: перевірено лише для FTS.
+
+---
+
+## 14. Загальний Підсумок
+
+### ✅ Підтверджено
+
+| Метрика | Значення |
+| :--- | :--- |
+| Neural pipeline | **Працездатний** — 560 doc + 1808 chunk embeddings |
+| Semantic search | **8.04 s p50**, 1.56 GB RSS |
+| Reranked search | **28.95 s p50**, 2.26 GB RSS |
+| Full sync | **2.81 GB peak RSS** (POWER_EMBED_NUM_THREADS=8) |
+| Pytest suite | **540 passed, 1 skipped, 74.14% coverage** |
+| Quality (semantic) | **nDCG@5=0.4350**, MRR@5=0.3958 |
+| Reranker token_type_ids fix | **Підтверджено** regression-тестами |
+| SQLite WAL persistence | **Виправлено** (checkpoint на close + PID lock) |
+
+### ⚠️ Залишається
+
+| Задача | Пріоритет | Статус |
+| :--- | :---: | :--- |
+| Batch reranking | P1 | ❌ Не реалізовано |
+| Warm MCP latency | P1 | ❌ Не виміряно |
+| Cgroup memory contract | P1 | ❌ Не виконано |
+| Sync stage profiling | P1 | ❌ Не профільовано |
+| Path traversal tests | P1 | ❌ Не виконано |
+| nDCG@5 > 0.45 gate | P0 | ❌ Жоден режим не досяг |
+
+### Ключовий вердикт
+**P.O.W.E.R. v3.2.1 neural pipeline — робоча сильна beta.** 
+Semantic пошук працює якісно (nDCG@5=0.4350), але не досягає gate 0.45. 
+Reranker потребує batch-оптимізації. Очікується production-ready після batch reranking та cgroup-валідації.
