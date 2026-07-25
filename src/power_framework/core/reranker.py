@@ -31,7 +31,9 @@ BGE_RERANKER_FILE_SHA256: dict[str, str] = {
     "tokenizer.json": "8bf8afbfd11306bd872018c53bfdf2e160a56f8edbcf49933324404791c148d3",
 }
 
-QWEN3_RERANKER_MODEL = os.getenv("POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX")
+QWEN3_RERANKER_MODEL = os.getenv(
+    "POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX"
+)
 
 # Jina remains a documented opt-in only (CC-BY-NC-4.0).
 JINA_RERANKER_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
@@ -121,6 +123,7 @@ class BGEM3Reranker:
     """
 
     _MAX_TOKENS = int(os.getenv("POWER_BGE_RERANKER_MAX_TOKENS", "512"))
+    _BATCH_SIZE = int(os.getenv("POWER_RERANKER_BATCH_SIZE", "8"))
 
     def __init__(
         self,
@@ -155,16 +158,49 @@ class BGEM3Reranker:
                     "Install with: pip install power-framework"
                 ) from e
 
-            offline = os.getenv("HF_HUB_OFFLINE", "0") == "1" or os.getenv("TRANSFORMERS_OFFLINE", "0") == "1"
+            offline = (
+                os.getenv("HF_HUB_OFFLINE", "0") == "1"
+                or os.getenv("TRANSFORMERS_OFFLINE", "0") == "1"
+            )
             local_only = offline
             try:
-                model_path = hf_hub_download(self.repo, "onnx/model.onnx", revision=self.revision, local_files_only=local_only)
-                data_path = hf_hub_download(self.repo, "onnx/model.onnx_data", revision=self.revision, local_files_only=local_only)
-                tok_path = hf_hub_download(self.repo, "tokenizer.json", revision=self.revision, local_files_only=local_only)
+                model_path = hf_hub_download(
+                    self.repo,
+                    "onnx/model.onnx",
+                    revision=self.revision,
+                    local_files_only=local_only,
+                )
+                data_path = hf_hub_download(
+                    self.repo,
+                    "onnx/model.onnx_data",
+                    revision=self.revision,
+                    local_files_only=local_only,
+                )
+                tok_path = hf_hub_download(
+                    self.repo,
+                    "tokenizer.json",
+                    revision=self.revision,
+                    local_files_only=local_only,
+                )
             except Exception:
-                model_path = hf_hub_download(self.repo, "onnx/model.onnx", revision=self.revision, local_files_only=True)
-                data_path = hf_hub_download(self.repo, "onnx/model.onnx_data", revision=self.revision, local_files_only=True)
-                tok_path = hf_hub_download(self.repo, "tokenizer.json", revision=self.revision, local_files_only=True)
+                model_path = hf_hub_download(
+                    self.repo,
+                    "onnx/model.onnx",
+                    revision=self.revision,
+                    local_files_only=True,
+                )
+                data_path = hf_hub_download(
+                    self.repo,
+                    "onnx/model.onnx_data",
+                    revision=self.revision,
+                    local_files_only=True,
+                )
+                tok_path = hf_hub_download(
+                    self.repo,
+                    "tokenizer.json",
+                    revision=self.revision,
+                    local_files_only=True,
+                )
 
             if (
                 self.repo == BGE_RERANKER_PINNED_REPO
@@ -185,10 +221,16 @@ class BGEM3Reranker:
 
             so = ort.SessionOptions()
             so.enable_cpu_mem_arena = False
-            so.intra_op_num_threads = max(1, int(os.getenv("POWER_EMBED_NUM_THREADS", "2")))
+            so.intra_op_num_threads = max(
+                1, int(os.getenv("POWER_EMBED_NUM_THREADS", "2"))
+            )
             so.inter_op_num_threads = 1
-            providers = [("CPUExecutionProvider", {"arena_extend_strategy": "kSameAsRequested"})]
-            self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            providers = [
+                ("CPUExecutionProvider", {"arena_extend_strategy": "kSameAsRequested"})
+            ]
+            self._session = ort.InferenceSession(
+                model_path, providers=providers, sess_options=so
+            )
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
 
@@ -263,6 +305,37 @@ class BGEM3Reranker:
 
     def _rerank_raw(self, query: str, document: str) -> list[float] | None:
         return self._rerank_batch(query, [document])
+
+    def _rerank_batch(self, query: str, documents: list[str]) -> list[float]:
+        import numpy as np
+
+        assert self._session is not None
+        assert self._tokenizer is not None
+        if not documents:
+            return []
+        encs = self._tokenizer.encode_batch([(query, doc) for doc in documents])
+        max_len = max(len(e.ids) for e in encs)
+        batch_size = len(encs)
+        input_ids = np.zeros((batch_size, max_len), dtype=np.int64)
+        attention_mask = np.zeros((batch_size, max_len), dtype=np.int64)
+        token_type_ids = np.zeros((batch_size, max_len), dtype=np.int64)
+        for i, e in enumerate(encs):
+            length = len(e.ids)
+            input_ids[i, :length] = e.ids
+            attention_mask[i, :length] = e.attention_mask
+            token_type_ids[i, :length] = e.type_ids
+        logits = self._session.run(
+            None,
+            {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "token_type_ids": token_type_ids,
+            },
+        )[0]
+        return [
+            float(1.0 / (1.0 + math.exp(-float(logits[i][0]))))
+            for i in range(batch_size)
+        ]
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         self._lazy_init()
