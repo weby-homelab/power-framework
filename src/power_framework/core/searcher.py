@@ -1142,16 +1142,24 @@ def _hybrid_reranked_search(
     query: str,
     max_results: int = 20,
 ) -> list[SearchResult]:
-    """Canonical POWER 3.0 retrieval: FTS/BM25 -> top-150 -> Jina v2 rerank -> top-20.
+    """Canonical POWER 3.2 retrieval: FTS/BM25 + TF-vector + Dense -> top-20 -> rerank.
 
-    Implements the R5 canonical search mode. Broad FTS recall (top-150) is merged
-    with TF-vector candidates via RRF, then a cross-encoder reranker (Jina v2
-    multilingual) re-ranks the leading pool. The reranker is cached (singleton)
-    so repeated queries stay fast.
+    Broad recall from FTS (top-150), TF-vector (top-150), and dense semantic
+    (top-60) is fused via RRF, then a cross-encoder reranker re-ranks the
+    leading pool. The reranker is cached (singleton) so repeated queries stay
+    fast. Includes dense candidates (POWER 3.2.1 fix) so the reranker sees
+    documents the embedding model finds relevant (not just lexical matches).
     """
     candidates = _fts_search(vault_dir, query, max_results=150)
     vector_results = _vector_search(vault_dir, query, max_results=150)
     candidates = _rrf_merge(candidates, vector_results)
+
+    # 3.2.1: include dense/semantic candidates in the reranker pool.
+    # Without this the reranker never sees documents the embedding model
+    # considers relevant, which caused reranked quality < semantic quality.
+    dense_results = _semantic_search(vault_dir, query, max_results=max_results * 3)
+    if dense_results:
+        candidates = _rrf_merge(candidates, dense_results)
 
     if not candidates:
         return []
@@ -1165,10 +1173,13 @@ def _hybrid_reranked_search(
 
     documents: list[str] = []
     for result in rerank_pool:
+        if result.snippet:
+            documents.append(result.snippet[:RERANK_TEXT_CHARS])
+            continue
         filepath = vault_dir / result.rel_path
         try:
-            content = read_file_content(filepath)
-            documents.append(content[:RERANK_TEXT_CHARS])
+            text = read_file_content(filepath)
+            documents.append(text[:RERANK_TEXT_CHARS])
         except Exception:
             documents.append("")
 

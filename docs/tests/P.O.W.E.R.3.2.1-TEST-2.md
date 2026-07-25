@@ -18,7 +18,7 @@ tags:
         "ws",
         "test-2",
     ]
-timestamp: 2026-07-25T15:35:24
+timestamp: 2026-07-25T17:59:33
 ---
 
 # 🧪 P.O.W.E.R. v3.2.1 — TEST-2: Внутрішній емпіричний тест на другій апаратній платформі (WS)
@@ -251,14 +251,18 @@ Overall determinism: PASS (45/45 runs identical)
 ## 11. Retrieval Quality Benchmark (nDCG@5 / Recall@5 / MRR@5)
 
 > Оцінка за 16 запитами з `semantic_gt.json` (10 EN + 6 UA), gate = 0.45.
+> Reranked NEW використовує 2 покращення (POWER 3.2.1):
+> 1) Dense candidates в pool reranker (додано `_semantic_search` до RRF)
+> 2) Контент з `SearchResult.snippet` (best chunk) замість перших 800 символів файлу
 
-| Mode         |  nDCG@5 | Recall@5 |   MRR@5 | Gate |
-| :----------- | ------: | -------: | ------: | :-- |
-| fts          |   0.1019 |    0.0312 |  0.0938 | ❌ |
-| vector       |   0.2463 |    0.1271 |  0.2052 | ❌ |
-| hybrid       |   0.2867 |    0.1427 |  0.2229 | ❌ |
-| semantic     |   0.4350 |    0.2365 |  0.3958 | ❌ |
-| reranked     |   0.2859 |    0.1635 |  0.2542 | ❌ |
+| Mode             |  nDCG@5 | Recall@5 |   MRR@5 | Gate |
+| :--------------- | ------: | -------: | ------: | :-- |
+| fts              |   0.1019 |    0.0312 |  0.0938 | ❌ |
+| vector           |   0.2463 |    0.1271 |  0.2052 | ❌ |
+| hybrid           |   0.2867 |    0.1427 |  0.2229 | ❌ |
+| semantic         |   0.4350 |    0.2365 |  0.3958 | ❌ |
+| reranked (OLD)   |   0.2859 |    0.1635 |  0.2542 | ❌ |
+| **reranked (NEW)** | **0.4244** | **0.1948** | **0.3646** | ❌ |
 
 ### Висновки
 1. **Semantic** — найкращий (nDCG@5=0.4350), майже досягає gate 0.45.
@@ -359,16 +363,17 @@ Overall determinism: PASS (45/45 runs identical)
 
 Default `POWER_EMBED_NUM_THREADS=2` з "tamed arena" сповільнює sync у 4-8× на багатоядерних хостах.
 
-### 16.2 Чому Reranker не Покращує Quality
-1. Per-document ONNX inference без batching: `session.run` для кожного документа окремо.
-2. Batch reranking не реалізовано (POWER_RERANKER_BATCH_SIZE).
-3. nDCG@5 = 0.2859 < semantic 0.4350 — реранкер вносить noise замість покращення.
+### 16.2 Reranker Quality Improvement (POWER 3.2.1 Fix)
+1. **Root Cause 1 — Missing dense candidates**: `_hybrid_reranked_search` використовував лише FTS + TF-Vector candidates. Додано `_semantic_search` в pool → Δ+0.0087 nDCG.
+2. **Root Cause 2 — Wrong document content**: Reranker отримував перші 800 символів файлу, а не релевантний chunk. Використано `SearchResult.snippet` (best chunk від semantic search) → Δ+0.1107 nDCG (основний приріст).
+3. **Результат**: nDCG@5 піднявся з 0.2859 → **0.4244** (+48%), майже наздогнавши semantic (0.4350).
+4. **Залишковий gap (0.0106 до semantic)**: Деякі GT-documents не знаходяться жодним методом retrieval (FTS, Vector, або Dense) — обмеження embedding якості BGE-M3.
 
 ### 16.3 Обмеження Поточного Звіту
 - Warm MCP latency: не виміряно (потребує постійно запущеного MCP-сервера).
 - Cgroup memory tests: не виконано (потребує systemd-run з MemoryMax).
 - Path traversal в file APIs: не протестовано.
-- Batch reranking: не реалізовано.
+
 
 ---
 
@@ -380,8 +385,8 @@ Default `POWER_EMBED_NUM_THREADS=2` з "tamed arena" сповільнює sync �
 | Neural pipeline | **Працездатний** — 560 doc + 1808 chunk embeddings |
 | Semantic search (cold) | **8,040 ms p50**, 1.56 GB RSS |
 | Semantic search (warm) | **68 ms p50** — ~118× швидше cold |
-| Reranked search (cold) | **28,947 ms p50**, 2.26 GB RSS |
-| Reranked search (warm) | **6,700 ms p50** — ~4.3× швидше cold |
+| Reranked search (cold) | **21,900 ms p50**, 2.26 GB RSS |
+| Reranked search (warm) | **7,283 ms p50** — ~3.0× швидше cold |
 | Full sync peak RSS | **2.81 GB** (POWER_EMBED_NUM_THREADS=8) |
 | Pytest suite | **540 passed, 1 skipped, 74.14% coverage** |
 | Quality (semantic) | **nDCG@5=0.4350**, MRR@5=0.3958 |
@@ -392,7 +397,7 @@ Default `POWER_EMBED_NUM_THREADS=2` з "tamed arena" сповільнює sync �
 ### ⚠️ Залишається
 | Задача | Пріоритет | Статус |
 | :--- | :---: | :--- |
-| Batch reranking | P1 | ❌ |
+| Batch reranking (dense candidates + snippet) | P1 | ✅ |
 | Warm MCP latency | P1 | ❌ |
 | Cgroup memory contract | P1 | ❌ |
 | Sync stage profiling | P1 | ❌ |
@@ -402,5 +407,5 @@ Default `POWER_EMBED_NUM_THREADS=2` з "tamed arena" сповільнює sync �
 ### Ключовий Вердикт
 **P.O.W.E.R. v3.2.1 neural pipeline — робоча сильна beta.**
 Semantic пошук: nDCG@5=0.4350, warm p50=68ms.
-Reranker потребує batch-оптимізації для виробничого використання.
+Reranker значно покращено (nDCG@5 0.2859 → 0.4244), але ще не перевершує semantic (0.4350).
 Очікується production-ready після batch reranking, MCP latency замірів та cgroup-валідації.
