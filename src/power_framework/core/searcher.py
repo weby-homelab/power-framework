@@ -9,7 +9,7 @@ Multi-mode search across vault notes:
 """
 
 from __future__ import annotations
-
+import time
 import contextlib
 import hashlib
 import json
@@ -349,11 +349,18 @@ def _sync_vault_to_db(
     the DB with periodic commits so the working set never holds the whole vault.
     """
     cursor = conn.cursor()
-    if force_rebuild and sync_embeddings:
-        logger.info("Force rebuild: clearing dense-embedding tables ...")
-        cursor.execute("DELETE FROM doc_embeddings")
-        cursor.execute("DELETE FROM chunk_embeddings")
-        conn.commit()
+    if sync_embeddings:
+        chunk_cnt = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+        if force_rebuild or chunk_cnt == 0:
+            logger.info("Dense embeddings missing or force rebuild requested: resetting mtime ...")
+            try:
+                cursor.execute("DELETE FROM doc_embeddings")
+                cursor.execute("DELETE FROM chunk_embeddings")
+                cursor.execute("UPDATE file_metadata SET mtime = 0")
+                conn.commit()
+            except sqlite3.OperationalError:
+                logger.warning("Embedding tables locked (concurrent sync?), skipping reset")
+                conn.rollback()
 
     disk_files: dict[str, float] = {}
     for filepath in vault_dir.rglob("*.md"):
@@ -435,6 +442,7 @@ def _sync_vault_to_db(
         len(disk_files),
         sync_embeddings,
     )
+    sync_start_time = time.perf_counter()
 
     # --- Lightweight pass: FTS + TF-vector (cheap, no model load) ---
     for rel_path, content, metadata, mtime in changed:
@@ -529,6 +537,7 @@ def _sync_vault_to_db(
         )
         conn.commit()
     _maybe_vacuum(conn, to_delete, db_files)
+    conn.commit()
 
 
 def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
@@ -597,11 +606,11 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
         vecs = _embed_retry(texts, batch_size)
         if vecs is None:
             return
-        for (chunk_id, rel_path, _, mtime), vec in zip(items, vecs, strict=True):
+        for (chunk_id, rel_path, chunk_content, mtime), vec in zip(items, vecs, strict=True):
             blob = struct.pack(f"{len(vec)}f", *vec)
             cursor.execute(
                 "INSERT OR REPLACE INTO chunk_embeddings (chunk_id, rel_path, embedding, content, mtime) VALUES (?, ?, ?, ?, ?)",
-                (chunk_id, rel_path, blob, _, mtime),
+                (chunk_id, rel_path, blob, chunk_content, mtime),
             )
 
     def _safe_commit() -> None:
@@ -639,6 +648,8 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
             _safe_commit()
     _safe_commit()
     logger.info("Embedding pass complete: %d vector(s) written", total)
+    rowc = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+    logger.info("DEBUG AT END OF EMBED_AND_STORE: chunk_embeddings=%d", rowc)
 
 
 def _maybe_vacuum(conn, to_delete, db_files) -> None:
@@ -1131,16 +1142,24 @@ def _hybrid_reranked_search(
     query: str,
     max_results: int = 20,
 ) -> list[SearchResult]:
-    """Canonical POWER 3.0 retrieval: FTS/BM25 -> top-150 -> Jina v2 rerank -> top-20.
+    """Canonical POWER 3.2 retrieval: FTS/BM25 + TF-vector + Dense -> top-20 -> rerank.
 
-    Implements the R5 canonical search mode. Broad FTS recall (top-150) is merged
-    with TF-vector candidates via RRF, then a cross-encoder reranker (Jina v2
-    multilingual) re-ranks the leading pool. The reranker is cached (singleton)
-    so repeated queries stay fast.
+    Broad recall from FTS (top-150), TF-vector (top-150), and dense semantic
+    (top-60) is fused via RRF, then a cross-encoder reranker re-ranks the
+    leading pool. The reranker is cached (singleton) so repeated queries stay
+    fast. Includes dense candidates (POWER 3.2.1 fix) so the reranker sees
+    documents the embedding model finds relevant (not just lexical matches).
     """
     candidates = _fts_search(vault_dir, query, max_results=150)
     vector_results = _vector_search(vault_dir, query, max_results=150)
     candidates = _rrf_merge(candidates, vector_results)
+
+    # 3.2.1: include dense/semantic candidates in the reranker pool.
+    # Without this the reranker never sees documents the embedding model
+    # considers relevant, which caused reranked quality < semantic quality.
+    dense_results = _semantic_search(vault_dir, query, max_results=max_results * 3)
+    if dense_results:
+        candidates = _rrf_merge(candidates, dense_results)
 
     if not candidates:
         return []
@@ -1154,10 +1173,13 @@ def _hybrid_reranked_search(
 
     documents: list[str] = []
     for result in rerank_pool:
+        if result.snippet:
+            documents.append(result.snippet[:RERANK_TEXT_CHARS])
+            continue
         filepath = vault_dir / result.rel_path
         try:
-            content = read_file_content(filepath)
-            documents.append(content[:RERANK_TEXT_CHARS])
+            text = read_file_content(filepath)
+            documents.append(text[:RERANK_TEXT_CHARS])
         except Exception:
             documents.append("")
 

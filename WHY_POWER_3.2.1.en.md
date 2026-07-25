@@ -20,9 +20,9 @@ Here is an honest technical breakdown comparing **P.O.W.E.R. 3.2.1** with popula
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Primary Goal** | Knowledge Base + MCP Super-Memory | General RAG Pipeline Builder | Heavy Graph Analytics | Chatbot Long-Term Memory | Raw Vector Database |
 | **Token Savings** | 🟢 **Up to 95%** (Sub-indexes + Chunks) | 🔴 Low (sticky context, file dumps) | 🟡 Moderate (expensive graph build) | 🟡 Moderate (session compression) | 🔴 Low (no index maps) |
-| **RAM Footprint** | 🟢 **~680 MB – 1.8 GB** (tamed ONNX) | 🟡 2–6 GB (Python + PyTorch) | 🔴 16–32 GB (OOM on VPS/LXC) | 🟡 2–4 GB | 🟢 1–3 GB |
+| **RAM Footprint** | 🟡 **~1.6–2.8 GB** (BGE-M3 ONNX, depends on mode) | 🟡 2–6 GB (Python + PyTorch) | 🔴 16–32 GB (OOM on VPS/LXC) | 🟡 2–4 GB | 🟢 1–3 GB |
 | **Search Latency** | 🟢 **15 – 120 ms** (C-ONNX + FTS5) | 🟡 300 – 1500 ms | 🔴 2000 – 8000 ms | 🟡 500 – 2000 ms | 🟢 50 – 200 ms |
-| **Bilingual UA ↔ EN** | 🟢 **100% SOTA** (BGE-M3 1024d) | 🔴 Basic OpenAI / MiniLM | 🟡 OpenAI Embeddings (expensive) | 🔴 Basic models | 🔴 Requires heavy models |
+| **Bilingual UA ↔ EN** | 🟢 **nDCG@5=0.4350** (BGE-M3 1024d, bilingual UA+EN) | 🔴 Basic OpenAI / MiniLM | 🟡 OpenAI Embeddings (expensive) | 🔴 Basic models | 🔴 Requires heavy models |
 | **Data Safety & Integrity** | 🟢 **Zero Data Loss** + Linter + Backups | 🔴 None (memory reset) | 🔴 Complex rebuild | 🟡 DB-dependent | 🔴 No metadata linter |
 | **Native MCP 3.x** | 🟢 **Native (12 out-of-box tools)** | 🟡 Requires wrappers | 🔴 None | 🟡 Limited | 🔴 None |
 | **Quality Control** | 🟢 **OKF Linter + Pydantic v2 + Heal** | 🔴 None | 🔴 None | 🔴 None | 🔴 None |

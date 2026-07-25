@@ -1,0 +1,535 @@
+{
+    "version": "3.2.1",
+    "description": "Frozen bilingual (UA+EN) holdout Ground Truth for POWER 3.2.1 retrieval evaluation. NOT used for development tuning. 64 queries across 4 language groups. Relevance grades: 3=directly answers, 2=strongly relevant, 1=partially relevant. Non-listed = 0.",
+    "queries": [
+        {
+            "query": "how to configure nginx reverse proxy for docker containers",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 2,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "set up wireguard vpn tunnel between servers",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Servers.md": 2
+            }
+        },
+        {
+            "query": "monitoring prometheus grafana dashboard setup",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/Technology Stack.md": 2,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "automated backup script with rotation and encryption",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Server_Inventory.md": 3,
+                "02_Areas/Infrastructure/Servers.md": 2
+            }
+        },
+        {
+            "query": "docker swarm vs kubernetes comparison",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/Technology Stack.md": 2,
+                "03_Resources/LLM_Software_Comparison.md": 1
+            }
+        },
+        {
+            "query": "ssl certificate renewal letsencrypt automation",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "postgresql database backup and restore",
+            "mode": "semantic",
+            "relevant": { "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 2 }
+        },
+        {
+            "query": "how to migrate git repository from github to self-hosted",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 2,
+                "PROTOCOLS/Successor-Hub.md": 1
+            }
+        },
+        {
+            "query": "configure fail2ban for ssh protection",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "ansible playbook for server provisioning",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Servers.md": 2,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "elk stack log aggregation setup",
+            "mode": "semantic",
+            "relevant": { "03_Resources/Technology Stack.md": 2 }
+        },
+        {
+            "query": "ci cd pipeline github actions deployment",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/POWER-Improvement-Execution-Plan.md": 1,
+                "PROTOCOLS/Successor-Hub.md": 1
+            }
+        },
+        {
+            "query": "systemd service file best practices",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 2,
+                "02_Areas/Infrastructure/Servers.md": 1
+            }
+        },
+        {
+            "query": "iptables vs nftables firewall rules",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "zfs filesystem snapshots and rollback",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/PRXMX-01_Hardware.md": 3,
+                "02_Areas/Infrastructure/PRXMX-02_Hardware.md": 2
+            }
+        },
+        {
+            "query": "caddy web server automatic https",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Infrastructure.md": 2,
+                "03_Resources/Technology Stack.md": 2
+            }
+        },
+        {
+            "query": "налаштування сервера для ai інференсу",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/LLM_Hardware_Research.md": 3,
+                "01_Projects/AI-HomeLab_Roadmap.md": 2,
+                "03_Resources/Local_moe_optimization.md": 2
+            }
+        },
+        {
+            "query": "резервне копіювання бази даних postgresql",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 2,
+                "02_Areas/Infrastructure/Server_Inventory.md": 2
+            }
+        },
+        {
+            "query": "моніторинг температури процесора linux",
+            "mode": "semantic",
+            "relevant": { "02_Areas/Infrastructure/PRXMX-01_Hardware.md": 2 }
+        },
+        {
+            "query": "автоматичне оновлення системи ubuntu сервер",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 2,
+                "02_Areas/Infrastructure/Servers.md": 2
+            }
+        },
+        {
+            "query": "налаштування postfix для поштового сервера",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Servers.md": 2,
+                "03_Resources/Technology Stack.md": 1
+            }
+        },
+        {
+            "query": "віртуалізація proxmox lxc контейнери",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Infrastructure.md": 3,
+                "02_Areas/Infrastructure/Servers.md": 2
+            }
+        },
+        {
+            "query": "безпека docker контейнерів практики",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "моніторинг мережі за допомогою snmp",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Infrastructure.md": 2,
+                "03_Resources/Technology Stack.md": 1
+            }
+        },
+        {
+            "query": "автоматизація деплою docker compose",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 2,
+                "01_Projects/POWER-Improvement-Execution-Plan.md": 1
+            }
+        },
+        {
+            "query": "логі сервера централізований збір loki",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/Technology Stack.md": 2,
+                "02_Areas/Infrastructure/Infrastructure.md": 1
+            }
+        },
+        {
+            "query": "налаштування брендмауера ufw ubuntu",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "встановлення та налаштування redis",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/Technology Stack.md": 2,
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 1
+            }
+        },
+        {
+            "query": "керування користувачами linux групи права",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 2,
+                "02_Areas/Infrastructure/Servers.md": 2
+            }
+        },
+        {
+            "query": "аналіз продуктивності сервера top htop iostat",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Servers.md": 2,
+                "02_Areas/Infrastructure/PRXMX-01_Hardware.md": 2
+            }
+        },
+        {
+            "query": "відновлення даних після збою диска",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/PRXMX-01_Hardware.md": 2,
+                "02_Areas/Infrastructure/Server_Inventory.md": 2
+            }
+        },
+        {
+            "query": "налаштування ssh ключів безпечний доступ",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Servers.md": 2
+            }
+        },
+        {
+            "query": "як оптимізувати локальну llm для мого сервера",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/LLM_Hardware_Research.md": 3,
+                "03_Resources/Local_moe_optimization.md": 3,
+                "01_Projects/AI-HomeLab_Roadmap.md": 2,
+                "03_Resources/Community_Analysis_Local_LLM.md": 2
+            }
+        },
+        {
+            "query": "який embedding model вибрати для українського пошуку",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2,
+                "01_Projects/Plan_POWER_3.2.md": 2
+            }
+        },
+        {
+            "query": "як перевірити безпеку мережі homelab аудит",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2,
+                "02_Areas/Infrastructure/PROD_Safety_Mandate.md": 2
+            }
+        },
+        {
+            "query": "чи підтримує power framework bilingual пошук",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "01_Projects/Plan_POWER_3.2.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2
+            }
+        },
+        {
+            "query": "як налаштувати opcode MCP для claude desktop",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 2,
+                "PROTOCOLS/LLM_WIKI_SCHEMA.md": 2
+            }
+        },
+        {
+            "query": "як запустити power sync без помилок",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Plan_POWER_3.2.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2,
+                "03_Resources/P.O.W.E.R.2.0.md": 2
+            }
+        },
+        {
+            "query": "де зберігаються бекапи proxmox сервера",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/PRXMX-01_Hardware.md": 3,
+                "02_Areas/Infrastructure/PRXMX-02_Hardware.md": 2,
+                "02_Areas/Infrastructure/Server_Inventory.md": 2
+            }
+        },
+        {
+            "query": "як додати новий сервер до tailscale мережі",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 2,
+                "02_Areas/Infrastructure/Infrastructure.md": 2,
+                "02_Areas/Infrastructure/Servers.md": 2
+            }
+        },
+        {
+            "query": "що таке OKF frontmatter у POWER",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "PROTOCOLS/LLM_WIKI_SCHEMA.md": 3,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2
+            }
+        },
+        {
+            "query": "як виправити биті посилання у vault",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2,
+                "03_Resources/P.O.W.E.R.2.0.md": 2
+            }
+        },
+        {
+            "query": "що робити при OOM краші power sync",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 3,
+                "01_Projects/Plan_POWER_3.2.md": 2
+            }
+        },
+        {
+            "query": "як налаштувати інтеграцію power framework з opencode",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 2,
+                "PROTOCOLS/LLM_WIKI_SCHEMA.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 1
+            }
+        },
+        {
+            "query": "як перевірити якість пошуку reranker",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 2,
+                "01_Projects/Plan_POWER_3.2.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2
+            }
+        },
+        {
+            "query": "як використовувати power synthesize для нотаток",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2,
+                "03_Resources/P.O.W.E.R.2.0.md": 2
+            }
+        },
+        {
+            "query": "як налаштувати PROD_Safety_Mandate на новому сервері",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/PROD_Safety_Mandate.md": 3,
+                "02_Areas/Infrastructure/Security.md": 2
+            }
+        },
+        {
+            "query": "як оновити MASTER_LESSONS_LEARNED",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 3,
+                "PROTOCOLS/Successor-Hub.md": 1
+            }
+        },
+        {
+            "query": "how does power framework index chunks",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "01_Projects/Plan_POWER_3.2.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2
+            }
+        },
+        {
+            "query": "azure speech to text ukrainian language support",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Power-Safety-UA/Release v3.9.0.md": 2,
+                "01_Projects/Power-Safety-UA/Release v3.2.3.md": 1
+            }
+        },
+        {
+            "query": "power safety alert air raid notification system",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Power-Safety-UA_Audit_2026-07.md": 3,
+                "03_Resources/Power-Safety-UA-Audit-07-2026.md": 3,
+                "01_Projects/Power-Safety-UA/Release v3.9.0.md": 2
+            }
+        },
+        {
+            "query": "niftywall automatic firewall management",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Niftywall.md": 3,
+                "02_Areas/Infrastructure/Security.md": 2
+            }
+        },
+        {
+            "query": "firewalld gui web interface management",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Firewalld-GUI.md": 3,
+                "02_Areas/Infrastructure/Security.md": 2
+            }
+        },
+        {
+            "query": "vector database vs power dense index comparison",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2
+            }
+        },
+        {
+            "query": "semantic search reranker quality benchmark methodology",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Plan_POWER_3.2.md": 3,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2,
+                "03_Resources/P.O.W.E.R.2.0.md": 2
+            }
+        },
+        {
+            "query": "tailscale derp relay server configuration",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Infrastructure.md": 2,
+                "02_Areas/Infrastructure/Security.md": 2
+            }
+        },
+        {
+            "query": "huawei e3372 4g modem linux setup",
+            "mode": "semantic",
+            "relevant": { "02_Areas/Infrastructure/Infrastructure.md": 2 }
+        },
+        {
+            "query": "power framework mcp server port configuration",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 2,
+                "PROTOCOLS/LLM_WIKI_SCHEMA.md": 2
+            }
+        },
+        {
+            "query": "bge bge reranker v2 m3 onnx integration",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 2,
+                "01_Projects/Plan_POWER_3.2.md": 2
+            }
+        },
+        {
+            "query": "discounted cumulative gain ndcg retrieval metric power",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Plan_POWER_3.2.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2
+            }
+        },
+        {
+            "query": "tailscale exit node VPN all traffic",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 2,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "power safety camera stream alert detection",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Power-Safety-UA/Release v3.9.0.md": 2,
+                "01_Projects/Power-Safety-UA/Release v3.2.3.md": 2,
+                "03_Resources/Power-Safety-UA-Audit-07-2026.md": 2
+            }
+        },
+        {
+            "query": "verify gpup signing before accepting merge request",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 3,
+                "PROTOCOLS/Successor-Hub.md": 2
+            }
+        },
+        {
+            "query": "tailscale acl rules restrict access",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "what monitoring stack we use in home server lab",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/Technology Stack.md": 2,
+                "02_Areas/Infrastructure/Infrastructure.md": 2
+            }
+        },
+        {
+            "query": "adguard home vs pihole dns comparison",
+            "mode": "semantic",
+            "relevant": { "02_Areas/Infrastructure/Security.md": 2 }
+        }
+    ]
+}
