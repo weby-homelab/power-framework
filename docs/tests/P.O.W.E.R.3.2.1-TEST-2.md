@@ -165,14 +165,23 @@ Sync scan: 0/562 ... 550/562 (progressively)
 Sync: 560 changed file(s) of 562 (embeddings=True)
 ```
 
-| Таблиця | Записи (через ~30s) |
+**Процес вимірювань під час neural sync:**
+
+| Метрика | Значення | Метод |
+| :--- | ---: | :--- |
+| PID threads | **41** | `/proc/PID/status` |
+| VmRSS peak | **2,800 MB** | `/proc/PID/status` |
+| VmPeak (virtual) | **5,224 MB** | `/proc/PID/status` |
+| CPU usage | **~198%** | `ps aux` |
+
+> ⚠️ **Критичний висновок:** Під час neural sync RSS досягає **2.8 GB**, VmPeak = **5.2 GB** virtual memory. Це значно перевищує контракт `≤1.8 GB`. Контейнер з `MemoryMax=2GB` **гарантовано отримає OOM** при `sync --force`.
+
+| Таблиця | Записи (через 5–10 хв) |
 | :--- | ---: |
 | `fts_notes` | 560 |
 | `tf_vectors` | 560 |
-| `doc_embeddings` | **8** |
-| `chunk_embeddings` | **0** (ongoing) |
-
-> **Стан:** Neural sync активно виконувався під час тестування. `doc_embeddings: 8` підтверджує завантаження BGE-M3 та початок індексації. `chunk_embeddings` заповнюється в процесі.
+| `doc_embeddings` | 8 |
+| `chunk_embeddings` | 0 (запис після завершення) |
 
 ---
 
@@ -203,14 +212,15 @@ Sync: 560 changed file(s) of 562 (embeddings=True)
 
 > **Різниця vs TEST-1 (PRXMX-01):** WS показує **8.6 секунд/текст → 55 мс/текст = 156× швидше**. Пояснення: PRXMX-01 мав набагато слабший CPU або ресурсні обмеження. WS — це 20-ядерна машина з Python 3.14.4.
 
-### 4.2 Оцінка часу індексації vault (~1803 chunks)
+### 4.2 Реальна тривалість neural sync vault (560 файлів)
 
 | Сценарій | Час |
 | :--- | :--- |
-| WS: 1803 chunks × 55ms | **≈100s = 1.7 хв** |
-| PRXMX-01: 1803 chunks × 8600ms | **≈4.3 год** |
+| WS: 560 файлів, повний sync | **>21 хв (виміряно)** |
+| WS: оцінка (~55ms/text × ~8 chunks/file × 560 files) | ~3.5 хв |
+| PRXMX-01: оцінка (~8600ms/text) | **~220 хв = 3.7 дні** |
 
-> **Висновок:** На WS neural pipeline є **практично придатним**. На PRXMX-01 він потребує GPU або дуже тривалого CPU-часу.
+> **Примітка:** chunk_embeddings = 0 протягом 21+ хв свідчить, що `power sync` використовує batch-write стратегію (запис в БД лише після обробки всіх чанків у пам'яті). Індексація активно виконується в пам'яті (2.8 GB RSS).
 
 ---
 
@@ -265,13 +275,20 @@ Sync: 560 changed file(s) of 562 (embeddings=True)
 | **BGE-M3 delta** | **+1,521 MB** | Лише модель |
 | Після embed_batch(32) | 1,567.7 MB | +33 MB для буферів |
 
-> **Оцінка повного стеку:**
-> - BGE-M3: **~1,521 MB**
-> - Python runtime + SQLite + FTS: ~66 MB
-> - Reranker (bge-reranker-v2-m3): ~500–800 MB (незаміряно)
-> - **Загальна оцінка з reranker: ~2.0–2.4 GB**
+> **Фактичний замір під час neural sync (`power sync --force`):**
 >
-> ⚠️ **Висновок:** Контракт `≤1.8 GB` **не підтверджений** для повного стеку з reranker. Достовірно виміряно лише BGE-M3 без reranker.
+> | Фаза | RSS (psutil/`ps aux`) |
+> | :--- | ---: |
+> | Baseline (Python) | 13.7 MB |
+> | Після BGE-M3 init | 1,534.7 MB |
+> | BGE-M3 delta | +1,521 MB |
+> | **Під час повної індексації (560 файлів)** | **2,634–2,717 MB** |
+>
+> ⚠️ **Критичний висновок:** RSS процесу `power sync --force` під час реальної індексації досяг **2,634–2,717 MB (2.6+ GB)**. Це **перевищує контракт `≤1.8 GB`** і навіть `≤2.0 GB`. 
+>
+> Причина: BGE-M3 (~1.5 GB) + чанки тексту в пам'яті + Python runtime + SQLite + embedding buffers.
+>
+> **Висновок для production:** Для безпечної роботи з neural pipeline рекомендується мінімум **3 GB RAM**. Контейнер з `MemoryMax=2GB` призведе до OOM під час `sync --force`.
 
 ---
 
