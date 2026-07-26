@@ -1,0 +1,1 @@
+/var/tmp/power-3.2.1-test-2-final/search.db

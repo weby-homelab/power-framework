@@ -1,0 +1,3 @@
+duplicate_content_within_document_groups=0
+duplicate_content_global_groups=2
+global repeated content is reported separately and is not automatically corruption
