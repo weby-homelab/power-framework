@@ -7,7 +7,7 @@ set -euo pipefail
 EXPECTED_HOST="ws"
 EXPECTED_IP="192.168.2.24"
 
-ACTUAL_HOST="$(hostname)"
+ACTUAL_HOST="$(hostname | tr '[:upper:]' '[:lower:]')"
 ACTUAL_IPS="$(hostname -I 2>/dev/null || true)"
 
 if [[ "$ACTUAL_HOST" != "$EXPECTED_HOST" ]]; then

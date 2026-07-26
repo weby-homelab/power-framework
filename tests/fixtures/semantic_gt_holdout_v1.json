@@ -1,6 +1,23 @@
 {
     "version": "3.2.1",
-    "description": "Frozen bilingual (UA+EN) holdout Ground Truth for POWER 3.2.1 retrieval evaluation. NOT used for development tuning. 64 queries across 4 language groups. Relevance grades: 3=directly answers, 2=strongly relevant, 1=partially relevant. Non-listed = 0.",
+    "description": "Frozen bilingual (UA+EN) holdout Ground Truth for POWER 3.2.1 retrieval evaluation. NOT used for development tuning. 66 queries: 34 English, 32 Ukrainian, with explicit language-group index labels. Relevance grades: 3=directly answers, 2=strongly relevant, 1=partially relevant. Non-listed = 0.",
+    "metadata": {
+        "query_count": 66,
+        "language_group_distribution": {
+            "en": 34,
+            "uk": 32
+        }
+    },
+    "language_groups": {
+        "en": {
+            "label": "English queries",
+            "query_indexes": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65]
+        },
+        "uk": {
+            "label": "Ukrainian queries",
+            "query_indexes": [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]
+        }
+    },
     "queries": [
         {
             "query": "how to configure nginx reverse proxy for docker containers",

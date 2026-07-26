@@ -31,7 +31,9 @@ BGE_RERANKER_FILE_SHA256: dict[str, str] = {
     "tokenizer.json": "8bf8afbfd11306bd872018c53bfdf2e160a56f8edbcf49933324404791c148d3",
 }
 
-QWEN3_RERANKER_MODEL = os.getenv("POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX")
+QWEN3_RERANKER_MODEL = os.getenv(
+    "POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX"
+)
 
 # Jina remains a documented opt-in only (CC-BY-NC-4.0).
 JINA_RERANKER_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
@@ -219,10 +221,16 @@ class BGEM3Reranker:
 
             so = ort.SessionOptions()
             so.enable_cpu_mem_arena = False
-            so.intra_op_num_threads = max(1, int(os.getenv("POWER_EMBED_NUM_THREADS", "2")))
+            so.intra_op_num_threads = max(
+                1, int(os.getenv("POWER_EMBED_NUM_THREADS", "2"))
+            )
             so.inter_op_num_threads = 1
-            providers = [("CPUExecutionProvider", {"arena_extend_strategy": "kSameAsRequested"})]
-            self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            providers = [
+                ("CPUExecutionProvider", {"arena_extend_strategy": "kSameAsRequested"})
+            ]
+            self._session = ort.InferenceSession(
+                model_path, providers=providers, sess_options=so
+            )
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
 

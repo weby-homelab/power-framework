@@ -1,18 +1,19 @@
-"""Crash/restart and PID lock tests for POWER sync and search.
+"""Crash/restart and PID-lock tests for POWER sync and search.
 
-Verifies:
-- Parallel sync prevention via PID lock
-- Stale PID lock cleanup
-- DB integrity after simulated crash during sync
-- Repeat sync produces valid manifest
+The tests exercise the public CLI sync boundary: a live PID is refused, a stale
+PID left after a killed process is recovered, and a concurrent SQLite reader is
+not blocked by the sync lock.
 """
 
 from __future__ import annotations
 
+import argparse
+import os
 import sqlite3
 from typing import TYPE_CHECKING
 
-from power_framework.core.searcher import _sync_vault_to_db
+from power_framework.core import cli, searcher
+from power_framework.core.utils import get_cache_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,76 +29,77 @@ def _create_test_vault(root: Path) -> Path:
     vault = root / "vault"
     vault.mkdir()
     (vault / "01_Projects").mkdir()
-    note = vault / "01_Projects" / "test_note.md"
-    note.write_text(NOTE_CONTENT)
+    (vault / "01_Projects" / "test_note.md").write_text(NOTE_CONTENT, encoding="utf-8")
     return vault
 
 
-def _init_test_db(db_path: Path) -> sqlite3.Connection:
-    """Initialize a test DB with WAL mode."""
-    conn = sqlite3.connect(str(db_path), timeout=30)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=30000")
-    from power_framework.core.db import _init_db
+def _sync_args(vault: Path) -> argparse.Namespace:
+    """Build CLI arguments for a deterministic FTS-only sync."""
+    return argparse.Namespace(path=str(vault), fts_only=True, force=False)
 
-    _init_db(conn)
-    return conn
+
+def _configure_sync_environment(monkeypatch, tmp_path: Path) -> Path:
+    db_path = tmp_path / "test.db"
+    monkeypatch.setenv("POWER_SEARCH_DB", str(db_path))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    return db_path
 
 
 class TestPidLock:
-    """PID lock prevents parallel sync operations."""
+    """PID lock prevents parallel sync operations while allowing reads."""
 
-    def test_parallel_sync_refused(self, tmp_path: Path, monkeypatch):
+    def test_parallel_sync_refused_for_live_pid(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
-        db = tmp_path / "test.db"
-        monkeypatch.setenv("POWER_SEARCH_DB", str(db))
-        conn = _init_test_db(db)
+        _configure_sync_environment(monkeypatch, tmp_path)
+        lock_path = get_cache_dir() / "sync.pid"
+        lock_path.write_text(str(os.getpid()), encoding="utf-8")
 
-        _sync_vault_to_db(vault, conn, sync_embeddings=False)
-        conn.close()
+        assert cli._cmd_sync(_sync_args(vault)) == 1
+        assert lock_path.exists()
+
+    def test_stale_lock_recovery_and_repeated_sync(self, tmp_path: Path, monkeypatch):
+        vault = _create_test_vault(tmp_path)
+        db_path = _configure_sync_environment(monkeypatch, tmp_path)
+        lock_path = get_cache_dir() / "sync.pid"
+        lock_path.write_text("99999999", encoding="utf-8")
+
+        # A stale PID models a process terminated by SIGKILL after it created its lock.
+        assert cli._cmd_sync(_sync_args(vault)) == 0
+        assert not lock_path.exists()
+        assert cli._cmd_sync(_sync_args(vault)) == 0
+
+        with sqlite3.connect(str(db_path)) as conn:
+            assert conn.execute("SELECT COUNT(*) FROM fts_notes").fetchone()[0] == 1
+            assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     def test_sync_lock_does_not_block_reads(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
-        db = tmp_path / "test.db"
-        monkeypatch.setenv("POWER_SEARCH_DB", str(db))
-        conn = _init_test_db(db)
-        _sync_vault_to_db(vault, conn, sync_embeddings=False)
-        conn.close()
+        db_path = _configure_sync_environment(monkeypatch, tmp_path)
+        original_sync = searcher._sync_vault_to_db
+        observed_read = False
 
-        sqlite3.connect(str(db)).execute("SELECT COUNT(*) FROM fts_notes").fetchone()
+        def sync_with_concurrent_reader(*args, **kwargs):
+            nonlocal observed_read
+            assert (get_cache_dir() / "sync.pid").exists()
+            with sqlite3.connect(str(db_path), timeout=0) as reader:
+                reader.execute("SELECT COUNT(*) FROM fts_notes").fetchone()
+            observed_read = True
+            return original_sync(*args, **kwargs)
+
+        monkeypatch.setattr(searcher, "_sync_vault_to_db", sync_with_concurrent_reader)
+
+        assert cli._cmd_sync(_sync_args(vault)) == 0
+        assert observed_read
 
 
 class TestDbIntegrity:
-    """DB integrity after sync operations."""
+    """DB integrity is retained after normal CLI synchronization."""
 
-    def test_integrity_check_passes(self, tmp_path: Path, monkeypatch):
+    def test_integrity_check_passes_after_cli_sync(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
-        db = tmp_path / "test.db"
-        monkeypatch.setenv("POWER_SEARCH_DB", str(db))
-        conn = _init_test_db(db)
+        db_path = _configure_sync_environment(monkeypatch, tmp_path)
 
-        _sync_vault_to_db(vault, conn, sync_embeddings=False)
-        conn.close()
-
-        conn2 = sqlite3.connect(str(db))
-        result = conn2.execute("PRAGMA integrity_check").fetchone()[0]
-        assert result == "ok"
-        conn2.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn2.close()
-
-    def test_integrity_check_after_repeated_sync(self, tmp_path: Path, monkeypatch):
-        vault = _create_test_vault(tmp_path)
-        db = tmp_path / "test.db"
-        monkeypatch.setenv("POWER_SEARCH_DB", str(db))
-        conn = _init_test_db(db)
-        _sync_vault_to_db(vault, conn, sync_embeddings=False)
-        conn.commit()
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn.close()
-
-        conn2 = sqlite3.connect(str(db))
-        row = conn2.execute("SELECT COUNT(*) FROM file_metadata").fetchone()
-        assert row[0] > 0, "file_metadata should contain entries after sync"
-        result = conn2.execute("PRAGMA integrity_check").fetchone()[0]
-        assert result == "ok"
-        conn2.close()
+        assert cli._cmd_sync(_sync_args(vault)) == 0
+        with sqlite3.connect(str(db_path)) as conn:
+            assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"

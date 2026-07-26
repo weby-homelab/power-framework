@@ -173,7 +173,7 @@ class TestVaultRelativeWritePaths:
         ],
     )
     def test_resolve_path_rejects_escape(self, sample_vault: Path, traversal_path: str):
-        with pytest.raises((ValueError, FileNotFoundError)):
+        with pytest.raises(ValueError, match=r"path|Path|Absolute|Invalid"):
             resolve_path_in_vault(
                 sample_vault, traversal_path, self._allowed_directories
             )

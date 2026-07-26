@@ -139,6 +139,7 @@ class TestBoundedRerank:
                 return [float(len(documents) - rank) for rank in range(len(documents))]
 
         monkeypatch.setattr(searcher, "_get_reranker", lambda: FakeReranker())
+        monkeypatch.setattr(searcher, "_semantic_search", lambda *args, **kwargs: [])
         results = _hybrid_reranked_search(indexed_vault, "test project", max_results=5)
         assert isinstance(results, list)
         assert len(results) <= 5
