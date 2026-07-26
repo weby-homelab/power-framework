@@ -13,7 +13,8 @@ timestamp: 2026-07-25T12:00:00Z
 
 > [!IMPORTANT]
 > Historical TEST-1 baseline executed on PRXMX-01 with an incomplete
-> neural index. Current WS validation is in P.O.W.E.R.3.2.1-TEST-2.md.
+> neural index. Current canonical POWER 3.2.1 source and WS full-sync
+> validation is documented in [P.O.W.E.R.3.2.1-TEST-2.md](P.O.W.E.R.3.2.1-TEST-2.md).
 
 TEST-1 is retained only as historical context. It must not be used for current
 semantic, reranked, memory, cgroup, egress, synchronization, determinism, or
