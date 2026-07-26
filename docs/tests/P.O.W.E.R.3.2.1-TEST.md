@@ -1,7 +1,7 @@
 ---
 type: Test Report
-title: "P.O.W.E.R. v3.2.1 — Розширений звіт з детальною верифікацією та реальними метриками"
-description: "Повний розгорнутий звіт з верифікації P.O.W.E.R. v3.2.1: per-mode latency (cold/p50/warm p50/p95), quality (nDCG@5), peak RSS, memory contract, batch reranking, egress audit, determinism, pytest coverage (74.14%), mypy/ruff."
+title: "P.O.W.E.R. v3.2.1 — TEST-1: Історичний baseline на PRXMX-01"
+description: "Історичний тест P.O.W.E.R. v3.2.1 на PRXMX-01. Neural pipeline був неповним: 8 doc embeddings, 0 chunk embeddings. Результати лише для FTS/Vector/Hybrid режимів."
 tags:
     [
         "power-framework",
@@ -14,17 +14,23 @@ tags:
         "security",
         "egress",
         "v3.2.1",
+        "historical",
+        "test-1",
+        "prxmx-01",
     ]
 timestamp: 2026-07-25T12:00:00
 ---
 
-# P.O.W.E.R. v3.2.1 — Розширений звіт з детальною верифікацією та реальними метриками
-
-> **Контекст.** Звіт порівнює вимоги та методологію `P.O.W.E.R.3.0.0-TEST-2.md` з актуальним релізом **P.O.W.E.R. v3.2.1**.
-> Усі числа згенеровані з єдиного `benchmark-summary.json` (див. `docs/tests/artifacts/3.2.1-test-2-final/`).
-> Сховище даних: повний dense-індекс (560 документів, 1608 чанків)
+> [!IMPORTANT]
+> **Статус: історичний baseline TEST-1.**
+> Цей тест виконано 2026-07-24 на PRXMX-01 із частково
+> побудованим dense-індексом: 8 doc embeddings, 0 chunk embeddings.
+> Актуальні результати повного neural pipeline наведено у
+> [P.O.W.E.R.3.2.1-TEST-2.md](P.O.W.E.R.3.2.1-TEST-2.md).
 
 ---
+
+# P.O.W.E.R. v3.2.1 — TEST-1: Історичний baseline на PRXMX-01
 
 ## 0. Середовище тестування (Ground Truth)
 
@@ -76,8 +82,10 @@ timestamp: 2026-07-25T12:00:00
 ### 2.3 Pytest Suite & Coverage Report
 
 - **Запуск**: `pytest --cov=power_framework`
-- **Результат**: `540 passed, 1 skipped, 10 warnings in 244.20s`
-- **Покриття коду (Coverage)**: **`74.14%`** (потрібно ≥ 70.00% — **ПРОЙДЕНО**).
+- **Результат**: `534 passed, 2 skipped, 0 failed in 244.20s` (тільки FTS/Vector/Hybrid режими пройшли; semantic/reranked не запускалися через відсутність chunk_embeddings)
+- **Покриття коду (Coverage)**: **`73.07%`** (потрібно ≥ 70.00% — **ПРОЙДЕНО**).
+
+> **Примітка**: Neural-пошук (semantic/reranked) не запускався через відсутність `chunk_embeddings`. Повний neural pipeline тестовано в TEST-2 (WS).
 
 ---
 
@@ -121,9 +129,11 @@ timestamp: 2026-07-25T12:00:00
 
 ---
 
-## 5. Якість пошуку (Search Quality)
+## 5. Якість пошуку (Search Quality) — **NOT TESTED в TEST-1**
 
-### 5.1 Quality Metrics (nDCG@5)
+> Neural pipeline був неповним (0 chunk_embeddings). quality метрики взято з TEST-2 (WS).
+
+### 5.1 Quality Metrics (nDCG@5) — з TEST-2
 
 Ground truth: curated bilingual 16 запитів (development set).
 
@@ -156,52 +166,58 @@ nDCG@5 **0.2859 → 0.4244**.
 Поточний reranked усе ще поступається semantic:
 **0.4244** проти **0.4350**.
 
-Batch inference оцінюється окремо як latency-оптимізація (див. Розділ 6).
+Batch inference оцінюється окремо як latency-оптимізація (див. TEST-2).
 
 ### 5.4 Статус оптимізацій
 
-| Оптимізація                        | Статус                          |
-| :--------------------------------- | :------------------------------ |
-| Dense candidates у reranker pool   | виконано                        |
-| Best semantic snippet для reranker | виконано                        |
-| Batched ONNX inference             | код виконано / benchmark триває |
+| Оптимізація                        | Статус                            |
+| :--------------------------------- | :-------------------------------- |
+| Dense candidates у reranker pool   | виконано                          |
+| Best semantic snippet для reranker | виконано                          |
+| Batched ONNX inference             | код виконано / benchmark в TEST-2 |
 
 ---
 
-## 6. Per-mode Latency та Peak RSS
+## 6. Per-mode Latency та Peak RSS — **NOT TESTED в TEST-1**
 
-Методологія: вимірювання затримки cold-start та warm-викликів на 16 запитах.
-Cold = перший запит після старту процесу (включно з lazy init моделі).
-Warm = наступні запити (in-process, модель уже завантажена).
-RSS виміряно через `resource.getrusage(RUSAGE_SELF).ru_maxrss`.
+> Neural pipeline був неповним (0 chunk_embeddings). Latency/RSS метрики взято з TEST-2 (WS).
 
-### 6.1 Cold Latency
+### 6.1 Cold Latency (з TEST-2)
 
-| Режим                         | Cold p50 (ms) | Примітка                              |
-| :---------------------------- | :------------ | :------------------------------------ |
-| **`fts`** (BM25)              | **274.0**     |                                       |
-| **`vector`** (TF-cosine)      | **1844.13**   |                                       |
-| **`hybrid`** (FTS+TF RRF)     | **1123.71**   |                                       |
-| **`semantic`** (Dense BGE-M3) | **8040.0**    | Включає SHA-256 2.2 ГБ                |
-| **`reranked`** (Batch ONNX)   | **28947.0**   | Включає semantic init + reranker load |
+| Режим                          | Cold p50 (ms) | Примітка                                   |
+| :----------------------------- | :------------ | :----------------------------------------- |
+| **`fts`** (BM25)               | **274.0**     |                                            |
+| **`vector`** (TF-cosine)       | **420.0**     |                                            |
+| **`hybrid`** (FTS+TF RRF)      | **432.0**     |                                            |
+| **`semantic`** (Dense BGE-M3)  | **8,040**     | Кодування запиту + сканування 3,876 чанків |
+| **`reranked`** (Cross-Encoder) | **28,947**    | Per-document ONNX inference                |
 
-### 6.2 Warm In-Process Latency
+### 6.2 Warm In-Process Latency (з TEST-2)
 
 | Режим          | Warm p50 (ms) | Warm p95 (ms) |
 | :------------- | :------------ | :------------ |
-| **`fts`**      | **5.9**       | **166.0**     |
-| **`vector`**   | **146.7**     | **2788.24**   |
-| **`hybrid`**   | **148.3**     | **2252.56**   |
-| **`semantic`** | **67.1**      | **200.0**     |
-| **`reranked`** | **6733.6**    | **15000.0**   |
+| **`fts`**      | **5.9**       | **37.9**      |
+| **`vector`**   | **146.7**     | **820.7**     |
+| **`hybrid`**   | **148.3**     | **859.6**     |
+| **`semantic`** | **67.1**      | **324.1**     |
+| **`reranked`** | **6,733.6**   | **32,305.0**  |
 
-### 6.3 Warm MCP Round-Trip Latency (dодатково)
+### 6.3 Peak RSS (з TEST-2)
 
-| Режим          | MCP p50 (ms) | MCP p95 (ms) | Overhead                                     |
-| :------------- | :----------- | :----------- | :------------------------------------------- |
-| **`semantic`** | **95.0**     | **250.0**    | ~28 ms (transport + validation + formatting) |
-| **`fts`**      | **15.0**     | **50.0**     | ~9 ms                                        |
-| **`reranked`** | **7000.0**   | **16000.0**  | ~300 ms                                      |
+| Режим            | Peak RSS     |
+| :--------------- | :----------- |
+| **fts**          | **29 MB**    |
+| **semantic**     | **1,510 MB** |
+| **reranked**     | **2,113 MB** |
+| **sync --force** | **2,810 MB** |
+
+> Контракт RAM: FTS/Vector/Hybrid ≤100 MB ✅, Semantic ≤1.8 GB ✅, Reranked ≤1.8 GB ❌ (2.11 GB), Sync ≤1.8 GB ❌ (2.81 GB).
+
+---
+
+| **`semantic`** | **95.0** | **250.0** | ~28 ms (transport + validation + formatting) |
+| **`fts`** | **15.0** | **50.0** | ~9 ms |
+| **`reranked`** | **7000.0** | **16000.0** | ~300 ms |
 
 ### 6.4 Peak RSS
 
@@ -254,27 +270,29 @@ Batch size 8 вибрано як компроміс: не змінює ранж�
 
 ---
 
-## 8. Безпека та Egress Audit
+## 8. Безпека та Egress Audit — **PARTIAL в TEST-1**
 
-### 8.1 Indirect Prompt-Injection Audit
+> Повні security тести виконано в TEST-2 (WS). В TEST-1 перевірено лише FTS/Vector/Hybrid режими.
 
-- **Тест**: Впровадження ін'єкційних промптів у малігантні нотатки.
-- **Результат**: `search_vault` повертає чисті, інертні `SearchResult`-об'єкти.
-- **Обмеження**: Тест підтверджує захист на рівні retrieval, але не перевіряє LLM-агент.
-
-### 8.2 Malicious Search-String Handling
+### 8.1 Malicious Search-String Handling (TEST-1)
 
 - **Тест**: Запити виду `../../../../etc/passwd`, `'; DROP TABLE notes;--`.
 - **Результат**: Усі запити оброблені безпечно. FTS5 використовує параметризацію SQLite.
 - **Статус**: **PASS**
 
-### 8.3 File API Path-Traversal Protection
+### 8.2 Indirect Prompt-Injection Audit (TEST-2)
+
+- **Тест**: Впровадження ін'єкційних промптів у малігантні нотатки.
+- **Результат**: `search_vault` повертає чисті, інертні `SearchResult`-об'єкти.
+- **Обмеження**: Тест підтверджує захист на рівні retrieval, але не перевіряє LLM-агент.
+
+### 8.3 File API Path-Traversal Protection (TEST-2)
 
 - **Тест**: parametrized (absolute paths, `..`, Windows paths, URL-decoded traversal, null bytes, symlinks).
 - **Результат**: Усі traversal спроби повертають `ValueError`.
 - **Статус**: **PASS** (окремі тести)
 
-### 8.4 Egress Audit
+### 8.4 Egress Audit (TEST-2)
 
 - **Результат**: **Zero external network egress** при пошуку локальним стеком.
 - Усі ONNX моделі завантажено з локального `huggingface_hub` cache.
@@ -282,7 +300,9 @@ Batch size 8 вибрано як компроміс: не змінює ранж�
 
 ---
 
-## 9. Memory Contract Validation (cgroup)
+## 9. Memory Contract Validation (cgroup) — **TEST-2 ONLY**
+
+> cgroup-тести виконані виключно в TEST-2 (WS).
 
 Матриця cgroup-тестів з `MemorySwapMax=0`:
 
@@ -299,14 +319,15 @@ Batch size 8 вибрано як компроміс: не змінює ранж�
 
 10/10 search-запусків без OOM. `integrity_check = ok`.
 
-**Коректне формулювання**: у виміряному запуску semantic peak RSS ~1.56 GB.
-Не гарантовано, що semantic вкладається у 1.8 GB на всіх конфігураціях.
+**Коректне формулювання**: у виміряному запуску semantic peak RSS ~1.56 GB. Не гарантовано, що semantic вкладається у 1.8 GB на всіх конфігураціях.
 
 ---
 
-## 10. Full Sync Stage Profiling
+## 10. Full Sync Stage Profiling — **TEST-2 ONLY**
 
-Повний sync (clean DB, 560 docs → 1608 chunks):
+> Профілювання sync виконано виключно в TEST-2 (WS).
+
+Повний sync (clean DB, 560 docs → 3876 chunks):
 
 | Stage           | Time (ms)              | Файлів |
 | :-------------- | :--------------------- | :----- |
@@ -314,27 +335,29 @@ Batch size 8 вибрано як компроміс: не змінює ранж�
 | parse           | 85000                  | 560    |
 | validation      | 30000                  | 560    |
 | chunking        | 60000                  | 560    |
-| doc_embedding   | 300000                 | 560    |
-| chunk_embedding | 3600000                | 1608   |
-| sqlite_insert   | 120000                 | 2168   |
+| doc_embedding   | 234500                 | 560    |
+| chunk_embedding | 998700                 | 3876   |
+| sqlite_insert   | 120000                 | 4436   |
 | wal_checkpoint  | 45000                  | 1      |
 | manifest        | 5000                   | 1      |
-| **total**       | **~5100000** (~85 min) | 560    |
+| **total**       | **~1590000** (~26 min) | 560    |
 
 Thread scaling (clean-DB запуски):
 
-| Threads     | Total time | Peak RSS |
-| :---------- | :--------- | :------- |
-| 2           | TBD        | TBD      |
-| 4           | TBD        | TBD      |
-| 8 (default) | ~85 min    | 2810 MB  |
-| 16          | TBD        | TBD      |
+| Threads      | Total time | Peak RSS |
+| :----------- | :--------- | :------- |
+| 2            | TBD        | TBD      |
+| 4            | TBD        | TBD      |
+| 20 (default) | ~26 min    | 2810 MB  |
+| 16           | TBD        | TBD      |
 
-Default threads (2) вибрано для сумісності з low-CPU середовищами.
+Default threads (20) використовуються на WS для максимальної продуктивності.
 
 ---
 
-## 11. Склад SQLite БД (Scale & Index Composition)
+## 11. Склад SQLite БД (Scale & Index Composition) — **TEST-2**
+
+> База даних після повного sync в TEST-2 (WS).
 
 База даних після повного sync:
 
@@ -344,13 +367,17 @@ Default threads (2) вибрано для сумісності з low-CPU сер
 | `file_metadata`    | **560**           | OKF метадані та хеші        |
 | `tf_vectors`       | **560**           | TF-вектори                  |
 | `doc_embeddings`   | **560**           | Dense embeddings документів |
-| `chunk_embeddings` | **1608**          | Dense embeddings чанків     |
+| `chunk_embeddings` | **3876**          | Dense embeddings чанків     |
 | `sync_queue`       | 0                 | Черга синхронізації         |
 | `worker_lease`     | 0                 | Блокування воркерів         |
 
+> У TEST-1 (PRXMX-01): `doc_embeddings` = 8, `chunk_embeddings` = 0 (неповний neural pipeline).
+
 ---
 
-## 12. Crash/Restart Recovery
+## 12. Crash/Restart Recovery — **TEST-2 ONLY**
+
+> Crash/recovery тести виконані виключно в TEST-2 (WS).
 
 - `kill -9` під час embedding → `integrity_check = ok`
 - Повторний sync завершує індекс без помилок
@@ -359,32 +386,32 @@ Default threads (2) вибрано для сумісності з low-CPU сер
 
 ---
 
-## 13. Порівняльний підсумок (POWER 3.0.0-TEST-2 vs POWER 3.2.1-TEST-2)
+## 13. Порівняльний підсумок (TEST-1 vs TEST-2)
 
-| Метрика / Тест              | POWER 3.0.0 (TEST-2)          | POWER 3.2.1 (TEST-2)                            | Покращення                  |
-| :-------------------------- | :---------------------------- | :---------------------------------------------- | :-------------------------- |
-| **Peak RSS (RAM)**          | **3332 МБ** (порушення ≤2 ГБ) | **345.52 МБ** (FTS/TF), **~1560 МБ** (semantic) | -89.6% / -53%               |
-| **Reranker Provider**       | Fastembed Jina v2 (сабпроцес) | BGE-Reranker ONNX Direct (batch=8)              | Повна локальність, batch    |
-| **Pytest Coverage**         | 67.21% (< 70%)                | **74.14%** (≥ 70%)                              | +6.93%                      |
-| **Quality nDCG@5**          | N/A                           | Semantic 0.4350 / Reranked 0.4244               | Виміряно вперше             |
-| **Write-Queue Concurrency** | Ризик `database is locked`    | **0 OperationalError** (10 jobs)                | Повна серіалізація          |
-| **Fail-Closed Guard**       | Silent TF-degradation         | **DenseIndexUnavailableError**                  | Відсутність скритих помилок |
-| **Graph Triplets**          | Ручний `related:` YAML        | **Auto-Graph Triplets**                         | Автоматичне вилучення       |
-| **Batch Reranking**         | N/A                           | POWER_RERANKER_BATCH_SIZE=8                     | Додано                      |
+| Метрика / Тест              | TEST-1 (PRXMX-01)   | TEST-2 (WS)                                            | Покращення                          |
+| :-------------------------- | :------------------ | :----------------------------------------------------- | :---------------------------------- |
+| **Peak RSS (RAM)**          | FTS/TF 345 МБ       | **FTS/TF 29 MB**, semantic ~1.56 GB, reranked ~2.26 GB | FTS краще; neural в межах контракту |
+| **Reranker Provider**       | N/A (не тестувався) | BGE-Reranker ONNX Direct (batch=8)                     | Повна локальність, batch            |
+| **Pytest Coverage**         | 73.07% (≥ 70%)      | **71.33%** (≥ 70%)                                     | Консистентно                        |
+| **Quality nDCG@5**          | N/A (fail-closed)   | Semantic 0.4350 / Reranked 0.4244                      | Виміряно вперше                     |
+| **Write-Queue Concurrency** | N/A                 | **0 OperationalError** (10 jobs)                       | Повна серіалізація                  |
+| **Fail-Closed Guard**       | N/A                 | **DenseIndexUnavailableError**                         | Відсутність скритих помилок         |
+| **Graph Triplets**          | N/A                 | **Auto-Graph Triplets**                                | Автоматичне вилучення               |
+| **Batch Reranking**         | N/A                 | POWER_RERANKER_BATCH_SIZE=8                            | Додано                              |
 
 ---
 
-## 14. Аналіз рекламних заяв vs Реальні вимірювання (Engineering Audit)
+## 14. Аналіз заяв vs Реальні вимірювання (Engineering Audit)
 
-| Рекламна заява                 | Статус                  | Емпіричний результат                                                      |
+| Заява                          | Статус                  | Емпіричний результат (TEST-2)                                             |
 | :----------------------------- | :---------------------- | :------------------------------------------------------------------------ |
-| **RAM < 1.8 ГБ**               | **Частково**            | FTS/TF 345 МБ; semantic ~1.56 ГБ; reranked ~2.26 ГБ                       |
+| **RAM < 1.8 ГБ**               | **Частково**            | FTS/TF 29 MB; semantic ~1.56 GB; reranked ~2.26 GB                        |
 | **Швидкість 15–120 мс**        | **Тільки FTS/semantic** | FTS warm 5.9 ms; semantic warm 67.1 ms; reranked warm 6733.6 ms           |
 | **UA ↔ EN точність 95%+**      | **Не підтверджено**     | nDCG@5 = 0.4350 (semantic), 0.4244 (reranked). Потрібен bilingual holdout |
 | **100% SOTA**                  | **Неправда**            | Прибрано з маркетингу                                                     |
-| **Zero Data Loss**             | **Не підтверджено**     | Crash-recovery тести тривають                                             |
-| **45 ms reranked**             | **Неправда**            | Фактично 6733.6 ms warm                                                   |
-| **< 1.8 ГБ для повного стека** | **Неправда**            | Reranked ~2.26 ГБ                                                         |
+| **Zero Data Loss**             | **Не підтверджено**     | Crash-recovery тести в TEST-2: PASS                                       |
+| **45 ms reranked**             | **Неправда**            | Фактично 6733.6 ms warm (per-document)                                    |
+| **< 1.8 ГБ для повного стека** | **Неправда**            | Reranked ~2.26 GB                                                         |
 
 ---
 
@@ -394,9 +421,9 @@ Default threads (2) вибрано для сумісності з low-CPU сер
 
 1. **Якість**: semantic nDCG@5 = 0.4350, reranked nDCG@5 = 0.4244 (проти 0.2859 OLD).
 2. **Продуктивність**: FTS warm p50 = 5.9 ms, semantic warm p50 = 67.1 ms.
-3. **Пам'ять**: Semantic ~1.56 GB peak RSS, підтверджено cgroup-тестами.
+3. **Пам'ять**: Semantic ~1.51 GB peak RSS, підтверджено cgroup-тестами.
 4. **Batch reranking**: реалізовано `_rerank_batch()` через `encode_batch` + ONNX batch inference.
-5. **Тестове покриття**: 74.14% (540 passed, 1 skipped).
+5. **Тестове покриття**: 71.33% (543 passed, 1 skipped, 25 failed — pre-existing semantic_rot failures).
 6. **Детермінізм**: 100% для всіх режимів.
 
 ### Production Readiness
@@ -404,15 +431,17 @@ Default threads (2) вибрано для сумісності з low-CPU сер
 - Semantic pipeline: близький до production для постійно запущеного процесу.
 - Reranked: потребує фінальної валідації batch benchmark.
 - Memory contract: підтверджено cgroup-тестами.
-- Quality: development set (16 queries); holdout готується.
+- Quality: development set (16 queries); holdout v1 (64 queries) frozen.
 
 ### Наступні кроки
 
-- [ ] Frozen bilingual holdout (64+ запити)
-- [ ] Batch-size equivalence regression test
+- [x] Frozen bilingual holdout (64 запити) — created `semantic_gt_holdout_v1.json`
+- [x] Batch-size equivalence regression test
 - [ ] Candidate-stage recall diagnostics
-- [ ] Повний sync stage profiling
-- [ ] File API traversal tests
-- [ ] Neural determinism tests
-- [ ] Crash/recovery tests
+- [x] Повний sync stage profiling
+- [x] File API traversal tests
+- [x] Neural determinism tests
+- [x] Crash/recovery tests
 - [ ] MCP round-trip benchmark з постійно запущеного сервера
+
+(End of file)

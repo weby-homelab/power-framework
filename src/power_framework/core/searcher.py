@@ -9,7 +9,7 @@ Multi-mode search across vault notes:
 """
 
 from __future__ import annotations
-import time
+
 import contextlib
 import hashlib
 import json
@@ -442,7 +442,6 @@ def _sync_vault_to_db(
         len(disk_files),
         sync_embeddings,
     )
-    sync_start_time = time.perf_counter()
 
     # --- Lightweight pass: FTS + TF-vector (cheap, no model load) ---
     for rel_path, content, metadata, mtime in changed:
