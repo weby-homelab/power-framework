@@ -31,8 +31,8 @@ tags: [power-framework, testing, evidence, ws, test-3, consolidated]
 | Historical baseline | [TEST-1](P.O.W.E.R.3.2.1-TEST.md), PRXMX-01 only |
 | Deferred validation | [issue #187](https://github.com/weby-homelab/power-framework/issues/187) |
 
-The source commit and all four commits above are ancestors of `main` at the
-time this record was assembled. TEST-1 is historical context only: it did not
+All four commit hashes above are ancestors of `main` at the time this record
+was assembled. TEST-1 is historical context only: it did not
 materialize a complete neural index and must not be used as current WS or
 release evidence.
 
@@ -168,6 +168,8 @@ README or marketing claim.
 Run these read-only checks against the intended `main` commit:
 
 ```bash
+set -euo pipefail
+
 git fetch origin --prune --tags
 main="$(git rev-parse origin/main)"
 
@@ -177,11 +179,19 @@ git show "$main:docs/tests/artifacts/3.2.1-ws-evidence/benchmark-summary.json" \
 
 audit_dir="$(mktemp -d /tmp/power-evidence.XXXXXX)"
 git ls-tree -r --name-only "$main" docs/tests/artifacts/3.2.1-ws-evidence \
-  | while IFS= read -r file; do
-      mkdir -p "$audit_dir/$(dirname "$file")"
-      git show "$main:$file" > "$audit_dir/$file"
-    done
-(cd "$audit_dir" && sha256sum -c docs/tests/artifacts/3.2.1-ws-evidence/files.sha256)
+  | sort > "$audit_dir/tree-files.txt"
+while IFS= read -r file; do
+  mkdir -p "$audit_dir/$(dirname "$file")"
+  git show "$main:$file" > "$audit_dir/$file"
+done < "$audit_dir/tree-files.txt"
+
+manifest="docs/tests/artifacts/3.2.1-ws-evidence/files.sha256"
+awk '{path=$2; sub(/^\\*/, "", path); print path}' "$audit_dir/$manifest" \
+  | sort > "$audit_dir/manifest-files.txt"
+grep -v "^$manifest$" "$audit_dir/tree-files.txt" \
+  > "$audit_dir/tree-files-without-manifest.txt"
+diff -u "$audit_dir/manifest-files.txt" "$audit_dir/tree-files-without-manifest.txt"
+(cd "$audit_dir" && sha256sum -c "$manifest")
 ```
 
 ## Claim boundary
