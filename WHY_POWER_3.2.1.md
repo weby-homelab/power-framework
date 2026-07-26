@@ -10,7 +10,7 @@ batching, defensive model-cache detection and regression/security coverage.
 These are source-level claims. A clean dedicated full sync on WS also completed
 successfully; its measured duration, peak RSS and actual index sizes are
 published in the post-merge WS evidence section of TEST-2. Its peak RSS was
-2,981,832 KiB (about 2.91 GiB), so this is not a claim that the full neural
+2,981,832 KiB (about 2.84 GiB), so this is not a claim that the full neural
 stack fits below 2 GB.
 
 Extended clean-index WS evidence remains tracked in

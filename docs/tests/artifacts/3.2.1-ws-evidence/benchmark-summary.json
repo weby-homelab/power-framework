@@ -26,7 +26,8 @@
     "chunk_embeddings_actual": 3884,
     "documents_with_chunks": 561,
     "integrity_check": "ok",
-    "foreign_key_check": "no rows",
+    "foreign_key_constraints_declared": false,
+    "foreign_key_check": "not applicable; schema declares no FOREIGN KEY constraints (PRAGMA foreign_key_check returned no rows)",
     "dense_manifest": {
       "schema_version": 2,
       "embedding_dimension": 1024,

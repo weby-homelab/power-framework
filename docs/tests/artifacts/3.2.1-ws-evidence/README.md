@@ -2,7 +2,7 @@
 
 This directory contains sanitized, reproducible evidence from the clean
 dedicated WS full sync completed after PR #186. The raw sync log remains in the
-WS workspace because it includes private vault paths; `sync-summary.json`
+WS workspace because it includes private vault paths; `benchmark-summary.json`
 contains only extracted timing and resource values.
 
 Tested source: `8f03847f557f80c567920f07a0e35acd62feb00e`.

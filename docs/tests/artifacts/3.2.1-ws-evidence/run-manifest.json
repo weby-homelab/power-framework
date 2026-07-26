@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-26T14:42:44Z",
+  "generated_at": "2026-07-26T15:07:04Z",
   "source_commit": "8f03847f557f80c567920f07a0e35acd62feb00e",
   "files": [
     {
       "filename": "README.md",
-      "sha256": "12b8d28a8d400430c50adc3dbf29b6c1e98051212612d077dec6a5d043bfaf78",
-      "size_bytes": 581,
+      "sha256": "18a35eebfaead63cef884c543a8b28b37cc46a1c462dfb034ce861d8ce934ddc",
+      "size_bytes": 586,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "benchmark-summary.json",
-      "sha256": "8b2761be2a4a76cbd488810dc831170ed0f4651d94417f305bdc0e35c45236f0",
-      "size_bytes": 1345,
+      "sha256": "203d962a393cd56c8ddd9313d00583d11e117cee11aa715f8aea185c2c674274",
+      "size_bytes": 1487,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "coverage.json",
@@ -25,7 +25,7 @@
       "size_bytes": 214035,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "db-schema-chunk-embeddings.txt",
@@ -33,7 +33,7 @@
       "size_bytes": 288,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "db-schema-full.txt",
@@ -41,7 +41,7 @@
       "size_bytes": 1826,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "db-state-final.txt",
@@ -49,7 +49,7 @@
       "size_bytes": 206,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "dense-index-manifest.txt",
@@ -57,7 +57,7 @@
       "size_bytes": 170,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "duplicate-chunk-ids.txt",
@@ -65,7 +65,7 @@
       "size_bytes": 0,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "duplicate-content-summary.txt",
@@ -73,7 +73,7 @@
       "size_bytes": 160,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "git-commit.txt",
@@ -81,7 +81,7 @@
       "size_bytes": 41,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "git-status-after-sync.txt",
@@ -89,7 +89,7 @@
       "size_bytes": 0,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "git-status-start.txt",
@@ -97,15 +97,15 @@
       "size_bytes": 0,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "known-baseline-failures.md",
-      "sha256": "a203cadc5a844729688aca0593a6018874bc2f5a9061a0b518bfdff2dda190a6",
-      "size_bytes": 34,
+      "sha256": "b888997b36edf0f6ba0902df30a055925f2fad156c45357d4aeb49d8ee49da04",
+      "size_bytes": 1191,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "mypy.log",
@@ -113,23 +113,23 @@
       "size_bytes": 44,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "pytest-baseline-comparison.json",
-      "sha256": "915a28659e8e7037a3fead386ad7a312af4af2236433f936f1aa070ed0662709",
-      "size_bytes": 2552,
+      "sha256": "748599d6b36bf40d0841423bf76897423192e2f6bb7bdf45c457bfe86a63a778",
+      "size_bytes": 2589,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "pytest-baseline-comparison.md",
-      "sha256": "1143a9246da1dbe9de1b5c32bd12f852bbce7eb3c983443afcc6894e6672d786",
-      "size_bytes": 2321,
+      "sha256": "e698f8a8ec300ffd3bd8770212edce02379ddcce0ed782fec67845cc08fe1b16",
+      "size_bytes": 2388,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "pytest-pr-ws.xml",
@@ -137,7 +137,7 @@
       "size_bytes": 67680,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "pytest.log",
@@ -145,7 +145,7 @@
       "size_bytes": 12847,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "ruff.log",
@@ -153,7 +153,7 @@
       "size_bytes": 19,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "search-db-path.txt",
@@ -161,15 +161,7 @@
       "size_bytes": 44,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
-    },
-    {
-      "filename": "source-sha256.txt",
-      "sha256": "18256ad70206bc8db5b372a9d1e1ea270721b648542076e250ed009becf3a5a7",
-      "size_bytes": 41,
-      "description": "Sanitized WS evidence artifact.",
-      "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "sync-end.txt",
@@ -177,7 +169,7 @@
       "size_bytes": 21,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "sync.exit-code",
@@ -185,7 +177,7 @@
       "size_bytes": 2,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     },
     {
       "filename": "tested-source-commit.txt",
@@ -193,7 +185,7 @@
       "size_bytes": 41,
       "description": "Sanitized WS evidence artifact.",
       "source": "WS completed full-sync workspace or local deterministic manifest generation",
-      "generated_at": "2026-07-26T14:42:44Z"
+      "generated_at": "2026-07-26T15:07:04Z"
     }
   ]
 }

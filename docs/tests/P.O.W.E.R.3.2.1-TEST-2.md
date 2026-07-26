@@ -31,7 +31,7 @@ tracking_issue: 187
 | MyPy | PASS — 32 source files |
 | Pytest | 562 passed, 0 failed, 10 skipped |
 | Coverage | 75.06% |
-| Failure comparison with `origin/main` | 0 new failures; 10 fixed failures |
+| Failure comparison with `origin/main` | 0 new failures; 1 executed fix; 9 baseline failures skipped/unverified |
 | GitHub CI | Python 3.10–3.14, CodeQL and security checks PASS |
 
 The source work includes the reranker batch implementation, conditional
@@ -59,7 +59,7 @@ Merged through PR #186: `b793af65afc1e4843c16c75cc8df706528b7233c`
 | Chunk embeddings, actual | 3,884 |
 | Documents with chunks | 561 |
 | SQLite integrity | `ok` |
-| Foreign-key check | no rows (no violations) |
+| Foreign-key check | N/A — schema declares no `FOREIGN KEY` constraints; check returned no rows |
 | Dense manifest | schema v2, BGE-M3 ONNX, 1,024 dimensions, 3,884 chunks |
 | Duplicate chunk IDs | 0 |
 | Exact duplicate content within a document | 0 groups |
