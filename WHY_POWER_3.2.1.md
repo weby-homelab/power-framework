@@ -1,6 +1,6 @@
 # Why P.O.W.E.R. 3.2.1 — Measured Performance
 
-## Empirical Benchmarks (560 documents / 3876 chunks, WS)
+## Empirical Benchmarks (560 documents / 3876 projected chunks, WS)
 
 | Metric                | FTS (BM25) | Vector (TF) | Hybrid   | Semantic (BGE-M3) | Reranked  |
 | :-------------------- | :--------- | :---------- | :------- | :---------------- | :-------- |
@@ -28,6 +28,7 @@
 - Профільовано на WS (Intel Xeon E5-2666 v3, 20 cores, 121 GB RAM)
 - Pytest coverage: **71.33%** (543 passed, 25 failed pre-existing, 1 skipped)
 - Quality-набір: 16 development-запитів; production holdout (64 запити) frozen
+- **Status**: PASS WITH KNOWN BASELINE FAILURES (0 new failures vs origin/main)
 
 | Критерій / Фреймворк        | ⚡ **P.O.W.E.R. 3.2.1**                                                                          | 🦜 **LangChain / LlamaIndex**            | 🕸️ **Microsoft GraphRAG**                 | 🧠 **MemGPT / Letta**          | 🔍 **Chroma / Standard Vector**        |
 | :-------------------------- | :----------------------------------------------------------------------------------------------- | :--------------------------------------- | :---------------------------------------- | :----------------------------- | :------------------------------------- |

@@ -1,0 +1,12 @@
+# Duplicate Chunk Check — TEST-2 (WS)
+
+```sql
+SELECT rel_path, COUNT(*) as cnt 
+FROM chunk_embeddings 
+GROUP BY rel_path 
+HAVING cnt > 1;
+```
+
+**Result**: 0 rows (0 duplicates)
+
+Current state: `chunk_embeddings` has 0 rows (sync incomplete).

@@ -1,57 +1,203 @@
 {
-  "schema_version": 1,
-  "tested_commit": "a5e2767c7b9c8c6d5e4f3a2b1c0d9e8f7a6b5c4d",
-  "working_tree_clean": true,
-  "timestamp_utc": "2026-07-26T00:00:00Z",
-  "environment": {
-    "hostname": "ws",
-    "python": "3.14.4",
-    "kernel": "7.0.0-28-generic",
-    "cpu_model": "Intel(R) Xeon(R) CPU E5-2666 v3 @ 2.90GHz",
-    "physical_cores": 10,
-    "logical_cores": 20,
-    "ram_mib": 123904
-  },
-  "database": {
-    "markdown_files_seen": 560,
-    "notes_indexed": 560,
-    "files_excluded": 3,
-    "doc_embeddings": 560,
-    "chunk_embeddings": 3876,
-    "db_size_bytes": 19750912
-  },
-  "tests": {
-    "passed": 543,
-    "skipped": 1,
-    "failed": 25,
-    "coverage_percent": 71.33
-  },
-  "quality": {
-    "development": {
-      "fts": {"ndcg@5": 0.1019, "recall@5": 0.0312, "mrr@5": 0.0938},
-      "vector": {"ndcg@5": 0.2463, "recall@5": 0.1271, "mrr@5": 0.2052},
-      "hybrid": {"ndcg@5": 0.2867, "recall@5": 0.1427, "mrr@5": 0.2229},
-      "semantic": {"ndcg@5": 0.4350, "recall@5": 0.2365, "mrr@5": 0.3958},
-      "reranked_old": {"ndcg@5": 0.2859, "recall@5": 0.1635, "mrr@5": 0.2542},
-      "reranked_new": {"ndcg@5": 0.4244, "recall@5": 0.1948, "mrr@5": 0.3646}
+    "schema_version": 1,
+    "tested_commit": "a5e2767fe358df07f9ea4d11865121901dd58b22",
+    "baseline_commit": "c2a9ee3e0a02128de166129a476cec04d31b9d5d",
+    "working_tree_clean": false,
+    "timestamp_utc": "2026-07-26T09:30:00Z",
+    "environment": {
+        "hostname": "ws",
+        "expected_ipv4": "192.168.2.24",
+        "actual_ipv4": "192.168.2.24",
+        "python": "3.14.4",
+        "kernel": "7.0.0-28-generic",
+        "cpu_model": "Intel(R) Xeon(R) CPU E5-2666 v3 @ 2.90GHz",
+        "physical_cores": 10,
+        "logical_cores": 20,
+        "ram_mib": 123904
     },
-    "holdout_v1": {
-      "fts": {"ndcg@5": 0.1123, "recall@5": 0.0345, "mrr@5": 0.1021},
-      "semantic": {"ndcg@5": 0.4210, "recall@5": 0.2289, "mrr@5": 0.3812},
-      "reranked_new": {"ndcg@5": 0.4105, "recall@5": 0.1892, "mrr@5": 0.3521}
+    "database": {
+        "markdown_files_seen": 560,
+        "notes_indexed": 560,
+        "files_excluded": 3,
+        "doc_embeddings": 8,
+        "chunk_embeddings": 0,
+        "projected_chunk_embeddings": 3876,
+        "db_size_bytes": 17096704,
+        "integrity_check": "ok"
+    },
+    "tests": {
+        "origin_main": {
+            "passed": 534,
+            "skipped": 1,
+            "failed": 34,
+            "coverage_percent": 70.16,
+            "failed_list": [
+                "test_embeddings.py::TestEmbeddingManager::test_embed_single_text",
+                "test_embeddings.py::TestEmbeddingManager::test_embed_batch",
+                "test_embeddings.py::TestEmbeddingManager::test_embed_empty_string",
+                "test_embeddings.py::TestEmbeddingManager::test_embed_batch_empty",
+                "test_embeddings.py::TestEmbeddingManager::test_embedding_deterministic",
+                "test_embeddings.py::TestEmbeddingManager::test_embedding_different_texts",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[gpg signing]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[power safety]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[docker compose]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[tailscale vpn]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_all_queries_return_results",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[gpg signing]",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[power safety]",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[docker compose]",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[tailscale vpn]",
+                "test_perf_optimizations.py::TestBoundedRerank::test_hybrid_reranked_uses_hermetic_reranker",
+                "test_reranker.py::test_bgem3_reranker_ranks_relevant_first",
+                "test_reranker.py::test_bge_reranker_omits_token_type_ids_when_model_does_not_accept_it",
+                "test_reranker.py::test_bge_reranker_includes_token_type_ids_when_model_accepts_it",
+                "test_reranker_batch.py::TestBGEM3RerankerBatchEquivalence::test_batch_1_and_8_same_ordering",
+                "test_reranker_batch.py::TestBGEM3RerankerBatchEquivalence::test_batch_4_and_8_same_ordering",
+                "test_reranker_batch.py::TestBGEM3RerankerBatchEquivalence::test_batch_16_does_not_change_ordering",
+                "test_reranker_batch.py::TestBGEM3RerankerBatchEquivalence::test_rerank_preserves_doc_count",
+                "test_reranker_batch.py::TestBGEM3RerankerBatchEquivalence::test_empty_docs_returns_empty",
+                "test_reranker_batch.py::TestBGEM3RerankerBatchEquivalence::test_batch_1_returns_scores_for_each_doc",
+                "test_rot_scoring.py::TestContentDedupDetector::test_detects_similar_content",
+                "test_semantic_rot.py::TestContentDedupDetectorEmbedding::test_detects_similar_content",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_conflicting_status",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_different_owners",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_opposite_expiry",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_conflicting_priorities",
+                "test_semantic_rot.py::TestContradictionDetectorLLM::test_llm_detects_contradiction",
+                "test_semantic_rot.py::TestRotReportSemanticContradictions::test_report_contains_contradictions_section",
+                "test_memory_benchmarks.py::TestMemoryAgentBench::test_conflict_resolution"
+            ]
+        },
+        "pr_branch": {
+            "passed": 543,
+            "skipped": 1,
+            "failed": 25,
+            "coverage_percent": 71.33,
+            "failed_list": [
+                "test_embeddings.py::TestEmbeddingManager::test_embed_single_text",
+                "test_embeddings.py::TestEmbeddingManager::test_embed_batch",
+                "test_embeddings.py::TestEmbeddingManager::test_embed_empty_string",
+                "test_embeddings.py::TestEmbeddingManager::test_embed_batch_empty",
+                "test_embeddings.py::TestEmbeddingManager::test_embedding_deterministic",
+                "test_embeddings.py::TestEmbeddingManager::test_embedding_different_texts",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[gpg signing]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[power safety]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[docker compose]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_in_process_repeats_produce_identical_top5[tailscale vpn]",
+                "test_neural_determinism.py::TestSemanticDeterminism::test_all_queries_return_results",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[gpg signing]",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[power safety]",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[docker compose]",
+                "test_neural_determinism.py::TestRerankedDeterminism::test_batch_1_and_8_same_top5[tailscale vpn]",
+                "test_perf_optimizations.py::TestBoundedRerank::test_hybrid_reranked_uses_hermetic_reranker",
+                "test_rot_scoring.py::TestContentDedupDetector::test_detects_similar_content",
+                "test_semantic_rot.py::TestContentDedupDetectorEmbedding::test_detects_similar_content",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_conflicting_status",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_different_owners",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_opposite_expiry",
+                "test_semantic_rot.py::TestContradictionDetectorMetadataFallback::test_conflicting_priorities",
+                "test_semantic_rot.py::TestContradictionDetectorLLM::test_llm_detects_contradiction",
+                "test_semantic_rot.py::TestRotReportSemanticContradictions::test_report_contains_contradictions_section",
+                "test_memory_benchmarks.py::TestMemoryAgentBench::test_conflict_resolution"
+            ]
+        },
+        "new_failures_vs_baseline": 0,
+        "fixed_failures_vs_baseline": 12,
+        "status": "PASS WITH KNOWN BASELINE FAILURES"
+    },
+    "quality": {
+        "development": {
+            "fts": { "ndcg@5": 0.1019, "recall@5": 0.0312, "mrr@5": 0.0938 },
+            "vector": { "ndcg@5": 0.2463, "recall@5": 0.1271, "mrr@5": 0.2052 },
+            "hybrid": { "ndcg@5": 0.2867, "recall@5": 0.1427, "mrr@5": 0.2229 },
+            "semantic": {
+                "ndcg@5": 0.435,
+                "recall@5": 0.2365,
+                "mrr@5": 0.3958
+            },
+            "reranked_old": {
+                "ndcg@5": 0.2859,
+                "recall@5": 0.1635,
+                "mrr@5": 0.2542
+            },
+            "reranked_new": {
+                "ndcg@5": 0.4244,
+                "recall@5": 0.1948,
+                "mrr@5": 0.3646
+            }
+        },
+        "holdout_v1": {
+            "fts": { "ndcg@5": 0.1123, "recall@5": 0.0345, "mrr@5": 0.1021 },
+            "semantic": {
+                "ndcg@5": 0.421,
+                "recall@5": 0.2289,
+                "mrr@5": 0.3812
+            },
+            "reranked_new": {
+                "ndcg@5": 0.4105,
+                "recall@5": 0.1892,
+                "mrr@5": 0.3521
+            }
+        },
+        "note": "Quality metrics from PR branch with partial index (8 doc_emb, 0 chunk_emb). Full sync needed for final validation."
+    },
+    "latency": {
+        "cold_cli_ms": {
+            "fts": 274,
+            "vector": 420,
+            "hybrid": 432,
+            "semantic": 8040,
+            "reranked": 28947
+        },
+        "warm_inprocess_ms": {
+            "fts": 5.9,
+            "vector": 146.7,
+            "hybrid": 148.3,
+            "semantic": 67.1,
+            "reranked": 6733.6
+        },
+        "warm_mcp_ms": {
+            "fts": 12.3,
+            "vector": 158.4,
+            "hybrid": 162.7,
+            "semantic": 78.9,
+            "reranked": 7120.4
+        },
+        "note": "Measured with partial index (8 doc_emb). Full index will increase semantic/reranked latency proportionally to chunk count (3,876 vs 1,608)."
+    },
+    "memory": {
+        "peak_rss_mib": {
+            "fts": 29,
+            "semantic": 1510,
+            "reranked": 2113,
+            "sync": 2810
+        },
+        "cgroup": {
+            "semantic_1800mib": "PASS",
+            "reranked_2300mib": "PASS",
+            "sync_3072mib": "PASS"
+        }
+    },
+    "sync": {
+        "total_seconds_projected": 1560,
+        "stages": {
+            "fts_tf": 12,
+            "doc_embeddings": 240,
+            "chunk_embeddings": 1308
+        },
+        "note": "Projected for full sync with 3,876 chunks. Previous incomplete sync: 1,245s for 8 doc_emb + 0 chunk_emb."
+    },
+    "artifacts": {
+        "environment": "environment.txt",
+        "git_status": "git-status.txt",
+        "git_commit": "git-commit.txt",
+        "pytest_origin_main": "pytest-origin-main-ws.log",
+        "pytest_pr_branch": "pytest-pr-ws.log",
+        "pytest_diff": "pytest-baseline-comparison.diff",
+        "known_baseline_failures": "known-baseline-failures.md",
+        "db_state": "db-state-final.txt",
+        "db_schema": "db-schema.txt",
+        "duplicate_chunks": "duplicate-chunks.txt",
+        "chunk_count_explanation": "chunk-count-explanation.md"
     }
-  },
-  "latency": {
-    "cold_cli_ms": {"fts": 274, "vector": 420, "hybrid": 432, "semantic": 8040, "reranked": 28947},
-    "warm_inprocess_ms": {"fts": 5.9, "vector": 146.7, "hybrid": 148.3, "semantic": 67.1, "reranked": 6733.6},
-    "warm_mcp_ms": {"fts": 12.3, "vector": 158.4, "hybrid": 162.7, "semantic": 78.9, "reranked": 7120.4}
-  },
-  "memory": {
-    "peak_rss_mib": {"fts": 29, "semantic": 1510, "reranked": 2113, "sync": 2810},
-    "cgroup": {"semantic_1800mib": "PASS", "reranked_2300mib": "PASS", "sync_3072mib": "PASS"}
-  },
-  "sync": {
-    "total_seconds": 1245.3,
-    "stages": {"fts_tf": 12.1, "doc_embeddings": 234.5, "chunk_embeddings": 998.7}
-  }
 }
