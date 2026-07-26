@@ -1,3 +1,0 @@
-query,mode,ndcg@5,recall@5,mrr@5
-"how to verify gpg commit signature before merge",semantic,0.4350,0.4000,0.5000
-"підпис git коміту gpg ключем",semantic,0.4200,0.3800,0.4800

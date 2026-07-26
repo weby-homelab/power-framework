@@ -1,2 +1,0 @@
-status=pending_ws_regeneration
-reason=This file is replaced by a sanitized WS capture before evidence publication.

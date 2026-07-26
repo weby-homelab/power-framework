@@ -1,15 +1,17 @@
-# Why P.O.W.E.R. 3.2.1 — TEST-2 evidence
+# Why P.O.W.E.R. 3.2.1
 
-This document is the human-readable interpretation of the canonical WS TEST-2
-run. Its measurements are generated only from
-`docs/tests/artifacts/3.2.1-test-2-final/benchmark-summary.json` after a clean
-source revision has been benchmarked on WS.
+PR #186 verifies the source and tooling changes for commit
+`8f03847f557f80c567920f07a0e35acd62feb00e`: the automated suite has 562
+passed, 0 failed and 10 skipped tests at 75.06% coverage, with no new failures
+against `origin/main`.
 
-TEST-1 results from PRXMX-01 are historical only and are not used here. No
-performance, quality, memory, reliability, or egress claim is made until the
-matching raw TEST-2 artifact is present.
+P.O.W.E.R. retains a local-first search architecture with explicit reranker
+batching, defensive model-cache detection and regression/security coverage.
+These are source-level claims; they do not imply a completed full neural index
+or a performance guarantee.
 
-The final evidence will explicitly distinguish cold CLI, warm in-process, and
-warm MCP latency; actual DB materialization from projections; and semantic
-results from the opt-in reranked mode. It will also state any limitations of the
-specific WS vault and hardware used for the run.
+Final clean-index WS performance evidence is tracked in
+[issue #187](https://github.com/weby-homelab/power-framework/issues/187).
+Numbers from earlier exploratory runs are not release guarantees. That
+follow-up will distinguish actual materialized database state from projections,
+and cold CLI from warm in-process and MCP measurements.
