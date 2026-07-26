@@ -7,10 +7,13 @@ against `origin/main`.
 
 P.O.W.E.R. retains a local-first search architecture with explicit reranker
 batching, defensive model-cache detection and regression/security coverage.
-These are source-level claims; they do not imply a completed full neural index
-or a performance guarantee.
+These are source-level claims. A clean dedicated full sync on WS also completed
+successfully; its measured duration, peak RSS and actual index sizes are
+published in the post-merge WS evidence section of TEST-2. Its peak RSS was
+2,981,832 KiB (about 2.84 GiB), so this is not a claim that the full neural
+stack fits below 2 GB.
 
-Final clean-index WS performance evidence is tracked in
+Extended clean-index WS evidence remains tracked in
 [issue #187](https://github.com/weby-homelab/power-framework/issues/187).
 Numbers from earlier exploratory runs are not release guarantees. That
 follow-up will distinguish actual materialized database state from projections,

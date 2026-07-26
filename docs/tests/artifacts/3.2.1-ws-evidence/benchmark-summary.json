@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "tracking_issue": 187,
+  "platform": {
+    "hostname": "ws",
+    "ipv4": "192.168.2.24"
+  },
+  "source": {
+    "tested_commit": "8f03847f557f80c567920f07a0e35acd62feb00e",
+    "merged_via_pr": 186,
+    "merge_commit": "b793af65afc1e4843c16c75cc8df706528b7233c"
+  },
+  "sync": {
+    "exit_code": 0,
+    "elapsed_seconds": 8701,
+    "peak_rss_kib": 2981832,
+    "peak_rss_mib": 2911.9453125,
+    "user_cpu_seconds": 15760.11,
+    "system_cpu_seconds": 1639.45
+  },
+  "database": {
+    "fts_notes": 561,
+    "tf_vectors": 561,
+    "doc_embeddings_actual": 561,
+    "chunk_embeddings_actual": 3884,
+    "documents_with_chunks": 561,
+    "integrity_check": "ok",
+    "foreign_key_constraints_declared": false,
+    "foreign_key_check": "not applicable; schema declares no FOREIGN KEY constraints (PRAGMA foreign_key_check returned no rows)",
+    "dense_manifest": {
+      "schema_version": 2,
+      "embedding_dimension": 1024,
+      "chunk_count": 3884,
+      "embedding_provider": "BGEM3OnnxManager",
+      "embedding_model": "aapot/bge-m3-onnx@76a603396f5eb9f03ed51bbab8f4893fcea7b2fe"
+    },
+    "duplicate_chunk_ids": 0,
+    "duplicate_content_within_document_groups": 0,
+    "duplicate_content_global_groups": 2
+  },
+  "limitations": [
+    "Extended cgroup, cold-latency, MCP, crash-recovery and neural-determinism matrices are deferred to issue #187.",
+    "Projected counts are intentionally omitted from actual-count fields."
+  ]
+}

@@ -1,0 +1,136 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0
+rootdir: /var/tmp/power-framework-pr186
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 572 items
+
+tests/test_chunker.py ..........................                         [  4%]
+tests/test_ci_policy.py ....                                             [  5%]
+tests/test_cli.py .................                                      [  8%]
+tests/test_crash_recovery.py ....                                        [  8%]
+tests/test_embeddings.py ..........                                      [ 10%]
+tests/test_graph_extraction.py ......                                    [ 11%]
+tests/test_healer.py ...................                                 [ 15%]
+tests/test_indexer.py ....................................               [ 21%]
+tests/test_integration.py ..                                             [ 21%]
+tests/test_linter.py ..............................                      [ 26%]
+tests/test_low_ram_sync.py ....                                          [ 27%]
+tests/test_markdown_checks.py .................                          [ 30%]
+tests/test_mcp_server.py ...........................                     [ 35%]
+tests/test_memory_benchmarks.py ............                             [ 37%]
+tests/test_models.py .............................                       [ 42%]
+tests/test_neural_determinism.py sssssssss                               [ 44%]
+tests/test_parser.py ......................                              [ 47%]
+tests/test_perf_optimizations.py .............                           [ 50%]
+tests/test_performance_v3.py ..                                          [ 50%]
+tests/test_query_expansion.py .................                          [ 53%]
+tests/test_relations.py ...................                              [ 56%]
+tests/test_rename.py ...                                                 [ 57%]
+tests/test_reranker.py ....................                              [ 60%]
+tests/test_reranker_batch.py ...........                                 [ 62%]
+tests/test_retrieval_fixture.py ...                                      [ 63%]
+tests/test_rot.py ..................                                     [ 66%]
+tests/test_rot_scoring.py ........                                       [ 67%]
+tests/test_search_quality.py s                                           [ 68%]
+tests/test_searcher.py ................................................. [ 76%]
+................                                                         [ 79%]
+tests/test_security.py .............................................     [ 87%]
+tests/test_semantic_rot.py ..............                                [ 89%]
+tests/test_synthesize.py ...                                             [ 90%]
+tests/test_typed_relations.py ........................                   [ 94%]
+tests/test_udcg.py ........                                              [ 95%]
+tests/test_udcg_real.py ....................                             [ 99%]
+tests/test_write_queue.py ..../var/tmp/power-framework-pr186/.venv/lib/python3.14/site-packages/coverage/inorout.py:577: CoverageWarning: Module power_framework was previously imported, but not measured (module-not-measured); see https://coverage.readthedocs.io/en/7.15.2/messages.html#warning-module-not-measured
+  self.warn(msg, slug="module-not-measured")
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778f34271a80>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778f34271c60>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778f34271b70>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778efc142e30>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778efc1dfa60>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778efc1df970>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778efc1df880>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778ef7f4be20>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778ef7f4bf10>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778ef7ec8040>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778ef7ec8130>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778ef7ec8220>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/collections/__init__.py:455: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x778ef7ec8310>
+  result = tuple_new(cls, iterable)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+                                           [100%]
+
+- generated xml file: /var/tmp/power-3.2.1-test-2-final/artifacts/pytest-pr-ws.xml -
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.14.4-final-0 ________________
+
+Name                                                          Stmts   Miss  Cover   Missing
+-------------------------------------------------------------------------------------------
+src/power_framework/__init__.py                                  12      0   100%
+src/power_framework/core/__init__.py                             19      0   100%
+src/power_framework/core/chunker.py                              58      0   100%
+src/power_framework/core/cli.py                                 381    112    71%   74-77, 215-216, 230-236, 294-300, 305-311, 316-322, 327-350, 355-365, 372-373, 383-384, 394-396, 410, 418-445, 450-463, 468-488
+src/power_framework/core/colbert_reranker.py                     52      8    85%   79-91, 109-110
+src/power_framework/core/constants.py                             6      0   100%
+src/power_framework/core/db.py                                   21      0   100%
+src/power_framework/core/embeddings.py                          353    190    46%   92-96, 100-132, 138-142, 150-153, 157-159, 162-180, 183-203, 206-219, 222-233, 236-247, 260-267, 270-296, 299-306, 330-332, 336, 339-369, 372-376, 379-389, 440, 445-446, 486-487, 511-512, 549-550, 582-583, 593-601, 604-607, 609-620, 622-625
+src/power_framework/core/graph_extraction.py                     77      6    92%   76, 80, 92, 108, 112, 125
+src/power_framework/core/healer.py                              232     41    82%   72-73, 124, 128-131, 173-177, 206-209, 211-216, 224-225, 263, 265, 269-271, 273, 277, 280, 306-307, 327, 333-335, 339, 343, 347, 375-377
+src/power_framework/core/ignore.py                               70     11    84%   57, 60, 86-87, 92-93, 115-119
+src/power_framework/core/index_worker.py                        152     83    45%   50, 91, 113-121, 126, 131-151, 155-157, 162-206, 218-219, 234-241, 250, 252, 271-273, 277-286
+src/power_framework/core/indexer.py                             162     13    92%   52, 62-63, 89, 95, 121-122, 232, 234, 236, 238-239, 313
+src/power_framework/core/linter.py                              412    120    71%   176-184, 189-192, 201-207, 210, 249-251, 254-256, 294-295, 318-320, 380, 382, 386-387, 409-411, 430, 449-450, 455-456, 461-462, 467-468, 473-474, 507, 509, 513, 517-518, 532-534, 544-545, 570-572, 583-718
+src/power_framework/core/markdown_checks.py                      96      0   100%
+src/power_framework/core/metrics/__init__.py                      0      0   100%
+src/power_framework/core/metrics/discounted_lexical_gain.py      22      3    86%   24, 36, 38
+src/power_framework/core/metrics/udcg.py                         10      0   100%
+src/power_framework/core/metrics/udcg_real.py                    41      0   100%
+src/power_framework/core/models.py                              105      4    96%   153, 170, 172, 183
+src/power_framework/core/parser.py                               63      0   100%
+src/power_framework/core/query_expansion.py                      84     16    81%   114-128, 131
+src/power_framework/core/relations.py                           319    111    65%   102, 152, 154, 158-159, 163, 199, 408-420, 443-510, 523-524, 527-531, 535-538, 547-562, 566-571, 582, 604-607, 620, 622, 625-626, 634, 639-641
+src/power_framework/core/reranker.py                            205     22    89%   62, 97-98, 105, 148, 153-154, 183-196, 216, 232-233, 241, 248-249, 305, 315, 344-345, 374
+src/power_framework/core/rot_scoring.py                         331     95    71%   88, 90, 94-96, 100, 105-107, 117, 132, 170, 172, 176-178, 182, 188-190, 198, 237-243, 246, 274-275, 289-290, 321-323, 330, 338, 358, 360, 364-366, 370, 412, 414, 418-420, 429-443, 447-501
+src/power_framework/core/searcher.py                            659    153    77%   58-62, 77, 179-180, 239, 291, 293, 299, 318-319, 361-363, 368, 370, 376-377, 384-394, 408-416, 430-433, 435-437, 476-478, 513, 519-529, 595, 603-608, 614, 626, 648-656, 679-680, 708, 764, 786, 803, 828-829, 837, 839, 864-865, 920, 925-1019, 1131, 1133-1141, 1180, 1183, 1197-1202, 1220-1224, 1272, 1301-1302
+src/power_framework/core/synthesize.py                           40      2    95%   82-83
+src/power_framework/core/utils.py                               189     48    75%   177-182, 219, 253, 258-262, 293-301, 308-309, 314-352
+src/power_framework/core/write_queue.py                          56      6    89%   50-56, 76, 114
+src/power_framework/mcp/__init__.py                               3      0   100%
+src/power_framework/mcp/__main__.py                               4      4     0%   3-8
+src/power_framework/mcp/power_server.py                         228     65    71%   96, 114-115, 157-158, 183, 192, 196, 202, 225-226, 234, 332-333, 342, 346, 371-372, 378-379, 392-404, 413-414, 422-462, 477, 483
+-------------------------------------------------------------------------------------------
+TOTAL                                                          4462   1113    75%
+Coverage JSON written to file /var/tmp/power-3.2.1-test-2-final/artifacts/coverage.json
+Required test coverage of 70% reached. Total coverage: 75.06%
+=========================== short test summary info ============================
+SKIPPED [4] tests/test_neural_determinism.py:78: set POWER_RUN_BENCHMARKS=1 with a real brain vault to run neural benchmarks
+SKIPPED [1] tests/test_neural_determinism.py:91: set POWER_RUN_BENCHMARKS=1 with a real brain vault to run neural benchmarks
+SKIPPED [4] tests/test_neural_determinism.py:113: set POWER_RUN_BENCHMARKS=1 with a real brain vault to run neural benchmarks
+SKIPPED [1] tests/test_search_quality.py:72: ranx not installed (pip install ranx to enable bench)
+================= 562 passed, 10 skipped in 101.69s (0:01:41) ==================

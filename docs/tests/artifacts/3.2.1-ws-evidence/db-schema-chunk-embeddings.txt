@@ -1,0 +1,12 @@
+CREATE TABLE chunk_embeddings (
+            chunk_id TEXT PRIMARY KEY,
+            rel_path TEXT,
+            embedding BLOB,
+            content TEXT,
+            mtime REAL
+        );
+0|chunk_id|TEXT|0||1
+1|rel_path|TEXT|0||0
+2|embedding|BLOB|0||0
+3|content|TEXT|0||0
+4|mtime|REAL|0||0
