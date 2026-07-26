@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import logging
 import os
 import resource
@@ -244,6 +245,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     force_rebuild = getattr(args, "force", False)
     # Prevent concurrent syncs via PID lock file
     from .utils import get_cache_dir
+
     _lock_p = get_cache_dir() / "sync.pid"
     _lock_p.parent.mkdir(parents=True, exist_ok=True)
     if _lock_p.exists():
@@ -265,16 +267,12 @@ def _cmd_sync(args: argparse.Namespace) -> int:
                 force_rebuild=force_rebuild,
             )
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            except Exception:
-                pass
             conn.close()
     finally:
-        try:
+        with contextlib.suppress(OSError):
             _lock_p.unlink()
-        except OSError:
-            pass
     logger.info("Index build complete.")
     return 0
 

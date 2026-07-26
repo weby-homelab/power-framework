@@ -23,6 +23,11 @@ def _vault_present() -> bool:
         return False
 
 
+def _benchmarks_enabled() -> bool:
+    """Keep real-vault neural benchmarks out of the default unit suite."""
+    return os.getenv("POWER_RUN_BENCHMARKS", "").lower() in {"1", "true", "yes"}
+
+
 def _reranker_available() -> bool:
     from huggingface_hub import try_to_load_from_cache
 
@@ -31,13 +36,17 @@ def _reranker_available() -> bool:
         BGE_RERANKER_PINNED_REVISION,
     )
 
-    return (
-        try_to_load_from_cache(
-            BGE_RERANKER_PINNED_REPO,
-            "onnx/model.onnx",
-            revision=BGE_RERANKER_PINNED_REVISION,
+    return all(
+        isinstance(
+            cached := try_to_load_from_cache(
+                BGE_RERANKER_PINNED_REPO,
+                filename,
+                revision=BGE_RERANKER_PINNED_REVISION,
+            ),
+            str,
         )
-        is not None
+        and Path(cached).is_file()
+        for filename in ("onnx/model.onnx", "onnx/model.onnx_data", "tokenizer.json")
     )
 
 
@@ -52,7 +61,10 @@ _REPEATS_IN_PROCESS = 5
 
 
 @pytest.mark.bench
-@pytest.mark.skipif(not _vault_present(), reason="real brain vault not present")
+@pytest.mark.skipif(
+    not (_benchmarks_enabled() and _vault_present()),
+    reason="set POWER_RUN_BENCHMARKS=1 with a real brain vault to run neural benchmarks",
+)
 class TestSemanticDeterminism:
     """Determinism assertions for semantic search mode."""
 
@@ -69,12 +81,12 @@ class TestSemanticDeterminism:
         for _ in range(_REPEATS_IN_PROCESS - 1):
             current = self._run_semantic(query)
             for i in range(min(len(first), 5)):
-                assert (
-                    first[i]["rel_path"] == current[i]["rel_path"]
-                ), f"Path mismatch at rank {i}: {first[i]['rel_path']} vs {current[i]['rel_path']}"
-                assert (
-                    abs(first[i]["score"] - current[i]["score"]) <= 1e-5
-                ), f"Score mismatch at rank {i}: {first[i]['score']} vs {current[i]['score']}"
+                assert first[i]["rel_path"] == current[i]["rel_path"], (
+                    f"Path mismatch at rank {i}: {first[i]['rel_path']} vs {current[i]['rel_path']}"
+                )
+                assert abs(first[i]["score"] - current[i]["score"]) <= 1e-5, (
+                    f"Score mismatch at rank {i}: {first[i]['score']} vs {current[i]['score']}"
+                )
 
     def test_all_queries_return_results(self):
         for query in _TEST_QUERIES:
@@ -83,7 +95,10 @@ class TestSemanticDeterminism:
 
 
 @pytest.mark.bench
-@pytest.mark.skipif(not _vault_present(), reason="real brain vault not present")
+@pytest.mark.skipif(
+    not (_benchmarks_enabled() and _vault_present()),
+    reason="set POWER_RUN_BENCHMARKS=1 with a real brain vault to run neural benchmarks",
+)
 @pytest.mark.skipif(not _reranker_available(), reason="reranker ONNX not cached")
 class TestRerankedDeterminism:
     """Determinism assertions for reranked mode."""
@@ -96,13 +111,14 @@ class TestRerankedDeterminism:
         return [{"rel_path": r.rel_path, "score": r.score} for r in results]
 
     @pytest.mark.parametrize("query", _TEST_QUERIES)
-    def test_batch_1_and_8_same_top5(self, query: str):
-        os.environ["POWER_RERANKER_BATCH_SIZE"] = "1"
+    def test_batch_1_and_8_same_top5(self, query: str, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_RERANKER_BATCH_SIZE", "1")
         scores_b1 = self._run_reranked(query)
-        os.environ["POWER_RERANKER_BATCH_SIZE"] = "8"
+        monkeypatch.setenv("POWER_RERANKER_BATCH_SIZE", "8")
         scores_b8 = self._run_reranked(query)
         for i in range(min(len(scores_b1), 5)):
             assert scores_b1[i]["rel_path"] == scores_b8[i]["rel_path"], (
                 f"Rank {i} path differs between batch=1 and batch=8: "
                 f"{scores_b1[i]['rel_path']} vs {scores_b8[i]['rel_path']}"
             )
+            assert abs(scores_b1[i]["score"] - scores_b8[i]["score"]) <= 1e-5

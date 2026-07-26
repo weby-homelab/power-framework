@@ -307,6 +307,7 @@ class TestRerankerManager:
 
 def test_bge_reranker_omits_token_type_ids_when_model_does_not_accept_it():
     from unittest.mock import MagicMock
+
     from power_framework.core.reranker import BGEM3Reranker
 
     reranker = BGEM3Reranker()
@@ -331,7 +332,7 @@ def test_bge_reranker_omits_token_type_ids_when_model_does_not_accept_it():
     scores = reranker.rerank("test query", ["test doc"])
     assert len(scores) == 1
 
-    args, kwargs = mock_session.run.call_args
+    args = mock_session.run.call_args[0]
     input_feed = args[1]
     assert "input_ids" in input_feed
     assert "attention_mask" in input_feed
@@ -340,6 +341,7 @@ def test_bge_reranker_omits_token_type_ids_when_model_does_not_accept_it():
 
 def test_bge_reranker_includes_token_type_ids_when_model_accepts_it():
     from unittest.mock import MagicMock
+
     from power_framework.core.reranker import BGEM3Reranker
 
     reranker = BGEM3Reranker()
@@ -366,7 +368,7 @@ def test_bge_reranker_includes_token_type_ids_when_model_accepts_it():
     scores = reranker.rerank("test query", ["test doc"])
     assert len(scores) == 1
 
-    args, kwargs = mock_session.run.call_args
+    args, _ = mock_session.run.call_args
     input_feed = args[1]
     assert "input_ids" in input_feed
     assert "attention_mask" in input_feed

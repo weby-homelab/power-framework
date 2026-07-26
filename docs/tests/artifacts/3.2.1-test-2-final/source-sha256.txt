@@ -1,3 +1,1 @@
-fb33f7b73d0a6e30d193c10fbf868a51ee4fe290b084ebf10fb319f9140a6672  src/power_framework/core/reranker.py
-c6ade26287fa8cbf76e960882ac561f33144e14bbce6812705f854b2d925ff41  src/power_framework/core/searcher.py
-b6dcd5153d7f9836a57621eed2814ed5218150b30d59f662793c8efeac3353c9  tests/fixtures/semantic_gt.json
+8f03847f557f80c567920f07a0e35acd62feb00e

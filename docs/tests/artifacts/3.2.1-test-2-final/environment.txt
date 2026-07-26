@@ -1,9 +1,0 @@
-host: pve01 (LXC)
-platform: Linux x86_64
-python: 3.13.5
-cpu: Intel(R) Core(TM) i5-5200U CPU @ 2.20GHz (4 vCPU)
-ram: 121 GB host, ~4 GB LXC limit
-vault: /root/geminicli/brain (560 documents)
-dense_backend: BAAI/bge-m3-onnx (1024d)
-reranker: onnx-community/bge-reranker-v2-m3-ONNX
-date: 2026-07-25

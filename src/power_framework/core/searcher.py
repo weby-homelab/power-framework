@@ -9,7 +9,7 @@ Multi-mode search across vault notes:
 """
 
 from __future__ import annotations
-import time
+
 import contextlib
 import hashlib
 import json
@@ -442,7 +442,6 @@ def _sync_vault_to_db(
         len(disk_files),
         sync_embeddings,
     )
-    sync_start_time = time.perf_counter()
 
     # --- Lightweight pass: FTS + TF-vector (cheap, no model load) ---
     for rel_path, content, metadata, mtime in changed:
@@ -490,6 +489,8 @@ def _sync_vault_to_db(
     doc_items: list[tuple[str, str, float]] = []  # (rel_path, full_text, mtime)
     chunk_items: list[tuple[str, str, str, float]] = []  # (chunk_id, rel_path, text, mtime)
     chunker = SemanticChunker()
+    files_seen = len(changed)
+    files_projected = 0
     for rel_path, content, metadata, mtime in changed:
         try:
             full_text = " ".join(
@@ -514,9 +515,26 @@ def _sync_vault_to_db(
                 )
             for i, chunk_text in enumerate(chunks):
                 chunk_items.append((f"{rel_path}::chunk_{i}", rel_path, chunk_text, mtime))
-        except Exception as e:  # noqa: PERF203
-            logger.warning("Chunk prep failed for %s: %s", rel_path, e)
-            continue
+            files_projected += 1
+        except Exception as exc:  # noqa: PERF203
+            logger.exception(
+                "Chunk projection failed for %s (files_seen=%d files_projected=%d "
+                "files_excluded=1): %s: %s",
+                rel_path,
+                files_seen,
+                files_projected,
+                type(exc).__name__,
+                exc,
+            )
+            raise RuntimeError(f"chunk projection failed for {rel_path}") from exc
+
+    logger.info(
+        "Chunk projection complete: files_seen=%d files_projected=%d files_excluded=0 "
+        "projected_chunks=%d",
+        files_seen,
+        files_projected,
+        len(chunk_items),
+    )
 
     _embed_and_store(embedder, cursor, conn, doc_items, chunk_items)
     dense_row = cursor.execute(

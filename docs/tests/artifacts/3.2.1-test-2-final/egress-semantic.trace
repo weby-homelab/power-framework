@@ -1,4 +1,0 @@
-timestamp,direction,protocol,remote_ip,port,bytes,process
-2026-07-25T00:00:00Z,out,TCP,0.0.0.0,0,0,power
-# Zero external egress during semantic search
-# All inference runs 100% offline via local ONNX Runtime
