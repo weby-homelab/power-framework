@@ -26,7 +26,9 @@ def validate_holdout(data: dict[str, Any], vault: Path) -> list[str]:
         )
 
     query_texts = [entry.get("query") for entry in queries if isinstance(entry, dict)]
-    if len(query_texts) != len(queries) or any(not isinstance(query, str) or not query for query in query_texts):
+    if len(query_texts) != len(queries) or any(
+        not isinstance(query, str) or not query for query in query_texts
+    ):
         errors.append("every query entry must contain a non-empty query string")
     elif len(set(query_texts)) != len(query_texts):
         errors.append("queries must be unique")
@@ -41,7 +43,9 @@ def validate_holdout(data: dict[str, Any], vault: Path) -> list[str]:
             continue
         for rel_path, grade in relevant.items():
             if grade not in {1, 2, 3}:
-                errors.append(f"query[{index}] has invalid relevance grade for {rel_path!r}: {grade!r}")
+                errors.append(
+                    f"query[{index}] has invalid relevance grade for {rel_path!r}: {grade!r}"
+                )
             candidate = vault / str(rel_path)
             if not candidate.is_file():
                 errors.append(f"query[{index}] relevant path is absent from vault: {rel_path}")
@@ -52,7 +56,11 @@ def validate_holdout(data: dict[str, Any], vault: Path) -> list[str]:
     group_indexes: list[int] = []
     distribution: dict[str, int] = {}
     for name, group in groups.items():
-        if not isinstance(group, dict) or not isinstance(group.get("label"), str) or not group["label"].strip():
+        if (
+            not isinstance(group, dict)
+            or not isinstance(group.get("label"), str)
+            or not group["label"].strip()
+        ):
             errors.append(f"language group {name!r} requires a non-empty label")
             continue
         indexes = group.get("query_indexes")
@@ -67,10 +75,12 @@ def validate_holdout(data: dict[str, Any], vault: Path) -> list[str]:
         errors.append("metadata.language_group_distribution does not match language_groups")
 
     description = data.get("description")
-    expected_description = f"{len(queries)} queries: " + ", ".join(
-        f"{count} {'English' if name == 'en' else 'Ukrainian' if name == 'uk' else name}"
+    distribution_terms = [
+        f"{count} {group['label'].removesuffix(' queries')}"
         for name, count in distribution.items()
-    )
+        if (group := groups.get(name)) and isinstance(group.get("label"), str)
+    ]
+    expected_description = f"{len(queries)} queries: " + ", ".join(distribution_terms)
     if not isinstance(description, str) or expected_description not in description:
         errors.append(f"description must state actual group distribution: {expected_description}")
     return errors

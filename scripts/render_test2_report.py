@@ -26,7 +26,7 @@ def main() -> int:
     summary = json.loads(args.summary.read_text(encoding="utf-8"))
     db = summary["db_actual"]
     source = summary["tested_source_commit"]
-    test2 = f'''---
+    test2 = f"""---
 type: Test Report
 title: "P.O.W.E.R. 3.2.1 — TEST-2 WS verification"
 description: "Canonical reproducible TEST-2 evidence generated from raw WS artifacts."
@@ -78,8 +78,8 @@ The quality results apply to the WS vault captured by this run. Reranked is
 reported separately from semantic and remains opt-in. See every raw command
 output, egress capture, DB check, cgroup run, determinism run, and recovery
 log in `docs/tests/artifacts/3.2.1-test-2-final/`.
-'''
-    why = f'''# Why P.O.W.E.R. 3.2.1 — measured TEST-2 evidence
+"""
+    why = f"""# Why P.O.W.E.R. 3.2.1 — measured TEST-2 evidence
 
 The following values come only from the WS TEST-2 summary for source commit
 `{source}`. The dedicated DB contained {db["doc_embeddings"]} actual document
@@ -94,7 +94,7 @@ If semantic scores higher than reranked, semantic is the stronger measured mode
 for this vault; reranked remains opt-in/experimental. Full synchronization and
 memory constraints are documented in the raw cgroup and sync artifacts. Cold
 CLI latency is not interchangeable with a warm persistent MCP server.
-'''
+"""
     args.test2.write_text(test2, encoding="utf-8")
     args.why.write_text(why, encoding="utf-8")
     return 0

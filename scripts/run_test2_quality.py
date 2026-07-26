@@ -44,7 +44,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vault", type=Path, required=True)
     parser.add_argument("--fixture", type=Path, required=True)
-    parser.add_argument("--mode", required=True, choices=["fts", "vector", "hybrid", "semantic", "reranked"])
+    parser.add_argument(
+        "--mode", required=True, choices=["fts", "vector", "hybrid", "semantic", "reranked"]
+    )
     parser.add_argument("--summary-output", type=Path, required=True)
     parser.add_argument("--per-query-output", type=Path, required=True)
     parser.add_argument("--candidate-output", type=Path)
@@ -89,11 +91,15 @@ def main() -> int:
                     "query": query,
                     "candidate_count": len(candidate_paths),
                     "relevant_count": len(relevant),
-                    "candidate_recall": len(candidate_paths & set(relevant)) / len(relevant),
+                    "candidate_recall": (
+                        len(candidate_paths & set(relevant)) / len(relevant) if relevant else 0.0
+                    ),
                 }
             )
 
-    args.per_query_output.parent.mkdir(parents=True, exist_ok=True)
+    for output in (args.summary_output, args.per_query_output, args.candidate_output):
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
     with args.per_query_output.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
@@ -122,7 +128,14 @@ def main() -> int:
         with args.candidate_output.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(
                 handle,
-                fieldnames=["query_index", "language_group", "query", "candidate_count", "relevant_count", "candidate_recall"],
+                fieldnames=[
+                    "query_index",
+                    "language_group",
+                    "query",
+                    "candidate_count",
+                    "relevant_count",
+                    "candidate_recall",
+                ],
             )
             writer.writeheader()
             writer.writerows(candidates)

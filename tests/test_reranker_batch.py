@@ -36,12 +36,16 @@ def _reranker_available() -> bool:
         BGE_RERANKER_PINNED_REVISION,
     )
 
-    cached = try_to_load_from_cache(
-        BGE_RERANKER_PINNED_REPO,
-        "onnx/model.onnx",
-        revision=BGE_RERANKER_PINNED_REVISION,
+    return all(
+        _cached_model_file_exists(
+            try_to_load_from_cache(
+                BGE_RERANKER_PINNED_REPO,
+                filename,
+                revision=BGE_RERANKER_PINNED_REVISION,
+            )
+        )
+        for filename in ("onnx/model.onnx", "onnx/model.onnx_data", "tokenizer.json")
     )
-    return _cached_model_file_exists(cached)
 
 
 def _cached_model_file_exists(cached: object) -> bool:
@@ -85,27 +89,27 @@ class TestBGEM3RerankerBatchEquivalence:
         assert len(scores_1) == len(scores_8) == len(_SAMPLE_DOCS)
 
         for i in range(len(_SAMPLE_DOCS)):
-            assert (
-                abs(scores_1[i] - scores_8[i]) <= 1e-5
-            ), f"Score mismatch at doc {i}: batch1={scores_1[i]:.6f} batch8={scores_8[i]:.6f}"
+            assert abs(scores_1[i] - scores_8[i]) <= 1e-5, (
+                f"Score mismatch at doc {i}: batch1={scores_1[i]:.6f} batch8={scores_8[i]:.6f}"
+            )
 
     def test_batch_4_and_8_same_ordering(self, monkeypatch: pytest.MonkeyPatch):
         scores_4 = self._run_with_batch(monkeypatch, 4)
         scores_8 = self._run_with_batch(monkeypatch, 8)
 
         for i in range(len(_SAMPLE_DOCS)):
-            assert (
-                abs(scores_4[i] - scores_8[i]) <= 1e-5
-            ), f"Score mismatch at doc {i}: batch4={scores_4[i]:.6f} batch8={scores_8[i]:.6f}"
+            assert abs(scores_4[i] - scores_8[i]) <= 1e-5, (
+                f"Score mismatch at doc {i}: batch4={scores_4[i]:.6f} batch8={scores_8[i]:.6f}"
+            )
 
     def test_batch_16_does_not_change_ordering(self, monkeypatch: pytest.MonkeyPatch):
         scores_1 = self._run_with_batch(monkeypatch, 1)
         scores_16 = self._run_with_batch(monkeypatch, 16)
 
         for i in range(len(_SAMPLE_DOCS)):
-            assert (
-                abs(scores_1[i] - scores_16[i]) <= 1e-5
-            ), f"Score mismatch at doc {i}: batch1={scores_1[i]:.6f} batch16={scores_16[i]:.6f}"
+            assert abs(scores_1[i] - scores_16[i]) <= 1e-5, (
+                f"Score mismatch at doc {i}: batch1={scores_1[i]:.6f} batch16={scores_16[i]:.6f}"
+            )
 
     def test_rerank_preserves_doc_count(self):
         reranker = BGEM3Reranker()
