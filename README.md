@@ -28,7 +28,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) with zero glue code, powered by FastMCP 3.x
-- **Stable 3.2.2 release** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.2.2 release](https://github.com/weby-homelab/power-framework/releases) records all completed gates.
+- **Stable 3.2.3 release** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.2.3 release](https://github.com/weby-homelab/power-framework/releases) records all completed gates.
 
 Detailed breakdown and technical comparison matrix with competing frameworks:
 
@@ -37,7 +37,7 @@ Detailed breakdown and technical comparison matrix with competing frameworks:
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.2
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -198,7 +198,7 @@ power search ~/my-vault "deployment guide" --max-results 5
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.2
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -540,7 +540,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.2
+softwareVersion: 3.2.3
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

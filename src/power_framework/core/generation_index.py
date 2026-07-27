@@ -106,6 +106,29 @@ def _snapshot_hash(sources: dict[str, str]) -> str:
     return digest.hexdigest()
 
 
+def _assert_source_snapshot_unchanged(vault_dir: Path, expected_sources: dict[str, str]) -> None:
+    """Reject a build when source content changed after staging began.
+
+    A path-only coverage check cannot prove that the staged rows describe the
+    current vault: a note can change while embedding is in progress. Compare
+    BLAKE2 identities again immediately before publication so callers retry
+    instead of activating a stale generation.
+    """
+    current_sources = _valid_sources(vault_dir)
+    if current_sources == expected_sources:
+        return
+
+    changed_paths = sorted(set(expected_sources) | set(current_sources))
+    details = [
+        f"{path}:{expected_sources.get(path, 'missing')}->{current_sources.get(path, 'missing')}"
+        for path in changed_paths
+        if expected_sources.get(path) != current_sources.get(path)
+    ]
+    raise IndexGenerationError(
+        "source snapshot changed during sync; retry required; changed=" + ", ".join(details[:10])
+    )
+
+
 def _record_building(
     vault_dir: Path, generation_id: str, snapshot_hash: str, sources: dict[str, str]
 ) -> None:
@@ -250,6 +273,7 @@ def sync_vault_atomically(
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
             )
+            _assert_source_snapshot_unchanged(root, sources)
             actual_files, actual_chunks, provider, model = _validate_staging(
                 conn, set(sources), sync_embeddings
             )

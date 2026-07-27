@@ -21,6 +21,7 @@ Supports stdio transport (local) and HTTP transport (Docker, with /health endpoi
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from datetime import datetime, timezone
@@ -36,9 +37,12 @@ if TYPE_CHECKING:
 from power_framework.core import (
     DEFAULT_SEARCH_MODE,
     PARA_FOLDERS,
+    MemoryKind,
+    MemoryMetadata,
     NoteType,
     OKFMetadata,
     RateLimiter,
+    WritePolicy,
     archive_stale_notes,
     atomic_write_in_vault,
     build_frontmatter,
@@ -245,6 +249,13 @@ async def ingest_note(
         description=description,
         resource=resource,
         tags=tags,
+        okf_version="0.2",
+        memory=MemoryMetadata(
+            kind=MemoryKind.SEMANTIC,
+            sources=["power://mcp/ingest_note"],
+            evidence=[f"sha256:{hashlib.sha256(content.encode('utf-8')).hexdigest()}"],
+            write_policy=WritePolicy.AGENT_PROPOSED,
+        ),
         timestamp=timestamp,
     )
 

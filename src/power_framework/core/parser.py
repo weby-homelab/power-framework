@@ -83,9 +83,20 @@ def build_frontmatter(metadata: OKFMetadata) -> str:
         lines.append(f"status: {metadata.status}")
     if metadata.expiry:
         lines.append(f"expiry: {metadata.expiry.isoformat()}")
+    if metadata.okf_version:
+        lines.append(f'okf_version: "{metadata.okf_version}"')
+    if metadata.memory:
+        lines.extend(
+            _render_yaml_field(
+                "memory",
+                metadata.memory.model_dump(mode="json", exclude_none=True),
+            )
+        )
     if metadata.related:
         related_str = ", ".join(r.path for r in metadata.related)
         lines.append(f"related: [{related_str}]")
+    for field, value in (metadata.model_extra or {}).items():
+        lines.extend(_render_yaml_field(field, value))
     lines.append(f"timestamp: {metadata.timestamp.isoformat()}")
     lines.append("---")
     return "\n".join(lines)
@@ -94,6 +105,17 @@ def build_frontmatter(metadata: OKFMetadata) -> str:
 def _escape_yaml_string(value: str) -> str:
     """Escape double quotes and backslashes in YAML string values."""
     return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _render_yaml_field(field: str, value: object) -> list[str]:
+    """Render an additive frontmatter field without discarding nested values."""
+    rendered = yaml.safe_dump(
+        {field: value},
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    ).strip()
+    return rendered.splitlines()
 
 
 def read_file_content(filepath: Path) -> str:

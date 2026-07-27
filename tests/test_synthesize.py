@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from power_framework.core.parser import validate_metadata
 from power_framework.core.synthesize import synthesize_session_ingest
 
 
@@ -30,7 +31,15 @@ def test_synthesize_session_ingest_success(tmp_path):
             vault_path=tmp_path,
         )
         assert "synthesized and ingested" in report
-        assert (tmp_path / "01_Projects" / "session1.md").exists()
+        note = tmp_path / "01_Projects" / "session1.md"
+        assert note.exists()
+        metadata = validate_metadata(note.read_text(encoding="utf-8"))
+        assert metadata is not None
+        assert metadata.okf_version == "0.2"
+        assert metadata.memory is not None
+        assert metadata.memory.kind == "episodic"
+        assert metadata.memory.sources == ["power://synthesize_session"]
+        assert metadata.memory.evidence[0].startswith("sha256:")
 
 
 def test_synthesize_session_ingest_exists_error(tmp_path):

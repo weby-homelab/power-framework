@@ -15,12 +15,13 @@ report — exactly mirroring the MCP behavior.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import logging
 from pathlib import Path
 
 from .indexer import run_generate_hierarchical_index
 from .linter import run_lint_report
-from .models import NoteType, OKFMetadata, TypedRelation
+from .models import MemoryKind, MemoryMetadata, NoteType, OKFMetadata, TypedRelation, WritePolicy
 from .parser import build_frontmatter
 from .utils import atomic_write
 
@@ -65,6 +66,13 @@ def synthesize_session_ingest(
         tags=tags,
         related=related_typed,
         owner=owner,
+        okf_version="0.2",
+        memory=MemoryMetadata(
+            kind=MemoryKind.EPISODIC,
+            sources=["power://synthesize_session"],
+            evidence=[f"sha256:{hashlib.sha256(content.encode('utf-8')).hexdigest()}"],
+            write_policy=WritePolicy.AGENT_PROPOSED,
+        ),
         timestamp=ts,
     )
 
