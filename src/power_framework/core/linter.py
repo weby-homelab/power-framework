@@ -22,6 +22,7 @@ import shutil
 from datetime import date as date_type
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import unquote
 
 from .ignore import should_skip
 from .parser import (
@@ -34,9 +35,18 @@ from .utils import clean_note_name, is_excluded_orphan
 
 logger = logging.getLogger(__name__)
 
-WIKI_LINK_PATTERN = re.compile(r"\[\[(.*?)\]\]")
-GFM_LINK_PATTERN = re.compile(r"\[.*?\]\(((?![a-zA-Z][a-zA-Z0-9+.-]*://)[^)]*\.md)(?:#.*?)?\)")
+WIKI_LINK_PATTERN = re.compile(r"(?<!!)\[\[(.*?)\]\]")
+GFM_LINK_PATTERN = re.compile(
+    r"(?<!!)\[[^\]]*\]\((?![a-zA-Z][a-zA-Z0-9+.-]*://)"
+    r"(?:<([^>]+)>|([^)]*\.md(?:#.*?)?))\)"
+)
 EMBED_LINK_PATTERN = re.compile(r"!\[\[(.*?)\]\]")
+FENCED_CODE_BLOCK_PATTERN = re.compile(
+    r"(?ms)^[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n.*?^[ \t]{0,3}\1[ \t]*$"
+)
+INLINE_CODE_PATTERN = re.compile(r"`+[^`\n]*`+")
+
+InternalLink = tuple[str, str]
 
 TRIVIAL_BODY_MIN_CHARS = 50
 TITLE_SIMILARITY_THRESHOLD = 0.6
@@ -49,17 +59,26 @@ class LintResult:
         self.total_notes: int = 0
         self.untyped_files: list[tuple[str, str]] = []
         self.broken_links: list[tuple[str, str]] = []
+        self.ambiguous_links: list[tuple[str, str, list[str]]] = []
         self.orphans: list[str] = []
         self.stale_notes: list[tuple[str, str]] = []
 
     @property
     def has_issues(self) -> bool:
-        return bool(self.untyped_files or self.broken_links or self.orphans or self.stale_notes)
+        return bool(
+            self.untyped_files
+            or self.broken_links
+            or self.ambiguous_links
+            or self.orphans
+            or self.stale_notes
+        )
 
     @property
     def has_blocking_issues(self) -> bool:
         """Return whether lint found invalid metadata, broken links, or expired notes."""
-        return bool(self.untyped_files or self.broken_links or self.stale_notes)
+        return bool(
+            self.untyped_files or self.broken_links or self.ambiguous_links or self.stale_notes
+        )
 
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable lint report."""
@@ -81,7 +100,13 @@ class LintResult:
         if self.broken_links:
             lines.append(f"ERROR: Broken links found ({len(self.broken_links)}):")
             for rp, target in sorted(self.broken_links):
-                lines.append(f"  - In {rp}: link to [[{target}]] cannot be resolved")
+                lines.append(f"  - In {rp}: link to {target} cannot be resolved")
+            lines.append("")
+
+        if self.ambiguous_links:
+            lines.append(f"ERROR: Ambiguous links found ({len(self.ambiguous_links)}):")
+            for rp, target, candidates in sorted(self.ambiguous_links):
+                lines.append(f"  - In {rp}: link to {target} matches {', '.join(candidates)}")
             lines.append("")
 
         if self.orphans:
@@ -236,26 +261,73 @@ def _get_body_content(raw_content: str) -> str:
     return raw_content.strip()
 
 
-def _extract_links(content: str) -> list[str]:
-    """Extract all internal link targets from markdown content."""
-    targets: list[str] = []
+def _extract_links(content: str) -> list[InternalLink]:
+    """Extract internal links while preserving their syntax and raw paths."""
+    # Markdown examples frequently contain illustrative links, not graph edges.
+    content = FENCED_CODE_BLOCK_PATTERN.sub("", content)
+    content = INLINE_CODE_PATTERN.sub("", content)
+    targets: list[InternalLink] = []
 
-    for match in WIKI_LINK_PATTERN.findall(content):
-        target = match.split("|")[0].split("#")[0].strip()
+    for match in WIKI_LINK_PATTERN.finditer(content):
+        target = match.group(1).split("|")[0].split("#")[0].strip()
         if target:
-            targets.append(clean_note_name(Path(target).name))
+            targets.append(("wiki", target))
 
-    for match in EMBED_LINK_PATTERN.findall(content):
-        target = match.split("|")[0].split("#")[0].strip()
+    for match in EMBED_LINK_PATTERN.finditer(content):
+        target = match.group(1).split("|")[0].split("#")[0].strip()
         if target:
-            targets.append(clean_note_name(Path(target).name))
+            targets.append(("wiki", target))
 
-    for match in GFM_LINK_PATTERN.findall(content):
-        target = Path(match).name
+    for match in GFM_LINK_PATTERN.finditer(content):
+        target = match.group(1) or match.group(2)
         if target:
-            targets.append(clean_note_name(target))
+            targets.append(("gfm", target.split("#")[0].strip()))
 
     return targets
+
+
+def _normalise_link_target(target: str) -> str:
+    """Normalize a Markdown target without changing its path semantics."""
+    normalized = unquote(target).replace("\\", "/").strip().strip("<>")
+    if normalized.lower().endswith(".md"):
+        return normalized
+    return f"{normalized}.md"
+
+
+def _resolve_internal_link(
+    vault_dir: Path,
+    source_rel_path: str,
+    link_kind: str,
+    target: str,
+    all_files: dict[str, Path],
+    basename_map: dict[str, list[str]],
+) -> list[str]:
+    """Resolve one link using Markdown-relative or Obsidian path semantics."""
+    normalized = _normalise_link_target(target)
+    source_path = Path(source_rel_path)
+
+    if link_kind == "gfm":
+        candidate = (vault_dir / source_path.parent / normalized).resolve()
+        try:
+            rel_candidate = candidate.relative_to(vault_dir).as_posix()
+        except ValueError:
+            return []
+        return [rel_candidate] if rel_candidate in all_files else []
+
+    if normalized.startswith(("./", "../")):
+        candidate = (vault_dir / source_path.parent / normalized).resolve()
+    else:
+        candidate = (vault_dir / normalized).resolve()
+
+    try:
+        rel_candidate = candidate.relative_to(vault_dir).as_posix()
+    except ValueError:
+        return []
+    if rel_candidate in all_files:
+        return [rel_candidate]
+
+    # Obsidian allows basename-only wiki-links. Resolve them only when unique.
+    return basename_map.get(clean_note_name(Path(normalized).name), [])
 
 
 def run_lint_vault(vault_dir: Path) -> LintResult:
@@ -270,8 +342,8 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
     result = LintResult()
 
     all_files: dict[str, Path] = {}
-    rel_paths: dict[str, str] = {}
-    links: dict[str, list[str]] = {}
+    basename_map: dict[str, list[str]] = {}
+    links: dict[str, list[InternalLink]] = {}
     orphan_exempt_paths: set[str] = set()
 
     for filepath in vault_dir.rglob("*.md"):
@@ -279,16 +351,13 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
         if should_skip(vault_dir, str(rel)):
             continue
 
-        clean = clean_note_name(filepath.name)
-
-        all_files[clean] = filepath
-        rel_paths[clean] = str(filepath.relative_to(vault_dir))
+        rel_path = str(filepath.relative_to(vault_dir))
+        all_files[rel_path] = filepath
+        basename_map.setdefault(clean_note_name(filepath.name), []).append(rel_path)
 
     result.total_notes = len(all_files)
 
-    for clean_name, abs_path in all_files.items():
-        rel_path = rel_paths[clean_name]
-
+    for rel_path, abs_path in all_files.items():
         try:
             content = read_file_content(abs_path)
         except Exception:  # noqa: S112
@@ -322,19 +391,28 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
         file_links = _extract_links(content)
         links[rel_path] = file_links
 
+    resolved_links: dict[str, list[str]] = {}
     for rel_path, targets in links.items():
-        for target in targets:
-            if target not in all_files:
-                direct_file = vault_dir / f"{target}.md"
-                if not direct_file.exists():
-                    result.broken_links.append((rel_path, target))
+        for link_kind, target in targets:
+            candidates = _resolve_internal_link(
+                vault_dir,
+                rel_path,
+                link_kind,
+                target,
+                all_files,
+                basename_map,
+            )
+            if not candidates:
+                result.broken_links.append((rel_path, target))
+            elif len(candidates) > 1:
+                result.ambiguous_links.append((rel_path, target, sorted(candidates)))
+            else:
+                resolved_links.setdefault(rel_path, []).append(candidates[0])
 
-    inbound_counts: dict[str, int] = dict.fromkeys(links, 0)
-    for targets in links.values():
-        for target in targets:
-            if target in all_files:
-                target_rel = rel_paths[target]
-                inbound_counts[target_rel] += 1
+    inbound_counts: dict[str, int] = dict.fromkeys(all_files, 0)
+    for resolved_targets in resolved_links.values():
+        for target in resolved_targets:
+            inbound_counts[target] += 1
 
     for rel_path, count in inbound_counts.items():
         filename = rel_path.rsplit("/", 1)[-1] if "/" in rel_path else rel_path

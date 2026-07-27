@@ -28,12 +28,12 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) with zero glue code, powered by FastMCP 3.x
-- **Stable 3.2.3 release** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.2.3 release](https://github.com/weby-homelab/power-framework/releases) records all completed gates.
+- **Stable 3.2.4 release** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.2.4 release](https://github.com/weby-homelab/power-framework/releases) records all completed gates.
 
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.4
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -130,7 +130,7 @@ Step-by-step protocol for any AI agent (Antigravity, OpenCode, Claude Code CLI, 
 
 ## 🗂️ Methodology compatibility
 
-P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. In 3.2.3, `power init <path>` creates the default P.A.R.A. scaffold only. Selectable templates and the `--template` option are planned; they are not CLI features yet.
+P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. In 3.2.4, `power init <path>` creates the default P.A.R.A. scaffold only. Selectable templates and the `--template` option are planned; they are not CLI features yet.
 
 For another layout, create or retain its folders, then use P.O.W.E.R. to ingest notes and run `lint`, `index`, and `search`. OKF metadata validation and the available search tools work independently of the folder names.
 
@@ -176,7 +176,7 @@ power search ~/my-vault "deployment guide" --max-results 5
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.4
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -442,7 +442,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.2.3 release notes](docs/release-3.2.3.md) — current release
+- [P.O.W.E.R. 3.2.4 release notes](docs/release-3.2.4.md) — current release
   scope, validation boundary, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is
@@ -520,7 +520,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.3
+softwareVersion: 3.2.4
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

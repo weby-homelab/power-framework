@@ -27,12 +27,12 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
 - **MCP-нативний** — всі 12 інструментів доступні будь-якому MCP-клієнту (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) через FastMCP 3.x без додаткового коду
-- **Стабільний реліз 3.2.3** — hermetic тести й security checks відстежуються у CI; [реліз P.O.W.E.R. 3.2.3](https://github.com/weby-homelab/power-framework/releases) фіксує всі виконані gates.
+- **Стабільний реліз 3.2.4** — hermetic тести й security checks відстежуються у CI; [реліз P.O.W.E.R. 3.2.4](https://github.com/weby-homelab/power-framework/releases) фіксує всі виконані gates.
 
 ## Швидкий старт
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.4
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -129,7 +129,7 @@ pip install --user --break-system-packages -e ".[dev]"
 
 ## 🗂️ Сумісність із методологіями
 
-P.O.W.E.R. індексує, шукає та перевіряє нотатки у наявному сховищі незалежно від структури папок: P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або довільної. У версії 3.2.3 команда `power init <path>` створює лише стандартний скелет P.A.R.A. Вибір шаблонів і параметр `--template` заплановані, але ще не реалізовані в CLI.
+P.O.W.E.R. індексує, шукає та перевіряє нотатки у наявному сховищі незалежно від структури папок: P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або довільної. У версії 3.2.4 команда `power init <path>` створює лише стандартний скелет P.A.R.A. Вибір шаблонів і параметр `--template` заплановані, але ще не реалізовані в CLI.
 
 Для іншої структури збережіть або створіть потрібні папки, а далі використовуйте P.O.W.E.R. для додавання нотаток і запуску `lint`, `index` та `search`. OKF-валідація метаданих і доступні інструменти пошуку не залежать від назв папок.
 
@@ -175,7 +175,7 @@ power search ~/my-vault "гайд деплой" --max-results 5
 Підключіть P.O.W.E.R. до будь-якого MCP-сумісного AI-клієнта (локальний stdio або Docker HTTP транспорт):
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.4
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -441,7 +441,7 @@ mypy src/power_framework/
 
 Для актуальної відтворюваної інформації про реліз і evidence:
 
-- [Нотатки релізу P.O.W.E.R. 3.2.3](docs/release-3.2.3.md) — поточний scope,
+- [Нотатки релізу P.O.W.E.R. 3.2.4](docs/release-3.2.4.md) — поточний scope,
   межі валідації та інструкції оновлення.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) —
   canonical checksum-verified post-merge WS full-sync evidence; розширена
@@ -485,7 +485,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.3
+softwareVersion: 3.2.4
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

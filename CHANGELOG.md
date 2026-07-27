@@ -5,6 +5,29 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.4] - 2026-07-27
+
+### Fixed
+
+- Made `related` metadata accept YAML mappings for typed `TypedRelation` values
+  while preserving plain-string backward compatibility.
+- Made vault link resolution path-aware for GFM links and duplicate-basename
+  safe; ambiguous links now fail the health gate instead of being guessed.
+- Ignored illustrative links inside fenced and inline code when building the
+  knowledge graph and lint report.
+
+### Added
+
+- Hierarchical indexing now catalogs `PROTOCOLS/` and valid root-level daily
+  logs in addition to the PARA folders.
+- Added regression coverage for typed YAML relations, relative GFM links,
+  duplicate basenames, code examples, and the expanded index scope.
+
+### Documentation
+
+- Synchronized the 3.2.4 version across the package metadata, CLI/MCP entry
+  points, Skills, installation guides, migration guides, and release docs.
+
 ## [3.2.3] - 2026-07-27
 
 ### Added
