@@ -22,7 +22,7 @@ N_DISTRACTORS = 508
 
 # ----------------------------------------------------------------------------
 # Target notes: (rel_path, title, description, tags, body, lang)
-# One per benchmark query (matches P.O.W.E.R.2.1.2-TEST-2 query list).
+# One per benchmark query in this generator's committed target corpus.
 # ----------------------------------------------------------------------------
 TARGETS: list[tuple[str, str, str, list[str], str, str]] = [
     # TC-01 Docker

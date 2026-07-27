@@ -50,8 +50,8 @@ canonical: true
 The source work includes the reranker batch implementation, conditional
 `token_type_ids` handling, cache-sentinel safeguards, environment-isolated
 regression tests, runtime batch-size coverage, security exception-contract
-coverage, and TEST-2 validation tooling. Raw WS source-validation artifacts are
-in `docs/tests/artifacts/3.2.1-test-2-final/`.
+coverage, and TEST-2 validation tooling. The complete sanitized post-merge WS
+package below is the only public evidence set retained for this report.
 
 ## Post-merge WS full-sync evidence
 

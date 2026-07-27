@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.1)"
-description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to P.O.W.E.R. (v3.2.1) OKF-compliant structure with full methodology independence (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, Custom)."
+title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.3)"
+description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to a P.O.W.E.R. 3.2.3 OKF-compliant structure while retaining its chosen folder layout."
 tags: [power, migration, guide, ai-agents, mcp, bge-m3, graphrag, methodologies]
 timestamp: 2026-07-24T16:00:00
 ---
 
-# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.1)
+# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.3)
 
 **Target audience:** AI agents (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) with MCP access to P.O.W.E.R.
 
@@ -21,7 +21,7 @@ This protocol enables any LLM-based AI agent to migrate an existing Obsidian vau
 - **MCP tools** — `ingest_note`, `lint_vault`, `generate_index`, `read_sub_index`, `search_vault_tool`
 - **Filesystem access** — reading existing `.md` files, moving files, updating link paths
 - **LLM intelligence** — classifying notes across methodologies (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal), extracting titles, generating descriptions
-- **Methodology Independence** — P.O.W.E.R. v3.2.1 is designed as a methodology-agnostic knowledge engine. The framework fully decouples physical folder structures from note metadata: search indexing (SQLite FTS5 + BGE-M3 1024d ONNX + Reranker v2 M3 + GraphRAG) and OKF validation operate seamlessly across any chosen methodology or custom folder tree.
+- **Folder-layout compatibility** — P.O.W.E.R. 3.2.3 can index and validate notes in an existing folder tree. `power init` creates the default P.A.R.A. scaffold only; selectable methodology templates are not implemented. OKF validation and supported search modes operate independently of the folder layout.
 
 The agent follows 6 phases. Each phase has clear success criteria.
 
@@ -67,7 +67,7 @@ The agent follows 6 phases. Each phase has clear success criteria.
 
 ### Methodology Support & OKF Type Mapping
 
-P.O.W.E.R. 3.2.1 is methodology-agnostic. Every note is assigned a valid `type` from the OKF `NoteType` enum (or extended semantic types in custom setups). Below is the canonical mapping for supported templates:
+Every note is assigned a valid `type` from the OKF `NoteType` enum (or extended semantic types in custom setups). The table below is a migration-planning aid, not a set of CLI templates:
 
 | Methodology | Primary Focus | Folder Skeleton | Initial Mapping to OKF `NoteType` |
 | :--- | :--- | :--- | :--- |
@@ -107,18 +107,7 @@ P.O.W.E.R. 3.2.1 is methodology-agnostic. Every note is assigned a valid `type` 
 
 ### Step 3a: Prepare the vault skeleton
 
-Initialize the vault with the desired organizational template via CLI:
-
-```bash
-power init /path/to/vault --template para         # P.A.R.A. template (Projects, Areas, Resources, Archive)
-power init /path/to/vault --template code         # C.O.D.E. template (Capture, Organize, Distill, Express)
-power init /path/to/vault --template gtd          # GTD template (Inbox, Next Actions, Waiting For, Someday)
-power init /path/to/vault --template zettelkasten # Zettelkasten template (fleeting, literature, permanent, index)
-power init /path/to/vault --template lyt          # LYT template (Home, MOCs, Notes, Archives)
-power init /path/to/vault --template johnny-decimal # Johnny.Decimal template (decimal category folders)
-```
-
-Or allow the agent to create a custom/hybrid folder tree based on user requirements.
+`power init /path/to/vault` creates the default P.A.R.A. structure. Do not run it in a non-empty vault unless that structure is intended. For C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or a custom layout, retain or create the required folders directly, then run `lint` and `index`. The `--template` option is not currently supported.
 
 ### Step 3b: Ingest each note
 
@@ -234,15 +223,15 @@ power sync /path/to/vault
 
 ---
 
-### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v3.2.1)
+### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v3.2.3)
 
-For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v3.2.1) globally or in the project's virtual environment:
+For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v3.2.3) globally or in the project's virtual environment:
 
 ```bash
 pip install git+https://github.com/weby-homelab/power-framework.git
 ```
 
-#### 🧠 Embedding & Reranker Stack Configuration (v3.2.1 Canonical Stack)
+#### 🧠 Embedding & Reranker Stack Configuration (v3.2.3 canonical stack)
 
 Starting with version 3.0+, the canonical default embedding engine is **`bge-m3`** (`aapot/bge-m3-onnx`, embedding dimension **1024**), running on direct **ONNX Runtime** + `tokenizers` (`BGEM3OnnxManager`). This is paired with the Apache-2.0 **`onnx-community/bge-reranker-v2-m3-ONNX`** cross-encoder reranker.
 
@@ -384,7 +373,7 @@ Set up a synchronization pipeline to preserve history and enable collaboration w
 
 ### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid + Semantic + Reranked)
 
-The P.O.W.E.R. framework (v3.2.1) includes a built-in search engine supporting distinct search strategies:
+The P.O.W.E.R. framework (v3.2.3) includes a built-in search engine supporting distinct search strategies:
 
 | Mode                 | Description                                                                                              | Best for                                    |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
@@ -495,7 +484,7 @@ Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-com
 | `read_sub_index` returns "No notes found"    | Category folder is empty or not indexed       | Run `generate_index(vault_path)` first                        |
 | Too many orphans in `04_Archive/`            | Archived notes by definition have few links   | This is expected — archive orphans are normal                 |
 | Lint reports 200+ extra notes                | `.git/` directory is not excluded             | Update linter to skip hidden dirs (v1.5.0+ does)              |
-| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v3.2.1 or re-run `generate_index`                  |
+| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v3.2.3 or re-run `generate_index`                  |
 | `pip install` fails with PEP 668             | System Python blocks direct install           | Use a venv: `/path/to/venv/bin/pip install ...`               |
 | `External data path escapes model directory` | ONNX Runtime security constraint              | Set `HF_HUB_DISABLE_SYMLINKS=1` in environment before running |
 
