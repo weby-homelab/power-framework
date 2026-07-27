@@ -13,7 +13,7 @@ import sqlite3
 from typing import TYPE_CHECKING
 
 from power_framework.core import cli, searcher
-from power_framework.core.utils import get_cache_dir
+from power_framework.core.vault_storage import vault_cache_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -51,7 +51,7 @@ class TestPidLock:
     def test_parallel_sync_refused_for_live_pid(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
         _configure_sync_environment(monkeypatch, tmp_path)
-        lock_path = get_cache_dir() / "sync.pid"
+        lock_path = vault_cache_dir(vault) / "sync.pid"
         lock_path.write_text(str(os.getpid()), encoding="utf-8")
 
         assert cli._cmd_sync(_sync_args(vault)) == 1
@@ -60,7 +60,7 @@ class TestPidLock:
     def test_stale_lock_recovery_and_repeated_sync(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
         db_path = _configure_sync_environment(monkeypatch, tmp_path)
-        lock_path = get_cache_dir() / "sync.pid"
+        lock_path = vault_cache_dir(vault) / "sync.pid"
         lock_path.write_text("99999999", encoding="utf-8")
 
         # A stale PID models a process terminated by SIGKILL after it created its lock.
@@ -76,12 +76,13 @@ class TestPidLock:
     def test_sync_lock_does_not_block_reads(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
         db_path = _configure_sync_environment(monkeypatch, tmp_path)
+        assert cli._cmd_sync(_sync_args(vault)) == 0
         original_sync = searcher._sync_vault_to_db
         observed_read = False
 
         def sync_with_concurrent_reader(*args, **kwargs):
             nonlocal observed_read
-            assert (get_cache_dir() / "sync.pid").exists()
+            assert (vault_cache_dir(vault) / "sync.pid").exists()
             with sqlite3.connect(str(db_path), timeout=0) as reader:
                 reader.execute("SELECT COUNT(*) FROM fts_notes").fetchone()
             observed_read = True

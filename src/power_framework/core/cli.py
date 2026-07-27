@@ -215,7 +215,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         logger.error("Vault not found: %s", vault_dir)
         return 1
 
-    from .searcher import _sync_vault_to_db
+    from .generation_index import IndexGenerationError, sync_vault_atomically
 
     set_vault_dir(vault_dir)
     sync_embeddings = not getattr(args, "fts_only", False)
@@ -243,10 +243,10 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         vault_dir,
     )
     force_rebuild = getattr(args, "force", False)
-    # Prevent concurrent syncs via PID lock file
-    from .utils import get_cache_dir
+    # Prevent concurrent syncs per vault without blocking independent vaults.
+    from .vault_storage import vault_cache_dir
 
-    _lock_p = get_cache_dir() / "sync.pid"
+    _lock_p = vault_cache_dir(vault_dir) / "sync.pid"
     _lock_p.parent.mkdir(parents=True, exist_ok=True)
     if _lock_p.exists():
         try:
@@ -258,22 +258,25 @@ def _cmd_sync(args: argparse.Namespace) -> int:
             pass
     _lock_p.write_text(str(os.getpid()))
     try:
-        conn = _open_conn()
         try:
-            _sync_vault_to_db(
+            report = sync_vault_atomically(
                 vault_dir,
-                conn,
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
             )
-        finally:
-            with contextlib.suppress(Exception):
-                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            conn.close()
+        except IndexGenerationError as exc:
+            logger.error("Index generation failed: %s", exc)
+            return 1
     finally:
         with contextlib.suppress(OSError):
             _lock_p.unlink()
-    logger.info("Index build complete.")
+    logger.info(
+        "Index generation %s active: %d/%d files, %d chunks.",
+        report.generation_id,
+        report.actual_files,
+        report.expected_files,
+        report.actual_chunks,
+    )
     return 0
 
 

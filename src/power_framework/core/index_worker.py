@@ -24,7 +24,7 @@ from pathlib import Path
 
 from .db import _init_db
 from .ignore import should_skip
-from .utils import get_cache_dir
+from .vault_storage import vault_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -34,20 +34,9 @@ _indexer_stop = threading.Event()
 
 
 def _db_path() -> Path:
-    """Resolve the search index DB path, honoring POWER_SEARCH_DB override.
-
-    Must match ``searcher._db_path`` so the background indexer and the
-    synchronous searcher operate on the same database — and so the
-    ``isolated_search_db`` test fixture (which sets POWER_SEARCH_DB) actually
-    isolates the indexer too. A prior version ignored the override, causing
-    silent cross-test contamination via the shared default DB.
-    """
-    import os
-
-    override = os.getenv("POWER_SEARCH_DB")
-    if override:
-        return Path(override)
-    return get_cache_dir() / "power_search.db"
+    """Resolve the same isolated DB namespace as the synchronous searcher."""
+    vault = _resolve_vault_dir()
+    return vault_db_path(vault)
 
 
 def _ensure_queue_table(conn) -> None:
@@ -77,6 +66,7 @@ def request_sync(vault_dir: Path, mode: str = "fts") -> None:
 
     Only one pending request is kept; concurrent callers are no-ops.
     """
+    set_vault_dir(vault_dir)
     try:
         conn = _connect()
         _ensure_queue_table(conn)
@@ -193,11 +183,9 @@ def _index_worker_loop() -> None:
 
             sync_embeddings = mode in ("semantic", "hybrid_reranked")
             try:
-                from .searcher import _sync_vault_to_db
+                from .generation_index import sync_vault_atomically
 
-                wconn = _connect()
-                _sync_vault_to_db(vault, wconn, sync_embeddings=sync_embeddings)
-                wconn.close()
+                sync_vault_atomically(vault, sync_embeddings=sync_embeddings)
                 logger.info("Background indexer completed sync (mode=%s)", mode)
             except Exception as e:  # pragma: no cover
                 logger.warning("Background indexer sync failed: %s", e)
