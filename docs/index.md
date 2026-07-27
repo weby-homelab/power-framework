@@ -49,7 +49,7 @@ for hermetic CI regression gates, not for production-quality claims. See the
 ## Quick start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.4
 
 power init ~/my-vault
 power lint ~/my-vault

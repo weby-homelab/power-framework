@@ -55,6 +55,11 @@ PARA_FOLDERS_: tuple[str, ...] = (
     "06_Daily_Logs",
 )
 
+# Folders that belong to the navigable knowledge catalog. ``PROTOCOLS`` is
+# intentionally separate from PARA because it is a system-guide namespace,
+# but it must still be indexed when it is part of the vault scope.
+INDEX_FOLDERS: tuple[str, ...] = (*PARA_FOLDERS_, "PROTOCOLS")
+
 SKIP_FILES: frozenset[str] = frozenset({"index.md", "log.md", "_index.md"})
 
 SYSTEM_SKIP_PARTS: tuple[str, ...] = (".git", "05_Templates", ".system_generated")

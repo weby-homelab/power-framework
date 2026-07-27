@@ -11,8 +11,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path  # noqa: TC003
 
+from .constants import INDEX_FOLDERS
 from .ignore import should_skip
-from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, PARA_FOLDERS, OKFMetadata
+from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, OKFMetadata
 from .parser import read_file_content, validate_metadata
 from .utils import atomic_write
 
@@ -85,7 +86,7 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
             continue
 
         top_folder = rel_path.parts[0]
-        if top_folder not in PARA_FOLDERS:
+        if top_folder not in INDEX_FOLDERS:
             continue
 
         try:
@@ -124,6 +125,33 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
     return folder_notes
 
 
+def scan_root_daily_logs(vault_dir: Path) -> list[dict]:
+    """Collect valid root-level daily logs for direct root-index navigation."""
+    root_logs: list[dict] = []
+    for filepath in vault_dir.glob("*.md"):
+        rel_path = filepath.relative_to(vault_dir)
+        if filepath.name in {"index.md", "log.md", "_index.md"}:
+            continue
+        if len(rel_path.parts) != 1 or should_skip(vault_dir, str(rel_path)):
+            continue
+
+        try:
+            content = read_file_content(filepath)
+            metadata: OKFMetadata | None = validate_metadata(content)
+            if metadata is None:
+                continue
+            root_logs.append(
+                {
+                    "rel_path": str(rel_path),
+                    "title": metadata.title,
+                    "description": metadata.description,
+                }
+            )
+        except Exception:  # noqa: S112
+            continue
+    return sorted(root_logs, key=lambda note: note["rel_path"])
+
+
 def generate_index_content(concepts: dict[str, list[tuple[str, str, str]]]) -> str:
     """Generate the full index.md content from scanned concepts (flat, legacy)."""
     lines = [
@@ -155,7 +183,9 @@ def generate_index_content(concepts: dict[str, list[tuple[str, str, str]]]) -> s
     return "\n".join(lines)
 
 
-def generate_main_index_content(folder_notes: dict[str, list[dict]]) -> str:
+def generate_main_index_content(
+    folder_notes: dict[str, list[dict]], root_daily_logs: list[dict] | None = None
+) -> str:
     """Generate the root index.md as a navigation map linking to sub-indexes."""
     lines = [
         "---",
@@ -167,7 +197,7 @@ def generate_main_index_content(folder_notes: dict[str, list[dict]]) -> str:
         "",
         "# Knowledge Catalog",
         "",
-        "This file is automatically maintained by AI agents. ",
+        "This file is automatically maintained by AI agents.",
         "Use sub-index links to explore detailed entries per category.",
         "",
         "## Navigation Map",
@@ -176,12 +206,22 @@ def generate_main_index_content(folder_notes: dict[str, list[dict]]) -> str:
         "|----------|-------|-----------|",
     ]
 
-    for folder in PARA_FOLDERS:
+    for folder in INDEX_FOLDERS:
         notes = folder_notes.get(folder, [])
         count = len(notes)
         sub_index_link = f"[_index.md]({folder}/_index.md)"
         display_name = folder.replace("_", " ")
         lines.append(f"| {display_name} | {count} | {sub_index_link} |")
+
+    if root_daily_logs:
+        lines.extend(["", "## Root Daily Logs", ""])
+        lines.extend(
+            [
+                f"- [{note['title']}]({note['rel_path']}) — "
+                f"{truncate_for_catalog(note['description'])}"
+                for note in root_daily_logs
+            ]
+        )
 
     lines.append("")
     lines.append("## Agent Protocol")
@@ -270,6 +310,7 @@ def run_generate_sub_index(vault_dir: Path, folder: str) -> str:
     notes = folder_notes.get(folder, [])
 
     sub_index_path = vault_dir / folder / "_index.md"
+    sub_index_path.parent.mkdir(parents=True, exist_ok=True)
     content = generate_sub_index_content(folder, notes)
     atomic_write(sub_index_path, content)
 
@@ -283,17 +324,19 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
     Returns a summary message.
     """
     folder_notes = scan_folder_notes(vault_dir)
+    root_daily_logs = scan_root_daily_logs(vault_dir)
 
-    total_notes = sum(len(notes) for notes in folder_notes.values())
+    total_notes = sum(len(notes) for notes in folder_notes.values()) + len(root_daily_logs)
 
     main_index_path = vault_dir / "index.md"
-    main_content = generate_main_index_content(folder_notes)
+    main_content = generate_main_index_content(folder_notes, root_daily_logs)
     atomic_write(main_index_path, main_content)
 
     sub_index_results = ["  index.md (navigation map)"]
-    for folder in PARA_FOLDERS:
+    for folder in INDEX_FOLDERS:
         notes = folder_notes.get(folder, [])
         sub_index_path = vault_dir / folder / "_index.md"
+        sub_index_path.parent.mkdir(parents=True, exist_ok=True)
         sub_content = generate_sub_index_content(folder, notes)
         atomic_write(sub_index_path, sub_content)
         sub_index_results.append(f"  {folder}/_index.md ({len(notes)} notes)")

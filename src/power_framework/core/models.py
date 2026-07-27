@@ -230,6 +230,8 @@ class OKFMetadata(BaseModel):
                                 confidence=1.0,
                             )
                         )
+                elif isinstance(item, dict):
+                    result.append(TypedRelation.model_validate(item))
                 else:
                     raise ValueError(f"Invalid related item: {item!r}")
             return result

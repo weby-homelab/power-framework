@@ -92,6 +92,24 @@ class TestBackwardCompatibility:
         assert meta.related[1].relation == "references"
         assert meta.related[1].confidence == 0.9
 
+    def test_mapping_list_accepts_typed_relations_from_yaml(self):
+        meta = OKFMetadata(
+            type="Resource",
+            title="Test",
+            description="Test",
+            timestamp=datetime(2026, 1, 1),
+            related=[
+                {
+                    "path": "02_Areas/Typed.md",
+                    "relation": "depends_on",
+                    "confidence": 0.8,
+                },
+            ],
+        )
+        assert meta.related[0].path == "02_Areas/Typed.md"
+        assert meta.related[0].relation == "depends_on"
+        assert meta.related[0].confidence == 0.8
+
     def test_empty_list(self):
         meta = OKFMetadata(
             type="Project",

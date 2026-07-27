@@ -12,6 +12,7 @@ from power_framework.core.indexer import (
     run_generate_index,
     run_generate_sub_index,
     scan_folder_notes,
+    scan_root_daily_logs,
     scan_vault_notes,
     truncate_for_catalog,
 )
@@ -132,6 +133,27 @@ class TestGenerateMainIndexContent:
         assert "01_Projects/_index.md" in content
         assert "02_Areas/_index.md" in content
         assert "03_Resources/_index.md" in content
+
+    def test_indexes_protocols_and_root_daily_logs(self, tmp_path: Path):
+        protocols = tmp_path / "PROTOCOLS"
+        protocols.mkdir()
+        (protocols / "Home.md").write_text(
+            '---\ntype: System Guide\ntitle: "Home"\ndescription: "Vault home"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Home\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "2026-07-21_session.md").write_text(
+            '---\ntype: Daily Log\ntitle: "Session"\ndescription: "Root session"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Session\n",
+            encoding="utf-8",
+        )
+
+        folder_notes = scan_folder_notes(tmp_path)
+        root_logs = scan_root_daily_logs(tmp_path)
+        content = generate_main_index_content(folder_notes, root_logs)
+
+        assert "| PROTOCOLS | 1 |" in content
+        assert "2026-07-21_session.md" in content
 
     def test_contains_note_counts(self, sample_vault: Path):
         folder_notes = scan_folder_notes(sample_vault)

@@ -78,6 +78,51 @@ class TestRunLintVault:
         assert result.total_notes == 2
         assert result.broken_links == []
 
+    def test_gfm_links_resolve_relative_to_source_note(self, tmp_path: Path):
+        resources = tmp_path / "03_Resources"
+        areas = tmp_path / "02_Areas"
+        resources.mkdir()
+        areas.mkdir()
+        (areas / "Target.md").write_text(
+            '---\ntype: Area\ntitle: "Target"\ndescription: "Target note"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Target\n",
+            encoding="utf-8",
+        )
+        (resources / "Source.md").write_text(
+            '---\ntype: Resource\ntitle: "Source"\ndescription: "Source note"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n[Target](../02_Areas/Target.md)\n",
+            encoding="utf-8",
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.broken_links == []
+        assert result.ambiguous_links == []
+
+    def test_duplicate_basenames_are_reported_as_ambiguous(self, tmp_path: Path):
+        projects = tmp_path / "01_Projects"
+        archive = tmp_path / "04_Archive"
+        projects.mkdir()
+        archive.mkdir()
+        note = (
+            "---\ntype: Project\ntitle: \"Target\"\ndescription: \"Target note\"\n"
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Target\n"
+        )
+        (projects / "Target.md").write_text(note, encoding="utf-8")
+        (archive / "Target.md").write_text(note.replace("Project", "Archive"), encoding="utf-8")
+        (projects / "Source.md").write_text(
+            '---\ntype: Project\ntitle: "Source"\ndescription: "Source note"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n[[Target]]\n",
+            encoding="utf-8",
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.total_notes == 3
+        assert result.broken_links == []
+        assert len(result.ambiguous_links) == 1
+        assert result.ambiguous_links[0][1] == "Target"
+
     def test_archive_and_root_daily_log_are_not_orphans(self, tmp_path: Path):
         archive = tmp_path / "04_Archive"
         archive.mkdir()
@@ -93,6 +138,34 @@ class TestRunLintVault:
         result = run_lint_vault(tmp_path)
 
         assert result.orphans == []
+
+    def test_links_inside_fenced_markdown_examples_are_ignored(self, tmp_path: Path):
+        projects = tmp_path / "01_Projects"
+        projects.mkdir()
+        (projects / "Source.md").write_text(
+            '---\ntype: Project\ntitle: "Source"\ndescription: "Source note"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n"
+            "```markdown\n[[missing-example]]\n[Example](missing-example.md)\n```\n",
+            encoding="utf-8",
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.broken_links == []
+
+    def test_links_inside_inline_code_examples_are_ignored(self, tmp_path: Path):
+        projects = tmp_path / "01_Projects"
+        projects.mkdir()
+        (projects / "Source.md").write_text(
+            '---\ntype: Project\ntitle: "Source"\ndescription: "Source note"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n---\n\n"
+            "Use `[[missing-example]]` as a literal example.\n",
+            encoding="utf-8",
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.broken_links == []
 
     def test_archived_status_is_not_orphan(self, tmp_path: Path):
         projects = tmp_path / "01_Projects"

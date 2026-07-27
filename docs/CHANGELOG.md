@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.4
+
+- Fixed typed YAML `related` mappings and preserved plain-string compatibility.
+- Resolved GFM links relative to their source note and reported ambiguous
+  duplicate-basename wiki links as blocking lint errors.
+- Ignored links inside inline/fenced code examples during graph extraction.
+- Indexed `PROTOCOLS/` and root-level daily logs in the hierarchical catalog.
+- Added regression coverage for all of the above behavior.
+
 ## 3.2.3
 
 - Refused publication of a staged search generation when a source note changes
