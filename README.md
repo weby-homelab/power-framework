@@ -30,10 +30,6 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) with zero glue code, powered by FastMCP 3.x
 - **Stable 3.2.3 release** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.2.3 release](https://github.com/weby-homelab/power-framework/releases) records all completed gates.
 
-Detailed breakdown and technical comparison matrix with competing frameworks:
-
-- **[⚡ Why P.O.W.E.R. 3.2.1 Is the Ultimate "Super-Memory" and "Exoskeleton" for Your AI Agents](https://github.com/weby-homelab/power-framework/blob/main/WHY_POWER_3.2.1.en.md)**
-
 ## Quick Start
 
 ```bash
@@ -132,29 +128,11 @@ Step-by-step protocol for any AI agent (Antigravity, OpenCode, Claude Code CLI, 
 - **[English: AI Agent Migration Guide](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
 - **[Українська: Ґайд міграції для AI-агента](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.ua.md)** — покроковий протокол для будь-якого AI-агента
 
-## 🗂️ Methodology Support: Choose What Works for You
+## 🗂️ Methodology compatibility
 
-P.O.W.E.R. is not locked to a single methodology. Initialize a vault with any popular knowledge organization system in one command:
+P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. In 3.2.3, `power init <path>` creates the default P.A.R.A. scaffold only. Selectable templates and the `--template` option are planned; they are not CLI features yet.
 
-```bash
-power init /path/to/vault --template para          # P.A.R.A. — project/deadline focus
-power init /path/to/vault --template code          # C.O.D.E. — content synthesis lifecycle
-power init /path/to/vault --template gtd           # GTD — inbox processing & task flow
-power init /path/to/vault --template zettelkasten  # Zettelkasten — atomic UID idea graph
-power init /path/to/vault --template lyt           # LYT — Maps of Content (MOCs)
-power init /path/to/vault --template johnny-decimal # Johnny.Decimal — strict numeric hierarchy
-```
-
-| Methodology      | Primary Focus               | Default Folder Structure                                    | Core Metric             |
-| :--------------- | :-------------------------- | :---------------------------------------------------------- | :---------------------- |
-| **P.A.R.A.**     | Actions & Deadlines         | `01_Projects`, `02_Areas`, `03_Resources`, `04_Archive`    | Project completion rate |
-| **C.O.D.E.**     | Content Distillation        | `01_Capture`, `02_Organize`, `03_Distill`, `04_Express`    | Idea generation speed   |
-| **GTD**          | Task Processing             | `00_Inbox`, `01_Next_Actions`, `02_Waiting_For`, `03_Someday` | Inbox Zero & Flow    |
-| **Zettelkasten** | Atomic Idea Graph           | `fleeting/`, `literature/`, `permanent/`, `index/`         | Link density & UIDs     |
-| **LYT**          | Maps of Content (MOC)       | `Home.md`, `MOCs/`, `Notes/`, `Archives/`                  | MOC coverage            |
-| **Johnny.Decimal** | Strict Decimal Index      | `10-19_Admin/`, `20-29_Engineering/`, `30-39_Ops/`         | Decimal addressability  |
-
-OKF metadata validation, BGE-M3 vector search, the linter, and all 12 MCP tools work **regardless of the chosen methodology**.
+For another layout, create or retain its folders, then use P.O.W.E.R. to ingest notes and run `lint`, `index`, and `search`. OKF metadata validation and the available search tools work independently of the folder names.
 
 ## Who Is This For
 
@@ -462,11 +440,13 @@ mypy src/power_framework/
 
 ### Test Reports & Benchmarks
 
-For detailed analysis and benchmarks of the P.O.W.E.R. framework:
+For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. v2.0.1 Test Report & Speed Benchmarks](docs/tests/P.O.W.E.R.2.0.1-TEST-1.md) — Multi-lingual (UA/EN) embeddings via `BAAI/bge-m3`, test run outputs, and memory overhead optimization.
-- [Vector Search Degradation & Scalability Limits Analysis](docs/tests/P.O.W.E.R.2.0.1-TEST-2.md) — Comparison of linear NumPy search vs SIMD C `sqlite-vec`, graph-based HNSW, and Qdrant database.
-- [AI Agent Memory Benchmark & SOTA Competency Report (v2.0.3-TEST)](docs/tests/P.O.W.E.R.2.0.3-TEST.md) — Multi-turn incremental evaluations covering MemoryAgentBench (ICLR 2026), LoCoMo, LongMemEval, and BEAM.
+- [P.O.W.E.R. 3.2.3 release notes](docs/release-3.2.3.md) — current release
+  scope, validation boundary, and upgrade guidance.
+- [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
+  checksum-verified post-merge WS full-sync evidence; extended validation is
+  explicitly tracked in issue #187.
 - [P.O.W.E.R. v3.0.0 — Extended UA↔EN Search-Quality Report](docs/tests/P.O.W.E.R.3.0.0-TEST.md) — historical report; its UDCG naming and real-vault quality claims are not current release evidence.
 
 ## Low-RAM Deployment (8–12 GB)

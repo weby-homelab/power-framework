@@ -5,6 +5,46 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.3] - 2026-07-27
+
+### Added
+
+- Optional OKF Memory Contract v0.2 metadata: typed memory kind, confidence,
+  validity dates, provenance, write policy, sensitivity, and supersession
+  fields. Existing v0.1 notes remain valid.
+- Provenance source and SHA-256 content evidence for notes written by
+  `power synthesize` and MCP `ingest_note`.
+- Regression coverage for the memory contract, provenance validation, parser
+  round-trips, healer preservation, and source changes during index sync.
+
+### Changed
+
+- `power sync` rechecks the BLAKE2 source snapshot before promotion. A source
+  that changes while staging is in progress fails the generation and leaves the
+  prior active index searchable.
+- Parser and healer preserve unknown, including nested, frontmatter extensions
+  rather than silently dropping them.
+
+### Documentation
+
+- Added [3.2.3 release notes](docs/release-3.2.3.md). Release assets include a
+  wheel, source distribution, SPDX SBOM, and GitHub provenance attestation.
+- Retired the incomplete pre-merge 3.2.1 evidence set in favor of the canonical
+  checksum-verified post-merge WS evidence package.
+
+## [3.2.2] - 2026-07-27
+
+### Added
+
+- Stable vault identities and isolated per-vault SQLite search databases.
+- Staged, integrity-checked index generations with atomic publication and
+  rollback to the previous active database on failure.
+
+### Documentation
+
+- Added [3.2.2 release notes](docs/release-3.2.2.md) and a machine-checkable
+  documentation-drift gate.
+
 ## [3.2.1] - 2026-07-24
 
 ### Fixed
@@ -150,10 +190,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **IR benchmark report** `docs/tests/P.O.W.E.R.2.2.1-TEST.md`: comparative
-  evaluation of all 5 search modes (fts/vector/hybrid/semantic/hybrid_reranked)
-  on the real vault (565 `.md` files). Key results: FTS MRR=0.889, hybrid
-  MRR=0.792, semantic MRR=0.096, hybrid_reranked MRR=0.286.
+- **IR benchmark report:** a historical comparative evaluation of all five
+  search modes on a real vault. Its measured results were specific to that
+  retired benchmark corpus and are not current release evidence.
 
 ## [2.2.1] - 2026-07-18
 

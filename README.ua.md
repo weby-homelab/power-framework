@@ -27,16 +27,12 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
 - **MCP-нативний** — всі 12 інструментів доступні будь-якому MCP-клієнту (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) через FastMCP 3.x без додаткового коду
-- **Стабільний реліз 3.2.2** — hermetic тести й security checks відстежуються у CI; [реліз P.O.W.E.R. 3.2.2](https://github.com/weby-homelab/power-framework/releases) фіксує всі виконані gates.
-
-Детальний опис та технічна порівняльна матриця з іншими фреймворками:
-
-- **[⚡ Чому P.O.W.E.R. 3.2.1 — Це "Суперпам'ять" та "Екзоскелет" для Ваших AI-Агентів](https://github.com/weby-homelab/power-framework/blob/main/WHY_POWER_3.2.1.md)**
+- **Стабільний реліз 3.2.3** — hermetic тести й security checks відстежуються у CI; [реліз P.O.W.E.R. 3.2.3](https://github.com/weby-homelab/power-framework/releases) фіксує всі виконані gates.
 
 ## Швидкий старт
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.2
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -131,29 +127,11 @@ pip install --user --break-system-packages -e ".[dev]"
 - **[English: AI Agent Migration Guide](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
 - **[Українська: Ґайд міграції для AI-агента](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.ua.md)** — покроковий протокол з MCP-інструментами, евристиками класифікації та вирішенням проблем
 
-## 🗂️ Підтримка Методологій: Оберіть Свою Систему
+## 🗂️ Сумісність із методологіями
 
-P.O.W.E.R. не прив'язує вас до однієї методології. Ініціалізуйте сховище з будь-якою популярною системою організації знань однією командою:
+P.O.W.E.R. індексує, шукає та перевіряє нотатки у наявному сховищі незалежно від структури папок: P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або довільної. У версії 3.2.3 команда `power init <path>` створює лише стандартний скелет P.A.R.A. Вибір шаблонів і параметр `--template` заплановані, але ще не реалізовані в CLI.
 
-```bash
-power init /шлях/до/vault --template para          # P.A.R.A. — орієнтація на проєкти та дедлайни
-power init /шлях/до/vault --template code          # C.O.D.E. — синтез та дистиляція контенту
-power init /шлях/до/vault --template gtd           # GTD — обробка задач і Inbox Zero
-power init /шлях/до/vault --template zettelkasten  # Zettelkasten — атомарні нотатки з UID-графом
-power init /шлях/до/vault --template lyt           # LYT — карти контенту MOC / Hubs
-power init /шлях/до/vault --template johnny-decimal # Johnny.Decimal — сувора десяткова ієрархія
-```
-
-| Методологія      | Головний Фокус              | Скелет Папок за замовчуванням                              | Основна Метрика         |
-| :--------------- | :-------------------------- | :--------------------------------------------------------- | :---------------------- |
-| **P.A.R.A.**     | Дії та Дедлайни             | `01_Projects`, `02_Areas`, `03_Resources`, `04_Archive`   | Завершення проєктів     |
-| **C.O.D.E.**     | Дистиляція контенту         | `01_Capture`, `02_Organize`, `03_Distill`, `04_Express`   | Швидкість генерації ідей|
-| **GTD**          | Опрацювання задач           | `00_Inbox`, `01_Next_Actions`, `02_Waiting_For`, `03_Someday` | Inbox Zero & Потік  |
-| **Zettelkasten** | Атомарний граф ідей         | `fleeting/`, `literature/`, `permanent/`, `index/`        | Густота зв'язків та UID |
-| **LYT**          | Карти контенту (MOC)        | `Home.md`, `MOCs/`, `Notes/`, `Archives/`                 | Покриття MOC-картами    |
-| **Johnny.Decimal** | Суворий десятичний індекс | `10-19_Admin/`, `20-29_Engineering/`, `30-39_Ops/`        | Десятична адресація     |
-
-OKF-валідація метаданих, векторний пошук BGE-M3, лінтер та всі 12 MCP-інструментів працюють **незалежно від обраної методології** — без компромісів!
+Для іншої структури збережіть або створіть потрібні папки, а далі використовуйте P.O.W.E.R. для додавання нотаток і запуску `lint`, `index` та `search`. OKF-валідація метаданих і доступні інструменти пошуку не залежать від назв папок.
 
 ## Для кого це
 
@@ -197,7 +175,7 @@ power search ~/my-vault "гайд деплой" --max-results 5
 Підключіть P.O.W.E.R. до будь-якого MCP-сумісного AI-клієнта (локальний stdio або Docker HTTP транспорт):
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.2
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.3
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -461,11 +439,13 @@ mypy src/power_framework/
 
 ### Звіти про тестування та бенчмарки
 
-Для детального аналізу та результатів продуктивності фреймворку P.O.W.E.R.:
+Для актуальної відтворюваної інформації про реліз і evidence:
 
-- [Звіт про тестування та бенчмарки швидкості P.O.W.E.R. v2.0.1](docs/tests/P.O.W.E.R.2.0.1-TEST-1.md) — оцінка розуміння української семантики моделлю `BAAI/bge-m3`, результати тестів та оптимізація VRAM.
-- [Аналіз деградації векторного пошуку та архітектурних лімітів](docs/tests/P.O.W.E.R.2.0.1-TEST-2.md) — порівняння лінійного NumPy-пошуку з `sqlite-vec` (SIMD C), FAISS (HNSW) та базою даних Qdrant.
-- [Звіт про тестування пам'яті ШІ-агентів у P.O.W.E.R. v2.0.3-TEST](docs/tests/P.O.W.E.R.2.0.3-TEST.md) — інтерактивне багатокрокове тестування на основі SOTA стандартів MemoryAgentBench (ICLR 2026), LoCoMo, LongMemEval та BEAM.
+- [Нотатки релізу P.O.W.E.R. 3.2.3](docs/release-3.2.3.md) — поточний scope,
+  межі валідації та інструкції оновлення.
+- [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) —
+  canonical checksum-verified post-merge WS full-sync evidence; розширена
+  валідація явно ведеться в issue #187.
 - [P.O.W.E.R. v3.0.0 — Розширений звіт про якість пошуку UA↔EN](docs/tests/P.O.W.E.R.3.0.0-TEST.md) — historical report; його UDCG naming і real-vault quality claims не є поточним release evidence.
 
 ## Низько-RAM розгортання (8–12 GB)
@@ -505,7 +485,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.2
+softwareVersion: 3.2.3
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework
