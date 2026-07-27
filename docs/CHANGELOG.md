@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.2.3
+
+- Refused publication of a staged search generation when a source note changes
+  during `power sync`; the previous active index remains available.
+- Added the additive OKF Memory Contract v0.2: optional typed lifecycle,
+  provenance, write-policy, and sensitivity metadata with forward-compatible
+  preservation of extension fields.
+- Added provenance digests for notes produced by session synthesis and MCP
+  ingest. See the [3.2.3 release notes](release-3.2.3.md).
+
 ## 3.2.2
 
 - Isolated search databases by stable vault identity, so independent vaults do

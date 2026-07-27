@@ -13,8 +13,9 @@ from __future__ import annotations
 from datetime import date as date_type
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class TypedRelation(BaseModel):
@@ -55,6 +56,60 @@ class NoteStatus(str, Enum):
     ACTIVE = "active"
     REVIEW = "review"
     ARCHIVED = "archived"
+
+
+class MemoryKind(str, Enum):
+    """Functional role of a governed memory record."""
+
+    SEMANTIC = "semantic"
+    EPISODIC = "episodic"
+    PROCEDURAL = "procedural"
+    INTENT = "intent"
+
+
+class WritePolicy(str, Enum):
+    """How a memory record was allowed to enter the vault."""
+
+    HUMAN = "human"
+    AGENT_PROPOSED = "agent-proposed"
+    AGENT_APPROVED = "agent-approved"
+
+
+class Sensitivity(str, Enum):
+    """Local handling class for memory content."""
+
+    PUBLIC = "public"
+    INTERNAL = "internal"
+    SENSITIVE = "sensitive"
+
+
+class MemoryMetadata(BaseModel):
+    """Optional OKF v0.2 lifecycle and provenance metadata for one note."""
+
+    kind: MemoryKind
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    valid_from: date_type | None = None
+    valid_until: date_type | None = None
+    supersedes: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    write_policy: WritePolicy = WritePolicy.HUMAN
+    sensitivity: Sensitivity = Sensitivity.INTERNAL
+
+    model_config = ConfigDict(extra="allow", use_enum_values=True)
+
+    @field_validator("supersedes", "sources", "evidence")
+    @classmethod
+    def normalize_string_list(cls, values: list[str]) -> list[str]:
+        return [value.strip() for value in values if value.strip()]
+
+    @model_validator(mode="after")
+    def validate_lifecycle_and_provenance(self) -> MemoryMetadata:
+        if self.valid_from and self.valid_until and self.valid_until < self.valid_from:
+            raise ValueError("valid_until must not be before valid_from")
+        if self.write_policy != WritePolicy.HUMAN.value and (not self.sources or not self.evidence):
+            raise ValueError("agent-managed memory requires sources and evidence")
+        return self
 
 
 NOTE_TYPE_ORDER: list[str] = [
@@ -114,13 +169,22 @@ class OKFMetadata(BaseModel):
         default=None,
         description="Date after which the note should be reviewed",
     )
+    okf_version: Literal["0.2"] | None = Field(
+        default=None,
+        description="Optional additive OKF Memory Contract version",
+    )
+    memory: MemoryMetadata | None = Field(
+        default=None,
+        description="Optional lifecycle, provenance, and sensitivity metadata",
+    )
 
     related: list[TypedRelation] = Field(
         default_factory=list,
         description="Typed knowledge graph links to related notes",
     )
 
-    model_config = ConfigDict(extra="ignore", use_enum_values=True)
+    # Unknown fields must survive parsing and healing during the v0.2 rollout.
+    model_config = ConfigDict(extra="allow", use_enum_values=True)
 
     @field_validator("title")
     @classmethod

@@ -12,6 +12,7 @@ from unittest.mock import Mock
 import pytest
 from fastmcp.exceptions import ToolError
 
+from power_framework.core.parser import validate_metadata
 from power_framework.mcp import power_server
 from power_framework.mcp.power_server import (
     ensure_sub_index,
@@ -160,6 +161,13 @@ async def test_ingest_note_tool(sample_vault: Path) -> None:
 
     content = note_path.read_text(encoding="utf-8")
     assert 'title: "New MCP Note"' in content
+    metadata = validate_metadata(content)
+    assert metadata is not None
+    assert metadata.okf_version == "0.2"
+    assert metadata.memory is not None
+    assert metadata.memory.kind == "semantic"
+    assert metadata.memory.sources == ["power://mcp/ingest_note"]
+    assert metadata.memory.evidence[0].startswith("sha256:")
 
     with pytest.raises(ToolError):
         await ingest_note(

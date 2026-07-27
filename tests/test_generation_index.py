@@ -88,3 +88,33 @@ def test_failed_generation_keeps_the_previous_active_index(
         ).fetchone()[0]
     assert (state, expected, actual) == ("ready", 1, 1)
     assert failed == 1
+
+
+def test_source_change_during_sync_keeps_previous_active_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A generation must not publish rows for a stale source snapshot."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "changing", "stable-token")
+    sync_vault_atomically(vault, sync_embeddings=False)
+    active_db = vault_db_path(vault)
+    before = active_db.read_bytes()
+
+    from power_framework.core import searcher
+
+    original_sync = searcher._sync_vault_to_db
+
+    def sync_then_change_source(*args: object, **kwargs: object) -> None:
+        original_sync(*args, **kwargs)
+        note = vault / "01_Projects" / "Test.md"
+        note.write_text(
+            note.read_text(encoding="utf-8").replace("stable-token", "changed-token"),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(searcher, "_sync_vault_to_db", sync_then_change_source)
+    with pytest.raises(IndexGenerationError, match=r"snapshot changed during sync.*Test.md"):
+        sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert active_db.read_bytes() == before
+    assert search_vault(vault, "stable-token", mode="fts")

@@ -17,6 +17,8 @@ import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+import yaml
+
 from .constants import SKIP_FILES
 from .ignore import should_skip
 from .models import NoteType
@@ -101,6 +103,17 @@ def _escape_yaml(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _render_yaml_field(field: str, value: object) -> list[str]:
+    """Render an unrecognized frontmatter field without lossy string coercion."""
+    rendered = yaml.safe_dump(
+        {field: value},
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    ).strip()
+    return rendered.splitlines()
+
+
 def _format_frontmatter(
     fm_data: dict,
     note_type: str | None,
@@ -129,6 +142,21 @@ def _format_frontmatter(
                 parts.append(f"{field}: {str(val).lower()}")
             else:
                 parts.append(f'{field}: "{_escape_yaml(str(val))}"')
+    preserved_fields = {
+        "type",
+        "title",
+        "description",
+        "resource",
+        "tags",
+        "owner",
+        "status",
+        "expiry",
+        "related",
+        "timestamp",
+    }
+    for field, value in fm_data.items():
+        if field not in preserved_fields:
+            parts.extend(_render_yaml_field(field, value))
     if timestamp:
         ts_str = timestamp.isoformat() if isinstance(timestamp, datetime) else str(timestamp)
         parts.append(f"timestamp: {ts_str}")
