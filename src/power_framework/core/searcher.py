@@ -31,7 +31,7 @@ from .index_worker import set_vault_dir
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
 from .query_expansion import QueryExpander
-from .utils import get_cache_dir
+from .vault_storage import vault_db_path
 
 if TYPE_CHECKING:
     from .reranker import RerankerProtocol
@@ -62,19 +62,9 @@ def _get_reranker() -> RerankerProtocol:
     return _reranker_singleton
 
 
-def _db_path() -> Path:
-    """Resolve the search index DB path, honoring POWER_SEARCH_DB override.
-
-    Tests set POWER_SEARCH_DB to an isolated temp file so the shared
-    ``~/.cache/power-framework/power_search.db`` is not cross-contaminated
-    between test cases.
-    """
-    import os
-
-    override = os.getenv("POWER_SEARCH_DB")
-    if override:
-        return Path(override)
-    return get_cache_dir() / "power_search.db"
+def _db_path(vault_dir: Path | None = None) -> Path:
+    """Resolve the isolated DB for a vault, honoring POWER_SEARCH_DB in tests."""
+    return vault_db_path(vault_dir)
 
 
 SNIPPET_WINDOW = 40
@@ -159,7 +149,7 @@ def validate_dense_index(vault_dir: Path) -> int:
     requested dense retrieval must run ``power sync`` first instead of silently
     receiving FTS results from a different retrieval contract.
     """
-    db_path = _db_path()
+    db_path = _db_path(vault_dir)
     if not db_path.exists():
         raise DenseIndexUnavailableError(
             f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
@@ -707,7 +697,7 @@ def _fts_search(
     if not fts_query:
         return []
 
-    db_path = _db_path()
+    db_path = _db_path(vault_dir)
 
     try:
         conn = sqlite3.connect(str(db_path), timeout=30)
@@ -803,7 +793,7 @@ def _vector_search(
         return []
 
     query_vec = _compute_tf_vector(query_tokens)
-    db_path = _db_path()
+    db_path = _db_path(vault_dir)
 
     try:
         conn = sqlite3.connect(str(db_path), timeout=30)
@@ -919,7 +909,7 @@ def _semantic_search(
     if not query or not query.strip():
         return []
 
-    db_path = _db_path()
+    db_path = _db_path(vault_dir)
     index_dimension = validate_dense_index(vault_dir)
 
     def _dense_failure(reason: str) -> None:
@@ -1083,7 +1073,7 @@ def search_vault(
         # the whole vault on every query (Performance Plan §1). Incremental
         # mtime checks inside _sync_vault_to_db keep repeat calls near-free.
         try:
-            conn = sqlite3.connect(str(_db_path()), timeout=30)
+            conn = sqlite3.connect(str(_db_path(vault_dir)), timeout=30)
             conn.execute("PRAGMA busy_timeout=30000")
             conn.execute("PRAGMA journal_mode=WAL")
             _init_db(conn)

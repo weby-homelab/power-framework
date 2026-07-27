@@ -19,10 +19,7 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +147,7 @@ def store_note_triplets(vault_dir: Path | str, rel_path: str, content: str) -> i
     triplets = extract_triplets(content, rel_path)
     if not triplets:
         return 0
-    db_path = _db_path()
+    db_path = _db_path(Path(vault_dir))
     conn = sqlite3.connect(str(db_path), timeout=30)
     try:
         conn.execute("PRAGMA busy_timeout=30000")

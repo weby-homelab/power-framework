@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/weby-homelab/power-framework/release/evidence/benchmark-manifest.schema.json",
+  "title": "POWER evidence benchmark manifest",
+  "description": "Reproducible, environment-scoped evidence for a POWER release claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "timestamp",
+    "source",
+    "vault",
+    "models",
+    "environment",
+    "commands",
+    "measurements",
+    "artifacts",
+    "claims"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "tree_sha256", "dirty"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "tree_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "dirty": {"type": "boolean"}
+      }
+    },
+    "vault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opaque_id", "snapshot_sha256", "note_count"],
+      "properties": {
+        "opaque_id": {"type": "string", "minLength": 8, "maxLength": 128},
+        "snapshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "note_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "repository", "revision", "files"],
+        "properties": {
+          "role": {"enum": ["embedding", "reranker", "other"]},
+          "repository": {"type": "string", "minLength": 1},
+          "revision": {"type": "string", "minLength": 1},
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hardware", "cgroup", "python_version", "platform"],
+      "properties": {
+        "hardware": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cpu", "logical_cores", "memory_bytes"],
+          "properties": {
+            "cpu": {"type": "string", "minLength": 1},
+            "logical_cores": {"type": "integer", "minimum": 1},
+            "memory_bytes": {"type": "integer", "minimum": 1}
+          }
+        },
+        "cgroup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["memory_max_bytes", "cpu_max"],
+          "properties": {
+            "memory_max_bytes": {"type": ["integer", "null"], "minimum": 1},
+            "cpu_max": {"type": "string", "minLength": 1}
+          }
+        },
+        "python_version": {"type": "string", "minLength": 1},
+        "platform": {"type": "string", "minLength": 1}
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "command", "classification"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "command": {"type": "string", "minLength": 1},
+          "classification": {"enum": ["cold", "warm", "setup", "validation"]}
+        }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "classification", "unit", "artifact_sha256"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "classification": {"enum": ["cold", "warm"]},
+          "unit": {"type": "string", "minLength": 1},
+          "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "statement", "state", "evidence_artifact_sha256"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_-]{2,63}$"},
+          "statement": {"type": "string", "minLength": 1},
+          "state": {"enum": ["source-verified", "measured", "experimental", "unverified"]},
+          "evidence_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

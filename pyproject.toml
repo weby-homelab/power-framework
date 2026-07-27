@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "3.2.1"
+version = "3.2.2"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -55,6 +55,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
+    "jsonschema>=4.23.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "types-PyYAML>=6.0.0",
@@ -67,6 +68,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
+    "jsonschema>=4.23.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "types-PyYAML>=6.0.0",
