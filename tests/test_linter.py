@@ -105,7 +105,7 @@ class TestRunLintVault:
         projects.mkdir()
         archive.mkdir()
         note = (
-            "---\ntype: Project\ntitle: \"Target\"\ndescription: \"Target note\"\n"
+            '---\ntype: Project\ntitle: "Target"\ndescription: "Target note"\n'
             "timestamp: 2026-07-21T00:00:00Z\n---\n\n# Target\n"
         )
         (projects / "Target.md").write_text(note, encoding="utf-8")

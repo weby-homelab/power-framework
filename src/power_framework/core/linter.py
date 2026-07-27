@@ -77,10 +77,7 @@ class LintResult:
     def has_blocking_issues(self) -> bool:
         """Return whether lint found invalid metadata, broken links, or expired notes."""
         return bool(
-            self.untyped_files
-            or self.broken_links
-            or self.ambiguous_links
-            or self.stale_notes
+            self.untyped_files or self.broken_links or self.ambiguous_links or self.stale_notes
         )
 
     def format_report(self, vault_dir: Path) -> str:
@@ -109,9 +106,7 @@ class LintResult:
         if self.ambiguous_links:
             lines.append(f"ERROR: Ambiguous links found ({len(self.ambiguous_links)}):")
             for rp, target, candidates in sorted(self.ambiguous_links):
-                lines.append(
-                    f"  - In {rp}: link to {target} matches {', '.join(candidates)}"
-                )
+                lines.append(f"  - In {rp}: link to {target} matches {', '.join(candidates)}")
             lines.append("")
 
         if self.orphans:
@@ -363,7 +358,6 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
     result.total_notes = len(all_files)
 
     for rel_path, abs_path in all_files.items():
-
         try:
             content = read_file_content(abs_path)
         except Exception:  # noqa: S112
@@ -416,8 +410,8 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
                 resolved_links.setdefault(rel_path, []).append(candidates[0])
 
     inbound_counts: dict[str, int] = dict.fromkeys(all_files, 0)
-    for targets in resolved_links.values():
-        for target in targets:
+    for resolved_targets in resolved_links.values():
+        for target in resolved_targets:
             inbound_counts[target] += 1
 
     for rel_path, count in inbound_counts.items():
