@@ -1,7 +1,7 @@
 # POWER 3.3.0 execution tracker
 
-**Status:** repository mirror; remote epic ID is required before Phase 1 may
-merge. **Owner:** Weby Homelab. **Baseline:** `v3.2.4` commit
+**Status:** repository mirror of [GitHub epic #195](https://github.com/weby-homelab/power-framework/issues/195).
+**Owner:** Weby Homelab. **Baseline:** `v3.2.4` commit
 `7411140515497bc9d8b74be3f26ef0bbbb15dc70`, tree
 `38adc02c740155164b9a26316542c57a6a3b1022`.
 
@@ -53,10 +53,19 @@ An issue being closed is never proof that a release gate passed.
   removal of the current ResourceWarning sources before strict new-warning
   enforcement is enabled.
 
-## Remote synchronization requirement
+## Canonical remote issues
 
-Before Phase 1 merges, create the GitHub epic **POWER 3.3.0 — execution
-tracker and release gates**, create child issues for the ten rows in the phase
-table, and replace this sentence with their canonical links. The remote issue
-content must preserve the same owner, target host, command, artifact, and gate
-for every row.
+- [#196 — Phase 1](https://github.com/weby-homelab/power-framework/issues/196)
+- [#197 — Phase 2](https://github.com/weby-homelab/power-framework/issues/197)
+- [#198 — Phase 3](https://github.com/weby-homelab/power-framework/issues/198)
+- [#199 — Phase 4](https://github.com/weby-homelab/power-framework/issues/199)
+- [#200 — Phase 5](https://github.com/weby-homelab/power-framework/issues/200)
+- [#201 — Phase 6](https://github.com/weby-homelab/power-framework/issues/201)
+- [#202 — Phase 7](https://github.com/weby-homelab/power-framework/issues/202)
+- [#203 — Phase 8](https://github.com/weby-homelab/power-framework/issues/203)
+- [#204 — Phase 9](https://github.com/weby-homelab/power-framework/issues/204)
+- [#205 — Phase 10](https://github.com/weby-homelab/power-framework/issues/205)
+
+Each issue mirrors the owner, target host, command, artifact, and gate in this
+repository tracker. Before Phase 1 merges, link the CI result for this branch
+to epic #195 and retain it with the Phase 0 evidence.
