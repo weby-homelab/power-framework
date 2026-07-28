@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 WORKFLOWS_DIR = Path(__file__).resolve().parent.parent / ".github" / "workflows"
+REPO_ROOT = WORKFLOWS_DIR.parent.parent
 FORBIDDEN_WORKFLOW_PATTERNS = ("continue-on-error", "|| true", "/root/gemma/brain")
 
 
@@ -23,6 +24,16 @@ def test_ci_keeps_blocking_test_and_security_jobs() -> None:
 
     assert "  test:" in ci_text
     assert "  security:" in ci_text
+
+
+def test_current_python_support_starts_at_3_11() -> None:
+    ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
+    pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'requires-python = ">=3.11"' in pyproject_text
+    assert '"Programming Language :: Python :: 3.10"' not in pyproject_text
+    assert 'python-version: ["3.11", "3.12", "3.13", "3.14"]' in ci_text
+    assert '"3.10"' not in ci_text
 
 
 def test_workflow_actions_are_pinned_to_immutable_commits() -> None:

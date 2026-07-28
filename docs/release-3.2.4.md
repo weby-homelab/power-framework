@@ -21,6 +21,12 @@ integrity, deterministic link resolution, and complete local catalog coverage.
 - Vault health lint: zero broken, ambiguous, orphan, or stale-note errors.
 - Markdown quality check: zero reported issues.
 
+The machine-readable release baseline in
+`release/evidence/baselines/v3.2.4.json` binds this release to its source tree,
+model-lock checksum, frozen synthetic benchmark hashes, warning count, and
+explicitly skipped optional gates. It is source evidence, not a production
+latency or quality claim.
+
 ## Upgrade
 
 ```bash
