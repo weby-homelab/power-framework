@@ -4,10 +4,10 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
     from fastembed import TextEmbedding
 
@@ -113,7 +113,10 @@ def _get_embedding_dim(model_name: str) -> int:
             import ollama
 
             result = ollama.show(OLLAMA_EMBED_MODEL)
-            mi = result.modelinfo if hasattr(result, "modelinfo") else result.get("model_info", {})
+            mi = cast(
+                "Mapping[str, Any]",
+                result.modelinfo if hasattr(result, "modelinfo") else result.get("model_info", {}),
+            )
             if "general.embedding_dim" in mi:
                 return int(mi["general.embedding_dim"])
             if "qwen3.embedding_length" in mi:
@@ -164,10 +167,11 @@ class OllamaEmbeddingManager:
 
             try:
                 result = ollama.show(self.model_name)
-                mi = (
+                mi = cast(
+                    "Mapping[str, Any]",
                     result.modelinfo
                     if hasattr(result, "modelinfo")
-                    else result.get("model_info", {})
+                    else result.get("model_info", {}),
                 )
                 if "general.embedding_dim" in mi:
                     self._dim = int(mi["general.embedding_dim"])

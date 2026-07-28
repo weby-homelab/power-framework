@@ -46,7 +46,6 @@ from power_framework.core import (
     archive_stale_notes,
     atomic_write_in_vault,
     build_frontmatter,
-    enqueue_write,
     format_relation_suggestions,
     format_untrusted_search_envelope,
     heal_vault,
@@ -59,6 +58,7 @@ from power_framework.core import (
     run_generate_sub_index,
     run_lint_report,
     run_rot_report,
+    run_vault_mutation,
     scan_folder_notes,
     search_vault,
     suggest_related,
@@ -164,8 +164,8 @@ async def generate_index(vault_path: str | None = None) -> str:
         )
 
     path = _get_vault_path(vault_path)
-    # Serialize index regeneration through the single-writer queue (WTF #6).
-    return await enqueue_write(lambda: run_generate_hierarchical_index(path))
+    # Serialize index regeneration within this vault while preserving other-vault parallelism.
+    return await run_vault_mutation(path, lambda: run_generate_hierarchical_index(path))
 
 
 @mcp.tool
@@ -210,7 +210,7 @@ async def ensure_sub_index(category: str, vault_path: str | None = None) -> str:
         sub_path = category_path / "_index.md"
         return f"{result}\n\n{sub_path.read_text(encoding='utf-8')}"
 
-    return await run_blocking(_gen_and_read)
+    return await run_vault_mutation(path, _gen_and_read)
 
 
 @mcp.tool
@@ -285,8 +285,8 @@ async def ingest_note(
             f"Linting Check:\n{lint_result}"
         )
 
-    # Serialize the write/index/log through the single-writer queue (WTF #6).
-    return await enqueue_write(_write_and_index)
+    # Serialize the write/index/log through the shared vault mutation boundary.
+    return await run_vault_mutation(path, _write_and_index)
 
 
 @mcp.tool
@@ -372,8 +372,8 @@ async def synthesize_session(
             timestamp=timestamp,
         )
 
-    # Serialize the write/index/log through the single-writer queue (WTF #6).
-    return await enqueue_write(_write_and_index)
+    # Serialize the write/index/log through the shared vault mutation boundary.
+    return await run_vault_mutation(path, _write_and_index)
 
 
 @mcp.tool
@@ -387,7 +387,9 @@ async def rot_audit(vault_path: str | None = None, extended: bool = False) -> st
 async def archive_notes(dry_run: bool = True, vault_path: str | None = None) -> str:
     """Move stale/expired notes to 04_Archive. Use dry_run=True (default) to preview first."""
     path = _get_vault_path(vault_path)
-    return await run_blocking(lambda: archive_stale_notes(path, dry_run=dry_run))
+    if dry_run:
+        return await run_blocking(lambda: archive_stale_notes(path, dry_run=True))
+    return await run_vault_mutation(path, lambda: archive_stale_notes(path, dry_run=False))
 
 
 @mcp.tool
@@ -422,7 +424,9 @@ async def heal_frontmatter_tool(
 ) -> str:
     """Scan and heal missing/invalid frontmatter fields across vault notes. Use dry_run=True (default) to preview first."""
     path = _get_vault_path(vault_path)
-    return await run_blocking(lambda: heal_vault(path, dry_run=dry_run))
+    if dry_run:
+        return await run_blocking(lambda: heal_vault(path, dry_run=True))
+    return await run_vault_mutation(path, lambda: heal_vault(path, dry_run=False))
 
 
 @mcp.tool

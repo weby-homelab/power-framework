@@ -5,6 +5,26 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.6] - 2026-07-28
+
+### Added
+
+- Added a shared per-vault mutation boundary for CLI and MCP writers.
+- Added in-process reentrant locking plus a cross-process file lock so writers
+  cannot publish conflicting vault mutations concurrently.
+- Added resource-safe coverage helpers and regression tests for multi-vault
+  isolation, lock ordering, cancellation, and failure cleanup.
+
+### Removed
+
+- Removed the daemon index worker and process-global active-vault state.
+
+### Fixed
+
+- Routed all supported vault mutations through the same lifecycle and locking
+  contract, preserving legacy write aliases without retaining an unmanaged
+  asyncio worker.
+
 ## [3.2.5] - 2026-07-28
 
 ### Added

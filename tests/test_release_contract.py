@@ -9,7 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VALIDATOR = REPO_ROOT / "scripts" / "verify_release_contract.py"
-BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.2.5.json"
+BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.2.6.json"
 MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
 
 
@@ -64,3 +64,42 @@ def test_benchmark_hash_must_match_frozen_dataset(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "benchmark.queries_sha256 does not match" in result.stderr
+
+
+def test_source_tree_must_be_a_real_tree_matching_commit(tmp_path: Path) -> None:
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    baseline["source"]["tree"] = "0" * 40
+    altered_baseline = _write_json(tmp_path / "altered-baseline.json", baseline)
+
+    result = _run_validator("--baseline", str(altered_baseline))
+
+    assert result.returncode == 1
+    assert "does not resolve to a Git tree" in result.stderr
+
+
+def test_source_tag_must_point_to_source_commit(tmp_path: Path) -> None:
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    baseline["source"]["tag"] = "v3.2.4"
+    altered_baseline = _write_json(tmp_path / "altered-baseline.json", baseline)
+
+    result = _run_validator("--baseline", str(altered_baseline))
+
+    assert result.returncode == 1
+    assert "does not point to source.commit" in result.stderr
+
+
+def test_release_tag_is_required_for_final_gate(tmp_path: Path) -> None:
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    baseline["source"]["tag"] = "v9.9.9"
+    candidate_baseline = _write_json(tmp_path / "candidate-baseline.json", baseline)
+
+    candidate = _run_validator("--baseline", str(candidate_baseline))
+    assert candidate.returncode == 0, candidate.stderr
+
+    final = _run_validator(
+        "--baseline",
+        str(candidate_baseline),
+        "--require-tag",
+    )
+    assert final.returncode == 1
+    assert "does not resolve to a commit" in final.stderr

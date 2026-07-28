@@ -14,7 +14,8 @@ Thank you for your interest in contributing to the P.O.W.E.R. Framework!
    ```bash
    python -m venv .venv
    source .venv/bin/activate
-   pip install -e ".[dev]"
+   python -m pip install uv==0.11.33
+   uv sync --locked --group dev
    ```
 
 3. Run tests to verify setup:
@@ -35,9 +36,9 @@ Thank you for your interest in contributing to the P.O.W.E.R. Framework!
 2. Make changes with tests
 3. Run quality checks:
    ```bash
-   ruff check power_core/ mcp_servers/ scripts/ tests/
-   ruff format --check power_core/ mcp_servers/ scripts/ tests/
-   mypy power_core/
+   ruff check src tests scripts
+   ruff format --check src tests scripts
+   mypy src/power_framework
    pytest tests/ -v
    ```
 4. Commit with a descriptive message (GPG-signed preferred)
@@ -58,4 +59,5 @@ Thank you for your interest in contributing to the P.O.W.E.R. Framework!
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the
+GNU General Public License v3.0 (GPLv3), matching `pyproject.toml` and `LICENSE`.

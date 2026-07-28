@@ -8,13 +8,12 @@ not blocked by the sync lock.
 from __future__ import annotations
 
 import argparse
-import os
 import sqlite3
+from contextlib import closing
 from typing import TYPE_CHECKING
 
 from power_framework.core import cli, searcher
 from power_framework.core.generation_index import resolve_active_generation_path
-from power_framework.core.vault_storage import vault_cache_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -45,32 +44,21 @@ def _configure_sync_environment(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
 
 
-class TestPidLock:
-    """PID lock prevents parallel sync operations while allowing reads."""
+class TestVaultMutationBoundary:
+    """Sync uses a transient per-vault mutation lock."""
 
-    def test_parallel_sync_refused_for_live_pid(self, tmp_path: Path, monkeypatch):
+    def test_repeated_sync_releases_lock(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
         _configure_sync_environment(monkeypatch, tmp_path)
-        lock_path = vault_cache_dir(vault) / "sync.pid"
-        lock_path.write_text(str(os.getpid()), encoding="utf-8")
-
-        assert cli._cmd_sync(_sync_args(vault)) == 1
-        assert lock_path.exists()
-
-    def test_stale_lock_recovery_and_repeated_sync(self, tmp_path: Path, monkeypatch):
-        vault = _create_test_vault(tmp_path)
-        _configure_sync_environment(monkeypatch, tmp_path)
-        lock_path = vault_cache_dir(vault) / "sync.pid"
-        lock_path.write_text("99999999", encoding="utf-8")
 
         # A stale PID models a process terminated by SIGKILL after it created its lock.
         assert cli._cmd_sync(_sync_args(vault)) == 0
-        assert not lock_path.exists()
+        assert (vault / ".power" / "mutation.lock").exists()
         assert cli._cmd_sync(_sync_args(vault)) == 0
 
         active_path = resolve_active_generation_path(vault)
         assert active_path is not None
-        with sqlite3.connect(f"file:{active_path}?mode=ro", uri=True) as conn:
+        with closing(sqlite3.connect(f"file:{active_path}?mode=ro", uri=True)) as conn:
             assert conn.execute("SELECT COUNT(*) FROM fts_notes").fetchone()[0] == 1
             assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
@@ -83,10 +71,12 @@ class TestPidLock:
 
         def sync_with_concurrent_reader(*args, **kwargs):
             nonlocal observed_read
-            assert (vault_cache_dir(vault) / "sync.pid").exists()
+            assert (vault / ".power" / "mutation.lock").exists()
             active_path = resolve_active_generation_path(vault)
             assert active_path is not None
-            with sqlite3.connect(f"file:{active_path}?mode=ro", uri=True, timeout=0) as reader:
+            with closing(
+                sqlite3.connect(f"file:{active_path}?mode=ro", uri=True, timeout=0)
+            ) as reader:
                 reader.execute("SELECT COUNT(*) FROM fts_notes").fetchone()
             observed_read = True
             return original_sync(*args, **kwargs)
@@ -107,5 +97,5 @@ class TestDbIntegrity:
         assert cli._cmd_sync(_sync_args(vault)) == 0
         active_path = resolve_active_generation_path(vault)
         assert active_path is not None
-        with sqlite3.connect(f"file:{active_path}?mode=ro", uri=True) as conn:
+        with closing(sqlite3.connect(f"file:{active_path}?mode=ro", uri=True)) as conn:
             assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"

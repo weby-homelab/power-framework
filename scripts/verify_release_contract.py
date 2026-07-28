@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,11 +21,12 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PYPROJECT = REPO_ROOT / "pyproject.toml"
 DEFAULT_MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
-DEFAULT_BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.2.5.json"
+DEFAULT_BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.2.6.json"
 DEFAULT_DATASET_MANIFEST = (
     REPO_ROOT / "benchmarks" / "power31" / "dataset" / "v1" / "corpus-manifest.json"
 )
 GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
+GIT_TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 DATASET_HASH_FIELDS = {
     "corpus_sha256": ("corpus", "hash_sha256"),
     "queries_sha256": ("queries", "hash_sha256"),
@@ -67,12 +69,81 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _git(repo: Path, *args: str) -> tuple[int, str, str]:
+    """Run a read-only Git query and return its status, stdout and stderr."""
+    result = subprocess.run(  # noqa: S603 -- fixed executable and repository-local read-only query.
+        ["git", "-C", str(repo), *args],  # noqa: S607 -- fixed executable name.
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+
+def _validate_git_source(
+    source: dict[str, Any],
+    *,
+    release: str,
+    git_repo: Path,
+    require_tag: bool,
+    errors: list[str],
+) -> None:
+    """Prove that the baseline names the released Git objects and ref."""
+    commit = source.get("commit")
+    tree = source.get("tree")
+    if not isinstance(commit, str) or not GIT_OBJECT_RE.fullmatch(commit):
+        return
+    if not isinstance(tree, str) or not GIT_OBJECT_RE.fullmatch(tree):
+        return
+
+    status, _, stderr = _git(git_repo, "cat-file", "-e", f"{commit}^{{commit}}")
+    if status != 0:
+        errors.append(
+            f"baseline source.commit does not resolve to a Git commit: {commit} ({stderr})"
+        )
+        return
+
+    status, _, stderr = _git(git_repo, "cat-file", "-e", f"{tree}^{{tree}}")
+    if status != 0:
+        errors.append(f"baseline source.tree does not resolve to a Git tree: {tree} ({stderr})")
+        return
+
+    status, actual_tree, stderr = _git(git_repo, "show", "-s", "--format=%T", commit)
+    if status != 0:
+        errors.append(f"cannot read commit tree for {commit}: {stderr}")
+    elif actual_tree != tree:
+        errors.append(
+            "baseline source.tree does not match the named commit: "
+            f"expected {tree}, actual {actual_tree}"
+        )
+
+    tag = source.get("tag", f"v{release}")
+    if not isinstance(tag, str) or not GIT_TAG_RE.fullmatch(tag):
+        errors.append(f"baseline source.tag must be a release tag like v{release!s}")
+        return
+    status, tag_commit, stderr = _git(
+        git_repo,
+        "rev-parse",
+        "--verify",
+        f"refs/tags/{tag}^{{commit}}",
+    )
+    if status != 0 and require_tag:
+        errors.append(f"baseline source.tag does not resolve to a commit: {tag} ({stderr})")
+    elif status == 0 and tag_commit != commit:
+        errors.append(
+            f"baseline source.tag {tag} does not point to source.commit: "
+            f"expected {commit}, actual {tag_commit}"
+        )
+
+
 def validate_release_contract(
     *,
     pyproject_path: Path,
     models_lock_path: Path,
     baseline_path: Path,
     dataset_manifest_path: Path,
+    git_repo: Path,
+    require_tag: bool = False,
 ) -> list[str]:
     """Return every release-contract violation without stopping at the first."""
     package_version = _load_package_version(pyproject_path)
@@ -108,6 +179,13 @@ def validate_release_contract(
             errors.append(
                 "baseline source.clean must be true; dirty source cannot be a release baseline"
             )
+        _validate_git_source(
+            source,
+            release=package_version,
+            git_repo=git_repo,
+            require_tag=require_tag,
+            errors=errors,
+        )
 
     expected_lock_hash = baseline.get("models_lock_sha256")
     actual_lock_hash = _sha256(models_lock_path)
@@ -166,6 +244,12 @@ def main() -> int:
     parser.add_argument("--models-lock", type=Path, default=DEFAULT_MODELS_LOCK)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
     parser.add_argument("--dataset-manifest", type=Path, default=DEFAULT_DATASET_MANIFEST)
+    parser.add_argument("--git-repo", type=Path, default=REPO_ROOT)
+    parser.add_argument(
+        "--require-tag",
+        action="store_true",
+        help="fail when the release tag is not present or does not point to source.commit",
+    )
     args = parser.parse_args()
 
     try:
@@ -174,6 +258,8 @@ def main() -> int:
             models_lock_path=args.models_lock,
             baseline_path=args.baseline,
             dataset_manifest_path=args.dataset_manifest,
+            git_repo=args.git_repo,
+            require_tag=args.require_tag,
         )
     except ValueError as exc:
         print(f"Release contract validation failed: {exc}", file=sys.stderr)

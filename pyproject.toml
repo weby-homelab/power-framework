@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "3.2.5"
+version = "3.2.6"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -51,6 +51,7 @@ power = "power_framework.core.cli:main"
 
 [dependency-groups]
 dev = [
+    "build>=1.2.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
@@ -64,6 +65,7 @@ dev = [
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.2.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
@@ -89,9 +91,16 @@ Issues = "https://github.com/weby-homelab/power-framework/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["src/power_framework"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/power_framework/data/semantic_gt.json" = "power_framework/data/semantic_gt.json"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+filterwarnings = [
+    "error::ResourceWarning",
+    "error::pytest.PytestUnraisableExceptionWarning",
+]
 addopts = "-v --tb=short --cov=power_framework --cov-report=term-missing --cov-fail-under=70"
 markers = [
     "bench: optional real-vault benchmark; never a blocking hermetic CI gate",
@@ -145,7 +154,6 @@ disable_error_code = ["type-arg"]
 module = [
     "power_framework.core.embeddings",
     "power_framework.core.searcher",
-    "power_framework.core.index_worker",
     "power_framework.core.reranker",
 ]
 disable_error_code = [

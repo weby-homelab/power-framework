@@ -1,4 +1,4 @@
-"""Tests for Performance Plan §1-§6 optimizations in searcher / index_worker."""
+"""Tests for Performance Plan §1-§6 search and explicit-sync behavior."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from power_framework.core import index_worker
+from power_framework.core.coverage import get_index_coverage
 from power_framework.core.searcher import (
     RERANK_CANDIDATE_LIMIT,
     DenseIndexUnavailableError,
@@ -75,8 +75,8 @@ def semantic_indexed_vault(sample_vault: Path, monkeypatch):
     return sample_vault
 
 
-class TestBackgroundIndexer:
-    """§1: search_vault must NOT synchronously index; it enqueues a request."""
+class TestExplicitIndexing:
+    """§1: search never starts a worker; indexing remains an explicit action."""
 
     def test_search_does_not_block_on_sync(self, sample_vault, monkeypatch):
         monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
@@ -91,23 +91,8 @@ class TestBackgroundIndexer:
         # On an empty index it legitimately returns nothing.
         assert isinstance(results, list)
 
-    def test_request_sync_enqueues(self, sample_vault, monkeypatch):
-        monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
-        # Prevent the background worker from draining/clearing the queue so the
-        # assertion is deterministic (the worker runs in a separate thread).
-        monkeypatch.setattr(index_worker, "ensure_indexer_running", lambda: None)
-        index_worker._clear_queue()
-        index_worker.request_sync(sample_vault, mode="fts")
-        # Read from the same (POWER_SEARCH_DB-isolated) path the worker uses.
-        conn = sqlite3.connect(str(index_worker._db_path()), timeout=30)
-        index_worker._ensure_queue_table(conn)
-        row = conn.execute("SELECT mode FROM sync_queue WHERE id = 1").fetchone()
-        conn.close()
-        assert row is not None
-        assert row[0] == "fts"
-
     def test_coverage_reports_counts(self, indexed_vault):
-        indexed, total = index_worker.get_coverage(indexed_vault)
+        indexed, total = get_index_coverage(indexed_vault)
         assert total > 0
         assert indexed == total
 

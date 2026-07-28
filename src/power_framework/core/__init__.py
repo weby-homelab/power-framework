@@ -65,6 +65,7 @@ from .models import (
     TypedRelation,
     WritePolicy,
 )
+from .mutation import run_blocking, run_vault_mutation
 from .parser import (
     build_frontmatter,
     extract_frontmatter_raw,
@@ -114,7 +115,7 @@ from .utils import (
     validate_path_in_vault,
     validate_vault_path,
 )
-from .write_queue import enqueue_write, run_blocking
+from .write_queue import enqueue_write
 
 EmbeddingManager = get_embedding_manager  # backward compat alias
 
@@ -196,6 +197,7 @@ __all__ = [
     "run_rot_audit",
     "run_rot_report",
     "run_status_report",
+    "run_vault_mutation",
     "scan_folder_notes",
     "scan_vault_notes",
     "search_vault",

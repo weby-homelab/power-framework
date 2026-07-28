@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -69,7 +70,7 @@ def _assert_previous_generation_is_unchanged(vault: Path, before_checksum: str) 
     assert hashlib.sha256(active.read_bytes()).hexdigest() == before_checksum
     assert searcher.search_vault(vault, "first-token", mode="fts")
     assert not searcher.search_vault(vault, "second-token", mode="fts")
-    with sqlite3.connect(_state_db_path(vault)) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
         active_id = conn.execute(
             "SELECT generation_id FROM active_generation WHERE id = 1"
         ).fetchone()[0]
@@ -217,7 +218,7 @@ def test_repeat_build_is_deterministic_at_query_layer(
     sync_vault_atomically(vault, sync_embeddings=False)
     first = resolve_active_generation_path(vault)
     assert first is not None
-    with sqlite3.connect(f"file:{first}?mode=ro", uri=True) as conn:
+    with closing(sqlite3.connect(f"file:{first}?mode=ro", uri=True)) as conn:
         first_rows = conn.execute(
             "SELECT rel_path, title, description, note_type, content FROM fts_notes ORDER BY rel_path"
         ).fetchall()
@@ -225,7 +226,7 @@ def test_repeat_build_is_deterministic_at_query_layer(
     sync_vault_atomically(vault, sync_embeddings=False)
     second = resolve_active_generation_path(vault)
     assert second is not None
-    with sqlite3.connect(f"file:{second}?mode=ro", uri=True) as conn:
+    with closing(sqlite3.connect(f"file:{second}?mode=ro", uri=True)) as conn:
         second_rows = conn.execute(
             "SELECT rel_path, title, description, note_type, content FROM fts_notes ORDER BY rel_path"
         ).fetchall()

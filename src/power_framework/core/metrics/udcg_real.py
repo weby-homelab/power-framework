@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,10 +15,21 @@ SEMANTIC_GT_PATH = (
     / "fixtures"
     / "semantic_gt.json"
 )
+SEMANTIC_GT_RESOURCE = files("power_framework").joinpath("data", "semantic_gt.json")
 
 
-def _load_semantic_gt(path: Path = SEMANTIC_GT_PATH) -> dict[str, dict[str, int]]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+def _load_semantic_gt(path: Path | None = None) -> dict[str, dict[str, int]]:
+    """Load the packaged GT, or an explicit fixture for a governed evaluation."""
+    if path is not None:
+        raw_data = path.read_text(encoding="utf-8")
+    else:
+        try:
+            raw_data = SEMANTIC_GT_RESOURCE.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            # Editable source checkouts before the package data target is built
+            # retain the historical fixture as a development fallback.
+            raw_data = SEMANTIC_GT_PATH.read_text(encoding="utf-8")
+    data = json.loads(raw_data)
     qrels: dict[str, dict[str, int]] = {}
     for entry in data["queries"]:
         qrels[entry["query"]] = entry["relevant"]
@@ -68,7 +80,7 @@ def compute_ndcg(
 def compute_semantic_udcg(
     run: dict[str, dict[str, float]],
     k: int = 5,
-    gt_path: Path = SEMANTIC_GT_PATH,
+    gt_path: Path | None = None,
 ) -> dict[str, float]:
     qrels = _load_semantic_gt(gt_path)
     return compute_ndcg(qrels, run, k=k)

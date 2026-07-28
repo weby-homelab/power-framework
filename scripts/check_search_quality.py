@@ -421,14 +421,9 @@ def evaluate(
     term-AND proxy (deprecated, diagnostic only).
     """
     from power_framework.core.metrics.udcg_real import (
-        SEMANTIC_GT_PATH,
         _load_semantic_gt,
         compute_semantic_udcg,
     )
-
-    if not SEMANTIC_GT_PATH.exists():
-        print(f"ERROR: semantic GT not found at {SEMANTIC_GT_PATH}", file=sys.stderr)
-        return {}
 
     if gt_mode == "lexical":
         import warnings
@@ -456,7 +451,11 @@ def evaluate(
         return {}
 
     # Use the curated GT query set (not DEFAULT_QUERIES)
-    gt_qrels = _load_semantic_gt(SEMANTIC_GT_PATH)
+    try:
+        gt_qrels = _load_semantic_gt()
+    except FileNotFoundError as exc:
+        print(f"ERROR: semantic GT resource is unavailable: {exc}", file=sys.stderr)
+        return {}
     queries = list(gt_qrels.keys())
 
     run = run_search(vault, queries, mode=mode, max_results=max_results)

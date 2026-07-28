@@ -1,10 +1,10 @@
 {
     "schema_version": 1,
-    "release": "3.2.5",
+    "release": "3.2.6",
     "source": {
-        "commit": "3f2e2b9687f96a6fc52c634a13bd75205af7dd96",
-        "tree": "83fd4c776ffea2c81f89d456183e4ba6d1f3f61e",
-        "tag": "v3.2.5",
+        "commit": "2704b17e921e3f773571a4c263cfe67522ae07b8",
+        "tree": "d9056a76aba873d1794fb8b1aa2ace72ccd9ffaf",
+        "tag": "v3.2.6",
         "clean": true
     },
     "environment": {
@@ -12,11 +12,11 @@
         "os": "ubuntu-latest"
     },
     "validation": {
-        "passed": 601,
+        "passed": 607,
         "skipped": 17,
-        "coverage_percent": 75.2,
-        "warning_count": 28,
-        "warning_policy": "Recorded from the final clean local validation run; ResourceWarning is treated as an error.",
+        "coverage_percent": 76.02,
+        "warning_count": 0,
+        "warning_policy": "Recorded from the final clean local validation run; ResourceWarning and PytestUnraisableExceptionWarning are treated as errors.",
         "skipped_optional_gates": [
             "real-vault neural evaluation",
             "target-host cgroup memory matrix",
@@ -30,5 +30,5 @@
         "qrels_sha256": "d91574c0d0c078391fca8f9b4ad41237dd81de78528739ae5cf3631bea868ea8",
         "expected_answers_sha256": "583e444d22a81bda057fa25280a48e05154181cc2a0fbdea268f1f350004d440"
     },
-    "models_lock_sha256": "f296225be001046c32b2bc13ac04d2bb27679bdf46cb264cf7be4dcf5951285e"
+    "models_lock_sha256": "7694ce6c7e64c3379d49ae23bef5f697ba64e43ffdb2bf1c0f631ad5af8a182d"
 }

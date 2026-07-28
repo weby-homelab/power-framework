@@ -1,0 +1,157 @@
+{
+    "version": "3.2",
+    "description": "Curated bilingual (UA+EN) semantic Ground Truth for POWER 3.2 retrieval evaluation. Relevance grades: 3=directly answers, 2=strongly relevant, 1=partially relevant. Non-listed = 0. Each query tests semantic understanding beyond exact term matching.",
+    "queries": [
+        {
+            "query": "how to verify gpg commit signature before merge",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 3,
+                "PROTOCOLS/Successor-Hub.md": 2,
+                "02_Areas/Infrastructure/PROD_Safety_Mandate.md": 1
+            }
+        },
+        {
+            "query": "підпис git коміту gpg ключем",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 3,
+                "PROTOCOLS/Successor-Hub.md": 2
+            }
+        },
+        {
+            "query": "proxmox backup server zpool configuration",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/PRXMX-01_Hardware.md": 3,
+                "02_Areas/Infrastructure/PRXMX-02_Hardware.md": 2,
+                "02_Areas/Infrastructure/Server_Inventory.md": 2,
+                "02_Areas/Infrastructure/Servers.md": 1
+            }
+        },
+        {
+            "query": "tailscale mesh vpn subnet routing setup",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Infrastructure.md": 3,
+                "02_Areas/Infrastructure/Security.md": 2,
+                "02_Areas/Infrastructure/Servers.md": 1
+            }
+        },
+        {
+            "query": "docker compose healthcheck and container monitoring",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 3,
+                "01_Projects/POWER-Improvement-Execution-Plan.md": 1,
+                "03_Resources/Technology Stack.md": 1
+            }
+        },
+        {
+            "query": "adguard home dns filtering blocklist management",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/Infrastructure.md": 2,
+                "01_Projects/ADBlock-PD_Upstream_Upgrade_Plan.md": 1
+            }
+        },
+        {
+            "query": "який embedding model використовувати для українсько-англійського пошуку",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2,
+                "01_Projects/Plan_POWER_3.2.md": 2
+            }
+        },
+        {
+            "query": "power framework okf frontmatter metadata validation",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "01_Projects/Plan_POWER_3.2.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 2,
+                "PROTOCOLS/LLM_WIKI_SCHEMA.md": 1
+            }
+        },
+        {
+            "query": "безпека сервера фаєрвол nftables налаштування",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Security.md": 3,
+                "02_Areas/Infrastructure/PROD_Safety_Mandate.md": 2,
+                "01_Projects/Niftywall.md": 2,
+                "01_Projects/Firewalld-GUI.md": 1
+            }
+        },
+        {
+            "query": "резервне копіювання бекап стратегія серверів",
+            "mode": "semantic",
+            "relevant": {
+                "02_Areas/Infrastructure/Server_Inventory.md": 3,
+                "02_Areas/Infrastructure/Servers.md": 2,
+                "02_Areas/Infrastructure/PRXMX-01_Hardware.md": 1,
+                "02_Areas/Infrastructure/PRXMX-02_Hardware.md": 1
+            }
+        },
+        {
+            "query": "second brain knowledge management best practices",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/P.O.W.E.R.2.0.md": 3,
+                "03_Resources/Second_Brain_2026_Best_Practices_Analysis.md": 3,
+                "PROTOCOLS/LLM_WIKI_SCHEMA.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 1
+            }
+        },
+        {
+            "query": "моніторинг повітряних тривог київ flash",
+            "mode": "semantic",
+            "relevant": {
+                "06_Daily_Logs/MASTER-LESSONS-LEARNED.md": 2,
+                "01_Projects/Plan_POWER_3.2.md": 1
+            }
+        },
+        {
+            "query": "power safety ukraine alert system deployment",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Power-Safety-UA_Audit_2026-07.md": 3,
+                "03_Resources/Power-Safety-UA-Audit-07-2026.md": 3,
+                "01_Projects/Power-Safety-UA/Release v3.9.0.md": 2,
+                "01_Projects/Power-Safety-UA/Release v3.2.3.md": 1
+            }
+        },
+        {
+            "query": "openrouter api key setup for llm inference",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/LLM_Model_Benchmarks.md": 2,
+                "03_Resources/LLM_Software_Comparison.md": 2,
+                "03_Resources/Technology Stack.md": 1,
+                "01_Projects/AI-HomeLab_Roadmap.md": 1
+            }
+        },
+        {
+            "query": "перевірка орфографії та форматування markdown нотаток",
+            "mode": "semantic",
+            "relevant": {
+                "01_Projects/Plan_POWER_3.2.md": 2,
+                "03_Resources/P.O.W.E.R.2.0.md": 2,
+                "01_Projects/POWER_Framework_Evolution_Plan.md": 1
+            }
+        },
+        {
+            "query": "ai homelab local llm optimization memory benchmark",
+            "mode": "semantic",
+            "relevant": {
+                "03_Resources/LLM_Hardware_Research.md": 3,
+                "03_Resources/Local_moe_optimization.md": 2,
+                "03_Resources/LLM_Model_Benchmarks.md": 2,
+                "03_Resources/Community_Analysis_Local_LLM.md": 1,
+                "01_Projects/AI-HomeLab_Roadmap.md": 1
+            }
+        }
+    ]
+}

@@ -28,7 +28,6 @@ from .db import _init_db
 from .embeddings import configured_embedding_identity, get_embedding_manager
 from .generation_index import ActiveGenerationError, resolve_active_generation_path
 from .ignore import should_skip
-from .index_worker import set_vault_dir
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
 from .query_expansion import QueryExpander
@@ -170,7 +169,7 @@ def validate_dense_index(vault_dir: Path) -> int:
         )
 
     try:
-        with _open_readonly_db(db_path) as conn:
+        with contextlib.closing(_open_readonly_db(db_path)) as conn:
             rows, min_size, max_size = conn.execute(
                 "SELECT COUNT(*), MIN(LENGTH(embedding)), MAX(LENGTH(embedding)) "
                 "FROM chunk_embeddings"
@@ -725,6 +724,7 @@ def _fts_search(
 
     db_path = _read_db_path(vault_dir)
 
+    conn: sqlite3.Connection | None = None
     try:
         conn = _open_readonly_db(db_path)
 
@@ -765,7 +765,6 @@ def _fts_search(
                 )
             )
 
-        conn.close()
         return results
     except ActiveGenerationError:
         raise
@@ -780,6 +779,9 @@ def _fts_search(
         fallback_results = _scan_and_search(vault_dir, terms_fallback)
         fallback_results.sort(key=lambda r: (-r.score, -r.match_count, r.title))
         return fallback_results[:max_results]
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def _compute_tf_vector(tokens: list[str]) -> dict[str, float]:
@@ -837,6 +839,7 @@ def _vector_search(
     active_generation_path = resolve_active_generation_path(vault_dir)
     db_path = active_generation_path or _db_path(vault_dir)
 
+    conn: sqlite3.Connection | None = None
     try:
         if active_generation_path is not None:
             conn = _open_readonly_db(db_path)
@@ -850,7 +853,6 @@ def _vector_search(
         cursor.execute("SELECT COUNT(*) FROM tf_vectors")
         if cursor.fetchone()[0] == 0:
             if active_generation_path is not None:
-                conn.close()
                 return []
             # Materialize TF vectors (cheap FTS-only sync) so direct
             # _vector_search calls work even before an explicit index.
@@ -862,11 +864,13 @@ def _vector_search(
             JOIN fts_notes f ON t.rel_path = f.rel_path
         """)
         rows = cursor.fetchall()
-        conn.close()
     except ActiveGenerationError:
         raise
     except Exception:
         return []
+    finally:
+        if conn is not None:
+            conn.close()
 
     scored: list[tuple[float, SearchResult]] = []
 
@@ -978,15 +982,18 @@ def _semantic_search(
             f"index dimension {index_dimension} does not match query dimension {len(query_vec)}"
         )
 
+    conn: sqlite3.Connection | None = None
     try:
         conn = _open_readonly_db(db_path)
 
         cursor = conn.cursor()
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
         rows = cursor.fetchall()
-        conn.close()
     except Exception as exc:
         _dense_failure(f"db error: {type(exc).__name__}")
+    finally:
+        if conn is not None:
+            conn.close()
 
     if not rows:
         _dense_failure("no dense vectors")
@@ -1113,12 +1120,12 @@ def search_vault(
     # Dense-capable modes never create or refresh embeddings from a read request:
     # the caller must explicitly run ``power sync``. Sparse modes retain their
     # lightweight first-use FTS refresh.
-    set_vault_dir(vault_dir)
     if not mode_spec.requires_dense_index and resolve_active_generation_path(vault_dir) is None:
         # Cheap synchronous FTS refresh ONLY when the index is empty/missing,
         # so non-semantic modes stay correct on first use without re-syncing
         # the whole vault on every query (Performance Plan §1). Incremental
         # mtime checks inside _sync_vault_to_db keep repeat calls near-free.
+        conn: sqlite3.Connection | None = None
         try:
             conn = sqlite3.connect(str(_db_path(vault_dir)), timeout=30)
             conn.execute("PRAGMA busy_timeout=30000")
@@ -1128,9 +1135,11 @@ def search_vault(
             cur.execute("SELECT COUNT(*) FROM file_metadata")
             if cur.fetchone()[0] == 0:
                 _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
-            conn.close()
         except Exception as e:
             logger.warning("Session-level FTS sync failed: %s", e)
+        finally:
+            if conn is not None:
+                conn.close()
 
     expander = QueryExpander()
     variants = expander.expand(query)
@@ -1299,14 +1308,14 @@ def format_search_results(
         lines.append("")
 
     if vault_dir is not None:
-        from .index_worker import get_coverage
+        from .coverage import get_index_coverage
 
         try:
-            indexed, total = get_coverage(vault_dir)
+            indexed, total = get_index_coverage(vault_dir)
             pending = max(0, total - indexed)
             footer = f"Index coverage: {indexed}/{total}"
             if pending:
-                footer += f"  (pending: {pending} — background indexing in progress)"
+                footer += f"  (pending: {pending} — run 'power sync' to refresh)"
             lines.append(footer)
         except Exception:  # pragma: no cover
             logger.debug("coverage footer computation failed")

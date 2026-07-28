@@ -54,3 +54,15 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "dist/*.spdx.json" in release_text
     assert "attestations: write" in release_text
     assert "id-token: write" in release_text
+
+
+def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
+    ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
+    release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
+
+    assert (REPO_ROOT / "uv.lock").is_file()
+    assert ci_text.count("uv sync --locked --group dev") >= 4
+    assert "package-smoke:" in ci_text
+    assert "scripts/smoke_package.py" in ci_text
+    assert "scripts/smoke_package.py" in release_text
+    assert "scripts/generate_release_receipt.py" in release_text

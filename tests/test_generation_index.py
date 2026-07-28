@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from typing import TYPE_CHECKING
 
 import pytest
@@ -86,7 +87,7 @@ def test_failed_generation_keeps_the_previous_active_index(
 
     assert active_db.read_bytes() == before
     assert search_vault(vault, "stable-token", mode="fts")
-    with sqlite3.connect(_state_db_path(vault)) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
         state, expected, actual = conn.execute(
             "SELECT state, expected_files, actual_files FROM index_generations "
             "WHERE generation_id = ?",
@@ -148,7 +149,7 @@ def test_active_pointer_retains_current_and_previous_generations(
     assert second_path != first_path
     assert first_path.is_file()
     assert search_vault(vault, "second-token", mode="fts")
-    with sqlite3.connect(_state_db_path(vault)) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
         active_id = conn.execute(
             "SELECT generation_id FROM active_generation WHERE id = 1"
         ).fetchone()[0]
@@ -182,7 +183,7 @@ def test_invalid_sources_are_explicitly_recorded(
     report = sync_vault_atomically(vault, sync_embeddings=False)
 
     assert (report.total_scanned, report.invalid_sources, report.expected_files) == (2, 1, 1)
-    with sqlite3.connect(_state_db_path(vault)) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
         invalid_count = conn.execute(
             "SELECT COUNT(*) FROM generation_invalid_sources WHERE generation_id = ?",
             (report.generation_id,),
@@ -200,7 +201,7 @@ def test_legacy_search_database_is_imported_before_removal(
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     vault = _vault(tmp_path, "legacy", "legacy-token")
     legacy_path = vault_db_path(vault)
-    with sqlite3.connect(legacy_path) as conn:
+    with closing(sqlite3.connect(legacy_path)) as conn:
         _init_db(conn)
         _sync_vault_to_db(vault, conn, sync_embeddings=False)
 
@@ -267,7 +268,7 @@ def test_failure_after_generation_move_keeps_previous_pointer_and_search(
     assert _active_db(vault).name == f"{first.generation_id}.db"
     assert search_vault(vault, "first-token", mode="fts")
     assert not search_vault(vault, "second-token", mode="fts")
-    with sqlite3.connect(_state_db_path(vault)) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
         failed = conn.execute(
             "SELECT COUNT(*) FROM index_generations WHERE state = 'failed'"
         ).fetchone()[0]

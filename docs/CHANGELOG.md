@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.2.6
+
+- Added shared per-vault mutation safety for CLI and MCP writers, with
+  reentrant in-process locks and cross-process file locking.
+- Removed the daemon index worker and process-global active-vault state.
+- Added coverage and regression tests for concurrent writers, cancellation,
+  failure cleanup, and resource-safe read-only inspection.
+
 ## 3.2.5
 
 - Added crash-atomic per-vault generation publication, failure-invariant tests
