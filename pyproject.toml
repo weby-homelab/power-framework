@@ -51,6 +51,7 @@ power = "power_framework.core.cli:main"
 
 [dependency-groups]
 dev = [
+    "build>=1.2.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
@@ -64,6 +65,7 @@ dev = [
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.2.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
