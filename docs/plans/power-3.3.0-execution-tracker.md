@@ -11,6 +11,14 @@ The current authoritative phase map is
 crash-atomic generation store. Phase 2 is now the release-truth and
 reproducible-CI gate described in the linked authoritative roadmap.
 
+**Phase 3 local delivery:** branch
+`feature/power-3-3-phase-3-mutation-safety` removes the daemon index worker and
+global active-vault state, adds per-vault in-process plus OS file locking, and
+routes CLI/MCP writes through the shared mutation boundary. The local Gate 3
+evidence is `607 passed, 17 skipped`, `76.02%` coverage, strict resource-warning
+gates, Mypy, Ruff, documentation, release-contract, and clean package smoke.
+Remote CI, review, and merge remain unverified until publication.
+
 **Runtime policy for 3.3.0:** Python `>=3.11`; required CI matrix is
 3.11–3.14. Python 3.10 compatibility is not part of the 3.3.0 contract.
 
@@ -59,9 +67,9 @@ An issue being closed is never proof that a release gate passed.
 - `python scripts/verify_release_contract.py` validates that contract.
 - `pytest benchmarks/power31/tests -q --no-cov --override-ini=addopts=` is a
   separate hermetic CI job; it never downloads models or reads a private vault.
-- The 47-warning release baseline is recorded without filtering. Phase 1 owns
-  removal of the current ResourceWarning sources before strict new-warning
-  enforcement is enabled.
+- The historical warning baseline is recorded without filtering. Current CI
+  additionally fails on `ResourceWarning` and
+  `PytestUnraisableExceptionWarning`; the Phase 3 local suite passes both gates.
 
 ## Canonical remote issues
 

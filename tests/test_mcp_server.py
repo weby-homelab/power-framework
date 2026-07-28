@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
@@ -196,7 +197,7 @@ async def test_synthesize_session_serializes_write_and_stores_triplets(
 
     assert "synthesized and ingested" in result
     assert (sample_vault / "06_Daily_Logs" / "McpSynthesis.md").exists()
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         rows = conn.execute(
             "SELECT source_path, relation FROM relations WHERE source_path = ?",
             ("06_Daily_Logs/McpSynthesis.md",),

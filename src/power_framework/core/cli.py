@@ -11,11 +11,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import contextlib
 import logging
 import os
 import resource
-import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,7 +21,6 @@ from pathlib import Path
 from .constants import SKIP_FILES
 from .healer import heal_vault
 from .ignore import should_skip
-from .index_worker import set_vault_dir
 from .indexer import generate_log_initial, run_generate_hierarchical_index
 from .linter import (
     archive_stale_notes,
@@ -34,6 +31,7 @@ from .linter import (
 )
 from .markdown_checks import check_all as check_markdown_issues
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
+from .mutation import execute_vault_mutation
 from .parser import build_frontmatter, read_file_content
 from .relations import (
     format_relation_suggestions,
@@ -139,7 +137,7 @@ def _cmd_index(args: argparse.Namespace) -> int:
         logger.error("Vault not found: %s", vault_dir)
         return 1
 
-    msg = run_generate_hierarchical_index(vault_dir)
+    msg = execute_vault_mutation(vault_dir, lambda: run_generate_hierarchical_index(vault_dir))
     logger.info("Generated hierarchical index:\n%s", msg)
     return 0
 
@@ -186,7 +184,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     )
     fm = build_frontmatter(metadata)
     body = f"{fm}\n\n# {title}\n\n"
-    atomic_write(note_path, body)
+    execute_vault_mutation(vault_dir, lambda: atomic_write(note_path, body))
     logger.info("Created note: %s", note_path.relative_to(vault_dir))
     return 0
 
@@ -217,7 +215,6 @@ def _cmd_sync(args: argparse.Namespace) -> int:
 
     from .generation_index import IndexGenerationError, sync_vault_atomically
 
-    set_vault_dir(vault_dir)
     sync_embeddings = not getattr(args, "fts_only", False)
 
     # v2.2.0 low-RAM guard: cap the address space so an over-sized embedding
@@ -243,33 +240,18 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         vault_dir,
     )
     force_rebuild = getattr(args, "force", False)
-    # Prevent concurrent syncs per vault without blocking independent vaults.
-    from .vault_storage import vault_cache_dir
-
-    _lock_p = vault_cache_dir(vault_dir) / "sync.pid"
-    _lock_p.parent.mkdir(parents=True, exist_ok=True)
-    if _lock_p.exists():
-        try:
-            _pid = int(_lock_p.read_text().strip())
-            os.kill(_pid, 0)
-            logger.error("Sync already running (PID %d), exiting.", _pid)
-            return 1
-        except (OSError, ValueError):
-            pass
-    _lock_p.write_text(str(os.getpid()))
     try:
-        try:
-            report = sync_vault_atomically(
+        report = execute_vault_mutation(
+            vault_dir,
+            lambda: sync_vault_atomically(
                 vault_dir,
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
-            )
-        except IndexGenerationError as exc:
-            logger.error("Index generation failed: %s", exc)
-            return 1
-    finally:
-        with contextlib.suppress(OSError):
-            _lock_p.unlink()
+            ),
+        )
+    except IndexGenerationError as exc:
+        logger.error("Index generation failed: %s", exc)
+        return 1
     logger.info(
         "Index generation %s active: %d/%d files, %d chunks.",
         report.generation_id,
@@ -278,18 +260,6 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         report.actual_chunks,
     )
     return 0
-
-
-def _open_conn() -> sqlite3.Connection:
-    from .db import _init_db
-    from .searcher import _db_path
-
-    db_path = _db_path()
-    conn = sqlite3.connect(str(db_path), timeout=30)
-    conn.execute("PRAGMA busy_timeout=30000")
-    conn.execute("PRAGMA journal_mode=WAL")
-    _init_db(conn)
-    return conn
 
 
 def _cmd_rot(args: argparse.Namespace) -> int:
@@ -309,7 +279,12 @@ def _cmd_archive(args: argparse.Namespace) -> int:
     if not vault_dir.exists():
         logger.error("Vault not found: %s", vault_dir)
         return 1
-    result = archive_stale_notes(vault_dir, dry_run=args.dry_run)
+    if args.dry_run:
+        result = archive_stale_notes(vault_dir, dry_run=True)
+    else:
+        result = execute_vault_mutation(
+            vault_dir, lambda: archive_stale_notes(vault_dir, dry_run=False)
+        )
     logger.info(result)
     return 0
 
@@ -342,7 +317,9 @@ def _cmd_cron(args: argparse.Namespace) -> int:
     logger.info("")
 
     logger.info("--- Step 2: Index ---")
-    index_msg = run_generate_hierarchical_index(vault_dir)
+    index_msg = execute_vault_mutation(
+        vault_dir, lambda: run_generate_hierarchical_index(vault_dir)
+    )
     logger.info(index_msg)
     logger.info("")
 
@@ -363,7 +340,12 @@ def _cmd_heal(args: argparse.Namespace) -> int:
     dry_run = not args.no_dry_run
     limit = getattr(args, "limit", None)
 
-    report = heal_vault(vault_dir, dry_run=dry_run, limit=limit)
+    if dry_run:
+        report = heal_vault(vault_dir, dry_run=True, limit=limit)
+    else:
+        report = execute_vault_mutation(
+            vault_dir, lambda: heal_vault(vault_dir, dry_run=False, limit=limit)
+        )
     logger.info(report)
     return 0
 
@@ -386,24 +368,27 @@ def _cmd_rename(args: argparse.Namespace) -> int:
         logger.error("Source note not found: %s", old_file)
         return 1
 
-    # 1. Rename physically if not dry run
-    if not dry_run:
+    def _rename_and_propagate() -> tuple[int, list[str]]:
+        """Perform the physical rename and reference propagation atomically."""
         new_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            import os
-
             os.rename(old_file, new_file)
             logger.info("Physically renamed %s to %s", old_rel, new_rel)
         except Exception as e:
             logger.error("Failed to rename file physically: %s", e)
-            return 1
-    else:
+            raise
+
+        from .healer import propagate_rename
+
+        return propagate_rename(vault_dir, old_rel, new_rel, dry_run=False)
+
+    if dry_run:
         logger.info("[DRY RUN] Would rename %s to %s", old_rel, new_rel)
+        from .healer import propagate_rename
 
-    # 2. Propagate rename references
-    from .healer import propagate_rename
-
-    updated_count, logs = propagate_rename(vault_dir, old_rel, new_rel, dry_run=dry_run)
+        updated_count, logs = propagate_rename(vault_dir, old_rel, new_rel, dry_run=True)
+    else:
+        updated_count, logs = execute_vault_mutation(vault_dir, _rename_and_propagate)
 
     if logs:
         logger.info("Updated references:")
@@ -473,16 +458,19 @@ def _cmd_synthesize(args: argparse.Namespace) -> int:
         logger.error("Vault not found: %s", vault_dir)
         return 1
     try:
-        report = synthesize_session_ingest(
-            name=args.name,
-            title=args.title,
-            description=args.description,
-            content=args.content,
-            note_type=args.note_type,
-            tags=args.tags,
-            related=args.related,
-            owner=args.owner,
-            vault_path=str(vault_dir),
+        report = execute_vault_mutation(
+            vault_dir,
+            lambda: synthesize_session_ingest(
+                name=args.name,
+                title=args.title,
+                description=args.description,
+                content=args.content,
+                note_type=args.note_type,
+                tags=args.tags,
+                related=args.related,
+                owner=args.owner,
+                vault_path=str(vault_dir),
+            ),
         )
     except FileExistsError as e:
         logger.error(str(e))

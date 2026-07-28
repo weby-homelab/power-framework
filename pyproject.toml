@@ -95,6 +95,10 @@ packages = ["src/power_framework"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+filterwarnings = [
+    "error::ResourceWarning",
+    "error::pytest.PytestUnraisableExceptionWarning",
+]
 addopts = "-v --tb=short --cov=power_framework --cov-report=term-missing --cov-fail-under=70"
 markers = [
     "bench: optional real-vault benchmark; never a blocking hermetic CI gate",
@@ -148,7 +152,6 @@ disable_error_code = ["type-arg"]
 module = [
     "power_framework.core.embeddings",
     "power_framework.core.searcher",
-    "power_framework.core.index_worker",
     "power_framework.core.reranker",
 ]
 disable_error_code = [

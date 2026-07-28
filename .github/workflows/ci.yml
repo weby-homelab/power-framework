@@ -49,8 +49,8 @@ jobs:
       - name: Verify release metadata contract
         run: python scripts/verify_release_contract.py
 
-      - name: Run tests with coverage
-        run: pytest tests/ -v --tb=short --cov=src/power_framework/ --cov-report=term-missing --cov-fail-under=70
+      - name: Run tests with coverage and resource warning gates
+        run: pytest tests/ -v --tb=short --cov=src/power_framework/ --cov-report=term-missing --cov-fail-under=70 -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
 
   benchmark-integrity:
     runs-on: ubuntu-latest

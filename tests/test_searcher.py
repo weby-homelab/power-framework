@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path  # noqa: TC003
 
@@ -104,7 +105,7 @@ class TestSearchModeContract:
             _semantic_search(tmp_path, "semantic query")
 
     def test_dense_index_manifest_schema_is_created(self, tmp_path: Path):
-        with sqlite3.connect(tmp_path / "index.db") as conn:
+        with closing(sqlite3.connect(tmp_path / "index.db")) as conn:
             _init_db(conn)
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master")}
         assert "dense_index_manifest" in tables
@@ -114,7 +115,7 @@ class TestSearchModeContract:
     ):
         db_path = tmp_path / "index.db"
         monkeypatch.setattr("power_framework.core.searcher._db_path", lambda _vault=None: db_path)
-        with sqlite3.connect(db_path) as conn:
+        with closing(sqlite3.connect(db_path)) as conn:
             _init_db(conn)
             conn.execute(
                 "INSERT INTO chunk_embeddings VALUES (?, ?, ?, ?, ?)",
@@ -134,7 +135,7 @@ class TestSearchModeContract:
             "power_framework.core.searcher.configured_embedding_identity",
             lambda: ("PinnedProvider", "example/model@revision"),
         )
-        with sqlite3.connect(db_path) as conn:
+        with closing(sqlite3.connect(db_path)) as conn:
             _init_db(conn)
             conn.execute(
                 "INSERT INTO chunk_embeddings VALUES (?, ?, ?, ?, ?)",
