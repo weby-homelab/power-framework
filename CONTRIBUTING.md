@@ -24,7 +24,7 @@ Thank you for your interest in contributing to the P.O.W.E.R. Framework!
 
 ## Code Standards
 
-- **Python**: 3.10+ with type hints
+- **Python**: 3.11+ with type hints
 - **Formatting**: Ruff (line-length 100)
 - **Types**: MyPy strict mode
 - **Style**: Follow PEP 8, use existing patterns

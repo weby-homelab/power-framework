@@ -8,6 +8,9 @@
 **Phase 0 delivery:** [PR #206](https://github.com/weby-homelab/power-framework/pull/206).
 Its CI, CodeQL, and documentation checks must be green before Phase 1 merges.
 
+**Runtime policy for 3.3.0:** Python `>=3.11`; required CI matrix is
+3.11–3.14. Python 3.10 compatibility is not part of the 3.3.0 contract.
+
 This is the authoritative repository-side receipt for the 3.3.0 execution
 plan. A GitHub epic with child issues for Phases 1–10 must mirror this table.
 An issue being closed is never proof that a release gate passed.

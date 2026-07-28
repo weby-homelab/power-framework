@@ -431,7 +431,7 @@ def _make_minimal_evidence() -> dict:
         },
         "dependency_lock_hash": None,
         "models_lock": {"hash": "a" * 64, "revision": "some-revision"},
-        "python_version": "3.10.0",
+        "python_version": "3.11.0",
         "platform": "linux",
         "hardware": {
             "cpu": "x86_64",

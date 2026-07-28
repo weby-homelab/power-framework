@@ -1,6 +1,6 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.10+, hatchling, Pydantic v2, FastMCP 3.x, ONNX Runtime, BGE-M3.
+Python 3.11+, hatchling, Pydantic v2, FastMCP 3.x, ONNX Runtime, BGE-M3.
 
 ## Commands
 
