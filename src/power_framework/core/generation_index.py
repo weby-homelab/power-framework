@@ -6,6 +6,7 @@ import hashlib
 import os
 import sqlite3
 import uuid
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -192,7 +193,7 @@ def _assert_source_snapshot_unchanged(vault_dir: Path, expected_sources: dict[st
 def _record_building(
     vault_dir: Path, generation_id: str, snapshot_hash: str, inventory: SourceInventory
 ) -> None:
-    with sqlite3.connect(_state_db_path(vault_dir), timeout=30) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
         _init_state_db(conn)
         conn.execute(
             """
@@ -236,7 +237,7 @@ def _record_building(
 
 
 def _record_failure(vault_dir: Path, generation_id: str, error: str) -> None:
-    with sqlite3.connect(_state_db_path(vault_dir), timeout=30) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
         _init_state_db(conn)
         conn.execute(
             """
@@ -286,7 +287,7 @@ def _verified_generation_path(
     if actual_size != expected_size or actual_sha256 != expected_sha256:
         raise ActiveGenerationError(f"active generation file identity mismatch: {generation_id}")
     try:
-        with sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30) as conn:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)) as conn:
             integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
     except sqlite3.Error as exc:
         raise ActiveGenerationError(f"active generation cannot be read: {generation_id}") from exc
@@ -310,7 +311,7 @@ def resolve_active_generation_path(vault_dir: Path) -> Path | None:
     if not state_path.exists():
         return None
     try:
-        with sqlite3.connect(f"file:{state_path}?mode=ro", uri=True, timeout=30) as conn:
+        with closing(sqlite3.connect(f"file:{state_path}?mode=ro", uri=True, timeout=30)) as conn:
             row = conn.execute(
                 """
                 SELECT generation_id, state, db_sha256, db_size
@@ -330,7 +331,7 @@ def resolve_active_generation_path(vault_dir: Path) -> Path | None:
 
 def _cleanup_generations(vault_dir: Path) -> None:
     """Best-effort retention, called only after an active-generation readback."""
-    with sqlite3.connect(_state_db_path(vault_dir), timeout=30) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
         _init_state_db(conn)
         rows = conn.execute(
             """
@@ -370,7 +371,7 @@ def _publish(
     os.replace(staging_path, generation_path)
     _fsync_directory(generation_path.parent)
     db_sha256, db_size = _file_identity(generation_path)
-    with sqlite3.connect(_state_db_path(vault_dir), timeout=30) as conn:
+    with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
         _init_state_db(conn)
         try:
             conn.execute("BEGIN IMMEDIATE")
@@ -491,8 +492,8 @@ def _migrate_legacy_database(
     staging_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with (
-            sqlite3.connect(legacy_path, timeout=30) as legacy_conn,
-            sqlite3.connect(staging_path, timeout=30) as staging_conn,
+            closing(sqlite3.connect(legacy_path, timeout=30)) as legacy_conn,
+            closing(sqlite3.connect(staging_path, timeout=30)) as staging_conn,
         ):
             legacy_conn.backup(staging_conn)
             actual_files, actual_chunks, provider, model = _validate_staging(
@@ -556,7 +557,7 @@ def sync_vault_atomically(
     try:
         from .searcher import _sync_vault_to_db
 
-        with sqlite3.connect(staging_path, timeout=30) as conn:
+        with closing(sqlite3.connect(staging_path, timeout=30)) as conn:
             _init_db(conn)
             _sync_vault_to_db(
                 root,
