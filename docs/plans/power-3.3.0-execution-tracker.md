@@ -3,22 +3,22 @@
 **Status:** historical repository mirror of [GitHub epic #195](https://github.com/weby-homelab/power-framework/issues/195).
 The current authoritative phase map is
 [`brain/01_Projects/Fact_n_Plan_Power_3.2.5-3.3.0.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/Fact_n_Plan_Power_3.2.5-3.3.0.md).
-**Owner:** Weby Homelab. **Current release baseline:** `v3.2.6` release
-candidate; the final tag commit/tree is recorded in
-`release/evidence/baselines/v3.2.6.json` after publication.
+**Owner:** Weby Homelab. **Current release baseline:** `v3.2.6` commit
+`e3270dcd7aea757fc264606036c0814aaaf50336`, tree
+`504e1a7c0f697b29a579fe3df1aa84980013c9be`.
 
 **Phase 0–1 delivery:** release `v3.2.5` contains the release foundation and
 crash-atomic generation store. Release `v3.2.6` carries the Phase 3 mutation
 safety implementation. Phase 2 is now the release-truth and
 reproducible-CI gate described in the linked authoritative roadmap.
 
-**Phase 3 local delivery:** branch
-`feature/power-3-3-phase-3-mutation-safety` removes the daemon index worker and
+**Phase 3 delivery:** release `v3.2.6` removes the daemon index worker and
 global active-vault state, adds per-vault in-process plus OS file locking, and
 routes CLI/MCP writes through the shared mutation boundary. The local Gate 3
 evidence is `607 passed, 17 skipped`, `76.02%` coverage, strict resource-warning
 gates, Mypy, Ruff, documentation, release-contract, and clean package smoke.
-Remote CI, review, and merge remain unverified until publication.
+PR #208 merged as `e3270dcd`; remote CI, CodeQL, package smoke, and benchmark
+integrity passed before the signed `v3.2.6` tag was published.
 
 **Runtime policy for 3.3.0:** Python `>=3.11`; required CI matrix is
 3.11–3.14. Python 3.10 compatibility is not part of the 3.3.0 contract.
