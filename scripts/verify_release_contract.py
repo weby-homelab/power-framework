@@ -17,8 +17,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import tomllib
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PYPROJECT = REPO_ROOT / "pyproject.toml"
 DEFAULT_MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
@@ -47,15 +45,21 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _load_package_version(path: Path) -> str:
-    """Read the package version without importing the package."""
+    """Read ``[project].version`` without importing the package or a TOML dependency."""
     try:
-        payload = tomllib.loads(path.read_text(encoding="utf-8"))
-        version = payload["project"]["version"]
-    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
         raise ValueError(f"cannot read project version from {path}: {exc}") from exc
-    if not isinstance(version, str) or not version:
+
+    project_section = re.search(r"(?ms)^\[project\]\s*(.*?)(?=^\[|\Z)", content)
+    version_match = (
+        re.search(r'(?m)^version\s*=\s*"([^"\n]+)"\s*$', project_section.group(1))
+        if project_section is not None
+        else None
+    )
+    if version_match is None:
         raise ValueError(f"project.version in {path} must be a non-empty string")
-    return version
+    return version_match.group(1)
 
 
 def _sha256(path: Path) -> str:
