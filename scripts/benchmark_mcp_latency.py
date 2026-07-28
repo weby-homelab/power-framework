@@ -12,26 +12,26 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import asyncio
-import json
 import statistics
 import sys
 import time
 from pathlib import Path
+
+from power_framework.core.metrics.udcg_real import _load_semantic_gt
 
 MODES = ["fts", "vector", "hybrid", "semantic", "reranked"]
 ROUNDS = 10
 SERVER_URL = "http://127.0.0.1:8765/mcp"
 
 
-async def main() -> None:
-    gt_path = Path("tests/fixtures/semantic_gt.json")
-    if not gt_path.exists():
-        print(f"ERROR: {gt_path} not found", file=sys.stderr)
+async def main(fixture: Path | None = None) -> int:
+    try:
+        queries = list(_load_semantic_gt(fixture))
+    except FileNotFoundError as exc:
+        print(f"ERROR: semantic GT resource is unavailable: {exc}", file=sys.stderr)
         return 1
-
-    gt = json.loads(gt_path.read_text(encoding="utf-8"))
-    queries = [item["query"] for item in gt["queries"]]
 
     try:
         from fastmcp import Client
@@ -88,4 +88,11 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--fixture",
+        type=Path,
+        help="Optional explicit semantic GT JSON; otherwise use the packaged fixture.",
+    )
+    args = parser.parse_args()
+    raise SystemExit(asyncio.run(main(args.fixture)))

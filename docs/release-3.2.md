@@ -23,7 +23,7 @@ still require measured evidence.
 | Canonical embedding model | `release/models.lock.json` → `canonical_embedding` (bge-m3-onnx, MIT)                      |
 | Canonical reranker model  | `release/models.lock.json` → `canonical_reranker` (bge-reranker-v2-m3-onnx, MIT)           |
 | Optional reranker         | `release/models.lock.json` → `optional_reranker` (jina-reranker-v2, CC-BY-NC-4.0)          |
-| Semantic ground truth     | `tests/fixtures/semantic_gt.json` — 16 bilingual UA+EN queries with graded relevance (0–3) |
+| Semantic ground truth     | Packaged `power_framework/data/semantic_gt.json` — 16 bilingual UA+EN queries with graded relevance (0–3); evaluation scripts accept an explicit fixture path for governed holdouts |
 | ADR baseline              | `docs/adr/0001-power-3.1-trust-release-baseline.md`                                        |
 
 ## Benchmark status

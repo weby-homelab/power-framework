@@ -64,3 +64,25 @@ def test_benchmark_hash_must_match_frozen_dataset(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "benchmark.queries_sha256 does not match" in result.stderr
+
+
+def test_source_tree_must_be_a_real_tree_matching_commit(tmp_path: Path) -> None:
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    baseline["source"]["tree"] = "0" * 40
+    altered_baseline = _write_json(tmp_path / "altered-baseline.json", baseline)
+
+    result = _run_validator("--baseline", str(altered_baseline))
+
+    assert result.returncode == 1
+    assert "does not resolve to a Git tree" in result.stderr
+
+
+def test_source_tag_must_point_to_source_commit(tmp_path: Path) -> None:
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    baseline["source"]["tag"] = "v3.2.4"
+    altered_baseline = _write_json(tmp_path / "altered-baseline.json", baseline)
+
+    result = _run_validator("--baseline", str(altered_baseline))
+
+    assert result.returncode == 1
+    assert "does not point to source.commit" in result.stderr

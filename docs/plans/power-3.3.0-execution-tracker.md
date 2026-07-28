@@ -1,18 +1,22 @@
 # POWER 3.3.0 execution tracker
 
-**Status:** repository mirror of [GitHub epic #195](https://github.com/weby-homelab/power-framework/issues/195).
-**Owner:** Weby Homelab. **Baseline:** `v3.2.4` commit
-`7411140515497bc9d8b74be3f26ef0bbbb15dc70`, tree
-`38adc02c740155164b9a26316542c57a6a3b1022`.
+**Status:** historical repository mirror of [GitHub epic #195](https://github.com/weby-homelab/power-framework/issues/195).
+The current authoritative phase map is
+[`brain/01_Projects/Fact_n_Plan_Power_3.2.5-3.3.0.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/Fact_n_Plan_Power_3.2.5-3.3.0.md).
+**Owner:** Weby Homelab. **Current release baseline:** `v3.2.5` commit
+`3f2e2b9687f96a6fc52c634a13bd75205af7dd96`, tree
+`83fd4c776ffea2c81f89d456183e4ba6d1f3f61e`.
 
-**Phase 0 delivery:** [PR #206](https://github.com/weby-homelab/power-framework/pull/206).
-Its CI, CodeQL, and documentation checks must be green before Phase 1 merges.
+**Phase 0–1 delivery:** release `v3.2.5` contains the release foundation and
+crash-atomic generation store. Phase 2 is now the release-truth and
+reproducible-CI gate described in the linked authoritative roadmap.
 
 **Runtime policy for 3.3.0:** Python `>=3.11`; required CI matrix is
 3.11–3.14. Python 3.10 compatibility is not part of the 3.3.0 contract.
 
-This is the authoritative repository-side receipt for the 3.3.0 execution
-plan. A GitHub epic with child issues for Phases 1–10 must mirror this table.
+This document retains the earlier repository-side execution tracker for
+reference. It is not the current phase authority; a GitHub epic with child
+issues for Phases 1–10 must not override the linked roadmap.
 An issue being closed is never proof that a release gate passed.
 
 ## Phase ownership and merge gates
@@ -49,7 +53,7 @@ An issue being closed is never proof that a release gate passed.
 ## Phase 0 evidence
 
 - `release/models.lock.json` release equals `pyproject.toml` version.
-- `release/evidence/baselines/v3.2.4.json` records release source, Python/OS,
+- `release/evidence/baselines/v3.2.5.json` records release source, Python/OS,
   test and warning counts, skipped optional gates, model-lock checksum, and
   frozen benchmark hashes.
 - `python scripts/verify_release_contract.py` validates that contract.

@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -28,13 +30,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev
 
       - name: Run Ruff linter
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ scripts/
 
       - name: Run Ruff formatter check
-        run: ruff format --check src/ tests/
+        run: ruff format --check src/ tests/ scripts/
 
       - name: Run MyPy type check
         if: ${{ matrix.python-version == '3.13' }}
@@ -53,6 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -62,7 +67,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev
 
       - name: Run hermetic frozen benchmark checks
         run: pytest benchmarks/power31/tests -q --no-cov --override-ini=addopts=
@@ -71,6 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -80,9 +88,37 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev
 
       - name: Audit dependencies for known vulnerabilities
         run: |
           python -m pip install --upgrade pip
           pip-audit --skip-editable
+
+  package-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Install locked runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Smoke-test wheel and sdist outside checkout
+        run: |
+          python scripts/smoke_package.py \
+            --wheel dist/power_framework-*.whl \
+            --sdist dist/power_framework-*.tar.gz
