@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.5
+
+- Added crash-atomic per-vault generation publication, failure-invariant tests
+  and versioned raw fault receipts.
+- Raised the supported Python floor to 3.11.
+
 ## 3.2.4
 
 - Fixed typed YAML `related` mappings and preserved plain-string compatibility.

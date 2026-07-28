@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "artifact_type": "power_generation_fault_matrix",
+  "artifact_id": "phase1-generation-fault-matrix-v1",
+  "classification": "hermetic_fault_injection",
+  "source_scope": "POWER 3.3.0 Phase 1 crash-atomic generation store",
+  "test_module": "tests/test_generation_fault_matrix.py",
+  "reproduction_command": "pytest tests/test_generation_fault_matrix.py -q --no-cov",
+  "invariant": "A failed or killed publication never exposes partial active data; after pointer commit the new immutable generation remains readable.",
+  "receipts": [
+    {
+      "id": "oom-first-batch",
+      "injection": "permanent MemoryError before first batch completes",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "oom-middle-batch",
+      "injection": "permanent MemoryError during middle batch",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "oom-last-batch",
+      "injection": "permanent MemoryError during last batch",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "enospc-staging",
+      "injection": "ENOSPC while initializing staging DB",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "enospc-generation-move",
+      "injection": "ENOSPC during staging to immutable generation move",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "enospc-state-db",
+      "injection": "ENOSPC while preparing state DB transaction",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "sqlite-locked-state-db",
+      "injection": "SQLite OperationalError database is locked during state transaction setup",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "corrupt-staging-db",
+      "injection": "staging integrity validation rejects a corrupt DB",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "source-add-race",
+      "injection": "valid source added after staging build",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "source-delete-race",
+      "injection": "valid source deleted after staging build",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "deterministic-repeat-build",
+      "injection": "repeat build without source change",
+      "expected_active": "new",
+      "expected_query": "identical FTS rows"
+    },
+    {
+      "id": "sigkill-before-move",
+      "injection": "SIGKILL while staging DB is ready before os.replace",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "sigkill-after-move",
+      "injection": "SIGKILL after immutable move before pointer transaction",
+      "expected_active": "previous",
+      "expected_query": "first-token"
+    },
+    {
+      "id": "sigkill-after-pointer",
+      "injection": "SIGKILL after pointer commit before cleanup",
+      "expected_active": "new",
+      "expected_query": "second-token"
+    }
+  ]
+}

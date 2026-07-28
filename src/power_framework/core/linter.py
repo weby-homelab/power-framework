@@ -19,8 +19,8 @@ from __future__ import annotations
 import logging
 import re
 import shutil
+from datetime import UTC, datetime
 from datetime import date as date_type
-from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -82,7 +82,7 @@ class LintResult:
 
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable lint report."""
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         lines = [
             "=== P.O.W.E.R. Health Lint Report ===",
             f"Vault scanned: {vault_dir}",
@@ -163,7 +163,7 @@ class ROTResult:
 
     def format_report(self, vault_dir: Path) -> str:
         """Generate a human-readable ROT audit report, including extended A2 metrics."""
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         lines = [
             "=== P.O.W.E.R. ROT Audit Report ===",
             f"Vault scanned: {vault_dir}",
@@ -379,10 +379,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
         if fm and "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
-                if (
-                    isinstance(expiry_val, date_type)
-                    and expiry_val < datetime.now(timezone.utc).date()
-                ):
+                if isinstance(expiry_val, date_type) and expiry_val < datetime.now(UTC).date():
                     result.stale_notes.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
                 # Ignore invalid date formats; handled by schema validation.
@@ -479,10 +476,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
         if "expiry" in fm:
             try:
                 expiry_val = fm["expiry"]
-                if (
-                    isinstance(expiry_val, date_type)
-                    and expiry_val < datetime.now(timezone.utc).date()
-                ):
+                if isinstance(expiry_val, date_type) and expiry_val < datetime.now(UTC).date():
                     stale_list.append((rel_path, f"Expired on {expiry_val.isoformat()}"))
             except (ValueError, TypeError):
                 # Ignore invalid date formats; handled by schema validation.
@@ -575,7 +569,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
     Returns: Summary string of actions taken
     """
     archive_dir = vault_dir / "04_Archive"
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     moved: list[str] = []
     errors: list[str] = []
 
@@ -663,7 +657,7 @@ def run_status_report(vault_dir: Path) -> str:
     from .parser import validate_metadata
     from .relations import KnowledgeGraph
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
 
     total_files = 0
     non_compliant = 0

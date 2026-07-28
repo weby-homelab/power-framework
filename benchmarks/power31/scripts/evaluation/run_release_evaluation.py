@@ -26,7 +26,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -711,13 +711,11 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
 
     # ── Assemble output ───────────────────────────────────────────────────
     timestamp_raw = (
-        args.timestamp
-        or os.environ.get("SOURCE_DATE_EPOCH")
-        or datetime.now(timezone.utc).isoformat()
+        args.timestamp or os.environ.get("SOURCE_DATE_EPOCH") or datetime.now(UTC).isoformat()
     )
     try:
         ts_epoch = int(timestamp_raw)
-        ts_str = datetime.fromtimestamp(ts_epoch, tz=timezone.utc).isoformat()
+        ts_str = datetime.fromtimestamp(ts_epoch, tz=UTC).isoformat()
     except (ValueError, TypeError, OSError):
         ts_str = timestamp_raw
 

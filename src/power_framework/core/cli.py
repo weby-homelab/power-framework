@@ -17,7 +17,7 @@ import os
 import resource
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .constants import SKIP_FILES
@@ -102,7 +102,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
         type="Resource",
         title="Template Note",
         description="Default OKF template for new notes",
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
     )
     atomic_write(template_path, content)
     created.append("  05_Templates/default.md")
@@ -182,7 +182,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         description=description,
         resource=resource,
         tags=tags,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
     fm = build_frontmatter(metadata)
     body = f"{fm}\n\n# {title}\n\n"

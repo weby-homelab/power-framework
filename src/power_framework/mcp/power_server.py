@@ -24,7 +24,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
@@ -242,7 +242,7 @@ async def ingest_note(
     if target_file.exists():
         raise ToolError(f"Note already exists at {name}")
 
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
     metadata = OKFMetadata(
         type=NoteType(note_type),
         title=title,
@@ -268,7 +268,7 @@ async def ingest_note(
 
         log_file = path / "log.md"
         if log_file.exists():
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            date_str = datetime.now(UTC).strftime("%Y-%m-%d")
             log_entry = (
                 f"\n## [{date_str}] ingest | Created {title}\n"
                 f"- **Action:** Created note '{name}' of type {note_type} via MCP tool ingest_note.\n"
@@ -356,7 +356,7 @@ async def synthesize_session(
     if target_file.exists():
         raise ToolError(f"Note already exists at {name}")
 
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
 
     def _write_and_index() -> str:
         return synthesize_session_ingest(

@@ -10,9 +10,9 @@ Supports:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from datetime import date as date_type
-from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -39,7 +39,7 @@ class TypedRelation(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-class NoteType(str, Enum):
+class NoteType(StrEnum):
     """Allowed OKF note types according to P.A.R.A. + LLM-Wiki schema."""
 
     PROJECT = "Project"
@@ -50,7 +50,7 @@ class NoteType(str, Enum):
     SYSTEM_GUIDE = "System Guide"
 
 
-class NoteStatus(str, Enum):
+class NoteStatus(StrEnum):
     """Lifecycle status for governance tracking."""
 
     ACTIVE = "active"
@@ -58,7 +58,7 @@ class NoteStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class MemoryKind(str, Enum):
+class MemoryKind(StrEnum):
     """Functional role of a governed memory record."""
 
     SEMANTIC = "semantic"
@@ -67,7 +67,7 @@ class MemoryKind(str, Enum):
     INTENT = "intent"
 
 
-class WritePolicy(str, Enum):
+class WritePolicy(StrEnum):
     """How a memory record was allowed to enter the vault."""
 
     HUMAN = "human"
@@ -75,7 +75,7 @@ class WritePolicy(str, Enum):
     AGENT_APPROVED = "agent-approved"
 
 
-class Sensitivity(str, Enum):
+class Sensitivity(StrEnum):
     """Local handling class for memory content."""
 
     PUBLIC = "public"
@@ -242,9 +242,7 @@ class OKFMetadata(BaseModel):
     def normalize_timestamp(cls, v: object) -> datetime:
         if isinstance(v, datetime):
             if v.tzinfo is None:
-                from datetime import timezone
-
-                v = v.replace(tzinfo=timezone.utc)
+                v = v.replace(tzinfo=UTC)
             return v
         raise ValueError("timestamp must be a datetime")
 

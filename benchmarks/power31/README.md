@@ -83,12 +83,28 @@ benchmarks/power31/
 │   ├── baseline.yaml                 # FTS-only
 │   ├── candidate.yaml               # Semantic + pinned BGE-M3 ONNX
 │   └── regression-budgets.yaml
+├── evidence/
+│   └── phase1-generation-fault-matrix-v1.json
+│                                      # versioned hermetic crash/OOM/ENOSPC/lock receipts
 ├── tests/
 │   └── test_benchmark_integrity.py
 └── scripts/
     ├── generate_benchmark.py
     └── evaluation/
         └── validate_dataset.py
+```
+
+## Generation fault receipts
+
+`evidence/phase1-generation-fault-matrix-v1.json` is a versioned correctness
+artifact for POWER 3.3.0 Phase 1. It records the hermetic fault matrix for
+generation publication (OOM, ENOSPC, SQLite lock, corrupt staging, source
+races, and SIGKILL checkpoints). It is not retrieval-quality evidence.
+
+Reproduce it with:
+
+```bash
+pytest tests/test_generation_fault_matrix.py -q --no-cov
 ```
 
 ## Regeneration

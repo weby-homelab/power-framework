@@ -14,7 +14,7 @@ import tempfile
 import time
 from collections import defaultdict
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PureWindowsPath
 from typing import Any
 from urllib.parse import unquote
@@ -201,7 +201,7 @@ def create_backup(filepath: Path, backup_dir: Path | None = None) -> Path | None
 
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     backup_name = f"{filepath.stem}.{timestamp}{filepath.suffix}"
     backup_path = backup_dir / backup_name
 
@@ -306,7 +306,7 @@ try:
 
     __version__ = _get_version("power-framework")
 except Exception:
-    __version__ = "3.2.4"
+    __version__ = "3.2.5"
 
 
 def run_opencode_cli(prompt: str) -> str:

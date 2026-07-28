@@ -8,7 +8,7 @@ Scans the vault for OKF-annotated notes and generates hierarchical index files:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003
 
 from .constants import INDEX_FOLDERS
@@ -159,7 +159,7 @@ def generate_index_content(concepts: dict[str, list[tuple[str, str, str]]]) -> s
         "type: System Guide",
         'title: "Second Brain Index"',
         'description: "Registry of all concepts in the Second Brain"',
-        f"timestamp: {datetime.now(timezone.utc).isoformat()}",
+        f"timestamp: {datetime.now(UTC).isoformat()}",
         "---",
         "",
         "# Knowledge Catalog (OKF Index)",
@@ -192,7 +192,7 @@ def generate_main_index_content(
         "type: System Guide",
         'title: "Second Brain Index"',
         'description: "Hierarchical navigation map for the knowledge vault"',
-        f"timestamp: {datetime.now(timezone.utc).isoformat()}",
+        f"timestamp: {datetime.now(UTC).isoformat()}",
         "---",
         "",
         "# Knowledge Catalog",
@@ -244,7 +244,7 @@ def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
         "type: System Guide",
         f'title: "{display_name} Sub-Index"',
         f'description: "Detailed catalog of all notes in {display_name}"',
-        f"timestamp: {datetime.now(timezone.utc).isoformat()}",
+        f"timestamp: {datetime.now(UTC).isoformat()}",
         "---",
         "",
     ]
@@ -355,8 +355,8 @@ def generate_log_initial(vault_dir: Path, note_count: int) -> None:
     if log_path.exists():
         return
 
-    timestamp = datetime.now(timezone.utc).isoformat()
-    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    timestamp = datetime.now(UTC).isoformat()
+    date_str = datetime.now(UTC).strftime("%Y-%m-%d")
     content = "\n".join(
         [
             "---",

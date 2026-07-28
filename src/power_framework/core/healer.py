@@ -14,7 +14,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import yaml
@@ -231,19 +231,17 @@ def heal_frontmatter(
 
     if timestamp:
         if not isinstance(timestamp, datetime) and isinstance(timestamp, date_type):
-            timestamp = datetime(
-                timestamp.year, timestamp.month, timestamp.day, tzinfo=timezone.utc
-            )
+            timestamp = datetime(timestamp.year, timestamp.month, timestamp.day, tzinfo=UTC)
             changes.append("Converted date timestamp to datetime")
         elif isinstance(timestamp, str):
             try:
                 timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                 changes.append("Parsed string timestamp to datetime")
             except ValueError:
-                timestamp = datetime.now(timezone.utc)
+                timestamp = datetime.now(UTC)
                 changes.append("Replaced invalid string timestamp with current time")
     else:
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         changes.append("Added missing timestamp")
 
     # 5. Tags list healing (convert non-strings like integers 2026 to strings)
