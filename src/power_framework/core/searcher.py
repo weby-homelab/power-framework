@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 from .chunker import SemanticChunker
 from .db import _init_db
 from .embeddings import configured_embedding_identity, get_embedding_manager
+from .generation_index import ActiveGenerationError, resolve_active_generation_path
 from .ignore import should_skip
 from .index_worker import set_vault_dir
 from .models import OKFMetadata  # noqa: TC001
@@ -65,6 +66,19 @@ def _get_reranker() -> RerankerProtocol:
 def _db_path(vault_dir: Path | None = None) -> Path:
     """Resolve the isolated DB for a vault, honoring POWER_SEARCH_DB in tests."""
     return vault_db_path(vault_dir)
+
+
+def _read_db_path(vault_dir: Path) -> Path:
+    """Resolve the immutable active DB, retaining legacy fallback only before migration."""
+    return resolve_active_generation_path(vault_dir) or _db_path(vault_dir)
+
+
+def _open_readonly_db(db_path: Path) -> sqlite3.Connection:
+    """Open an existing index without mutating its immutable generation file."""
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30)
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA query_only=ON")
+    return conn
 
 
 SNIPPET_WINDOW = 40
@@ -149,14 +163,14 @@ def validate_dense_index(vault_dir: Path) -> int:
     requested dense retrieval must run ``power sync`` first instead of silently
     receiving FTS results from a different retrieval contract.
     """
-    db_path = _db_path(vault_dir)
+    db_path = _read_db_path(vault_dir)
     if not db_path.exists():
         raise DenseIndexUnavailableError(
             f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
         )
 
     try:
-        with sqlite3.connect(str(db_path), timeout=30) as conn:
+        with _open_readonly_db(db_path) as conn:
             rows, min_size, max_size = conn.execute(
                 "SELECT COUNT(*), MIN(LENGTH(embedding)), MAX(LENGTH(embedding)) "
                 "FROM chunk_embeddings"
@@ -503,8 +517,20 @@ def _sync_vault_to_db(
                 chunks = chunker.chunk(
                     content, title=metadata.title, description=metadata.description
                 )
+            source_content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
             for i, chunk_text in enumerate(chunks):
-                chunk_items.append((f"{rel_path}::chunk_{i}", rel_path, chunk_text, mtime))
+                chunk_items.append(
+                    (
+                        _stable_chunk_id(
+                            source_content_hash,
+                            _chunk_section_identity(chunk_text, i),
+                            chunk_text,
+                        ),
+                        rel_path,
+                        chunk_text,
+                        mtime,
+                    )
+                )
             files_projected += 1
         except Exception as exc:  # noqa: PERF203
             logger.exception(
@@ -697,13 +723,10 @@ def _fts_search(
     if not fts_query:
         return []
 
-    db_path = _db_path(vault_dir)
+    db_path = _read_db_path(vault_dir)
 
     try:
-        conn = sqlite3.connect(str(db_path), timeout=30)
-        conn.execute("PRAGMA busy_timeout=30000")
-        conn.execute("PRAGMA journal_mode=WAL")
-        _init_db(conn)
+        conn = _open_readonly_db(db_path)
 
         cursor = conn.cursor()
         cursor.execute(
@@ -744,6 +767,8 @@ def _fts_search(
 
         conn.close()
         return results
+    except ActiveGenerationError:
+        raise
     except Exception:
         terms_fallback: list[str] = []
         for match in re.finditer(r'"([^"]+)"|(\S+)', query.strip()):
@@ -762,6 +787,22 @@ def _compute_tf_vector(tokens: list[str]) -> dict[str, float]:
     counter = Counter(tokens)
     total = len(tokens) or 1
     return {word: count / total for word, count in counter.items()}
+
+
+def _stable_chunk_id(source_content_hash: str, section_identity: str, chunk_text: str) -> str:
+    """Return a content-addressed chunk identifier independent of vault paths."""
+    normalized_chunk = " ".join(chunk_text.split()).casefold()
+    normalized_section = " ".join(section_identity.split()).casefold()
+    payload = "\x00".join((source_content_hash, normalized_section, normalized_chunk))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _chunk_section_identity(chunk_text: str, ordinal: int) -> str:
+    """Use the first heading in a chunk, with a deterministic fallback label."""
+    for line in chunk_text.splitlines():
+        if line.lstrip().startswith("#"):
+            return line.lstrip("#").strip() or f"section-{ordinal}"
+    return f"section-{ordinal}"
 
 
 def _cosine_similarity(vec_a: dict[str, float], vec_b: dict[str, float]) -> float:
@@ -793,17 +834,24 @@ def _vector_search(
         return []
 
     query_vec = _compute_tf_vector(query_tokens)
-    db_path = _db_path(vault_dir)
+    active_generation_path = resolve_active_generation_path(vault_dir)
+    db_path = active_generation_path or _db_path(vault_dir)
 
     try:
-        conn = sqlite3.connect(str(db_path), timeout=30)
-        conn.execute("PRAGMA busy_timeout=30000")
-        conn.execute("PRAGMA journal_mode=WAL")
-        _init_db(conn)
+        if active_generation_path is not None:
+            conn = _open_readonly_db(db_path)
+        else:
+            conn = sqlite3.connect(str(db_path), timeout=30)
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            _init_db(conn)
 
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM tf_vectors")
         if cursor.fetchone()[0] == 0:
+            if active_generation_path is not None:
+                conn.close()
+                return []
             # Materialize TF vectors (cheap FTS-only sync) so direct
             # _vector_search calls work even before an explicit index.
             _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
@@ -815,6 +863,8 @@ def _vector_search(
         """)
         rows = cursor.fetchall()
         conn.close()
+    except ActiveGenerationError:
+        raise
     except Exception:
         return []
 
@@ -909,7 +959,7 @@ def _semantic_search(
     if not query or not query.strip():
         return []
 
-    db_path = _db_path(vault_dir)
+    db_path = _read_db_path(vault_dir)
     index_dimension = validate_dense_index(vault_dir)
 
     def _dense_failure(reason: str) -> None:
@@ -929,10 +979,7 @@ def _semantic_search(
         )
 
     try:
-        conn = sqlite3.connect(str(db_path), timeout=30)
-        conn.execute("PRAGMA busy_timeout=30000")
-        conn.execute("PRAGMA journal_mode=WAL")
-        _init_db(conn)
+        conn = _open_readonly_db(db_path)
 
         cursor = conn.cursor()
         cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
@@ -1067,7 +1114,7 @@ def search_vault(
     # the caller must explicitly run ``power sync``. Sparse modes retain their
     # lightweight first-use FTS refresh.
     set_vault_dir(vault_dir)
-    if not mode_spec.requires_dense_index:
+    if not mode_spec.requires_dense_index and resolve_active_generation_path(vault_dir) is None:
         # Cheap synchronous FTS refresh ONLY when the index is empty/missing,
         # so non-semantic modes stay correct on first use without re-syncing
         # the whole vault on every query (Performance Plan §1). Incremental

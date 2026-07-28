@@ -8,12 +8,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from power_framework.core.db import _init_db
 from power_framework.core.generation_index import (
+    ActiveGenerationError,
     IndexGenerationError,
     _state_db_path,
+    resolve_active_generation_path,
     sync_vault_atomically,
 )
-from power_framework.core.searcher import search_vault
+from power_framework.core.searcher import _stable_chunk_id, _sync_vault_to_db, search_vault
 from power_framework.core.vault_storage import ensure_vault_identity, vault_db_path
 
 if TYPE_CHECKING:
@@ -35,6 +38,12 @@ def _vault(root: Path, title: str, token: str) -> Path:
         encoding="utf-8",
     )
     return vault
+
+
+def _active_db(vault: Path) -> Path:
+    active = resolve_active_generation_path(vault)
+    assert active is not None
+    return active
 
 
 def test_vault_identity_and_database_namespace_are_stable_and_isolated(
@@ -63,7 +72,7 @@ def test_failed_generation_keeps_the_previous_active_index(
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     vault = _vault(tmp_path, "atomic", "stable-token")
     report = sync_vault_atomically(vault, sync_embeddings=False)
-    active_db = vault_db_path(vault)
+    active_db = _active_db(vault)
     before = active_db.read_bytes()
 
     from power_framework.core import searcher
@@ -97,7 +106,7 @@ def test_source_change_during_sync_keeps_previous_active_index(
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     vault = _vault(tmp_path, "changing", "stable-token")
     sync_vault_atomically(vault, sync_embeddings=False)
-    active_db = vault_db_path(vault)
+    active_db = _active_db(vault)
     before = active_db.read_bytes()
 
     from power_framework.core import searcher
@@ -118,3 +127,196 @@ def test_source_change_during_sync_keeps_previous_active_index(
 
     assert active_db.read_bytes() == before
     assert search_vault(vault, "stable-token", mode="fts")
+
+
+def test_active_pointer_retains_current_and_previous_generations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "retention", "first-token")
+    first = sync_vault_atomically(vault, sync_embeddings=False)
+    first_path = _active_db(vault)
+
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("first-token", "second-token"), encoding="utf-8"
+    )
+    second = sync_vault_atomically(vault, sync_embeddings=False)
+    second_path = _active_db(vault)
+
+    assert second.generation_id != first.generation_id
+    assert second_path != first_path
+    assert first_path.is_file()
+    assert search_vault(vault, "second-token", mode="fts")
+    with sqlite3.connect(_state_db_path(vault)) as conn:
+        active_id = conn.execute(
+            "SELECT generation_id FROM active_generation WHERE id = 1"
+        ).fetchone()[0]
+        ready_count = conn.execute(
+            "SELECT COUNT(*) FROM index_generations WHERE state = 'ready'"
+        ).fetchone()[0]
+    assert active_id == second.generation_id
+    assert ready_count == 2
+
+
+def test_missing_active_generation_file_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "missing", "stable-token")
+    sync_vault_atomically(vault, sync_embeddings=False)
+    _active_db(vault).unlink()
+
+    with pytest.raises(ActiveGenerationError, match="active generation file is missing"):
+        search_vault(vault, "stable-token", mode="fts")
+
+
+def test_invalid_sources_are_explicitly_recorded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "inventory", "valid-token")
+    invalid = vault / "01_Projects" / "Invalid.md"
+    invalid.write_text("# no frontmatter\n", encoding="utf-8")
+
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert (report.total_scanned, report.invalid_sources, report.expected_files) == (2, 1, 1)
+    with sqlite3.connect(_state_db_path(vault)) as conn:
+        invalid_count = conn.execute(
+            "SELECT COUNT(*) FROM generation_invalid_sources WHERE generation_id = ?",
+            (report.generation_id,),
+        ).fetchone()[0]
+        reason = conn.execute(
+            "SELECT reason FROM generation_invalid_sources WHERE generation_id = ?",
+            (report.generation_id,),
+        ).fetchone()[0]
+    assert (invalid_count, reason) == (1, "invalid_metadata")
+
+
+def test_legacy_search_database_is_imported_before_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "legacy", "legacy-token")
+    legacy_path = vault_db_path(vault)
+    with sqlite3.connect(legacy_path) as conn:
+        _init_db(conn)
+        _sync_vault_to_db(vault, conn, sync_embeddings=False)
+
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert _active_db(vault).is_file()
+    assert not legacy_path.exists()
+    archive = legacy_path.parent / "legacy" / f"search.db.{report.generation_id}.bak"
+    assert archive.is_file()
+    assert search_vault(vault, "legacy-token", mode="fts")
+
+
+def test_cleanup_failure_after_pointer_commit_keeps_new_generation_active(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "cleanup", "first-token")
+    sync_vault_atomically(vault, sync_embeddings=False)
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("first-token", "second-token"), encoding="utf-8"
+    )
+
+    from power_framework.core import generation_index
+
+    def fail_cleanup(_: Path) -> None:
+        raise OSError("simulated cleanup failure")
+
+    monkeypatch.setattr(generation_index, "_cleanup_generations", fail_cleanup)
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert _active_db(vault).name == f"{report.generation_id}.db"
+    assert search_vault(vault, "second-token", mode="fts")
+
+
+def test_failure_after_generation_move_keeps_previous_pointer_and_search(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "move-failure", "first-token")
+    first = sync_vault_atomically(vault, sync_embeddings=False)
+    first_path = _active_db(vault)
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("first-token", "second-token"), encoding="utf-8"
+    )
+
+    from power_framework.core import generation_index
+
+    original_identity = generation_index._file_identity
+
+    def fail_new_generation_identity(path: Path) -> tuple[str, int]:
+        if path.parent.name == "generations" and path != first_path:
+            raise OSError("simulated generation move identity failure")
+        return original_identity(path)
+
+    with monkeypatch.context() as fault:
+        fault.setattr(generation_index, "_file_identity", fail_new_generation_identity)
+        with pytest.raises(
+            IndexGenerationError, match="simulated generation move identity failure"
+        ):
+            sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert _active_db(vault).name == f"{first.generation_id}.db"
+    assert search_vault(vault, "first-token", mode="fts")
+    assert not search_vault(vault, "second-token", mode="fts")
+    with sqlite3.connect(_state_db_path(vault)) as conn:
+        failed = conn.execute(
+            "SELECT COUNT(*) FROM index_generations WHERE state = 'failed'"
+        ).fetchone()[0]
+        half_ready = conn.execute(
+            "SELECT COUNT(*) FROM index_generations WHERE state = 'building'"
+        ).fetchone()[0]
+    assert (failed, half_ready) == (1, 0)
+
+
+def test_state_transaction_setup_failure_keeps_previous_pointer_and_search(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "state-failure", "first-token")
+    first = sync_vault_atomically(vault, sync_embeddings=False)
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("first-token", "second-token"), encoding="utf-8"
+    )
+
+    from power_framework.core import generation_index
+
+    original_init = generation_index._init_state_db
+    calls = 0
+
+    def fail_publish_state_initialization(conn: sqlite3.Connection) -> None:
+        nonlocal calls
+        calls += 1
+        original_init(conn)
+        if calls == 2:
+            raise sqlite3.OperationalError("simulated state transaction setup failure")
+
+    with monkeypatch.context() as fault:
+        fault.setattr(generation_index, "_init_state_db", fail_publish_state_initialization)
+        with pytest.raises(IndexGenerationError, match="simulated state transaction setup failure"):
+            sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert _active_db(vault).name == f"{first.generation_id}.db"
+    assert search_vault(vault, "first-token", mode="fts")
+    assert not search_vault(vault, "second-token", mode="fts")
+
+
+def test_chunk_identity_is_content_addressed_and_path_independent() -> None:
+    first = _stable_chunk_id("source-hash-a", "Overview", "# Overview\nStable content")
+    same = _stable_chunk_id("source-hash-a", "Overview", "# Overview\nStable content")
+    changed_source = _stable_chunk_id("source-hash-b", "Overview", "# Overview\nStable content")
+    changed_section = _stable_chunk_id("source-hash-a", "Details", "# Overview\nStable content")
+
+    assert first == same
+    assert first != changed_source
+    assert first != changed_section
+    assert "::chunk_" not in first

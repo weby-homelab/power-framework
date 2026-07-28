@@ -13,6 +13,7 @@ import sqlite3
 from typing import TYPE_CHECKING
 
 from power_framework.core import cli, searcher
+from power_framework.core.generation_index import resolve_active_generation_path
 from power_framework.core.vault_storage import vault_cache_dir
 
 if TYPE_CHECKING:
@@ -38,11 +39,10 @@ def _sync_args(vault: Path) -> argparse.Namespace:
     return argparse.Namespace(path=str(vault), fts_only=True, force=False)
 
 
-def _configure_sync_environment(monkeypatch, tmp_path: Path) -> Path:
+def _configure_sync_environment(monkeypatch, tmp_path: Path) -> None:
     db_path = tmp_path / "test.db"
     monkeypatch.setenv("POWER_SEARCH_DB", str(db_path))
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    return db_path
 
 
 class TestPidLock:
@@ -59,7 +59,7 @@ class TestPidLock:
 
     def test_stale_lock_recovery_and_repeated_sync(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
-        db_path = _configure_sync_environment(monkeypatch, tmp_path)
+        _configure_sync_environment(monkeypatch, tmp_path)
         lock_path = vault_cache_dir(vault) / "sync.pid"
         lock_path.write_text("99999999", encoding="utf-8")
 
@@ -68,14 +68,15 @@ class TestPidLock:
         assert not lock_path.exists()
         assert cli._cmd_sync(_sync_args(vault)) == 0
 
-        with sqlite3.connect(str(db_path)) as conn:
+        active_path = resolve_active_generation_path(vault)
+        assert active_path is not None
+        with sqlite3.connect(f"file:{active_path}?mode=ro", uri=True) as conn:
             assert conn.execute("SELECT COUNT(*) FROM fts_notes").fetchone()[0] == 1
             assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     def test_sync_lock_does_not_block_reads(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
-        db_path = _configure_sync_environment(monkeypatch, tmp_path)
+        _configure_sync_environment(monkeypatch, tmp_path)
         assert cli._cmd_sync(_sync_args(vault)) == 0
         original_sync = searcher._sync_vault_to_db
         observed_read = False
@@ -83,7 +84,9 @@ class TestPidLock:
         def sync_with_concurrent_reader(*args, **kwargs):
             nonlocal observed_read
             assert (vault_cache_dir(vault) / "sync.pid").exists()
-            with sqlite3.connect(str(db_path), timeout=0) as reader:
+            active_path = resolve_active_generation_path(vault)
+            assert active_path is not None
+            with sqlite3.connect(f"file:{active_path}?mode=ro", uri=True, timeout=0) as reader:
                 reader.execute("SELECT COUNT(*) FROM fts_notes").fetchone()
             observed_read = True
             return original_sync(*args, **kwargs)
@@ -99,8 +102,10 @@ class TestDbIntegrity:
 
     def test_integrity_check_passes_after_cli_sync(self, tmp_path: Path, monkeypatch):
         vault = _create_test_vault(tmp_path)
-        db_path = _configure_sync_environment(monkeypatch, tmp_path)
+        _configure_sync_environment(monkeypatch, tmp_path)
 
         assert cli._cmd_sync(_sync_args(vault)) == 0
-        with sqlite3.connect(str(db_path)) as conn:
+        active_path = resolve_active_generation_path(vault)
+        assert active_path is not None
+        with sqlite3.connect(f"file:{active_path}?mode=ro", uri=True) as conn:
             assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
