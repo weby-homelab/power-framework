@@ -1,10 +1,17 @@
 # Issue #187 — executable production-validation checklist
 
-**Status:** Open evidence gate
+**Status:** Historical acceptance source. GitHub Issue #187 closed on 2026-07-27;
+its unchecked rows are not reopened by this document and must be transferred to
+the [POWER 3.3.0 execution tracker](power-3.3.0-execution-tracker.md) before
+a phase is marked complete.
 
 **Scope:** this checklist turns Issue #187 into a reproducible acceptance
 record. It does not convert historical 3.2.1 measurements into release
 guarantees.
+
+The tracker must assign every row an owner, target host, retained artifact, and
+phase gate. Issue state alone is never evidence that a command was run or an
+artifact was retained.
 
 ## Preconditions
 
