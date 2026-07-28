@@ -5,6 +5,9 @@
 `7411140515497bc9d8b74be3f26ef0bbbb15dc70`, tree
 `38adc02c740155164b9a26316542c57a6a3b1022`.
 
+**Phase 0 delivery:** [PR #206](https://github.com/weby-homelab/power-framework/pull/206).
+Its CI, CodeQL, and documentation checks must be green before Phase 1 merges.
+
 This is the authoritative repository-side receipt for the 3.3.0 execution
 plan. A GitHub epic with child issues for Phases 1–10 must mirror this table.
 An issue being closed is never proof that a release gate passed.
