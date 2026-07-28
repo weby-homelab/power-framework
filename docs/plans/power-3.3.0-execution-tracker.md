@@ -3,12 +3,13 @@
 **Status:** historical repository mirror of [GitHub epic #195](https://github.com/weby-homelab/power-framework/issues/195).
 The current authoritative phase map is
 [`brain/01_Projects/Fact_n_Plan_Power_3.2.5-3.3.0.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/Fact_n_Plan_Power_3.2.5-3.3.0.md).
-**Owner:** Weby Homelab. **Current release baseline:** `v3.2.5` commit
-`3f2e2b9687f96a6fc52c634a13bd75205af7dd96`, tree
-`83fd4c776ffea2c81f89d456183e4ba6d1f3f61e`.
+**Owner:** Weby Homelab. **Current release baseline:** `v3.2.6` release
+candidate; the final tag commit/tree is recorded in
+`release/evidence/baselines/v3.2.6.json` after publication.
 
 **Phase 0–1 delivery:** release `v3.2.5` contains the release foundation and
-crash-atomic generation store. Phase 2 is now the release-truth and
+crash-atomic generation store. Release `v3.2.6` carries the Phase 3 mutation
+safety implementation. Phase 2 is now the release-truth and
 reproducible-CI gate described in the linked authoritative roadmap.
 
 **Phase 3 local delivery:** branch
@@ -61,7 +62,7 @@ An issue being closed is never proof that a release gate passed.
 ## Phase 0 evidence
 
 - `release/models.lock.json` release equals `pyproject.toml` version.
-- `release/evidence/baselines/v3.2.5.json` records release source, Python/OS,
+- `release/evidence/baselines/v3.2.6.json` records release source, Python/OS,
   test and warning counts, skipped optional gates, model-lock checksum, and
   frozen benchmark hashes.
 - `python scripts/verify_release_contract.py` validates that contract.

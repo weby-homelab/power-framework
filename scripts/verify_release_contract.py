@@ -21,7 +21,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PYPROJECT = REPO_ROOT / "pyproject.toml"
 DEFAULT_MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
-DEFAULT_BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.2.5.json"
+DEFAULT_BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.2.6.json"
 DEFAULT_DATASET_MANIFEST = (
     REPO_ROOT / "benchmarks" / "power31" / "dataset" / "v1" / "corpus-manifest.json"
 )
@@ -85,6 +85,7 @@ def _validate_git_source(
     *,
     release: str,
     git_repo: Path,
+    require_tag: bool,
     errors: list[str],
 ) -> None:
     """Prove that the baseline names the released Git objects and ref."""
@@ -126,9 +127,9 @@ def _validate_git_source(
         "--verify",
         f"refs/tags/{tag}^{{commit}}",
     )
-    if status != 0:
+    if status != 0 and require_tag:
         errors.append(f"baseline source.tag does not resolve to a commit: {tag} ({stderr})")
-    elif tag_commit != commit:
+    elif status == 0 and tag_commit != commit:
         errors.append(
             f"baseline source.tag {tag} does not point to source.commit: "
             f"expected {commit}, actual {tag_commit}"
@@ -142,6 +143,7 @@ def validate_release_contract(
     baseline_path: Path,
     dataset_manifest_path: Path,
     git_repo: Path,
+    require_tag: bool = False,
 ) -> list[str]:
     """Return every release-contract violation without stopping at the first."""
     package_version = _load_package_version(pyproject_path)
@@ -177,7 +179,13 @@ def validate_release_contract(
             errors.append(
                 "baseline source.clean must be true; dirty source cannot be a release baseline"
             )
-        _validate_git_source(source, release=package_version, git_repo=git_repo, errors=errors)
+        _validate_git_source(
+            source,
+            release=package_version,
+            git_repo=git_repo,
+            require_tag=require_tag,
+            errors=errors,
+        )
 
     expected_lock_hash = baseline.get("models_lock_sha256")
     actual_lock_hash = _sha256(models_lock_path)
@@ -237,6 +245,11 @@ def main() -> int:
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
     parser.add_argument("--dataset-manifest", type=Path, default=DEFAULT_DATASET_MANIFEST)
     parser.add_argument("--git-repo", type=Path, default=REPO_ROOT)
+    parser.add_argument(
+        "--require-tag",
+        action="store_true",
+        help="fail when the release tag is not present or does not point to source.commit",
+    )
     args = parser.parse_args()
 
     try:
@@ -246,6 +259,7 @@ def main() -> int:
             baseline_path=args.baseline,
             dataset_manifest_path=args.dataset_manifest,
             git_repo=args.git_repo,
+            require_tag=args.require_tag,
         )
     except ValueError as exc:
         print(f"Release contract validation failed: {exc}", file=sys.stderr)
