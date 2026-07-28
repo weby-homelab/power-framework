@@ -31,7 +31,7 @@ def smoke_artifact(artifact: Path, root: Path) -> None:
     _run([sys.executable, "-m", "venv", "--system-site-packages", str(venv_dir)], cwd=root)
     python = venv_dir / "bin" / "python"
     _run(
-        [str(python), "-m", "pip", "install", "--no-deps", "--force-reinstall", str(artifact)],
+        [str(python), "-m", "pip", "install", "--force-reinstall", str(artifact)],
         cwd=root,
     )
     _run([str(python), "-c", SMOKE_CODE], cwd=root)
