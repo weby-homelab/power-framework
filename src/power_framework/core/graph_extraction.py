@@ -19,6 +19,7 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass
+from datetime import UTC
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -120,9 +121,9 @@ def store_triplets(conn: sqlite3.Connection, source_path: str, triplets: list[Tr
     """Persist triplets into the ``relations`` table. Returns rows written."""
     if not triplets:
         return 0
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now(UTC).isoformat()
     rows = 0
     for t in triplets:
         conn.execute(

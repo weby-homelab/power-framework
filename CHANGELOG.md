@@ -5,6 +5,22 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.5] - 2026-07-28
+
+### Added
+
+- Immutable per-vault SQLite search generations with an authoritative active
+  state pointer, integrity-checked read-only resolution, current/previous
+  retention, and verified legacy-index migration.
+- Fault coverage and versioned failure receipts for OOM, `ENOSPC`, SQLite lock,
+  corrupt staging DB, source races and process-kill publication checkpoints.
+
+### Changed
+
+- Raised the supported Python runtime and CI matrix to Python 3.11–3.14.
+- Switched Ruff's target version to Python 3.11 and removed Python 3.10 from
+  active release evidence.
+
 ## [3.2.4] - 2026-07-27
 
 ### Fixed

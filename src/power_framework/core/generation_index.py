@@ -8,7 +8,7 @@ import sqlite3
 import uuid
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .db import _init_db
@@ -209,7 +209,7 @@ def _record_building(
                 "SemanticChunker/v1",
                 inventory.total_scanned,
                 len(inventory.invalid_sources),
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
         )
         conn.executemany(
@@ -245,7 +245,7 @@ def _record_failure(vault_dir: Path, generation_id: str, error: str) -> None:
             SET state = 'failed', error = ?, completed_at = ?
             WHERE generation_id = ?
             """,
-            (error[:4000], datetime.now(timezone.utc).isoformat(), generation_id),
+            (error[:4000], datetime.now(UTC).isoformat(), generation_id),
         )
         conn.commit()
 
@@ -391,7 +391,7 @@ def _publish(
                     db_sha256,
                     db_size,
                     GENERATION_STORE_SCHEMA_VERSION,
-                    datetime.now(timezone.utc).isoformat(),
+                    datetime.now(UTC).isoformat(),
                     generation_id,
                 ),
             )
@@ -402,7 +402,7 @@ def _publish(
                 ON CONFLICT(id) DO UPDATE SET generation_id = excluded.generation_id,
                     activated_at = excluded.activated_at
                 """,
-                (generation_id, datetime.now(timezone.utc).isoformat()),
+                (generation_id, datetime.now(UTC).isoformat()),
             )
             conn.commit()
         except Exception:

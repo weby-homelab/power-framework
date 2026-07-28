@@ -18,7 +18,7 @@ import re
 import sqlite3
 import threading
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from .embeddings import get_embedding_manager
@@ -313,7 +313,7 @@ class ContradictionDetector:
             try:
                 from datetime import date as date_type
 
-                now = datetime.now(timezone.utc).date()
+                now = datetime.now(UTC).date()
                 expired_a = isinstance(expiry_a, date_type) and expiry_a < now
                 expired_b = isinstance(expiry_b, date_type) and expiry_b < now
                 if expired_a != expired_b:
@@ -349,7 +349,7 @@ class FreshnessScorer:
         """
         from .parser import parse_frontmatter
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         scores: dict[str, float] = {}
 
         for filepath in vault_dir.rglob("*.md"):
@@ -374,7 +374,7 @@ class FreshnessScorer:
 
             if isinstance(ts, datetime):
                 if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
+                    ts = ts.replace(tzinfo=UTC)
                 age = (now - ts).total_seconds() / 86400.0
             else:
                 age = 0.0
@@ -524,7 +524,7 @@ class UsageTracker:
 
     def track_access(self, rel_path: str) -> None:
         """Increment access counter for a note."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._lock:
             conn = sqlite3.connect(self.db_path)
             conn.execute(

@@ -27,7 +27,7 @@ from .utils import atomic_write
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TZ = datetime.timezone.utc
+_DEFAULT_TZ = datetime.UTC
 
 
 def synthesize_session_ingest(

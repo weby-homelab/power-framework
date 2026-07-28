@@ -543,7 +543,7 @@ def _evaluate_lexical(
     for f in _iter_md_files(Path(vault)):
         try:
             contents[_rel(f, Path(vault))] = f.read_text(encoding="utf-8", errors="ignore").lower()
-        except OSError:  # noqa: PERF203
+        except OSError:
             continue
 
     ranx_qrels = {q: qrels.get(q, {}) for q in queries}

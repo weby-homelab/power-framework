@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import TYPE_CHECKING
 
 from power_framework.core.rot_scoring import (
@@ -76,9 +77,9 @@ class TestFreshnessScorer:
         (vault / "06_Daily_Logs").mkdir()
 
         note = vault / "06_Daily_Logs" / "recent.md"
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         note.write_text(
             '---\ntype: Daily Log\ntitle: "Recent Note"\n'
             'description: "Fresh note"\n'

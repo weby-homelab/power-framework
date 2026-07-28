@@ -59,7 +59,7 @@ nav:
       - POWER 3.1 Trust-Release Baseline: adr/0001-power-3.1-trust-release-baseline.md
       - POWER Memory OS Principles: adr/0002-memory-os-principles.md
   - POWER 3.1 Release Evidence: release-3.1.md
-  - POWER 3.2.4 Release Notes: release-3.2.4.md
+  - POWER 3.2.5 Release Notes: release-3.2.5.md
   - Release Governance:
       - POWER 3.3.0 Execution Tracker: plans/power-3.3.0-execution-tracker.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md

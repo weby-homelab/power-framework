@@ -1,0 +1,33 @@
+{
+    "schema_version": 1,
+    "release": "3.2.5",
+    "source": {
+        "commit": "872656c83772d3a54d8d37d27388d579bdbf41fe",
+        "tree": "c14851ae80ba27ef42f8b69b56af508db286823f",
+        "clean": true
+    },
+    "environment": {
+        "python": ["3.11", "3.12", "3.13", "3.14"],
+        "os": "ubuntu-latest"
+    },
+    "validation": {
+        "passed": 601,
+        "skipped": 17,
+        "coverage_percent": 75.2,
+        "warning_count": 28,
+        "warning_policy": "Recorded from the final clean local validation run; ResourceWarning is treated as an error.",
+        "skipped_optional_gates": [
+            "real-vault neural evaluation",
+            "target-host cgroup memory matrix",
+            "persistent MCP latency matrix"
+        ]
+    },
+    "benchmark": {
+        "synthetic": true,
+        "corpus_sha256": "63b1b9ed5590cfad08a718b69cb168bf7b3b7ca5ce40d9f225fa704743da43b6",
+        "queries_sha256": "52d152e13c039c083eeefcb8066f0ec9c0f100ae1a16e9f9cd5f6fdd57c90d3a",
+        "qrels_sha256": "d91574c0d0c078391fca8f9b4ad41237dd81de78528739ae5cf3631bea868ea8",
+        "expected_answers_sha256": "583e444d22a81bda057fa25280a48e05154181cc2a0fbdea268f1f350004d440"
+    },
+    "models_lock_sha256": "f296225be001046c32b2bc13ac04d2bb27679bdf46cb264cf7be4dcf5951285e"
+}

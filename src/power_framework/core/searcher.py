@@ -477,7 +477,7 @@ def _sync_vault_to_db(
                 "INSERT OR REPLACE INTO tf_vectors (rel_path, tf_data, mtime) VALUES (?, ?, ?)",
                 (rel_path, json.dumps(tf_vec), mtime),
             )
-        except Exception as e:  # noqa: PERF203
+        except Exception as e:
             logger.warning("FTS/TF write failed for %s: %s", rel_path, e)
             continue
     conn.commit()
@@ -532,7 +532,7 @@ def _sync_vault_to_db(
                     )
                 )
             files_projected += 1
-        except Exception as exc:  # noqa: PERF203
+        except Exception as exc:
             logger.exception(
                 "Chunk projection failed for %s (files_seen=%d files_projected=%d "
                 "files_excluded=1): %s: %s",
@@ -605,7 +605,7 @@ def _embed_and_store(embedder, cursor, conn, doc_items, chunk_items) -> None:
         while cur >= 1:
             try:
                 return embedder.embed_batch(texts, batch_size=cur)
-            except Exception as e:  # noqa: PERF203
+            except Exception as e:
                 last_err = e
                 if cur == 1:
                     break

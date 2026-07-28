@@ -6,7 +6,7 @@ import json
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .utils import atomic_write, get_cache_dir
@@ -54,7 +54,7 @@ def ensure_vault_identity(vault_dir: Path) -> VaultIdentity:
     identity = VaultIdentity(
         vault_id=str(uuid.uuid4()),
         schema_version=VAULT_SCHEMA_VERSION,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
     identity_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(
