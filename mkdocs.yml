@@ -55,6 +55,7 @@ nav:
       - Searcher: api/searcher.md
       - Utils: api/utils.md
   - Architecture: architecture.md
+  - Security Threat Model: threat-model.md
   - Architecture Decisions:
       - POWER 3.1 Trust-Release Baseline: adr/0001-power-3.1-trust-release-baseline.md
       - POWER Memory OS Principles: adr/0002-memory-os-principles.md
