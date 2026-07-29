@@ -27,13 +27,13 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
-- **MCP-native** — expose all 12 tools to any MCP-compatible AI client (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) with zero glue code, powered by FastMCP 3.x
-- **Stable 3.2.6 release** — hermetic tests and security checks are tracked in CI; the [P.O.W.E.R. 3.2.6 release](https://github.com/weby-homelab/power-framework/releases) records all completed gates.
+- **MCP-native** — expose 17 tools to MCP-compatible AI clients through FastMCP 3.x
+- **Stable 3.2.7 release** — CI, CodeQL, package smoke tests, and release attestations verify the published artifacts
 
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.6
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -87,8 +87,8 @@ pip install --user --break-system-packages -e ".[dev]"
 
 | Feature                         | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **CLI**                         | `power init`, `lint`, `index`, `ingest`, `search`, `sync`, `rot`, `status`, `archive`, `cron`, `heal`, `markdown-check`, `suggest-related`, `synthesize`, `rename` — 15 commands for full vault management                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **MCP Server**                  | Exposes `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`, `search_vault_tool`, `synthesize_session`, `rot_audit`, `archive_notes`, `suggest_related_tool`, `heal_frontmatter_tool`, `check_markdown_tool` — 12 tools for AI agents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **CLI**                         | 16 commands, including `power memory` for explicit proposal, approval, validation, and history                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **MCP Server**                  | 17 tools, including governed memory context, proposal, apply, validation, and history operations                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **OKF Validation**              | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | **Knowledge Graph (Graph RAG)** | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | **Freshness Monitoring**        | Linter flags stale/expired notes by checking `expiry` dates, ensuring your vault stays current                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -130,7 +130,7 @@ Step-by-step protocol for any AI agent (Antigravity, OpenCode, Claude Code CLI, 
 
 ## 🗂️ Methodology compatibility
 
-P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. In 3.2.6, `power init <path>` creates the default P.A.R.A. scaffold only. Selectable templates and the `--template` option are planned; they are not CLI features yet.
+P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. In 3.2.7, `power init <path>` creates the default P.A.R.A. scaffold only. Selectable templates and the `--template` option are planned; they are not CLI features yet.
 
 For another layout, create or retain its folders, then use P.O.W.E.R. to ingest notes and run `lint`, `index`, and `search`. OKF metadata validation and the available search tools work independently of the folder names.
 
@@ -176,7 +176,7 @@ power search ~/my-vault "deployment guide" --max-results 5
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.6
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -267,7 +267,6 @@ related:
 The framework combines four complementary methodologies:
 
 - **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — Organizes files based on actionability into Projects, Areas, Resources, and Archives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
-- **O** — **OKF Overlay** (Open Knowledge Format) — Imposes a strict schema layer over standard Markdown files. Built on Pydantic v2 schemas, OKF requires every note to be explicitly typed and validated (containing required frontmatter attributes such as title, description, tags, and timestamps). This turns unstructured markdown folders into a predictable, queryable, and machine-readable local database.
 - **W** — **LLM-Wiki** (A. Karpathy's philosophy) — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation that slashes AI agent context usage by 75% to 94%.
 - **E.R.** — **Execution Rules** — Integrates operational rules and guidelines specifically formatted for AI agents (like `RULES.md`, `PROMPTS.md`, and system-level guidelines), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system. GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup.
 
@@ -297,7 +296,7 @@ graph TD
   1. **Hybrid Retrieval (RAG):** Combines SQLite FTS5 (BM25) full-text search, offline dense vector embeddings (**BGE-M3** 1024d), and **BGE Reranker v2 M3** cross-encoder reranking via Reciprocal Rank Fusion (RRF). Provides sub-second precision without overwhelming LLM context windows.
   2. **Vault Health & Linting (`power lint`):** Scans for missing OKF metadata, broken wiki-links, orphan notes, and stale content.
   3. **Hierarchical Indexing & GraphRAG (`power index`):** Scans folder structures to automatically generate navigation maps (`index.md`), per-folder sub-catalogs (`_index.md`), and Mermaid graph relations.
-  4. **Auto-Healing & Audit (`power heal` / `power audit`):** Fixes invalid frontmatter schemas, formats dates/tags, and detects redundant/outdated/trivial notes (ROT Scoring).
+  4. **Auto-Healing & ROT audit (`power heal` / `power rot`):** Fixes invalid frontmatter schemas and detects redundant, outdated, or trivial notes.
 
 #### 3. Collaboration Matrix
 
@@ -333,7 +332,7 @@ flowchart TD
         Embeddings["🧠 Dense Embeddings<br/>(BGE-M3 1024d, direct ONNX)"]:::rag
         SQLite[("🗄️ SQLite (FTS5 + chunk_embeddings)")]:::rag
         Expander["🔄 Query Expander (Synonyms / LLM)"]:::rag
-        Reranker["🎯 Cross-Encoder Reranker (Jina v2 multilingual)"]:::rag
+        Reranker["🎯 Cross-Encoder Reranker (BGE reranker v2 M3)"]:::rag
         KG["🕸️ Knowledge Graph (BFS / Mermaid Graph)"]:::rag
     end
 
@@ -407,13 +406,12 @@ flowchart TD
 | `core/query_expansion.py` | Synonym map (EN/UK) & OpenRouter Multi-Query expansion                                                                                                                                                                             |
 | `core/chunker.py`         | Semantic & contextual note splitter (Anthropic Contextual Retrieval)                                                                                                                                                               |
 | `core/healer.py`          | Auto-fix missing/invalid frontmatter fields                                                                                                                                                                                        |
-| `core/relations.py`       | KnowledgeGraph builder, BFS traversal, and Mermaid exporter                                                                                                                                                                        |
 | `core/rot_scoring.py`     | A2 scoring: semantic content dedup, freshness, contradiction checks                                                                                                                                                                |
 | `core/markdown_checks.py` | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                                                                           |
 | `core/constants.py`       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
 | `core/utils.py`           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                                                                                    |
-| `core/cli.py`             | Command-line interface (12 commands via argparse)                                                                                                                                                                                  |
-| `mcp/power_server.py`     | FastMCP 3.x server with 12 async tools + HTTP transport + /health                                                                                                                                                                  |
+| `core/cli.py`             | Command-line interface with 16 commands, including transactional memory workflows                                                                                                                                                  |
+| `mcp/power_server.py`     | FastMCP 3.x server with 17 async tools, loopback HTTP transport, and `/health`                                                                                                                                                     |
 
 All components share `power_framework.core` as the single source of truth.
 
@@ -442,7 +440,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.2.6 release notes](docs/release-3.2.6.md) — current release
+- [P.O.W.E.R. 3.2.7 release notes](docs/release-3.2.7.md) — current release
   scope, validation boundary, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is
@@ -520,7 +518,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.6
+softwareVersion: 3.2.7
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

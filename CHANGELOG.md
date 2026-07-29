@@ -5,6 +5,22 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.7] - 2026-07-29
+
+### Added
+
+- Added governed candidate graph decisions, temporal retrieval semantics, and
+  a transactional memory API shared by library, CLI, and MCP clients.
+- Added a fail-closed remote egress policy and negative regression coverage.
+- Added a repository-scoped security threat model and a regression test for
+  its M1 control references.
+
+### Changed
+
+- Added `power memory` and five MCP memory tools, bringing the public command
+  and tool counts to 16 and 17.
+- Updated current installation and release documentation to 3.2.7.
+
 ## [3.2.6] - 2026-07-28
 
 ### Added
