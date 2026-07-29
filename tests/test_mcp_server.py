@@ -16,13 +16,17 @@ from fastmcp.exceptions import ToolError
 from power_framework.core.parser import validate_metadata
 from power_framework.mcp import power_server
 from power_framework.mcp.power_server import (
+    apply_memory_change,
     ensure_sub_index,
     generate_index,
     ingest_note,
     lint_vault,
+    propose_memory_change,
+    read_memory_history,
     read_sub_index,
     search_vault_tool,
     synthesize_session,
+    validate_memory_state,
 )
 
 if TYPE_CHECKING:
@@ -57,6 +61,21 @@ async def test_search_vault_finds_notes(sample_vault: Path) -> None:
     assert envelope["temporal_view"] == "current"
     assert envelope["as_of"]
     assert envelope["results"][0]["source"]["content_sha256"]
+
+
+async def test_transactional_memory_tools_share_approval_and_history(sample_vault: Path) -> None:
+    proposal = json.loads(
+        await propose_memory_change(
+            path="01_Projects/FromTransaction.md",
+            content='---\ntype: Project\ntitle: "From transaction"\ndescription: "MCP transaction"\ntimestamp: 2026-07-29T00:00:00Z\n---\n',
+            vault_path=str(sample_vault),
+        )
+    )
+    with pytest.raises(ToolError, match="approved"):
+        await apply_memory_change(proposal=proposal, approved=False, vault_path=str(sample_vault))
+    await apply_memory_change(proposal=proposal, approved=True, vault_path=str(sample_vault))
+    assert json.loads(await read_memory_history(vault_path=str(sample_vault)))[0]["path"]
+    assert isinstance(await validate_memory_state(vault_path=str(sample_vault)), bool)
 
 
 async def test_search_vault_empty_query(sample_vault: Path) -> None:
