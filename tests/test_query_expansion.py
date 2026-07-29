@@ -96,7 +96,8 @@ class TestQueryExpanderLLM:
             variants = expander.expand("docker")
         assert "docker" in variants
 
-    def test_llm_adds_variants_on_success(self):
+    def test_llm_adds_variants_on_success(self, monkeypatch):
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-internal")
         expander = QueryExpander(use_llm=True, api_key="sk-test-key")
         mock_resp = MagicMock()
         mock_resp.read.return_value = b'{"choices":[{"message":{"content":"[\\"docker orchestration\\",\\"container management\\"]"}}]}'

@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from .egress import EgressOperation, is_remote_endpoint, require_remote_egress
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
@@ -225,6 +227,9 @@ class OllamaEmbeddingManager:
     def embed(self, text: str) -> list[float]:
         import ollama
 
+        if is_remote_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")):
+            require_remote_egress(EgressOperation.EMBEDDINGS)
+
         def _do():
             result = ollama.embed(
                 model=self.model_name,
@@ -238,6 +243,9 @@ class OllamaEmbeddingManager:
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         import ollama
+
+        if is_remote_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")):
+            require_remote_egress(EgressOperation.EMBEDDINGS)
 
         def _do():
             result = ollama.embed(
