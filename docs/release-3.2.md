@@ -13,6 +13,19 @@ still require measured evidence.
 | #3 Silent fallback on TF     | **Fixed**     | Unknown `POWER_EMBED_PROVIDER` raises `RuntimeError`. Fallback permitted only with `POWER_ALLOW_DENSE_FALLBACK=1` env gate; contract recorded in `SearchResult.retrieval_contract`.     |
 | #4 OKF description ≤150      | **Fixed**     | `max_length` removed from Pydantic schema. Truncation applied only in catalog render (`index.md`/`_index.md`).                                                                          |
 | #5 Half-manual Graph RAG     | **Foundation only** | Auto-triplet extraction (`graph_extraction.py`) uses a deterministic regex-based extractor. M1.2 stores its output as reviewable SQLite candidates; only explicit approval writes accepted `relations`. Semantic suggest remains available via `suggest_related_semantic`. |
+
+## M1.3 temporal retrieval contract
+
+For notes with optional `memory` metadata, `valid_from` and `valid_until` are
+inclusive date bounds. A valid successor listed in `supersedes` makes the
+prior note historical; Markdown remains the source of truth and neither note
+is overwritten. Competing current successors are surfaced as `conflicted`,
+never selected silently.
+
+`search_vault`, `power search`, and MCP `search_vault_tool` share
+`temporal_view` (`current`, `historical`, or `all`) and an optional inclusive
+`as_of` (`YYYY-MM-DD`) boundary. MCP envelopes return both the requested
+boundary and each result's `temporal_status`.
 | #6 SQLite locks              | **Fixed**     | Single-writer `asyncio.Queue` worker (`write_queue.py`). Write operations serialized; reads parallel.                                                                                   |
 | Memory contract ≤12 GB       | **Pending**   | Model SHA pins and bounded runtime configuration are present; an RSS measurement on the target hardware is still required.                                                                 |
 

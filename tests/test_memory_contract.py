@@ -10,6 +10,11 @@ from pydantic import ValidationError
 from power_framework.core.healer import heal_frontmatter
 from power_framework.core.models import MemoryMetadata, OKFMetadata
 from power_framework.core.parser import build_frontmatter, validate_metadata
+from power_framework.core.temporal import (
+    TemporalRecord,
+    TemporalStatus,
+    resolve_temporal_statuses,
+)
 
 
 def _memory(**overrides: object) -> MemoryMetadata:
@@ -92,3 +97,37 @@ Body used to infer a description.
     assert parsed.related[0].relation == "depends_on"
     assert parsed.related[0].confidence == 0.42
     assert parsed.related[0].model_extra == {"evidence": {"source": "human-review"}}
+
+
+def test_temporal_chain_uses_inclusive_dates_and_preserves_history() -> None:
+    records = {
+        "03_Resources/old.md": TemporalRecord("03_Resources/old.md", _memory()),
+        "03_Resources/new.md": TemporalRecord(
+            "03_Resources/new.md",
+            _memory(valid_from=date(2026, 7, 10), supersedes=["03_Resources/old.md"]),
+        ),
+    }
+
+    before = resolve_temporal_statuses(records, date(2026, 7, 9))
+    boundary = resolve_temporal_statuses(records, date(2026, 7, 10))
+
+    assert before["03_Resources/old.md"] == TemporalStatus.CURRENT
+    assert before["03_Resources/new.md"] == TemporalStatus.HISTORICAL
+    assert boundary["03_Resources/old.md"] == TemporalStatus.HISTORICAL
+    assert boundary["03_Resources/new.md"] == TemporalStatus.CURRENT
+
+
+def test_competing_supersession_is_explicitly_conflicted() -> None:
+    records = {
+        "03_Resources/old.md": TemporalRecord("03_Resources/old.md", _memory()),
+        "03_Resources/a.md": TemporalRecord(
+            "03_Resources/a.md", _memory(supersedes=["03_Resources/old.md"])
+        ),
+        "03_Resources/b.md": TemporalRecord(
+            "03_Resources/b.md", _memory(supersedes=["03_Resources/old.md"])
+        ),
+    }
+
+    statuses = resolve_temporal_statuses(records, date(2026, 7, 10))
+
+    assert set(statuses.values()) == {TemporalStatus.CONFLICTED}

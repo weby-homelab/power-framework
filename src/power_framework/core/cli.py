@@ -200,7 +200,14 @@ def _cmd_search(args: argparse.Namespace) -> int:
     max_results = args.max_results
     mode = args.mode
 
-    results = search_vault(vault_dir, query, max_results=max_results, mode=mode)
+    results = search_vault(
+        vault_dir,
+        query,
+        max_results=max_results,
+        mode=mode,
+        temporal_view=args.temporal_view,
+        as_of=args.as_of,
+    )
     report = format_search_results(results, query, mode=mode, vault_dir=vault_dir)
     print(report)
     return 0
@@ -534,6 +541,17 @@ def main() -> None:
     p_search.add_argument("path", help="Path to the vault directory")
     p_search.add_argument(
         "query", help='Search query (supports multiple terms and "quoted phrases")'
+    )
+    p_search.add_argument(
+        "--temporal-view",
+        choices=["current", "historical", "all"],
+        default="current",
+        help="Lifecycle projection: current (default), historical, or all including conflicts",
+    )
+    p_search.add_argument(
+        "--as-of",
+        default=None,
+        help="Inclusive lifecycle boundary in ISO date format (YYYY-MM-DD)",
     )
     p_search.add_argument(
         "--max-results",

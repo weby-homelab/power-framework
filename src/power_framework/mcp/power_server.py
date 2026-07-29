@@ -294,6 +294,8 @@ async def search_vault_tool(
     query: str,
     max_results: int = 20,
     search_mode: str = DEFAULT_SEARCH_MODE,
+    temporal_view: str = "current",
+    as_of: str | None = None,
     vault_path: str | None = None,
 ) -> str:
     """Search vault notes and return provenance-bearing untrusted data only.
@@ -309,12 +311,30 @@ async def search_vault_tool(
         raise ToolError(f"max_results must be between 1 and {_MAX_MCP_SEARCH_RESULTS}")
     try:
         search_mode = normalize_search_mode(search_mode)
+        from power_framework.core.temporal import normalize_as_of, normalize_temporal_view
+
+        temporal_view = normalize_temporal_view(temporal_view).value
+        normalized_as_of = normalize_as_of(as_of).isoformat()
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
 
     def _do_search() -> str:
-        results = search_vault(path, query, max_results=max_results, mode=search_mode)
-        return format_untrusted_search_envelope(results, query, mode=search_mode, vault_dir=path)
+        results = search_vault(
+            path,
+            query,
+            max_results=max_results,
+            mode=search_mode,
+            temporal_view=temporal_view,
+            as_of=normalized_as_of,
+        )
+        return format_untrusted_search_envelope(
+            results,
+            query,
+            mode=search_mode,
+            vault_dir=path,
+            temporal_view=temporal_view,
+            as_of=normalized_as_of,
+        )
 
     return await run_blocking(_do_search)
 
