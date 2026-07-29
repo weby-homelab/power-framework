@@ -72,3 +72,8 @@ site/
 
 # Search-quality bench qrels cache
 .cache/
+
+# M2 human-retrieval evidence is assembled from a private vault and must never
+# be published or committed.  Keep annotation responses outside this checkout.
+benchmarks/human_retrieval/dataset/
+benchmarks/human_retrieval/annotation-packets/
