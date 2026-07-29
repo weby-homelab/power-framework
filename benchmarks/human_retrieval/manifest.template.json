@@ -6,6 +6,12 @@
   "queries_sha256": "REPLACE_WITH_SHA256",
   "raw_judgments_sha256": "REPLACE_WITH_SHA256",
   "adjudicated_qrels_sha256": "REPLACE_WITH_SHA256",
+  "artifacts": {
+    "corpus": "corpus.jsonl",
+    "queries": "queries.jsonl",
+    "raw_judgments": "raw-judgments.jsonl",
+    "adjudicated_qrels": "adjudicated-qrels.jsonl"
+  },
   "annotation_protocol": "annotation_protocol.md",
   "journeys": [
     "current_fact",
