@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 from contextlib import closing
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path  # noqa: TC003
 
 import pytest
@@ -35,6 +35,60 @@ from power_framework.core.searcher import (
     search_vault,
     validate_dense_index,
 )
+
+
+def test_search_temporal_views_filter_one_shared_corpus(sample_vault: Path) -> None:
+    old = sample_vault / "03_Resources" / "old-fact.md"
+    new = sample_vault / "03_Resources" / "new-fact.md"
+    old.write_text(
+        """---
+type: Resource
+title: "Old fact"
+description: "temporal-token historical fact"
+okf_version: "0.2"
+memory:
+  kind: semantic
+  valid_from: 2026-01-01
+timestamp: 2026-01-01T00:00:00
+---
+
+temporal-token historical fact
+""",
+        encoding="utf-8",
+    )
+    new.write_text(
+        """---
+type: Resource
+title: "New fact"
+description: "temporal-token current fact"
+okf_version: "0.2"
+memory:
+  kind: semantic
+  valid_from: 2026-07-10
+  supersedes: [03_Resources/old-fact.md]
+timestamp: 2026-07-10T00:00:00
+---
+
+temporal-token current fact
+""",
+        encoding="utf-8",
+    )
+
+    current = search_vault(
+        sample_vault, "temporal-token", mode="fts", temporal_view="current", as_of=date(2026, 7, 10)
+    )
+    historical = search_vault(
+        sample_vault,
+        "temporal-token",
+        mode="fts",
+        temporal_view="historical",
+        as_of="2026-07-10",
+    )
+
+    assert {result.rel_path for result in current} == {"03_Resources/new-fact.md"}
+    assert {result.rel_path for result in historical} == {"03_Resources/old-fact.md"}
+    assert current[0].temporal_status == "current"
+    assert historical[0].temporal_status == "historical"
 
 
 class TestTokenize:

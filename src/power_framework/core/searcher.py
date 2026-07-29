@@ -31,9 +31,19 @@ from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
 from .parser import read_file_content, validate_metadata
 from .query_expansion import QueryExpander
+from .temporal import (
+    TemporalStatus,
+    includes_temporal_status,
+    normalize_as_of,
+    normalize_temporal_view,
+    resolve_temporal_statuses,
+    scan_temporal_records,
+)
 from .vault_storage import vault_db_path
 
 if TYPE_CHECKING:
+    from datetime import date
+
     from .reranker import RerankerProtocol
 
 logger = logging.getLogger(__name__)
@@ -132,6 +142,7 @@ class SearchResult:
     match_count: int
     tags: list[str] = field(default_factory=list)
     retrieval_contract: str = "dense"
+    temporal_status: str = TemporalStatus.CURRENT.value
 
 
 def normalize_search_mode(mode: str) -> str:
@@ -1068,6 +1079,8 @@ def search_vault(
     query: str,
     max_results: int = 20,
     mode: str = DEFAULT_SEARCH_MODE,
+    temporal_view: str = "current",
+    as_of: date | str | None = None,
 ) -> list[SearchResult]:
     """
     Search the vault for notes matching the query.
@@ -1081,6 +1094,8 @@ def search_vault(
               index. Other explicit modes are "fts" (BM25), "vector" (TF
               cosine), "hybrid" (RRF of FTS + TF vector), and "reranked".
               ``hybrid_reranked`` is a deprecated alias of ``reranked``.
+        temporal_view: ``current`` (default), ``historical``, or ``all``.
+        as_of: Inclusive ISO-8601 date boundary for temporal evaluation.
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -1090,6 +1105,8 @@ def search_vault(
     # coerce to a resolved Path once here.
     vault_dir = Path(vault_dir).expanduser().resolve()
     mode = normalize_search_mode(mode)
+    temporal_view = normalize_temporal_view(temporal_view).value
+    boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
     retrieval_contract = "dense"
     if mode_spec.requires_dense_index:
@@ -1166,7 +1183,9 @@ def search_vault(
         vec_dedup = sorted(vec_map.values(), key=lambda x: -x.score)
 
         # Single RRF fusion at the end
-        return _rrf_merge(fts_dedup, vec_dedup)[:max_results]
+        return _filter_temporal_results(
+            vault_dir, _rrf_merge(fts_dedup, vec_dedup), temporal_view, boundary, max_results
+        )
 
     # For non-hybrid modes, gather results, dedup by rel_path keeping max score, and sort
     all_results: list[SearchResult] = []
@@ -1195,10 +1214,30 @@ def search_vault(
             res_map[r.rel_path] = r
 
     final_results = sorted(res_map.values(), key=lambda x: (-x.score, x.title))
-    final_results = final_results[:max_results]
+    final_results = _filter_temporal_results(
+        vault_dir, final_results, temporal_view, boundary, max_results
+    )
     for r in final_results:
         r.retrieval_contract = retrieval_contract
     return final_results
+
+
+def _filter_temporal_results(
+    vault_dir: Path,
+    results: list[SearchResult],
+    temporal_view: str,
+    as_of: date,
+    max_results: int,
+) -> list[SearchResult]:
+    """Attach resolved status and filter ranked results at the retrieval boundary."""
+    statuses = resolve_temporal_statuses(scan_temporal_records(vault_dir), as_of)
+    filtered: list[SearchResult] = []
+    for result in results:
+        status = statuses.get(result.rel_path, TemporalStatus.CURRENT)
+        result.temporal_status = status.value
+        if includes_temporal_status(status, temporal_view):
+            filtered.append(result)
+    return filtered[:max_results]
 
 
 def _hybrid_reranked_search(
@@ -1302,6 +1341,7 @@ def format_search_results(
         score_str = f"{r.score:.4f}"
         lines.append(f"{i}. [{r.note_type}] {r.title}  (score: {score_str})")
         lines.append(f"   Path: {r.rel_path}")
+        lines.append(f"   Temporal status: {r.temporal_status}")
         lines.append(f"   {r.description}")
         if r.snippet:
             lines.append(f"   ...{r.snippet}...")
@@ -1328,6 +1368,8 @@ def format_untrusted_search_envelope(
     query: str,
     mode: str,
     vault_dir: Path,
+    temporal_view: str = "current",
+    as_of: str | None = None,
 ) -> str:
     """Serialize MCP retrieval output as untrusted, provenance-bearing data.
 
@@ -1363,6 +1405,7 @@ def format_untrusted_search_envelope(
                     "note_type": result.note_type,
                     "tags": result.tags,
                     "retrieval_contract": result.retrieval_contract,
+                    "temporal_status": result.temporal_status,
                 },
                 "score": result.score,
                 "match_count": result.match_count,
@@ -1380,6 +1423,8 @@ def format_untrusted_search_envelope(
         ),
         "query": query,
         "mode": mode,
+        "temporal_view": temporal_view,
+        "as_of": as_of,
         "result_count": len(envelope_results),
         "results": envelope_results,
     }

@@ -193,6 +193,33 @@ def test_search_uses_canonical_default_mode(sample_vault: Path) -> None:
     assert search.call_args.kwargs["mode"] == DEFAULT_SEARCH_MODE
 
 
+def test_search_passes_shared_temporal_contract(sample_vault: Path) -> None:
+    with (
+        patch("power_framework.core.cli.format_search_results", return_value="No results"),
+        patch("power_framework.core.cli.search_vault", return_value=[]) as search,
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "search",
+                str(sample_vault),
+                "Test",
+                "--temporal-view",
+                "historical",
+                "--as-of",
+                "2026-07-10",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 0
+    assert search.call_args.kwargs["temporal_view"] == "historical"
+    assert search.call_args.kwargs["as_of"] == "2026-07-10"
+
+
 def test_search_no_results(sample_vault: Path) -> None:
     with (
         patch.object(

@@ -54,6 +54,8 @@ async def test_search_vault_finds_notes(sample_vault: Path) -> None:
     assert envelope["trust"] == "untrusted"
     assert envelope["data_only"] is True
     assert envelope["result_count"] > 0
+    assert envelope["temporal_view"] == "current"
+    assert envelope["as_of"]
     assert envelope["results"][0]["source"]["content_sha256"]
 
 
@@ -67,8 +69,8 @@ async def test_search_vault_uses_canonical_default_mode(
 ) -> None:
     captured: dict[str, str] = {}
 
-    def fake_search(_path: Path, _query: str, *, max_results: int, mode: str):
-        captured["mode"] = mode
+    def fake_search(_path: Path, _query: str, **kwargs: object):
+        captured["mode"] = str(kwargs["mode"])
         return []
 
     monkeypatch.setattr(power_server, "search_vault", fake_search)
@@ -84,8 +86,8 @@ async def test_search_vault_keeps_explicit_fts_mode_compatible(
 ) -> None:
     captured: dict[str, str] = {}
 
-    def fake_search(_path: Path, _query: str, *, max_results: int, mode: str):
-        captured["mode"] = mode
+    def fake_search(_path: Path, _query: str, **kwargs: object):
+        captured["mode"] = str(kwargs["mode"])
         return []
 
     monkeypatch.setattr(power_server, "search_vault", fake_search)
@@ -96,6 +98,32 @@ async def test_search_vault_keeps_explicit_fts_mode_compatible(
 
     assert captured["mode"] == "fts"
     assert envelope["mode"] == "fts"
+
+
+async def test_search_vault_uses_shared_temporal_contract(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_search(_path: Path, _query: str, **kwargs: object):
+        captured["temporal_view"] = str(kwargs["temporal_view"])
+        captured["as_of"] = str(kwargs["as_of"])
+        return []
+
+    monkeypatch.setattr(power_server, "search_vault", fake_search)
+    envelope = json.loads(
+        await search_vault_tool(
+            query="Test",
+            search_mode="fts",
+            temporal_view="historical",
+            as_of="2026-07-10",
+            vault_path=str(sample_vault),
+        )
+    )
+
+    assert captured == {"temporal_view": "historical", "as_of": "2026-07-10"}
+    assert envelope["temporal_view"] == "historical"
+    assert envelope["as_of"] == "2026-07-10"
 
 
 async def test_search_vault_rejects_unknown_mode(sample_vault: Path) -> None:

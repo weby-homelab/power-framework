@@ -102,6 +102,7 @@ from .searcher import (
     normalize_search_mode,
     search_vault,
 )
+from .temporal import TemporalStatus, TemporalView, normalize_as_of, normalize_temporal_view
 from .utils import (
     RateLimiter,
     __version__,
@@ -150,6 +151,8 @@ __all__ = [
     "SearchResult",
     "SemanticChunker",
     "Sensitivity",
+    "TemporalStatus",
+    "TemporalView",
     "TypedRelation",
     "UsageTracker",
     "WritePolicy",
@@ -183,7 +186,9 @@ __all__ = [
     "has_type_field",
     "heal_frontmatter",
     "heal_vault",
+    "normalize_as_of",
     "normalize_search_mode",
+    "normalize_temporal_view",
     "parse_frontmatter",
     "read_file_content",
     "resolve_path_in_vault",
