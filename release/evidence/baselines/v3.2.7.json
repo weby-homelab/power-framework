@@ -2,8 +2,8 @@
     "schema_version": 1,
     "release": "3.2.7",
     "source": {
-        "commit": "96fe791e4d13713915c311d87d1ca9b2ff26ecc2",
-        "tree": "37267801dc8bc0963062a8d493cb2f9a7588226e",
+        "commit": "a8cfba1cfcb91c0cf94f8bba0e4086e1098c1d15",
+        "tree": "ed940228418cfa48353ee2101979d9c8f47b205a",
         "tag": "v3.2.7",
         "clean": true
     },
@@ -12,11 +12,11 @@
         "os": "ubuntu-latest"
     },
     "validation": {
-        "passed": 0,
-        "skipped": 0,
-        "coverage_percent": 0,
+        "passed": 629,
+        "skipped": 17,
+        "coverage_percent": 77,
         "warning_count": 0,
-        "warning_policy": "Candidate metadata; GitHub CI records final release validation.",
+        "warning_policy": "Recorded from GitHub CI run 30468314402; ResourceWarning and PytestUnraisableExceptionWarning are treated as errors.",
         "skipped_optional_gates": [
             "real-vault neural evaluation",
             "target-host cgroup memory matrix",
