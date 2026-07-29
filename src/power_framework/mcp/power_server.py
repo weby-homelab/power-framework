@@ -22,6 +22,7 @@ Supports stdio transport (local) and HTTP transport (Docker, with /health endpoi
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 from datetime import UTC, datetime
@@ -43,14 +44,18 @@ from power_framework.core import (
     OKFMetadata,
     RateLimiter,
     WritePolicy,
+    apply_change,
     archive_stale_notes,
     atomic_write_in_vault,
     build_frontmatter,
     format_relation_suggestions,
     format_untrusted_search_envelope,
+    get_context,
     heal_vault,
     normalize_search_mode,
+    propose_change,
     read_file_content,
+    read_history,
     resolve_path_in_vault,
     resolve_vault_path,
     run_blocking,
@@ -62,6 +67,7 @@ from power_framework.core import (
     scan_folder_notes,
     search_vault,
     suggest_related,
+    validate_state,
     validate_vault_path,
 )
 from power_framework.core import (
@@ -287,6 +293,51 @@ async def ingest_note(
 
     # Serialize the write/index/log through the shared vault mutation boundary.
     return await run_vault_mutation(path, _write_and_index)
+
+
+@mcp.tool
+async def get_memory_context(query: str, vault_path: str | None = None) -> str:
+    """Read transactional-memory context without changing vault state."""
+    path = _get_vault_path(vault_path)
+    return json.dumps(
+        [result.rel_path for result in await run_blocking(lambda: get_context(path, query))]
+    )
+
+
+@mcp.tool
+async def propose_memory_change(path: str, content: str, vault_path: str | None = None) -> str:
+    """Create a reviewable, content-addressed memory proposal."""
+    root = _get_vault_path(vault_path)
+    return json.dumps(
+        await run_blocking(lambda: propose_change(root, path, content)), sort_keys=True
+    )
+
+
+@mcp.tool
+async def apply_memory_change(
+    proposal: dict[str, str], approved: bool, vault_path: str | None = None
+) -> str:
+    """Apply only an explicitly approved memory proposal."""
+    root = _get_vault_path(vault_path)
+    try:
+        receipt = await run_blocking(lambda: apply_change(root, proposal, approved))
+    except (PermissionError, RuntimeError, ValueError) as exc:
+        raise ToolError(str(exc)) from exc
+    return json.dumps(receipt, sort_keys=True)
+
+
+@mcp.tool
+async def validate_memory_state(vault_path: str | None = None) -> bool:
+    """Validate the vault after a transactional-memory operation."""
+    root = _get_vault_path(vault_path)
+    return await run_blocking(lambda: validate_state(root))
+
+
+@mcp.tool
+async def read_memory_history(vault_path: str | None = None) -> str:
+    """Read append-only transaction receipts without note content."""
+    root = _get_vault_path(vault_path)
+    return json.dumps(await run_blocking(lambda: read_history(root)), sort_keys=True)
 
 
 @mcp.tool

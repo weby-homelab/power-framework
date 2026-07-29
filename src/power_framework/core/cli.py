@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import resource
@@ -30,6 +31,7 @@ from .linter import (
     run_status_report,
 )
 from .markdown_checks import check_all as check_markdown_issues
+from .memory_api import apply_change, get_context, propose_change, read_history, validate_state
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .mutation import execute_vault_mutation
 from .parser import build_frontmatter, read_file_content
@@ -486,6 +488,22 @@ def _cmd_synthesize(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_memory(args: argparse.Namespace) -> int:
+    vault_dir = _resolve_path(args.path)
+    if args.memory_command == "context":
+        print(json.dumps([item.rel_path for item in get_context(vault_dir, args.query)]))
+    elif args.memory_command == "propose":
+        print(json.dumps(propose_change(vault_dir, args.note_path, args.content), sort_keys=True))
+    elif args.memory_command == "apply":
+        proposal = json.loads(args.proposal)
+        print(json.dumps(apply_change(vault_dir, proposal, args.approved), sort_keys=True))
+    elif args.memory_command == "validate":
+        print(json.dumps({"valid": validate_state(vault_dir)}))
+    else:
+        print(json.dumps(read_history(vault_dir), sort_keys=True))
+    return 0
+
+
 def main() -> None:
     """P.O.W.E.R. CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -571,6 +589,25 @@ def main() -> None:
         ),
     )
     p_search.set_defaults(func=_cmd_search)
+
+    p_memory = subparsers.add_parser("memory", help="Human-governed transactional memory workflow")
+    memory_sub = p_memory.add_subparsers(dest="memory_command", required=True)
+    p_context = memory_sub.add_parser("context")
+    p_context.add_argument("path")
+    p_context.add_argument("query")
+    p_propose = memory_sub.add_parser("propose")
+    p_propose.add_argument("path")
+    p_propose.add_argument("note_path")
+    p_propose.add_argument("content")
+    p_apply = memory_sub.add_parser("apply")
+    p_apply.add_argument("path")
+    p_apply.add_argument("proposal")
+    p_apply.add_argument("--approved", action="store_true")
+    p_validate = memory_sub.add_parser("validate")
+    p_validate.add_argument("path")
+    p_history = memory_sub.add_parser("history")
+    p_history.add_argument("path")
+    p_memory.set_defaults(func=_cmd_memory)
 
     p_sync = subparsers.add_parser(
         "sync", help="Build the search index for the vault (FTS + dense embeddings)"

@@ -49,6 +49,7 @@ from .markdown_checks import (
     fix_list_markers,
     fix_trailing_whitespace,
 )
+from .memory_api import apply_change, get_context, propose_change, read_history, validate_state
 from .models import (
     MAX_DESCRIPTION_LENGTH,
     MAX_TITLE_LENGTH,
@@ -157,6 +158,7 @@ __all__ = [
     "UsageTracker",
     "WritePolicy",
     "__version__",
+    "apply_change",
     "archive_stale_notes",
     "atomic_write",
     "atomic_write_in_vault",
@@ -182,6 +184,7 @@ __all__ = [
     "generate_main_index_content",
     "generate_sub_index_content",
     "get_cache_dir",
+    "get_context",
     "has_frontmatter",
     "has_type_field",
     "heal_frontmatter",
@@ -190,7 +193,9 @@ __all__ = [
     "normalize_search_mode",
     "normalize_temporal_view",
     "parse_frontmatter",
+    "propose_change",
     "read_file_content",
+    "read_history",
     "resolve_path_in_vault",
     "resolve_vault_path",
     "run_blocking",
@@ -210,5 +215,6 @@ __all__ = [
     "suggest_related_semantic",
     "validate_metadata",
     "validate_path_in_vault",
+    "validate_state",
     "validate_vault_path",
 ]
