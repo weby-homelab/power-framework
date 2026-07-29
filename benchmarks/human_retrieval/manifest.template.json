@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "status": "pending_human_annotation",
+  "split": "development",
+  "corpus_sha256": "REPLACE_WITH_SHA256",
+  "queries_sha256": "REPLACE_WITH_SHA256",
+  "raw_judgments_sha256": "REPLACE_WITH_SHA256",
+  "adjudicated_qrels_sha256": "REPLACE_WITH_SHA256",
+  "annotation_protocol": "annotation_protocol.md",
+  "journeys": [
+    "current_fact",
+    "historical_fact",
+    "provenance_trace",
+    "abstention",
+    "candidate_boundary"
+  ],
+  "thresholds": null
+}
