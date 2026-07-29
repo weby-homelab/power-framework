@@ -12,7 +12,7 @@ still require measured evidence.
 | #2 CC-BY-NC reranker default | **Fixed**     | Default switched to `BGEM3Reranker` (MIT ONNX). Jina requires `POWER_RERANKER=jina AND POWER_ALLOW_NONCOMMERCIAL_MODELS=1`.                                                             |
 | #3 Silent fallback on TF     | **Fixed**     | Unknown `POWER_EMBED_PROVIDER` raises `RuntimeError`. Fallback permitted only with `POWER_ALLOW_DENSE_FALLBACK=1` env gate; contract recorded in `SearchResult.retrieval_contract`.     |
 | #4 OKF description ≤150      | **Fixed**     | `max_length` removed from Pydantic schema. Truncation applied only in catalog render (`index.md`/`_index.md`).                                                                          |
-| #5 Half-manual Graph RAG     | **Fixed**     | Auto-triplet extraction (`graph_extraction.py`) with deterministic regex-based extractor. Triplets stored in SQLite `relations` table. Semantic suggest via `suggest_related_semantic`. |
+| #5 Half-manual Graph RAG     | **Foundation only** | Auto-triplet extraction (`graph_extraction.py`) uses a deterministic regex-based extractor. M1.2 stores its output as reviewable SQLite candidates; only explicit approval writes accepted `relations`. Semantic suggest remains available via `suggest_related_semantic`. |
 | #6 SQLite locks              | **Fixed**     | Single-writer `asyncio.Queue` worker (`write_queue.py`). Write operations serialized; reads parallel.                                                                                   |
 | Memory contract ≤12 GB       | **Pending**   | Model SHA pins and bounded runtime configuration are present; an RSS measurement on the target hardware is still required.                                                                 |
 

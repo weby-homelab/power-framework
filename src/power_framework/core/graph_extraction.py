@@ -2,8 +2,8 @@
 
 POWER 3.1 only linked notes via explicit, hand-written ``related:`` YAML and
 keyword/tag Jaccard overlap. This module extracts ``(subject -> relation ->
-object)`` triplets automatically so ``synthesize_session`` can populate a real
-graph without manual curation.
+object)`` candidates automatically so ``synthesize_session`` can record
+reviewable proposals without granting graph authority.
 
 Two backends:
   * Local (default, no network): deterministic regex / linguistic heuristics
@@ -19,10 +19,15 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 logger = logging.getLogger(__name__)
+
+_HEURISTIC_SOURCE = "heuristic"
+_HEURISTIC_METHOD = "regex-cues"
+_HEURISTIC_MODEL_VERSION = "power-local-heuristics-v1"
 
 
 @dataclass(frozen=True)
@@ -33,6 +38,24 @@ class Triplet:
     relation: str
     object: str
     confidence: float = 1.0
+    evidence: str = ""
+
+
+@dataclass(frozen=True)
+class GraphCandidate:
+    """A heuristic edge that has not yet become accepted graph authority."""
+
+    id: int
+    source_path: str
+    subject: str
+    relation: str
+    object: str
+    source: str
+    method: str
+    model_version: str
+    confidence: float
+    evidence: str
+    status: str
 
 
 # UA↔EN relationship cues -> canonical relation name. Order matters: longer /
@@ -111,36 +134,146 @@ def extract_triplets(content: str, note_path: str | None = None) -> list[Triplet
             # Skip trivial self-loops.
             if subject.lower() == obj.lower():
                 continue
-            triplets.append(Triplet(subject=subject, relation=relation, object=obj))
+            triplets.append(
+                Triplet(subject=subject, relation=relation, object=obj, evidence=sentence)
+            )
             break  # one relation per sentence (first / most specific cue)
 
     return triplets
 
 
 def store_triplets(conn: sqlite3.Connection, source_path: str, triplets: list[Triplet]) -> int:
-    """Persist triplets into the ``relations`` table. Returns rows written."""
+    """Persist heuristic triplets as unreviewed graph candidates.
+
+    This compatibility-named function intentionally never writes the accepted
+    ``relations`` table. Approval is the only path that grants graph authority.
+    """
     if not triplets:
         return 0
-    from datetime import datetime
+    import json
 
     created_at = datetime.now(UTC).isoformat()
     rows = 0
     for t in triplets:
-        conn.execute(
-            "INSERT INTO relations (source_path, subject, relation, object, confidence, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (source_path, t.subject, t.relation, t.object, t.confidence, created_at),
+        evidence = json.dumps(
+            {"statement": t.evidence or f"{t.subject} {t.relation} {t.object}"},
+            ensure_ascii=False,
+            sort_keys=True,
         )
-        rows += 1
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO relation_candidates "
+            "(source_path, subject, relation, object, source, method, model_version, confidence, "
+            "evidence, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'candidate', ?)",
+            (
+                source_path,
+                t.subject,
+                t.relation,
+                t.object,
+                _HEURISTIC_SOURCE,
+                _HEURISTIC_METHOD,
+                _HEURISTIC_MODEL_VERSION,
+                t.confidence,
+                evidence,
+                created_at,
+            ),
+        )
+        rows += cursor.rowcount
     conn.commit()
     return rows
+
+
+def _candidate_from_row(row: tuple[object, ...]) -> GraphCandidate:
+    return GraphCandidate(
+        id=cast("int", row[0]),
+        source_path=str(row[1]),
+        subject=str(row[2]),
+        relation=str(row[3]),
+        object=str(row[4]),
+        source=str(row[5]),
+        method=str(row[6]),
+        model_version=str(row[7]),
+        confidence=cast("float", row[8]),
+        evidence=str(row[9]),
+        status=str(row[10]),
+    )
+
+
+def _review_candidate(
+    conn: sqlite3.Connection,
+    candidate_id: int,
+    decision: str,
+    reviewer: str,
+    reason: str,
+) -> GraphCandidate:
+    """Record one irreversible review decision and promote only on acceptance."""
+    if decision not in {"accepted", "rejected"}:
+        raise ValueError(f"Unsupported candidate decision: {decision}")
+    if not reviewer.strip() or not reason.strip():
+        raise ValueError("reviewer and reason are required")
+
+    row = conn.execute(
+        "SELECT id, source_path, subject, relation, object, source, method, model_version, "
+        "confidence, evidence, status FROM relation_candidates WHERE id = ?",
+        (candidate_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Candidate {candidate_id} does not exist")
+    candidate = _candidate_from_row(row)
+    if candidate.status != "candidate":
+        raise ValueError(f"Candidate {candidate_id} already reviewed as {candidate.status}")
+
+    reviewed_at = datetime.now(UTC).isoformat()
+    with conn:
+        if decision == "accepted":
+            conn.execute(
+                "INSERT INTO relations "
+                "(source_path, subject, relation, object, confidence, created_at, candidate_id, "
+                "accepted_by, accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    candidate.source_path,
+                    candidate.subject,
+                    candidate.relation,
+                    candidate.object,
+                    candidate.confidence,
+                    reviewed_at,
+                    candidate.id,
+                    reviewer.strip(),
+                    reviewed_at,
+                ),
+            )
+        conn.execute(
+            "UPDATE relation_candidates SET status = ?, reviewed_at = ?, reviewed_by = ?, "
+            "review_reason = ? WHERE id = ?",
+            (decision, reviewed_at, reviewer.strip(), reason.strip(), candidate.id),
+        )
+        conn.execute(
+            "INSERT INTO relation_candidate_decisions "
+            "(candidate_id, decision, reviewer, reason, decided_at) VALUES (?, ?, ?, ?, ?)",
+            (candidate.id, decision, reviewer.strip(), reason.strip(), reviewed_at),
+        )
+
+    return GraphCandidate(**{**candidate.__dict__, "status": decision})
+
+
+def approve_candidate(
+    conn: sqlite3.Connection, candidate_id: int, reviewer: str, reason: str
+) -> GraphCandidate:
+    """Promote one reviewed candidate into the accepted relations table."""
+    return _review_candidate(conn, candidate_id, "accepted", reviewer, reason)
+
+
+def reject_candidate(
+    conn: sqlite3.Connection, candidate_id: int, reviewer: str, reason: str
+) -> GraphCandidate:
+    """Reject one candidate while retaining a deterministic audit record."""
+    return _review_candidate(conn, candidate_id, "rejected", reviewer, reason)
 
 
 def store_note_triplets(vault_dir: Path | str, rel_path: str, content: str) -> int:
     """Extract and persist triplets for ``content`` into the vault search DB.
 
-    Convenience used by ``synthesize_session`` so every synthesized note grows
-    the auto knowledge graph without manual ``related:`` YAML.
+    Convenience used by ``synthesize_session`` so every synthesized note
+    records reviewable graph candidates without modifying accepted relations.
     """
     from .db import _init_db
     from .searcher import _db_path
