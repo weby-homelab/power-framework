@@ -97,7 +97,6 @@ Body used to infer a description.
     assert parsed.related[0].relation == "depends_on"
     assert parsed.related[0].confidence == 0.42
     assert parsed.related[0].model_extra == {"evidence": {"source": "human-review"}}
-<<<<<<< HEAD
 
 
 def test_temporal_chain_uses_inclusive_dates_and_preserves_history() -> None:
@@ -132,5 +131,3 @@ def test_competing_supersession_is_explicitly_conflicted() -> None:
     statuses = resolve_temporal_statuses(records, date(2026, 7, 10))
 
     assert set(statuses.values()) == {TemporalStatus.CONFLICTED}
-=======
->>>>>>> 6fee2bc (fix: preserve typed relation semantics)

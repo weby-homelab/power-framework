@@ -242,6 +242,7 @@ class TestContradictionDetectorLLM:
 
     def test_llm_detects_contradiction(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-key")
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-internal")
         vault = self._make_simple_vault(tmp_path, self.LLM_BODY_A, self.LLM_BODY_B)
 
         detector = ContradictionDetector(similarity_threshold=0.5)
@@ -284,6 +285,7 @@ class TestContradictionDetectorLLM:
 
     def test_llm_no_contradiction(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-key")
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-internal")
         vault = self._make_simple_vault(tmp_path, self.LLM_COMPAT_A, self.LLM_COMPAT_B)
 
         detector = ContradictionDetector(similarity_threshold=0.5)

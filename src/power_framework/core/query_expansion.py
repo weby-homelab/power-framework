@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 from typing import ClassVar
 
+from .egress import EgressOperation, require_remote_egress
 from .utils import run_opencode_cli
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,9 @@ class QueryExpander:
         "помилка": ["error"],
     }
 
-    def __init__(self, use_llm: bool = False, api_key: str | None = None) -> None:
+    def __init__(
+        self, use_llm: bool = False, api_key: str | None = None, sensitivity: str = "internal"
+    ) -> None:
         self.use_llm = use_llm
         if api_key is not None:
             self.api_key = api_key
@@ -69,6 +72,7 @@ class QueryExpander:
             "/"
         )
         self.model = os.environ.get("POWER_LLM_MODEL", OPENROUTER_MODELS[0])
+        self.sensitivity = sensitivity
 
     def expand(self, query: str) -> list[str]:
         if not query or not query.strip():
@@ -129,6 +133,8 @@ class QueryExpander:
 
         if not self.api_key:
             return []
+
+        require_remote_egress(EgressOperation.QUERY_EXPANSION, self.sensitivity)
 
         payload = json.dumps(
             {

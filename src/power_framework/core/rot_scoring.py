@@ -21,14 +21,14 @@ import urllib.request
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from .egress import EgressDeniedError, EgressOperation, require_remote_egress
 from .embeddings import get_embedding_manager
+from .ignore import should_skip
 from .parser import FRONTMATTER_PATTERN, parse_frontmatter, read_file_content
 from .utils import run_opencode_cli
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-from .ignore import should_skip
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +245,8 @@ class ContradictionDetector:
         if not self.api_key:
             return None
 
+        require_remote_egress(EgressOperation.ROT, "internal")
+
         payload = json.dumps(
             {
                 "model": self.model,
@@ -445,6 +447,10 @@ class LinkRotChecker:
     def _head_status(self, url: str) -> int:
         """Perform HTTP HEAD request and return status code. Returns -1 on error."""
         if not url.startswith(("http://", "https://")):
+            return -1
+        try:
+            require_remote_egress(EgressOperation.ROT, "public")
+        except EgressDeniedError:
             return -1
         try:
             from urllib.parse import urlparse

@@ -26,6 +26,15 @@ never selected silently.
 `temporal_view` (`current`, `historical`, or `all`) and an optional inclusive
 `as_of` (`YYYY-MM-DD`) boundary. MCP envelopes return both the requested
 boundary and each result's `temporal_status`.
+
+## M1.4 fail-closed egress contract
+
+`POWER_EGRESS_POLICY` defaults to `deny`. Remote paths must pass the shared
+policy before sending any vault-derived value: `allow-public`,
+`allow-internal`, and `allow-sensitive` are the only explicit opt-ins. The
+policy guards OpenRouter query expansion, ROT contradiction analysis, HTTP
+link-ROT, and a non-loopback Ollama embedding endpoint. Local ONNX/fastembed/
+Qwen and local rerankers do not send note content off-host.
 | #6 SQLite locks              | **Fixed**     | Single-writer `asyncio.Queue` worker (`write_queue.py`). Write operations serialized; reads parallel.                                                                                   |
 | Memory contract ≤12 GB       | **Pending**   | Model SHA pins and bounded runtime configuration are present; an RSS measurement on the target hardware is still required.                                                                 |
 
