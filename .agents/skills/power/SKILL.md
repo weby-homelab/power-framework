@@ -1,6 +1,6 @@
 ---
 name: power
-version: 3.2.5
+version: 3.2.7
 description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
 ---
 
@@ -30,7 +30,7 @@ The skill contains automated scripts in the `scripts/` directory and a CLI:
 
 ### Scripts
 
-1.  **`lint_brain.py`** — linter + ROT audit script (v3.2.5):
+1.  **`lint_brain.py`** — linter + ROT audit script (v3.2.7):
 
 ```bash
 python3 .agents/skills/power/scripts/lint_brain.py
@@ -60,14 +60,14 @@ python3 .agents/skills/power/scripts/generate_index.py
 14. `power synthesize <path>` — create session summary note
 15. `power rename <path> --old <old_path> --new <new_path>` — rename note and update Graph RAG links
 
-### MCP Tools (12) — FastMCP 3.x (v3.2.5)
+### MCP Tools (12) — FastMCP 3.x (v3.2.7)
 
 - `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`
 - `search_vault_tool`, `synthesize_session`
 - `rot_audit`, `archive_notes`, `suggest_related_tool`
 - `heal_frontmatter_tool`, `check_markdown_tool`
 
-### Configuration (v3.2.5)
+### Configuration (v3.2.7)
 
 - **Embedding model** — canonically `BAAI/bge-m3` (1024 dim) via direct ONNX Runtime. BGE-M3 natively supports **dense + sparse + ColBERT** in a single model, enabling hybrid search (RRF) without a separate BM25. The provider is switched via `POWER_EMBED_PROVIDER`; `fastembed`/MiniLM remains a light opt-in fallback.
 - **Default reranker** — `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0, UA+EN). `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) remains explicit opt-in.
