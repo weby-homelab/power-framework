@@ -49,7 +49,11 @@ def synthesize_session_ingest(
     """
     vault = Path(vault_path).expanduser().resolve()
     tags = tags or []
-    related_typed = [TypedRelation(path=r) for r in (related or [])]
+    related_typed = [
+        TypedRelation.from_legacy_path(path)
+        for relation in (related or [])
+        if (path := relation.strip())
+    ]
 
     if not name.endswith(".md"):
         name += ".md"

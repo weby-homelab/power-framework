@@ -69,6 +69,12 @@ memory:
   write_policy: agent-proposed
 custom_extension:
   retention: 90d
+related:
+  - path: 01_Projects/dependency.md
+    relation: depends_on
+    confidence: 0.42
+    evidence:
+      source: human-review
 timestamp: 2026-07-27T12:00:00+00:00
 ---
 
@@ -83,3 +89,6 @@ Body used to infer a description.
     assert parsed.memory is not None
     assert parsed.memory.evidence == ["sha256:abc123"]
     assert parsed.model_extra == {"custom_extension": {"retention": "90d"}}
+    assert parsed.related[0].relation == "depends_on"
+    assert parsed.related[0].confidence == 0.42
+    assert parsed.related[0].model_extra == {"evidence": {"source": "human-review"}}

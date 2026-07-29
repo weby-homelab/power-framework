@@ -93,8 +93,17 @@ def build_frontmatter(metadata: OKFMetadata) -> str:
             )
         )
     if metadata.related:
-        related_str = ", ".join(r.path for r in metadata.related)
-        lines.append(f"related: [{related_str}]")
+        related_values: list[object] = [
+            relation.path
+            if relation.uses_legacy_compact_form
+            else relation.model_dump(mode="json", exclude_none=True)
+            for relation in metadata.related
+        ]
+        legacy_paths = [value for value in related_values if isinstance(value, str)]
+        if len(legacy_paths) == len(related_values):
+            lines.append(f"related: [{', '.join(legacy_paths)}]")
+        else:
+            lines.extend(_render_yaml_field("related", related_values))
     for field, value in (metadata.model_extra or {}).items():
         lines.extend(_render_yaml_field(field, value))
     lines.append(f"timestamp: {metadata.timestamp.isoformat()}")
