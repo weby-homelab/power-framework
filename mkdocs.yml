@@ -60,7 +60,7 @@ nav:
       - POWER 3.1 Trust-Release Baseline: adr/0001-power-3.1-trust-release-baseline.md
       - POWER Memory OS Principles: adr/0002-memory-os-principles.md
   - POWER 3.1 Release Evidence: release-3.1.md
-  - POWER 3.2.6 Release Notes: release-3.2.6.md
+  - POWER 3.2.7 Release Notes: release-3.2.7.md
   - Release Governance:
       - ROADMAP POWER: https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md

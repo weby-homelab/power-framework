@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.2.7
+
+- Added explicit candidate-graph decisions, temporal retrieval semantics,
+  fail-closed remote egress, and governed transactional memory operations.
+- Added a versioned repository threat model for vault, MCP, mutation, and
+  egress boundaries.
+- Added `power memory` and five MCP memory tools.
+
 ## 3.2.6
 
 - Added shared per-vault mutation safety for CLI and MCP writers, with
