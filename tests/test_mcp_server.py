@@ -181,7 +181,7 @@ async def test_ingest_note_tool(sample_vault: Path) -> None:
         )
 
 
-async def test_synthesize_session_serializes_write_and_stores_triplets(
+async def test_synthesize_session_serializes_write_and_stores_candidate_triplets(
     sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     db_path = tmp_path / "power-search.db"
@@ -199,10 +199,10 @@ async def test_synthesize_session_serializes_write_and_stores_triplets(
     assert (sample_vault / "06_Daily_Logs" / "McpSynthesis.md").exists()
     with closing(sqlite3.connect(db_path)) as conn:
         rows = conn.execute(
-            "SELECT source_path, relation FROM relations WHERE source_path = ?",
+            "SELECT source_path, relation, status FROM relation_candidates WHERE source_path = ?",
             ("06_Daily_Logs/McpSynthesis.md",),
         ).fetchall()
-    assert ("06_Daily_Logs/McpSynthesis.md", "is_a") in rows
+    assert ("06_Daily_Logs/McpSynthesis.md", "is_a", "candidate") in rows
 
 
 @pytest.mark.parametrize("tool_name", ["ingest", "synthesize"])

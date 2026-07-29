@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
+
 from power_framework.core.db import _init_db
 from power_framework.core.graph_extraction import (
     Triplet,
+    approve_candidate,
     extract_triplets,
+    reject_candidate,
     store_note_triplets,
     store_triplets,
 )
@@ -40,7 +44,7 @@ def test_skips_trivial_self_loop():
     assert extract_triplets(text) == []
 
 
-def test_store_triplets_persists_rows(tmp_path):
+def test_store_triplets_persists_candidates_with_required_provenance(tmp_path):
     db = tmp_path / "search.db"
     conn = sqlite3.connect(str(db))
     conn.execute("PRAGMA journal_mode=WAL")
@@ -52,10 +56,22 @@ def test_store_triplets_persists_rows(tmp_path):
     written = store_triplets(conn, "note.md", triplets)
     assert written == 2
     rows = conn.execute(
-        "SELECT source_path, subject, relation, object FROM relations ORDER BY id"
+        "SELECT source_path, subject, relation, object, source, method, model_version, "
+        "confidence, evidence, status FROM relation_candidates ORDER BY id"
     ).fetchall()
-    assert rows[0] == ("note.md", "A", "uses", "B")
-    assert rows[1] == ("note.md", "A", "is_a", "C")
+    assert rows[0][:8] == (
+        "note.md",
+        "A",
+        "uses",
+        "B",
+        "heuristic",
+        "regex-cues",
+        "power-local-heuristics-v1",
+        1.0,
+    )
+    assert rows[0][8]
+    assert rows[0][9] == "candidate"
+    assert conn.execute("SELECT COUNT(*) FROM relations").fetchone()[0] == 0
     conn.close()
 
 
@@ -74,9 +90,66 @@ def test_store_note_triplets_extracts_and_persists(tmp_path, monkeypatch):
 
     conn = sqlite3.connect(str(db))
     rows = conn.execute(
-        "SELECT source_path, relation FROM relations WHERE source_path = ?",
+        "SELECT source_path, relation, status FROM relation_candidates WHERE source_path = ?",
         ("01_Projects/Note.md",),
     ).fetchall()
     conn.close()
-    assert ("01_Projects/Note.md", "is_a") in rows
-    assert ("01_Projects/Note.md", "uses") in rows
+    assert ("01_Projects/Note.md", "is_a", "candidate") in rows
+    assert ("01_Projects/Note.md", "uses", "candidate") in rows
+
+
+def test_candidate_review_is_deterministic_and_only_approval_creates_relation(tmp_path):
+    db = tmp_path / "search.db"
+    conn = sqlite3.connect(str(db))
+    _init_db(conn)
+    store_triplets(
+        conn,
+        "note.md",
+        [
+            Triplet(subject="A", relation="uses", object="B", evidence="A uses B."),
+            Triplet(subject="A", relation="is_a", object="C", evidence="A is C."),
+        ],
+    )
+
+    candidate_ids = [
+        row[0] for row in conn.execute("SELECT id FROM relation_candidates ORDER BY id").fetchall()
+    ]
+    approved = approve_candidate(conn, candidate_ids[0], reviewer="human", reason="verified")
+    rejected = reject_candidate(conn, candidate_ids[1], reviewer="human", reason="irrelevant")
+
+    assert approved.status == "accepted"
+    assert rejected.status == "rejected"
+    assert conn.execute("SELECT COUNT(*) FROM relations").fetchone()[0] == 1
+    assert conn.execute("SELECT candidate_id FROM relations").fetchone()[0] == candidate_ids[0]
+    decisions = conn.execute(
+        "SELECT candidate_id, decision FROM relation_candidate_decisions ORDER BY id"
+    ).fetchall()
+    assert decisions == [(candidate_ids[0], "accepted"), (candidate_ids[1], "rejected")]
+    with pytest.raises(ValueError, match="already reviewed"):
+        approve_candidate(conn, candidate_ids[0], reviewer="human", reason="again")
+    conn.close()
+
+
+def test_legacy_relations_are_reclassified_as_unreviewed_candidates(tmp_path):
+    db = tmp_path / "legacy.db"
+    conn = sqlite3.connect(str(db))
+    conn.execute(
+        "CREATE TABLE relations ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, source_path TEXT NOT NULL, subject TEXT NOT NULL, "
+        "relation TEXT NOT NULL, object TEXT NOT NULL, confidence REAL DEFAULT 1.0, "
+        "created_at TEXT NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO relations (source_path, subject, relation, object, confidence, created_at) "
+        "VALUES ('legacy.md', 'A', 'uses', 'B', 0.7, '2026-07-29T00:00:00+00:00')"
+    )
+    conn.commit()
+
+    _init_db(conn)
+
+    assert conn.execute("SELECT COUNT(*) FROM relations").fetchone()[0] == 0
+    row = conn.execute(
+        "SELECT source, method, model_version, confidence, status FROM relation_candidates"
+    ).fetchone()
+    assert row == ("heuristic", "legacy-unreviewed", "pre-m1.2", 0.7, "candidate")
+    conn.close()
