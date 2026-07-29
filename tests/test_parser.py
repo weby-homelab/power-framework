@@ -169,6 +169,71 @@ class TestBuildFrontmatter:
         result = build_frontmatter(meta)
         assert "related: [01_Projects/Other.md, 02_Areas/Related.md]" in result
 
+    def test_typed_related_round_trip_is_lossless(self):
+        meta = OKFMetadata(
+            type="Project",
+            title="Typed graph note",
+            description="A note with governed graph semantics",
+            timestamp=datetime(2026, 7, 29, 12, 0, 0),
+            related=[
+                {
+                    "path": "01_Projects/Dependency.md",
+                    "relation": "depends_on",
+                    "confidence": 0.42,
+                    "evidence": {"source": "human-review", "revision": 3},
+                },
+            ],
+        )
+
+        rendered = build_frontmatter(meta)
+        parsed_raw = parse_frontmatter(f"{rendered}\n")
+        parsed = validate_metadata(f"{rendered}\n\nBody")
+
+        assert parsed_raw is not None
+        assert parsed_raw["related"] == [
+            {
+                "path": "01_Projects/Dependency.md",
+                "relation": "depends_on",
+                "confidence": 0.42,
+                "evidence": {"source": "human-review", "revision": 3},
+            }
+        ]
+        assert parsed is not None
+        assert parsed.related[0].relation == "depends_on"
+        assert parsed.related[0].confidence == 0.42
+        assert parsed.related[0].model_extra == {
+            "evidence": {"source": "human-review", "revision": 3}
+        }
+
+    def test_mixed_related_round_trip_preserves_legacy_and_typed_forms(self):
+        meta = OKFMetadata(
+            type="Project",
+            title="Mixed graph note",
+            description="A note with legacy and typed relations",
+            timestamp=datetime(2026, 7, 29, 12, 0, 0),
+            related=[
+                "01_Projects/Legacy.md",
+                {
+                    "path": "01_Projects/Typed.md",
+                    "relation": "references",
+                    "confidence": 0.8,
+                },
+            ],
+        )
+
+        rendered = build_frontmatter(meta)
+        parsed_raw = parse_frontmatter(f"{rendered}\n")
+
+        assert parsed_raw is not None
+        assert parsed_raw["related"] == [
+            "01_Projects/Legacy.md",
+            {
+                "path": "01_Projects/Typed.md",
+                "relation": "references",
+                "confidence": 0.8,
+            },
+        ]
+
     def test_build_with_all_new_fields(self):
         meta = OKFMetadata(
             type="Project",

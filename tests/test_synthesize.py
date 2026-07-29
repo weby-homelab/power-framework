@@ -36,10 +36,32 @@ def test_synthesize_session_ingest_success(tmp_path):
         metadata = validate_metadata(note.read_text(encoding="utf-8"))
         assert metadata is not None
         assert metadata.okf_version == "0.2"
+        assert metadata.related == []
         assert metadata.memory is not None
         assert metadata.memory.kind == "episodic"
         assert metadata.memory.sources == ["power://synthesize_session"]
         assert metadata.memory.evidence[0].startswith("sha256:")
+
+
+def test_synthesize_session_ingest_keeps_legacy_related_compact(tmp_path):
+    with (
+        patch(
+            "power_framework.core.synthesize.run_generate_hierarchical_index",
+            return_value="Index updated",
+        ),
+        patch("power_framework.core.synthesize.run_lint_report", return_value="Lint clean"),
+    ):
+        synthesize_session_ingest(
+            name="session-related.md",
+            title="Session with relation",
+            description="Synthesis with a legacy relation",
+            content="Content",
+            related=["01_Projects/Dependency.md"],
+            vault_path=tmp_path,
+        )
+
+    content = (tmp_path / "session-related.md").read_text(encoding="utf-8")
+    assert "related: [01_Projects/Dependency.md]" in content
 
 
 def test_synthesize_session_ingest_exists_error(tmp_path):

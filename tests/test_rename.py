@@ -13,7 +13,7 @@ from power_framework.core.healer import propagate_rename
 
 if TYPE_CHECKING:
     from pathlib import Path
-from power_framework.core.parser import read_file_content
+from power_framework.core.parser import parse_frontmatter, read_file_content
 
 
 def test_propagate_rename_dry_run(tmp_path: Path):
@@ -55,7 +55,8 @@ def test_propagate_rename_live(tmp_path: Path):
         "type: Project\n"
         'title: "Note A"\n'
         'description: "A test note"\n'
-        "related: [02_Areas/NoteB.md, {path: 02_Areas/NoteB.md, relation: depends_on}]\n"
+        "related: [02_Areas/NoteB.md, {path: 02_Areas/NoteB.md, relation: depends_on, "
+        "confidence: 0.42, evidence: {source: human-review}}]\n"
         "timestamp: 2026-07-17T12:00:00Z\n"
         "---\n"
         "Content of note A\n"
@@ -74,6 +75,14 @@ def test_propagate_rename_live(tmp_path: Path):
     assert "02_Areas/NoteB.md" not in content
     assert "02_Areas/NoteB_new.md" in content
     assert 'path: "02_Areas/NoteB_new.md"' in content or "02_Areas/NoteB_new.md" in content
+    parsed = parse_frontmatter(content)
+    assert parsed is not None
+    assert parsed["related"][1] == {
+        "path": "02_Areas/NoteB_new.md",
+        "relation": "depends_on",
+        "confidence": 0.42,
+        "evidence": {"source": "human-review"},
+    }
 
 
 def test_cli_rename_command(tmp_path: Path):

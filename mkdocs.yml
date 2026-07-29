@@ -61,7 +61,7 @@ nav:
   - POWER 3.1 Release Evidence: release-3.1.md
   - POWER 3.2.6 Release Notes: release-3.2.6.md
   - Release Governance:
-      - POWER 3.3.0 Execution Tracker: plans/power-3.3.0-execution-tracker.md
+      - ROADMAP POWER: https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md
   - Changelog: CHANGELOG.md
   - Contributing: contributing.md

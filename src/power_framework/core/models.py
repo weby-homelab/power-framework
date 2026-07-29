@@ -15,7 +15,7 @@ from datetime import date as date_type
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 
 class TypedRelation(BaseModel):
@@ -35,8 +35,21 @@ class TypedRelation(BaseModel):
         le=1.0,
         description="Confidence score (0.0 - 1.0)",
     )
+    _legacy_compact: bool = PrivateAttr(default=False)
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="allow")
+
+    @classmethod
+    def from_legacy_path(cls, path: str) -> TypedRelation:
+        """Create a relation that should retain the legacy compact YAML form."""
+        relation = cls(path=path)
+        relation._legacy_compact = True
+        return relation
+
+    @property
+    def uses_legacy_compact_form(self) -> bool:
+        """Whether frontmatter serialization should emit only the relation path."""
+        return self._legacy_compact
 
 
 class NoteType(StrEnum):
@@ -223,13 +236,7 @@ class OKFMetadata(BaseModel):
                 elif isinstance(item, str):
                     stripped = item.strip()
                     if stripped:
-                        result.append(
-                            TypedRelation(
-                                path=stripped,
-                                relation="related_to",
-                                confidence=1.0,
-                            )
-                        )
+                        result.append(TypedRelation.from_legacy_path(stripped))
                 elif isinstance(item, dict):
                     result.append(TypedRelation.model_validate(item))
                 else:

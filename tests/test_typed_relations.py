@@ -41,14 +41,15 @@ class TestTypedRelation:
         with pytest.raises(pydantic.ValidationError):
             TypedRelation(path="x.md", confidence=1.5)
 
-    def test_extra_fields_ignored(self):
+    def test_extra_fields_preserved(self):
         tr = TypedRelation(
             path="x.md",
             relation="related_to",
             confidence=0.5,
-            unknown="ignored",
+            evidence={"source": "human-review"},
         )
         assert tr.path == "x.md"
+        assert tr.model_extra == {"evidence": {"source": "human-review"}}
 
 
 class TestBackwardCompatibility:
@@ -68,6 +69,7 @@ class TestBackwardCompatibility:
         assert meta.related[0].path == "01_Projects/A.md"
         assert meta.related[0].relation == "related_to"
         assert meta.related[0].confidence == 1.0
+        assert meta.related[0].uses_legacy_compact_form is True
         assert meta.related[1].path == "02_Areas/B.md"
 
     def test_mixed_strings_and_typed(self):
@@ -91,6 +93,7 @@ class TestBackwardCompatibility:
         assert meta.related[1].path == "02_Areas/Typed.md"
         assert meta.related[1].relation == "references"
         assert meta.related[1].confidence == 0.9
+        assert meta.related[1].uses_legacy_compact_form is False
 
     def test_mapping_list_accepts_typed_relations_from_yaml(self):
         meta = OKFMetadata(
