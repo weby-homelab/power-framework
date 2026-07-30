@@ -31,13 +31,13 @@ ARTIFACTS = {
     "adjudicated_qrels": "adjudicated_qrels_sha256",
 }
 REQUIRED_THRESHOLDS = {
-    "recall_at_10",
-    "ndcg_at_10",
-    "mrr_at_10",
-    "citation_provenance_accuracy",
-    "stale_answer_rate_max",
-    "abstention_quality",
-    "p95_latency_ms",
+    "recall_at_10": 0.80,
+    "ndcg_at_10": 0.70,
+    "mrr_at_10": 0.70,
+    "citation_provenance_accuracy": 0.95,
+    "stale_answer_rate_max": 0.02,
+    "abstention_quality": 0.90,
+    "p95_latency_ms": 1500,
 }
 logger = logging.getLogger(__name__)
 
@@ -71,13 +71,15 @@ def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[s
         errors.append("artifact paths must be non-empty strings")
     if manifest.get("status") == "adjudicated":
         thresholds = manifest.get("thresholds")
-        if not isinstance(thresholds, dict) or set(thresholds) != REQUIRED_THRESHOLDS:
+        if not isinstance(thresholds, dict) or set(thresholds) != set(REQUIRED_THRESHOLDS):
             errors.append("adjudicated evidence requires complete pre-registered thresholds")
         elif not all(
             isinstance(value, (int, float)) and math.isfinite(value)
             for value in thresholds.values()
         ):
             errors.append("pre-registered thresholds must be finite numbers")
+        elif thresholds != REQUIRED_THRESHOLDS:
+            errors.append("adjudicated evidence thresholds must match the canonical M2 policy")
         if not isinstance(manifest.get("annotator_count"), int) or manifest["annotator_count"] < 2:
             errors.append("adjudicated evidence requires at least two independent annotators")
         if not isinstance(manifest.get("agreement"), dict):
