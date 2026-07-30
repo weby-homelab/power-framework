@@ -63,6 +63,7 @@ nav:
   - POWER 3.2.7 Release Notes: release-3.2.7.md
   - Release Governance:
       - ROADMAP POWER: https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md
+      - M2 Human Evaluation: m2-human-evaluation.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md
   - Changelog: CHANGELOG.md
   - Contributing: contributing.md
