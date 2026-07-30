@@ -60,6 +60,22 @@ def test_adjudicated_manifest_requires_preregistered_thresholds() -> None:
     assert "adjudicated evidence requires complete pre-registered thresholds" in errors
 
 
+def test_adjudicated_manifest_requires_canonical_threshold_values() -> None:
+    manifest = _manifest(
+        status="adjudicated",
+        thresholds=dict(MODULE.REQUIRED_THRESHOLDS),
+        annotator_count=2,
+        agreement={},
+    )
+    assert MODULE.validate_manifest(manifest, allow_sealed=False) == []
+    thresholds = manifest["thresholds"]
+    assert isinstance(thresholds, dict)
+    thresholds["recall_at_10"] = 0.79
+    assert "adjudicated evidence thresholds must match the canonical M2 policy" in (
+        MODULE.validate_manifest(manifest, allow_sealed=False)
+    )
+
+
 def test_evidence_file_binds_each_artifact_to_its_declared_hash(tmp_path: Path) -> None:
     artifacts = _manifest()["artifacts"]
     assert isinstance(artifacts, dict)
