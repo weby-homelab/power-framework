@@ -20,6 +20,16 @@ assert SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+CANONICAL_THRESHOLDS = {
+    "recall_at_10": 0.80,
+    "ndcg_at_10": 0.70,
+    "mrr_at_10": 0.70,
+    "citation_provenance_accuracy": 0.95,
+    "stale_answer_rate_max": 0.02,
+    "abstention_quality": 0.90,
+    "p95_latency_ms": 1500,
+}
+
 
 def _manifest(**overrides: object) -> dict[str, object]:
     manifest: dict[str, object] = {
@@ -63,17 +73,17 @@ def test_adjudicated_manifest_requires_preregistered_thresholds() -> None:
 def test_adjudicated_manifest_requires_canonical_threshold_values() -> None:
     manifest = _manifest(
         status="adjudicated",
-        thresholds=dict(MODULE.REQUIRED_THRESHOLDS),
+        thresholds=dict(CANONICAL_THRESHOLDS),
         annotator_count=2,
         agreement={},
     )
+    assert MODULE.REQUIRED_THRESHOLDS == CANONICAL_THRESHOLDS
     assert MODULE.validate_manifest(manifest, allow_sealed=False) == []
-    thresholds = manifest["thresholds"]
-    assert isinstance(thresholds, dict)
-    thresholds["recall_at_10"] = 0.79
-    assert "adjudicated evidence thresholds must match the canonical M2 policy" in (
-        MODULE.validate_manifest(manifest, allow_sealed=False)
-    )
+    for key, value in CANONICAL_THRESHOLDS.items():
+        manifest["thresholds"] = {**CANONICAL_THRESHOLDS, key: value + 1}
+        assert "adjudicated evidence thresholds must match the canonical M2 policy" in (
+            MODULE.validate_manifest(manifest, allow_sealed=False)
+        )
 
 
 def test_evidence_file_binds_each_artifact_to_its_declared_hash(tmp_path: Path) -> None:

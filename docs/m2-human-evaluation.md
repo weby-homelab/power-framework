@@ -95,19 +95,23 @@ GitHub призначений для коду, публічного проток
 
 Допустимі `relevance`: `2`, `1`, `0`, `-1`. Допустимі
 `temporal_classification`: `current`, `historical`, `conflicted` або `unknown`.
-Відсутній рядок, повторений ідентифікатор або значення поза цим набором
-робить packet неповним і повертається оцінювачу без reconciliation.
+Відсутній рядок, повторена пара `query_id` і `document_id` або значення поза
+цим набором робить packet неповним і повертається оцінювачу без reconciliation.
+Один `query_id` може законно повторюватися в кількох рядках — по одному для
+кожного документа-кандидата.
 
 ## Що перевіряє координатор
 
-Коли сформовано manifest і файли evidence, запускати:
+Коли сформовано manifest і файли evidence, у захищеному середовищі термінала
+встановити `M2_EVIDENCE_ROOT` на корінь сховища. Не записувати його фактичне
+значення в репозиторій, Issue, PR або лог. Потім запускати:
 
 ```bash
 python benchmarks/human_retrieval/scripts/validate_human_evidence.py \
-  /restricted/path/development/manifest.json
+  "${M2_EVIDENCE_ROOT}/development/manifest.json"
 
 python benchmarks/human_retrieval/scripts/validate_human_evidence.py \
-  /restricted/path/sealed_holdout/manifest.json --allow-sealed
+  "${M2_EVIDENCE_ROOT}/sealed_holdout/manifest.json" --allow-sealed
 ```
 
 Команда не оцінює якість замість людей. Вона перевіряє, що manifest пов'язує
