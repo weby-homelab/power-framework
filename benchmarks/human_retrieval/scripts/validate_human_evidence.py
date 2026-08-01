@@ -184,7 +184,14 @@ def validate_adjudicated_qrels(
                 f"{query_id}/{document_id}: v2 acceptable_citation must be a JSON boolean"
             )
         bucket["citation"][document_id] = bool(citation)
-        bucket["temporal"][document_id] = str(final.get("temporal_status"))
+        temporal = final.get("temporal_status")
+        if schema_version == "2.0" and temporal not in {
+            "current",
+            "historical",
+            "not_applicable",
+        }:
+            errors.append(f"{query_id}/{document_id}: v2 temporal_status is invalid")
+        bucket["temporal"][document_id] = str(temporal)
         if schema_version == "2.0":
             if "query_abstention_correct" in final or "abstention_correct" in final:
                 errors.append(f"{query_id}: v2 forbids manual query-level abstention labels")

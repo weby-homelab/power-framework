@@ -199,6 +199,30 @@ def test_v2_qrels_reject_non_boolean_citation(tmp_path: Path) -> None:
     assert "q-current/doc-current: v2 acceptable_citation must be a JSON boolean" in errors
 
 
+def test_v2_qrels_reject_missing_temporal_status(tmp_path: Path) -> None:
+    queries = tmp_path / "queries.jsonl"
+    qrels = tmp_path / "qrels.jsonl"
+    queries.write_text(
+        json.dumps({"query_id": "q-current", "journey": "current_fact"}) + "\n",
+        encoding="utf-8",
+    )
+    qrels.write_text(
+        json.dumps(
+            {
+                "query_id": "q-current",
+                "document_id": "doc-current",
+                "final": {"relevance": 2, "acceptable_citation": True},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    errors = MODULE.validate_adjudicated_qrels(queries, qrels, schema_version="2.0")
+
+    assert "q-current/doc-current: v2 temporal_status is invalid" in errors
+
+
 def test_adjudicated_qrels_reject_jointly_infeasible_current_fact(tmp_path: Path) -> None:
     queries = tmp_path / "queries.jsonl"
     qrels = tmp_path / "qrels.jsonl"

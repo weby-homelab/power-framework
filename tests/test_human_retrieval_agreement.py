@@ -66,6 +66,14 @@ def test_v2_rejects_non_integer_relevance() -> None:
         MODULE.compute_receipt(rows, "2.0")
 
 
+def test_v2_rejects_free_text_or_unknown_judgment_fields() -> None:
+    rows = _rows()
+    rows[0]["comment"] = "неоднозначно"
+
+    with pytest.raises(ValueError, match="exact contract"):
+        MODULE.compute_receipt(rows, "2.0")
+
+
 def test_protocol_v1_is_diagnostic_only() -> None:
     rows = _rows()
     for row in rows:

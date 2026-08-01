@@ -24,6 +24,14 @@ if TYPE_CHECKING:
 
 BOOTSTRAP_SAMPLES = 10_000
 BOOTSTRAP_SEED = 20260801
+V2_JUDGMENT_FIELDS = {
+    "participant_id",
+    "query_id",
+    "document_id",
+    "relevance",
+    "acceptable_citation",
+    "temporal_status",
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -140,6 +148,8 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
         raise ValueError("agreement requires exactly two non-empty participant IDs")
     pair_rows: dict[tuple[str, str], dict[str, dict[str, Any]]] = defaultdict(dict)
     for row in rows:
+        if protocol_version == "2.0" and set(row) != V2_JUDGMENT_FIELDS:
+            raise ValueError("v2 judgment fields do not match the exact contract")
         query_id = str(row.get("query_id", ""))
         document_id = str(row.get("document_id", ""))
         participant_id = str(row.get("participant_id", ""))
