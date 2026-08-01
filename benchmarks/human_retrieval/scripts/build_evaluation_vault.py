@@ -34,7 +34,8 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 def build(corpus: Path, output: Path) -> int:
     """Write one validated OKF note per development corpus document."""
     records = load_jsonl(corpus)
-    output.mkdir(parents=True, exist_ok=True)
+    notes_dir = output / "01_Projects"
+    notes_dir.mkdir(parents=True, exist_ok=True)
     written = 0
     for row in records:
         document_id = row.get("document_id")
@@ -61,7 +62,7 @@ def build(corpus: Path, output: Path) -> int:
             "---\n\n"
             f"{text.strip()}\n"
         )
-        (output / f"{document_id}.md").write_text(note, encoding="utf-8")
+        (notes_dir / f"{document_id}.md").write_text(note, encoding="utf-8")
         written += 1
     return written
 
