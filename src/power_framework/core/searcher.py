@@ -761,8 +761,33 @@ def _fts_search(
             (fts_query, max_results),
         )
 
+        rows = cursor.fetchall()
+        if not rows and len(terms) > 1:
+            # Natural-language questions rarely have every function word in a
+            # short note. Preserve the precise AND contract when it matches,
+            # then recover recall with BM25-ranked OR instead of returning an
+            # empty lexical comparator for the whole question.
+            cursor.execute(
+                """
+                SELECT
+                    rel_path,
+                    title,
+                    description,
+                    note_type,
+                    -bm25(fts_notes, 10.0, 5.0, 3.0, 1.0) as score,
+                    snippet(fts_notes, 3, '...', '...', '...', 15) as snippet_text,
+                    tags
+                FROM fts_notes
+                WHERE fts_notes MATCH ?
+                ORDER BY score DESC
+                LIMIT ?
+                """,
+                (" OR ".join(terms), max_results),
+            )
+            rows = cursor.fetchall()
+
         results: list[SearchResult] = []
-        for row in cursor.fetchall():
+        for row in rows:
             rel_path, title, description, note_type, score, snippet, tags_str = row
             tags = tags_str.split(" ") if tags_str else []
             match_count = 1

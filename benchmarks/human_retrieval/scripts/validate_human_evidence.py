@@ -42,11 +42,20 @@ REQUIRED_THRESHOLDS = {
 logger = logging.getLogger(__name__)
 
 
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
 def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[str]:
     """Return contract violations; never silently treats a holdout as development."""
     errors: list[str] = []
-    if manifest.get("schema_version") != "1.0":
-        errors.append("schema_version must be '1.0'")
+    schema_version = manifest.get("schema_version")
+    if schema_version not in {"1.0", "2.0"}:
+        errors.append("schema_version must be '1.0' or '2.0'")
     if manifest.get("status") not in {"pending_human_annotation", "adjudicated"}:
         errors.append("status must be pending_human_annotation or adjudicated")
     split = manifest.get("split")
@@ -58,17 +67,24 @@ def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[s
         errors.append("journeys must contain each required M2 journey exactly once")
     for key in REQUIRED_HASHES:
         value = manifest.get(key)
-        if (
-            not isinstance(value, str)
-            or len(value) != 64
-            or any(c not in "0123456789abcdef" for c in value)
-        ):
+        if not _is_sha256(value):
             errors.append(f"{key} must be a lowercase SHA-256 hex digest")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict) or set(artifacts) != set(ARTIFACTS):
         errors.append("artifacts must name corpus, queries, raw_judgments, and adjudicated_qrels")
     elif not all(isinstance(path, str) and path for path in artifacts.values()):
         errors.append("artifact paths must be non-empty strings")
+    expected_protocol = (
+        "annotation_protocol_v2.md" if schema_version == "2.0" else "annotation_protocol.md"
+    )
+    if manifest.get("annotation_protocol") != expected_protocol:
+        errors.append(f"annotation_protocol must be {expected_protocol}")
+    if schema_version == "2.0":
+        calibration = manifest.get("calibration")
+        if not isinstance(calibration, dict) or calibration.get("status") != "passed":
+            errors.append("schema v2 requires a passed calibration receipt")
+        elif not _is_sha256(calibration.get("agreement_receipt_sha256")):
+            errors.append("schema v2 calibration requires agreement_receipt_sha256")
     if manifest.get("status") == "adjudicated":
         thresholds = manifest.get("thresholds")
         if not isinstance(thresholds, dict) or set(thresholds) != set(REQUIRED_THRESHOLDS):
@@ -96,6 +112,85 @@ def _artifact_path(root: Path, value: str) -> Path | None:
     return candidate
 
 
+def _load_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as stream:
+        for line_number, line in enumerate(stream, 1):
+            if not line.strip():
+                continue
+            value = json.loads(line)
+            if not isinstance(value, dict):
+                raise ValueError(f"JSONL row is not an object at {path}:{line_number}")
+            rows.append(value)
+    return rows
+
+
+def validate_adjudicated_qrels(queries_path: Path, qrels_path: Path) -> list[str]:
+    """Validate query-level consistency and joint metric feasibility."""
+    queries = {str(row.get("query_id", "")): row for row in _load_jsonl(queries_path)}
+    grouped: dict[str, dict[str, Any]] = {}
+    errors: list[str] = []
+    for row in _load_jsonl(qrels_path):
+        query_id = str(row.get("query_id", ""))
+        document_id = str(row.get("document_id", ""))
+        final = row.get("final")
+        if not query_id or not document_id or not isinstance(final, dict):
+            errors.append("frozen qrels require query_id, document_id and final object")
+            continue
+        relevance = final.get("relevance")
+        if not isinstance(relevance, int) or relevance < -1 or relevance > 2:
+            errors.append(f"unsupported final relevance for {query_id}/{document_id}")
+            continue
+        bucket = grouped.setdefault(
+            query_id,
+            {
+                "relevance": {},
+                "citation": {},
+                "temporal": {},
+                "abstention": set(),
+                "taxonomy": set(),
+            },
+        )
+        bucket["relevance"][document_id] = relevance
+        bucket["citation"][document_id] = bool(final.get("acceptable_citation"))
+        bucket["temporal"][document_id] = str(final.get("temporal_status"))
+        abstention_key = (
+            "query_abstention_correct"
+            if "query_abstention_correct" in final
+            else "abstention_correct"
+        )
+        bucket["abstention"].add(str(final.get(abstention_key)))
+        bucket["taxonomy"].add(str(final.get("taxonomy")))
+
+    if set(queries) != set(grouped):
+        errors.append("queries and frozen qrels have different query IDs")
+        return errors
+    for query_id, query in queries.items():
+        qrel = grouped[query_id]
+        if qrel["abstention"] not in ({"yes"}, {"no"}):
+            errors.append(f"{query_id}: query-level abstention labels are missing or inconsistent")
+        journey = str(query.get("journey", ""))
+        if qrel["taxonomy"] != {journey}:
+            errors.append(f"{query_id}: qrel taxonomy must match the query journey")
+        for document_id, acceptable in qrel["citation"].items():
+            if acceptable and qrel["relevance"][document_id] < 1:
+                errors.append(
+                    f"{query_id}/{document_id}: acceptable citation requires relevance >= 1"
+                )
+        if journey == "current_fact" and "no" in qrel["abstention"]:
+            feasible = any(
+                qrel["relevance"][document_id] >= 1
+                and qrel["citation"].get(document_id, False)
+                and qrel["temporal"].get(document_id) == "current"
+                for document_id in qrel["relevance"]
+            )
+            if not feasible:
+                errors.append(
+                    f"{query_id}: no jointly relevant, citation-acceptable and current document"
+                )
+    return errors
+
+
 def validate_evidence_file(manifest_path: Path, *, allow_sealed: bool) -> list[str]:
     """Validate the manifest plus the exact bytes it claims to govern."""
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -103,6 +198,7 @@ def validate_evidence_file(manifest_path: Path, *, allow_sealed: bool) -> list[s
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         return errors
+    resolved_artifacts: dict[str, Path] = {}
     for artifact_key, digest_key in ARTIFACTS.items():
         relative_path = artifacts.get(artifact_key)
         if not isinstance(relative_path, str):
@@ -114,6 +210,18 @@ def validate_evidence_file(manifest_path: Path, *, allow_sealed: bool) -> list[s
             errors.append(f"{artifact_key} artifact is missing")
         elif hashlib.sha256(artifact_path.read_bytes()).hexdigest() != manifest.get(digest_key):
             errors.append(f"{artifact_key} SHA-256 does not match {digest_key}")
+        else:
+            resolved_artifacts[artifact_key] = artifact_path
+    if (
+        manifest.get("status") == "adjudicated"
+        and "queries" in resolved_artifacts
+        and "adjudicated_qrels" in resolved_artifacts
+    ):
+        errors.extend(
+            validate_adjudicated_qrels(
+                resolved_artifacts["queries"], resolved_artifacts["adjudicated_qrels"]
+            )
+        )
     return errors
 
 

@@ -514,6 +514,16 @@ class TestSearchVault:
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
 
+    def test_natural_language_fts_falls_back_to_or_when_and_has_no_match(self, sample_vault: Path):
+        results = search_vault(
+            sample_vault,
+            "Which test project contains a deliberately absent token",
+            mode="fts",
+        )
+
+        assert results
+        assert any("Test Project" in result.title for result in results)
+
     def test_search_vault_fallback_on_sqlite_error(self, sample_vault: Path):
         from unittest.mock import patch
 

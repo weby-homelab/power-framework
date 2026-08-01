@@ -131,7 +131,7 @@ def group_qrels(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         if not query_id or not document_id or not isinstance(final, dict):
             raise ValueError("frozen qrels require query_id, document_id and final object")
         relevance = final.get("relevance")
-        if not isinstance(relevance, int) or relevance < 0 or relevance > 2:
+        if not isinstance(relevance, int) or relevance < -1 or relevance > 2:
             raise ValueError(f"unsupported final relevance for {query_id}/{document_id}")
         bucket = grouped.setdefault(
             query_id,
@@ -158,6 +158,103 @@ def group_qrels(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return grouped
 
 
+def annotation_protocol_version(rows: list[dict[str, Any]]) -> str:
+    """Infer the frozen annotation protocol without rewriting its labels."""
+    v2_rows = [
+        "query_abstention_correct" in row.get("final", {})
+        for row in rows
+        if isinstance(row.get("final"), dict)
+    ]
+    if not v2_rows or len(v2_rows) != len(rows):
+        raise ValueError("every frozen qrel row requires a final object")
+    if all(v2_rows):
+        return "2.0"
+    if not any(v2_rows):
+        return "1.0"
+    raise ValueError("frozen qrels mix annotation protocol v1 and v2 fields")
+
+
+def expected_abstention(qrel: dict[str, Any]) -> str | None:
+    """Return one query-level abstention label, or ``None`` when it is ambiguous."""
+    values = qrel.get("query_abstention") or qrel["abstention"]
+    if len(values) != 1:
+        return None
+    value = next(iter(values))
+    return value if value in {"yes", "no"} else None
+
+
+def validate_metric_contract(
+    queries: list[dict[str, Any]],
+    qrels: dict[str, dict[str, Any]],
+) -> list[dict[str, str]]:
+    """Reject qrels that cannot support the pre-registered joint metrics.
+
+    Query-level labels repeated on v1 query-document rows must agree. For a
+    current-fact query that expects an answer, at least one document must be
+    simultaneously relevant, citation-acceptable and current; otherwise the
+    citation and stale-answer targets require mutually exclusive top results.
+    """
+    errors: list[dict[str, str]] = []
+    for query in queries:
+        query_id = str(query["query_id"])
+        journey = str(query.get("journey", ""))
+        qrel = qrels[query_id]
+        abstention = expected_abstention(qrel)
+        if abstention is None:
+            errors.append(
+                {
+                    "query_id": query_id,
+                    "code": "ambiguous_query_abstention",
+                    "reason": "query-level abstention labels are missing or inconsistent",
+                }
+            )
+
+        taxonomies = qrel["taxonomy"]
+        if taxonomies != {journey}:
+            errors.append(
+                {
+                    "query_id": query_id,
+                    "code": "inconsistent_query_taxonomy",
+                    "reason": "qrel taxonomy is not one query-level label matching the journey",
+                }
+            )
+
+        relevance: dict[str, int] = qrel["relevance"]
+        citations: dict[str, bool] = qrel["citation"]
+        invalid_citations = sorted(
+            doc_id
+            for doc_id, acceptable in citations.items()
+            if acceptable and relevance[doc_id] < 1
+        )
+        if invalid_citations:
+            errors.append(
+                {
+                    "query_id": query_id,
+                    "code": "nonrelevant_acceptable_citation",
+                    "reason": "an acceptable citation must have relevance >= 1",
+                }
+            )
+
+        if journey == "current_fact" and abstention == "no":
+            feasible = any(
+                relevance[doc_id] >= 1
+                and citations.get(doc_id, False)
+                and qrel["temporal"].get(doc_id) == "current"
+                for doc_id in relevance
+            )
+            if not feasible:
+                errors.append(
+                    {
+                        "query_id": query_id,
+                        "code": "current_citation_joint_gate_infeasible",
+                        "reason": (
+                            "no document is jointly relevant, citation-acceptable and current"
+                        ),
+                    }
+                )
+    return errors
+
+
 def result_metrics(
     query: dict[str, Any],
     result_ids: list[str],
@@ -168,16 +265,17 @@ def result_metrics(
     top10 = result_ids[:10]
     recall = None if not relevant else len(set(top10) & relevant) / len(relevant)
 
-    gains = [2 ** relevance.get(doc_id, 0) - 1 for doc_id in top10]
-    ideal = sorted((2**value - 1 for value in relevance.values()), reverse=True)[:10]
+    gains = [max(0, 2 ** relevance.get(doc_id, 0) - 1) for doc_id in top10]
+    ideal = sorted((max(0, 2**value - 1) for value in relevance.values()), reverse=True)[:10]
     dcg = sum(gain / math.log2(rank + 2) for rank, gain in enumerate(gains))
     idcg = sum(gain / math.log2(rank + 2) for rank, gain in enumerate(ideal))
     ndcg = None if idcg == 0 else dcg / idcg
     mrr = next((1.0 / (rank + 1) for rank, doc_id in enumerate(top10) if doc_id in relevant), 0.0)
 
-    citation = 0.0
-    if top10:
-        citation = 1.0 if qrel["citation"].get(top10[0], False) else 0.0
+    abstention_expected = expected_abstention(qrel)
+    citation = None
+    if relevant and abstention_expected != "yes":
+        citation = 1.0 if top10 and qrel["citation"].get(top10[0], False) else 0.0
 
     journey = str(query.get("journey", ""))
     stale = None
@@ -185,15 +283,12 @@ def result_metrics(
         stale = bool(top10 and qrel["temporal"].get(top10[0]) != "current")
 
     abstention = None
-    abstention_values = qrel.get("query_abstention") or qrel["abstention"]
-    if len(abstention_values) == 1:
-        expected = next(iter(abstention_values))
-        if expected in {"yes", "no"}:
-            top_relevance = relevance.get(top10[0], 0) if top10 else 0
-            abstention = float(
-                (expected == "yes" and top_relevance == 0)
-                or (expected == "no" and top_relevance >= 1)
-            )
+    if abstention_expected is not None:
+        top_relevance = relevance.get(top10[0], 0) if top10 else 0
+        abstention = float(
+            (abstention_expected == "yes" and top_relevance == 0)
+            or (abstention_expected == "no" and top_relevance >= 1)
+        )
 
     return {
         "query_id": str(query["query_id"]),
@@ -348,11 +443,13 @@ def main() -> int:
     args = parse_args()
     queries = load_jsonl(args.queries)
     qrel_rows = load_jsonl(args.qrels)
+    annotation_protocol = annotation_protocol_version(qrel_rows)
     qrels = group_qrels(qrel_rows)
     if {str(row.get("query_id")) for row in queries} != set(qrels):
         raise ValueError("queries and frozen qrels have different query IDs")
     if len(queries) != len(qrels):
         raise ValueError("duplicate query IDs in queries.jsonl")
+    evidence_contract_errors = validate_metric_contract(queries, qrels)
 
     requested = [name.strip() for name in args.modes.split(",") if name.strip()]
     unknown = sorted(set(requested) - set(ALL_MODES))
@@ -373,10 +470,11 @@ def main() -> int:
         for mode_name, result in modes.items()
         if result.get("status") != "completed"
     ]
-    gate_passed = not failed_thresholds and not unavailable
+    gate_passed = not failed_thresholds and not unavailable and not evidence_contract_errors
     output = {
-        "schema_version": "power.m2.retrieval-evaluation.v2",
-        "protocol_version": "2.0",
+        "schema_version": "power.m2.retrieval-evaluation.v3",
+        "evaluator_contract_version": "3.0",
+        "annotation_protocol_version": annotation_protocol,
         "status": "completed",
         "split": "development",
         "corpus_sha256": sha256_file(args.corpus),
@@ -398,7 +496,7 @@ def main() -> int:
             "recall_at_10": "relevance >= 1 retrieved in top 10 divided by all frozen relevant documents",
             "ndcg_at_10": "graded gains 2^relevance-1 over the frozen qrels",
             "mrr_at_10": "reciprocal rank of the first relevance >= 1 result",
-            "citation_provenance_accuracy": "acceptable_citation of the top retrieved document",
+            "citation_provenance_accuracy": "acceptable_citation of the top retrieved document for answerable queries; correct-abstention queries excluded",
             "stale_answer_rate": "top result is not current for current_fact queries; no-result is not stale",
             "abstention_quality": "query-level retrieval proxy: top result is non-relevant when abstention=yes and relevant when no; inconsistent labels excluded",
             "p95_latency_ms": "95th percentile of five warm steady-state query latencies",
@@ -406,12 +504,16 @@ def main() -> int:
         "modes": modes,
         "failed_thresholds": failed_thresholds,
         "unavailable_modes": unavailable,
+        "evidence_contract_errors": evidence_contract_errors,
         "sealed_holdout_decision": {
             "open": gate_passed,
             "decision": "open" if gate_passed else "do_not_open",
             "reason": "development metrics satisfy every threshold and every pre-registered comparator is executable"
             if gate_passed
-            else "development gate has failed thresholds or unavailable pre-registered comparators",
+            else (
+                "development gate has failed thresholds, unavailable comparators, or an "
+                "infeasible human-evidence metric contract"
+            ),
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -424,6 +526,7 @@ def main() -> int:
                 "output": str(args.output),
                 "failed_thresholds": len(failed_thresholds),
                 "unavailable_modes": unavailable,
+                "evidence_contract_errors": len(evidence_contract_errors),
                 "sealed_holdout": output["sealed_holdout_decision"],
             },
             ensure_ascii=False,
