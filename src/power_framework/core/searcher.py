@@ -762,7 +762,7 @@ def _fts_search(
         )
 
         rows = cursor.fetchall()
-        if not rows and len(terms) > 1:
+        if not rows and len(terms) > 2:
             # Natural-language questions rarely have every function word in a
             # short note. Preserve the precise AND contract when it matches,
             # then recover recall with BM25-ranked OR instead of returning an
