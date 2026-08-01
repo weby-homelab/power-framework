@@ -79,6 +79,15 @@ def git_commit() -> str | None:
     return completed.stdout.strip() or None
 
 
+def runtime_configuration() -> dict[str, int]:
+    """Record the non-secret inference controls that affect latency."""
+    return {
+        "embed_num_threads": int(os.getenv("POWER_EMBED_NUM_THREADS", "2")),
+        "reranker_batch_size": int(os.getenv("POWER_RERANKER_BATCH_SIZE", "8")),
+        "reranker_max_tokens": int(os.getenv("POWER_BGE_RERANKER_MAX_TOKENS", "512")),
+    }
+
+
 def percentile(values: list[float], percent: float) -> float:
     if not values:
         raise ValueError("percentile requires at least one value")
@@ -488,6 +497,7 @@ def main() -> int:
             "power_path": str(Path(__file__).resolve()),
             "bootstrap_samples": BOOTSTRAP_SAMPLES,
             "bootstrap_seed": BOOTSTRAP_SEED,
+            "inference": runtime_configuration(),
             "latency_measurement": "warm-up excluded; five steady-state query calls per mode",
         },
         "thresholds": THRESHOLDS,

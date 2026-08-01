@@ -81,6 +81,18 @@ def test_annotation_protocol_is_derived_from_frozen_qrel_fields() -> None:
     assert MODULE.annotation_protocol_version(v2_rows) == "2.0"
 
 
+def test_runtime_receipt_records_latency_controls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POWER_EMBED_NUM_THREADS", "8")
+    monkeypatch.setenv("POWER_RERANKER_BATCH_SIZE", "4")
+    monkeypatch.setenv("POWER_BGE_RERANKER_MAX_TOKENS", "256")
+
+    assert MODULE.runtime_configuration() == {
+        "embed_num_threads": 8,
+        "reranker_batch_size": 4,
+        "reranker_max_tokens": 256,
+    }
+
+
 def test_current_fact_requires_one_jointly_current_acceptable_citation() -> None:
     qrels = MODULE.group_qrels(_rows(current_citation=False))
     queries = [
