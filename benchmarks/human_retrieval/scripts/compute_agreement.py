@@ -89,29 +89,43 @@ def exact_receipt(matches: list[bool], *, total_units: int, seed: int) -> dict[s
     }
 
 
-def quadratic_weighted_kappa(pairs: list[tuple[int, int]]) -> float | None:
+def quadratic_weighted_kappa(
+    pairs: list[tuple[int, int]], *, categories: tuple[int, ...] = (-1, 0, 1, 2)
+) -> float | None:
     if not pairs:
         return None
-    categories = (-1, 0, 1, 2)
+    if len(categories) < 2:
+        raise ValueError("quadratic kappa requires at least two ordered categories")
     index = {value: position for position, value in enumerate(categories)}
     matrix = [[0 for _ in categories] for _ in categories]
     for first, second in pairs:
         if first not in index or second not in index:
-            raise ValueError("relevance must be one of -1, 0, 1, 2")
+            raise ValueError(f"relevance must be one of {categories}")
         matrix[index[first]][index[second]] += 1
     total = len(pairs)
     first_counts = [sum(row) for row in matrix]
-    second_counts = [sum(matrix[row][column] for row in range(4)) for column in range(4)]
-    weights = [[((row - column) / 3) ** 2 for column in range(4)] for row in range(4)]
+    category_count = len(categories)
+    second_counts = [
+        sum(matrix[row][column] for row in range(category_count))
+        for column in range(category_count)
+    ]
+    weights = [
+        [((row - column) / (category_count - 1)) ** 2 for column in range(category_count)]
+        for row in range(category_count)
+    ]
     observed = (
-        sum(weights[row][column] * matrix[row][column] for row in range(4) for column in range(4))
+        sum(
+            weights[row][column] * matrix[row][column]
+            for row in range(category_count)
+            for column in range(category_count)
+        )
         / total
     )
     expected = (
         sum(
             weights[row][column] * first_counts[row] * second_counts[column] / total
-            for row in range(4)
-            for column in range(4)
+            for row in range(category_count)
+            for column in range(category_count)
         )
         / total
     )
@@ -180,10 +194,14 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
         total_units=len(units),
         seed=BOOTSTRAP_SEED,
     )
-    kappa = quadratic_weighted_kappa(relevance_pairs)
+    kappa_categories = (0, 1, 2) if protocol_version == "2.0" else (-1, 0, 1, 2)
+    kappa_statistic = lambda sample: quadratic_weighted_kappa(  # noqa: E731
+        sample, categories=kappa_categories
+    )
+    kappa = kappa_statistic(relevance_pairs)
     relevance_exact["quadratic_weighted_kappa"] = {
         "value": round(kappa, 6) if kappa is not None else None,
-        "ci95": bootstrap_ci(relevance_pairs, quadratic_weighted_kappa, BOOTSTRAP_SEED + 1),
+        "ci95": bootstrap_ci(relevance_pairs, kappa_statistic, BOOTSTRAP_SEED + 1),
         "n": len(relevance_pairs),
     }
 

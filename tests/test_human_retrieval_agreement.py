@@ -54,6 +54,8 @@ def test_v2_has_no_manual_query_level_fields() -> None:
     assert "query_abstention" not in receipt["query_level"]
     assert "taxonomy" not in receipt["query_level"]
     assert receipt["calibration_rule"]["passed"] is True
+    with pytest.raises(ValueError, match="relevance must be one of"):
+        MODULE.quadratic_weighted_kappa([(0, -1)], categories=(0, 1, 2))
 
 
 def test_v2_rejects_non_integer_relevance() -> None:
