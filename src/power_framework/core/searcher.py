@@ -102,7 +102,9 @@ RERANK_CANDIDATE_LIMIT = 20
 # Keeps cross-encoder token cost bounded on CPU (Performance Plan §4).
 RERANK_TEXT_CHARS = 800
 DEFAULT_SEARCH_MODE = "semantic"
-CANONICAL_SEARCH_MODES = frozenset({"fts", "vector", "hybrid", "semantic", "reranked"})
+CANONICAL_SEARCH_MODES = frozenset(
+    {"fts", "vector", "hybrid", "semantic", "reranked", "graph_assisted"}
+)
 SEARCH_MODE_ALIASES = {"hybrid_reranked": "reranked"}
 
 
@@ -122,6 +124,7 @@ SEARCH_MODE_REGISTRY = {
     "hybrid": SearchModeSpec(("fts", "tf_vector"), "rrf", False, False),
     "semantic": SearchModeSpec(("dense",), None, False, True),
     "reranked": SearchModeSpec(("fts", "tf_vector", "dense"), "rrf", True, True),
+    "graph_assisted": SearchModeSpec(("fts", "tf_vector", "graph"), "rrf_graph", False, False),
 }
 
 
@@ -1092,8 +1095,10 @@ def search_vault(
         mode: Search mode. POWER 3.1 canonical mode is "semantic" (default),
               backed by the pinned BGE-M3 ONNX revision and a compatible dense
               index. Other explicit modes are "fts" (BM25), "vector" (TF
-              cosine), "hybrid" (RRF of FTS + TF vector), and "reranked".
-              ``hybrid_reranked`` is a deprecated alias of ``reranked``.
+              cosine), "hybrid" (RRF of FTS + TF vector), "reranked", and
+              "graph_assisted" (sparse RRF expanded through accepted OKF
+              relations). ``hybrid_reranked`` is a deprecated alias of
+              ``reranked``.
         temporal_view: ``current`` (default), ``historical``, or ``all``.
         as_of: Inclusive ISO-8601 date boundary for temporal evaluation.
 
@@ -1109,6 +1114,8 @@ def search_vault(
     boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
     retrieval_contract = "dense"
+    if mode == "graph_assisted":
+        retrieval_contract = "graph_assisted"
     if mode_spec.requires_dense_index:
         try:
             validate_dense_index(vault_dir)
@@ -1183,9 +1190,12 @@ def search_vault(
         vec_dedup = sorted(vec_map.values(), key=lambda x: -x.score)
 
         # Single RRF fusion at the end
-        return _filter_temporal_results(
+        results = _filter_temporal_results(
             vault_dir, _rrf_merge(fts_dedup, vec_dedup), temporal_view, boundary, max_results
         )
+        for result in results:
+            result.retrieval_contract = retrieval_contract
+        return results
 
     # For non-hybrid modes, gather results, dedup by rel_path keeping max score, and sort
     all_results: list[SearchResult] = []
@@ -1194,6 +1204,8 @@ def search_vault(
             results = _vector_search(vault_dir, variant, max_results=max_results)
         elif mode == "semantic":
             results = _semantic_search(vault_dir, variant, max_results=max_results)
+        elif mode == "graph_assisted":
+            results = _graph_assisted_search(vault_dir, variant, max_results=max_results)
         elif mode in ("reranked", "hybrid_reranked"):
             results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
             # R5 (POWER 3.0): dense fallback ONLY when FTS/rerank yields too few
@@ -1300,6 +1312,86 @@ def _hybrid_reranked_search(
     return (reranked + tail)[:max_results]
 
 
+def _graph_assisted_search(
+    vault_dir: Path,
+    query: str,
+    max_results: int = 20,
+) -> list[SearchResult]:
+    """Expand a sparse candidate pool through the accepted knowledge graph.
+
+    The graph comparator is deterministic and provenance-preserving: the
+    initial candidates come from FTS + TF-vector, and expansion uses only
+    ``suggest_related_v2`` over validated OKF notes. Missing or quarantined
+    relation targets are ignored by the graph builder. A graph hop is a
+    ranking signal, never a replacement for the source note.
+    """
+    from .relations import WeightedKnowledgeGraph, suggest_related_v2
+
+    candidate_limit = max(20, max_results * 4)
+    candidates = _rrf_merge(
+        _fts_search(vault_dir, query, max_results=candidate_limit),
+        _vector_search(vault_dir, query, max_results=candidate_limit),
+    )
+    if not candidates:
+        return []
+
+    graph_boosts: dict[str, float] = {}
+    for rank, anchor in enumerate(candidates[:candidate_limit]):
+        try:
+            suggestions = suggest_related_v2(
+                vault_dir,
+                target_path=anchor.rel_path,
+                max_results=max(20, max_results * 4),
+                score_threshold=0.0,
+            )
+            graph = WeightedKnowledgeGraph.from_suggestions(suggestions)
+            anchor_weight = 1.0 / (rank + 1)
+            for path, weight, depth in graph.weighted_bfs(anchor.rel_path, max_hops=2):
+                decay = 1.0 if depth == 1 else 0.5
+                graph_boosts[path] = max(
+                    graph_boosts.get(path, 0.0), anchor_weight * weight * decay
+                )
+        except Exception:
+            # Relation suggestions are an optional ranking signal. A malformed
+            # note must not make the sparse comparator unavailable.
+            logger.debug("Graph expansion failed for %s", anchor.rel_path, exc_info=True)
+
+    result_map = {result.rel_path: result for result in candidates}
+    for rank, result in enumerate(candidates):
+        result.score = (1.0 / (rank + 1)) + 0.25 * graph_boosts.get(result.rel_path, 0.0)
+        result.retrieval_contract = "graph_assisted"
+
+    # Bring graph-only neighbours into the result set with a bounded, stable
+    # score. They remain ordinary SearchResult records with their own source
+    # metadata; graph labels are not presented as document content.
+    for path, boost in graph_boosts.items():
+        if path in result_map:
+            continue
+        source = vault_dir / path
+        try:
+            content = read_file_content(source)
+            metadata = validate_metadata(content)
+            if metadata is None:
+                continue
+            result_map[path] = SearchResult(
+                rel_path=path,
+                title=metadata.title,
+                description=metadata.description,
+                note_type=metadata.type,
+                score=0.25 * boost,
+                snippet=content[:MAX_SNIPPET_LENGTH].replace("\n", " ").strip(),
+                match_count=0,
+                tags=metadata.tags,
+                retrieval_contract="graph_assisted",
+            )
+        except Exception:  # noqa: S112
+            continue
+
+    return sorted(result_map.values(), key=lambda item: (-item.score, item.title, item.rel_path))[
+        :max_results
+    ]
+
+
 def _merge_by_rel_path(target: list[SearchResult], incoming: list[SearchResult]) -> None:
     """Merge ``incoming`` into ``target``, keeping the highest score per rel_path."""
     seen: dict[str, float] = {r.rel_path: r.score for r in target}
@@ -1329,6 +1421,8 @@ def format_search_results(
         "hybrid": "Hybrid (FTS+Vector)",
         "semantic": "Semantic (Dense Embedding)",
         "hybrid_reranked": "Hybrid (RRF + Rerank)",
+        "reranked": "Hybrid (RRF + Rerank)",
+        "graph_assisted": "Graph-assisted (RRF + OKF relations)",
     }.get(mode.lower(), mode.upper())
 
     lines = [

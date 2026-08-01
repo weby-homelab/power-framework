@@ -140,13 +140,20 @@ def group_qrels(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
                 "citation": {},
                 "temporal": {},
                 "abstention": set(),
+                "query_abstention": set(),
                 "taxonomy": set(),
             },
         )
         bucket["relevance"][document_id] = relevance
         bucket["citation"][document_id] = bool(final.get("acceptable_citation"))
         bucket["temporal"][document_id] = str(final.get("temporal_status"))
-        bucket["abstention"].add(str(final.get("abstention_correct")))
+        # Protocol v1 stored abstention on every query-document row. Protocol
+        # v2 binds it once at query level; retain the v1 fallback so frozen v1
+        # qrels remain byte-for-byte untouched and reproducible.
+        if "query_abstention_correct" in final:
+            bucket["query_abstention"].add(str(final.get("query_abstention_correct")))
+        else:
+            bucket["abstention"].add(str(final.get("abstention_correct")))
         bucket["taxonomy"].add(str(final.get("taxonomy")))
     return grouped
 
@@ -178,7 +185,7 @@ def result_metrics(
         stale = bool(top10 and qrel["temporal"].get(top10[0]) != "current")
 
     abstention = None
-    abstention_values = qrel["abstention"]
+    abstention_values = qrel.get("query_abstention") or qrel["abstention"]
     if len(abstention_values) == 1:
         expected = next(iter(abstention_values))
         if expected in {"yes", "no"}:
@@ -213,13 +220,6 @@ def evaluate_mode(
         from power_framework.core.searcher import search_vault
     except ImportError as exc:  # pragma: no cover - command-line guard
         return {"status": "unavailable", "reason": f"import_error:{type(exc).__name__}"}
-
-    if mode_name == "graph_assisted":
-        return {
-            "status": "unavailable",
-            "power_mode": None,
-            "reason": "no graph_assisted mode in SEARCH_MODE_REGISTRY",
-        }
 
     warmup_query = str(queries[0]["question"])
     try:
@@ -375,7 +375,8 @@ def main() -> int:
     ]
     gate_passed = not failed_thresholds and not unavailable
     output = {
-        "schema_version": "power.m2.retrieval-evaluation.v1",
+        "schema_version": "power.m2.retrieval-evaluation.v2",
+        "protocol_version": "2.0",
         "status": "completed",
         "split": "development",
         "corpus_sha256": sha256_file(args.corpus),
@@ -399,7 +400,7 @@ def main() -> int:
             "mrr_at_10": "reciprocal rank of the first relevance >= 1 result",
             "citation_provenance_accuracy": "acceptable_citation of the top retrieved document",
             "stale_answer_rate": "top result is not current for current_fact queries; no-result is not stale",
-            "abstention_quality": "retrieval proxy: top result is non-relevant when abstention=yes and relevant when no; inconsistent labels excluded",
+            "abstention_quality": "query-level retrieval proxy: top result is non-relevant when abstention=yes and relevant when no; inconsistent labels excluded",
             "p95_latency_ms": "95th percentile of five warm steady-state query latencies",
         },
         "modes": modes,

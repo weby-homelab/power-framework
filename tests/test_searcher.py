@@ -130,6 +130,15 @@ class TestSearchModeContract:
     def test_normalize_mode_keeps_explicit_legacy_compatible_mode(self):
         assert normalize_search_mode("fts") == "fts"
 
+    def test_graph_assisted_mode_is_sparse_and_canonical(self):
+        assert normalize_search_mode("GRAPH_ASSISTED") == "graph_assisted"
+        assert get_search_mode_spec("graph_assisted") == SearchModeSpec(
+            candidate_sources=("fts", "tf_vector", "graph"),
+            fusion="rrf_graph",
+            reranker=False,
+            requires_dense_index=False,
+        )
+
     def test_normalize_mode_rejects_unknown_value(self):
         with pytest.raises(ValueError, match="Unsupported search mode"):
             normalize_search_mode("silent-fallback")
@@ -550,6 +559,12 @@ class TestSearchVault:
         if len(results) > 1:
             scores = [r.score for r in results]
             assert scores == sorted(scores, reverse=True)
+
+    def test_graph_assisted_mode_returns_provenance_bound_results(self, sample_vault: Path):
+        results = search_vault(sample_vault, "test project", mode="graph_assisted")
+        assert results
+        assert all(result.retrieval_contract == "graph_assisted" for result in results)
+        assert any("Test Project" in result.title for result in results)
 
     def test_all_modes_return_same_content_type(self, sample_vault: Path):
         fts_results = search_vault(sample_vault, "test", mode="fts")
