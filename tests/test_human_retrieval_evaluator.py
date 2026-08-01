@@ -81,6 +81,27 @@ def test_annotation_protocol_is_derived_from_frozen_qrel_fields() -> None:
     assert MODULE.annotation_protocol_version(v2_rows) == "2.0"
 
 
+def test_v2_group_qrels_rejects_string_citation_and_legacy_fields() -> None:
+    rows = [
+        {
+            "query_id": "q",
+            "document_id": "doc",
+            "final": {
+                "relevance": 2,
+                "acceptable_citation": "false",
+                "temporal_status": "current",
+            },
+        }
+    ]
+    with pytest.raises(ValueError, match="JSON boolean"):
+        MODULE.group_qrels(rows, "2.0")
+
+    rows[0]["final"]["acceptable_citation"] = False  # type: ignore[index]
+    rows[0]["final"]["abstention_correct"] = "no"  # type: ignore[index]
+    with pytest.raises(ValueError, match="must not contain"):
+        MODULE.group_qrels(rows, "2.0")
+
+
 def test_runtime_receipt_records_latency_controls(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("POWER_EMBED_NUM_THREADS", "8")
     monkeypatch.setenv("POWER_RERANKER_BATCH_SIZE", "4")

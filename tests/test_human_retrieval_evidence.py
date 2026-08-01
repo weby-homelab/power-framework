@@ -87,16 +87,18 @@ def test_adjudicated_manifest_requires_canonical_threshold_values() -> None:
         )
 
 
-def test_protocol_v2_requires_hash_bound_passed_calibration() -> None:
+def test_protocol_v2_starts_pending_and_requires_hash_bound_calibration() -> None:
     manifest = _manifest(
         schema_version="2.0",
         annotation_protocol="annotation_protocol_v2.md",
+        language="uk",
+        status="pending_calibration",
+        calibration={"status": "pending", "agreement_receipt_sha256": None},
     )
 
-    assert "schema v2 requires a passed calibration receipt" in MODULE.validate_manifest(
-        manifest, allow_sealed=False
-    )
+    assert MODULE.validate_manifest(manifest, allow_sealed=False) == []
 
+    manifest["status"] = "pending_human_annotation"
     manifest["calibration"] = {
         "status": "passed",
         "agreement_receipt_sha256": "e" * 64,
@@ -124,6 +126,77 @@ def test_evidence_file_binds_each_artifact_to_its_declared_hash(tmp_path: Path) 
     assert "queries SHA-256 does not match queries_sha256" in MODULE.validate_evidence_file(
         manifest_path, allow_sealed=False
     )
+
+
+def test_v2_qrels_derive_answerability_and_reject_old_fields(tmp_path: Path) -> None:
+    queries = tmp_path / "queries.jsonl"
+    qrels = tmp_path / "qrels.jsonl"
+    queries.write_text(
+        json.dumps({"query_id": "q-current", "journey": "current_fact"}) + "\n",
+        encoding="utf-8",
+    )
+    qrels.write_text(
+        "".join(
+            json.dumps(row) + "\n"
+            for row in (
+                {
+                    "query_id": "q-current",
+                    "document_id": "doc-current",
+                    "final": {
+                        "relevance": 2,
+                        "acceptable_citation": True,
+                        "temporal_status": "current",
+                    },
+                },
+                {
+                    "query_id": "q-current",
+                    "document_id": "doc-other",
+                    "final": {
+                        "relevance": 0,
+                        "acceptable_citation": False,
+                        "temporal_status": "not_applicable",
+                    },
+                },
+            )
+        ),
+        encoding="utf-8",
+    )
+    assert MODULE.validate_adjudicated_qrels(queries, qrels, schema_version="2.0") == []
+
+    invalid = json.loads(qrels.read_text(encoding="utf-8").splitlines()[0])
+    invalid["final"]["relevance"] = -1
+    invalid["final"]["abstention_correct"] = "no"
+    qrels.write_text(json.dumps(invalid) + "\n", encoding="utf-8")
+    errors = MODULE.validate_adjudicated_qrels(queries, qrels, schema_version="2.0")
+    assert any("unsupported final relevance" in error for error in errors)
+
+
+def test_v2_qrels_reject_non_boolean_citation(tmp_path: Path) -> None:
+    queries = tmp_path / "queries.jsonl"
+    qrels = tmp_path / "qrels.jsonl"
+    queries.write_text(
+        json.dumps({"query_id": "q-current", "journey": "current_fact"}) + "\n",
+        encoding="utf-8",
+    )
+    qrels.write_text(
+        json.dumps(
+            {
+                "query_id": "q-current",
+                "document_id": "doc-current",
+                "final": {
+                    "relevance": 2,
+                    "acceptable_citation": "true",
+                    "temporal_status": "current",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    errors = MODULE.validate_adjudicated_qrels(queries, qrels, schema_version="2.0")
+
+    assert "q-current/doc-current: v2 acceptable_citation must be a JSON boolean" in errors
 
 
 def test_adjudicated_qrels_reject_jointly_infeasible_current_fact(tmp_path: Path) -> None:

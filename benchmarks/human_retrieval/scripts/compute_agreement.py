@@ -142,13 +142,39 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
 
     units = sorted(pair_rows)
     first, second = participants
-    relevance_pairs = [
-        (
-            int(pair_rows[unit][first]["relevance"]),
-            int(pair_rows[unit][second]["relevance"]),
-        )
-        for unit in units
-    ]
+    relevance_pairs: list[tuple[int, int]] = []
+    for unit in units:
+        left_raw = pair_rows[unit][first]["relevance"]
+        right_raw = pair_rows[unit][second]["relevance"]
+        if protocol_version == "2.0" and any(
+            not isinstance(value, int) or isinstance(value, bool) for value in (left_raw, right_raw)
+        ):
+            raise ValueError("v2 relevance must be an integer JSON value")
+        left = int(left_raw)
+        right = int(right_raw)
+        minimum = 0 if protocol_version == "2.0" else -1
+        if left < minimum or right < minimum or left > 2 or right > 2:
+            raise ValueError(
+                f"relevance must be between {minimum} and 2 for protocol {protocol_version}"
+            )
+        for participant in (first, second):
+            judgment = pair_rows[unit][participant]
+            citation = judgment.get("acceptable_citation")
+            if protocol_version == "2.0" and not isinstance(citation, bool):
+                raise ValueError("v2 acceptable_citation must be a JSON boolean")
+            if bool(citation) and int(judgment["relevance"]) != 2:
+                raise ValueError("v2 acceptable_citation requires relevance=2")
+            if protocol_version == "2.0" and str(judgment.get("temporal_status")) not in {
+                "current",
+                "historical",
+                "not_applicable",
+            }:
+                raise ValueError("v2 temporal_status is invalid")
+            if protocol_version == "2.0" and (
+                "taxonomy" in judgment or "abstention_correct" in judgment
+            ):
+                raise ValueError("v2 judgments must not contain taxonomy or abstention fields")
+        relevance_pairs.append((left, right))
     relevance_exact = exact_receipt(
         [left == right for left, right in relevance_pairs],
         total_units=len(units),
@@ -175,9 +201,6 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
     citation_matches: list[bool] = []
     taxonomy_matches: list[bool] = []
     abstention_matches: list[bool] = []
-    abstention_field = (
-        "query_abstention_correct" if protocol_version == "2.0" else "abstention_correct"
-    )
     for query_id in query_ids:
         documents = [document_id for candidate, document_id in units if candidate == query_id]
         first_citations = {
@@ -192,46 +215,47 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
         }
         citation_matches.append(first_citations == second_citations)
 
-        first_taxonomy = {
-            str(pair_rows[(query_id, document_id)][first].get("taxonomy"))
-            for document_id in documents
-        }
-        second_taxonomy = {
-            str(pair_rows[(query_id, document_id)][second].get("taxonomy"))
-            for document_id in documents
-        }
-        if len(first_taxonomy) == len(second_taxonomy) == 1:
-            taxonomy_matches.append(first_taxonomy == second_taxonomy)
+        if protocol_version != "2.0":
+            first_taxonomy = {
+                str(pair_rows[(query_id, document_id)][first].get("taxonomy"))
+                for document_id in documents
+            }
+            second_taxonomy = {
+                str(pair_rows[(query_id, document_id)][second].get("taxonomy"))
+                for document_id in documents
+            }
+            if len(first_taxonomy) == len(second_taxonomy) == 1:
+                taxonomy_matches.append(first_taxonomy == second_taxonomy)
 
-        first_abstention = {
-            str(pair_rows[(query_id, document_id)][first].get(abstention_field))
-            for document_id in documents
-        }
-        second_abstention = {
-            str(pair_rows[(query_id, document_id)][second].get(abstention_field))
-            for document_id in documents
-        }
-        if len(first_abstention) == len(second_abstention) == 1:
-            abstention_matches.append(first_abstention == second_abstention)
+            first_abstention = {
+                str(pair_rows[(query_id, document_id)][first].get("abstention_correct"))
+                for document_id in documents
+            }
+            second_abstention = {
+                str(pair_rows[(query_id, document_id)][second].get("abstention_correct"))
+                for document_id in documents
+            }
+            if len(first_abstention) == len(second_abstention) == 1:
+                abstention_matches.append(first_abstention == second_abstention)
 
     query_fields = {
         "acceptable_citation_set": exact_receipt(
             citation_matches, total_units=len(query_ids), seed=BOOTSTRAP_SEED + 10
         ),
-        "taxonomy": exact_receipt(
-            taxonomy_matches, total_units=len(query_ids), seed=BOOTSTRAP_SEED + 11
-        ),
-        "query_abstention": exact_receipt(
-            abstention_matches, total_units=len(query_ids), seed=BOOTSTRAP_SEED + 12
-        ),
     }
-    abstention = query_fields["query_abstention"]
+    if protocol_version != "2.0":
+        query_fields["taxonomy"] = exact_receipt(
+            taxonomy_matches, total_units=len(query_ids), seed=BOOTSTRAP_SEED + 11
+        )
+        query_fields["query_abstention"] = exact_receipt(
+            abstention_matches, total_units=len(query_ids), seed=BOOTSTRAP_SEED + 12
+        )
     kappa_receipt = pair_fields["relevance"]["quadratic_weighted_kappa"]
     calibration_passed = bool(
         protocol_version == "2.0"
-        and abstention["measurable_units"] == abstention["total_units"]
-        and abstention["value"] is not None
-        and abstention["value"] >= 0.80
+        and relevance_exact["measurable_units"] == relevance_exact["total_units"]
+        and relevance_exact["value"] is not None
+        and relevance_exact["value"] >= 0.80
         and kappa_receipt["ci95"][0] is not None
         and kappa_receipt["ci95"][0] >= 0.60
     )
@@ -250,7 +274,7 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
         "pair_level": pair_fields,
         "query_level": query_fields,
         "calibration_rule": {
-            "query_abstention_exact_min": 0.80,
+            "relevance_exact_min": 0.80,
             "relevance_weighted_kappa_ci95_lower_min": 0.60,
             "passed": calibration_passed,
             "eligible": protocol_version == "2.0",

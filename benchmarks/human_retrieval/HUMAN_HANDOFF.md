@@ -1,25 +1,23 @@
-# M2 independent human-annotation handoff
+# Передача M2-v2 незалежним оцінювачам
 
-The generated `annotation-packets/annotator-a-*.jsonl` and
-`annotation-packets/annotator-b-*.jsonl` contain the same pooled candidates
-but no retrieval-mode labels, source locations, hostnames, personal data, or
-sealed qrels. Give exactly one packet to each independent annotator.
+Використовуйте лише україномовні `annotation-packets/annotator-a-development.jsonl`
+та `annotator-b-development.jsonl`. Обидва packets мають однакові чотири
+кандидати на кожен запит і не містять назви режиму пошуку, source path,
+hostname, персональних даних або sealed qrels.
 
-Store completed responses **outside the framework working copy**, for example
-in a restricted evidence store. Each response contains the opaque `query_id`,
-document-level relevance (`-1`, `0`, `1`, `2`), acceptable citation IDs and
-temporal classification. Record `query_abstention_correct` and taxonomy once
-per query. Do not modify the corpus or queries after annotation begins.
+Raw responses зберігайте **поза робочою копією** у restricted storage. Кожен
+JSONL judgment містить лише `participant_id`, `query_id`, `document_id`,
+`relevance` (`0`, `1`, `2`), `acceptable_citation` (`true` або `false`) і
+`temporal_status` (`current`, `historical`, `not_applicable`). Окремих ручних
+полів `abstention` або `taxonomy` у v2 немає.
 
-Before a new production packet, the same two annotators complete a blinded
-calibration packet and `compute_agreement.py --protocol-version 2.0` must pass
-the pre-registered gate. Before reconciliation, calculate and retain the
-production agreement receipt. Send every disagreement to a third person, who
-records `scope`, `temporal`, `provenance`, `partial`, `conflict`, or `other`;
-final qrels retain both original judgments. Run `validate_human_evidence.py`
-before retrieval. Only then may a fresh adjudicated manifest include
-`status: adjudicated`, the two-annotator count, calibration and agreement
-receipts, and the pre-registered thresholds.
+Перед production обидва учасники незалежно проходять короткий calibration
+packet. Production дозволяється лише після `compute_agreement.py
+--protocol-version 2.0` і проходження preregistered gate. Після цього вони
+незалежно оцінюють production packet; відповіді не обговорюються до створення
+agreement receipt. Disagreement bundle передається третьому adjudicator лише
+після production agreement. До retrieval координатор запускає
+`validate_human_evidence.py`; sealed holdout залишається `do_not_open`.
 
-No generated pending file is a human judgment, qrel, adjudication or release
-claim.
+Жоден pending-файл не є людським judgment, qrel, adjudication або release
+claim. Frozen v1 не змінюється і не може задовольнити v2 calibration gate.

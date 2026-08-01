@@ -24,6 +24,7 @@ REQUIRED_HASHES = {
     "adjudicated_qrels_sha256",
 }
 VALID_SPLITS = {"development", "sealed_holdout"}
+VALID_STATUSES = {"pending_calibration", "pending_human_annotation", "adjudicated"}
 ARTIFACTS = {
     "corpus": "corpus_sha256",
     "queries": "queries_sha256",
@@ -56,8 +57,8 @@ def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[s
     schema_version = manifest.get("schema_version")
     if schema_version not in {"1.0", "2.0"}:
         errors.append("schema_version must be '1.0' or '2.0'")
-    if manifest.get("status") not in {"pending_human_annotation", "adjudicated"}:
-        errors.append("status must be pending_human_annotation or adjudicated")
+    if manifest.get("status") not in VALID_STATUSES:
+        errors.append("status must be pending_calibration, pending_human_annotation or adjudicated")
     split = manifest.get("split")
     if split not in VALID_SPLITS:
         errors.append("split must be development or sealed_holdout")
@@ -80,11 +81,22 @@ def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[s
     if manifest.get("annotation_protocol") != expected_protocol:
         errors.append(f"annotation_protocol must be {expected_protocol}")
     if schema_version == "2.0":
+        if manifest.get("language") != "uk":
+            errors.append("schema v2 requires language=uk")
         calibration = manifest.get("calibration")
-        if not isinstance(calibration, dict) or calibration.get("status") != "passed":
-            errors.append("schema v2 requires a passed calibration receipt")
-        elif not _is_sha256(calibration.get("agreement_receipt_sha256")):
-            errors.append("schema v2 calibration requires agreement_receipt_sha256")
+        if not isinstance(calibration, dict):
+            errors.append("schema v2 requires a calibration object")
+        else:
+            calibration_status = calibration.get("status")
+            if manifest.get("status") == "pending_calibration" and calibration_status != "pending":
+                errors.append("pending_calibration requires calibration status=pending")
+            if manifest.get("status") in {"pending_human_annotation", "adjudicated"}:
+                if calibration_status != "passed":
+                    errors.append("v2 annotation requires a passed calibration receipt")
+                elif not _is_sha256(calibration.get("agreement_receipt_sha256")):
+                    errors.append("passed v2 calibration requires agreement_receipt_sha256")
+            elif calibration_status not in {"pending", "passed"}:
+                errors.append("calibration status must be pending or passed")
     if manifest.get("status") == "adjudicated":
         thresholds = manifest.get("thresholds")
         if not isinstance(thresholds, dict) or set(thresholds) != set(REQUIRED_THRESHOLDS):
@@ -125,11 +137,14 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def validate_adjudicated_qrels(queries_path: Path, qrels_path: Path) -> list[str]:
-    """Validate query-level consistency and joint metric feasibility."""
+def validate_adjudicated_qrels(
+    queries_path: Path, qrels_path: Path, *, schema_version: str = "1.0"
+) -> list[str]:
+    """Validate qrels consistency and joint metric feasibility."""
     queries = {str(row.get("query_id", "")): row for row in _load_jsonl(queries_path)}
     grouped: dict[str, dict[str, Any]] = {}
     errors: list[str] = []
+    seen_units: set[tuple[str, str]] = set()
     for row in _load_jsonl(qrels_path):
         query_id = str(row.get("query_id", ""))
         document_id = str(row.get("document_id", ""))
@@ -137,8 +152,19 @@ def validate_adjudicated_qrels(queries_path: Path, qrels_path: Path) -> list[str
         if not query_id or not document_id or not isinstance(final, dict):
             errors.append("frozen qrels require query_id, document_id and final object")
             continue
+        unit = (query_id, document_id)
+        if unit in seen_units:
+            errors.append(f"duplicate frozen qrel for {query_id}/{document_id}")
+            continue
+        seen_units.add(unit)
         relevance = final.get("relevance")
-        if not isinstance(relevance, int) or relevance < -1 or relevance > 2:
+        minimum_relevance = 0 if schema_version == "2.0" else -1
+        if (
+            not isinstance(relevance, int)
+            or isinstance(relevance, bool)
+            or relevance < minimum_relevance
+            or relevance > 2
+        ):
             errors.append(f"unsupported final relevance for {query_id}/{document_id}")
             continue
         bucket = grouped.setdefault(
@@ -152,34 +178,56 @@ def validate_adjudicated_qrels(queries_path: Path, qrels_path: Path) -> list[str
             },
         )
         bucket["relevance"][document_id] = relevance
-        bucket["citation"][document_id] = bool(final.get("acceptable_citation"))
+        citation = final.get("acceptable_citation")
+        if schema_version == "2.0" and not isinstance(citation, bool):
+            errors.append(
+                f"{query_id}/{document_id}: v2 acceptable_citation must be a JSON boolean"
+            )
+        bucket["citation"][document_id] = bool(citation)
         bucket["temporal"][document_id] = str(final.get("temporal_status"))
-        abstention_key = (
-            "query_abstention_correct"
-            if "query_abstention_correct" in final
-            else "abstention_correct"
-        )
-        bucket["abstention"].add(str(final.get(abstention_key)))
-        bucket["taxonomy"].add(str(final.get("taxonomy")))
+        if schema_version == "2.0":
+            if "query_abstention_correct" in final or "abstention_correct" in final:
+                errors.append(f"{query_id}: v2 forbids manual query-level abstention labels")
+            if "taxonomy" in final:
+                errors.append(f"{query_id}: v2 taxonomy is derived, not a human qrel field")
+        else:
+            abstention_key = (
+                "query_abstention_correct"
+                if "query_abstention_correct" in final
+                else "abstention_correct"
+            )
+            bucket["abstention"].add(str(final.get(abstention_key)))
+            bucket["taxonomy"].add(str(final.get("taxonomy")))
 
     if set(queries) != set(grouped):
         errors.append("queries and frozen qrels have different query IDs")
         return errors
     for query_id, query in queries.items():
         qrel = grouped[query_id]
-        if qrel["abstention"] not in ({"yes"}, {"no"}):
-            errors.append(f"{query_id}: query-level abstention labels are missing or inconsistent")
         journey = str(query.get("journey", ""))
-        if qrel["taxonomy"] != {journey}:
-            errors.append(f"{query_id}: qrel taxonomy must match the query journey")
-        for document_id, acceptable in qrel["citation"].items():
-            if acceptable and qrel["relevance"][document_id] < 1:
+        if schema_version != "2.0":
+            if qrel["abstention"] not in ({"yes"}, {"no"}):
                 errors.append(
-                    f"{query_id}/{document_id}: acceptable citation requires relevance >= 1"
+                    f"{query_id}: query-level abstention labels are missing or inconsistent"
                 )
-        if journey == "current_fact" and "no" in qrel["abstention"]:
+            if qrel["taxonomy"] != {journey}:
+                errors.append(f"{query_id}: qrel taxonomy must match the query journey")
+        for document_id, acceptable in qrel["citation"].items():
+            minimum_for_citation = 2 if schema_version == "2.0" else 1
+            if acceptable and qrel["relevance"][document_id] < minimum_for_citation:
+                errors.append(
+                    f"{query_id}/{document_id}: acceptable citation requires direct relevance"
+                )
+        answerable = (
+            any(value >= 2 for value in qrel["relevance"].values())
+            if schema_version == "2.0"
+            else "no" in qrel["abstention"]
+        )
+        if schema_version == "2.0" and journey == "abstention" and answerable:
+            errors.append(f"{query_id}: abstention journey has a direct answer")
+        if journey == "current_fact" and answerable:
             feasible = any(
-                qrel["relevance"][document_id] >= 1
+                qrel["relevance"][document_id] >= (2 if schema_version == "2.0" else 1)
                 and qrel["citation"].get(document_id, False)
                 and qrel["temporal"].get(document_id) == "current"
                 for document_id in qrel["relevance"]
@@ -219,7 +267,9 @@ def validate_evidence_file(manifest_path: Path, *, allow_sealed: bool) -> list[s
     ):
         errors.extend(
             validate_adjudicated_qrels(
-                resolved_artifacts["queries"], resolved_artifacts["adjudicated_qrels"]
+                resolved_artifacts["queries"],
+                resolved_artifacts["adjudicated_qrels"],
+                schema_version=str(manifest.get("schema_version", "1.0")),
             )
         )
     return errors

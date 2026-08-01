@@ -131,17 +131,43 @@ def mean_and_ci(values: list[float], seed: int) -> dict[str, Any]:
     }
 
 
-def group_qrels(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def group_qrels(
+    rows: list[dict[str, Any]], protocol_version: str = "1.0"
+) -> dict[str, dict[str, Any]]:
     grouped: dict[str, dict[str, Any]] = {}
+    seen_units: set[tuple[str, str]] = set()
     for row in rows:
         query_id = str(row.get("query_id", ""))
         document_id = str(row.get("document_id", ""))
         final = row.get("final")
         if not query_id or not document_id or not isinstance(final, dict):
             raise ValueError("frozen qrels require query_id, document_id and final object")
+        unit = (query_id, document_id)
+        if unit in seen_units:
+            raise ValueError(f"duplicate frozen qrel for {query_id}/{document_id}")
+        seen_units.add(unit)
         relevance = final.get("relevance")
-        if not isinstance(relevance, int) or relevance < -1 or relevance > 2:
+        minimum_relevance = 0 if protocol_version == "2.0" else -1
+        if (
+            not isinstance(relevance, int)
+            or isinstance(relevance, bool)
+            or relevance < minimum_relevance
+            or relevance > 2
+        ):
             raise ValueError(f"unsupported final relevance for {query_id}/{document_id}")
+        if protocol_version == "2.0":
+            if not isinstance(final.get("acceptable_citation"), bool):
+                raise ValueError("v2 acceptable_citation must be a JSON boolean")
+            if final["acceptable_citation"] and relevance != 2:
+                raise ValueError("v2 acceptable_citation requires relevance=2")
+            if str(final.get("temporal_status")) not in {
+                "current",
+                "historical",
+                "not_applicable",
+            }:
+                raise ValueError("v2 temporal_status is invalid")
+            if {"taxonomy", "abstention_correct", "query_abstention_correct"}.intersection(final):
+                raise ValueError("v2 qrels must not contain taxonomy or abstention fields")
         bucket = grouped.setdefault(
             query_id,
             {
@@ -161,9 +187,10 @@ def group_qrels(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         # qrels remain byte-for-byte untouched and reproducible.
         if "query_abstention_correct" in final:
             bucket["query_abstention"].add(str(final.get("query_abstention_correct")))
-        else:
+        elif "abstention_correct" in final:
             bucket["abstention"].add(str(final.get("abstention_correct")))
-        bucket["taxonomy"].add(str(final.get("taxonomy")))
+        if "taxonomy" in final:
+            bucket["taxonomy"].add(str(final.get("taxonomy")))
     return grouped
 
 
@@ -179,14 +206,23 @@ def annotation_protocol_version(rows: list[dict[str, Any]]) -> str:
     if all(v2_rows):
         return "2.0"
     if not any(v2_rows):
-        return "1.0"
+        legacy_rows = [
+            "abstention_correct" in row.get("final", {})
+            for row in rows
+            if isinstance(row.get("final"), dict)
+        ]
+        if any(legacy_rows) and not all(legacy_rows):
+            raise ValueError("frozen qrels mix legacy and v2 fields")
+        return "1.0" if all(legacy_rows) else "2.0"
     raise ValueError("frozen qrels mix annotation protocol v1 and v2 fields")
 
 
 def expected_abstention(qrel: dict[str, Any]) -> str | None:
-    """Return one query-level abstention label, or ``None`` when it is ambiguous."""
+    """Derive v2 abstention from direct-answer relevance; retain v1 fallback."""
     values = qrel.get("query_abstention") or qrel["abstention"]
     if len(values) != 1:
+        if not values and qrel.get("relevance"):
+            return "no" if any(value >= 2 for value in qrel["relevance"].values()) else "yes"
         return None
     value = next(iter(values))
     return value if value in {"yes", "no"} else None
@@ -209,7 +245,8 @@ def validate_metric_contract(
         journey = str(query.get("journey", ""))
         qrel = qrels[query_id]
         abstention = expected_abstention(qrel)
-        if abstention is None:
+        is_v2 = not qrel.get("abstention") and not qrel.get("taxonomy")
+        if abstention is None and not is_v2:
             errors.append(
                 {
                     "query_id": query_id,
@@ -219,7 +256,7 @@ def validate_metric_contract(
             )
 
         taxonomies = qrel["taxonomy"]
-        if taxonomies != {journey}:
+        if not is_v2 and taxonomies != {journey}:
             errors.append(
                 {
                     "query_id": query_id,
@@ -233,20 +270,20 @@ def validate_metric_contract(
         invalid_citations = sorted(
             doc_id
             for doc_id, acceptable in citations.items()
-            if acceptable and relevance[doc_id] < 1
+            if acceptable and relevance[doc_id] < (2 if is_v2 else 1)
         )
         if invalid_citations:
             errors.append(
                 {
                     "query_id": query_id,
                     "code": "nonrelevant_acceptable_citation",
-                    "reason": "an acceptable citation must have relevance >= 1",
+                    "reason": "an acceptable citation must have direct relevance",
                 }
             )
 
         if journey == "current_fact" and abstention == "no":
             feasible = any(
-                relevance[doc_id] >= 1
+                relevance[doc_id] >= (2 if is_v2 else 1)
                 and citations.get(doc_id, False)
                 and qrel["temporal"].get(doc_id) == "current"
                 for doc_id in relevance
@@ -453,7 +490,7 @@ def main() -> int:
     queries = load_jsonl(args.queries)
     qrel_rows = load_jsonl(args.qrels)
     annotation_protocol = annotation_protocol_version(qrel_rows)
-    qrels = group_qrels(qrel_rows)
+    qrels = group_qrels(qrel_rows, annotation_protocol)
     if {str(row.get("query_id")) for row in queries} != set(qrels):
         raise ValueError("queries and frozen qrels have different query IDs")
     if len(queries) != len(qrels):
@@ -508,7 +545,7 @@ def main() -> int:
             "mrr_at_10": "reciprocal rank of the first relevance >= 1 result",
             "citation_provenance_accuracy": "acceptable_citation of the top retrieved document for answerable queries; correct-abstention queries excluded",
             "stale_answer_rate": "top result is not current for current_fact queries; no-result is not stale",
-            "abstention_quality": "query-level retrieval proxy: top result is non-relevant when abstention=yes and relevant when no; inconsistent labels excluded",
+            "abstention_quality": "query-level retrieval proxy: top result has no direct answer when abstention=yes and a direct answer when no; v2 expectation is derived from qrels",
             "p95_latency_ms": "95th percentile of five warm steady-state query latencies",
         },
         "modes": modes,

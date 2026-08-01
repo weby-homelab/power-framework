@@ -1,5 +1,9 @@
 # POWER M2 Human Retrieval Evidence
 
+> **M2-v1 відкликано.** Попередній англомовний і суперечливий packet є лише
+> audit-only історією. Для нових учасників використовується тільки
+> україномовний M2-v2 після реальної calibration.
+
 This directory is the evidence contract for M2. It is deliberately separate
 from `benchmarks/power31`: the latter is a synthetic CI regression benchmark
 and cannot be used as human-quality or production evidence.
@@ -12,16 +16,22 @@ M2 evaluates five real knowledge-worker journeys:
 4. decide that a question has no supported answer and abstain; and
 5. retrieve a cross-note relationship without treating candidates as authority.
 
-For a frozen v1 audit, use `manifest.template.json`. Every new run uses
-`manifest.v2.template.json` and the additive `annotation_protocol_v2.md`.
-Schema v2 is invalid until a blinded calibration packet passes and its
-de-identified agreement receipt is bound by SHA-256. Retain raw annotations
+For a frozen v1 audit, use `manifest.template.json`; it must never be promoted
+to a quality gate. Every new run uses `manifest.v2.template.json`,
+`annotation_protocol_v2.md` and the short Ukrainian handoff in
+`ANNOTATOR_INSTRUCTIONS_UK.md`; the third person uses
+`ADJUDICATOR_INSTRUCTIONS_UK.md`. Schema v2 starts as `pending_calibration` and
+cannot become annotation-ready until a blinded calibration packet passes and
+its de-identified agreement receipt is bound by SHA-256. Retain raw annotations
 outside the development working copy and publish only de-identified,
 review-approved material.
 
+`scripts/validate_annotation_packet.py` checks the human-facing packet before
+delivery: Ukrainian text, exactly four candidates, no hidden journey or
+answerability fields, no sensitive data and no malformed response contract.
 `scripts/compute_agreement.py` produces field-wise agreement without copying
 participant identities or labels. `scripts/validate_human_evidence.py` checks
-artifact hashes, query-level consistency, and joint metric feasibility. It
-refuses the sealed holdout unless `--allow-sealed` is explicit. Private human
-qrels and result receipts are intentionally absent from this repository;
-their existence elsewhere is not, by itself, an M2 pass or release claim.
+artifact hashes and joint metric feasibility. It refuses the sealed holdout
+unless `--allow-sealed` is explicit. Private human qrels and result receipts
+are intentionally absent from this repository; their existence elsewhere is
+not, by itself, an M2 pass or release claim.

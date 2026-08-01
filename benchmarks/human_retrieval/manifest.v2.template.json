@@ -1,7 +1,8 @@
 {
   "schema_version": "2.0",
-  "status": "pending_human_annotation",
+  "status": "pending_calibration",
   "split": "development",
+  "language": "uk",
   "corpus_sha256": "REPLACE_WITH_SHA256",
   "queries_sha256": "REPLACE_WITH_SHA256",
   "raw_judgments_sha256": "REPLACE_WITH_SHA256",
@@ -14,8 +15,8 @@
   },
   "annotation_protocol": "annotation_protocol_v2.md",
   "calibration": {
-    "status": "passed",
-    "agreement_receipt_sha256": "REPLACE_WITH_SHA256"
+    "status": "pending",
+    "agreement_receipt_sha256": null
   },
   "journeys": [
     "current_fact",

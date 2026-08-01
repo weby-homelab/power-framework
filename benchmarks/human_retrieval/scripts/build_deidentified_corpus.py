@@ -1,4 +1,4 @@
-"""Build local-only, de-identified M2 corpus and blinded annotation packets.
+"""Build local-only, de-identified M2-v2 corpus and Ukrainian packets.
 
 This deliberately does not create human judgments or qrels.  It transforms
 manually reviewed semantic excerpts from the real vault into opaque document
@@ -14,6 +14,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+# Ukrainian corpus fixtures intentionally contain Cyrillic text.
+# ruff: noqa: RUF001
+
+PROTOCOL_VERSION = "2.0"
+PACKET_LANGUAGE = "uk"
 JOURNEYS = (
     "current_fact",
     "historical_fact",
@@ -62,65 +67,101 @@ def _manifest(output: Path, split: str) -> dict[str, Any]:
     }
     digests = {key: _sha256(output / filename) for key, filename in artifacts.items()}
     return {
-        "schema_version": "1.0",
-        "status": "pending_human_annotation",
+        "schema_version": PROTOCOL_VERSION,
+        "status": "pending_calibration",
         "split": split,
         "corpus_sha256": digests["corpus"],
         "queries_sha256": digests["queries"],
         "raw_judgments_sha256": digests["raw_judgments"],
         "adjudicated_qrels_sha256": digests["adjudicated_qrels"],
         "artifacts": artifacts,
-        "annotation_protocol": "../../annotation_protocol.md",
+        "annotation_protocol": "annotation_protocol_v2.md",
+        "language": PACKET_LANGUAGE,
+        "calibration": {
+            "status": "pending",
+            "agreement_receipt_sha256": None,
+        },
         "journeys": list(JOURNEYS),
         "thresholds": None,
-        "corpus_status": "deidentified_reviewed_pending_independent_annotation",
+        "corpus_status": "deidentified_reviewed_pending_calibration_and_annotation",
     }
 
 
+def _packet_rows(
+    queries: list[dict[str, Any]], documents: list[dict[str, Any]], split: str
+) -> list[dict[str, Any]]:
+    """Render only the human-facing fields; never expose journey or source data."""
+    visible_documents = [
+        {
+            "document_id": str(document["document_id"]),
+            "title": str(document["title"]),
+            "text": str(document["text"]),
+        }
+        for document in documents
+    ]
+    return [
+        {
+            "packet_schema_version": PROTOCOL_VERSION,
+            "language": PACKET_LANGUAGE,
+            "split": split,
+            "query_id": str(query["query_id"]),
+            "question": str(query["question"]),
+            "candidates": visible_documents,
+            "response_fields": [
+                "document_id",
+                "relevance",
+                "acceptable_citation",
+                "temporal_status",
+            ],
+        }
+        for query in queries
+    ]
+
+
 def build(output_root: Path, vault: Path) -> None:
-    """Create split-isolated corpus, queries and two mode-blind packets."""
+    """Create split-isolated corpus, calibration material and Ukrainian packets."""
     documents = [
         {
             "document_id": "doc-001",
             "family": "roadmap-authority",
             "split": "development",
-            "title": "Canonical roadmap authority",
-            "text": "Markdown in version control is authoritative. Derived indexes and embeddings can be rebuilt. A status may be called done only with executable evidence.",
+            "title": "Поточне правило: головний план",
+            "text": "Статус документа: поточний. Головним планом проєкту є Markdown у системі версій. Похідні індекси та embeddings можна побудувати знову. Називати роботу завершеною можна лише за наявності виконуваного доказу.",
         },
         {
             "document_id": "doc-002",
             "family": "roadmap-quality-gap",
             "split": "development",
-            "title": "Human retrieval quality gap",
-            "text": "A synthetic benchmark is useful for regression but does not demonstrate usefulness for real questions. Frozen human qrels, a sealed holdout and adjudication are required.",
+            "title": "Історичний запис: межа синтетичного тесту",
+            "text": "Статус документа: історичний. Синтетичний benchmark корисний для регресійної перевірки, але сам не доводить користь для реальних запитань. Для такого висновку потрібні людські qrels, adjudication і sealed holdout.",
         },
         {
             "document_id": "doc-003",
             "family": "m2-foundation",
             "split": "development",
-            "title": "M2 evidence boundary",
-            "text": "M2 requires independently produced human judgments and a sealed holdout. The evidence contract separates development from holdout and binds corpus, queries and judgments by hashes.",
+            "title": "Поточне правило: доказ M2",
+            "text": "Статус документа: поточний. M2 потребує незалежних людських оцінок і sealed holdout. Контракт доказів відділяє development від holdout та зв'язує corpus, queries і judgments контрольними сумами.",
         },
         {
             "document_id": "doc-004",
             "family": "release-boundary",
             "split": "development",
-            "title": "Release evidence limits",
-            "text": "Release checks can prove package provenance and automation gates. They do not prove human-adjudicated retrieval quality, sealed evaluation or production performance on target hardware.",
+            "title": "Поточне правило: межі release-доказу",
+            "text": "Статус документа: поточний. Release-перевірки можуть довести походження пакета й автоматичні gate. Вони не доводять людську якість пошуку, sealed evaluation або production performance на цільовому обладнанні.",
         },
         {
             "document_id": "doc-005",
             "family": "security-model",
             "split": "sealed_holdout",
-            "title": "Threat model controls",
-            "text": "The formal threat model covers assets, trust boundaries, attacker-controlled inputs, assumptions and mitigations. Controls include path containment, atomic writes and explicit approved mutations.",
+            "title": "Поточне правило: controls threat model",
+            "text": "Статус документа: поточний. Формальна модель загроз описує активи, межі довіри, входи під контролем атакувальника, припущення та захист. Серед controls є containment шляхів, атомарні записи й явно дозволені зміни.",
         },
         {
             "document_id": "doc-006",
             "family": "m2-adjudication",
             "split": "sealed_holdout",
-            "title": "Human adjudication requirement",
-            "text": "Two annotators judge each query-document pair independently. A third adjudicator resolves disagreements while retaining both original judgments and a reason code.",
+            "title": "Історичний запис: правило adjudication",
+            "text": "Статус документа: історичний. Двоє оцінювачів незалежно оцінюють кожну пару «запит—документ». Третій adjudicator вирішує розбіжності, зберігаючи обидві початкові оцінки та причину.",
         },
     ]
     queries = [
@@ -128,61 +169,97 @@ def build(output_root: Path, vault: Path) -> None:
             "query_id": "dev-q-001",
             "split": "development",
             "journey": "current_fact",
-            "question": "What artifact is authoritative for the current project plan?",
+            "question": "Що є головним джерелом поточного плану проєкту?",
         },
         {
             "query_id": "dev-q-002",
             "split": "development",
             "journey": "historical_fact",
-            "question": "Does a successful release gate prove human retrieval quality?",
+            "question": "Чи доводить успішна release-перевірка якість пошуку для людей?",
         },
         {
             "query_id": "dev-q-003",
             "split": "development",
             "journey": "provenance_trace",
-            "question": "Which evidence is required before a retrieval status may be treated as completed?",
+            "question": "Що потрібно мати, перш ніж назвати перевірку пошуку завершеною?",
         },
         {
             "query_id": "dev-q-004",
             "split": "development",
             "journey": "abstention",
-            "question": "Which document states the target hardware p95 latency threshold?",
+            "question": "У якому документі вказано число для p95 затримки цільового обладнання?",
         },
         {
             "query_id": "dev-q-005",
             "split": "development",
             "journey": "candidate_boundary",
-            "question": "Can a synthetic CI benchmark authorize a production-quality claim?",
+            "question": "Чи може синтетичний CI-тест сам довести production-якість?",
         },
         {
             "query_id": "holdout-q-001",
             "split": "sealed_holdout",
             "journey": "current_fact",
-            "question": "What controls are named by the formal threat model?",
+            "question": "Які controls називає формальна модель загроз?",
         },
         {
             "query_id": "holdout-q-002",
             "split": "sealed_holdout",
             "journey": "historical_fact",
-            "question": "What must remain after disagreement reconciliation?",
+            "question": "Що треба зберегти після вирішення розбіжностей?",
         },
         {
             "query_id": "holdout-q-003",
             "split": "sealed_holdout",
             "journey": "provenance_trace",
-            "question": "How are corpus and annotation artifacts made reproducible?",
+            "question": "Як зробити corpus і оцінки відтворюваними?",
         },
         {
             "query_id": "holdout-q-004",
             "split": "sealed_holdout",
             "journey": "abstention",
-            "question": "Which document gives the currently approved remote hostname?",
+            "question": "У якому документі вказано затверджене ім'я віддаленого хоста?",
         },
         {
             "query_id": "holdout-q-005",
             "split": "sealed_holdout",
             "journey": "candidate_boundary",
-            "question": "May heuristic inference be treated as authoritative evidence?",
+            "question": "Чи можна вважати heuristic inference доказом без додаткової перевірки?",
+        },
+    ]
+    calibration_documents = [
+        {
+            "document_id": "cal-doc-001",
+            "title": "Поточний запис: час зустрічі",
+            "text": "Статус документа: поточний. Командна зустріч починається о 10:00.",
+        },
+        {
+            "document_id": "cal-doc-002",
+            "title": "Історичний запис: стара назва",
+            "text": "Статус документа: історичний. Раніше проєкт мав назву «Старий план».",
+        },
+        {
+            "document_id": "cal-doc-003",
+            "title": "Поточний запис: формат звіту",
+            "text": "Статус документа: поточний. Щотижневий звіт зберігають у форматі Markdown.",
+        },
+        {
+            "document_id": "cal-doc-004",
+            "title": "Довідковий запис: колір",
+            "text": "Статус документа: поточний. Для заголовка дозволено синій колір.",
+        },
+    ]
+    calibration_queries = [
+        {
+            "query_id": "cal-q-001",
+            "question": "О котрій починається командна зустріч?",
+        },
+        {
+            "query_id": "cal-q-002",
+            "question": "Яку стару назву мав проєкт?",
+        },
+        {
+            "query_id": "cal-q-003",
+            "question": "Який номер телефону вказано для команди?",
         },
     ]
     sources = {
@@ -195,7 +272,7 @@ def build(output_root: Path, vault: Path) -> None:
     if not all(path.is_file() for path in sources.values()):
         missing = [source_id for source_id, path in sources.items() if not path.is_file()]
         raise FileNotFoundError(f"approved vault sources are missing: {', '.join(missing)}")
-    _assert_deidentified(documents + queries)
+    _assert_deidentified(documents + queries + calibration_documents + calibration_queries)
     output_root.mkdir(parents=True, exist_ok=True)
     (output_root / "source-provenance.json").write_text(
         json.dumps(
@@ -215,7 +292,9 @@ def build(output_root: Path, vault: Path) -> None:
     (output_root / "pre-registration.json").write_text(
         json.dumps(
             {
-                "status": "pre_registered_before_sealed_evaluation",
+                "status": "pre_registered_before_human_calibration",
+                "protocol_version": PROTOCOL_VERSION,
+                "language": PACKET_LANGUAGE,
                 "thresholds": {
                     "recall_at_10": 0.80,
                     "ndcg_at_10": 0.70,
@@ -233,6 +312,15 @@ def build(output_root: Path, vault: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
+    calibration_root = output_root / "calibration"
+    _write_jsonl(calibration_root / "corpus.jsonl", calibration_documents)
+    _write_jsonl(calibration_root / "queries.jsonl", calibration_queries)
+    calibration_packets = _packet_rows(calibration_queries, calibration_documents, "calibration")
+    for annotator in ("a", "b"):
+        _write_jsonl(
+            output_root / "annotation-packets" / f"annotator-{annotator}-calibration.jsonl",
+            calibration_packets,
+        )
     for split in ("development", "sealed_holdout"):
         output = output_root / split
         split_docs = [record for record in documents if record["split"] == split]
@@ -251,11 +339,16 @@ def build(output_root: Path, vault: Path) -> None:
             json.dumps(_manifest(output, split), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        candidates = [{"query": query, "candidates": split_docs} for query in split_queries]
-        for annotator in ("a", "b"):
-            _write_jsonl(
-                output_root / "annotation-packets" / f"annotator-{annotator}-{split}.jsonl",
-                candidates,
+        if split == "development":
+            candidates = _packet_rows(split_queries, split_docs, split)
+            for annotator in ("a", "b"):
+                _write_jsonl(
+                    output_root / "annotation-packets" / f"annotator-{annotator}-{split}.jsonl",
+                    candidates,
+                )
+        else:
+            (output_root / "annotation-packets" / "SEALED_NOT_PACKAGED").write_text(
+                "Sealed holdout packet intentionally not generated.\n", encoding="utf-8"
             )
 
 
