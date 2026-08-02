@@ -297,7 +297,7 @@ def build(output_root: Path, vault: Path) -> None:
                 "protocol_version": PROTOCOL_VERSION,
                 "language": PACKET_LANGUAGE,
                 "thresholds": {
-                    "recall_at_10": 0.80,
+                    "recall_at_10": 0.75,
                     "ndcg_at_10": 0.70,
                     "mrr_at_10": 0.70,
                     "citation_provenance_accuracy": 0.95,

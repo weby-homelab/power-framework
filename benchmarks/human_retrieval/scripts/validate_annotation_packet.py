@@ -95,7 +95,8 @@ def validate_packet(
         if query_id in seen_queries:
             errors.append(f"packet row {index}: duplicate query_id")
         seen_queries.add(query_id)
-        if packet.get("packet_schema_version") != PACKET_SCHEMA_VERSION:
+        packet_version = packet.get("packet_schema_version")
+        if packet_version != PACKET_SCHEMA_VERSION:
             errors.append(f"packet row {index}: packet_schema_version must be 2.0")
         if packet.get("language") != LANGUAGE:
             errors.append(f"packet row {index}: language must be uk")
@@ -118,7 +119,6 @@ def validate_packet(
         candidates = packet.get("candidates")
         if not isinstance(candidates, list) or len(candidates) != 4:
             errors.append(f"packet row {index}: exactly four candidates are required")
-            continue
         ids: list[str] = []
         for candidate in candidates:
             if not isinstance(candidate, dict):

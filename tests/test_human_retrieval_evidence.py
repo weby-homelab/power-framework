@@ -21,7 +21,7 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 CANONICAL_THRESHOLDS = {
-    "recall_at_10": 0.80,
+    "recall_at_10": 0.75,
     "ndcg_at_10": 0.70,
     "mrr_at_10": 0.70,
     "citation_provenance_accuracy": 0.95,

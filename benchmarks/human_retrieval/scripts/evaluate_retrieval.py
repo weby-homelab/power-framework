@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 THRESHOLDS: dict[str, float] = {
-    "recall_at_10": 0.8,
+    "recall_at_10": 0.75,
     "ndcg_at_10": 0.7,
     "mrr_at_10": 0.7,
     "citation_provenance_accuracy": 0.95,

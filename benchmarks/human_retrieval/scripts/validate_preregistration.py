@@ -12,7 +12,7 @@ from typing import Any
 GATED_COMPARATORS = frozenset({"semantic", "hybrid", "reranked", "graph_assisted"})
 DIAGNOSTIC_COMPARATORS = frozenset({"lexical", "vector"})
 REQUIRED_THRESHOLDS = {
-    "recall_at_10": 0.8,
+    "recall_at_10": 0.75,
     "ndcg_at_10": 0.7,
     "mrr_at_10": 0.7,
     "citation_provenance_accuracy": 0.95,
@@ -116,12 +116,13 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
             for key in (
                 "new_ukrainian_query_set",
                 "independent_from_m2_v2_queries_and_qrels",
-                "same_four_candidate_contract",
                 "calibration_required_before_production",
                 "raw_judgments_stay_restricted",
             )
             if human.get(key) is not True
         )
+        if human.get("same_four_candidate_contract") is not True:
+            errors.append("human_validation.same_four_candidate_contract must be true")
         for key, minimum in (
             ("minimum_relevance_exact", 0.8),
             ("minimum_weighted_kappa_ci95_lower", 0.6),

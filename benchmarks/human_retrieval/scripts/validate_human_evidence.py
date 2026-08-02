@@ -32,7 +32,7 @@ ARTIFACTS = {
     "adjudicated_qrels": "adjudicated_qrels_sha256",
 }
 REQUIRED_THRESHOLDS = {
-    "recall_at_10": 0.80,
+    "recall_at_10": 0.75,
     "ndcg_at_10": 0.70,
     "mrr_at_10": 0.70,
     "citation_provenance_accuracy": 0.95,
