@@ -72,6 +72,20 @@ def test_abstention_query_is_excluded_from_citation_denominator() -> None:
     assert metrics["abstention_quality"] == 1.0
 
 
+def test_unjudged_top_result_is_not_dropped_before_scoring() -> None:
+    qrels = MODULE.group_qrels(_rows())
+
+    metrics = MODULE.result_metrics(
+        {"query_id": "q-current", "journey": "current_fact"},
+        ["outside-frozen-pool", "doc-current"],
+        qrels["q-current"],
+    )
+
+    assert metrics["result_doc_ids"] == ["outside-frozen-pool", "doc-current"]
+    assert metrics["citation_provenance_accuracy"] == 0.0
+    assert metrics["abstention_quality"] == 0.0
+
+
 def test_annotation_protocol_is_derived_from_frozen_qrel_fields() -> None:
     assert MODULE.annotation_protocol_version(_rows()) == "1.0"
     v2_rows = _rows()

@@ -392,11 +392,11 @@ def evaluate_mode(
             }
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         result_ids = [Path(result.rel_path).stem for result in results]
-        frozen_relevance = qrels[str(query["query_id"])]["relevance"]
-        if any(doc_id not in frozen_relevance for doc_id in result_ids):
-            # A search result outside the frozen pool is not silently scored as a
-            # negative; it is retained in the receipt and excluded from qrel lookup.
-            result_ids = [doc_id for doc_id in result_ids if doc_id in frozen_relevance]
+        # Preserve the complete ranked order. An unjudged document is not
+        # evidence of relevance, but dropping it before scoring would let the
+        # next judged document become an artificial top-1 citation/abstention
+        # result. ``result_metrics`` treats unknown IDs as non-relevant,
+        # non-citable and non-current while retaining them in the receipt.
         metrics = result_metrics(query, result_ids, qrels[str(query["query_id"])])
         metrics["latency_ms"] = round(elapsed_ms, 6)
         per_query.append(metrics)
