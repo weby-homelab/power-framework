@@ -87,6 +87,28 @@ def test_index_missing_vault(tmp_path: Path) -> None:
     assert exc.value.code == 1
 
 
+def test_index_strict_reports_invalid_notes(tmp_path: Path) -> None:
+    projects = tmp_path / "01_Projects"
+    projects.mkdir(parents=True)
+    (projects / "invalid.md").write_text(
+        "---\n"
+        "type: Project\n"
+        'title: "Invalid"\n'
+        'description: "bad resource"\n'
+        'resource: "not-a-url"\n'
+        "timestamp: 2026-08-02T00:00:00Z\n"
+        "---\n\n# Invalid\n",
+        encoding="utf-8",
+    )
+    with (
+        patch.object(sys, "argv", ["power", "index", str(tmp_path), "--strict"]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 1
+    assert (tmp_path / "index.md").exists()
+
+
 def test_ingest_creates_note(sample_vault: Path) -> None:
     with (
         patch.object(

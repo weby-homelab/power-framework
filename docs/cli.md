@@ -52,14 +52,18 @@ Checks:
 Generate hierarchical indexes.
 
 ```
-power index path
+power index path [--strict]
 ```
 
 | Argument/Flag | Required | Description                 |
 | ------------- | -------- | --------------------------- |
 | `path`        | Yes      | Path to the vault directory |
+| `--strict`    | No       | Return non-zero when invalid notes are skipped (recommended for CI) |
 
 Creates `index.md` (overview) and per-folder `_index.md` (detailed entries).
+The command always reports skipped invalid notes. With `--strict`, that report
+is also an unsuccessful process result so automation cannot silently accept a
+partial index.
 
 ### `ingest`
 

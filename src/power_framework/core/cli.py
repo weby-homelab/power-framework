@@ -152,6 +152,9 @@ def _cmd_index(args: argparse.Namespace) -> int:
 
     msg = execute_vault_mutation(vault_dir, lambda: run_generate_hierarchical_index(vault_dir))
     logger.info("Generated hierarchical index:\n%s", msg)
+    if args.strict and "WARNING: skipped invalid notes (" in msg:
+        logger.error("Strict index check failed: invalid notes were skipped")
+        return 1
     return 0
 
 
@@ -593,6 +596,12 @@ def main() -> None:
         "index", help="Generate hierarchical index (index.md + per-folder _index.md)"
     )
     p_index.add_argument("path", help="Path to the vault directory")
+    p_index.add_argument(
+        "--strict",
+        action="store_true",
+        default=False,
+        help="Return non-zero when invalid notes were skipped (useful for CI)",
+    )
     p_index.set_defaults(func=_cmd_index)
 
     p_ingest = subparsers.add_parser("ingest", help="Create a new note with OKF metadata")
