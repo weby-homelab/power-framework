@@ -83,3 +83,8 @@ every gated and diagnostic comparator to be completed, takes the preregistered
 top-k per comparator and deterministic random negatives, and writes the pool
 with mode `0600`. A pending policy, sealed document, missing comparator or
 unknown document ID fails closed.
+
+The evaluator consumes the same approved policy with
+`--preregistration m2-v2.1-preregistration.json`; it records that policy SHA in
+the receipt and uses its gated/diagnostic comparator sets. Without this flag,
+the historical v2 evaluator contract remains unchanged.

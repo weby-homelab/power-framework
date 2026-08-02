@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -46,6 +47,28 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def load_preregistration(path: Path) -> dict[str, Any]:
+    """Load only a curator-approved, executable M2-v2.1 policy."""
+    try:
+        policy = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot read M2-v2.1 policy: {path}") from exc
+    if not isinstance(policy, dict):
+        raise ValueError("M2-v2.1 policy must be a JSON object")
+    validator_path = Path(__file__).with_name("validate_preregistration.py")
+    spec = importlib.util.spec_from_file_location("m2_preregistration_validator", validator_path)
+    if spec is None or spec.loader is None:
+        raise ValueError("cannot load M2-v2.1 policy validator")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    errors = list(module.validate_policy(policy))
+    if errors:
+        raise ValueError("invalid M2-v2.1 policy: " + "; ".join(errors))
+    if policy.get("status") != "pre_registered_before_human_calibration":
+        raise ValueError("M2-v2.1 evaluator requires curator-approved policy status")
+    return policy
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -358,6 +381,7 @@ def evaluate_mode(
     queries: list[dict[str, Any]],
     qrels: dict[str, dict[str, Any]],
     mode_name: str,
+    thresholds: dict[str, float] = THRESHOLDS,
 ) -> dict[str, Any]:
     power_mode = MODE_TO_POWER.get(mode_name, mode_name)
     try:
@@ -435,7 +459,7 @@ def evaluate_mode(
     for metric_name in minimum_metrics:
         metric = aggregate[metric_name]
         value = metric["value"]
-        threshold = THRESHOLDS[metric_name]
+        threshold = thresholds[metric_name]
         if value is None:
             failed.append(
                 {
@@ -454,16 +478,16 @@ def evaluate_mode(
         failed.append(
             {
                 "metric": "stale_answer_rate_max",
-                "threshold": THRESHOLDS["stale_answer_rate_max"],
+                "threshold": thresholds["stale_answer_rate_max"],
                 "value": None,
                 "reason": "not_measurable",
             }
         )
-    elif stale_value > THRESHOLDS["stale_answer_rate_max"]:
+    elif stale_value > thresholds["stale_answer_rate_max"]:
         failed.append(
             {
                 "metric": "stale_answer_rate_max",
-                "threshold": THRESHOLDS["stale_answer_rate_max"],
+                "threshold": thresholds["stale_answer_rate_max"],
                 "value": stale_value,
             }
         )
@@ -478,7 +502,9 @@ def evaluate_mode(
 
 
 def collect_gate_results(
-    modes: dict[str, dict[str, Any]], requested: list[str]
+    modes: dict[str, dict[str, Any]],
+    requested: list[str],
+    gated_modes: tuple[str, ...] = PRE_REGISTERED,
 ) -> dict[str, list[dict[str, Any]]]:
     """Separate preregistered gate results from diagnostic mode results.
 
@@ -487,7 +513,8 @@ def collect_gate_results(
     completed; an omitted comparator is an explicit fail-closed unavailability.
     """
     requested_set = set(requested)
-    missing = sorted(set(PRE_REGISTERED) - requested_set)
+    gated_set = set(gated_modes)
+    missing = sorted(gated_set - requested_set)
     failed: list[dict[str, Any]] = []
     diagnostic_failed: list[dict[str, Any]] = []
     unavailable: list[dict[str, Any]] = [
@@ -496,7 +523,7 @@ def collect_gate_results(
     diagnostic_unavailable: list[dict[str, Any]] = []
 
     for mode_name, result in modes.items():
-        is_gated = mode_name in PRE_REGISTERED
+        is_gated = mode_name in gated_set
         if result.get("status") != "completed":
             target = unavailable if is_gated else diagnostic_unavailable
             target.append({"mode": mode_name, "reason": result.get("reason", "unknown")})
@@ -521,12 +548,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--queries", type=Path, required=True)
     parser.add_argument("--qrels", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--modes", default=",".join(ALL_MODES))
+    parser.add_argument("--modes", default=None)
+    parser.add_argument(
+        "--preregistration",
+        type=Path,
+        help="Approved M2-v2.1 policy; binds comparator gates and thresholds",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    policy = load_preregistration(args.preregistration) if args.preregistration else None
+    gated_comparators = tuple(policy["gated_comparators"]) if policy else PRE_REGISTERED
+    diagnostic_modes = tuple(policy["diagnostic_comparators"]) if policy else DIAGNOSTIC_MODES
+    thresholds = dict(policy["thresholds"]) if policy else THRESHOLDS
     queries = load_jsonl(args.queries)
     qrel_rows = load_jsonl(args.qrels)
     annotation_protocol = annotation_protocol_version(qrel_rows)
@@ -537,16 +573,24 @@ def main() -> int:
         raise ValueError("duplicate query IDs in queries.jsonl")
     evidence_contract_errors = validate_metric_contract(queries, qrels)
 
-    requested = [name.strip() for name in args.modes.split(",") if name.strip()]
+    requested_names = (
+        args.modes.split(",")
+        if args.modes
+        else [
+            *gated_comparators,
+            *diagnostic_modes,
+        ]
+    )
+    requested = [name.strip() for name in requested_names if name.strip()]
     unknown = sorted(set(requested) - set(ALL_MODES))
     if unknown:
         raise ValueError(f"unsupported evaluator modes: {unknown}")
 
     modes: dict[str, Any] = {}
     for mode_name in requested:
-        modes[mode_name] = evaluate_mode(args.vault, queries, qrels, mode_name)
+        modes[mode_name] = evaluate_mode(args.vault, queries, qrels, mode_name, thresholds)
 
-    gate_results = collect_gate_results(modes, requested)
+    gate_results = collect_gate_results(modes, requested, gated_comparators)
     failed_thresholds = gate_results["failed_thresholds"]
     unavailable = gate_results["unavailable_modes"]
     gate_passed = not failed_thresholds and not unavailable and not evidence_contract_errors
@@ -570,9 +614,9 @@ def main() -> int:
             "inference": runtime_configuration(),
             "latency_measurement": "warm-up excluded; five steady-state query calls per mode",
         },
-        "thresholds": THRESHOLDS,
-        "pre_registered_comparators": PRE_REGISTERED,
-        "diagnostic_modes": DIAGNOSTIC_MODES,
+        "thresholds": thresholds,
+        "pre_registered_comparators": list(gated_comparators),
+        "diagnostic_modes": list(diagnostic_modes),
         "requested_modes": requested,
         "metric_definitions": {
             "recall_at_10": "relevance >= 1 retrieved in top 10 divided by all frozen relevant documents",
@@ -600,6 +644,9 @@ def main() -> int:
             ),
         },
     }
+    if args.preregistration is not None and policy is not None:
+        output["preregistration_schema_version"] = policy["schema_version"]
+        output["preregistration_sha256"] = sha256_file(args.preregistration)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

@@ -212,3 +212,32 @@ def test_missing_preregistered_mode_is_fail_closed() -> None:
 
     assert results["failed_thresholds"] == []
     assert results["unavailable_modes"] == [{"mode": "graph_assisted", "reason": "not_requested"}]
+
+
+def test_custom_policy_gate_keeps_lexical_diagnostic() -> None:
+    modes = {
+        "semantic": {"status": "completed", "failed_thresholds": []},
+        "lexical": {
+            "status": "completed",
+            "failed_thresholds": [{"metric": "recall_at_10", "value": 0.0}],
+        },
+    }
+
+    results = MODULE.collect_gate_results(modes, ["semantic", "lexical"], ("semantic",))
+
+    assert results["failed_thresholds"] == []
+    assert results["diagnostic_failed_thresholds"] == [
+        {"mode": "lexical", "metric": "recall_at_10", "value": 0.0}
+    ]
+
+
+def test_pending_v2_1_policy_cannot_run_evaluator() -> None:
+    policy = (
+        Path(__file__).parents[1]
+        / "benchmarks"
+        / "human_retrieval"
+        / "m2-v2.1-preregistration.json"
+    )
+
+    with pytest.raises(ValueError, match="curator-approved policy status"):
+        MODULE.load_preregistration(policy)
