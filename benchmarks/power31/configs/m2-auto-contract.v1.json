@@ -1,0 +1,23 @@
+{
+  "schema_version": "m2-auto/v1",
+  "scope": "machine_only",
+  "human_evidence_used": false,
+  "sealed_accessed": false,
+  "benchmark_version": "power31.v1",
+  "baseline_mode": "fts",
+  "candidate_mode": "hybrid",
+  "top_k": 10,
+  "max_runtime_seconds": 45,
+  "absolute_thresholds": {
+    "ndcg@10": 0.55,
+    "mrr@10": 0.68,
+    "recall@5": 0.58,
+    "precision@5": 0.20
+  },
+  "max_absolute_regression": {
+    "ndcg@10": 0.05,
+    "mrr@10": 0.05,
+    "recall@5": 0.05,
+    "precision@5": 0.05
+  }
+}

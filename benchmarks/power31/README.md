@@ -61,6 +61,26 @@ python -m pytest benchmarks/power31/tests/ -v --no-cov \
     --override-ini="addopts="
 ```
 
+### Run the machine-only M2-AUTO gate
+
+M2-AUTO is a bounded, synthetic regression gate for comparing sparse FTS with
+the model-free FTS+TF-vector hybrid path. It reads only `dataset/v1`; it never
+reads human judgments, private M2 packets, or the sealed holdout. A PASS is a
+technical CI result, not human retrieval quality or production evidence.
+
+```bash
+python benchmarks/power31/scripts/evaluation/run_m2_auto.py \
+    --output /tmp/m2-auto-evidence.json
+python benchmarks/power31/scripts/evaluation/verify_m2_auto.py \
+    /tmp/m2-auto-evidence.json
+```
+
+The contract fixes a 45-second runtime budget, the dataset shape (228 queries,
+100 documents, 416 qrels), and absolute/regression thresholds. `graph_assisted`,
+`reranked`, and neural modes are intentionally outside this bounded contract;
+they require a separate timed performance receipt and do not become PASS by
+being silently skipped.
+
 ## Artifacts
 
 ```
@@ -82,7 +102,8 @@ benchmarks/power31/
 ├── configs/
 │   ├── baseline.yaml                 # FTS-only
 │   ├── candidate.yaml               # Semantic + pinned BGE-M3 ONNX
-│   └── regression-budgets.yaml
+│   ├── regression-budgets.yaml
+│   └── m2-auto-contract.v1.json     # bounded machine-only gate
 ├── evidence/
 │   └── phase1-generation-fault-matrix-v1.json
 │                                      # versioned hermetic crash/OOM/ENOSPC/lock receipts
@@ -91,7 +112,9 @@ benchmarks/power31/
 └── scripts/
     ├── generate_benchmark.py
     └── evaluation/
-        └── validate_dataset.py
+        ├── validate_dataset.py
+        ├── run_m2_auto.py
+        └── verify_m2_auto.py
 ```
 
 ## Generation fault receipts
