@@ -19,12 +19,14 @@ from power_framework.core.searcher import (
     DenseIndexUnavailableError,
     SearchModeSpec,
     SearchResult,
+    _apply_semantic_lexical_guard,
     _compute_tf_vector,
     _cosine_similarity,
     _embedding_manifest_identity,
     _fts_search,
     _make_snippet,
     _rrf_merge,
+    _rrf_merge_many,
     _score_note,
     _semantic_search,
     _sync_vault_to_db,
@@ -109,6 +111,83 @@ class TestTokenize:
 
     def test_lowercase(self):
         assert _tokenize("Hello World") == ["hello", "world"]
+
+
+def test_semantic_lexical_guard_breaks_only_a_close_dense_tie(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dense_top = SearchResult(
+        rel_path="01_Projects/dense.md",
+        title="Dense",
+        description="",
+        note_type="Project",
+        score=0.520,
+        snippet="",
+        match_count=1,
+    )
+    lexical_candidate = SearchResult(
+        rel_path="01_Projects/lexical.md",
+        title="Lexical",
+        description="",
+        note_type="Project",
+        score=0.506,
+        snippet="",
+        match_count=1,
+    )
+    distant = SearchResult(
+        rel_path="01_Projects/distant.md",
+        title="Distant",
+        description="",
+        note_type="Project",
+        score=0.400,
+        snippet="",
+        match_count=1,
+    )
+    monkeypatch.setattr(
+        "power_framework.core.searcher._fts_search",
+        lambda *_args, **_kwargs: [lexical_candidate],
+    )
+
+    guarded = _apply_semantic_lexical_guard(
+        tmp_path, "query", [dense_top, lexical_candidate, distant]
+    )
+
+    assert [result.rel_path for result in guarded] == [
+        "01_Projects/lexical.md",
+        "01_Projects/dense.md",
+        "01_Projects/distant.md",
+    ]
+
+
+def test_semantic_lexical_guard_does_not_override_a_clear_dense_winner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dense_top = SearchResult(
+        rel_path="01_Projects/dense.md",
+        title="Dense",
+        description="",
+        note_type="Project",
+        score=0.700,
+        snippet="",
+        match_count=1,
+    )
+    lexical_candidate = SearchResult(
+        rel_path="01_Projects/lexical.md",
+        title="Lexical",
+        description="",
+        note_type="Project",
+        score=0.500,
+        snippet="",
+        match_count=1,
+    )
+    monkeypatch.setattr(
+        "power_framework.core.searcher._fts_search",
+        lambda *_args, **_kwargs: [lexical_candidate],
+    )
+
+    guarded = _apply_semantic_lexical_guard(tmp_path, "query", [dense_top, lexical_candidate])
+
+    assert guarded[0] is dense_top
 
 
 class TestSearchModeContract:
@@ -663,6 +742,43 @@ timestamp: 2026-01-01T00:00:00
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
 
+    def test_hybrid_uses_dense_candidates_when_available(
+        self, sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        def result(path: str, score: float) -> SearchResult:
+            return SearchResult(
+                rel_path=path,
+                title=path,
+                description="",
+                note_type="Resource",
+                score=score,
+                snippet="",
+                match_count=1,
+            )
+
+        fts_result = result("03_Resources/fts.md", 1.0)
+        vector_result = result("03_Resources/vector.md", 0.8)
+        dense_result = result("03_Resources/dense.md", 0.9)
+        monkeypatch.setattr(
+            "power_framework.core.searcher._fts_search", lambda *_args, **_kwargs: [fts_result]
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher._vector_search",
+            lambda *_args, **_kwargs: [vector_result],
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher._semantic_search",
+            lambda *_args, **_kwargs: [dense_result],
+        )
+
+        results = search_vault(sample_vault, "query", mode="hybrid")
+
+        assert {item.rel_path for item in results} == {
+            fts_result.rel_path,
+            vector_result.rel_path,
+            dense_result.rel_path,
+        }
+
     def test_hybrid_mode_empty_query(self, sample_vault: Path):
         results = search_vault(sample_vault, "", mode="hybrid")
         assert results == []
@@ -849,3 +965,14 @@ class TestRRFMerge:
         unique_b = self._make_result("unique_b.md")
         merged = _rrf_merge([shared, unique_a], [shared, unique_b])
         assert merged[0].rel_path == "shared.md"
+
+    def test_many_lists_preserve_candidates_from_each_source(self):
+        lists = [
+            [self._make_result("fts.md")],
+            [self._make_result("vector.md")],
+            [self._make_result("dense.md")],
+        ]
+
+        merged = _rrf_merge_many(lists)
+
+        assert {result.rel_path for result in merged} == {"fts.md", "vector.md", "dense.md"}

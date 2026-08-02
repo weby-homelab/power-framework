@@ -103,6 +103,7 @@ RERANK_CANDIDATE_LIMIT = 20
 # Keeps cross-encoder token cost bounded on CPU (Performance Plan §4).
 RERANK_TEXT_CHARS = 800
 DEFAULT_FTS_OPERATOR = "OR"
+SEMANTIC_LEXICAL_GUARD_RELATIVE_MARGIN = 0.05
 # Function words carry little retrieval signal and can dominate OR-mode BM25
 # on short Ukrainian questions. Keep this deliberately small and language
 # neutral; content words, quoted phrases and identifiers are never filtered.
@@ -1014,18 +1015,27 @@ def _rrf_merge(
     k: int = 60,
 ) -> list[SearchResult]:
     """Merge two ranked result lists using Reciprocal Rank Fusion."""
+    return _rrf_merge_many([fts_results, vector_results], k=k)
+
+
+def _rrf_merge_many(
+    result_sets: list[list[SearchResult]],
+    k: int = 60,
+) -> list[SearchResult]:
+    """Merge any number of ranked result lists using reciprocal rank fusion."""
     rrf_scores: dict[str, float] = {}
 
-    for rank, result in enumerate(fts_results):
-        rrf_scores[result.rel_path] = 1.0 / (k + rank + 1)
-
-    for rank, result in enumerate(vector_results):
-        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (k + rank + 1)
+    for results in result_sets:
+        for rank, result in enumerate(results):
+            rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (
+                k + rank + 1
+            )
 
     doc_map: dict[str, SearchResult] = {}
-    for r in fts_results + vector_results:
-        if r.rel_path not in doc_map or r.score > doc_map[r.rel_path].score:
-            doc_map[r.rel_path] = r
+    for results in result_sets:
+        for result in results:
+            if result.rel_path not in doc_map or result.score > doc_map[result.rel_path].score:
+                doc_map[result.rel_path] = result
 
     merged: list[SearchResult] = []
     for path, score in sorted(rrf_scores.items(), key=lambda x: -x[1]):
@@ -1159,6 +1169,42 @@ def _semantic_search(
     return results
 
 
+def _apply_semantic_lexical_guard(
+    vault_dir: Path,
+    query: str,
+    results: list[SearchResult],
+) -> list[SearchResult]:
+    """Use lexical evidence only to break an ambiguous dense top-1 tie.
+
+    Dense retrieval remains the candidate generator. If its top score is close
+    to the score of a lexical top result already present in the dense pool,
+    preferring the lexical result prevents an arbitrary embedding tie from
+    replacing an exact source phrase. No new candidates are introduced and
+    failure to read FTS leaves the dense ranking unchanged.
+    """
+    if len(results) < 2 or results[0].score <= 0:
+        return results
+    try:
+        lexical = _fts_search(vault_dir, query, max_results=1)
+    except Exception:
+        return results
+    if not lexical:
+        return results
+
+    lexical_path = lexical[0].rel_path
+    dense_by_path = {result.rel_path: result for result in results}
+    lexical_result = dense_by_path.get(lexical_path)
+    if lexical_result is None or lexical_result is results[0]:
+        return results
+
+    margin = results[0].score - lexical_result.score
+    allowed_margin = results[0].score * SEMANTIC_LEXICAL_GUARD_RELATIVE_MARGIN
+    if margin > allowed_margin:
+        return results
+
+    return [lexical_result, *[result for result in results if result is not lexical_result]]
+
+
 def search_vault(
     vault_dir: Path,
     query: str,
@@ -1268,9 +1314,12 @@ def search_vault(
     if mode == "hybrid":
         fts_all: list[SearchResult] = []
         vec_all: list[SearchResult] = []
+        dense_all: list[SearchResult] = []
         for variant in variants:
             fts_all.extend(_fts_search(vault_dir, variant, max_results=max_results * 2))
             vec_all.extend(_vector_search(vault_dir, variant, max_results=max_results * 2))
+            with contextlib.suppress(DenseIndexUnavailableError):
+                dense_all.extend(_semantic_search(vault_dir, variant, max_results=max_results * 2))
 
         # Deduplicate FTS by rel_path (keeping max score) and sort
         fts_map: dict[str, SearchResult] = {}
@@ -1286,8 +1335,20 @@ def search_vault(
                 vec_map[r.rel_path] = r
         vec_dedup = sorted(vec_map.values(), key=lambda x: -x.score)
 
-        # Single RRF fusion at the end
-        merged = _rrf_merge(fts_dedup, vec_dedup)
+        dense_map: dict[str, SearchResult] = {}
+        for r in dense_all:
+            if r.rel_path not in dense_map or r.score > dense_map[r.rel_path].score:
+                dense_map[r.rel_path] = r
+        dense_dedup = sorted(dense_map.values(), key=lambda x: -x.score)
+
+        # Preserve the established sparse ranking and use dense retrieval as a
+        # candidate-expansion source. A direct three-way RRF can let a dense
+        # near-match displace a strong lexical citation; appending dense-only
+        # candidates keeps the hybrid contract recall-oriented without changing
+        # the evidence-backed sparse top-1 order.
+        merged = _rrf_merge_many([fts_dedup, vec_dedup])
+        sparse_paths = {result.rel_path for result in merged}
+        merged.extend(result for result in dense_dedup if result.rel_path not in sparse_paths)
         if domain_path:
             merged = _filter_domain_results(merged, domain_path)
         results = _filter_temporal_results(
@@ -1328,6 +1389,8 @@ def search_vault(
     final_results = _filter_temporal_results(
         vault_dir, final_results, temporal_view, boundary, requested_max_results
     )
+    if mode == "semantic":
+        final_results = _apply_semantic_lexical_guard(vault_dir, query, final_results)
     for r in final_results:
         r.retrieval_contract = retrieval_contract
     return final_results

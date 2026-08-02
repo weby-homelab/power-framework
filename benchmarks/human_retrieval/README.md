@@ -35,3 +35,9 @@ artifact hashes and joint metric feasibility. It refuses the sealed holdout
 unless `--allow-sealed` is explicit. Private human qrels and result receipts
 are intentionally absent from this repository; their existence elsewhere is
 not, by itself, an M2 pass or release claim.
+
+The retrieval evaluator gates only the five preregistered comparators:
+`lexical`, `semantic`, `hybrid`, `reranked` and `graph_assisted`. The optional
+`vector` mode remains in every receipt as a diagnostic, but its threshold
+failures cannot silently block or open the M2 gate. Omitting a preregistered
+mode is fail-closed as `unavailable`.

@@ -35,6 +35,7 @@ THRESHOLDS: dict[str, float] = {
 PRE_REGISTERED = ("lexical", "semantic", "hybrid", "reranked", "graph_assisted")
 MODE_TO_POWER = {"lexical": "fts", "vector": "vector"}
 ALL_MODES = (*PRE_REGISTERED, "vector")
+DIAGNOSTIC_MODES = tuple(mode for mode in ALL_MODES if mode not in PRE_REGISTERED)
 BOOTSTRAP_SAMPLES = 10_000
 BOOTSTRAP_SEED = 20260801
 
@@ -474,6 +475,43 @@ def evaluate_mode(
     }
 
 
+def collect_gate_results(
+    modes: dict[str, dict[str, Any]], requested: list[str]
+) -> dict[str, list[dict[str, Any]]]:
+    """Separate preregistered gate results from diagnostic mode results.
+
+    Diagnostic modes remain visible in the receipt, but cannot block the M2
+    gate. Every preregistered comparator must nevertheless be requested and
+    completed; an omitted comparator is an explicit fail-closed unavailability.
+    """
+    requested_set = set(requested)
+    missing = sorted(set(PRE_REGISTERED) - requested_set)
+    failed: list[dict[str, Any]] = []
+    diagnostic_failed: list[dict[str, Any]] = []
+    unavailable: list[dict[str, Any]] = [
+        {"mode": mode_name, "reason": "not_requested"} for mode_name in missing
+    ]
+    diagnostic_unavailable: list[dict[str, Any]] = []
+
+    for mode_name, result in modes.items():
+        is_gated = mode_name in PRE_REGISTERED
+        if result.get("status") != "completed":
+            target = unavailable if is_gated else diagnostic_unavailable
+            target.append({"mode": mode_name, "reason": result.get("reason", "unknown")})
+            continue
+        target = failed if is_gated else diagnostic_failed
+        target.extend(
+            {"mode": mode_name, **failure} for failure in result.get("failed_thresholds", [])
+        )
+
+    return {
+        "failed_thresholds": failed,
+        "diagnostic_failed_thresholds": diagnostic_failed,
+        "unavailable_modes": unavailable,
+        "diagnostic_unavailable_modes": diagnostic_unavailable,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vault", type=Path, required=True)
@@ -506,20 +544,13 @@ def main() -> int:
     for mode_name in requested:
         modes[mode_name] = evaluate_mode(args.vault, queries, qrels, mode_name)
 
-    failed_thresholds = [
-        {"mode": mode_name, **failure}
-        for mode_name, result in modes.items()
-        for failure in result.get("failed_thresholds", [])
-    ]
-    unavailable = [
-        {"mode": mode_name, "reason": result.get("reason", "unknown")}
-        for mode_name, result in modes.items()
-        if result.get("status") != "completed"
-    ]
+    gate_results = collect_gate_results(modes, requested)
+    failed_thresholds = gate_results["failed_thresholds"]
+    unavailable = gate_results["unavailable_modes"]
     gate_passed = not failed_thresholds and not unavailable and not evidence_contract_errors
     output = {
-        "schema_version": "power.m2.retrieval-evaluation.v3",
-        "evaluator_contract_version": "3.0",
+        "schema_version": "power.m2.retrieval-evaluation.v4",
+        "evaluator_contract_version": "3.1",
         "annotation_protocol_version": annotation_protocol,
         "status": "completed",
         "split": "development",
@@ -539,6 +570,8 @@ def main() -> int:
         },
         "thresholds": THRESHOLDS,
         "pre_registered_comparators": PRE_REGISTERED,
+        "diagnostic_modes": DIAGNOSTIC_MODES,
+        "requested_modes": requested,
         "metric_definitions": {
             "recall_at_10": "relevance >= 1 retrieved in top 10 divided by all frozen relevant documents",
             "ndcg_at_10": "graded gains 2^relevance-1 over the frozen qrels",
@@ -550,7 +583,9 @@ def main() -> int:
         },
         "modes": modes,
         "failed_thresholds": failed_thresholds,
+        "diagnostic_failed_thresholds": gate_results["diagnostic_failed_thresholds"],
         "unavailable_modes": unavailable,
+        "diagnostic_unavailable_modes": gate_results["diagnostic_unavailable_modes"],
         "evidence_contract_errors": evidence_contract_errors,
         "sealed_holdout_decision": {
             "open": gate_passed,

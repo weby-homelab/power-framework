@@ -174,3 +174,37 @@ def test_misleading_relevance_is_supported_without_negative_dcg_gain() -> None:
 
     assert metrics["ndcg_at_10"] == pytest.approx(1.0 / MODULE.math.log2(3))
     assert metrics["mrr_at_10"] == 0.5
+
+
+def test_diagnostic_mode_failures_do_not_block_preregistered_gate() -> None:
+    modes = {
+        mode: {
+            "status": "completed",
+            "failed_thresholds": [],
+        }
+        for mode in MODULE.PRE_REGISTERED
+    }
+    modes["vector"] = {
+        "status": "completed",
+        "failed_thresholds": [{"metric": "recall_at_10", "value": 0.0}],
+    }
+
+    results = MODULE.collect_gate_results(modes, [*MODULE.PRE_REGISTERED, "vector"])
+
+    assert results["failed_thresholds"] == []
+    assert results["diagnostic_failed_thresholds"] == [
+        {"mode": "vector", "metric": "recall_at_10", "value": 0.0}
+    ]
+    assert results["unavailable_modes"] == []
+
+
+def test_missing_preregistered_mode_is_fail_closed() -> None:
+    modes = {
+        mode: {"status": "completed", "failed_thresholds": []}
+        for mode in MODULE.PRE_REGISTERED[:-1]
+    }
+
+    results = MODULE.collect_gate_results(modes, list(modes))
+
+    assert results["failed_thresholds"] == []
+    assert results["unavailable_modes"] == [{"mode": "graph_assisted", "reason": "not_requested"}]
