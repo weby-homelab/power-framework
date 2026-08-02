@@ -117,12 +117,16 @@ def test_v2_group_qrels_rejects_string_citation_and_legacy_fields() -> None:
 
 
 def test_runtime_receipt_records_latency_controls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POWER_EMBED_DEVICE", "CUDA")
     monkeypatch.setenv("POWER_EMBED_NUM_THREADS", "8")
+    monkeypatch.setenv("POWER_RERANKER_DEVICE", "CUDA")
     monkeypatch.setenv("POWER_RERANKER_BATCH_SIZE", "4")
     monkeypatch.setenv("POWER_BGE_RERANKER_MAX_TOKENS", "256")
 
     assert MODULE.runtime_configuration() == {
+        "embed_device": "cuda",
         "embed_num_threads": 8,
+        "reranker_device": "cuda",
         "reranker_batch_size": 4,
         "reranker_max_tokens": 256,
     }

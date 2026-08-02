@@ -80,10 +80,12 @@ def git_commit() -> str | None:
     return completed.stdout.strip() or None
 
 
-def runtime_configuration() -> dict[str, int]:
-    """Record the non-secret inference controls that affect latency."""
+def runtime_configuration() -> dict[str, int | str]:
+    """Record non-secret inference controls that affect quality or latency."""
     return {
+        "embed_device": os.getenv("POWER_EMBED_DEVICE", "auto").lower(),
         "embed_num_threads": int(os.getenv("POWER_EMBED_NUM_THREADS", "2")),
+        "reranker_device": os.getenv("POWER_RERANKER_DEVICE", "auto").lower(),
         "reranker_batch_size": int(os.getenv("POWER_RERANKER_BATCH_SIZE", "8")),
         "reranker_max_tokens": int(os.getenv("POWER_BGE_RERANKER_MAX_TOKENS", "512")),
     }
