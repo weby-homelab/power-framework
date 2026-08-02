@@ -520,6 +520,45 @@ domains:
         with pytest.raises(DenseIndexUnavailableError, match="power sync"):
             search_vault(sample_vault, "xyznonexistent12345", mode="reranked")
 
+    def test_reranked_score_scale_is_not_overwritten_by_dense_fallback(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Cross-encoder ranking must survive dense-score deduplication."""
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        reranked = SearchResult(
+            rel_path="01_Projects/reranked.md",
+            title="Reranked",
+            description="",
+            note_type="Project",
+            score=0.2,
+            snippet="",
+            match_count=1,
+        )
+        dense = SearchResult(
+            rel_path=reranked.rel_path,
+            title=reranked.title,
+            description="",
+            note_type=reranked.note_type,
+            score=0.9,
+            snippet="",
+            match_count=1,
+        )
+        monkeypatch.setattr("power_framework.core.searcher.validate_dense_index", lambda _: 1)
+        monkeypatch.setattr(
+            "power_framework.core.searcher._hybrid_reranked_search",
+            lambda *_args, **_kwargs: [reranked],
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher._semantic_search",
+            lambda *_args, **_kwargs: [dense],
+        )
+
+        results = search_vault(vault, "query", max_results=10, mode="reranked")
+
+        assert len(results) == 1
+        assert results[0].score == 0.2
+
     def test_max_results(self, sample_vault: Path):
         results = search_vault(sample_vault, "test", max_results=1, mode="fts")
         assert len(results) <= 1

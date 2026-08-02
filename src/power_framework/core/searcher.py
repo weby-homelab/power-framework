@@ -1308,14 +1308,11 @@ def search_vault(
             results = _graph_assisted_search(vault_dir, variant, max_results=max_results)
         elif mode in ("reranked", "hybrid_reranked"):
             results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
-            # R5 (POWER 3.0): dense fallback ONLY when FTS/rerank yields too few
-            # hits — keeps the canonical path cheap (no model load) for the common
-            # case, but never silently returns a short list when the vault clearly
-            # has relevant dense matches. This is the inverse of the old behavior
-            # where semantic was the default and FTS was the fallback.
-            if len(results) < 5:
-                dense = _semantic_search(vault_dir, variant, max_results=max_results)
-                _merge_by_rel_path(all_results, dense)
+            # ``_hybrid_reranked_search`` already fuses dense candidates before
+            # assigning cross-encoder scores. Do not add a second dense fallback
+            # here: dense cosine scores and cross-encoder scores are different
+            # scales, and the later max-score deduplication would silently replace
+            # the reranked order with the semantic order on small vaults.
         else:
             results = _fts_search(vault_dir, variant, max_results=max_results)
         all_results.extend(results)
