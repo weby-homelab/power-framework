@@ -76,6 +76,8 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
             or pool["random_negative_count_per_query"] < 1
         ):
             errors.append("candidate_pool.random_negative_count_per_query must be an integer >= 1")
+        if not isinstance(pool.get("random_seed"), int) or isinstance(pool["random_seed"], bool):
+            errors.append("candidate_pool.random_seed must be a deterministic integer")
         errors.extend(
             f"candidate_pool.{key} must be true"
             for key in (

@@ -64,3 +64,22 @@ python3 benchmarks/human_retrieval/scripts/validate_preregistration.py \
 No qrel-specific synonym, fuzzy threshold, tokenizer change or frozen-qrel
 rewrite is permitted. A new Ukrainian query set, fresh calibration and a
 hash-bound de-identified receipt are required before production access.
+
+After curator approval changes the policy status to
+`pre_registered_before_human_calibration`, freeze the candidate pool from the
+same receipt before producing any human packet:
+
+```bash
+python3 benchmarks/human_retrieval/scripts/build_candidate_pool.py \
+  --policy m2-v2.1-preregistration.json \
+  --corpus development/corpus.jsonl \
+  --queries development/queries.jsonl \
+  --receipt development/evaluation-v2.1.json \
+  --output development/candidate-pool.v1.json
+```
+
+The builder binds policy, corpus, queries and receipt SHA-256 values, requires
+every gated and diagnostic comparator to be completed, takes the preregistered
+top-k per comparator and deterministic random negatives, and writes the pool
+with mode `0600`. A pending policy, sealed document, missing comparator or
+unknown document ID fails closed.

@@ -52,6 +52,8 @@ def test_candidate_pool_requires_every_mode_and_random_negatives() -> None:
     assert isinstance(pool, dict)
     pool["include_every_gated_comparator"] = False
     pool["random_negative_count_per_query"] = 0
+    pool["random_seed"] = "not-an-integer"
     errors = MODULE.validate_policy(policy)
     assert "candidate_pool.include_every_gated_comparator must be true" in errors
     assert "candidate_pool.random_negative_count_per_query must be an integer >= 1" in errors
+    assert "candidate_pool.random_seed must be a deterministic integer" in errors

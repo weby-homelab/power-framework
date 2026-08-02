@@ -28,6 +28,7 @@
     "include_every_gated_comparator": true,
     "include_every_diagnostic_comparator": true,
     "random_negative_count_per_query": 2,
+    "random_seed": 20260802,
     "deduplicate_by_document_id": true,
     "pool_is_frozen_before_human_judgment": true
   },
