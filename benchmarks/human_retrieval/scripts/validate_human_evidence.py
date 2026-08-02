@@ -93,6 +93,11 @@ def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[s
             if manifest.get("status") in {"pending_human_annotation", "adjudicated"}:
                 if calibration_status != "passed":
                     errors.append("v2 annotation requires a passed calibration receipt")
+                elif (
+                    not isinstance(calibration.get("agreement_receipt"), str)
+                    or not calibration["agreement_receipt"]
+                ):
+                    errors.append("passed v2 calibration requires agreement_receipt path")
                 elif not _is_sha256(calibration.get("agreement_receipt_sha256")):
                     errors.append("passed v2 calibration requires agreement_receipt_sha256")
             elif calibration_status not in {"pending", "passed"}:
@@ -110,8 +115,14 @@ def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[s
             errors.append("adjudicated evidence thresholds must match the canonical M2 policy")
         if not isinstance(manifest.get("annotator_count"), int) or manifest["annotator_count"] < 2:
             errors.append("adjudicated evidence requires at least two independent annotators")
-        if not isinstance(manifest.get("agreement"), dict):
+        agreement = manifest.get("agreement")
+        if not isinstance(agreement, dict):
             errors.append("adjudicated evidence requires an agreement receipt")
+        else:
+            if not isinstance(agreement.get("receipt"), str) or not agreement["receipt"]:
+                errors.append("adjudicated evidence requires agreement.receipt path")
+            if not _is_sha256(agreement.get("receipt_sha256")):
+                errors.append("adjudicated evidence requires agreement.receipt_sha256")
     return errors
 
 
@@ -122,6 +133,44 @@ def _artifact_path(root: Path, value: str) -> Path | None:
     except ValueError:
         return None
     return candidate
+
+
+def _validate_receipt_binding(
+    manifest_root: Path,
+    *,
+    relative_path: object,
+    expected_sha256: object,
+    label: str,
+    expected_raw_sha256: str | None = None,
+) -> list[str]:
+    """Verify a de-identified agreement receipt is present and hash-bound."""
+    errors: list[str] = []
+    if not isinstance(relative_path, str) or not relative_path:
+        return [f"{label} receipt path must be a non-empty string"]
+    receipt_path = _artifact_path(manifest_root, relative_path)
+    if receipt_path is None:
+        return [f"{label} receipt path must stay under the manifest directory"]
+    if not receipt_path.is_file():
+        return [f"{label} receipt is missing"]
+    actual_sha256 = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    if actual_sha256 != expected_sha256:
+        errors.append(f"{label} receipt SHA-256 does not match its manifest binding")
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return [*errors, f"{label} receipt is not valid JSON"]
+    if receipt.get("schema_version") != "power.m2.human-agreement.v2":
+        errors.append(f"{label} receipt has an unsupported schema")
+    if receipt.get("annotation_protocol_version") != "2.0":
+        errors.append(f"{label} receipt must use annotation protocol 2.0")
+    if receipt.get("status") != "calibration_passed":
+        errors.append(f"{label} receipt is not calibration_passed")
+    if (
+        expected_raw_sha256 is not None
+        and receipt.get("raw_judgments_sha256") != expected_raw_sha256
+    ):
+        errors.append(f"{label} receipt raw judgments do not match the manifest")
+    return errors
 
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -267,6 +316,32 @@ def validate_evidence_file(manifest_path: Path, *, allow_sealed: bool) -> list[s
             errors.append(f"{artifact_key} SHA-256 does not match {digest_key}")
         else:
             resolved_artifacts[artifact_key] = artifact_path
+    if str(manifest.get("schema_version")) == "2.0":
+        calibration = manifest.get("calibration")
+        if isinstance(calibration, dict) and calibration.get("status") == "passed":
+            errors.extend(
+                _validate_receipt_binding(
+                    manifest_path.parent,
+                    relative_path=calibration.get("agreement_receipt"),
+                    expected_sha256=calibration.get("agreement_receipt_sha256"),
+                    label="calibration",
+                )
+            )
+        agreement = manifest.get("agreement")
+        if manifest.get("status") == "adjudicated" and isinstance(agreement, dict):
+            errors.extend(
+                _validate_receipt_binding(
+                    manifest_path.parent,
+                    relative_path=agreement.get("receipt"),
+                    expected_sha256=agreement.get("receipt_sha256"),
+                    label="adjudication",
+                    expected_raw_sha256=(
+                        str(manifest.get("raw_judgments_sha256"))
+                        if _is_sha256(manifest.get("raw_judgments_sha256"))
+                        else None
+                    ),
+                )
+            )
     if (
         manifest.get("status") == "adjudicated"
         and "queries" in resolved_artifacts

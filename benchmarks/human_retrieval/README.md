@@ -31,7 +31,8 @@ delivery: Ukrainian text, exactly four candidates, no hidden journey or
 answerability fields, no sensitive data and no malformed response contract.
 `scripts/compute_agreement.py` produces field-wise agreement without copying
 participant identities or labels. `scripts/validate_human_evidence.py` checks
-artifact hashes and joint metric feasibility. It refuses the sealed holdout
+artifact hashes, agreement-receipt path/SHA bindings and joint metric
+feasibility. It refuses the sealed holdout
 unless `--allow-sealed` is explicit. Private human qrels and result receipts
 are intentionally absent from this repository; their existence elsewhere is
 not, by itself, an M2 pass or release claim.

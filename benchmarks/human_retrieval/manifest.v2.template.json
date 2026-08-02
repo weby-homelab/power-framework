@@ -16,6 +16,7 @@
   "annotation_protocol": "annotation_protocol_v2.md",
   "calibration": {
     "status": "pending",
+    "agreement_receipt": "calibration-agreement.v2.json",
     "agreement_receipt_sha256": null
   },
   "journeys": [

@@ -79,6 +79,7 @@ def _manifest(output: Path, split: str) -> dict[str, Any]:
         "language": PACKET_LANGUAGE,
         "calibration": {
             "status": "pending",
+            "agreement_receipt": "calibration-agreement.v2.json",
             "agreement_receipt_sha256": None,
         },
         "journeys": list(JOURNEYS),

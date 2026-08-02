@@ -76,7 +76,7 @@ def test_adjudicated_manifest_requires_canonical_threshold_values() -> None:
         status="adjudicated",
         thresholds=dict(CANONICAL_THRESHOLDS),
         annotator_count=2,
-        agreement={},
+        agreement={"receipt": "agreement.v2.json", "receipt_sha256": "e" * 64},
     )
     assert MODULE.REQUIRED_THRESHOLDS == CANONICAL_THRESHOLDS
     assert MODULE.validate_manifest(manifest, allow_sealed=False) == []
@@ -101,6 +101,7 @@ def test_protocol_v2_starts_pending_and_requires_hash_bound_calibration() -> Non
     manifest["status"] = "pending_human_annotation"
     manifest["calibration"] = {
         "status": "passed",
+        "agreement_receipt": "calibration-agreement.v2.json",
         "agreement_receipt_sha256": "e" * 64,
     }
     assert MODULE.validate_manifest(manifest, allow_sealed=False) == []
@@ -125,6 +126,45 @@ def test_evidence_file_binds_each_artifact_to_its_declared_hash(tmp_path: Path) 
     (tmp_path / artifacts["queries"]).write_text("tampered\n", encoding="utf-8")
     assert "queries SHA-256 does not match queries_sha256" in MODULE.validate_evidence_file(
         manifest_path, allow_sealed=False
+    )
+
+
+def test_v2_evidence_binds_calibration_receipt_bytes(tmp_path: Path) -> None:
+    manifest = _manifest(
+        schema_version="2.0",
+        annotation_protocol="annotation_protocol_v2.md",
+        language="uk",
+        status="pending_human_annotation",
+        calibration={
+            "status": "passed",
+            "agreement_receipt": "calibration-agreement.v2.json",
+            "agreement_receipt_sha256": "0" * 64,
+        },
+    )
+    artifacts = manifest["artifacts"]
+    assert isinstance(artifacts, dict)
+    for key, filename in artifacts.items():
+        content = f"{key}\n".encode()
+        (tmp_path / filename).write_bytes(content)
+        digest_key = "raw_judgments_sha256" if key == "raw_judgments" else f"{key}_sha256"
+        manifest[digest_key] = hashlib.sha256(content).hexdigest()
+    receipt = {
+        "schema_version": "power.m2.human-agreement.v2",
+        "annotation_protocol_version": "2.0",
+        "status": "calibration_passed",
+    }
+    receipt_path = tmp_path / "calibration-agreement.v2.json"
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    manifest["calibration"]["agreement_receipt_sha256"] = hashlib.sha256(  # type: ignore[index]
+        receipt_path.read_bytes()
+    ).hexdigest()
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert MODULE.validate_evidence_file(manifest_path, allow_sealed=False) == []
+    receipt_path.write_text("tampered\n", encoding="utf-8")
+    assert "calibration receipt SHA-256 does not match its manifest binding" in (
+        MODULE.validate_evidence_file(manifest_path, allow_sealed=False)
     )
 
 
