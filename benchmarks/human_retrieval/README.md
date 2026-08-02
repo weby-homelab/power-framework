@@ -42,3 +42,25 @@ The retrieval evaluator gates only the five preregistered comparators:
 `vector` mode remains in every receipt as a diagnostic, but its threshold
 failures cannot silently block or open the M2 gate. Omitting a preregistered
 mode is fail-closed as `unavailable`.
+
+## M2-v2.1 after the independent architecture test
+
+The current v2 receipt remains an honest **FAIL** because its preregistered
+lexical recall is `0.75` against `0.80`; that result is not changed by this
+document. The independent test showed that lexical FTS cannot be treated as a
+semantic synonym engine, so a new human run must use the separate
+`m2-v2.1-preregistration.json` policy. It keeps lexical and vector as visible
+diagnostics, gates semantic/hybrid/reranked/graph-assisted, and freezes a pool
+from every comparator plus random negatives before any new judgment.
+
+The policy is not issued to participants while its status is
+`pending_curator_approval`. Validate it before creating any packet:
+
+```bash
+python3 benchmarks/human_retrieval/scripts/validate_preregistration.py \
+  benchmarks/human_retrieval/m2-v2.1-preregistration.json
+```
+
+No qrel-specific synonym, fuzzy threshold, tokenizer change or frozen-qrel
+rewrite is permitted. A new Ukrainian query set, fresh calibration and a
+hash-bound de-identified receipt are required before production access.
