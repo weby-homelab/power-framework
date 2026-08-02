@@ -28,12 +28,12 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose 17 tools to MCP-compatible AI clients through FastMCP 3.x
-- **Stable 3.2.7 release** — CI, CodeQL, package smoke tests, and release attestations verify the published artifacts
+- **Technical 3.3.0 release** — CI, package smoke tests, release provenance, and M2 remediation scope are verified; sealed/human-quality claims remain closed
 
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.0
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -205,7 +205,7 @@ power search ~/my-vault "experiment" --mode auto --domain research
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.0
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -547,7 +547,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.7
+softwareVersion: 3.3.0
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

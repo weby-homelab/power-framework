@@ -27,12 +27,12 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
 - **MCP-нативний** — всі 12 інструментів доступні будь-якому MCP-клієнту (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) через FastMCP 3.x без додаткового коду
-- **Стабільний реліз 3.2.7** — CI, CodeQL, package smoke tests і release attestations перевіряють опубліковані артефакти.
+- **Технічний реліз 3.3.0** — CI, package smoke tests, provenance і scope M2 remediation перевірені; sealed та human-quality claims залишаються закритими.
 
 ## Швидкий старт
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.0
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -204,7 +204,7 @@ power search ~/my-vault "experiment" --mode auto --domain research
 Підключіть P.O.W.E.R. до будь-якого MCP-сумісного AI-клієнта (локальний stdio або Docker HTTP транспорт):
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.0
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -513,7 +513,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.7
+softwareVersion: 3.3.0
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

@@ -5,6 +5,18 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-08-02
+
+### Added
+
+- Added a transparent M2 remediation readback with the curator-set `recall@10`
+  threshold of `0.75`; the original `0.80` receipt remains immutable.
+- Recorded the independent architecture-test fixes and portable retrieval/indexing gates.
+
+### Changed
+
+- Kept the sealed holdout closed and made no human-quality or production-certification claim.
+
 ## [3.2.7] - 2026-07-29
 
 ### Added

@@ -1,6 +1,6 @@
 {
     "schema_version": 1,
-    "release": "3.2.7",
+    "release": "3.3.0",
     "canonical_embedding": {
         "provider": "bge-m3-onnx",
         "repository": "aapot/bge-m3-onnx",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.0
+
+- Technical release with explicit M2 remediation scope and sealed holdout closure.
+- No new human judgments were generated; the prior development receipt remains
+  the measured source and the original threshold is preserved.
+
 ## 3.2.7
 
 - Added explicit candidate-graph decisions, temporal retrieval semantics,
