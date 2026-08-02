@@ -129,9 +129,36 @@ pip install --user --break-system-packages -e ".[dev]"
 
 ## 🗂️ Сумісність із методологіями
 
-P.O.W.E.R. індексує, шукає та перевіряє нотатки у наявному сховищі незалежно від структури папок: P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або довільної. У версії 3.2.7 команда `power init <path>` створює лише стандартний скелет P.A.R.A. Вибір шаблонів і параметр `--template` заплановані, але ще не реалізовані в CLI.
+P.O.W.E.R. індексує, шукає та перевіряє нотатки у наявному сховищі незалежно від структури папок: P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або довільної. Команда `power init <path>` створює стандартний скелет P.A.R.A., а опційний реєстр `.power/domains.yaml` додає явне розміщення доменів, окремі шаблони, правила маршрутизації та пріоритети пошуку.
 
 Для іншої структури збережіть або створіть потрібні папки, а далі використовуйте P.O.W.E.R. для додавання нотаток і запуску `lint`, `index` та `search`. OKF-валідація метаданих і доступні інструменти пошуку не залежать від назв папок.
+
+### Доменне розміщення та пошук
+
+Для доменної бази створіть `.power/domains.yaml` і робіть структуру каталогів
+та назви файлів змістовними: для AI це перші сигнали навігації; OKF frontmatter
+залишається перевірюваним контрактом походження та життєвого циклу, але не є
+єдиним механізмом маршрутизації. Мінімальний реєстр:
+
+```yaml
+version: 1
+domains:
+  - name: research
+    path: 03_Resources/research
+    template: 05_Templates/research.md
+    rules:
+      - keywords: [paper, experiment]
+        weight: 2
+      - tags: [science]
+    search_priority: [semantic, fts]
+```
+
+`power ingest` маршрутизує нотатку за цими правилами (або приймає
+`--domain research`) та використовує обраний шаблон. Команда
+`power search ... --mode auto --domain research` дотримується пріоритету домену
+й обмежує кандидатів його шляхом. Реєстр приймає лише реалізовані режими POWER;
+непідтримувані провайдери на кшталт Qdrant відхиляються, а не рекламуються як
+доступні. Без реєстру залишаються старе розміщення P.A.R.A. та default semantic.
 
 ## Для кого це
 
@@ -161,6 +188,7 @@ power cron <path>              Автоматичне обслуговуванн
 ```bash
 power ingest ~/my-vault --type Project --title "Мій Додаток" --description "Новий проєкт"
 power ingest ~/my-vault --type Resource --title "Docker Гайд" --description "Найкращі практики Docker" --tags devops,docker --resource "https://docs.docker.com"
+power ingest ~/my-vault --type Resource --title "Нотатки експерименту" --description "Research experiment" --domain research
 ```
 
 ### Приклади пошуку
@@ -168,6 +196,7 @@ power ingest ~/my-vault --type Resource --title "Docker Гайд" --description 
 ```bash
 power search ~/my-vault "api аутентифікація"
 power search ~/my-vault "гайд деплой" --max-results 5
+power search ~/my-vault "experiment" --mode auto --domain research
 ```
 
 ## Налаштування MCP Server

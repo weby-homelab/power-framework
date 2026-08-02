@@ -12,6 +12,7 @@ from power_framework.core.indexer import (
     run_generate_index,
     run_generate_sub_index,
     scan_folder_notes,
+    scan_folder_notes_incremental,
     scan_root_daily_logs,
     scan_vault_notes,
     truncate_for_catalog,
@@ -268,6 +269,46 @@ class TestRunGenerateHierarchicalIndex:
 
         assert main_index.exists()
         assert "5 total notes" in result
+
+    def test_reports_invalid_notes_in_index_summary(self, tmp_path: Path):
+        projects = tmp_path / "01_Projects"
+        projects.mkdir()
+        (projects / "Invalid.md").write_text(
+            "---\n"
+            "type: Project\n"
+            'title: "Invalid"\n'
+            'description: "Invalid resource URL"\n'
+            'resource: "not-a-url"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "---\n\n# Invalid\n",
+            encoding="utf-8",
+        )
+
+        result = run_generate_hierarchical_index(tmp_path)
+
+        assert "WARNING: skipped invalid notes (1)" in result
+        assert "01_Projects/Invalid.md: Invalid OKF metadata" in result
+
+    def test_incremental_scan_reuses_unchanged_metadata(self, sample_vault: Path, monkeypatch):
+        first, first_invalid, first_count = scan_folder_notes_incremental(sample_vault)
+        assert first_invalid == []
+        assert first_count == 5
+
+        from power_framework.core import indexer
+
+        original_read = indexer.read_file_content
+
+        def reject_unchanged_read(path: Path) -> str:
+            if path.name == "TestProject.md":
+                raise AssertionError("unchanged note was read again")
+            return original_read(path)
+
+        monkeypatch.setattr(indexer, "read_file_content", reject_unchanged_read)
+        second, second_invalid, second_count = scan_folder_notes_incremental(sample_vault)
+
+        assert second_invalid == []
+        assert second_count == first_count
+        assert second == first
 
     def test_creates_sub_indexes(self, sample_vault: Path):
         run_generate_hierarchical_index(sample_vault)

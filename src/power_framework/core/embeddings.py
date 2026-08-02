@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import signal
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -74,6 +76,66 @@ BGE_M3_DIM = 1024
 
 def _env_flag(name: str) -> bool:
     return os.getenv(name, "").lower() in {"1", "true", "yes"}
+
+
+def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list[object]:
+    """Select ONNX Runtime providers with explicit and automatic device modes.
+
+    ``auto`` prefers GPU-capable providers reported by the installed ORT build
+    and always retains CPU as a deterministic fallback. An explicit device is
+    fail-closed when unavailable, preventing a requested GPU benchmark from
+    silently running on a different backend.
+    """
+    available = set(ort.get_available_providers())
+    requested = os.getenv(env_var, os.getenv("POWER_EMBED_DEVICE", "auto")).lower()
+    if requested not in {"auto", "cpu", "cuda", "rocm", "directml"}:
+        raise ValueError(f"invalid_{env_var.lower()}:{requested}")
+
+    cpu_provider: tuple[str, dict[str, object]] = (
+        "CPUExecutionProvider",
+        {"arena_extend_strategy": "kSameAsRequested"},
+    )
+    if requested == "cpu":
+        return [cpu_provider]
+
+    gpu_candidates = {
+        "cuda": "CUDAExecutionProvider",
+        "rocm": "ROCmExecutionProvider",
+        "directml": "DmlExecutionProvider",
+    }
+    if requested != "auto":
+        provider_name = gpu_candidates[requested]
+        if provider_name not in available:
+            raise RuntimeError(
+                f"requested_onnx_provider_unavailable:{provider_name}; available={sorted(available)}"
+            )
+        options: dict[str, object] = {}
+        if provider_name in {"CUDAExecutionProvider", "ROCmExecutionProvider"}:
+            options = {
+                "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
+                "arena_extend_strategy": "kSameAsRequested",
+            }
+        return [(provider_name, options), cpu_provider]
+
+    for provider_name in (
+        "CUDAExecutionProvider",
+        "ROCmExecutionProvider",
+        "DmlExecutionProvider",
+    ):
+        if provider_name in available:
+            options = (
+                {
+                    "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
+                    "arena_extend_strategy": "kSameAsRequested",
+                }
+                if provider_name in {"CUDAExecutionProvider", "ROCmExecutionProvider"}
+                else {}
+            )
+            logger.info("ONNX Runtime device=auto selected %s", provider_name)
+            return [(provider_name, options), cpu_provider]
+
+    logger.info("ONNX Runtime device=auto selected CPUExecutionProvider")
+    return [cpu_provider]
 
 
 def _verify_sha256(path: str, expected: str) -> None:
@@ -209,10 +271,18 @@ class OllamaEmbeddingManager:
         raise RuntimeError(f"Ollama embed failed after retries: {last_err}")
 
     def _do_attempt(self, fn: Callable[[], Any]) -> tuple[Any, Exception | None]:
-        import signal
-
         def _handler(signum, frame):
             raise TimeoutError("ollama embed timed out")
+
+        if (
+            not hasattr(signal, "SIGALRM")
+            or threading.current_thread() is not threading.main_thread()
+        ):
+            # SIGALRM is POSIX-only and signal handlers may only be installed
+            # by the main thread. Ollama's HTTP client still enforces its own
+            # transport timeout on these platforms/threads; avoid crashing the
+            # caller merely because the optional POSIX alarm is unavailable.
+            return self._run_without_alarm(fn)
 
         old = signal.signal(signal.SIGALRM, _handler)
         signal.alarm(self._timeout)
@@ -223,6 +293,13 @@ class OllamaEmbeddingManager:
         finally:
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old)
+
+    @staticmethod
+    def _run_without_alarm(fn: Callable[[], Any]) -> tuple[Any, Exception | None]:
+        try:
+            return fn(), None
+        except Exception as exc:
+            return None, exc
 
     def embed(self, text: str) -> list[float]:
         import ollama
@@ -506,12 +583,7 @@ class BGEM3OnnxManager:
             so.enable_cpu_mem_arena = False
             so.intra_op_num_threads = max(1, EMBED_NUM_THREADS)
             so.inter_op_num_threads = 1
-            providers = [
-                (
-                    "CPUExecutionProvider",
-                    {"arena_extend_strategy": "kSameAsRequested"},
-                )
-            ]
+            providers = select_onnx_providers(ort)
             self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)

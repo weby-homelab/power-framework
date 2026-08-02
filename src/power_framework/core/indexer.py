@@ -8,14 +8,16 @@ Scans the vault for OKF-annotated notes and generates hierarchical index files:
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003
 
 from .constants import INDEX_FOLDERS
 from .ignore import should_skip
-from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, OKFMetadata
+from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, OKFMetadata, TypedRelation
 from .parser import read_file_content, validate_metadata
 from .utils import atomic_write
+from .vault_storage import vault_cache_dir
 
 
 def truncate_for_catalog(description: str, max_length: int = MAX_DESCRIPTION_LENGTH) -> str:
@@ -66,7 +68,9 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
     return concepts
 
 
-def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
+def scan_folder_notes(
+    vault_dir: Path, invalid_notes: list[tuple[str, str]] | None = None
+) -> dict[str, list[dict]]:
     """
     Scan vault directory grouping notes by their P.A.R.A. folder.
 
@@ -93,6 +97,8 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
             content = read_file_content(filepath)
             metadata: OKFMetadata | None = validate_metadata(content)
             if metadata is None:
+                if invalid_notes is not None:
+                    invalid_notes.append((str(rel_path), "Invalid OKF metadata"))
                 continue
 
             tags = metadata.tags if metadata.tags else []
@@ -123,6 +129,131 @@ def scan_folder_notes(vault_dir: Path) -> dict[str, list[dict]]:
             continue
 
     return folder_notes
+
+
+def _note_info_from_metadata(filepath: Path, vault_dir: Path, metadata: OKFMetadata) -> dict:
+    """Build the catalog representation shared by full and incremental scans."""
+    rel_path = filepath.relative_to(vault_dir)
+    return {
+        "rel_path": str(rel_path),
+        "title": metadata.title,
+        "description": metadata.description,
+        "note_type": metadata.type,
+        "tags": metadata.tags if metadata.tags else [],
+        "timestamp": metadata.timestamp.isoformat() if metadata.timestamp else "",
+        "filename": filepath.name,
+        "owner": metadata.owner if metadata.owner else "",
+        "status": metadata.status if metadata.status else "",
+        "expiry": metadata.expiry.isoformat() if metadata.expiry else "",
+        "related": metadata.related if metadata.related else [],
+    }
+
+
+def _serialise_note_info(note: dict) -> dict:
+    """Convert catalog metadata to JSON-safe cache data."""
+    serialised = dict(note)
+    serialised["related"] = [
+        relation.model_dump(mode="json", exclude_none=True)
+        if isinstance(relation, TypedRelation)
+        else relation
+        for relation in note.get("related", [])
+    ]
+    return serialised
+
+
+def _deserialise_note_info(note: dict) -> dict:
+    """Restore typed relations after loading the incremental catalog cache."""
+    restored = dict(note)
+    restored["related"] = [
+        relation if isinstance(relation, TypedRelation) else TypedRelation.model_validate(relation)
+        for relation in note.get("related", [])
+    ]
+    return restored
+
+
+def scan_folder_notes_incremental(
+    vault_dir: Path,
+) -> tuple[dict[str, list[dict]], list[tuple[str, str]], int]:
+    """Scan only changed notes and reuse validated metadata for unchanged notes.
+
+    The cache lives outside the Markdown vault content under POWER's stable
+    per-vault cache namespace. File size and nanosecond mtime form the cheap
+    change detector; a cache miss always re-reads and validates the note.
+    """
+    cache_path = vault_cache_dir(vault_dir) / "hierarchical-index-cache.json"
+    try:
+        cached = json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
+    except (OSError, ValueError, TypeError):
+        cached = {}
+    cached_entries = cached.get("entries", {}) if isinstance(cached, dict) else {}
+
+    folder_notes: dict[str, list[dict]] = {}
+    invalid_notes: list[tuple[str, str]] = []
+    next_entries: dict[str, dict] = {}
+    for filepath in sorted(vault_dir.rglob("*.md")):
+        if filepath.name in {"index.md", "log.md", "_index.md"}:
+            continue
+        rel_path = filepath.relative_to(vault_dir)
+        if should_skip(vault_dir, str(rel_path)) or not rel_path.parts:
+            continue
+        top_folder = rel_path.parts[0]
+        if top_folder not in INDEX_FOLDERS:
+            continue
+
+        try:
+            stat = filepath.stat()
+            signature = {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size}
+        except OSError:
+            invalid_notes.append((str(rel_path), "read_error"))
+            continue
+
+        cached_entry = cached_entries.get(str(rel_path))
+        if (
+            isinstance(cached_entry, dict)
+            and cached_entry.get("signature") == signature
+            and isinstance(cached_entry.get("note"), dict)
+        ):
+            note_info = _deserialise_note_info(cached_entry["note"])
+            if cached_entry.get("valid", False):
+                folder_notes.setdefault(top_folder, []).append(note_info)
+            else:
+                invalid_notes.append(
+                    (str(rel_path), str(cached_entry.get("reason", "invalid_metadata")))
+                )
+            next_entries[str(rel_path)] = cached_entry
+            continue
+
+        try:
+            metadata = validate_metadata(read_file_content(filepath))
+        except (OSError, UnicodeError):
+            metadata = None
+        if metadata is None:
+            reason = "Invalid OKF metadata"
+            invalid_notes.append((str(rel_path), reason))
+            next_entries[str(rel_path)] = {
+                "signature": signature,
+                "valid": False,
+                "reason": reason,
+                "note": {},
+            }
+            continue
+
+        note_info = _note_info_from_metadata(filepath, vault_dir, metadata)
+        folder_notes.setdefault(top_folder, []).append(note_info)
+        next_entries[str(rel_path)] = {
+            "signature": signature,
+            "valid": True,
+            "note": _serialise_note_info(note_info),
+        }
+
+    atomic_write(
+        cache_path,
+        json.dumps(
+            {"schema_version": 1, "entries": next_entries}, ensure_ascii=False, sort_keys=True
+        )
+        + "\n",
+    )
+    return folder_notes, invalid_notes, len(next_entries)
 
 
 def scan_root_daily_logs(vault_dir: Path) -> list[dict]:
@@ -323,7 +454,7 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
 
     Returns a summary message.
     """
-    folder_notes = scan_folder_notes(vault_dir)
+    folder_notes, invalid_notes, _ = scan_folder_notes_incremental(vault_dir)
     root_daily_logs = scan_root_daily_logs(vault_dir)
 
     total_notes = sum(len(notes) for notes in folder_notes.values()) + len(root_daily_logs)
@@ -344,6 +475,9 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
     lines = [
         f"Generated hierarchical index with {total_notes} total notes:",
     ]
+    if invalid_notes:
+        lines.append(f"WARNING: skipped invalid notes ({len(invalid_notes)}):")
+        lines.extend(f"  - {path}: {reason}" for path, reason in sorted(invalid_notes))
     lines.extend(sub_index_results)
 
     return "\n".join(lines)

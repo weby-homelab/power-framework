@@ -259,7 +259,10 @@ def _file_identity(path: Path) -> tuple[str, int]:
 
 
 def _fsync_file(path: Path) -> None:
-    with path.open("rb") as handle:
+    # fsync requires a writable descriptor on Windows. Staged generations are
+    # created by POWER and therefore safely opened read/write here; using
+    # ``r+b`` also remains valid on POSIX filesystems.
+    with path.open("r+b") as handle:
         os.fsync(handle.fileno())
 
 
@@ -553,11 +556,21 @@ def sync_vault_atomically(
     staging_dir = vault_cache_dir(root) / "staging"
     staging_dir.mkdir(parents=True, exist_ok=True)
     staging_path = staging_dir / f"{generation_id}.db"
+    active_path = resolve_active_generation_path(root)
 
     try:
         from .searcher import _sync_vault_to_db
 
         with closing(sqlite3.connect(staging_path, timeout=30)) as conn:
+            if active_path is not None:
+                # Preserve the previous immutable index as the starting point
+                # for this generation. `_sync_vault_to_db` can then use its
+                # mtime/content cache and rewrite only changed rows instead of
+                # embedding the whole vault on every atomic publication.
+                with closing(
+                    sqlite3.connect(f"file:{active_path}?mode=ro", uri=True, timeout=30)
+                ) as active_conn:
+                    active_conn.backup(conn)
             _init_db(conn)
             _sync_vault_to_db(
                 root,

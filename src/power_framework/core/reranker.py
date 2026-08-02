@@ -7,6 +7,8 @@ import os
 import time
 from typing import Protocol
 
+from .embeddings import select_onnx_providers
+
 logger = logging.getLogger(__name__)
 
 # Default reranker is now a LICENSE-CLEAN (MIT/Apache) BGE cross-encoder ONNX
@@ -221,7 +223,7 @@ class BGEM3Reranker:
             so.enable_cpu_mem_arena = False
             so.intra_op_num_threads = max(1, int(os.getenv("POWER_EMBED_NUM_THREADS", "2")))
             so.inter_op_num_threads = 1
-            providers = [("CPUExecutionProvider", {"arena_extend_strategy": "kSameAsRequested"})]
+            providers = select_onnx_providers(ort, env_var="POWER_RERANKER_DEVICE")
             self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)

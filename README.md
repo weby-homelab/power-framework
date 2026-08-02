@@ -130,9 +130,36 @@ Step-by-step protocol for any AI agent (Antigravity, OpenCode, Claude Code CLI, 
 
 ## 🗂️ Methodology compatibility
 
-P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. In 3.2.7, `power init <path>` creates the default P.A.R.A. scaffold only. Selectable templates and the `--template` option are planned; they are not CLI features yet.
+P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. `power init <path>` creates the default P.A.R.A. scaffold, while an optional `.power/domains.yaml` registry adds explicit domain placement, per-domain templates, routing rules, and search priorities.
 
 For another layout, create or retain its folders, then use P.O.W.E.R. to ingest notes and run `lint`, `index`, and `search`. OKF metadata validation and the available search tools work independently of the folder names.
+
+### Domain-first placement and retrieval
+
+For a domain-oriented vault, create `.power/domains.yaml` and keep directory and
+filename names meaningful: these are the first navigation signals for an AI
+agent. OKF frontmatter remains the validated provenance and lifecycle contract,
+not the only routing mechanism. A minimal registry is:
+
+```yaml
+version: 1
+domains:
+  - name: research
+    path: 03_Resources/research
+    template: 05_Templates/research.md
+    rules:
+      - keywords: [paper, experiment]
+        weight: 2
+      - tags: [science]
+    search_priority: [semantic, fts]
+```
+
+`power ingest` routes by these rules (or accepts `--domain research`) and uses
+the selected template. `power search ... --mode auto --domain research` follows
+the domain priority and scopes candidates to the domain path. Only retrieval
+modes implemented by POWER are accepted; unsupported providers such as Qdrant
+are rejected instead of being advertised as available. Without a registry,
+legacy P.A.R.A. placement and the semantic search default are unchanged.
 
 ## Who Is This For
 
@@ -162,6 +189,7 @@ power cron <path>              Run automated maintenance (lint + index + rot)
 ```bash
 power ingest ~/my-vault --type Project --title "My App" --description "A new project"
 power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Docker best practices" --tags devops,docker --resource "https://docs.docker.com"
+power ingest ~/my-vault --type Resource --title "Experiment Notes" --description "Research experiment" --domain research
 ```
 
 ### Search Examples
@@ -169,6 +197,7 @@ power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Do
 ```bash
 power search ~/my-vault "api authentication"
 power search ~/my-vault "deployment guide" --max-results 5
+power search ~/my-vault "experiment" --mode auto --domain research
 ```
 
 ## MCP Server Setup

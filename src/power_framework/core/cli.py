@@ -14,12 +14,23 @@ import argparse
 import json
 import logging
 import os
-import resource
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+try:  # resource is POSIX-only; Windows uses the no-limit path.
+    import resource
+except ImportError:  # pragma: no cover - exercised on Windows
+    resource = None  # type: ignore[assignment]
+
 from .constants import SKIP_FILES
+from .domains import (
+    DomainConfigError,
+    domain_template_path,
+    load_domain_registry,
+    render_domain_template,
+    route_domain,
+)
 from .healer import heal_vault
 from .ignore import should_skip
 from .indexer import generate_log_initial, run_generate_hierarchical_index
@@ -157,6 +168,26 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     resource = args.resource
     tags = args.tags or []
 
+    try:
+        registry = load_domain_registry(vault_dir)
+        domain = (
+            registry.get(args.domain)
+            if args.domain
+            else route_domain(
+                registry,
+                title=title,
+                description=description,
+                tags=tags,
+                note_type=note_type,
+            )
+        )
+    except DomainConfigError as exc:
+        logger.error("Invalid domain registry: %s", exc)
+        return 1
+    if args.domain and domain is None:
+        logger.error("Unknown domain: %s", args.domain)
+        return 1
+
     type_dir_map = {
         "Project": "01_Projects",
         "Area": "02_Areas",
@@ -165,7 +196,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         "Archive": "04_Archive",
         "System Guide": "PROTOCOLS",
     }
-    target_dir = vault_dir / type_dir_map.get(note_type, "00_Inbox")
+    target_dir = vault_dir / (domain.path if domain else type_dir_map.get(note_type, "00_Inbox"))
     target_dir.mkdir(parents=True, exist_ok=True)
 
     safe_name = title.lower().replace(" ", "_").replace("/", "-")
@@ -186,8 +217,27 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     )
     fm = build_frontmatter(metadata)
     body = f"{fm}\n\n# {title}\n\n"
+    if domain:
+        try:
+            template_path = domain_template_path(vault_dir, domain)
+            template = template_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError, DomainConfigError) as exc:
+            logger.error("Cannot load template for domain %s: %s", domain.name, exc)
+            return 1
+        values = {
+            "type": note_type,
+            "title": title,
+            "description": description,
+            "timestamp": metadata.timestamp.isoformat(),
+            "resource": resource or "",
+            "tags": ", ".join(tags),
+        }
+        rendered = render_domain_template(template, values).strip()
+        body = rendered if rendered.startswith("---") else f"{fm}\n\n{rendered}\n"
     execute_vault_mutation(vault_dir, lambda: atomic_write(note_path, body))
     logger.info("Created note: %s", note_path.relative_to(vault_dir))
+    if domain:
+        logger.info("Domain routing: %s (template: %s)", domain.name, domain.template)
     return 0
 
 
@@ -209,6 +259,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
         mode=mode,
         temporal_view=args.temporal_view,
         as_of=args.as_of,
+        domain=args.domain,
     )
     report = format_search_results(results, query, mode=mode, vault_dir=vault_dir)
     print(report)
@@ -232,7 +283,12 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     # Qwen3-0.6B ONNX) legitimately need >6 GB for their inference arena. Enable
     # it on tight 8 GB hosts via POWER_SYNC_VMEM_LIMIT_MB=6144.
     vmem_limit_mb = int(os.getenv("POWER_SYNC_VMEM_LIMIT_MB", "0"))
-    if vmem_limit_mb and sync_embeddings and hasattr(resource, "RLIMIT_AS"):
+    if (
+        vmem_limit_mb
+        and sync_embeddings
+        and resource is not None
+        and hasattr(resource, "RLIMIT_AS")
+    ):
         try:
             _, hard = resource.getrlimit(resource.RLIMIT_AS)
             new_soft = (
@@ -553,6 +609,11 @@ def main() -> None:
     p_ingest.add_argument("--resource", default=None, help="External URL (optional)")
     p_ingest.add_argument("--tags", nargs="*", default=[], help="Markdown tags")
     p_ingest.add_argument("--overwrite", action="store_true", help="Overwrite existing note")
+    p_ingest.add_argument(
+        "--domain",
+        default=None,
+        help="Domain slug; without it, configured domain rules route the note automatically",
+    )
     p_ingest.set_defaults(func=_cmd_ingest)
 
     p_search = subparsers.add_parser("search", help="Full-text search across vault notes")
@@ -579,15 +640,17 @@ def main() -> None:
     )
     p_search.add_argument(
         "--mode",
-        choices=sorted(CANONICAL_SEARCH_MODES | set(SEARCH_MODE_ALIASES)),
+        choices=sorted(CANONICAL_SEARCH_MODES | set(SEARCH_MODE_ALIASES) | {"auto"}),
         default=DEFAULT_SEARCH_MODE,
         help=(
             'Search mode: "semantic" (canonical default, pinned BGE-M3), "fts" (BM25), '
             '"vector" (TF cosine), "hybrid" (RRF merged), or "semantic" '
             '(dense embedding); "reranked" is an explicit opt-in. '
-            '"hybrid_reranked" is a deprecated alias.'
+            '"reranked" is an explicit opt-in, "auto" follows domain priority, '
+            'and "hybrid_reranked" is a deprecated alias.'
         ),
     )
+    p_search.add_argument("--domain", default=None, help="Optional domain slug to scope the search")
     p_search.set_defaults(func=_cmd_search)
 
     p_memory = subparsers.add_parser("memory", help="Human-governed transactional memory workflow")

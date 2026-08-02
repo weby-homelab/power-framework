@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 from .chunker import SemanticChunker
 from .db import _init_db
+from .domains import DomainConfigError, resolve_search_policy
 from .embeddings import configured_embedding_identity, get_embedding_manager
 from .generation_index import ActiveGenerationError, resolve_active_generation_path
 from .ignore import should_skip
@@ -101,6 +102,7 @@ RERANK_CANDIDATE_LIMIT = 20
 # Max characters of each candidate doc fed to the reranker (truncated excerpt).
 # Keeps cross-encoder token cost bounded on CPU (Performance Plan §4).
 RERANK_TEXT_CHARS = 800
+DEFAULT_FTS_OPERATOR = "OR"
 DEFAULT_SEARCH_MODE = "semantic"
 CANONICAL_SEARCH_MODES = frozenset(
     {"fts", "vector", "hybrid", "semantic", "reranked", "graph_assisted"}
@@ -435,6 +437,7 @@ def _sync_vault_to_db(
     # v2.2.0: collect changed files first, then embed in batches. This avoids
     # holding the embedding model AND all vectors in memory at once.
     changed: list[tuple[str, str, OKFMetadata, float]] = []  # (rel_path, content, metadata, mtime)
+    invalid_changed = False
     for idx, (rel_path, mtime) in enumerate(disk_files.items()):
         if idx % 50 == 0:
             logger.info("Sync scan: %d/%d (%s)", idx, len(disk_files), rel_path)
@@ -444,9 +447,12 @@ def _sync_vault_to_db(
                 content = read_file_content(filepath)
                 metadata = validate_metadata(content)
                 if metadata is None:
+                    invalid_changed = True
                     cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
                     cursor.execute("DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,))
                     cursor.execute("DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM chunk_embeddings WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM tf_vectors WHERE rel_path = ?", (rel_path,))
                     continue
                 changed.append((rel_path, content, metadata, mtime))
             except Exception as e:
@@ -493,6 +499,22 @@ def _sync_vault_to_db(
         except Exception as e:
             logger.warning("FTS/TF write failed for %s: %s", rel_path, e)
             continue
+
+    if not sync_embeddings and (changed or invalid_changed or to_delete):
+        # A lightweight FTS sync cannot refresh dense vectors for changed
+        # notes. Invalidate the dense contract instead of leaving stale rows
+        # that semantic/reranked callers might mistake for current evidence.
+        changed_paths = [rel_path for rel_path, *_ in changed]
+        cursor.executemany(
+            "DELETE FROM doc_embeddings WHERE rel_path = ?", [(path,) for path in changed_paths]
+        )
+        cursor.executemany(
+            "DELETE FROM chunk_embeddings WHERE rel_path = ?", [(path,) for path in changed_paths]
+        )
+        cursor.execute("DELETE FROM dense_index_manifest")
+        logger.info(
+            "Dense index invalidated by FTS-only source changes; run power sync for dense search"
+        )
     conn.commit()
 
     if not (sync_embeddings and embedder is not None):
@@ -718,7 +740,7 @@ def _fts_search(
 ) -> list[SearchResult]:
     """SQLite FTS5 full-text search with weighted BM25 scoring."""
     clean_query = re.sub(
-        r'[^\w\s"а-яєіїґ\']',  # noqa: RUF001
+        r'[^\w\s"а-яєіїґ\'-]',  # noqa: RUF001
         " ",
         query,
         flags=re.IGNORECASE,
@@ -730,9 +752,16 @@ def _fts_search(
         if phrase:
             terms.append(f'"{phrase.strip()}"')
         elif word:
-            terms.append(f"{word.strip()}*")
+            token = word.strip()
+            # FTS5 treats punctuation such as a hyphen as a query operator or
+            # a token separator. Quoting it preserves the user's identifier
+            # and prevents ``first-token`` from matching ``second-token``.
+            terms.append(f'"{token}"' if "-" in token else f"{token}*")
 
-    fts_query = " AND ".join(terms) if terms else ""
+    operator = os.getenv("POWER_FTS_OPERATOR", DEFAULT_FTS_OPERATOR).upper()
+    if operator not in {"AND", "OR"}:
+        raise ValueError("POWER_FTS_OPERATOR must be AND or OR")
+    fts_query = f" {operator} ".join(terms) if terms else ""
     if not fts_query:
         return []
 
@@ -762,29 +791,6 @@ def _fts_search(
         )
 
         rows = cursor.fetchall()
-        if not rows and len(terms) > 2:
-            # Natural-language questions rarely have every function word in a
-            # short note. Preserve the precise AND contract when it matches,
-            # then recover recall with BM25-ranked OR instead of returning an
-            # empty lexical comparator for the whole question.
-            cursor.execute(
-                """
-                SELECT
-                    rel_path,
-                    title,
-                    description,
-                    note_type,
-                    -bm25(fts_notes, 10.0, 5.0, 3.0, 1.0) as score,
-                    snippet(fts_notes, 3, '...', '...', '...', 15) as snippet_text,
-                    tags
-                FROM fts_notes
-                WHERE fts_notes MATCH ?
-                ORDER BY score DESC
-                LIMIT ?
-                """,
-                (" OR ".join(terms), max_results),
-            )
-            rows = cursor.fetchall()
 
         results: list[SearchResult] = []
         for row in rows:
@@ -1109,6 +1115,7 @@ def search_vault(
     mode: str = DEFAULT_SEARCH_MODE,
     temporal_view: str = "current",
     as_of: date | str | None = None,
+    domain: str | None = None,
 ) -> list[SearchResult]:
     """
     Search the vault for notes matching the query.
@@ -1123,9 +1130,13 @@ def search_vault(
               cosine), "hybrid" (RRF of FTS + TF vector), "reranked", and
               "graph_assisted" (sparse RRF expanded through accepted OKF
               relations). ``hybrid_reranked`` is a deprecated alias of
-              ``reranked``.
+              ``reranked``. ``auto`` uses the selected domain's first
+              ``search_priority`` entry; without a domain registry it retains
+              the semantic default.
         temporal_view: ``current`` (default), ``historical``, or ``all``.
         as_of: Inclusive ISO-8601 date boundary for temporal evaluation.
+        domain: Optional domain slug. When present, results are scoped to the
+            domain path and its priority is used when ``mode=auto``.
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -1134,7 +1145,17 @@ def search_vault(
     # path; downstream code uses Path operators (vault_dir / rel_path), so
     # coerce to a resolved Path once here.
     vault_dir = Path(vault_dir).expanduser().resolve()
+    requested_max_results = max_results
+    try:
+        mode, resolved_domain = resolve_search_policy(vault_dir, query, mode, domain)
+    except DomainConfigError:
+        raise
     mode = normalize_search_mode(mode)
+    domain_path = resolved_domain.path if resolved_domain else None
+    if resolved_domain:
+        # Scope after candidate generation, but over-fetch so a domain does not
+        # appear empty merely because another domain occupied the global top-K.
+        max_results = max(max_results * 5, 20)
     temporal_view = normalize_temporal_view(temporal_view).value
     boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
@@ -1215,8 +1236,11 @@ def search_vault(
         vec_dedup = sorted(vec_map.values(), key=lambda x: -x.score)
 
         # Single RRF fusion at the end
+        merged = _rrf_merge(fts_dedup, vec_dedup)
+        if domain_path:
+            merged = _filter_domain_results(merged, domain_path)
         results = _filter_temporal_results(
-            vault_dir, _rrf_merge(fts_dedup, vec_dedup), temporal_view, boundary, max_results
+            vault_dir, merged, temporal_view, boundary, requested_max_results
         )
         for result in results:
             result.retrieval_contract = retrieval_contract
@@ -1251,8 +1275,10 @@ def search_vault(
             res_map[r.rel_path] = r
 
     final_results = sorted(res_map.values(), key=lambda x: (-x.score, x.title))
+    if domain_path:
+        final_results = _filter_domain_results(final_results, domain_path)
     final_results = _filter_temporal_results(
-        vault_dir, final_results, temporal_view, boundary, max_results
+        vault_dir, final_results, temporal_view, boundary, requested_max_results
     )
     for r in final_results:
         r.retrieval_contract = retrieval_contract
@@ -1275,6 +1301,16 @@ def _filter_temporal_results(
         if includes_temporal_status(status, temporal_view):
             filtered.append(result)
     return filtered[:max_results]
+
+
+def _filter_domain_results(results: list[SearchResult], domain_path: Path) -> list[SearchResult]:
+    """Keep only results below a validated domain-relative path."""
+    prefix = domain_path.as_posix().rstrip("/")
+    return [
+        result
+        for result in results
+        if (result.rel_path == prefix or result.rel_path.startswith(prefix + "/"))
+    ]
 
 
 def _hybrid_reranked_search(

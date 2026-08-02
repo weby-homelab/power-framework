@@ -143,6 +143,52 @@ def test_ingest_with_tags(sample_vault: Path) -> None:
     assert note.exists()
 
 
+def test_ingest_routes_to_domain_template(sample_vault: Path) -> None:
+    (sample_vault / ".power").mkdir()
+    (sample_vault / ".power" / "domains.yaml").write_text(
+        """
+version: 1
+domains:
+  - name: research
+    path: 03_Resources/research
+    template: 05_Templates/research.md
+    rules:
+      - keywords: [experiment]
+    search_priority: [fts]
+""",
+        encoding="utf-8",
+    )
+    (sample_vault / "05_Templates").mkdir(exist_ok=True)
+    (sample_vault / "05_Templates" / "research.md").write_text(
+        '---\ntype: {type}\ntitle: "{title}"\n'
+        'description: "{description}"\ntimestamp: {timestamp}\n---\n\n# {title}\n\nResearch template.\n',
+        encoding="utf-8",
+    )
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "ingest",
+                str(sample_vault),
+                "--type",
+                "Resource",
+                "--title",
+                "Experiment Notes",
+                "--description",
+                "Research experiment",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 0
+    note = sample_vault / "03_Resources" / "research" / "experiment_notes.md"
+    assert note.exists()
+    assert "Research template." in note.read_text(encoding="utf-8")
+
+
 def test_ingest_missing_vault(tmp_path: Path) -> None:
     missing = tmp_path / "nonexistent"
     with (

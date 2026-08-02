@@ -22,10 +22,12 @@ from power_framework.core.searcher import (
     _compute_tf_vector,
     _cosine_similarity,
     _embedding_manifest_identity,
+    _fts_search,
     _make_snippet,
     _rrf_merge,
     _score_note,
     _semantic_search,
+    _sync_vault_to_db,
     _tokenize,
     _vector_search,
     format_search_results,
@@ -480,6 +482,25 @@ class TestSearchVault:
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
 
+    def test_auto_domain_policy_scopes_results(self, sample_vault: Path):
+        (sample_vault / ".power").mkdir(exist_ok=True)
+        (sample_vault / ".power" / "domains.yaml").write_text(
+            """
+version: 1
+domains:
+  - name: projects
+    path: 01_Projects
+    template: 05_Templates/default.md
+    rules:
+      - keywords: [test]
+    search_priority: [fts]
+""",
+            encoding="utf-8",
+        )
+        results = search_vault(sample_vault, "test project", mode="auto")
+        assert results
+        assert all(result.rel_path.startswith("01_Projects/") for result in results)
+
     def test_search_by_tag(self, sample_vault: Path):
         results = search_vault(sample_vault, "sample", mode="fts")
         assert len(results) > 0
@@ -523,6 +544,17 @@ class TestSearchVault:
 
         assert results
         assert any("Test Project" in result.title for result in results)
+
+    def test_fts_defaults_to_or_with_explicit_and_override(self, sample_vault: Path, monkeypatch):
+        search_vault(sample_vault, "test", mode="fts")
+
+        monkeypatch.delenv("POWER_FTS_OPERATOR", raising=False)
+        exploratory = _fts_search(sample_vault, "Test absent-token", max_results=20)
+        assert exploratory
+
+        monkeypatch.setenv("POWER_FTS_OPERATOR", "AND")
+        strict = _fts_search(sample_vault, "Test absent-token", max_results=20)
+        assert strict == []
 
     def test_search_vault_fallback_on_sqlite_error(self, sample_vault: Path):
         from unittest.mock import patch
@@ -653,6 +685,41 @@ class TestCosineSimilarity:
 
 class TestVectorSearch:
     """Tests for vector search function."""
+
+    def test_fts_only_change_invalidates_stale_dense_manifest(self, tmp_path: Path):
+        note = tmp_path / "01_Projects" / "Note.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            'title: "Note"\n'
+            'description: "Dense invalidation"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "---\n\noriginal\n",
+            encoding="utf-8",
+        )
+        conn = sqlite3.connect(tmp_path / "search.db")
+        _init_db(conn)
+        conn.execute(
+            "INSERT INTO file_metadata(rel_path, mtime) VALUES (?, ?)",
+            ("01_Projects/Note.md", 0.0),
+        )
+        conn.execute(
+            "INSERT INTO chunk_embeddings(chunk_id, rel_path, embedding, content, mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("chunk", "01_Projects/Note.md", b"\x00\x00\x80?", "original", 0.0),
+        )
+        conn.executemany(
+            "INSERT INTO dense_index_manifest(manifest_key, manifest_value) VALUES (?, ?)",
+            [("schema_version", "2"), ("chunk_count", "1")],
+        )
+        conn.commit()
+
+        _sync_vault_to_db(tmp_path, conn, sync_embeddings=False)
+
+        assert conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM dense_index_manifest").fetchone()[0] == 0
+        conn.close()
 
     def test_finds_relevant_note(self, sample_vault: Path):
         results = _vector_search(sample_vault, "project architecture")

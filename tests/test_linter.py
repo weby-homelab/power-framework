@@ -28,6 +28,25 @@ class TestRunLintVault:
         untyped_paths = [rp for rp, _ in result.untyped_files]
         assert any("NoType.md" in rp for rp in untyped_paths)
 
+    def test_detects_invalid_okf_metadata(self, tmp_path: Path):
+        projects = tmp_path / "01_Projects"
+        projects.mkdir()
+        (projects / "Invalid.md").write_text(
+            "---\n"
+            "type: Project\n"
+            'title: "Invalid"\n'
+            'description: "Invalid resource URL"\n'
+            'resource: "not-a-url"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "---\n\n# Invalid\n",
+            encoding="utf-8",
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert ("01_Projects/Invalid.md", "Invalid OKF metadata") in result.untyped_files
+        assert result.has_blocking_issues
+
     def test_detects_broken_links(self, vault_with_issues: Path):
         result = run_lint_vault(vault_with_issues)
         assert len(result.broken_links) > 0

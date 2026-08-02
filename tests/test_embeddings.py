@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import signal
 from typing import TYPE_CHECKING
 
 import pytest
@@ -14,6 +15,32 @@ if TYPE_CHECKING:
 
 
 class TestEmbeddingManager:
+    def test_auto_device_prefers_cuda_and_keeps_cpu_fallback(self, monkeypatch: pytest.MonkeyPatch):
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["CPUExecutionProvider", "CUDAExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "auto")
+        providers = embeddings.select_onnx_providers(FakeOrt())
+        assert providers[0][0] == "CUDAExecutionProvider"
+        assert providers[-1][0] == "CPUExecutionProvider"
+
+    def test_explicit_unavailable_device_fails_closed(self, monkeypatch: pytest.MonkeyPatch):
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
+        with pytest.raises(RuntimeError, match="requested_onnx_provider_unavailable"):
+            embeddings.select_onnx_providers(FakeOrt())
+
+    def test_ollama_attempt_does_not_require_sigalrm(self, monkeypatch: pytest.MonkeyPatch):
+        manager = embeddings.OllamaEmbeddingManager()
+        monkeypatch.delattr(signal, "SIGALRM", raising=False)
+        assert manager._do_attempt(lambda: "ok") == ("ok", None)
+
     def test_import_has_no_hardcoded_env_file_side_effect(self):
         assert "/root/geminicli/.env" not in inspect.getsource(embeddings)
 
