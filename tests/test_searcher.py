@@ -556,6 +556,42 @@ domains:
         strict = _fts_search(sample_vault, "Test absent-token", max_results=20)
         assert strict == []
 
+    def test_fts_filters_function_words_from_or_queries(self, sample_vault: Path):
+        (sample_vault / "03_Resources" / "release-signal.md").write_text(
+            """---
+type: Resource
+title: "Release signal"
+description: "A unique release marker"
+okf_version: "0.2"
+memory:
+  kind: semantic
+timestamp: 2026-01-01T00:00:00
+---
+
+release-signal
+""",
+            encoding="utf-8",
+        )
+        (sample_vault / "03_Resources" / "function-word.md").write_text(
+            """---
+type: Resource
+title: "Function word"
+description: "чи"
+okf_version: "0.2"
+memory:
+  kind: semantic
+timestamp: 2026-01-01T00:00:00
+---
+
+чи
+""",
+            encoding="utf-8",
+        )
+
+        results = search_vault(sample_vault, "чи release-signal", mode="fts")
+
+        assert [result.rel_path for result in results] == ["03_Resources/release-signal.md"]
+
     def test_search_vault_fallback_on_sqlite_error(self, sample_vault: Path):
         from unittest.mock import patch
 

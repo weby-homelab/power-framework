@@ -103,6 +103,56 @@ RERANK_CANDIDATE_LIMIT = 20
 # Keeps cross-encoder token cost bounded on CPU (Performance Plan §4).
 RERANK_TEXT_CHARS = 800
 DEFAULT_FTS_OPERATOR = "OR"
+# Function words carry little retrieval signal and can dominate OR-mode BM25
+# on short Ukrainian questions. Keep this deliberately small and language
+# neutral; content words, quoted phrases and identifiers are never filtered.
+FTS_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "be",
+        "can",
+        "do",
+        "does",
+        "for",
+        "in",
+        "is",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "what",
+        "which",
+        "або",  # noqa: RUF001
+        "в",
+        "де",
+        "для",
+        "до",
+        "є",
+        "за",
+        "і",  # noqa: RUF001
+        "із",
+        "й",
+        "як",
+        "який",
+        "яка",
+        "яке",
+        "якому",
+        "може",
+        "на",
+        "не",
+        "ні",
+        "про",
+        "саме",
+        "та",
+        "у",  # noqa: RUF001
+        "що",
+        "чи",
+    }
+)
 DEFAULT_SEARCH_MODE = "semantic"
 CANONICAL_SEARCH_MODES = frozenset(
     {"fts", "vector", "hybrid", "semantic", "reranked", "graph_assisted"}
@@ -756,7 +806,8 @@ def _fts_search(
             # FTS5 treats punctuation such as a hyphen as a query operator or
             # a token separator. Quoting it preserves the user's identifier
             # and prevents ``first-token`` from matching ``second-token``.
-            terms.append(f'"{token}"' if "-" in token else f"{token}*")
+            if "-" in token or token.casefold() not in FTS_STOPWORDS:
+                terms.append(f'"{token}"' if "-" in token else f"{token}*")
 
     operator = os.getenv("POWER_FTS_OPERATOR", DEFAULT_FTS_OPERATOR).upper()
     if operator not in {"AND", "OR"}:
@@ -817,7 +868,7 @@ def _fts_search(
         terms_fallback: list[str] = []
         for match in re.finditer(r'"([^"]+)"|(\S+)', query.strip()):
             term = (match.group(1) or match.group(2)).strip().lower()
-            if term:
+            if term and ("-" in term or term.casefold() not in FTS_STOPWORDS):
                 terms_fallback.append(term)
         if not terms_fallback:
             return []
