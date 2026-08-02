@@ -97,10 +97,18 @@ def execute_vault_mutation(vault_dir: Path, operation: Callable[[], T]) -> T:
 
 
 async def run_blocking(sync_fn: Callable[[], T]) -> T:
-    """Run a blocking operation and join its executor before returning."""
+    """Run a blocking operation and join its executor before returning.
+
+    Polling the submitted future avoids a Python 3.13 runtime deadlock seen
+    when ``asyncio`` waits for an executor callback after file-backed work.
+    The work still runs in the bounded executor; only completion observation is
+    kept on the event loop.
+    """
     with ThreadPoolExecutor(max_workers=1) as executor:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(executor, sync_fn)
+        future = executor.submit(sync_fn)
+        while not future.done():
+            await asyncio.sleep(0.01)
+        return future.result()
 
 
 async def run_vault_mutation(vault_dir: Path, operation: Callable[[], T]) -> T:

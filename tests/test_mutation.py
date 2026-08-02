@@ -14,6 +14,7 @@ import pytest
 from power_framework.core.mutation import (
     execute_vault_mutation,
     reset_mutation_registry_for_test,
+    run_blocking,
     vault_mutation,
 )
 
@@ -117,3 +118,13 @@ def test_os_lock_serializes_another_process(tmp_path: Path) -> None:
         child.wait()
         raise
     assert marker.read_text(encoding="utf-8") == "ok"
+
+
+@pytest.mark.asyncio
+async def test_run_blocking_joins_file_backed_work(tmp_path: Path) -> None:
+    target = tmp_path / "async-write.txt"
+
+    result = await run_blocking(lambda: target.write_text("ok", encoding="utf-8"))
+
+    assert result == 2
+    assert target.read_text(encoding="utf-8") == "ok"
