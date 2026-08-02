@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from pathlib import Path  # noqa: TC003
+from pathlib import Path
 
 from .constants import INDEX_FOLDERS
 from .ignore import should_skip
@@ -18,6 +18,9 @@ from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, OKFMetadata, TypedR
 from .parser import read_file_content, validate_metadata
 from .utils import atomic_write
 from .vault_storage import vault_cache_dir
+
+INDEX_CACHE_SCHEMA_VERSION = 2
+INDEX_RENDERER_VERSION = 1
 
 
 def truncate_for_catalog(description: str, max_length: int = MAX_DESCRIPTION_LENGTH) -> str:
@@ -171,25 +174,36 @@ def _deserialise_note_info(note: dict) -> dict:
     return restored
 
 
-def scan_folder_notes_incremental(
+def _scan_folder_notes_incremental(
     vault_dir: Path,
-) -> tuple[dict[str, list[dict]], list[tuple[str, str]], int]:
-    """Scan only changed notes and reuse validated metadata for unchanged notes.
+) -> tuple[dict[str, list[dict]], list[tuple[str, str]], int, set[str]]:
+    """Scan changed notes and report the folders whose catalogs need rendering.
 
     The cache lives outside the Markdown vault content under POWER's stable
     per-vault cache namespace. File size and nanosecond mtime form the cheap
-    change detector; a cache miss always re-reads and validates the note.
+    change detector; a cache miss always re-reads and validates the note. The
+    renderer version is part of the cache contract so a catalog-format change
+    invalidates every folder exactly once.
     """
     cache_path = vault_cache_dir(vault_dir) / "hierarchical-index-cache.json"
     try:
         cached = json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
     except (OSError, ValueError, TypeError):
         cached = {}
-    cached_entries = cached.get("entries", {}) if isinstance(cached, dict) else {}
+    cache_is_current = (
+        isinstance(cached, dict)
+        and cached.get("schema_version") == INDEX_CACHE_SCHEMA_VERSION
+        and cached.get("renderer_version") == INDEX_RENDERER_VERSION
+    )
+    cached_entries = cached.get("entries", {}) if cache_is_current else {}
+    if not isinstance(cached_entries, dict):
+        cached_entries = {}
 
     folder_notes: dict[str, list[dict]] = {}
     invalid_notes: list[tuple[str, str]] = []
     next_entries: dict[str, dict] = {}
+    changed_folders: set[str] = set() if cache_is_current else set(INDEX_FOLDERS)
+    seen_paths: set[str] = set()
     for filepath in sorted(vault_dir.rglob("*.md")):
         if filepath.name in {"index.md", "log.md", "_index.md"}:
             continue
@@ -199,15 +213,18 @@ def scan_folder_notes_incremental(
         top_folder = rel_path.parts[0]
         if top_folder not in INDEX_FOLDERS:
             continue
+        rel_path_str = str(rel_path)
+        seen_paths.add(rel_path_str)
 
         try:
             stat = filepath.stat()
             signature = {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size}
         except OSError:
+            changed_folders.add(top_folder)
             invalid_notes.append((str(rel_path), "read_error"))
             continue
 
-        cached_entry = cached_entries.get(str(rel_path))
+        cached_entry = cached_entries.get(rel_path_str)
         if (
             isinstance(cached_entry, dict)
             and cached_entry.get("signature") == signature
@@ -222,6 +239,8 @@ def scan_folder_notes_incremental(
                 )
             next_entries[str(rel_path)] = cached_entry
             continue
+
+        changed_folders.add(top_folder)
 
         try:
             metadata = validate_metadata(read_file_content(filepath))
@@ -246,14 +265,42 @@ def scan_folder_notes_incremental(
             "note": _serialise_note_info(note_info),
         }
 
+    # A deleted note is not visited above. Mark its former folder so the
+    # stale catalog row is removed on this run.
+    for cached_path in cached_entries:
+        if cached_path in seen_paths:
+            continue
+        cached_parts = Path(cached_path).parts
+        if cached_parts and cached_parts[0] in INDEX_FOLDERS:
+            changed_folders.add(cached_parts[0])
+
     atomic_write(
         cache_path,
         json.dumps(
-            {"schema_version": 1, "entries": next_entries}, ensure_ascii=False, sort_keys=True
+            {
+                "schema_version": INDEX_CACHE_SCHEMA_VERSION,
+                "renderer_version": INDEX_RENDERER_VERSION,
+                "entries": next_entries,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
         )
         + "\n",
     )
-    return folder_notes, invalid_notes, len(next_entries)
+    return folder_notes, invalid_notes, len(next_entries), changed_folders
+
+
+def scan_folder_notes_incremental(
+    vault_dir: Path,
+) -> tuple[dict[str, list[dict]], list[tuple[str, str]], int]:
+    """Scan changed notes and reuse validated metadata for unchanged notes.
+
+    Keep the historical three-value return shape for callers outside the
+    hierarchical generator; the internal helper additionally reports the
+    folders whose rendered indexes are stale.
+    """
+    folder_notes, invalid_notes, entry_count, _ = _scan_folder_notes_incremental(vault_dir)
+    return folder_notes, invalid_notes, entry_count
 
 
 def scan_root_daily_logs(vault_dir: Path) -> list[dict]:
@@ -454,7 +501,7 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
 
     Returns a summary message.
     """
-    folder_notes, invalid_notes, _ = scan_folder_notes_incremental(vault_dir)
+    folder_notes, invalid_notes, _, changed_folders = _scan_folder_notes_incremental(vault_dir)
     root_daily_logs = scan_root_daily_logs(vault_dir)
 
     total_notes = sum(len(notes) for notes in folder_notes.values()) + len(root_daily_logs)
@@ -468,8 +515,9 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
         notes = folder_notes.get(folder, [])
         sub_index_path = vault_dir / folder / "_index.md"
         sub_index_path.parent.mkdir(parents=True, exist_ok=True)
-        sub_content = generate_sub_index_content(folder, notes)
-        atomic_write(sub_index_path, sub_content)
+        if folder in changed_folders or not sub_index_path.exists():
+            sub_content = generate_sub_index_content(folder, notes)
+            atomic_write(sub_index_path, sub_content)
         sub_index_results.append(f"  {folder}/_index.md ({len(notes)} notes)")
 
     lines = [

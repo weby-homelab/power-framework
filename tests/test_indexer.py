@@ -332,6 +332,29 @@ class TestRunGenerateHierarchicalIndex:
         assert "Test Project" in content
         assert "Weby-QRank Architecture" in content
 
+    def test_unchanged_run_skips_sub_index_rendering(self, sample_vault: Path, monkeypatch):
+        run_generate_hierarchical_index(sample_vault)
+
+        from power_framework.core import indexer
+
+        original_generate = indexer.generate_sub_index_content
+        rendered_folders: list[str] = []
+
+        def record_render(folder: str, notes: list[dict]) -> str:
+            rendered_folders.append(folder)
+            return original_generate(folder, notes)
+
+        monkeypatch.setattr(indexer, "generate_sub_index_content", record_render)
+        run_generate_hierarchical_index(sample_vault)
+        assert rendered_folders == []
+
+        note_path = sample_vault / "01_Projects" / "TestProject.md"
+        note_path.write_text(
+            note_path.read_text(encoding="utf-8") + "\nChanged.\n", encoding="utf-8"
+        )
+        run_generate_hierarchical_index(sample_vault)
+        assert rendered_folders == ["01_Projects"]
+
     def test_overwrites_existing_indexes(self, sample_vault: Path):
         main_index = sample_vault / "index.md"
         main_index.write_text("Old main content")
