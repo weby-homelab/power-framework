@@ -28,6 +28,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
+      - name: Generate and verify tag-bound release baseline
+        run: |
+          mkdir -p dist
+          python scripts/generate_release_baseline.py \
+            --tag "$GITHUB_REF_NAME" \
+            --output dist/power-framework.release-baseline.json
+          python scripts/verify_release_contract.py \
+            --require-tag \
+            --baseline dist/power-framework.release-baseline.json
+
       - name: Build package
         run: python -m build
 

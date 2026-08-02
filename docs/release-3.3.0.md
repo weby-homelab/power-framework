@@ -23,3 +23,12 @@ execution.
 - Framework: `706 passed`, `10 skipped`, coverage `79.53%`.
 - Ruff, format, MyPy and `git diff --check`: PASS.
 - Release contract and package smoke must be run against the signed release tag.
+
+## Corrected tag-bound baseline
+
+The original tag contains a historical baseline snapshot from before the final
+M2 profile-binding commit. The authoritative corrected artifact is the
+`power-framework.release-baseline.json` release asset, generated from the
+exact signed tag commit and verified with `--require-tag`. The release workflow
+now generates and verifies this asset before building packages; the existing
+`v3.3.0` tag and its package assets are not force-rewritten.
