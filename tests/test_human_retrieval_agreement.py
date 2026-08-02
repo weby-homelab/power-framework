@@ -74,6 +74,29 @@ def test_v2_rejects_free_text_or_unknown_judgment_fields() -> None:
         MODULE.compute_receipt(rows, "2.0")
 
 
+def test_v2_calibration_requires_temporal_field_agreement() -> None:
+    rows = _rows()
+    rows[-1]["temporal_status"] = "current"
+
+    receipt = MODULE.compute_receipt(rows, "2.0")
+
+    assert receipt["pair_level"]["temporal_status"]["value"] == 0.75
+    assert receipt["calibration_rule"]["temporal_status_exact"] is False
+    assert receipt["status"] == "calibration_failed"
+    assert receipt["calibration_rule"]["passed"] is False
+
+
+def test_v2_calibration_requires_query_citation_agreement() -> None:
+    rows = _rows()
+    rows[4]["acceptable_citation"] = False
+
+    receipt = MODULE.compute_receipt(rows, "2.0")
+
+    assert receipt["query_level"]["acceptable_citation_set"]["value"] == 0.5
+    assert receipt["calibration_rule"]["acceptable_citation_set_exact"] is False
+    assert receipt["status"] == "calibration_failed"
+
+
 def test_protocol_v1_is_diagnostic_only() -> None:
     rows = _rows()
     for row in rows:

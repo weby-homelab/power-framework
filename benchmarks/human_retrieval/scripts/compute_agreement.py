@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 BOOTSTRAP_SAMPLES = 10_000
 BOOTSTRAP_SEED = 20260801
+V2_EXACT_AGREEMENT_MIN = 0.80
+V2_WEIGHTED_KAPPA_CI95_LOWER_MIN = 0.60
 V2_JUDGMENT_FIELDS = {
     "participant_id",
     "query_id",
@@ -279,13 +281,28 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
             abstention_matches, total_units=len(query_ids), seed=BOOTSTRAP_SEED + 12
         )
     kappa_receipt = pair_fields["relevance"]["quadratic_weighted_kappa"]
+    temporal_receipt = pair_fields["temporal_status"]
+    citation_receipt = query_fields["acceptable_citation_set"]
+    fieldwise_checks = {
+        "temporal_status_exact": (
+            temporal_receipt["measurable_units"] == temporal_receipt["total_units"]
+            and temporal_receipt["value"] is not None
+            and temporal_receipt["value"] >= V2_EXACT_AGREEMENT_MIN
+        ),
+        "acceptable_citation_set_exact": (
+            citation_receipt["measurable_units"] == citation_receipt["total_units"]
+            and citation_receipt["value"] is not None
+            and citation_receipt["value"] >= V2_EXACT_AGREEMENT_MIN
+        ),
+    }
     calibration_passed = bool(
         protocol_version == "2.0"
         and relevance_exact["measurable_units"] == relevance_exact["total_units"]
         and relevance_exact["value"] is not None
-        and relevance_exact["value"] >= 0.80
+        and relevance_exact["value"] >= V2_EXACT_AGREEMENT_MIN
         and kappa_receipt["ci95"][0] is not None
-        and kappa_receipt["ci95"][0] >= 0.60
+        and kappa_receipt["ci95"][0] >= V2_WEIGHTED_KAPPA_CI95_LOWER_MIN
+        and all(fieldwise_checks.values())
     )
     status = "diagnostic_only"
     if protocol_version == "2.0":
@@ -302,8 +319,10 @@ def compute_receipt(rows: list[dict[str, Any]], protocol_version: str) -> dict[s
         "pair_level": pair_fields,
         "query_level": query_fields,
         "calibration_rule": {
-            "relevance_exact_min": 0.80,
-            "relevance_weighted_kappa_ci95_lower_min": 0.60,
+            "relevance_exact_min": V2_EXACT_AGREEMENT_MIN,
+            "relevance_weighted_kappa_ci95_lower_min": V2_WEIGHTED_KAPPA_CI95_LOWER_MIN,
+            "fieldwise_exact_min": V2_EXACT_AGREEMENT_MIN,
+            **fieldwise_checks,
             "passed": calibration_passed,
             "eligible": protocol_version == "2.0",
         },

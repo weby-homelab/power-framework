@@ -304,8 +304,13 @@ def build(output_root: Path, vault: Path) -> None:
                     "abstention_quality": 0.90,
                     "p95_latency_ms": 1500,
                 },
+                "agreement_thresholds": {
+                    "relevance_exact_min": 0.80,
+                    "relevance_weighted_kappa_ci95_lower_min": 0.60,
+                    "fieldwise_exact_min": 0.80,
+                },
                 "comparators": ["lexical", "semantic", "hybrid", "reranked", "graph_assisted"],
-                "rule": "Thresholds are policy targets, not measured results; change requires a new pre-registration receipt before sealed access.",
+                "rule": "Thresholds are policy targets, not measured results; changing them requires a new pre-registration receipt before sealed access.",
             },
             indent=2,
         )
