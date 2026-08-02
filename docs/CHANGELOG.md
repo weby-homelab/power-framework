@@ -5,6 +5,9 @@
 - Technical release with explicit M2 remediation scope and sealed holdout closure.
 - No new human judgments were generated; the prior development receipt remains
   the measured source and the original threshold is preserved.
+- The historical evaluator keeps `0.80`; `0.75` is restricted to the explicit
+  v2.1 policy/readback profile.
+- Added regression coverage for the separate threshold profiles.
 
 ## 3.2.7
 

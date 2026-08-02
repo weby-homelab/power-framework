@@ -24,7 +24,10 @@ from pathlib import Path
 from typing import Any
 
 THRESHOLDS: dict[str, float] = {
-    "recall_at_10": 0.75,
+    # Historical M2-v2 execution contract. The curator-authorized 0.75
+    # remediation is available only through the explicit v2.1 policy or the
+    # separate threshold readback; it must not silently change old runs.
+    "recall_at_10": 0.8,
     "ndcg_at_10": 0.7,
     "mrr_at_10": 0.7,
     "citation_provenance_accuracy": 0.95,

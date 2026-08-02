@@ -21,6 +21,11 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+def test_historical_v2_default_threshold_is_not_silently_lowered() -> None:
+    """The 0.75 remediation belongs to the explicit v2.1 policy/readback."""
+    assert MODULE.THRESHOLDS["recall_at_10"] == 0.8
+
+
 def _rows(*, current_citation: bool = True) -> list[dict[str, object]]:
     return [
         {

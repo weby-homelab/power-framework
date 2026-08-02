@@ -83,6 +83,7 @@ def _manifest(output: Path, split: str) -> dict[str, Any]:
             "agreement_receipt_sha256": None,
         },
         "journeys": list(JOURNEYS),
+        "threshold_profile": "m2-v2.1",
         "thresholds": None,
         "corpus_status": "deidentified_reviewed_pending_calibration_and_annotation",
     }

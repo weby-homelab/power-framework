@@ -43,6 +43,12 @@ The retrieval evaluator gates only the five preregistered comparators:
 failures cannot silently block or open the M2 gate. Omitting a preregistered
 mode is fail-closed as `unavailable`.
 
+Threshold profiles are explicit. The historical M2-v2 evaluator and existing
+adjudicated manifest retain the frozen `recall_at_10 >= 0.80` contract. The
+curator-authorized `0.75` value belongs only to the separately named M2-v2.1
+policy (or its transparent threshold readback); it must never silently change
+an old receipt or invalidate the frozen human evidence.
+
 ## M2-v2.1 after the independent architecture test
 
 The current v2 receipt remains an honest **FAIL** because its preregistered

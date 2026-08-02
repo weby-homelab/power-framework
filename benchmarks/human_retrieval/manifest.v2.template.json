@@ -19,6 +19,7 @@
     "agreement_receipt": "calibration-agreement.v2.json",
     "agreement_receipt_sha256": null
   },
+  "threshold_profile": "m2-v2.1",
   "journeys": [
     "current_fact",
     "historical_fact",

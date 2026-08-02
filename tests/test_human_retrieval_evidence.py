@@ -21,7 +21,7 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 CANONICAL_THRESHOLDS = {
-    "recall_at_10": 0.75,
+    "recall_at_10": 0.80,
     "ndcg_at_10": 0.70,
     "mrr_at_10": 0.70,
     "citation_provenance_accuracy": 0.95,
@@ -82,9 +82,33 @@ def test_adjudicated_manifest_requires_canonical_threshold_values() -> None:
     assert MODULE.validate_manifest(manifest, allow_sealed=False) == []
     for key, value in CANONICAL_THRESHOLDS.items():
         manifest["thresholds"] = {**CANONICAL_THRESHOLDS, key: value + 1}
-        assert "adjudicated evidence thresholds must match the canonical M2 policy" in (
+        assert "adjudicated evidence thresholds must match the m2-v2 policy" in (
             MODULE.validate_manifest(manifest, allow_sealed=False)
         )
+
+
+def test_v21_threshold_profile_is_explicit_and_separate() -> None:
+    manifest = _manifest(
+        schema_version="2.0",
+        annotation_protocol="annotation_protocol_v2.md",
+        language="uk",
+        status="adjudicated",
+        threshold_profile="m2-v2.1",
+        thresholds=dict(MODULE.V21_THRESHOLDS),
+        annotator_count=2,
+        agreement={"receipt": "agreement.v2.json", "receipt_sha256": "e" * 64},
+        calibration={
+            "status": "passed",
+            "agreement_receipt": "calibration-agreement.v2.json",
+            "agreement_receipt_sha256": "f" * 64,
+        },
+    )
+    assert MODULE.validate_manifest(manifest, allow_sealed=False) == []
+
+    manifest.pop("threshold_profile")
+    assert "adjudicated evidence thresholds must match the m2-v2 policy" in (
+        MODULE.validate_manifest(manifest, allow_sealed=False)
+    )
 
 
 def test_protocol_v2_starts_pending_and_requires_hash_bound_calibration() -> None:

@@ -11,7 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a transparent M2 remediation readback with the curator-set `recall@10`
   threshold of `0.75`; the original `0.80` receipt remains immutable.
+- Preserved the historical evaluator's `0.80` default; the lower threshold is
+  bound to the explicit v2.1 policy/readback profile.
 - Recorded the independent architecture-test fixes and portable retrieval/indexing gates.
+- Added regression coverage proving the historical v2 and explicit v2.1 threshold profiles cannot be conflated.
 
 ### Changed
 

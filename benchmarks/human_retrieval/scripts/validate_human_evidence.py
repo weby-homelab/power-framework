@@ -31,14 +31,24 @@ ARTIFACTS = {
     "raw_judgments": "raw_judgments_sha256",
     "adjudicated_qrels": "adjudicated_qrels_sha256",
 }
-REQUIRED_THRESHOLDS = {
-    "recall_at_10": 0.75,
+LEGACY_V2_THRESHOLDS = {
+    "recall_at_10": 0.80,
     "ndcg_at_10": 0.70,
     "mrr_at_10": 0.70,
     "citation_provenance_accuracy": 0.95,
     "stale_answer_rate_max": 0.02,
     "abstention_quality": 0.90,
     "p95_latency_ms": 1500,
+}
+# The existing v2 manifest and frozen human evidence use the original
+# preregistration. v2.1 is a separate, explicitly named policy profile.
+V21_THRESHOLDS = {**LEGACY_V2_THRESHOLDS, "recall_at_10": 0.75}
+# Public callers historically imported this name; keep it bound to the
+# historical v2 contract rather than silently changing old evidence.
+REQUIRED_THRESHOLDS = LEGACY_V2_THRESHOLDS
+THRESHOLD_PROFILES = {
+    "m2-v2": LEGACY_V2_THRESHOLDS,
+    "m2-v2.1": V21_THRESHOLDS,
 }
 logger = logging.getLogger(__name__)
 
@@ -103,16 +113,23 @@ def validate_manifest(manifest: dict[str, Any], *, allow_sealed: bool) -> list[s
             elif calibration_status not in {"pending", "passed"}:
                 errors.append("calibration status must be pending or passed")
     if manifest.get("status") == "adjudicated":
+        threshold_profile = manifest.get("threshold_profile", "m2-v2")
+        expected_thresholds = THRESHOLD_PROFILES.get(threshold_profile)
+        if expected_thresholds is None:
+            errors.append("threshold_profile must be m2-v2 or m2-v2.1")
+            expected_thresholds = REQUIRED_THRESHOLDS
         thresholds = manifest.get("thresholds")
-        if not isinstance(thresholds, dict) or set(thresholds) != set(REQUIRED_THRESHOLDS):
+        if not isinstance(thresholds, dict) or set(thresholds) != set(expected_thresholds):
             errors.append("adjudicated evidence requires complete pre-registered thresholds")
         elif not all(
             isinstance(value, (int, float)) and math.isfinite(value)
             for value in thresholds.values()
         ):
             errors.append("pre-registered thresholds must be finite numbers")
-        elif thresholds != REQUIRED_THRESHOLDS:
-            errors.append("adjudicated evidence thresholds must match the canonical M2 policy")
+        elif thresholds != expected_thresholds:
+            errors.append(
+                f"adjudicated evidence thresholds must match the {threshold_profile} policy"
+            )
         if not isinstance(manifest.get("annotator_count"), int) or manifest["annotator_count"] < 2:
             errors.append("adjudicated evidence requires at least two independent annotators")
         agreement = manifest.get("agreement")

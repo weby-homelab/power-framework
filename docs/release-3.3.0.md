@@ -11,6 +11,8 @@ execution.
   original `0.80` threshold.
 - The curator-authorized remediation profile uses `recall@10 = 0.75` and has
   zero gated failures in the readback receipt.
+- The historical evaluator default remains `0.80`; `0.75` is accepted only by
+  the explicit M2-v2.1 policy or the separate readback artifact.
 - This is a readback, not a new retrieval execution. No human judgments were
   generated or changed.
 - The sealed holdout remains `do_not_open`; this release makes no human-quality
@@ -18,6 +20,6 @@ execution.
 
 ## Verification
 
-- Framework: `704 passed`, `10 skipped`, coverage `79.53%`.
+- Framework: `706 passed`, `10 skipped`, coverage `79.53%`.
 - Ruff, format, MyPy and `git diff --check`: PASS.
 - Release contract and package smoke must be run against the signed release tag.
