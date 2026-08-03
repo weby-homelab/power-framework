@@ -28,9 +28,9 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose 17 tools to MCP-compatible AI clients through FastMCP 3.x
-- **Technical 3.3.1 release** — package and CI provenance are
-  available, but M2, M3, M4, and M5 are incomplete; no sealed/human-quality or
-  production claim is made
+- **Technical 3.3.1 release** — the machine-only M2–M5 gates, package and CI
+  provenance are verified; human-quality certification, sealed-holdout access,
+  and production claims remain incomplete
 
 ## Quick Start
 
@@ -111,10 +111,11 @@ pip install --user --break-system-packages -e ".[dev]"
 | **CI/CD**                       | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest. |
 | **Documentation**               | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
-> **POWER 3.2 beta evidence status:** historical feature-table figures, model
-> comparisons, resource limits and benchmark recommendations are not current
-> release evidence. The framework remains beta/research until the P0/P1 gates
-> in the 3.1 remediation plan are closed with versioned artifacts.
+> **POWER 3.3.1 evidence status:** the release contains machine-only M2–M5
+> technical gates and package/CI provenance. Historical feature-table figures,
+> model comparisons, resource limits and benchmark recommendations are not
+> current release evidence. Human-quality certification, sealed-holdout access,
+> and production-quality claims remain outside this release.
 
 ## Migration Report
 
@@ -177,6 +178,8 @@ power lint <path>              Scan for broken links, missing metadata, orphans
 power index <path>             Generate hierarchical index (index.md + _index.md files)
 power search <path> <query>    Full-text search with relevance scoring
 power ingest <path> [options]  Create a new note with validated OKF metadata
+power memory <operation>       Governed memory context, proposal, apply, validation, and history
+power sync <path>              Build FTS and dense search indexes
 power rot <path>               ROT Audit — detect redundant, outdated, trivial notes
 power status [path]            Show vault status dashboard (statistics & health metrics)
 power heal <path>              Auto-heal missing/invalid frontmatter
@@ -184,6 +187,8 @@ power markdown-check <path>    Check markdown quality issues
 power archive <path>           Auto-archive stale notes to 04_Archive/
 power suggest-related <path>   Suggest cross-note relations for Graph RAG
 power cron <path>              Run automated maintenance (lint + index + rot)
+power synthesize <path>        Auto-ingest a session synthesis note
+power rename <path> <name>     Rename a note and update related paths
 ```
 
 ### Ingest Examples
@@ -374,7 +379,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI Agent (FastMCP 3.x)"]
-        Tools[["🔌 12 Async MCP Tools (stdio/HTTP)"]]:::agent
+        Tools[["🔌 17 Async MCP Tools (stdio/HTTP)"]]:::agent
         Search[["🔍 Hybrid / Reranked Search"]]:::agent
         ROT{{"🛠️ ROT & Contradiction Audit (Semantic/LLM)"}}:::agent
     end
@@ -437,6 +442,7 @@ flowchart TD
 | `core/query_expansion.py` | Synonym map (EN/UK) & OpenRouter Multi-Query expansion                                                                                                                                                                             |
 | `core/chunker.py`         | Semantic & contextual note splitter (Anthropic Contextual Retrieval)                                                                                                                                                               |
 | `core/healer.py`          | Auto-fix missing/invalid frontmatter fields                                                                                                                                                                                        |
+| `core/relations.py`       | Knowledge graph construction, BFS traversal, and Mermaid export                                                                                                                                                                   |
 | `core/rot_scoring.py`     | A2 scoring: semantic content dedup, freshness, contradiction checks                                                                                                                                                                |
 | `core/markdown_checks.py` | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                                                                           |
 | `core/constants.py`       | Centralized exclusion lists and system constants                                                                                                                                                                                   |

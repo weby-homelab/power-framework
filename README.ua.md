@@ -12,6 +12,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![CodeQL](https://github.com/weby-homelab/power-framework/actions/workflows/codeql.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/codeql.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-8A2BE2?logo=materialformkdocs)](https://weby-homelab.github.io/power-framework/)
+[![OKF BundleDex](https://bundledex.net/static-badge.svg)](https://bundledex.net)
 
 ## Про P.O.W.E.R. - Hybrid Knowledge Management Framework
 
@@ -26,8 +27,8 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Knowledge Graph** — поле `related` зв'язує нотатки між собою для Graph RAG
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
-- **MCP-нативний** — всі 12 інструментів доступні будь-якому MCP-клієнту (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) через FastMCP 3.x без додаткового коду
-- **Технічний реліз 3.3.1** — machine-only M2–M5 technical gate, CI, package smoke tests і provenance перевірені; sealed та human/production claims залишаються закритими.
+- **MCP-нативний** — 17 інструментів доступні MCP-сумісним AI-клієнтам через FastMCP 3.x
+- **Технічний реліз 3.3.1** — machine-only M2–M5 gates, package та CI provenance перевірені; сертифікація human-quality, доступ до sealed holdout і production claims залишаються закритими.
 
 ## Швидкий старт
 
@@ -88,30 +89,31 @@ pip install --user --break-system-packages -e ".[dev]"
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **CLI**                         | 16 команд, включно з `power memory` для явного proposal, approval, validation та history                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **MCP Server**                  | 17 інструментів, включно з керованими операціями memory context, proposal, apply, validation та history                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **OKF Validation**              | Pydantic v2 схеми з полями governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **OKF Validation**              | Pydantic v2 схеми забезпечують строгі OKF-метадані на кожній нотатці з governance-полями (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | **Knowledge Graph (Graph RAG)** | Поле `related` в OKF frontmatter з підтримкою `TypedRelation` (path, relation, confidence), BFS обходом та експортом підграфів у Mermaid-діаграми (`to_mermaid`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **Freshness Monitoring**        | Лінтер виявляє застарілі нотатки за полем `expiry`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **Agent Auto-Ingest**           | `synthesize_session` — агенти автономно створюють нотатки з governance + graph links + перебудовою індексу                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **Режими retrieval**            | Доступні FTS5 (BM25), local TF vector, Hybrid (RRF), Semantic та **Reranked** режими. Default POWER 3.2 потребує сумісний dense index і завершується fail-closed з remediation `power sync`, якщо assets відсутні або несумісні. |
-| **Cross-Encoder реранкер**      | Default BGE reranker є Apache-2.0 ONNX snapshot із SHA-256 перевірками. Jina є явним non-commercial opt-in. |
+| **Режими retrieval**            | Доступні FTS5 (BM25), local TF vector, Hybrid (RRF), Semantic та **Reranked** режими. Default POWER 3.2 потребує сумісний dense index і завершується fail-closed з remediation `power sync`, якщо assets відсутні або несумісні. Semantic ranking застосовує 5% confidence-bound lexical tie-break без додавання кандидатів; явно дозволений FTS downgrade позначається в result contract. Якісні та ресурсні показники потребують versioned evidence перед будь-яким release claim. |
+| **Cross-Encoder реранкер**      | Канонічний BGE-реранкер — Apache-2.0 ONNX snapshot із SHA-256-перевірками. Локальний `jinaai/jina-reranker-v2-base-multilingual` має CC-BY-NC-4.0 і потребує `POWER_RERANKER=jina` та `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` для дозволеного non-commercial використання. |
 | **Graph RAG v2**                | Фаза 3 suggester зв'язків: явні OKF `related` посилання дають сильний куратований сигнал, злитий з перетином ключових слів/тегів у **зважений двонаправлений граф подібності** зі зваженим BFS та центральністю за ступенем/вагою (`power suggest-related --v2`). Лише впевнені передбачення, без вигаданих зв'язків.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **ColBERT Opt-In реранкер**     | Фаза 3 `POWER_RERANKER=colbert` вмикає late-interaction ColBERT реранкинг (потрібно ≥16 GB RAM, інакше пропускається); **вимкнено за замовчуванням**. Канонічний fallback — ліцензійно чистий BGE ONNX реранкер; Jina доступна лише через явний non-commercial opt-in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **Synthesize Auto-Ingest**      | Фаза 3 CLI `power synthesize <path>` (дзеркалить MCP-інструмент `synthesize_session`) автокласифікує OKF метадані, пише атомарно, регенерує ієрархічний індекс, дописує `log.md` та запускає lint-звіт — Auto-Ingest Feedback Loop.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | **Статус метрики якості пошуку** | Колишнє значення `UDCG@5` — це legacy normalised discounted lexical proxy, а не EACL-2026 UDCG; воно лише діагностичне. Release-quality claims відкладено до paper-backed reference vectors справжньої UDCG. |
-| **ROT Audit**                   | Виявляє дублікати за допомогою векторного косинусного порівняння та перевіряє семантичні суперечності за допомогою LLM або метаданих                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **ROT Audit**                   | Виявляє redundant, outdated і trivial нотатки за допомогою семантичної дедублікації dense embeddings та LLM-перевірки суперечностей фактів |
 | **Auto-Archive**                | Автоматично архівує застарілі нотатки до `04_Archive/` — `power archive <path>` з dry-run переглядом                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **Healer**                      | Автоматично виправляє відсутні/невалідні поля frontmatter — `power heal <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **Markdown Checks**             | Перевіряє якість Markdown: trailing whitespace, списки, заголовки, мова коду — `power markdown-check <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Healer**                     | Автоматично виправляє відсутні/невалідні поля frontmatter (`title`, `description`, `type`, `timestamp`) — `power heal <path>` |
+| **Markdown Checks**             | Виявляє кінцеві пробіли, непослідовні маркери списків, стрибки заголовків і відсутню мову коду — `power markdown-check <path>` |
 | **Relation Suggestions**        | Аналіз перетину ключових слів та тегів для Graph RAG — `power suggest-related <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **Cron Maintenance**            | Запускає lint + index + rot audit однією командою — `power cron <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **Hierarchical Index**          | `index.md` (навігаційна карта) + `*/_index.md` (детальні каталоги) для економії токенів AI-агентів (~75-94%)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **CI/CD**                       | Hermetic тести, CodeQL SAST і автоматизовані GitHub-релізи; release evidence перевіряється versioned harness `benchmarks/power31` та pinned model manifest. |
 | **Документація**                | Повний [mkdocs-material сайт](https://weby-homelab.github.io/power-framework/) з API reference та гайдами                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-> **Статус evidence для POWER 3.1:** historical figures у feature-table,
+> **Статус evidence для POWER 3.3.1:** реліз містить machine-only M2–M5
+> technical gates і package/CI provenance. Historical figures у feature-table,
 > model comparisons, resource limits і benchmark recommendations не є поточним
-> release evidence. Framework лишається beta/research, доки P0/P1 gates плану
-> 3.1 не закриті versioned artifacts.
+> release evidence. Сертифікація human-quality, доступ до sealed holdout та
+> production-quality claims залишаються поза межами цього релізу.
 
 ## Звіт міграції
 
@@ -174,6 +176,8 @@ power lint <path>              Сканування на биті посилан
 power index <path>             Згенерувати ієрархічний індекс (index.md + _index.md)
 power search <path> <query>    Повнотекстовий пошук з релевантним ранжуванням
 power ingest <path> [опції]    Створити нову нотатку з валідованими OKF метаданими
+power memory <операція>        Керований memory context, proposal, apply, validation та history
+power sync <path>              Побудувати FTS і dense-індекси пошуку
 power rot <path>               ROT Audit — виявити дублікати, застарілі, тривіальні
 power status [path]            Показати інформаційну панель стану vault (статистика та здоров'я)
 power heal <path>              Автоматично виправити відсутній/невалідний frontmatter
@@ -181,6 +185,8 @@ power markdown-check <path>    Перевірити якість Markdown
 power archive <path>           Автоматично архівувати застарілі нотатки в 04_Archive/
 power suggest-related <path>   Запропонувати Graph RAG зв'язки між нотатками
 power cron <path>              Автоматичне обслуговування (lint + index + rot)
+power synthesize <path>        Автоматично додати нотатку з підсумком сесії
+power rename <path> <name>     Перейменувати нотатку й оновити пов'язані шляхи
 ```
 
 ### Приклади ingest
@@ -371,7 +377,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI-Агент (FastMCP 3.x)"]
-        Tools[["🔌 12 асинхронних інструментів MCP"]]:::agent
+        Tools[["🔌 17 асинхронних інструментів MCP"]]:::agent
         Search[["🔍 Гібридний / Reranked пошук"]]:::agent
         ROT{{"🛠️ Аудит ROT та суперечностей (Semantic/LLM)"}}:::agent
     end
@@ -504,6 +510,40 @@ P.O.W.E.R. Framework розповсюджується під ліцензією 
 
 <!--
 AI-INDEXING: ALLOWED | CRAWLER-PRIORITY: HIGH | CONTENT-TYPE: OPEN-SOURCE-TOOL
+MACHINE-READABLE-METADATA: JSON-LD BELOW
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "P.O.W.E.R. Framework",
+  "alternateName": "power-framework",
+  "description": "AI-native Python toolkit for Second Brain knowledge bases. Validate, index, search, and manage Obsidian vaults via CLI or MCP server using the P.A.R.A. + OKF methodology.",
+  "url": "https://github.com/weby-homelab/power-framework",
+  "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Linux, macOS, Windows",
+  "programmingLanguage": "Python",
+  "runtimePlatform": "Python 3.11+",
+  "softwareVersion": "latest",
+  "license": "https://www.gnu.org/licenses/gpl-3.0",
+  "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
+  "author": {
+    "@type": "Organization",
+    "name": "Weby Homelab",
+    "url": "https://github.com/weby-homelab"
+  },
+  "codeRepository": "https://github.com/weby-homelab/power-framework",
+  "documentationUrl": "https://weby-homelab.github.io/power-framework/",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+-->
+
+<!--
+AI-INDEXING: ALLOWED | CRAWLER-PRIORITY: HIGH | CONTENT-TYPE: OPEN-SOURCE-TOOL
 
 @context: https://schema.org
 @type: SoftwareApplication
@@ -521,8 +561,3 @@ downloadUrl: https://github.com/weby-homelab/power-framework/releases
 license: GPL-3.0
 isAccessibleForFree: true
 -->
-
-<p align="center">
-  Створено в Україні під час повітряних тривог та блекаутів ⚡<br>
-  &copy; 2026 Weby Homelab
-</p>
