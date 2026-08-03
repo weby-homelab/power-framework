@@ -27,7 +27,7 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
 - **MCP-нативний** — всі 12 інструментів доступні будь-якому MCP-клієнту (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor) через FastMCP 3.x без додаткового коду
-- **Технічний реліз 3.3.1 (pre-release)** — machine-only M2–M5 technical gate, CI, package smoke tests і provenance перевірені; sealed та human/production claims залишаються закритими.
+- **Технічний реліз 3.3.1** — machine-only M2–M5 technical gate, CI, package smoke tests і provenance перевірені; sealed та human/production claims залишаються закритими.
 
 ## Швидкий старт
 
