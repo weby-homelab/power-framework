@@ -87,6 +87,28 @@ def test_index_missing_vault(tmp_path: Path) -> None:
     assert exc.value.code == 1
 
 
+def test_index_strict_reports_invalid_notes(tmp_path: Path) -> None:
+    projects = tmp_path / "01_Projects"
+    projects.mkdir(parents=True)
+    (projects / "invalid.md").write_text(
+        "---\n"
+        "type: Project\n"
+        'title: "Invalid"\n'
+        'description: "bad resource"\n'
+        'resource: "not-a-url"\n'
+        "timestamp: 2026-08-02T00:00:00Z\n"
+        "---\n\n# Invalid\n",
+        encoding="utf-8",
+    )
+    with (
+        patch.object(sys, "argv", ["power", "index", str(tmp_path), "--strict"]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 1
+    assert (tmp_path / "index.md").exists()
+
+
 def test_ingest_creates_note(sample_vault: Path) -> None:
     with (
         patch.object(
@@ -141,6 +163,52 @@ def test_ingest_with_tags(sample_vault: Path) -> None:
     assert exc.value.code == 0
     note = sample_vault / "03_Resources" / "test_resource.md"
     assert note.exists()
+
+
+def test_ingest_routes_to_domain_template(sample_vault: Path) -> None:
+    (sample_vault / ".power").mkdir()
+    (sample_vault / ".power" / "domains.yaml").write_text(
+        """
+version: 1
+domains:
+  - name: research
+    path: 03_Resources/research
+    template: 05_Templates/research.md
+    rules:
+      - keywords: [experiment]
+    search_priority: [fts]
+""",
+        encoding="utf-8",
+    )
+    (sample_vault / "05_Templates").mkdir(exist_ok=True)
+    (sample_vault / "05_Templates" / "research.md").write_text(
+        '---\ntype: {type}\ntitle: "{title}"\n'
+        'description: "{description}"\ntimestamp: {timestamp}\n---\n\n# {title}\n\nResearch template.\n',
+        encoding="utf-8",
+    )
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "ingest",
+                str(sample_vault),
+                "--type",
+                "Resource",
+                "--title",
+                "Experiment Notes",
+                "--description",
+                "Research experiment",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 0
+    note = sample_vault / "03_Resources" / "research" / "experiment_notes.md"
+    assert note.exists()
+    assert "Research template." in note.read_text(encoding="utf-8")
 
 
 def test_ingest_missing_vault(tmp_path: Path) -> None:

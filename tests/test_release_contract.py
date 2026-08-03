@@ -9,7 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VALIDATOR = REPO_ROOT / "scripts" / "verify_release_contract.py"
-BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.2.7.json"
+BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.3.1.json"
 MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
 
 

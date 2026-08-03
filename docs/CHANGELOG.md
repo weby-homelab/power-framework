@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.3.1
+
+- Added the fail-closed machine-only M2–M5 technical gate over synthetic M2/M3,
+  transactional M4, and tag-bound M5 release checks.
+- Fixed the Python 3.13 file-backed async mutation completion deadlock and added
+  a focused regression test.
+- Kept human-quality, production-quality, and sealed-holdout claims explicitly
+  closed in the release contract.
+
+## 3.3.0
+
+- Technical release with explicit M2 remediation scope and sealed holdout closure.
+- No new human judgments were generated; the prior development receipt remains
+  the measured source and the original threshold is preserved.
+- The historical evaluator keeps `0.80`; `0.75` is restricted to the explicit
+  v2.1 policy/readback profile.
+- Added regression coverage for the separate threshold profiles.
+
 ## 3.2.7
 
 - Added explicit candidate-graph decisions, temporal retrieval semantics,

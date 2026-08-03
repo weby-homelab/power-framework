@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 from .chunker import SemanticChunker
 from .db import _init_db
+from .domains import DomainConfigError, resolve_search_policy
 from .embeddings import configured_embedding_identity, get_embedding_manager
 from .generation_index import ActiveGenerationError, resolve_active_generation_path
 from .ignore import should_skip
@@ -101,8 +102,62 @@ RERANK_CANDIDATE_LIMIT = 20
 # Max characters of each candidate doc fed to the reranker (truncated excerpt).
 # Keeps cross-encoder token cost bounded on CPU (Performance Plan §4).
 RERANK_TEXT_CHARS = 800
+DEFAULT_FTS_OPERATOR = "OR"
+SEMANTIC_LEXICAL_GUARD_RELATIVE_MARGIN = 0.05
+# Function words carry little retrieval signal and can dominate OR-mode BM25
+# on short Ukrainian questions. Keep this deliberately small and language
+# neutral; content words, quoted phrases and identifiers are never filtered.
+FTS_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "be",
+        "can",
+        "do",
+        "does",
+        "for",
+        "in",
+        "is",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "what",
+        "which",
+        "або",  # noqa: RUF001
+        "в",
+        "де",
+        "для",
+        "до",
+        "є",
+        "за",
+        "і",  # noqa: RUF001
+        "із",
+        "й",
+        "як",
+        "який",
+        "яка",
+        "яке",
+        "якому",
+        "може",
+        "на",
+        "не",
+        "ні",
+        "про",
+        "саме",
+        "та",
+        "у",  # noqa: RUF001
+        "що",
+        "чи",
+    }
+)
 DEFAULT_SEARCH_MODE = "semantic"
-CANONICAL_SEARCH_MODES = frozenset({"fts", "vector", "hybrid", "semantic", "reranked"})
+CANONICAL_SEARCH_MODES = frozenset(
+    {"fts", "vector", "hybrid", "semantic", "reranked", "graph_assisted"}
+)
 SEARCH_MODE_ALIASES = {"hybrid_reranked": "reranked"}
 
 
@@ -122,6 +177,7 @@ SEARCH_MODE_REGISTRY = {
     "hybrid": SearchModeSpec(("fts", "tf_vector"), "rrf", False, False),
     "semantic": SearchModeSpec(("dense",), None, False, True),
     "reranked": SearchModeSpec(("fts", "tf_vector", "dense"), "rrf", True, True),
+    "graph_assisted": SearchModeSpec(("fts", "tf_vector", "graph"), "rrf_graph", False, False),
 }
 
 
@@ -432,6 +488,7 @@ def _sync_vault_to_db(
     # v2.2.0: collect changed files first, then embed in batches. This avoids
     # holding the embedding model AND all vectors in memory at once.
     changed: list[tuple[str, str, OKFMetadata, float]] = []  # (rel_path, content, metadata, mtime)
+    invalid_changed = False
     for idx, (rel_path, mtime) in enumerate(disk_files.items()):
         if idx % 50 == 0:
             logger.info("Sync scan: %d/%d (%s)", idx, len(disk_files), rel_path)
@@ -441,9 +498,12 @@ def _sync_vault_to_db(
                 content = read_file_content(filepath)
                 metadata = validate_metadata(content)
                 if metadata is None:
+                    invalid_changed = True
                     cursor.execute("DELETE FROM fts_notes WHERE rel_path = ?", (rel_path,))
                     cursor.execute("DELETE FROM file_metadata WHERE rel_path = ?", (rel_path,))
                     cursor.execute("DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM chunk_embeddings WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM tf_vectors WHERE rel_path = ?", (rel_path,))
                     continue
                 changed.append((rel_path, content, metadata, mtime))
             except Exception as e:
@@ -490,6 +550,22 @@ def _sync_vault_to_db(
         except Exception as e:
             logger.warning("FTS/TF write failed for %s: %s", rel_path, e)
             continue
+
+    if not sync_embeddings and (changed or invalid_changed or to_delete):
+        # A lightweight FTS sync cannot refresh dense vectors for changed
+        # notes. Invalidate the dense contract instead of leaving stale rows
+        # that semantic/reranked callers might mistake for current evidence.
+        changed_paths = [rel_path for rel_path, *_ in changed]
+        cursor.executemany(
+            "DELETE FROM doc_embeddings WHERE rel_path = ?", [(path,) for path in changed_paths]
+        )
+        cursor.executemany(
+            "DELETE FROM chunk_embeddings WHERE rel_path = ?", [(path,) for path in changed_paths]
+        )
+        cursor.execute("DELETE FROM dense_index_manifest")
+        logger.info(
+            "Dense index invalidated by FTS-only source changes; run power sync for dense search"
+        )
     conn.commit()
 
     if not (sync_embeddings and embedder is not None):
@@ -715,7 +791,7 @@ def _fts_search(
 ) -> list[SearchResult]:
     """SQLite FTS5 full-text search with weighted BM25 scoring."""
     clean_query = re.sub(
-        r'[^\w\s"а-яєіїґ\']',  # noqa: RUF001
+        r'[^\w\s"а-яєіїґ\'-]',  # noqa: RUF001
         " ",
         query,
         flags=re.IGNORECASE,
@@ -727,9 +803,17 @@ def _fts_search(
         if phrase:
             terms.append(f'"{phrase.strip()}"')
         elif word:
-            terms.append(f"{word.strip()}*")
+            token = word.strip()
+            # FTS5 treats punctuation such as a hyphen as a query operator or
+            # a token separator. Quoting it preserves the user's identifier
+            # and prevents ``first-token`` from matching ``second-token``.
+            if "-" in token or token.casefold() not in FTS_STOPWORDS:
+                terms.append(f'"{token}"' if "-" in token else f"{token}*")
 
-    fts_query = " AND ".join(terms) if terms else ""
+    operator = os.getenv("POWER_FTS_OPERATOR", DEFAULT_FTS_OPERATOR).upper()
+    if operator not in {"AND", "OR"}:
+        raise ValueError("POWER_FTS_OPERATOR must be AND or OR")
+    fts_query = f" {operator} ".join(terms) if terms else ""
     if not fts_query:
         return []
 
@@ -758,8 +842,10 @@ def _fts_search(
             (fts_query, max_results),
         )
 
+        rows = cursor.fetchall()
+
         results: list[SearchResult] = []
-        for row in cursor.fetchall():
+        for row in rows:
             rel_path, title, description, note_type, score, snippet, tags_str = row
             tags = tags_str.split(" ") if tags_str else []
             match_count = 1
@@ -783,7 +869,7 @@ def _fts_search(
         terms_fallback: list[str] = []
         for match in re.finditer(r'"([^"]+)"|(\S+)', query.strip()):
             term = (match.group(1) or match.group(2)).strip().lower()
-            if term:
+            if term and ("-" in term or term.casefold() not in FTS_STOPWORDS):
                 terms_fallback.append(term)
         if not terms_fallback:
             return []
@@ -929,18 +1015,27 @@ def _rrf_merge(
     k: int = 60,
 ) -> list[SearchResult]:
     """Merge two ranked result lists using Reciprocal Rank Fusion."""
+    return _rrf_merge_many([fts_results, vector_results], k=k)
+
+
+def _rrf_merge_many(
+    result_sets: list[list[SearchResult]],
+    k: int = 60,
+) -> list[SearchResult]:
+    """Merge any number of ranked result lists using reciprocal rank fusion."""
     rrf_scores: dict[str, float] = {}
 
-    for rank, result in enumerate(fts_results):
-        rrf_scores[result.rel_path] = 1.0 / (k + rank + 1)
-
-    for rank, result in enumerate(vector_results):
-        rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (k + rank + 1)
+    for results in result_sets:
+        for rank, result in enumerate(results):
+            rrf_scores[result.rel_path] = rrf_scores.get(result.rel_path, 0.0) + 1.0 / (
+                k + rank + 1
+            )
 
     doc_map: dict[str, SearchResult] = {}
-    for r in fts_results + vector_results:
-        if r.rel_path not in doc_map or r.score > doc_map[r.rel_path].score:
-            doc_map[r.rel_path] = r
+    for results in result_sets:
+        for result in results:
+            if result.rel_path not in doc_map or result.score > doc_map[result.rel_path].score:
+                doc_map[result.rel_path] = result
 
     merged: list[SearchResult] = []
     for path, score in sorted(rrf_scores.items(), key=lambda x: -x[1]):
@@ -1074,6 +1169,42 @@ def _semantic_search(
     return results
 
 
+def _apply_semantic_lexical_guard(
+    vault_dir: Path,
+    query: str,
+    results: list[SearchResult],
+) -> list[SearchResult]:
+    """Use lexical evidence only to break an ambiguous dense top-1 tie.
+
+    Dense retrieval remains the candidate generator. If its top score is close
+    to the score of a lexical top result already present in the dense pool,
+    preferring the lexical result prevents an arbitrary embedding tie from
+    replacing an exact source phrase. No new candidates are introduced and
+    failure to read FTS leaves the dense ranking unchanged.
+    """
+    if len(results) < 2 or results[0].score <= 0:
+        return results
+    try:
+        lexical = _fts_search(vault_dir, query, max_results=1)
+    except Exception:
+        return results
+    if not lexical:
+        return results
+
+    lexical_path = lexical[0].rel_path
+    dense_by_path = {result.rel_path: result for result in results}
+    lexical_result = dense_by_path.get(lexical_path)
+    if lexical_result is None or lexical_result is results[0]:
+        return results
+
+    margin = results[0].score - lexical_result.score
+    allowed_margin = results[0].score * SEMANTIC_LEXICAL_GUARD_RELATIVE_MARGIN
+    if margin > allowed_margin:
+        return results
+
+    return [lexical_result, *[result for result in results if result is not lexical_result]]
+
+
 def search_vault(
     vault_dir: Path,
     query: str,
@@ -1081,6 +1212,7 @@ def search_vault(
     mode: str = DEFAULT_SEARCH_MODE,
     temporal_view: str = "current",
     as_of: date | str | None = None,
+    domain: str | None = None,
 ) -> list[SearchResult]:
     """
     Search the vault for notes matching the query.
@@ -1092,10 +1224,16 @@ def search_vault(
         mode: Search mode. POWER 3.1 canonical mode is "semantic" (default),
               backed by the pinned BGE-M3 ONNX revision and a compatible dense
               index. Other explicit modes are "fts" (BM25), "vector" (TF
-              cosine), "hybrid" (RRF of FTS + TF vector), and "reranked".
-              ``hybrid_reranked`` is a deprecated alias of ``reranked``.
+              cosine), "hybrid" (RRF of FTS + TF vector), "reranked", and
+              "graph_assisted" (sparse RRF expanded through accepted OKF
+              relations). ``hybrid_reranked`` is a deprecated alias of
+              ``reranked``. ``auto`` uses the selected domain's first
+              ``search_priority`` entry; without a domain registry it retains
+              the semantic default.
         temporal_view: ``current`` (default), ``historical``, or ``all``.
         as_of: Inclusive ISO-8601 date boundary for temporal evaluation.
+        domain: Optional domain slug. When present, results are scoped to the
+            domain path and its priority is used when ``mode=auto``.
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -1104,11 +1242,23 @@ def search_vault(
     # path; downstream code uses Path operators (vault_dir / rel_path), so
     # coerce to a resolved Path once here.
     vault_dir = Path(vault_dir).expanduser().resolve()
+    requested_max_results = max_results
+    try:
+        mode, resolved_domain = resolve_search_policy(vault_dir, query, mode, domain)
+    except DomainConfigError:
+        raise
     mode = normalize_search_mode(mode)
+    domain_path = resolved_domain.path if resolved_domain else None
+    if resolved_domain:
+        # Scope after candidate generation, but over-fetch so a domain does not
+        # appear empty merely because another domain occupied the global top-K.
+        max_results = max(max_results * 5, 20)
     temporal_view = normalize_temporal_view(temporal_view).value
     boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
     retrieval_contract = "dense"
+    if mode == "graph_assisted":
+        retrieval_contract = "graph_assisted"
     if mode_spec.requires_dense_index:
         try:
             validate_dense_index(vault_dir)
@@ -1164,9 +1314,12 @@ def search_vault(
     if mode == "hybrid":
         fts_all: list[SearchResult] = []
         vec_all: list[SearchResult] = []
+        dense_all: list[SearchResult] = []
         for variant in variants:
             fts_all.extend(_fts_search(vault_dir, variant, max_results=max_results * 2))
             vec_all.extend(_vector_search(vault_dir, variant, max_results=max_results * 2))
+            with contextlib.suppress(DenseIndexUnavailableError):
+                dense_all.extend(_semantic_search(vault_dir, variant, max_results=max_results * 2))
 
         # Deduplicate FTS by rel_path (keeping max score) and sort
         fts_map: dict[str, SearchResult] = {}
@@ -1182,10 +1335,28 @@ def search_vault(
                 vec_map[r.rel_path] = r
         vec_dedup = sorted(vec_map.values(), key=lambda x: -x.score)
 
-        # Single RRF fusion at the end
-        return _filter_temporal_results(
-            vault_dir, _rrf_merge(fts_dedup, vec_dedup), temporal_view, boundary, max_results
+        dense_map: dict[str, SearchResult] = {}
+        for r in dense_all:
+            if r.rel_path not in dense_map or r.score > dense_map[r.rel_path].score:
+                dense_map[r.rel_path] = r
+        dense_dedup = sorted(dense_map.values(), key=lambda x: -x.score)
+
+        # Preserve the established sparse ranking and use dense retrieval as a
+        # candidate-expansion source. A direct three-way RRF can let a dense
+        # near-match displace a strong lexical citation; appending dense-only
+        # candidates keeps the hybrid contract recall-oriented without changing
+        # the evidence-backed sparse top-1 order.
+        merged = _rrf_merge_many([fts_dedup, vec_dedup])
+        sparse_paths = {result.rel_path for result in merged}
+        merged.extend(result for result in dense_dedup if result.rel_path not in sparse_paths)
+        if domain_path:
+            merged = _filter_domain_results(merged, domain_path)
+        results = _filter_temporal_results(
+            vault_dir, merged, temporal_view, boundary, requested_max_results
         )
+        for result in results:
+            result.retrieval_contract = retrieval_contract
+        return results
 
     # For non-hybrid modes, gather results, dedup by rel_path keeping max score, and sort
     all_results: list[SearchResult] = []
@@ -1194,16 +1365,15 @@ def search_vault(
             results = _vector_search(vault_dir, variant, max_results=max_results)
         elif mode == "semantic":
             results = _semantic_search(vault_dir, variant, max_results=max_results)
+        elif mode == "graph_assisted":
+            results = _graph_assisted_search(vault_dir, variant, max_results=max_results)
         elif mode in ("reranked", "hybrid_reranked"):
             results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
-            # R5 (POWER 3.0): dense fallback ONLY when FTS/rerank yields too few
-            # hits — keeps the canonical path cheap (no model load) for the common
-            # case, but never silently returns a short list when the vault clearly
-            # has relevant dense matches. This is the inverse of the old behavior
-            # where semantic was the default and FTS was the fallback.
-            if len(results) < 5:
-                dense = _semantic_search(vault_dir, variant, max_results=max_results)
-                _merge_by_rel_path(all_results, dense)
+            # ``_hybrid_reranked_search`` already fuses dense candidates before
+            # assigning cross-encoder scores. Do not add a second dense fallback
+            # here: dense cosine scores and cross-encoder scores are different
+            # scales, and the later max-score deduplication would silently replace
+            # the reranked order with the semantic order on small vaults.
         else:
             results = _fts_search(vault_dir, variant, max_results=max_results)
         all_results.extend(results)
@@ -1214,9 +1384,13 @@ def search_vault(
             res_map[r.rel_path] = r
 
     final_results = sorted(res_map.values(), key=lambda x: (-x.score, x.title))
+    if domain_path:
+        final_results = _filter_domain_results(final_results, domain_path)
     final_results = _filter_temporal_results(
-        vault_dir, final_results, temporal_view, boundary, max_results
+        vault_dir, final_results, temporal_view, boundary, requested_max_results
     )
+    if mode == "semantic":
+        final_results = _apply_semantic_lexical_guard(vault_dir, query, final_results)
     for r in final_results:
         r.retrieval_contract = retrieval_contract
     return final_results
@@ -1238,6 +1412,16 @@ def _filter_temporal_results(
         if includes_temporal_status(status, temporal_view):
             filtered.append(result)
     return filtered[:max_results]
+
+
+def _filter_domain_results(results: list[SearchResult], domain_path: Path) -> list[SearchResult]:
+    """Keep only results below a validated domain-relative path."""
+    prefix = domain_path.as_posix().rstrip("/")
+    return [
+        result
+        for result in results
+        if (result.rel_path == prefix or result.rel_path.startswith(prefix + "/"))
+    ]
 
 
 def _hybrid_reranked_search(
@@ -1300,6 +1484,86 @@ def _hybrid_reranked_search(
     return (reranked + tail)[:max_results]
 
 
+def _graph_assisted_search(
+    vault_dir: Path,
+    query: str,
+    max_results: int = 20,
+) -> list[SearchResult]:
+    """Expand a sparse candidate pool through the accepted knowledge graph.
+
+    The graph comparator is deterministic and provenance-preserving: the
+    initial candidates come from FTS + TF-vector, and expansion uses only
+    ``suggest_related_v2`` over validated OKF notes. Missing or quarantined
+    relation targets are ignored by the graph builder. A graph hop is a
+    ranking signal, never a replacement for the source note.
+    """
+    from .relations import WeightedKnowledgeGraph, suggest_related_v2
+
+    candidate_limit = max(20, max_results * 4)
+    candidates = _rrf_merge(
+        _fts_search(vault_dir, query, max_results=candidate_limit),
+        _vector_search(vault_dir, query, max_results=candidate_limit),
+    )
+    if not candidates:
+        return []
+
+    graph_boosts: dict[str, float] = {}
+    for rank, anchor in enumerate(candidates[:candidate_limit]):
+        try:
+            suggestions = suggest_related_v2(
+                vault_dir,
+                target_path=anchor.rel_path,
+                max_results=max(20, max_results * 4),
+                score_threshold=0.0,
+            )
+            graph = WeightedKnowledgeGraph.from_suggestions(suggestions)
+            anchor_weight = 1.0 / (rank + 1)
+            for path, weight, depth in graph.weighted_bfs(anchor.rel_path, max_hops=2):
+                decay = 1.0 if depth == 1 else 0.5
+                graph_boosts[path] = max(
+                    graph_boosts.get(path, 0.0), anchor_weight * weight * decay
+                )
+        except Exception:
+            # Relation suggestions are an optional ranking signal. A malformed
+            # note must not make the sparse comparator unavailable.
+            logger.debug("Graph expansion failed for %s", anchor.rel_path, exc_info=True)
+
+    result_map = {result.rel_path: result for result in candidates}
+    for rank, result in enumerate(candidates):
+        result.score = (1.0 / (rank + 1)) + 0.25 * graph_boosts.get(result.rel_path, 0.0)
+        result.retrieval_contract = "graph_assisted"
+
+    # Bring graph-only neighbours into the result set with a bounded, stable
+    # score. They remain ordinary SearchResult records with their own source
+    # metadata; graph labels are not presented as document content.
+    for path, boost in graph_boosts.items():
+        if path in result_map:
+            continue
+        source = vault_dir / path
+        try:
+            content = read_file_content(source)
+            metadata = validate_metadata(content)
+            if metadata is None:
+                continue
+            result_map[path] = SearchResult(
+                rel_path=path,
+                title=metadata.title,
+                description=metadata.description,
+                note_type=metadata.type,
+                score=0.25 * boost,
+                snippet=content[:MAX_SNIPPET_LENGTH].replace("\n", " ").strip(),
+                match_count=0,
+                tags=metadata.tags,
+                retrieval_contract="graph_assisted",
+            )
+        except Exception:  # noqa: S112
+            continue
+
+    return sorted(result_map.values(), key=lambda item: (-item.score, item.title, item.rel_path))[
+        :max_results
+    ]
+
+
 def _merge_by_rel_path(target: list[SearchResult], incoming: list[SearchResult]) -> None:
     """Merge ``incoming`` into ``target``, keeping the highest score per rel_path."""
     seen: dict[str, float] = {r.rel_path: r.score for r in target}
@@ -1329,6 +1593,8 @@ def format_search_results(
         "hybrid": "Hybrid (FTS+Vector)",
         "semantic": "Semantic (Dense Embedding)",
         "hybrid_reranked": "Hybrid (RRF + Rerank)",
+        "reranked": "Hybrid (RRF + Rerank)",
+        "graph_assisted": "Graph-assisted (RRF + OKF relations)",
     }.get(mode.lower(), mode.upper())
 
     lines = [

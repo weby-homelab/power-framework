@@ -157,6 +157,31 @@ def atomic_write_in_vault(
     symlink replacement from redirecting the write outside the canonical root.
     """
     target = resolve_path_in_vault(vault_root, untrusted_relative_path, allowed_directories)
+
+    if os.name == "nt":  # pragma: no cover - exercised on Windows
+        # Windows does not implement ``dir_fd`` or ``O_NOFOLLOW``. Keep the
+        # same atomic temp-file contract with a directory-local tempfile, and
+        # recheck the destination immediately before replacement to reject a
+        # symlink swap where the platform exposes one.
+        fd, temporary_path = tempfile.mkstemp(
+            dir=str(target.parent),
+            prefix=f".{target.name}.",
+            suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "w", encoding=encoding) as temporary_file:
+                temporary_file.write(content)
+                temporary_file.flush()
+                os.fsync(temporary_file.fileno())
+            if target.is_symlink():
+                raise ValueError("Symlink note targets are not allowed")
+            os.replace(temporary_path, target)
+        except Exception:
+            with suppress(FileNotFoundError):
+                os.unlink(temporary_path)
+            raise
+        return target
+
     directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     directory_fd = os.open(target.parent, directory_flags)
     temporary_name = f".{target.name}.{secrets.token_hex(16)}.tmp"

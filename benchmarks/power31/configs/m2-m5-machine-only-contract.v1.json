@@ -1,0 +1,30 @@
+{
+  "schema_version": "power.machine-only-m2-m5/v1",
+  "scope": "machine_only_technical",
+  "human_evidence_used": false,
+  "sealed_accessed": false,
+  "m2": {
+    "contract": "m2-auto-contract.v1.json"
+  },
+  "m3": {
+    "max_runtime_seconds": 60,
+    "max_query_p95_ms": 250,
+    "max_peak_rss_mb": 2048,
+    "max_index_bytes": 100000000,
+    "modes": ["fts", "hybrid"]
+  },
+  "m4": {
+    "scenario": "transactional-memory-v1",
+    "required_history_entries": 2,
+    "requires_validated_state": true
+  },
+  "m5": {
+    "require_clean_tree": true,
+    "require_release_contract": true,
+    "require_tag": true,
+    "technical_release": true,
+    "human_quality_certification": false,
+    "production_quality_claim": false,
+    "sealed_holdout": "do_not_open"
+  }
+}

@@ -61,6 +61,45 @@ python -m pytest benchmarks/power31/tests/ -v --no-cov \
     --override-ini="addopts="
 ```
 
+### Run the machine-only M2-AUTO gate
+
+M2-AUTO is a bounded, synthetic regression gate for comparing sparse FTS with
+the model-free FTS+TF-vector hybrid path. It reads only `dataset/v1`; it never
+reads human judgments, private M2 packets, or the sealed holdout. A PASS is a
+technical CI result, not human retrieval quality or production evidence.
+
+```bash
+python benchmarks/power31/scripts/evaluation/run_m2_auto.py \
+    --output /tmp/m2-auto-evidence.json
+python benchmarks/power31/scripts/evaluation/verify_m2_auto.py \
+    /tmp/m2-auto-evidence.json
+```
+
+The contract fixes a 45-second runtime budget, the dataset shape (228 queries,
+100 documents, 416 qrels), and absolute/regression thresholds. `graph_assisted`,
+`reranked`, and neural modes are intentionally outside this bounded contract;
+they require a separate timed performance receipt and do not become PASS by
+being silently skipped.
+
+### Run the complete machine-only M2-M5 technical gate
+
+When development is explicitly restricted to automation, the following gate
+combines the bounded M2-AUTO check, synthetic M3 latency/RSS/index measurements,
+the transactional M4 proposal/apply/stale/validate scenario, and the M5 signed
+release-contract check. It uses only this committed synthetic dataset and
+temporary vaults; it never opens private evaluation packets or the sealed
+holdout.
+
+```bash
+python benchmarks/power31/scripts/evaluation/run_machine_only_gate.py \
+    --output /tmp/power-machine-only-m2-m5.json
+```
+
+The runner is fail-closed for `human_evidence_used`, sealed access, dirty source
+trees, missing performance measurements, stale proposals, and invalid release
+contracts. A PASS is a machine-only technical receipt. It is not a human-quality
+certification, a product-adoption result, or a production performance claim.
+
 ## Artifacts
 
 ```
@@ -82,7 +121,10 @@ benchmarks/power31/
 ├── configs/
 │   ├── baseline.yaml                 # FTS-only
 │   ├── candidate.yaml               # Semantic + pinned BGE-M3 ONNX
-│   └── regression-budgets.yaml
+│   ├── regression-budgets.yaml
+│   ├── m2-auto-contract.v1.json     # bounded machine-only M2 gate
+│   └── m2-m5-machine-only-contract.v1.json
+│                                      # complete technical M2-M5 contract
 ├── evidence/
 │   └── phase1-generation-fault-matrix-v1.json
 │                                      # versioned hermetic crash/OOM/ENOSPC/lock receipts
@@ -91,7 +133,10 @@ benchmarks/power31/
 └── scripts/
     ├── generate_benchmark.py
     └── evaluation/
-        └── validate_dataset.py
+        ├── validate_dataset.py
+        ├── run_m2_auto.py
+        ├── verify_m2_auto.py
+        └── run_machine_only_gate.py
 ```
 
 ## Generation fault receipts

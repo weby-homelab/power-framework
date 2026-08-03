@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "release": "3.3.1",
+  "source": {
+    "commit": "7165a2145dded04000a11b8410ca9d75127ab951",
+    "tree": "7fd9fcf800cddd4285ee4fe6dc98bda6d5de028f",
+    "tag": "v3.3.1",
+    "clean": true
+  },
+  "environment": {
+    "python": [
+      "3.11",
+      "3.12",
+      "3.13",
+      "3.14"
+    ],
+    "os": "ubuntu-latest"
+  },
+  "validation": {
+    "passed": 707,
+    "skipped": 10,
+    "coverage_percent": 79.54,
+    "warning_count": 0,
+    "warning_policy": "Local full framework gate; skipped tests are explicit optional neural/quality gates.",
+    "skipped_optional_gates": [
+      "real-vault neural evaluation",
+      "target-host cgroup memory matrix",
+      "persistent MCP latency matrix"
+    ]
+  },
+  "benchmark": {
+    "synthetic": true,
+    "corpus_sha256": "63b1b9ed5590cfad08a718b69cb168bf7b3b7ca5ce40d9f225fa704743da43b6",
+    "queries_sha256": "52d152e13c039c083eeefcb8066f0ec9c0f100ae1a16e9f9cd5f6fdd57c90d3a",
+    "qrels_sha256": "d91574c0d0c078391fca8f9b4ad41237dd81de78528739ae5cf3631bea868ea8",
+    "expected_answers_sha256": "583e444d22a81bda057fa25280a48e05154181cc2a0fbdea268f1f350004d440"
+  },
+  "scope": {
+    "technical_release": true,
+    "human_quality_certification": false,
+    "production_quality_claim": false,
+    "sealed_holdout": "do_not_open"
+  },
+  "models_lock_sha256": "b6558acf95e6ae4172f0daaab1690c1265b5988cd4e173c41834fe4580b9a802"
+}

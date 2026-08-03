@@ -1,0 +1,44 @@
+{
+    "schema_version": 1,
+    "release": "3.3.0",
+    "source": {
+        "commit": "343e61a6f733d1954e667bf9df0c0eb6a813ce54",
+        "tree": "cdc8dd963def030ad8363366c64d5e581b129343",
+        "tag": "v3.3.0",
+        "clean": true
+    },
+    "environment": {
+        "python": ["3.11", "3.12", "3.13", "3.14"],
+        "os": "ubuntu-latest"
+    },
+    "validation": {
+        "passed": 706,
+        "skipped": 10,
+        "coverage_percent": 79.53,
+        "warning_count": 0,
+        "warning_policy": "Local full framework gate; skipped tests are explicit optional neural/quality gates.",
+        "skipped_optional_gates": [
+            "real-vault neural evaluation",
+            "target-host cgroup memory matrix",
+            "persistent MCP latency matrix"
+        ]
+    },
+    "benchmark": {
+        "synthetic": true,
+        "corpus_sha256": "63b1b9ed5590cfad08a718b69cb168bf7b3b7ca5ce40d9f225fa704743da43b6",
+        "queries_sha256": "52d152e13c039c083eeefcb8066f0ec9c0f100ae1a16e9f9cd5f6fdd57c90d3a",
+        "qrels_sha256": "d91574c0d0c078391fca8f9b4ad41237dd81de78528739ae5cf3631bea868ea8",
+        "expected_answers_sha256": "583e444d22a81bda057fa25280a48e05154181cc2a0fbdea268f1f350004d440"
+    },
+    "scope": {
+        "technical_release": true,
+        "human_quality_certification": false,
+        "production_quality_claim": false,
+        "sealed_holdout": "do_not_open",
+        "m2_remediation_receipt": {
+            "path": "private:.m2-private-v2/development/evaluation-v26-remediation.json",
+            "sha256": "adac5d79b8852c21f7420e7067a4602057eb512531a1ed3048cb9c58adca4163"
+        }
+    },
+    "models_lock_sha256": "c8ac39ee87946d0afdd8635077eb107b6f9855a185bc39d7c4fa6353e6b4b70f"
+}

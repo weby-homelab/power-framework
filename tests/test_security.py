@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from power_framework.core import utils
 from power_framework.core.utils import (
     atomic_write,
     atomic_write_in_vault,
@@ -220,6 +221,26 @@ class TestVaultRelativeWritePaths:
             allowed_directories=self._allowed_directories,
         )
         assert target.read_text(encoding="utf-8") == "safe content"
+
+    def test_atomic_write_windows_path_avoids_dir_fd(self, sample_vault: Path, monkeypatch):
+        """The Windows branch must not depend on POSIX ``dir_fd`` arguments."""
+
+        class WindowsOS:
+            name = "nt"
+
+            def __getattr__(self, attribute):
+                return getattr(os, attribute)
+
+        monkeypatch.setattr(utils, "os", WindowsOS())
+
+        target = atomic_write_in_vault(
+            sample_vault,
+            "01_Projects/Windows.md",
+            "portable content",
+            allowed_directories=self._allowed_directories,
+        )
+
+        assert target.read_text(encoding="utf-8") == "portable content"
 
 
 class TestCreateBackup:

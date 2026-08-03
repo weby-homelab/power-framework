@@ -28,12 +28,14 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose 17 tools to MCP-compatible AI clients through FastMCP 3.x
-- **Stable 3.2.7 release** — CI, CodeQL, package smoke tests, and release attestations verify the published artifacts
+- **Technical 3.3.1 release** — the machine-only M2–M5 gates, package and CI
+  provenance are verified; human-quality certification, sealed-holdout access,
+  and production claims remain incomplete
 
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.1
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -99,7 +101,7 @@ pip install --user --break-system-packages -e ".[dev]"
 | **Markdown Checks**             | Detects trailing whitespace, inconsistent list markers, header jumps, missing code language — `power markdown-check <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **Relation Suggestions**        | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **Cron Maintenance**            | Runs lint + index + rot audit in one command — `power cron <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **Retrieval modes**             | FTS5 (BM25), local TF vector, Hybrid (RRF), Semantic and **Reranked** modes. The POWER 3.2 default requires a compatible dense index and fails with a `power sync` remediation message when assets are missing or incompatible. An explicitly allowed FTS downgrade is marked in the result contract. Quality and resource figures require versioned evidence before any release claim. |
+| **Retrieval modes**             | FTS5 (BM25), local TF vector, Hybrid (RRF), Semantic and **Reranked** modes. The POWER 3.2 default requires a compatible dense index and fails with a `power sync` remediation message when assets are missing or incompatible. Semantic ranking applies a 5% confidence-bound lexical tie-break without adding candidates; an explicitly allowed FTS downgrade is marked in the result contract. Quality and resource figures require versioned evidence before any release claim. |
 | **Cross-Encoder Reranker**      | The default BGE reranker is an Apache-2.0 ONNX snapshot with SHA-256 checks. Local `jinaai/jina-reranker-v2-base-multilingual` is CC-BY-NC-4.0 and requires `POWER_RERANKER=jina` plus `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` for permitted non-commercial use. |
 | **Hierarchical Index**          | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **Graph RAG v2**                | Phase 3 relation suggester: explicit OKF `related` links contribute a strong curated signal, fused with keyword/tag overlap into a **weighted, bidirectional similarity graph** with weighted BFS and degree/weight centrality (`power suggest-related --v2`). Confident predictions only, no fabricated links.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -109,10 +111,11 @@ pip install --user --break-system-packages -e ".[dev]"
 | **CI/CD**                       | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest. |
 | **Documentation**               | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
-> **POWER 3.2 beta evidence status:** historical feature-table figures, model
-> comparisons, resource limits and benchmark recommendations are not current
-> release evidence. The framework remains beta/research until the P0/P1 gates
-> in the 3.1 remediation plan are closed with versioned artifacts.
+> **POWER 3.3.1 evidence status:** the release contains machine-only M2–M5
+> technical gates and package/CI provenance. Historical feature-table figures,
+> model comparisons, resource limits and benchmark recommendations are not
+> current release evidence. Human-quality certification, sealed-holdout access,
+> and production-quality claims remain outside this release.
 
 ## Migration Report
 
@@ -130,9 +133,36 @@ Step-by-step protocol for any AI agent (Antigravity, OpenCode, Claude Code CLI, 
 
 ## 🗂️ Methodology compatibility
 
-P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. In 3.2.7, `power init <path>` creates the default P.A.R.A. scaffold only. Selectable templates and the `--template` option are planned; they are not CLI features yet.
+P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. `power init <path>` creates the default P.A.R.A. scaffold, while an optional `.power/domains.yaml` registry adds explicit domain placement, per-domain templates, routing rules, and search priorities.
 
 For another layout, create or retain its folders, then use P.O.W.E.R. to ingest notes and run `lint`, `index`, and `search`. OKF metadata validation and the available search tools work independently of the folder names.
+
+### Domain-first placement and retrieval
+
+For a domain-oriented vault, create `.power/domains.yaml` and keep directory and
+filename names meaningful: these are the first navigation signals for an AI
+agent. OKF frontmatter remains the validated provenance and lifecycle contract,
+not the only routing mechanism. A minimal registry is:
+
+```yaml
+version: 1
+domains:
+  - name: research
+    path: 03_Resources/research
+    template: 05_Templates/research.md
+    rules:
+      - keywords: [paper, experiment]
+        weight: 2
+      - tags: [science]
+    search_priority: [semantic, fts]
+```
+
+`power ingest` routes by these rules (or accepts `--domain research`) and uses
+the selected template. `power search ... --mode auto --domain research` follows
+the domain priority and scopes candidates to the domain path. Only retrieval
+modes implemented by POWER are accepted; unsupported providers such as Qdrant
+are rejected instead of being advertised as available. Without a registry,
+legacy P.A.R.A. placement and the semantic search default are unchanged.
 
 ## Who Is This For
 
@@ -148,6 +178,8 @@ power lint <path>              Scan for broken links, missing metadata, orphans
 power index <path>             Generate hierarchical index (index.md + _index.md files)
 power search <path> <query>    Full-text search with relevance scoring
 power ingest <path> [options]  Create a new note with validated OKF metadata
+power memory <operation>       Governed memory context, proposal, apply, validation, and history
+power sync <path>              Build FTS and dense search indexes
 power rot <path>               ROT Audit — detect redundant, outdated, trivial notes
 power status [path]            Show vault status dashboard (statistics & health metrics)
 power heal <path>              Auto-heal missing/invalid frontmatter
@@ -155,6 +187,8 @@ power markdown-check <path>    Check markdown quality issues
 power archive <path>           Auto-archive stale notes to 04_Archive/
 power suggest-related <path>   Suggest cross-note relations for Graph RAG
 power cron <path>              Run automated maintenance (lint + index + rot)
+power synthesize <path>        Auto-ingest a session synthesis note
+power rename <path> <name>     Rename a note and update related paths
 ```
 
 ### Ingest Examples
@@ -162,6 +196,7 @@ power cron <path>              Run automated maintenance (lint + index + rot)
 ```bash
 power ingest ~/my-vault --type Project --title "My App" --description "A new project"
 power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Docker best practices" --tags devops,docker --resource "https://docs.docker.com"
+power ingest ~/my-vault --type Resource --title "Experiment Notes" --description "Research experiment" --domain research
 ```
 
 ### Search Examples
@@ -169,6 +204,7 @@ power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Do
 ```bash
 power search ~/my-vault "api authentication"
 power search ~/my-vault "deployment guide" --max-results 5
+power search ~/my-vault "experiment" --mode auto --domain research
 ```
 
 ## MCP Server Setup
@@ -176,7 +212,7 @@ power search ~/my-vault "deployment guide" --max-results 5
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.2.7
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.1
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -343,7 +379,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI Agent (FastMCP 3.x)"]
-        Tools[["🔌 12 Async MCP Tools (stdio/HTTP)"]]:::agent
+        Tools[["🔌 17 Async MCP Tools (stdio/HTTP)"]]:::agent
         Search[["🔍 Hybrid / Reranked Search"]]:::agent
         ROT{{"🛠️ ROT & Contradiction Audit (Semantic/LLM)"}}:::agent
     end
@@ -406,6 +442,7 @@ flowchart TD
 | `core/query_expansion.py` | Synonym map (EN/UK) & OpenRouter Multi-Query expansion                                                                                                                                                                             |
 | `core/chunker.py`         | Semantic & contextual note splitter (Anthropic Contextual Retrieval)                                                                                                                                                               |
 | `core/healer.py`          | Auto-fix missing/invalid frontmatter fields                                                                                                                                                                                        |
+| `core/relations.py`       | Knowledge graph construction, BFS traversal, and Mermaid export                                                                                                                                                                   |
 | `core/rot_scoring.py`     | A2 scoring: semantic content dedup, freshness, contradiction checks                                                                                                                                                                |
 | `core/markdown_checks.py` | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                                                                           |
 | `core/constants.py`       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
@@ -440,7 +477,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.2.7 release notes](docs/release-3.2.7.md) — current release
+- [P.O.W.E.R. 3.3.1 release notes](docs/release-3.3.1.md) — current technical release
   scope, validation boundary, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is
@@ -518,7 +555,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.2.7
+softwareVersion: 3.3.1
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

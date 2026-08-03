@@ -1,0 +1,66 @@
+{
+  "schema_version": "power.m2.retrieval-preregistration.v1",
+  "status": "pending_curator_approval",
+  "protocol_version": "2.0",
+  "language": "uk",
+  "purpose": "Нова незалежна development-оцінка після аудиту M2-v2; не переписує frozen v1 або v2.",
+  "gated_comparators": [
+    "semantic",
+    "hybrid",
+    "reranked",
+    "graph_assisted"
+  ],
+  "diagnostic_comparators": [
+    "lexical",
+    "vector"
+  ],
+  "thresholds": {
+    "recall_at_10": 0.75,
+    "ndcg_at_10": 0.7,
+    "mrr_at_10": 0.7,
+    "citation_provenance_accuracy": 0.95,
+    "stale_answer_rate_max": 0.02,
+    "abstention_quality": 0.9,
+    "p95_latency_ms": 1500.0
+  },
+  "candidate_pool": {
+    "top_k_per_comparator": 10,
+    "include_every_gated_comparator": true,
+    "include_every_diagnostic_comparator": true,
+    "random_negative_count_per_query": 2,
+    "random_seed": 20260802,
+    "deduplicate_by_document_id": true,
+    "pool_is_frozen_before_human_judgment": true
+  },
+  "lexical_policy": {
+    "operator": "OR",
+    "status": "diagnostic_only",
+    "report_metrics": true,
+    "enforce_quality_thresholds": false,
+    "qrel_specific_synonyms": false,
+    "fuzzy_matching": false,
+    "post_hoc_tokenizer_changes": false
+  },
+  "human_validation": {
+    "new_ukrainian_query_set": true,
+    "independent_from_m2_v2_queries_and_qrels": true,
+    "same_four_candidate_contract": true,
+    "calibration_required_before_production": true,
+    "minimum_relevance_exact": 0.8,
+    "minimum_weighted_kappa_ci95_lower": 0.6,
+    "minimum_temporal_exact": 0.8,
+    "minimum_citation_set_exact": 0.8,
+    "raw_judgments_stay_restricted": true
+  },
+  "sealed_policy": {
+    "default_decision": "do_not_open",
+    "open_only_after_development_gate": true,
+    "explicit_allow_sealed_required": true
+  },
+  "anti_leakage_rules": [
+    "Не додавати qrel-specific synonyms, винятки або fuzzy-пороги після перегляду результатів.",
+    "Не змінювати frozen v1/v2 qrels і не повторювати оцінювання старими packet-ами.",
+    "Зафіксувати цей policy hash до створення calibration packet і людських judgments.",
+    "Публікувати лише de-identified receipts; raw judgments і sealed матеріали залишаються restricted."
+  ]
+}

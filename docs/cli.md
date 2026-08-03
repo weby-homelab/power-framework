@@ -52,14 +52,18 @@ Checks:
 Generate hierarchical indexes.
 
 ```
-power index path
+power index path [--strict]
 ```
 
 | Argument/Flag | Required | Description                 |
 | ------------- | -------- | --------------------------- |
 | `path`        | Yes      | Path to the vault directory |
+| `--strict`    | No       | Return non-zero when invalid notes are skipped (recommended for CI) |
 
 Creates `index.md` (overview) and per-folder `_index.md` (detailed entries).
+The command always reports skipped invalid notes. With `--strict`, that report
+is also an unsuccessful process result so automation cannot silently accept a
+partial index.
 
 ### `ingest`
 
@@ -92,7 +96,7 @@ power search path query [--max-results MAX_RESULTS]
 | `path`          | Yes      | Path to the vault directory                                             |
 | `query`         | Yes      | Search query (supports multiple terms and "quoted phrases")             |
 | `--max-results` | No       | Maximum number of results (default: 20)                                 |
-| `--mode`        | No       | Search mode: `reranked` (canonical, default), `fts`, `vector`, `hybrid`, or `semantic`; legacy `hybrid_reranked` is accepted as an alias for `reranked` |
+| `--mode`        | No       | Search mode: `semantic` (canonical default), `fts`, `vector`, `hybrid`, `reranked` (explicit opt-in), `auto` (domain priority), or `graph_assisted`; legacy `hybrid_reranked` is accepted as an alias for `reranked` |
 
 ### `status`
 

@@ -1,5 +1,10 @@
 # M2 annotation and adjudication protocol
 
+The frozen v1 contract is preserved. The next annotation/evaluation run uses
+the additive [protocol v2](annotation_protocol_v2.md), which moves abstention
+to query level and adds field-wise agreement, confidence intervals, and a
+calibration gate.
+
 ## Scope and privacy
 
 Each corpus item must be de-identified before annotation. Do not include

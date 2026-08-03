@@ -30,6 +30,7 @@ from .parser import (
     has_type_field,
     parse_frontmatter,
     read_file_content,
+    validate_metadata,
 )
 from .utils import clean_note_name, is_excluded_orphan
 
@@ -369,6 +370,10 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
             continue
         if not has_type_field(content):
             result.untyped_files.append((rel_path, "Missing required 'type' field"))
+            links[rel_path] = _extract_links(content)
+            continue
+        if validate_metadata(content) is None:
+            result.untyped_files.append((rel_path, "Invalid OKF metadata"))
             links[rel_path] = _extract_links(content)
             continue
 

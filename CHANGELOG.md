@@ -5,6 +5,35 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1] - 2026-08-03
+
+### Added
+
+- Added the fail-closed machine-only M2–M5 technical gate over synthetic M2/M3,
+  transactional M4, and tag-bound M5 release checks.
+- Added a regression test for file-backed async mutation completion on Python
+  3.13 runtimes.
+
+### Changed
+
+- Release evidence explicitly records `human_quality_certification=false`,
+  `production_quality_claim=false`, and `sealed_holdout=do_not_open`.
+
+## [3.3.0] - 2026-08-02
+
+### Added
+
+- Added a transparent M2 remediation readback with the curator-set `recall@10`
+  threshold of `0.75`; the original `0.80` receipt remains immutable.
+- Preserved the historical evaluator's `0.80` default; the lower threshold is
+  bound to the explicit v2.1 policy/readback profile.
+- Recorded the independent architecture-test fixes and portable retrieval/indexing gates.
+- Added regression coverage proving the historical v2 and explicit v2.1 threshold profiles cannot be conflated.
+
+### Changed
+
+- Kept the sealed holdout closed and made no human-quality or production-certification claim.
+
 ## [3.2.7] - 2026-07-29
 
 ### Added

@@ -74,6 +74,7 @@ from power_framework.core import (
     check_all as check_markdown,
 )
 from power_framework.core.constants import SKIP_FILES
+from power_framework.core.domains import DomainConfigError
 from power_framework.core.ignore import should_skip
 from power_framework.core.relations import suggest_related_semantic
 from power_framework.core.synthesize import synthesize_session_ingest
@@ -347,6 +348,7 @@ async def search_vault_tool(
     search_mode: str = DEFAULT_SEARCH_MODE,
     temporal_view: str = "current",
     as_of: str | None = None,
+    domain: str | None = None,
     vault_path: str | None = None,
 ) -> str:
     """Search vault notes and return provenance-bearing untrusted data only.
@@ -361,12 +363,13 @@ async def search_vault_tool(
     if not 1 <= max_results <= _MAX_MCP_SEARCH_RESULTS:
         raise ToolError(f"max_results must be between 1 and {_MAX_MCP_SEARCH_RESULTS}")
     try:
-        search_mode = normalize_search_mode(search_mode)
+        if search_mode.casefold() != "auto":
+            search_mode = normalize_search_mode(search_mode)
         from power_framework.core.temporal import normalize_as_of, normalize_temporal_view
 
         temporal_view = normalize_temporal_view(temporal_view).value
         normalized_as_of = normalize_as_of(as_of).isoformat()
-    except ValueError as exc:
+    except (ValueError, DomainConfigError) as exc:
         raise ToolError(str(exc)) from exc
 
     def _do_search() -> str:
@@ -377,6 +380,7 @@ async def search_vault_tool(
             mode=search_mode,
             temporal_view=temporal_view,
             as_of=normalized_as_of,
+            domain=domain,
         )
         return format_untrusted_search_envelope(
             results,

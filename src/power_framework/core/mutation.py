@@ -10,12 +10,21 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import fcntl
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
+
+try:  # POSIX advisory locks.
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on Windows
+    fcntl = None  # type: ignore[assignment]
+
+try:  # Windows byte-range locks.
+    import msvcrt
+except ImportError:  # pragma: no cover - exercised on POSIX
+    msvcrt = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -25,6 +34,32 @@ T = TypeVar("T")
 _registry_guard = threading.Lock()
 _vault_locks: dict[Path, threading.RLock] = {}
 _compatibility_lock = threading.RLock()
+
+
+def _lock_descriptor(descriptor: int) -> None:
+    """Acquire an exclusive advisory lock on one byte of the lock file."""
+    if fcntl is not None:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        return
+    if msvcrt is not None:  # pragma: no cover - Windows-only branch
+        # ``msvcrt.locking`` locks bytes, so make the lock file non-empty
+        # before seeking and taking the one-byte region.
+        if os.fstat(descriptor).st_size == 0:
+            os.write(descriptor, b"\0")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+        return
+    raise OSError("no supported platform file-lock implementation")
+
+
+def _unlock_descriptor(descriptor: int) -> None:
+    """Release a lock acquired by :func:`_lock_descriptor`."""
+    if fcntl is not None:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        return
+    if msvcrt is not None:  # pragma: no cover - Windows-only branch
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
 
 
 def _get_vault_lock(vault_dir: Path) -> threading.RLock:
@@ -47,11 +82,11 @@ def vault_mutation(vault_dir: Path) -> Iterator[Path]:
     with process_lock:
         descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            _lock_descriptor(descriptor)
             yield root
         finally:
             with contextlib.suppress(OSError):
-                fcntl.flock(descriptor, fcntl.LOCK_UN)
+                _unlock_descriptor(descriptor)
             os.close(descriptor)
 
 
@@ -62,10 +97,18 @@ def execute_vault_mutation(vault_dir: Path, operation: Callable[[], T]) -> T:
 
 
 async def run_blocking(sync_fn: Callable[[], T]) -> T:
-    """Run a blocking operation and join its executor before returning."""
+    """Run a blocking operation and join its executor before returning.
+
+    Polling the submitted future avoids a Python 3.13 runtime deadlock seen
+    when ``asyncio`` waits for an executor callback after file-backed work.
+    The work still runs in the bounded executor; only completion observation is
+    kept on the event loop.
+    """
     with ThreadPoolExecutor(max_workers=1) as executor:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(executor, sync_fn)
+        future = executor.submit(sync_fn)
+        while not future.done():
+            await asyncio.sleep(0.01)
+        return future.result()
 
 
 async def run_vault_mutation(vault_dir: Path, operation: Callable[[], T]) -> T:

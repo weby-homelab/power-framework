@@ -21,7 +21,7 @@ This protocol enables any LLM-based AI agent to migrate an existing Obsidian vau
 - **MCP tools** — `ingest_note`, `lint_vault`, `generate_index`, `read_sub_index`, `search_vault_tool`
 - **Filesystem access** — reading existing `.md` files, moving files, updating link paths
 - **LLM intelligence** — classifying notes across methodologies (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal), extracting titles, generating descriptions
-- **Folder-layout compatibility** — P.O.W.E.R. 3.2.7 can index and validate notes in an existing folder tree. `power init` creates the default P.A.R.A. scaffold only; selectable methodology templates are not implemented. OKF validation and supported search modes operate independently of the folder layout.
+- **Folder-layout compatibility** — P.O.W.E.R. can index and validate notes in an existing folder tree. `power init` creates the default P.A.R.A. scaffold; an optional `.power/domains.yaml` registry adds domain templates, routing rules, and search priorities. OKF validation remains independent of the folder layout.
 
 The agent follows 6 phases. Each phase has clear success criteria.
 
@@ -107,7 +107,7 @@ Every note is assigned a valid `type` from the OKF `NoteType` enum (or extended 
 
 ### Step 3a: Prepare the vault skeleton
 
-`power init /path/to/vault` creates the default P.A.R.A. structure. Do not run it in a non-empty vault unless that structure is intended. For C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or a custom layout, retain or create the required folders directly, then run `lint` and `index`. The `--template` option is not currently supported.
+`power init /path/to/vault` creates the default P.A.R.A. structure. Do not run it in a non-empty vault unless that structure is intended. For C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or a custom layout, retain or create the required folders directly, then add `.power/domains.yaml` if automatic domain placement and templates are wanted, and run `lint` and `index`. The global `power init --template` option is not currently supported; domain templates are selected by the registry during `power ingest`.
 
 ### Step 3b: Ingest each note
 
@@ -377,7 +377,7 @@ The P.O.W.E.R. framework (v3.2.7) includes a built-in search engine supporting d
 
 | Mode                 | Description                                                                                              | Best for                                    |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `reranked` (default) | Canonical POWER 3.2 pipeline: RRF merge of FTS5 + BGE-M3 Dense + BGE Reranker v2 M3                      | Highest-precision multilingual ranking      |
+| `reranked` (explicit opt-in) | Canonical POWER 3.2 pipeline: RRF merge of FTS5 + BGE-M3 Dense + BGE Reranker v2 M3              | Highest-precision multilingual ranking when requested      |
 | `fts`                | SQLite FTS5 with weighted BM25 scoring                                                                   | Exact keyword & phrase matching             |
 | `vector`             | TF-vector cosine similarity (pure Python, zero deps)                                                     | Lexical similarity comparison               |
 | `hybrid`             | RRF (Reciprocal Rank Fusion) merge of FTS + Vector                                                       | Balanced lexical recall                     |

@@ -19,13 +19,17 @@ from power_framework.core.searcher import (
     DenseIndexUnavailableError,
     SearchModeSpec,
     SearchResult,
+    _apply_semantic_lexical_guard,
     _compute_tf_vector,
     _cosine_similarity,
     _embedding_manifest_identity,
+    _fts_search,
     _make_snippet,
     _rrf_merge,
+    _rrf_merge_many,
     _score_note,
     _semantic_search,
+    _sync_vault_to_db,
     _tokenize,
     _vector_search,
     format_search_results,
@@ -109,6 +113,83 @@ class TestTokenize:
         assert _tokenize("Hello World") == ["hello", "world"]
 
 
+def test_semantic_lexical_guard_breaks_only_a_close_dense_tie(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dense_top = SearchResult(
+        rel_path="01_Projects/dense.md",
+        title="Dense",
+        description="",
+        note_type="Project",
+        score=0.520,
+        snippet="",
+        match_count=1,
+    )
+    lexical_candidate = SearchResult(
+        rel_path="01_Projects/lexical.md",
+        title="Lexical",
+        description="",
+        note_type="Project",
+        score=0.506,
+        snippet="",
+        match_count=1,
+    )
+    distant = SearchResult(
+        rel_path="01_Projects/distant.md",
+        title="Distant",
+        description="",
+        note_type="Project",
+        score=0.400,
+        snippet="",
+        match_count=1,
+    )
+    monkeypatch.setattr(
+        "power_framework.core.searcher._fts_search",
+        lambda *_args, **_kwargs: [lexical_candidate],
+    )
+
+    guarded = _apply_semantic_lexical_guard(
+        tmp_path, "query", [dense_top, lexical_candidate, distant]
+    )
+
+    assert [result.rel_path for result in guarded] == [
+        "01_Projects/lexical.md",
+        "01_Projects/dense.md",
+        "01_Projects/distant.md",
+    ]
+
+
+def test_semantic_lexical_guard_does_not_override_a_clear_dense_winner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dense_top = SearchResult(
+        rel_path="01_Projects/dense.md",
+        title="Dense",
+        description="",
+        note_type="Project",
+        score=0.700,
+        snippet="",
+        match_count=1,
+    )
+    lexical_candidate = SearchResult(
+        rel_path="01_Projects/lexical.md",
+        title="Lexical",
+        description="",
+        note_type="Project",
+        score=0.500,
+        snippet="",
+        match_count=1,
+    )
+    monkeypatch.setattr(
+        "power_framework.core.searcher._fts_search",
+        lambda *_args, **_kwargs: [lexical_candidate],
+    )
+
+    guarded = _apply_semantic_lexical_guard(tmp_path, "query", [dense_top, lexical_candidate])
+
+    assert guarded[0] is dense_top
+
+
 class TestSearchModeContract:
     """Tests for the shared core/CLI/MCP retrieval mode contract."""
 
@@ -129,6 +210,15 @@ class TestSearchModeContract:
 
     def test_normalize_mode_keeps_explicit_legacy_compatible_mode(self):
         assert normalize_search_mode("fts") == "fts"
+
+    def test_graph_assisted_mode_is_sparse_and_canonical(self):
+        assert normalize_search_mode("GRAPH_ASSISTED") == "graph_assisted"
+        assert get_search_mode_spec("graph_assisted") == SearchModeSpec(
+            candidate_sources=("fts", "tf_vector", "graph"),
+            fusion="rrf_graph",
+            reranker=False,
+            requires_dense_index=False,
+        )
 
     def test_normalize_mode_rejects_unknown_value(self):
         with pytest.raises(ValueError, match="Unsupported search mode"):
@@ -471,6 +561,25 @@ class TestSearchVault:
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
 
+    def test_auto_domain_policy_scopes_results(self, sample_vault: Path):
+        (sample_vault / ".power").mkdir(exist_ok=True)
+        (sample_vault / ".power" / "domains.yaml").write_text(
+            """
+version: 1
+domains:
+  - name: projects
+    path: 01_Projects
+    template: 05_Templates/default.md
+    rules:
+      - keywords: [test]
+    search_priority: [fts]
+""",
+            encoding="utf-8",
+        )
+        results = search_vault(sample_vault, "test project", mode="auto")
+        assert results
+        assert all(result.rel_path.startswith("01_Projects/") for result in results)
+
     def test_search_by_tag(self, sample_vault: Path):
         results = search_vault(sample_vault, "sample", mode="fts")
         assert len(results) > 0
@@ -490,6 +599,45 @@ class TestSearchVault:
         with pytest.raises(DenseIndexUnavailableError, match="power sync"):
             search_vault(sample_vault, "xyznonexistent12345", mode="reranked")
 
+    def test_reranked_score_scale_is_not_overwritten_by_dense_fallback(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Cross-encoder ranking must survive dense-score deduplication."""
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        reranked = SearchResult(
+            rel_path="01_Projects/reranked.md",
+            title="Reranked",
+            description="",
+            note_type="Project",
+            score=0.2,
+            snippet="",
+            match_count=1,
+        )
+        dense = SearchResult(
+            rel_path=reranked.rel_path,
+            title=reranked.title,
+            description="",
+            note_type=reranked.note_type,
+            score=0.9,
+            snippet="",
+            match_count=1,
+        )
+        monkeypatch.setattr("power_framework.core.searcher.validate_dense_index", lambda _: 1)
+        monkeypatch.setattr(
+            "power_framework.core.searcher._hybrid_reranked_search",
+            lambda *_args, **_kwargs: [reranked],
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher._semantic_search",
+            lambda *_args, **_kwargs: [dense],
+        )
+
+        results = search_vault(vault, "query", max_results=10, mode="reranked")
+
+        assert len(results) == 1
+        assert results[0].score == 0.2
+
     def test_max_results(self, sample_vault: Path):
         results = search_vault(sample_vault, "test", max_results=1, mode="fts")
         assert len(results) <= 1
@@ -504,6 +652,63 @@ class TestSearchVault:
         results = search_vault(sample_vault, '"Test Project"', mode="fts")
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
+
+    def test_natural_language_fts_falls_back_to_or_when_and_has_no_match(self, sample_vault: Path):
+        results = search_vault(
+            sample_vault,
+            "Which test project contains a deliberately absent token",
+            mode="fts",
+        )
+
+        assert results
+        assert any("Test Project" in result.title for result in results)
+
+    def test_fts_defaults_to_or_with_explicit_and_override(self, sample_vault: Path, monkeypatch):
+        search_vault(sample_vault, "test", mode="fts")
+
+        monkeypatch.delenv("POWER_FTS_OPERATOR", raising=False)
+        exploratory = _fts_search(sample_vault, "Test absent-token", max_results=20)
+        assert exploratory
+
+        monkeypatch.setenv("POWER_FTS_OPERATOR", "AND")
+        strict = _fts_search(sample_vault, "Test absent-token", max_results=20)
+        assert strict == []
+
+    def test_fts_filters_function_words_from_or_queries(self, sample_vault: Path):
+        (sample_vault / "03_Resources" / "release-signal.md").write_text(
+            """---
+type: Resource
+title: "Release signal"
+description: "A unique release marker"
+okf_version: "0.2"
+memory:
+  kind: semantic
+timestamp: 2026-01-01T00:00:00
+---
+
+release-signal
+""",
+            encoding="utf-8",
+        )
+        (sample_vault / "03_Resources" / "function-word.md").write_text(
+            """---
+type: Resource
+title: "Function word"
+description: "чи"
+okf_version: "0.2"
+memory:
+  kind: semantic
+timestamp: 2026-01-01T00:00:00
+---
+
+чи
+""",
+            encoding="utf-8",
+        )
+
+        results = search_vault(sample_vault, "чи release-signal", mode="fts")
+
+        assert [result.rel_path for result in results] == ["03_Resources/release-signal.md"]
 
     def test_search_vault_fallback_on_sqlite_error(self, sample_vault: Path):
         from unittest.mock import patch
@@ -537,6 +742,43 @@ class TestSearchVault:
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
 
+    def test_hybrid_uses_dense_candidates_when_available(
+        self, sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        def result(path: str, score: float) -> SearchResult:
+            return SearchResult(
+                rel_path=path,
+                title=path,
+                description="",
+                note_type="Resource",
+                score=score,
+                snippet="",
+                match_count=1,
+            )
+
+        fts_result = result("03_Resources/fts.md", 1.0)
+        vector_result = result("03_Resources/vector.md", 0.8)
+        dense_result = result("03_Resources/dense.md", 0.9)
+        monkeypatch.setattr(
+            "power_framework.core.searcher._fts_search", lambda *_args, **_kwargs: [fts_result]
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher._vector_search",
+            lambda *_args, **_kwargs: [vector_result],
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher._semantic_search",
+            lambda *_args, **_kwargs: [dense_result],
+        )
+
+        results = search_vault(sample_vault, "query", mode="hybrid")
+
+        assert {item.rel_path for item in results} == {
+            fts_result.rel_path,
+            vector_result.rel_path,
+            dense_result.rel_path,
+        }
+
     def test_hybrid_mode_empty_query(self, sample_vault: Path):
         results = search_vault(sample_vault, "", mode="hybrid")
         assert results == []
@@ -550,6 +792,12 @@ class TestSearchVault:
         if len(results) > 1:
             scores = [r.score for r in results]
             assert scores == sorted(scores, reverse=True)
+
+    def test_graph_assisted_mode_returns_provenance_bound_results(self, sample_vault: Path):
+        results = search_vault(sample_vault, "test project", mode="graph_assisted")
+        assert results
+        assert all(result.retrieval_contract == "graph_assisted" for result in results)
+        assert any("Test Project" in result.title for result in results)
 
     def test_all_modes_return_same_content_type(self, sample_vault: Path):
         fts_results = search_vault(sample_vault, "test", mode="fts")
@@ -629,6 +877,41 @@ class TestCosineSimilarity:
 class TestVectorSearch:
     """Tests for vector search function."""
 
+    def test_fts_only_change_invalidates_stale_dense_manifest(self, tmp_path: Path):
+        note = tmp_path / "01_Projects" / "Note.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            'title: "Note"\n'
+            'description: "Dense invalidation"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "---\n\noriginal\n",
+            encoding="utf-8",
+        )
+        conn = sqlite3.connect(tmp_path / "search.db")
+        _init_db(conn)
+        conn.execute(
+            "INSERT INTO file_metadata(rel_path, mtime) VALUES (?, ?)",
+            ("01_Projects/Note.md", 0.0),
+        )
+        conn.execute(
+            "INSERT INTO chunk_embeddings(chunk_id, rel_path, embedding, content, mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("chunk", "01_Projects/Note.md", b"\x00\x00\x80?", "original", 0.0),
+        )
+        conn.executemany(
+            "INSERT INTO dense_index_manifest(manifest_key, manifest_value) VALUES (?, ?)",
+            [("schema_version", "2"), ("chunk_count", "1")],
+        )
+        conn.commit()
+
+        _sync_vault_to_db(tmp_path, conn, sync_embeddings=False)
+
+        assert conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM dense_index_manifest").fetchone()[0] == 0
+        conn.close()
+
     def test_finds_relevant_note(self, sample_vault: Path):
         results = _vector_search(sample_vault, "project architecture")
         assert len(results) > 0
@@ -682,3 +965,14 @@ class TestRRFMerge:
         unique_b = self._make_result("unique_b.md")
         merged = _rrf_merge([shared, unique_a], [shared, unique_b])
         assert merged[0].rel_path == "shared.md"
+
+    def test_many_lists_preserve_candidates_from_each_source(self):
+        lists = [
+            [self._make_result("fts.md")],
+            [self._make_result("vector.md")],
+            [self._make_result("dense.md")],
+        ]
+
+        merged = _rrf_merge_many(lists)
+
+        assert {result.rel_path for result in merged} == {"fts.md", "vector.md", "dense.md"}

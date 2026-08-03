@@ -160,6 +160,42 @@ def test_active_pointer_retains_current_and_previous_generations(
     assert ready_count == 2
 
 
+def test_new_generation_starts_from_active_db_for_incremental_reuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Atomic publication must not discard the previous mtime cache."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "incremental", "first-token")
+    sync_vault_atomically(vault, sync_embeddings=False)
+    added = vault / "01_Projects" / "Added.md"
+    added.write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Added\n"
+        "description: added note\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\nsecond-token\n",
+        encoding="utf-8",
+    )
+
+    from power_framework.core import searcher
+
+    original_sync = searcher._sync_vault_to_db
+    observed: dict[str, int] = {}
+
+    def capture_existing_rows(*args: object, **kwargs: object) -> None:
+        conn = args[1]
+        assert isinstance(conn, sqlite3.Connection)
+        observed["before_sync"] = conn.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0]
+        original_sync(*args, **kwargs)
+
+    monkeypatch.setattr(searcher, "_sync_vault_to_db", capture_existing_rows)
+    sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert observed["before_sync"] == 1
+    assert search_vault(vault, "second-token", mode="fts")
+
+
 def test_missing_active_generation_file_fails_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

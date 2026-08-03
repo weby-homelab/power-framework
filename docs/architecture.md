@@ -84,6 +84,7 @@ because they are compatibility input, not canonical modes.
 | `hybrid` | `fts + tf_vector` | `rrf` | no | no |
 | `semantic` | `dense` | — | no | yes |
 | `reranked` | `fts + tf_vector + dense` | `rrf` | yes | yes |
+| `graph_assisted` | `fts + tf_vector + graph` | `rrf_graph` | no | no |
 
 The current default is `semantic`; `reranked` is an explicit opt-in until the
 frozen quality and latency comparison in Issue #187 supports another default.
