@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import power_framework.core.utils as utils
+from power_framework.core import utils
 from power_framework.core.utils import (
     atomic_write,
     atomic_write_in_vault,

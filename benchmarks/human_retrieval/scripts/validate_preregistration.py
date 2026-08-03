@@ -163,6 +163,7 @@ def main() -> int:
         policy = json.loads(args.policy.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         parser.error(f"cannot read policy: {exc}")
+        return 2
     if not isinstance(policy, dict):
         parser.error("policy must be a JSON object")
     errors = validate_policy(policy)

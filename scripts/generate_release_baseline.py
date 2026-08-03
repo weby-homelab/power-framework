@@ -100,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
+        return 2
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(baseline, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
