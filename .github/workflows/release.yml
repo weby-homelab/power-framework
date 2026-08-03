@@ -67,6 +67,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
+            dist/power-framework.release-baseline.json
             dist/*.whl
             dist/*.tar.gz
             dist/*.spdx.json
