@@ -5,6 +5,20 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1] - 2026-08-03
+
+### Added
+
+- Added the fail-closed machine-only M2–M5 technical gate over synthetic M2/M3,
+  transactional M4, and tag-bound M5 release checks.
+- Added a regression test for file-backed async mutation completion on Python
+  3.13 runtimes.
+
+### Changed
+
+- Release evidence explicitly records `human_quality_certification=false`,
+  `production_quality_claim=false`, and `sealed_holdout=do_not_open`.
+
 ## [3.3.0] - 2026-08-02
 
 ### Added

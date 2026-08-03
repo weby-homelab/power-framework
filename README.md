@@ -28,14 +28,14 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
 - **MCP-native** — expose 17 tools to MCP-compatible AI clients through FastMCP 3.x
-- **Technical 3.3.0 snapshot (pre-release)** — package and CI provenance are
+- **Technical 3.3.1 snapshot (pre-release)** — package and CI provenance are
   available, but M2, M3, M4, and M5 are incomplete; no sealed/human-quality or
   production claim is made
 
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.0
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.1
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -207,7 +207,7 @@ power search ~/my-vault "experiment" --mode auto --domain research
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.0
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.1
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -471,7 +471,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.2.7 release notes](docs/release-3.2.7.md) — current release
+- [P.O.W.E.R. 3.3.1 release notes](docs/release-3.3.1.md) — current technical release
   scope, validation boundary, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is
@@ -549,7 +549,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux
-softwareVersion: 3.3.0
+softwareVersion: 3.3.1
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

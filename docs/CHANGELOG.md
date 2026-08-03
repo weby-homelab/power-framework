@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.1
+
+- Added the fail-closed machine-only M2–M5 technical gate over synthetic M2/M3,
+  transactional M4, and tag-bound M5 release checks.
+- Fixed the Python 3.13 file-backed async mutation completion deadlock and added
+  a focused regression test.
+- Kept human-quality, production-quality, and sealed-holdout claims explicitly
+  closed in the release contract.
+
 ## 3.3.0
 
 - Technical release with explicit M2 remediation scope and sealed holdout closure.
