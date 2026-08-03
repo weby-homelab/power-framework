@@ -19,7 +19,7 @@ def test_generated_baseline_binds_v331_tag(tmp_path: Path) -> None:
     git_executable = shutil.which("git")
     assert git_executable is not None
     tag = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local refs.
-        [git_executable, "rev-parse", "--verify", "refs/tags/v3.3.1"],
+        [git_executable, "rev-parse", "--verify", "refs/tags/v3.3.1^{}"],
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
