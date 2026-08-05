@@ -21,7 +21,7 @@ from verify_release_contract import (
 )
 
 TAG_PATTERN = re.compile(r"^v\d+\.\d+\.\d+$")
-DEFAULT_TEMPLATE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.3.1.json"
+DEFAULT_TEMPLATE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.3.2.json"
 
 
 def _default_template() -> Path:

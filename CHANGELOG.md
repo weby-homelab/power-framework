@@ -5,6 +5,17 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.2] - 2026-08-05
+
+### Fixed
+
+- Fixed the Windows-incompatible destination overwrite path in `power rename`:
+  the physical file move now uses `os.replace()` instead of `os.rename()`, which
+  would raise `FileExistsError` on Windows when the destination already exists.
+- Added regression coverage proving the existing-destination overwrite contract
+  and asserting the implementation calls `os.replace` directly, so the fix
+  cannot silently regress on POSIX-only CI.
+
 ## [3.3.1] - 2026-08-03
 
 ### Added

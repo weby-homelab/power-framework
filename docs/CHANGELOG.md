@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.2
+
+- Fixed the Windows-incompatible destination overwrite path in `power rename`:
+  the physical file move now uses `os.replace()` instead of `os.rename()`, which
+  would raise `FileExistsError` on Windows when the destination already exists.
+- Added regression coverage proving the existing-destination overwrite contract
+  and asserting the implementation calls `os.replace` directly. See the
+  [3.3.2 release notes](release-3.3.2.md).
+
 ## 3.3.1
 
 - Added the fail-closed machine-only M2–M5 technical gate over synthetic M2/M3,
