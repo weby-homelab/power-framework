@@ -440,7 +440,7 @@ def _cmd_rename(args: argparse.Namespace) -> int:
         """Perform the physical rename and reference propagation atomically."""
         new_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            os.rename(old_file, new_file)
+            os.replace(old_file, new_file)
             logger.info("Physically renamed %s to %s", old_rel, new_rel)
         except Exception as e:
             logger.error("Failed to rename file physically: %s", e)

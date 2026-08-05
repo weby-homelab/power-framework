@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import TYPE_CHECKING
 from unittest.mock import patch
@@ -90,7 +91,7 @@ def test_cli_rename_command(tmp_path: Path):
     # Setup file structure
     (tmp_path / "02_Areas").mkdir(parents=True, exist_ok=True)
     note_b = tmp_path / "02_Areas" / "NoteB.md"
-    note_b.write_text(
+    source_content = (
         "---\n"
         "type: Area\n"
         'title: "Note B"\n'
@@ -99,6 +100,8 @@ def test_cli_rename_command(tmp_path: Path):
         "---\n"
         "Content of target note\n"
     )
+    note_b.write_text(source_content)
+    note_b_new = tmp_path / "02_Areas" / "NoteB_new.md"
 
     note_a = tmp_path / "NoteA.md"
     note_a.write_text(
@@ -134,10 +137,13 @@ def test_cli_rename_command(tmp_path: Path):
     assert exc.value.code == 0
     # Dry run should not rename physically
     assert note_b.exists()
-    assert not (tmp_path / "02_Areas" / "NoteB_new.md").exists()
+    assert not note_b_new.exists()
 
     # Test Live CLI command
+    note_b_new.write_text("OLD TARGET CONTENT\n")
+    original_replace = os.replace
     with (
+        patch("power_framework.core.cli.os.replace", wraps=original_replace) as replace_mock,
         patch.object(
             sys,
             "argv",
@@ -157,9 +163,12 @@ def test_cli_rename_command(tmp_path: Path):
         main()
 
     assert exc.value.code == 0
-    # Live run should rename physically
+    # Live run should rename physically and overwrite the existing destination
     assert not note_b.exists()
-    assert (tmp_path / "02_Areas" / "NoteB_new.md").exists()
+    assert note_b_new.exists()
+    assert read_file_content(note_b_new) == source_content
+    assert read_file_content(note_b_new) != "OLD TARGET CONTENT\n"
+    replace_mock.assert_any_call(note_b, note_b_new)
 
     # References in Note A should be updated on disk
     content = read_file_content(note_a)

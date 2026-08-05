@@ -15,22 +15,22 @@ SCRIPT = REPO_ROOT / "scripts" / "generate_release_baseline.py"
 VERIFY = REPO_ROOT / "scripts" / "verify_release_contract.py"
 
 
-def test_generated_baseline_binds_v331_tag(tmp_path: Path) -> None:
+def test_generated_baseline_binds_v332_tag(tmp_path: Path) -> None:
     git_executable = shutil.which("git")
     assert git_executable is not None
     tag = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local refs.
-        [git_executable, "rev-parse", "--verify", "refs/tags/v3.3.1^{}"],
+        [git_executable, "rev-parse", "--verify", "refs/tags/v3.3.2^{}"],
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
         text=True,
     )
     if tag.returncode != 0:
-        pytest.skip("v3.3.1 is created only for the release tag gate")
+        pytest.skip("v3.3.2 is created only for the release tag gate")
 
     output = tmp_path / "release-baseline.json"
     result = subprocess.run(  # noqa: S603 -- invokes repository-local scripts.
-        [sys.executable, str(SCRIPT), "--tag", "v3.3.1", "--output", str(output)],
+        [sys.executable, str(SCRIPT), "--tag", "v3.3.2", "--output", str(output)],
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
@@ -39,7 +39,7 @@ def test_generated_baseline_binds_v331_tag(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
 
     baseline = json.loads(output.read_text(encoding="utf-8"))
-    assert baseline["release"] == "3.3.1"
+    assert baseline["release"] == "3.3.2"
     expected_commit = tag.stdout.strip()
     expected_tree = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local object.
         [git_executable, "show", "-s", "--format=%T", expected_commit],
