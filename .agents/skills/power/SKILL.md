@@ -1,89 +1,89 @@
 ---
 name: power
-version: 3.2.7
+version: 3.3.2
 description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
 ---
 
 # ⚡ P.O.W.E.R. Knowledge Management Skill
 
-This skill automates the management, validation, and lifecycle maintenance of the Obsidian Second Brain knowledge base using the hybrid **P.O.W.E.R.** methodology.
+Цей скілл призначений для автоматизації управління, перевірки та підтримки життєвого циклу бази знань Obsidian Second Brain за гібридною методологією **P.O.W.E.R.**
 
-## 🚀 Primary Use Cases
+## 🚀 Основні сценарії використання
 
-The skill is automatically activated by AI agents (Antigravity CLI and OpenCode) or manually by the user when performing the following tasks:
+Скілл автоматично активується ШІ-агентами (Antigravity CLI та OpenCode) або вручну користувачем при виконанні наступних завдань:
 
-1.  **Ingest (Knowledge Import)** — adding or editing documents in the knowledge base.
-2.  **Indexing (Re-indexing)** — updating the content and listing of concepts.
-3.  **Linting (Health Check)** — finding broken links, metadata errors, or orphan pages.
-4.  **ROT Audit** — detecting duplicate, outdated, and trivial notes.
-5.  **Auto-Archive** — automatically archiving outdated notes to `04_Archive/`.
-6.  **Relation Suggestions (Graph RAG v2)** — analyzing keyword, tag, and explicit link intersections for hybrid (vector + graph) Graph RAG search.
-7.  **Cron Maintenance** — automatic execution of lint + index + rot audit.
-8.  **Sync & Commit** — committing changes to Git according to host security rules.
-9.  **Rename & Propagation** — renaming a file and automatically updating links.
+1.  **Ingest (Імпорт знань)** — додавання або редагування документів у базі знань.
+2.  **Indexing (Переіндексація)** — оновлення змісту та переліку концепцій.
+3.  **Linting (Перевірка здоров'я)** — пошук битих посилань, помилок у метаданих чи сторінок-сиріт.
+4.  **ROT Audit** — виявлення дублікатів, застарілих та тривіальних нотаток.
+5.  **Auto-Archive** — автоматичне архівування застарілих нотаток до `04_Archive/`.
+6.  **Relation Suggestions (Graph RAG v2)** — аналіз перетину ключових слів, тегів та явних лінків для гібридного (вектор + граф) Graph RAG пошуку.
+7.  **Cron Maintenance** — автоматичне виконання lint + index + rot audit.
+8.  **Sync & Commit** — фіксація змін у Git згідно з правилами безпеки хоста.
+9.  **Rename & Propagation** — перейменування файлу та автоматичне оновлення зв'язків.
 
 ---
 
-## 🛠️ Available Tools (Scripts + CLI)
+## 🛠️ Доступні інструменти (Scripts + CLI)
 
-The skill contains automated scripts in the `scripts/` directory and a CLI:
+Скілл містить автоматизовані скрипти у каталозі `scripts/` та CLI:
 
 ### Scripts
 
-1.  **`lint_brain.py`** — linter + ROT audit script (v3.2.7):
+1.  **`lint_brain.py`** — скрипт лінтера + ROT аудиту (v3.3.2):
 
 ```bash
 python3 .agents/skills/power/scripts/lint_brain.py
 ```
 
-2.  **`generate_index.py`** — script for automatic hierarchical index generation:
+2.  **`generate_index.py`** — скрипт автоматичної побудови ієрархічного індексу:
 
 ```bash
 python3 .agents/skills/power/scripts/generate_index.py
 ```
 
-### CLI (power, 15 commands)
+### CLI (power, 15 команд)
 
-1. `power init <path>` — create vault structure
-2. `power lint <path>` — validate metadata, links, orphans
-3. `power index <path>` — generate hierarchical index
-4. `power ingest <path>` — create note with OKF metadata
-5. `power search <path> <query>` — full-text search
-6. `power sync <path>` — build FTS and dense index
-7. `power rot <path>` — ROT audit (duplicates, outdated, trivial)
-8. `power archive <path>` — archive outdated notes
-9. `power status <path>` — vault status dashboard
-10. `power cron <path>` — automatic maintenance
-11. `power heal <path>` — auto-fix frontmatter
-12. `power markdown-check <path>` — check Markdown quality
-13. `power suggest-related <path>` — Graph RAG link suggestions
-14. `power synthesize <path>` — create session summary note
-15. `power rename <path> --old <old_path> --new <new_path>` — rename note and update Graph RAG links
+1. `power init <path>` — створити структуру vault
+2. `power lint <path>` — перевірка метаданих, посилань, orphan
+3. `power index <path>` — генерація ієрархічного індексу
+4. `power ingest <path>` — створення нотатки з OKF метаданими
+5. `power search <path> <query>` — повнотекстовий пошук
+6. `power sync <path>` — побудова FTS і dense-індексу
+7. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
+8. `power archive <path>` — архівування застарілих нотаток
+9. `power status <path>` — панель стану vault
+10. `power cron <path>` — автоматичне обслуговування
+11. `power heal <path>` — автовиправлення frontmatter
+12. `power markdown-check <path>` — перевірка якості Markdown
+13. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
+14. `power synthesize <path>` — створення підсумкової нотатки сесії
+15. `power rename <path> --old <old_path> --new <new_path>` — перейменування нотатки з оновленням зв'язків Graph RAG
 
-### MCP Tools (12) — FastMCP 3.x (v3.2.7)
+### MCP Tools (12) — FastMCP 3.x (v3.3.2)
 
 - `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`
 - `search_vault_tool`, `synthesize_session`
 - `rot_audit`, `archive_notes`, `suggest_related_tool`
 - `heal_frontmatter_tool`, `check_markdown_tool`
 
-### Configuration (v3.2.7)
+### Конфігурація (v3.3.2)
 
-- **Embedding model** — canonically `BAAI/bge-m3` (1024 dim) via direct ONNX Runtime. BGE-M3 natively supports **dense + sparse + ColBERT** in a single model, enabling hybrid search (RRF) without a separate BM25. The provider is switched via `POWER_EMBED_PROVIDER`; `fastembed`/MiniLM remains a light opt-in fallback.
-- **Default reranker** — `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0, UA+EN). `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) remains explicit opt-in.
-- **Resource controls:**
-  - `POWER_EMBED_BATCH_SIZE` (default `8`) — limits peak RAM usage during sync/embedding. On `MemoryError`, batch size is automatically halved.
-  - `POWER_EMBED_NUM_THREADS` (default `2`) — caps ONNX/OMP/OpenBLAS threads.
-  - `POWER_EMBED_COMMIT_EVERY` (default `50`) — frequency of persisting vectors to SQLite to reduce disk I/O.
-  - `POWER_SYNC_VMEM_LIMIT_MB` (default `0` = disabled) — optional virtual memory limit (RLIMIT_AS) for the sync process.
-- **ROT audit (A2)** — parallel link checking via `ThreadPoolExecutor(max_workers=16)`.
-- **MCP entry-point** — `/root/geminicli/.agents/mcp_servers/power_server.py` → `power_framework.mcp`
+- **Модель ембеддінгів** — канонічно `BAAI/bge-m3` (1024 dim) через direct ONNX Runtime. BGE-M3 natively підтримує **dense + sparse + ColBERT** в одній моделі, що дозволяє гібридний пошук (RRF) без окремого BM25. Провайдер змінюється через `POWER_EMBED_PROVIDER`; `fastembed`/MiniLM лишається полегшеним opt-in fallback.
+- **Реранкер за замовчуванням** — `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0, UA+EN). `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) лишається явним opt-in.
+- **Контроль ресурсів:**
+  - `POWER_EMBED_BATCH_SIZE` (за замовчуванням `8`) — лімітує пікове використання RAM при синхронізації/ембеддінгу. При `MemoryError` розмір батча автоматично зменшується вдвічі.
+  - `POWER_EMBED_NUM_THREADS` (за замовчуванням `2`) — обмежує потоки ONNX/OMP/OpenBLAS.
+  - `POWER_EMBED_COMMIT_EVERY` (за замовчуванням `50`) — частота збереження векторів у SQLite для зниження навантаження на диск.
+  - `POWER_SYNC_VMEM_LIMIT_MB` (за замовчуванням `0` = вимкнено) — опціональний ліміт віртуальної пам'яті (RLIMIT_AS) процесу синхронізації.
+- **ROT аудит (A2)** — паралельна перевірка посилань через `ThreadPoolExecutor(max_workers=16)`.
+- **MCP ентрі-поінт** — `/root/geminicli/.agents/mcp_servers/power_server.py` → `power_framework.mcp`
 
 ---
 
 ## 📖 Hierarchical Navigation Protocol (On-Demand Sub-Index Reading)
 
-P.O.W.E.R. uses **hierarchical indexing** to optimize AI agent context:
+P.O.W.E.R. використовує **ієрархічну індексацію** для оптимізації контексту AI-агентів:
 
 ```
 vault/
@@ -115,56 +115,56 @@ vault/
 
 ---
 
-## 📋 AI Agent Instructions (Step-by-Step Rules)
+## 📋 Інструкції для ШІ-агента (Step-by-Step Rules)
 
-When working with the knowledge base in the vault workspace (Workspace/Vault Root), ALWAYS follow this chain of actions (PAV + P.O.W.E.R.):
+Коли ви працюєте з базою знань у просторі ваулта (Workspace/Vault Root), ЗАВЖДИ дотримуйтеся наступного ланцюжка дій (PAV + P.O.W.E.R.):
 
-### Step 1. Validate Metadata (OKF Frontmatter)
+### Крок 1. Перевірка метаданих (OKF Frontmatter)
 
-When creating or editing files, ensure the file starts with the correct frontmatter (OKF v0.1 — `type` is the only required field):
+При створенні або редагуванні файлів упевнитись, що файл починається з правильної плашки (OKF v0.1 — `type` є єдиним обов'язковим полем):
 
 ```yaml
 ---
 type: Project | Area | Resource | Daily Log | Archive | System Guide
-title: "Page title"
-description: "One-line description for the catalog"
-tags: [tag1, tag2]
+title: "Назва сторінки"
+description: "Опис в один рядок для каталогу"
+tags: [тег1, тег2]
 timestamp: YYYY-MM-DDTHH:MM:SS+TZ
 ---
 ```
 
-### Step 2. Automatic Hierarchical Index Generation
+### Крок 2. Автоматична генерація ієрархічного каталогу (Index)
 
-After adding/changing a file, run the index generation script. It will automatically update `index.md` and all `_index.md` files:
+Після додавання/зміни файлу виконайте скрипт генерації індексу. Він автоматично оновить `index.md` та всі `_index.md` файли:
 
 ```bash
 python3 .agents/skills/power/scripts/generate_index.py
 ```
 
-### Step 3. Add Entry to Change Log
+### Крок 3. Додавання запису у Change Log
 
-Record the completed action at the end of the `log.md` file in chronological format:
+Запишіть виконану дію в кінець файлу `log.md` у хронологічному форматі:
 
 ```markdown
 ## [YYYY-MM-DD] <operation_type> | <action_title>
 
-- **Action:** Brief description of what was done
-- **Result:** Which files were changed/created
+- **Action:** Стислий опис того, що зроблено
+- **Result:** Які файли змінено/створено
 ```
 
-### Step 4. Linter Validation (Lint check)
+### Крок 4. Валідація лінтером (Lint check)
 
-Run the linter script to check for new broken links or orphan pages:
+Запустіть скрипт лінтера, щоб перевірити, чи не з'явилися нові биті посилання чи сторінки-сироти:
 
 ```bash
 python3 .agents/skills/power/scripts/lint_brain.py
 ```
 
-_If the linter reports errors (e.g., broken links in Home.md), fix them immediately._
+_Якщо лінтер звітує про помилки (наприклад, broken links у Home.md), негайно виправте їх._
 
-### Step 5. Git Commit & Push (Execution Rules)
+### Крок 5. Git Commit & Push (Execution Rules)
 
-- Commits are made **only in separate branches** `feature/*` or `fix/*`.
-- Git is configured for GPG-signed commits using developer keys from the `.env` file.
-- After push, a Pull Request is opened and merged.
-- The `cleanup-branches` skill must be run to clean up merged branches.
+- Коміти виконуються **лише в окремі гілки** `feature/*` or `fix/*`.
+- Git налаштовується на GPG-підпис комітів за допомогою ключів розробника з `.env` файлу.
+- Після пушу відкривається Pull Request та здійснюється злиття.
+- Обов'язково запускається скілл `cleanup-branches` для прибирання злитих гілок.
