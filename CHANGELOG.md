@@ -5,6 +5,21 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added a reproducible, hermetic FTS operator A/B benchmark comparing SQLite
+  FTS5 `OR` vs `AND` (`POWER_FTS_OPERATOR`) over the frozen synthetic
+  `power31/dataset/v1` corpus (228 paired queries, independent graded qrels,
+  paired bootstrap 10,000 resamples, zero-result diagnostics). Harness lives in
+  `benchmarks/fts_operator/` with 36 hermetic regression tests; canonical run
+  artifacts are committed under `benchmarks/fts_operator/results/run-20260806/`.
+  Result: OR preferred (Recall@10 0.625 vs 0.057; AND returns zero results for
+  82.5% of queries). `DEFAULT_FTS_OPERATOR = "OR"` is unchanged — no code
+  change is recommended by this evidence. See
+  `docs/benchmarks/fts-or-vs-and.md`.
+
 ## [3.3.2] - 2026-08-05
 
 ### Fixed

@@ -1,0 +1,26 @@
+{
+    "schema_version": "power.fts-operator.gt-provenance.v1",
+    "corpus": "benchmarks/power31/dataset/v1/corpus",
+    "queries": "benchmarks/power31/dataset/v1/queries.jsonl",
+    "qrels": "benchmarks/power31/dataset/v1/qrels.synthetic.jsonl",
+    "corpus_manifest": "benchmarks/power31/dataset/v1/corpus-manifest.json",
+    "qrels_generation": {
+        "annotator": "synthetic-generator-v1",
+        "rubric_version": "1.0",
+        "rule": "topic membership: relevance >= 2 for the topic's own document, relevance 1 for a paired-topic document, explicit distractors; missing (query_id, document_id) pairs imply relevance 0",
+        "generator": "benchmarks/power31/scripts/generate_benchmark.py"
+    },
+    "independence_declaration": {
+        "not_derived_from_fts": true,
+        "not_derived_from_lexical_term_and": true,
+        "not_derived_from_or_and_operator_runs": true,
+        "human_judged": false,
+        "claim_class": "development_synthetic"
+    },
+    "notes": [
+        "SYNTHETIC benchmark dataset: relevance is rule-assigned by topic membership, not by human judges.",
+        "The qrels are frozen and committed; they are independent of the FTS boolean operator (OR/AND) and of any lexical all-terms-in-document rule.",
+        "Results produced on this dataset are development evidence only and are NOT a production-quality or human-quality certification.",
+        "The canonical human M2 qrels are private and are intentionally never used by this harness."
+    ]
+}
