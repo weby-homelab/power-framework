@@ -1,0 +1,17 @@
+# POWER FTS Operator A/B — variant: FTS OR
+# Pre-registered before the OR/AND comparison. Changes invalidate evidence.
+
+benchmark: "fts_operator"
+schema_version: "power.fts-operator.variant.v1"
+variant_id: "fts_or"
+retrieval_mode: "fts"
+fts_operator: "OR"
+max_results: 10
+
+fixed_variables:
+  tokenizer: "unicode61 (SQLite FTS5 default)"
+  query_preprocessing: "quoted phrases; prefix wildcard term*; FTS_STOPWORDS filtering; hyphenated identifier quoting"
+  bm25_weights: { title: 10.0, tags: 5.0, description: 3.0, content: 1.0 }
+  index: "single FTS index, synced once before both variants"
+  reranker: null
+  query_expansion: "deterministic local synonym map (no LLM)"

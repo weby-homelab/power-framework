@@ -1,0 +1,2261 @@
+{
+  "schema_version": "power.fts-operator.comparison.v1",
+  "conclusion": {
+    "label": "OR preferred",
+    "rationale": "OR favors 4/4 primary metrics",
+    "votes": {
+      "and": 0,
+      "or": 4,
+      "neutral": 0
+    },
+    "details": {
+      "ndcg@5": {
+        "delta": -0.524852,
+        "vote": "or"
+      },
+      "recall@10": {
+        "delta": -0.567982,
+        "vote": "or"
+      },
+      "mrr@5": {
+        "delta": -0.53867,
+        "vote": "or"
+      },
+      "zero_result": {
+        "delta": 0.798246,
+        "vote": "or"
+      }
+    }
+  },
+  "primary_metrics": [
+    "ndcg@5",
+    "recall@10",
+    "mrr@5",
+    "zero_result"
+  ],
+  "metrics": {
+    "ndcg@5": {
+      "or_mean": 0.606949,
+      "and_mean": 0.082097,
+      "or_median": 0.6278397607958708,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.524852,
+      "ci95": [
+        -0.5664299205236156,
+        -0.482065274844162
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 182,
+      "ties": 46
+    },
+    "recall@5": {
+      "or_mean": 0.561404,
+      "and_mean": 0.057018,
+      "or_median": 0.5,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.504386,
+      "ci95": [
+        -0.5460526315789473,
+        -0.46271929824561403
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 182,
+      "ties": 46
+    },
+    "precision@5": {
+      "or_mean": 0.234211,
+      "and_mean": 0.078801,
+      "or_median": 0.2,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.155409,
+      "ci95": [
+        -0.18940058479532165,
+        -0.11944444444444445
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 21,
+      "or_wins": 175,
+      "ties": 32
+    },
+    "mrr@5": {
+      "or_mean": 0.637354,
+      "and_mean": 0.098684,
+      "or_median": 0.5,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.53867,
+      "ci95": [
+        -0.5885233918128655,
+        -0.48837719298245613
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 175,
+      "ties": 53
+    },
+    "hit_rate@5": {
+      "or_mean": 0.877193,
+      "and_mean": 0.109649,
+      "or_median": 1.0,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.767544,
+      "ci95": [
+        -0.8201754385964912,
+        -0.7105263157894737
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 175,
+      "ties": 53
+    },
+    "relevant_hits@5": {
+      "or_mean": 1.100877,
+      "and_mean": 0.114035,
+      "or_median": 1.0,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.986842,
+      "ci95": [
+        -1.0657894736842106,
+        -0.9035087719298246
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 182,
+      "ties": 46
+    },
+    "ndcg@10": {
+      "or_mean": 0.622343,
+      "and_mean": 0.082097,
+      "or_median": 0.6278397607958708,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.540247,
+      "ci95": [
+        -0.5814068339413455,
+        -0.4977989927479289
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 188,
+      "ties": 40
+    },
+    "recall@10": {
+      "or_mean": 0.625,
+      "and_mean": 0.057018,
+      "or_median": 0.5,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.567982,
+      "ci95": [
+        -0.6118421052631579,
+        -0.5241228070175439
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 188,
+      "ties": 40
+    },
+    "precision@10": {
+      "or_mean": 0.173369,
+      "and_mean": 0.077799,
+      "or_median": 0.16666666666666666,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.095571,
+      "ci95": [
+        -0.1282981759955444,
+        -0.05969959621275411
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 21,
+      "or_wins": 180,
+      "ties": 27
+    },
+    "mrr@10": {
+      "or_mean": 0.640722,
+      "and_mean": 0.098684,
+      "or_median": 0.5,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.542037,
+      "ci95": [
+        -0.591374269005848,
+        -0.49236633249791145
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 180,
+      "ties": 48
+    },
+    "hit_rate@10": {
+      "or_mean": 0.899123,
+      "and_mean": 0.109649,
+      "or_median": 1.0,
+      "and_median": 0.0,
+      "delta_and_minus_or": -0.789474,
+      "ci95": [
+        -0.8421052631578947,
+        -0.7368421052631579
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 180,
+      "ties": 48
+    },
+    "relevant_hits@10": {
+      "or_mean": 1.219298,
+      "and_mean": 0.114035,
+      "or_median": 1.0,
+      "and_median": 0.0,
+      "delta_and_minus_or": -1.105263,
+      "ci95": [
+        -1.1885964912280702,
+        -1.0175438596491229
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 188,
+      "ties": 40
+    },
+    "first_relevant_rank": {
+      "or_mean": 1.618421,
+      "and_mean": 0.131579,
+      "or_median": 1.0,
+      "and_median": 0.0,
+      "delta_and_minus_or": -1.486842,
+      "ci95": [
+        -1.662280701754386,
+        -1.3201754385964912
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 180,
+      "ties": 48
+    },
+    "zero_result": {
+      "or_mean": 0.026316,
+      "and_mean": 0.824561,
+      "or_median": 0.0,
+      "and_median": 1.0,
+      "delta_and_minus_or": 0.798246,
+      "ci95": [
+        0.7456140350877193,
+        0.8508771929824561
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 182,
+      "or_wins": 0,
+      "ties": 46
+    },
+    "result_count": {
+      "or_mean": 7.438596,
+      "and_mean": 0.333333,
+      "or_median": 8.5,
+      "and_median": 0.0,
+      "delta_and_minus_or": -7.105263,
+      "ci95": [
+        -7.504385964912281,
+        -6.68859649122807
+      ],
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 20260801,
+      "n": 228,
+      "and_wins": 0,
+      "or_wins": 218,
+      "ties": 10
+    }
+  },
+  "groups": {
+    "all": {
+      "n": 228,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.606949,
+          "and_mean": 0.082097,
+          "delta_and_minus_or": -0.524852,
+          "ci95": [
+            -0.5657830810817815,
+            -0.4836065409778254
+          ],
+          "n": 228
+        },
+        "recall@10": {
+          "or_mean": 0.625,
+          "and_mean": 0.057018,
+          "delta_and_minus_or": -0.567982,
+          "ci95": [
+            -0.6140350877192983,
+            -0.5219298245614035
+          ],
+          "n": 228
+        },
+        "mrr@5": {
+          "or_mean": 0.637354,
+          "and_mean": 0.098684,
+          "delta_and_minus_or": -0.53867,
+          "ci95": [
+            -0.5867690058479532,
+            -0.4908625730994152
+          ],
+          "n": 228
+        },
+        "zero_result": {
+          "or_mean": 0.026316,
+          "and_mean": 0.824561,
+          "delta_and_minus_or": 0.798246,
+          "ci95": [
+            0.7456140350877193,
+            0.8464912280701754
+          ],
+          "n": 228
+        }
+      },
+      "zero_result_or": 0.026316,
+      "zero_result_and": 0.824561
+    },
+    "uk": {
+      "n": 114,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.595721,
+          "and_mean": 0.033563,
+          "delta_and_minus_or": -0.562157,
+          "ci95": [
+            -0.6179380746628224,
+            -0.5017046561413907
+          ],
+          "n": 114
+        },
+        "recall@10": {
+          "or_mean": 0.596491,
+          "and_mean": 0.02193,
+          "delta_and_minus_or": -0.574561,
+          "ci95": [
+            -0.6359649122807017,
+            -0.5175438596491229
+          ],
+          "n": 114
+        },
+        "mrr@5": {
+          "or_mean": 0.627924,
+          "and_mean": 0.039474,
+          "delta_and_minus_or": -0.58845,
+          "ci95": [
+            -0.6578947368421053,
+            -0.5146198830409356
+          ],
+          "n": 114
+        },
+        "zero_result": {
+          "or_mean": 0.052632,
+          "and_mean": 0.929825,
+          "delta_and_minus_or": 0.877193,
+          "ci95": [
+            0.8157894736842105,
+            0.9298245614035088
+          ],
+          "n": 114
+        }
+      },
+      "zero_result_or": 0.052632,
+      "zero_result_and": 0.929825
+    },
+    "ua_to_ua": {
+      "n": 59,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.710961,
+          "and_mean": 0.056016,
+          "delta_and_minus_or": -0.654945,
+          "ci95": [
+            -0.7334092576745439,
+            -0.5676426320808741
+          ],
+          "n": 59
+        },
+        "recall@10": {
+          "or_mean": 0.618644,
+          "and_mean": 0.033898,
+          "delta_and_minus_or": -0.584746,
+          "ci95": [
+            -0.6610169491525424,
+            -0.5
+          ],
+          "n": 59
+        },
+        "mrr@5": {
+          "or_mean": 0.806497,
+          "and_mean": 0.067797,
+          "delta_and_minus_or": -0.738701,
+          "ci95": [
+            -0.8305084745762712,
+            -0.634180790960452
+          ],
+          "n": 59
+        },
+        "zero_result": {
+          "or_mean": 0.050847,
+          "and_mean": 0.932203,
+          "delta_and_minus_or": 0.881356,
+          "ci95": [
+            0.7966101694915254,
+            0.9661016949152542
+          ],
+          "n": 59
+        }
+      },
+      "zero_result_or": 0.050847,
+      "zero_result_and": 0.932203
+    },
+    "long_queries": {
+      "n": 182,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.619692,
+          "and_mean": 0.05399,
+          "delta_and_minus_or": -0.565702,
+          "ci95": [
+            -0.6129648387968062,
+            -0.5183923376431843
+          ],
+          "n": 182
+        },
+        "recall@10": {
+          "or_mean": 0.648352,
+          "and_mean": 0.035714,
+          "delta_and_minus_or": -0.612637,
+          "ci95": [
+            -0.6675824175824175,
+            -0.5631868131868132
+          ],
+          "n": 182
+        },
+        "mrr@5": {
+          "or_mean": 0.647436,
+          "and_mean": 0.063187,
+          "delta_and_minus_or": -0.584249,
+          "ci95": [
+            -0.6419413919413919,
+            -0.5306776556776557
+          ],
+          "n": 182
+        },
+        "zero_result": {
+          "or_mean": 0.0,
+          "and_mean": 0.89011,
+          "delta_and_minus_or": 0.89011,
+          "ci95": [
+            0.8406593406593407,
+            0.9340659340659341
+          ],
+          "n": 182
+        }
+      },
+      "zero_result_or": 0.0,
+      "zero_result_and": 0.89011
+    },
+    "en": {
+      "n": 114,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.618177,
+          "and_mean": 0.13063,
+          "delta_and_minus_or": -0.487547,
+          "ci95": [
+            -0.5511488475875773,
+            -0.42364068085984785
+          ],
+          "n": 114
+        },
+        "recall@10": {
+          "or_mean": 0.653509,
+          "and_mean": 0.092105,
+          "delta_and_minus_or": -0.561404,
+          "ci95": [
+            -0.631578947368421,
+            -0.5
+          ],
+          "n": 114
+        },
+        "mrr@5": {
+          "or_mean": 0.646784,
+          "and_mean": 0.157895,
+          "delta_and_minus_or": -0.488889,
+          "ci95": [
+            -0.5605263157894737,
+            -0.4159356725146199
+          ],
+          "n": 114
+        },
+        "zero_result": {
+          "or_mean": 0.0,
+          "and_mean": 0.719298,
+          "delta_and_minus_or": 0.719298,
+          "ci95": [
+            0.631578947368421,
+            0.7982456140350878
+          ],
+          "n": 114
+        }
+      },
+      "zero_result_or": 0.0,
+      "zero_result_and": 0.719298
+    },
+    "en_to_en": {
+      "n": 59,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.761779,
+          "and_mean": 0.211893,
+          "delta_and_minus_or": -0.549886,
+          "ci95": [
+            -0.6551421185699774,
+            -0.44743040282536845
+          ],
+          "n": 59
+        },
+        "recall@10": {
+          "or_mean": 0.70339,
+          "and_mean": 0.144068,
+          "delta_and_minus_or": -0.559322,
+          "ci95": [
+            -0.6610169491525424,
+            -0.4576271186440678
+          ],
+          "n": 59
+        },
+        "mrr@5": {
+          "or_mean": 0.855932,
+          "and_mean": 0.262712,
+          "delta_and_minus_or": -0.59322,
+          "ci95": [
+            -0.711864406779661,
+            -0.4745762711864407
+          ],
+          "n": 59
+        },
+        "zero_result": {
+          "or_mean": 0.0,
+          "and_mean": 0.728814,
+          "delta_and_minus_or": 0.728814,
+          "ci95": [
+            0.6101694915254238,
+            0.8305084745762712
+          ],
+          "n": 59
+        }
+      },
+      "zero_result_or": 0.0,
+      "zero_result_and": 0.728814
+    },
+    "ua_to_en": {
+      "n": 55,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.4721,
+          "and_mean": 0.009478,
+          "delta_and_minus_or": -0.462622,
+          "ci95": [
+            -0.5231451349823732,
+            -0.40049113795960156
+          ],
+          "n": 55
+        },
+        "recall@10": {
+          "or_mean": 0.572727,
+          "and_mean": 0.009091,
+          "delta_and_minus_or": -0.563636,
+          "ci95": [
+            -0.6454545454545455,
+            -0.4818181818181818
+          ],
+          "n": 55
+        },
+        "mrr@5": {
+          "or_mean": 0.436364,
+          "and_mean": 0.009091,
+          "delta_and_minus_or": -0.427273,
+          "ci95": [
+            -0.5,
+            -0.3606060606060606
+          ],
+          "n": 55
+        },
+        "zero_result": {
+          "or_mean": 0.054545,
+          "and_mean": 0.927273,
+          "delta_and_minus_or": 0.872727,
+          "ci95": [
+            0.7818181818181819,
+            0.9454545454545454
+          ],
+          "n": 55
+        }
+      },
+      "zero_result_or": 0.054545,
+      "zero_result_and": 0.927273
+    },
+    "en_to_ua": {
+      "n": 55,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.464132,
+          "and_mean": 0.043457,
+          "delta_and_minus_or": -0.420675,
+          "ci95": [
+            -0.4768635793858461,
+            -0.35853414972837055
+          ],
+          "n": 55
+        },
+        "recall@10": {
+          "or_mean": 0.6,
+          "and_mean": 0.036364,
+          "delta_and_minus_or": -0.563636,
+          "ci95": [
+            -0.6454545454545455,
+            -0.4818181818181818
+          ],
+          "n": 55
+        },
+        "mrr@5": {
+          "or_mean": 0.422424,
+          "and_mean": 0.045455,
+          "delta_and_minus_or": -0.37697,
+          "ci95": [
+            -0.4393939393939394,
+            -0.31242424242424244
+          ],
+          "n": 55
+        },
+        "zero_result": {
+          "or_mean": 0.0,
+          "and_mean": 0.709091,
+          "delta_and_minus_or": 0.709091,
+          "ci95": [
+            0.6,
+            0.8181818181818182
+          ],
+          "n": 55
+        }
+      },
+      "zero_result_or": 0.0,
+      "zero_result_and": 0.709091
+    },
+    "short_queries": {
+      "n": 46,
+      "metrics": {
+        "ndcg@5": {
+          "or_mean": 0.556532,
+          "and_mean": 0.1933,
+          "delta_and_minus_or": -0.363231,
+          "ci95": [
+            -0.45115217262495416,
+            -0.27305414752054924
+          ],
+          "n": 46
+        },
+        "recall@10": {
+          "or_mean": 0.532609,
+          "and_mean": 0.141304,
+          "delta_and_minus_or": -0.391304,
+          "ci95": [
+            -0.4782608695652174,
+            -0.30434782608695654
+          ],
+          "n": 46
+        },
+        "mrr@5": {
+          "or_mean": 0.597464,
+          "and_mean": 0.23913,
+          "delta_and_minus_or": -0.358333,
+          "ci95": [
+            -0.46811594202898554,
+            -0.25181159420289856
+          ],
+          "n": 46
+        },
+        "zero_result": {
+          "or_mean": 0.130435,
+          "and_mean": 0.565217,
+          "delta_and_minus_or": 0.434783,
+          "ci95": [
+            0.2826086956521739,
+            0.5869565217391305
+          ],
+          "n": 46
+        }
+      },
+      "zero_result_or": 0.130435,
+      "zero_result_and": 0.565217
+    }
+  },
+  "zero_result": {
+    "newly_lost_by_and": 182,
+    "newly_lost_queries": [
+      {
+        "query_id": "QUU0001",
+        "query": "як оптимізувати Docker образи через multi-stage build",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0001",
+        "query": "how to optimize Docker images with multi-stage build",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0001",
+        "query": "як оптимізувати Docker образи через multi-stage build",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0001",
+        "query": "how to optimize Docker images with multi-stage build",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0002",
+        "query": "як налаштувати Docker Compose мережі та volumes",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0002",
+        "query": "how to configure Docker Compose networks and volumes",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0002",
+        "query": "як налаштувати Docker Compose мережі та volumes",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0002",
+        "query": "how to configure Docker Compose networks and volumes",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0003",
+        "query": "як розгорнути Kubernetes кластер з k3s",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0003",
+        "query": "how to deploy Kubernetes cluster with k3s",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0003",
+        "query": "як розгорнути Kubernetes кластер з k3s",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0003",
+        "query": "how to deploy Kubernetes cluster with k3s",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0004",
+        "query": "що таке Kubernetes Networking та Ingress",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0004",
+        "query": "що таке Kubernetes Networking та Ingress",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0005",
+        "query": "як налаштувати CI/CD пайплайн з GitHub Actions",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0005",
+        "query": "how to set up CI/CD pipeline with GitHub Actions",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0005",
+        "query": "як налаштувати CI/CD пайплайн з GitHub Actions",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0005",
+        "query": "how to set up CI/CD pipeline with GitHub Actions",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0006",
+        "query": "що таке Terraform Infrastructure as Code",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0006",
+        "query": "що таке Terraform Infrastructure as Code",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0007",
+        "query": "як автоматизувати конфігурацію серверів з Ansible",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0007",
+        "query": "how to automate server configuration with Ansible",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0007",
+        "query": "як автоматизувати конфігурацію серверів з Ansible",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0007",
+        "query": "how to automate server configuration with Ansible",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0008",
+        "query": "як налаштувати резервне копіювання з BorgBackup",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0008",
+        "query": "how to set up backup strategy with BorgBackup",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0008",
+        "query": "як налаштувати резервне копіювання з BorgBackup",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0008",
+        "query": "how to set up backup strategy with BorgBackup",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0009",
+        "query": "як налаштувати моніторинг з Prometheus та Grafana",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0009",
+        "query": "how to set up monitoring with Prometheus and Grafana",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0009",
+        "query": "як налаштувати моніторинг з Prometheus та Grafana",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0009",
+        "query": "how to set up monitoring with Prometheus and Grafana",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0010",
+        "query": "як налаштувати alerting правила Prometheus",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0010",
+        "query": "how to configure Prometheus alerting rules",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0010",
+        "query": "як налаштувати alerting правила Prometheus",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0010",
+        "query": "how to configure Prometheus alerting rules",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0011",
+        "query": "як налаштувати NFTables фаєрвол",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0011",
+        "query": "how to configure NFTables firewall",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0011",
+        "query": "як налаштувати NFTables фаєрвол",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0011",
+        "query": "how to configure NFTables firewall",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0012",
+        "query": "як налаштувати Fail2ban для захисту SSH",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0012",
+        "query": "how to configure Fail2ban for SSH protection",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0012",
+        "query": "як налаштувати Fail2ban для захисту SSH",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0012",
+        "query": "how to configure Fail2ban for SSH protection",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0014",
+        "query": "як налаштувати Tailscale VPN",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0014",
+        "query": "how to set up Tailscale VPN",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0014",
+        "query": "як налаштувати Tailscale VPN",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0014",
+        "query": "how to set up Tailscale VPN",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0015",
+        "query": "як провести аудит безпеки інфраструктури",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0015",
+        "query": "how to conduct infrastructure security audit",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0015",
+        "query": "як провести аудит безпеки інфраструктури",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QEU0015",
+        "query": "how to conduct infrastructure security audit",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QUU0016",
+        "query": "як посилити безпеку SSH сервера",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0016",
+        "query": "how to harden SSH server security",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0016",
+        "query": "як посилити безпеку SSH сервера",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0016",
+        "query": "how to harden SSH server security",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0017",
+        "query": "how to build API Gateway with FastAPI",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0017",
+        "query": "how to build API Gateway with FastAPI",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0018",
+        "query": "як налаштувати rate limiting в API Gateway",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0018",
+        "query": "how to configure rate limiting in API Gateway",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0018",
+        "query": "як налаштувати rate limiting в API Gateway",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0018",
+        "query": "how to configure rate limiting in API Gateway",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0019",
+        "query": "як налаштувати JWT автентифікацію в FastAPI",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0019",
+        "query": "how to configure JWT authentication in FastAPI",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0019",
+        "query": "як налаштувати JWT автентифікацію в FastAPI",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0019",
+        "query": "how to configure JWT authentication in FastAPI",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0020",
+        "query": "як використовувати Redis для кешування в FastAPI",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0020",
+        "query": "how to use Redis caching for FastAPI",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0020",
+        "query": "як використовувати Redis для кешування в FastAPI",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0020",
+        "query": "how to use Redis caching for FastAPI",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0021",
+        "query": "як використовувати asyncio для асинхронного Python",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0021",
+        "query": "how to use asyncio for async Python",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0021",
+        "query": "як використовувати asyncio для асинхронного Python",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0021",
+        "query": "how to use asyncio for async Python",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0022",
+        "query": "як використовувати Pydantic для валідації даних",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0022",
+        "query": "how to use Pydantic for data validation",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0022",
+        "query": "як використовувати Pydantic для валідації даних",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0022",
+        "query": "how to use Pydantic for data validation",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0023",
+        "query": "як писати асинхронні запити з SQLAlchemy",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0023",
+        "query": "how to write async queries with SQLAlchemy",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0023",
+        "query": "як писати асинхронні запити з SQLAlchemy",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0023",
+        "query": "how to write async queries with SQLAlchemy",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0024",
+        "query": "як розробляти веб-додатки з FastAPI",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0024",
+        "query": "how to develop web applications with FastAPI",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0024",
+        "query": "як розробляти веб-додатки з FastAPI",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0024",
+        "query": "how to develop web applications with FastAPI",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0025",
+        "query": "як використовувати Pytest для тестування Python",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0025",
+        "query": "how to use Pytest for Python testing",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0025",
+        "query": "як використовувати Pytest для тестування Python",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0025",
+        "query": "how to use Pytest for Python testing",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0026",
+        "query": "how to view logs with systemd and journalctl",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0026",
+        "query": "how to view logs with systemd and journalctl",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0027",
+        "query": "як налаштувати продуктивність PostgreSQL",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0027",
+        "query": "how to tune PostgreSQL performance",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0027",
+        "query": "як налаштувати продуктивність PostgreSQL",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0027",
+        "query": "how to tune PostgreSQL performance",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0028",
+        "query": "як мігрувати PostgreSQL з 14 на 16",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0028",
+        "query": "how to migrate PostgreSQL from 14 to 16",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0028",
+        "query": "як мігрувати PostgreSQL з 14 на 16",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0028",
+        "query": "how to migrate PostgreSQL from 14 to 16",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0029",
+        "query": "як створити резервну копію PostgreSQL",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0029",
+        "query": "how to backup and restore PostgreSQL",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0029",
+        "query": "як створити резервну копію PostgreSQL",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0029",
+        "query": "how to backup and restore PostgreSQL",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0030",
+        "query": "що таке SQLite вбудована база даних",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0030",
+        "query": "що таке SQLite вбудована база даних",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0031",
+        "query": "як налаштувати ZFS файлову систему",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0031",
+        "query": "how to configure ZFS filesystem",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0031",
+        "query": "як налаштувати ZFS файлову систему",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0031",
+        "query": "how to configure ZFS filesystem",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0032",
+        "query": "як адмініструвати Linux сервер",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0032",
+        "query": "how to administer Linux server",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0032",
+        "query": "як адмініструвати Linux сервер",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0032",
+        "query": "how to administer Linux server",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0033",
+        "query": "як налаштувати cron планові завдання в Linux",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0033",
+        "query": "how to schedule cron tasks in Linux",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0033",
+        "query": "як налаштувати cron планові завдання в Linux",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0033",
+        "query": "how to schedule cron tasks in Linux",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0034",
+        "query": "як налаштувати Docker HEALTHCHECK",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0034",
+        "query": "how to configure Docker HEALTHCHECK",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0034",
+        "query": "як налаштувати Docker HEALTHCHECK",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0034",
+        "query": "how to configure Docker HEALTHCHECK",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0035",
+        "query": "що таке BGE-M3 модель ембедінгів",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0035",
+        "query": "що таке BGE-M3 модель ембедінгів",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0036",
+        "query": "що таке miniLM модель ембедінгів",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0036",
+        "query": "що таке miniLM модель ембедінгів",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0037",
+        "query": "як працює Cross-Encoder для реранкінгу",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0037",
+        "query": "how does Cross-Encoder reranking work",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0037",
+        "query": "як працює Cross-Encoder для реранкінгу",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0037",
+        "query": "how does Cross-Encoder reranking work",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0038",
+        "query": "що таке метрика nDCG для оцінки пошуку",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0038",
+        "query": "що таке метрика nDCG для оцінки пошуку",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0039",
+        "query": "що таке метрика UDCG",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0039",
+        "query": "що таке метрика UDCG",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0040",
+        "query": "що таке FTS5 пошуковий індекс",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0040",
+        "query": "що таке FTS5 пошуковий індекс",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0041",
+        "query": "як використовувати Chain-of-Thought промптинг",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0041",
+        "query": "how to use Chain-of-Thought prompting",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0041",
+        "query": "як використовувати Chain-of-Thought промптинг",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0041",
+        "query": "how to use Chain-of-Thought prompting",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0042",
+        "query": "як дизайнити ефективні промпти для LLM",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEE0042",
+        "query": "how to design effective LLM prompts",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUE0042",
+        "query": "як дизайнити ефективні промпти для LLM",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QEU0042",
+        "query": "how to design effective LLM prompts",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 2
+      },
+      {
+        "query_id": "QUU0043",
+        "query": "що таке OKF метадані для нотаток",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0043",
+        "query": "що таке OKF метадані для нотаток",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0044",
+        "query": "що таке P.A.R.A. методологія",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0044",
+        "query": "що таке P.A.R.A. методологія",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0045",
+        "query": "що таке POWER Framework",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0045",
+        "query": "що таке POWER Framework",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0046",
+        "query": "що таке MCP Server для AI агентів",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0046",
+        "query": "що таке MCP Server для AI агентів",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0047",
+        "query": "що таке Graph RAG пошук знань",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0047",
+        "query": "що таке Graph RAG пошук знань",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEE0048",
+        "query": "compare embedding models BGE-M3 OpenAI miniLM",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QEU0048",
+        "query": "compare embedding models BGE-M3 OpenAI miniLM",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0049",
+        "query": "що таке Service Mesh з Istio",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0049",
+        "query": "що таке Service Mesh з Istio",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUU0050",
+        "query": "що таке Disaster Recovery план",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QUE0050",
+        "query": "що таке Disaster Recovery план",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QNEE0001",
+        "query": "how to configure TensorFlow on GPU",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEU0001",
+        "query": "how to configure TensorFlow on GPU",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNUU0002",
+        "query": "як створити S3 сумісне сховище",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEE0002",
+        "query": "how to set up S3 compatible storage",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNUE0002",
+        "query": "як створити S3 сумісне сховище",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEU0002",
+        "query": "how to set up S3 compatible storage",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEE0003",
+        "query": "how to develop React components",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEU0003",
+        "query": "how to develop React components",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEE0004",
+        "query": "how to configure RabbitMQ queues",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEU0004",
+        "query": "how to configure RabbitMQ queues",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNUU0005",
+        "query": "як індексувати дані в Elasticsearch",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEE0005",
+        "query": "how to index data in Elasticsearch",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNUE0005",
+        "query": "як індексувати дані в Elasticsearch",
+        "stratum": "ua_to_en",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QNEU0005",
+        "query": "how to index data in Elasticsearch",
+        "stratum": "en_to_ua",
+        "or_relevant_hits@10": 0
+      },
+      {
+        "query_id": "QDD0001",
+        "query": "What is the best embedding model for multilingual search?",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QDD0002",
+        "query": "Яка найкраща модель ембедінгів для багатомовного пошуку?",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QDD0003",
+        "query": "Compare Docker build strategies for production",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QDD0004",
+        "query": "Порівняння стратегій збірки Docker для продакшну",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QDD0005",
+        "query": "Kubernetes vs Nomad for container orchestration",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QDD0006",
+        "query": "Kubernetes чи Nomad для оркестрації контейнерів",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QDD0007",
+        "query": "Best monitoring stack for production infrastructure",
+        "stratum": "en_to_en",
+        "or_relevant_hits@10": 1
+      },
+      {
+        "query_id": "QDD0008",
+        "query": "Найкращий стек моніторингу для продакшн інфраструктури",
+        "stratum": "ua_to_ua",
+        "or_relevant_hits@10": 0
+      }
+    ]
+  },
+  "failures": [],
+  "examples": {
+    "or_wins": [
+      {
+        "query_id": "QEE0004",
+        "query": "what is Kubernetes networking and Ingress",
+        "query_language": "en",
+        "query_class": "conceptual",
+        "stratum": "en_to_en",
+        "query_term_count": 3,
+        "relevant_count": 2,
+        "or_result_count": 6,
+        "and_result_count": 2,
+        "or_top10": "[\"topic-004-ua.md\", \"topic-004-en.md\", \"topic-003-ua.md\", \"topic-003-en.md\", \"topic-049-en.md\", \"topic-049-ua.md\"]",
+        "and_top10": "[\"topic-004-ua.md\", \"topic-004-en.md\"]",
+        "or_relevant_hits@5": 2,
+        "and_relevant_hits@5": 1,
+        "or_relevant_hits@10": 2,
+        "and_relevant_hits@10": 1,
+        "or_first_relevant_rank": 2.0,
+        "and_first_relevant_rank": 2.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 0.0,
+        "or_only_relevant": "[\"topic-003-en.md\", \"topic-004-en.md\"]",
+        "and_only_relevant": "[\"topic-004-en.md\"]",
+        "common_relevant": "[\"topic-004-en.md\"]",
+        "or_ndcg@5": 0.639909328045346,
+        "or_ndcg@10": 0.639909328045346,
+        "or_recall@5": 1.0,
+        "or_recall@10": 1.0,
+        "or_mrr@5": 0.5,
+        "or_mrr@10": 0.5,
+        "or_precision@5": 0.4,
+        "or_precision@10": 0.3333333333333333,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.52129602861432,
+        "and_ndcg@10": 0.52129602861432,
+        "and_recall@5": 0.5,
+        "and_recall@10": 0.5,
+        "and_mrr@5": 0.5,
+        "and_mrr@10": 0.5,
+        "and_precision@5": 0.5,
+        "and_precision@10": 0.5,
+        "and_hit_rate@5": 1.0,
+        "and_hit_rate@10": 1.0
+      },
+      {
+        "query_id": "QEU0004",
+        "query": "what is Kubernetes networking and Ingress",
+        "query_language": "en",
+        "query_class": "conceptual",
+        "stratum": "en_to_ua",
+        "query_term_count": 3,
+        "relevant_count": 2,
+        "or_result_count": 6,
+        "and_result_count": 2,
+        "or_top10": "[\"topic-004-ua.md\", \"topic-004-en.md\", \"topic-003-ua.md\", \"topic-003-en.md\", \"topic-049-en.md\", \"topic-049-ua.md\"]",
+        "and_top10": "[\"topic-004-ua.md\", \"topic-004-en.md\"]",
+        "or_relevant_hits@5": 2,
+        "and_relevant_hits@5": 1,
+        "or_relevant_hits@10": 2,
+        "and_relevant_hits@10": 1,
+        "or_first_relevant_rank": 1.0,
+        "and_first_relevant_rank": 1.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 0.0,
+        "or_only_relevant": "[\"topic-003-ua.md\", \"topic-004-ua.md\"]",
+        "and_only_relevant": "[\"topic-004-ua.md\"]",
+        "common_relevant": "[\"topic-004-ua.md\"]",
+        "or_ndcg@5": 0.9639404333166532,
+        "or_ndcg@10": 0.9639404333166532,
+        "or_recall@5": 1.0,
+        "or_recall@10": 1.0,
+        "or_mrr@5": 1.0,
+        "or_mrr@10": 1.0,
+        "or_precision@5": 0.4,
+        "or_precision@10": 0.3333333333333333,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.8262346571285599,
+        "and_ndcg@10": 0.8262346571285599,
+        "and_recall@5": 0.5,
+        "and_recall@10": 0.5,
+        "and_mrr@5": 1.0,
+        "and_mrr@10": 1.0,
+        "and_precision@5": 0.5,
+        "and_precision@10": 0.5,
+        "and_hit_rate@5": 1.0,
+        "and_hit_rate@10": 1.0
+      },
+      {
+        "query_id": "QUU0005",
+        "query": "як налаштувати CI/CD пайплайн з GitHub Actions",
+        "query_language": "uk",
+        "query_class": "conceptual",
+        "stratum": "ua_to_ua",
+        "query_term_count": 7,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-005-ua.md\", \"topic-005-en.md\", \"topic-047-ua.md\", \"topic-012-ua.md\", \"topic-033-ua.md\", \"topic-025-ua.md\", \"topic-023-ua.md\", \"topic-017-ua.md\", \"topic-026-ua.md\", \"topic-049-ua.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 1.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-005-ua.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.8262346571285599,
+        "or_ndcg@10": 0.8262346571285599,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 1.0,
+        "or_mrr@10": 1.0,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      },
+      {
+        "query_id": "QEE0005",
+        "query": "how to set up CI/CD pipeline with GitHub Actions",
+        "query_language": "en",
+        "query_class": "conceptual",
+        "stratum": "en_to_en",
+        "query_term_count": 9,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-005-en.md\", \"topic-005-ua.md\", \"topic-014-en.md\", \"topic-025-en.md\", \"topic-003-en.md\", \"topic-027-en.md\", \"topic-016-en.md\", \"topic-021-en.md\", \"topic-008-en.md\", \"topic-017-en.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 1.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-005-en.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.8262346571285599,
+        "or_ndcg@10": 0.8262346571285599,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 1.0,
+        "or_mrr@10": 1.0,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      },
+      {
+        "query_id": "QUE0005",
+        "query": "як налаштувати CI/CD пайплайн з GitHub Actions",
+        "query_language": "uk",
+        "query_class": "conceptual",
+        "stratum": "ua_to_en",
+        "query_term_count": 7,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-005-ua.md\", \"topic-005-en.md\", \"topic-047-ua.md\", \"topic-012-ua.md\", \"topic-033-ua.md\", \"topic-025-ua.md\", \"topic-023-ua.md\", \"topic-017-ua.md\", \"topic-026-ua.md\", \"topic-049-ua.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 2.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-005-en.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.52129602861432,
+        "or_ndcg@10": 0.52129602861432,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 0.5,
+        "or_mrr@10": 0.5,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      },
+      {
+        "query_id": "QEU0005",
+        "query": "how to set up CI/CD pipeline with GitHub Actions",
+        "query_language": "en",
+        "query_class": "conceptual",
+        "stratum": "en_to_ua",
+        "query_term_count": 9,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-005-en.md\", \"topic-005-ua.md\", \"topic-014-en.md\", \"topic-025-en.md\", \"topic-003-en.md\", \"topic-027-en.md\", \"topic-016-en.md\", \"topic-021-en.md\", \"topic-008-en.md\", \"topic-017-en.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 2.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-005-ua.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.52129602861432,
+        "or_ndcg@10": 0.52129602861432,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 0.5,
+        "or_mrr@10": 0.5,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      },
+      {
+        "query_id": "QUU0006",
+        "query": "що таке Terraform Infrastructure as Code",
+        "query_language": "uk",
+        "query_class": "conceptual",
+        "stratum": "ua_to_ua",
+        "query_term_count": 5,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-006-en.md\", \"topic-006-ua.md\", \"topic-021-en.md\", \"topic-015-en.md\", \"topic-025-en.md\", \"topic-023-en.md\", \"topic-021-ua.md\", \"topic-023-ua.md\", \"topic-001-en.md\", \"topic-007-en.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 2.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-006-ua.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.52129602861432,
+        "or_ndcg@10": 0.52129602861432,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 0.5,
+        "or_mrr@10": 0.5,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      },
+      {
+        "query_id": "QUE0006",
+        "query": "що таке Terraform Infrastructure as Code",
+        "query_language": "uk",
+        "query_class": "conceptual",
+        "stratum": "ua_to_en",
+        "query_term_count": 5,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-006-en.md\", \"topic-006-ua.md\", \"topic-021-en.md\", \"topic-015-en.md\", \"topic-025-en.md\", \"topic-023-en.md\", \"topic-021-ua.md\", \"topic-023-ua.md\", \"topic-001-en.md\", \"topic-007-en.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 1.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-006-en.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.8262346571285599,
+        "or_ndcg@10": 0.8262346571285599,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 1.0,
+        "or_mrr@10": 1.0,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      },
+      {
+        "query_id": "QUU0007",
+        "query": "як автоматизувати конфігурацію серверів з Ansible",
+        "query_language": "uk",
+        "query_class": "conceptual",
+        "stratum": "ua_to_ua",
+        "query_term_count": 5,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-007-ua.md\", \"topic-007-en.md\", \"topic-032-ua.md\", \"topic-046-ua.md\", \"topic-047-ua.md\", \"topic-012-ua.md\", \"topic-033-ua.md\", \"topic-025-ua.md\", \"topic-023-ua.md\", \"topic-017-ua.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 1.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-007-ua.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.8262346571285599,
+        "or_ndcg@10": 0.8262346571285599,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 1.0,
+        "or_mrr@10": 1.0,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      },
+      {
+        "query_id": "QEE0007",
+        "query": "how to automate server configuration with Ansible",
+        "query_language": "en",
+        "query_class": "conceptual",
+        "stratum": "en_to_en",
+        "query_term_count": 6,
+        "relevant_count": 2,
+        "or_result_count": 10,
+        "and_result_count": 0,
+        "or_top10": "[\"topic-007-en.md\", \"topic-032-en.md\", \"topic-046-en.md\", \"topic-007-ua.md\", \"topic-030-en.md\", \"topic-011-en.md\", \"topic-034-en.md\", \"topic-034-ua.md\", \"topic-027-ua.md\", \"topic-014-ua.md\"]",
+        "and_top10": "[]",
+        "or_relevant_hits@5": 1,
+        "and_relevant_hits@5": 0,
+        "or_relevant_hits@10": 1,
+        "and_relevant_hits@10": 0,
+        "or_first_relevant_rank": 1.0,
+        "and_first_relevant_rank": 0.0,
+        "or_zero_result": 0.0,
+        "and_zero_result": 1.0,
+        "or_only_relevant": "[\"topic-007-en.md\"]",
+        "and_only_relevant": "[]",
+        "common_relevant": "[]",
+        "or_ndcg@5": 0.8262346571285599,
+        "or_ndcg@10": 0.8262346571285599,
+        "or_recall@5": 0.5,
+        "or_recall@10": 0.5,
+        "or_mrr@5": 1.0,
+        "or_mrr@10": 1.0,
+        "or_precision@5": 0.2,
+        "or_precision@10": 0.1,
+        "or_hit_rate@5": 1.0,
+        "or_hit_rate@10": 1.0,
+        "and_ndcg@5": 0.0,
+        "and_ndcg@10": 0.0,
+        "and_recall@5": 0.0,
+        "and_recall@10": 0.0,
+        "and_mrr@5": 0.0,
+        "and_mrr@10": 0.0,
+        "and_precision@5": 0.0,
+        "and_precision@10": 0.0,
+        "and_hit_rate@5": 0.0,
+        "and_hit_rate@10": 0.0
+      }
+    ],
+    "and_wins": []
+  }
+}

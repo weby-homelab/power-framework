@@ -1,0 +1,43 @@
+{
+  "schema_version": "power.fts-operator.manifest.v1",
+  "power_version": "3.3.2",
+  "git_commit": "55a0a843072c50482ca9c19dcc01ad3eef5e4a66",
+  "python_version": "3.13.5",
+  "sqlite_version": "3.46.1",
+  "timestamp_utc": "2026-08-06T20:17:41.938000+00:00",
+  "corpus_path": "/root/geminicli/projects/P.O.W.E.R/benchmarks/power31/dataset/v1/corpus",
+  "corpus_snapshot_hash": "e80778a480cdc99360c99c2ae017a5813318299a31ec89904d0d3e77617858d4",
+  "corpus_document_count": 100,
+  "queries_path": "/root/geminicli/projects/P.O.W.E.R/benchmarks/power31/dataset/v1/queries.jsonl",
+  "queries_sha256": "6c7fd512bbf6490477c1672c95d9414655b25753dede1096bf9f951d78ec0ffa",
+  "qrels_path": "/root/geminicli/projects/P.O.W.E.R/benchmarks/power31/dataset/v1/qrels.synthetic.jsonl",
+  "qrels_sha256": "e550f7863685e41717fc63149a999f128ea8588d3f7b1fffd46fba4efd4586b6",
+  "provenance_path": "benchmarks/fts_operator/fixtures/ground_truth_provenance.json",
+  "provenance_sha256": "121187187c420e730556073995775645424be73434d2ad03df791bb2b8126e74",
+  "variants": {
+    "fts_or": {
+      "mode": "fts",
+      "fts_operator": "OR"
+    },
+    "fts_and": {
+      "mode": "fts",
+      "fts_operator": "AND"
+    }
+  },
+  "bm25_weights": {
+    "title": 10.0,
+    "tags": 5.0,
+    "description": 3.0,
+    "content": 1.0
+  },
+  "code_changed_between_variants": false,
+  "index": "single FTS index synced once before both variants",
+  "top_k": 10,
+  "seed": 20260801,
+  "bootstrap_resamples": 10000,
+  "query_count": 228,
+  "variant_configs": {
+    "fts_or": null,
+    "fts_and": null
+  }
+}
