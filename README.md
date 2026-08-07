@@ -101,18 +101,56 @@ pip install --user --break-system-packages -e ".[dev]"
 
 ## Windows 11 Installation
 
-P.O.W.E.R. runs natively on Windows 11 (Python 3.11+). The CLI works in
+P.O.W.E.R. runs natively on Windows 11 (Python 3.11+, 64-bit). The CLI works in
 PowerShell 5.1/7 and Windows Terminal; `power rename` uses `os.replace()`, so
 renaming onto an existing destination works on Windows instead of raising
 `FileExistsError`.
 
-```powershell
-# 1. Install Python 3.11+ from python.org (tick "Add python.exe to PATH")
-py -m pip install --user "git+https://github.com/weby-homelab/power-framework.git@v3.3.2"
+### Prerequisites
 
-# 2. Verify — `power` lands in %USERPROFILE%\AppData\Roaming\Python\Scripts
+1. **Python 3.11+** — download the 64-bit installer from
+   [python.org](https://www.python.org/downloads/windows/). On the first setup
+   screen check **"Add python.exe to PATH"**, then click _Install Now_.
+2. **Git for Windows** — from [git-scm.com](https://git-scm.com/download/win)
+   (required for `pip install git+...`).
+3. **Windows Terminal / PowerShell** — built into Windows 11 (Win+X → Terminal).
+
+### Option A: Virtual environment (recommended)
+
+Isolates P.O.W.E.R. and its model dependencies from your global Python:
+
+```powershell
+# 1. Create a tools folder and virtual environment
+mkdir %USERPROFILE%\power-tools
+cd %USERPROFILE%\power-tools
+python -m venv .venv
+
+# 2. Activate it (PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# 3. Install P.O.W.E.R. 3.3.2
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.2
+
+# 4. Verify
 power --version
 ```
+
+> `power` remains available only while the venv is active. Re-activate with
+> `.\.venv\Scripts\Activate.ps1` (or add a shortcut in your PowerShell profile).
+> On first dense search (`power sync`), model assets (BGE-M3 + reranker ONNX,
+> SHA-256 pinned) download automatically into the venv cache.
+
+### Option B: User-site install (global, no venv)
+
+```powershell
+py -m pip install --user "git+https://github.com/weby-homelab/power-framework.git@v3.3.2"
+power --version
+```
+
+Scripts are placed in `%USERPROFILE%\AppData\Roaming\Python\Scripts`. If
+`power` is not recognized, close and reopen the terminal, or add that directory
+to your `PATH` (System Properties → Environment Variables; PowerShell:
+`$env:Path += ";$env:APPDATA\Python\Scripts"` for the session).
 
 For development (editable, easy update):
 
@@ -123,15 +161,54 @@ py -m pip install --user -e ".[dev]"
 git pull origin main   # update anytime
 ```
 
+### Create a vault and run first checks
+
+```powershell
+power init C:\Users\you\my-vault
+power lint C:\Users\you\my-vault
+power index C:\Users\you\my-vault
+power status C:\Users\you\my-vault
+```
+
+### MCP setup on Windows (Claude Desktop)
+
+Edit `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+    "mcpServers": {
+        "power": {
+            "command": "py",
+            "args": ["-m", "power_framework.mcp"],
+            "env": {
+                "POWER_VAULT_DIR": "C:\\Users\\you\\my-vault"
+            }
+        }
+    }
+}
+```
+
 Notes:
 
-- **PATH** — ensure `%USERPROFILE%\AppData\Roaming\Python\Scripts` is on `PATH`
-  (PowerShell: `$env:Path += ";$env:APPDATA\Python\Scripts"` for the session,
-  or set it in System Properties → Environment Variables).
-- **MCP clients** — use `"command": "py", "args": ["-m", "power_framework.mcp"]`
-  in Claude Desktop / OpenCode configs on Windows.
+- **MCP clients** — use `"command": "py"` (the Windows Python launcher; not
+  `python3`) in Claude Desktop / OpenCode configs on Windows.
+- **Escape backslashes** in JSON (`\\`) or use forward slashes: `C:/Users/you/my-vault`.
+- **Venv path** — if you used Option A, point `command` at the full path:
+  `C:\Users\you\power-tools\.venv\Scripts\python.exe`.
 - **POWER_VAULT_DIR** — set the env var via System Properties → Environment
-  Variables when you want the MCP server to skip the interactive vault prompt.
+  Variables (or the `env` block above) when you want the MCP server to skip the
+  interactive vault prompt.
+
+### Troubleshooting on Windows 11
+
+| Symptom                                          | Fix                                                                                                       |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `'power' is not recognized`                      | Reopen the terminal, or add `%USERPROFILE%\AppData\Roaming\Python\Scripts` (or venv `Scripts`) to `PATH`. |
+| `pip install git+...` fails                      | Install [Git for Windows](https://git-scm.com/download/win) and restart the terminal.                     |
+| `python` not found                               | Reinstall Python and check **"Add python.exe to PATH"**; restart the terminal.                            |
+| SmartScreen/Defender warning during `power sync` | Expected on first model download; assets are SHA-256 pinned and validated fail-closed.                    |
+
+## What's Inside
 
 ## What's Inside
 
