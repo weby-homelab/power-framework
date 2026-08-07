@@ -1,16 +1,26 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.7)"
-description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to a P.O.W.E.R. 3.2.7 OKF-compliant structure while retaining its chosen folder layout."
+title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.3.2)"
+description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to a P.O.W.E.R. 3.3.2 OKF-compliant structure while retaining its chosen folder layout."
 tags: [power, migration, guide, ai-agents, mcp, bge-m3, graphrag, methodologies]
-timestamp: 2026-07-24T16:00:00
+timestamp: 2026-08-07T21:10:00
 ---
 
-# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.2.7)
+# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.3.2)
 
 **Target audience:** AI agents (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) with MCP access to P.O.W.E.R.
 
 **Goal:** Transform any unstructured or existing Obsidian vault into a P.O.W.E.R.-compliant knowledge base with validated OKF metadata, any chosen organizational methodology (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or custom/hybrid), and hierarchical indexes — fully autonomously.
+
+## Repository Instruction Index (Read Me First)
+
+For any AI agent onboarding into this repository: this repository contains all the detailed, step-by-step instructions you need for every setup path. Read the relevant guide below before starting work:
+
+1. **Fresh installation from zero on a clean knowledge base** — see [Getting Started](getting-started.md): install the framework, create a vault with `power init`, add notes with `power ingest`, validate with `power lint`, build indexes with `power index`, and start the MCP server (`python -m power_framework.mcp`).
+2. **Correct migration from any existing knowledge base to P.O.W.E.R.** — this guide (`docs/migration-guide.md`): migrate any existing Obsidian vault (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or unstructured/hybrid) with zero data loss, following the 6 phases below.
+3. **Full Windows 11 installation instructions** — see `README.md` → **Windows 11 Installation**: Python 3.11+ from python.org, `py -m pip install --user git+https://github.com/weby-homelab/power-framework.git@v3.3.2`, `PATH` setup for `%APPDATA%\Python\Scripts`, and MCP client configuration using `"command": "py", "args": ["-m", "power_framework.mcp"]`.
+
+If you are starting from an empty vault, read `docs/getting-started.md` first, then use this guide only when you need to migrate an existing vault.
 
 ---
 
@@ -223,15 +233,15 @@ power sync /path/to/vault
 
 ---
 
-### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v3.2.7)
+### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v3.3.2)
 
-For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v3.2.7) globally or in the project's virtual environment:
+For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v3.3.2) globally or in the project's virtual environment:
 
 ```bash
 pip install git+https://github.com/weby-homelab/power-framework.git
 ```
 
-#### 🧠 Embedding & Reranker Stack Configuration (v3.2.7 canonical stack)
+#### 🧠 Embedding & Reranker Stack Configuration (v3.3.2 canonical stack)
 
 Starting with version 3.0+, the canonical default embedding engine is **`bge-m3`** (`aapot/bge-m3-onnx`, embedding dimension **1024**), running on direct **ONNX Runtime** + `tokenizers` (`BGEM3OnnxManager`). This is paired with the Apache-2.0 **`onnx-community/bge-reranker-v2-m3-ONNX`** cross-encoder reranker.
 
@@ -298,9 +308,6 @@ node_modules/
 
 ---
 
-### Step 6c: Configure AI Agent Instructions and Rules
-
-Provide project rules and context to your agent using system rule files (e.g., `.clinerules`, `.cursorrules`, `.windsurfrules`) or an instructions array in the agent's client configuration.
 ### Step 6c: Configure AI Agent Instructions and Rules
 
 Provide project rules and context to your agent using system rule files (e.g., `.clinerules`, `.cursorrules`, `.windsurfrules`) or an instructions array in the agent's client configuration.
@@ -373,7 +380,7 @@ Set up a synchronization pipeline to preserve history and enable collaboration w
 
 ### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid + Semantic + Reranked)
 
-The P.O.W.E.R. framework (v3.2.7) includes a built-in search engine supporting distinct search strategies:
+The P.O.W.E.R. framework (v3.3.2) includes a built-in search engine supporting distinct search strategies:
 
 | Mode                 | Description                                                                                              | Best for                                    |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
@@ -484,7 +491,7 @@ Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-com
 | `read_sub_index` returns "No notes found"    | Category folder is empty or not indexed       | Run `generate_index(vault_path)` first                        |
 | Too many orphans in `04_Archive/`            | Archived notes by definition have few links   | This is expected — archive orphans are normal                 |
 | Lint reports 200+ extra notes                | `.git/` directory is not excluded             | Update linter to skip hidden dirs (v1.5.0+ does)              |
-| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v3.2.7 or re-run `generate_index`                  |
+| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v3.3.2 or re-run `generate_index`                  |
 | `pip install` fails with PEP 668             | System Python blocks direct install           | Use a venv: `/path/to/venv/bin/pip install ...`               |
 | `External data path escapes model directory` | ONNX Runtime security constraint              | Set `HF_HUB_DISABLE_SYMLINKS=1` in environment before running |
 
