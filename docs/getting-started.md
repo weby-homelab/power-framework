@@ -33,7 +33,7 @@ vault/
 ├── 02_Areas/
 ├── 03_Resources/
 ├── 04_Archive/
-├── 05_Templates/
+├── 05_Templates/       # Note templates (default.md with OKF frontmatter)
 ├── 06_Daily_Logs/
 ├── PROTOCOLS/
 ├── index.md

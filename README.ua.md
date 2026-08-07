@@ -97,20 +97,58 @@ pip install --user --break-system-packages -e ".[dev]"
 > power --version
 > ```
 
-## Установка на Windows 11
+## Встановлення на Windows 11
 
-P.O.W.E.R. працює нативно на Windows 11 (Python 3.11+). CLI працює в
+P.O.W.E.R. працює нативно на Windows 11 (Python 3.11+, 64-bit). CLI працює в
 PowerShell 5.1/7 та Windows Terminal; `power rename` використовує
 `os.replace()`, тому перейменування поверх наявного файлу працює на Windows
 замість помилки `FileExistsError`.
 
-```powershell
-# 1. Встановіть Python 3.11+ з python.org (позначте "Add python.exe to PATH")
-py -m pip install --user "git+https://github.com/weby-homelab/power-framework.git@v3.3.2"
+### Попередні вимоги
 
-# 2. Перевірка — `power` опиниться у %USERPROFILE%\AppData\Roaming\Python\Scripts
+1. **Python 3.11+** — завантажте 64-bit інсталятор з
+   [python.org](https://www.python.org/downloads/windows/). На першому екрані
+   увімкніть **"Add python.exe to PATH"**, потім _Install Now_.
+2. **Git for Windows** — з [git-scm.com](https://git-scm.com/download/win)
+   (потрібен для `pip install git+...`).
+3. **Windows Terminal / PowerShell** — вбудовані у Windows 11 (Win+X → Terminal).
+
+### Варіант A: Віртуальне середовище (рекомендовано)
+
+Ізолює P.O.W.E.R. та його модельні залежності від глобального Python:
+
+```powershell
+# 1. Створіть папку та віртуальне середовище
+mkdir %USERPROFILE%\power-tools
+cd %USERPROFILE%\power-tools
+python -m venv .venv
+
+# 2. Активуйте його (PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# 3. Встановіть P.O.W.E.R. 3.3.2
+pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.2
+
+# 4. Перевірка
 power --version
 ```
+
+> `power` доступний лише поки активне venv. Повторно активуйте через
+> `.\.venv\Scripts\Activate.ps1` (або додайте до профілю PowerShell).
+> Під час першого щільного пошуку (`power sync`) модельні файли (BGE-M3 +
+> реранкер ONNX, з перевіркою SHA-256) завантажуються автоматично у кеш venv.
+
+### Варіант B: Встановлення у user-site (глобально, без venv)
+
+```powershell
+py -m pip install --user "git+https://github.com/weby-homelab/power-framework.git@v3.3.2"
+power --version
+```
+
+Скрипти розміщуються у `%USERPROFILE%\AppData\Roaming\Python\Scripts`. Якщо
+`power` не розпізнається — закрийте та відкрийте термінал заново, або додайте
+цю папку до `PATH` (System Properties → Environment Variables; PowerShell:
+`$env:Path += ";$env:APPDATA\Python\Scripts"` на поточну сесію).
 
 Для розробки (editable, легке оновлення):
 
@@ -121,16 +159,54 @@ py -m pip install --user -e ".[dev]"
 git pull origin main   # оновлення будь-коли
 ```
 
+### Створіть vault та виконайте перші перевірки
+
+```powershell
+power init C:\Users\you\my-vault
+power lint C:\Users\you\my-vault
+power index C:\Users\you\my-vault
+power status C:\Users\you\my-vault
+```
+
+### Налаштування MCP на Windows (Claude Desktop)
+
+Відредагуйте `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+    "mcpServers": {
+        "power": {
+            "command": "py",
+            "args": ["-m", "power_framework.mcp"],
+            "env": {
+                "POWER_VAULT_DIR": "C:\\Users\\you\\my-vault"
+            }
+        }
+    }
+}
+```
+
 Примітки:
 
-- **PATH** — додайте `%USERPROFILE%\AppData\Roaming\Python\Scripts` до `PATH`
-  (PowerShell: `$env:Path += ";$env:APPDATA\Python\Scripts"` на поточну сесію,
-  або через System Properties → Environment Variables).
-- **MCP-клієнти** — у конфігах Claude Desktop / OpenCode на Windows
-  використовуйте `"command": "py", "args": ["-m", "power_framework.mcp"]`.
+- **MCP-клієнти** — використовуйте `"command": "py"` (Windows Python launcher;
+  не `python3`) у конфігах Claude Desktop / OpenCode на Windows.
+- **Екранування backslash** у JSON (`\\`) або використовуйте forward slashes: `C:/Users/you/my-vault`.
+- **Шлях до venv** — якщо обрали Варіант A, вкажіть повний шлях у `command`:
+  `C:\Users\you\power-tools\.venv\Scripts\python.exe`.
 - **POWER_VAULT_DIR** — задайте змінну середовища через System Properties →
-  Environment Variables, якщо MCP-сервер не має питати шлях до vault
-  інтерактивно.
+  Environment Variables (або у блоці `env` вище), якщо MCP-сервер не має
+  питати шлях до vault інтерактивно.
+
+### Усунення проблем на Windows 11
+
+| Симптом                                                | Рішення                                                                                                                  |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `'power' is not recognized`                            | Відкрийте термінал заново, або додайте `%USERPROFILE%\AppData\Roaming\Python\Scripts` (чи `Scripts` від venv) до `PATH`. |
+| `pip install git+...` не працює                        | Встановіть [Git for Windows](https://git-scm.com/download/win) і перезапустіть термінал.                                 |
+| `python` не знайдено                                   | Перевстановіть Python з галочкою **"Add python.exe to PATH"**; перезапустіть термінал.                                   |
+| Попередження SmartScreen/Defender під час `power sync` | Очікувано при першому завантаженні моделей; файли перевіряються за SHA-256 та валідуються fail-closed.                   |
+
+## Що всередині
 
 ## Що всередині
 
