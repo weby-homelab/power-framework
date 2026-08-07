@@ -33,6 +33,17 @@ P.O.W.E.R. — це гібридна система, створена для п�
   замість помилки `FileExistsError`
 - **Технічний реліз 3.3.2** — machine-only M2–M5 gates, package та CI provenance перевірені; сертифікація human-quality, доступ до sealed holdout і production claims залишаються закритими.
 
+## Для AI-агентів
+
+P.O.W.E.R. створений для роботи як людьми, так і AI-агентами. Агентам
+(Antigravity, OpenCode, Claude Code, Gemini, Devin, DeepSeek) варто прочитати
+рольові ґайди перед роботою з vault:
+
+- **[Getting Started](https://github.com/weby-homelab/power-framework/blob/main/docs/getting-started.md)** — перша установка, перший vault, перший запит
+- **[CLI Reference](https://github.com/weby-homelab/power-framework/blob/main/docs/cli.md)** — усі команди, прапорці та коди виходу
+- **[MCP Server](https://github.com/weby-homelab/power-framework/blob/main/docs/mcp-server.md)** — 17 керованих MCP-інструментів для MCP-сумісних клієнтів
+- **[Ґайд міграції для AI-агента](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.ua.md)** — 5-фазний протокол адаптації наявного vault
+
 ## Швидкий старт
 
 ```bash
@@ -85,6 +96,41 @@ pip install --user --break-system-packages -e ".[dev]"
 > fi
 > power --version
 > ```
+
+## Установка на Windows 11
+
+P.O.W.E.R. працює нативно на Windows 11 (Python 3.11+). CLI працює в
+PowerShell 5.1/7 та Windows Terminal; `power rename` використовує
+`os.replace()`, тому перейменування поверх наявного файлу працює на Windows
+замість помилки `FileExistsError`.
+
+```powershell
+# 1. Встановіть Python 3.11+ з python.org (позначте "Add python.exe to PATH")
+py -m pip install --user "git+https://github.com/weby-homelab/power-framework.git@v3.3.2"
+
+# 2. Перевірка — `power` опиниться у %USERPROFILE%\AppData\Roaming\Python\Scripts
+power --version
+```
+
+Для розробки (editable, легке оновлення):
+
+```powershell
+git clone https://github.com/weby-homelab/power-framework.git C:\dev\power-framework
+cd C:\dev\power-framework
+py -m pip install --user -e ".[dev]"
+git pull origin main   # оновлення будь-коли
+```
+
+Примітки:
+
+- **PATH** — додайте `%USERPROFILE%\AppData\Roaming\Python\Scripts` до `PATH`
+  (PowerShell: `$env:Path += ";$env:APPDATA\Python\Scripts"` на поточну сесію,
+  або через System Properties → Environment Variables).
+- **MCP-клієнти** — у конфігах Claude Desktop / OpenCode на Windows
+  використовуйте `"command": "py", "args": ["-m", "power_framework.mcp"]`.
+- **POWER_VAULT_DIR** — задайте змінну середовища через System Properties →
+  Environment Variables, якщо MCP-сервер не має питати шлях до vault
+  інтерактивно.
 
 ## Що всередині
 
@@ -191,7 +237,7 @@ power archive <path>           Автоматично архівувати за�
 power suggest-related <path>   Запропонувати Graph RAG зв'язки між нотатками
 power cron <path>              Автоматичне обслуговування (lint + index + rot)
 power synthesize <path>        Автоматично додати нотатку з підсумком сесії
-power rename <path> <name>     Перейменувати нотатку й оновити пов'язані шляхи
+power rename <path> --old OLD --new NEW   Перейменувати нотатку й оновити пов'язані шляхи
 ```
 
 ### Приклади ingest

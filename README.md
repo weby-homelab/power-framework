@@ -35,6 +35,17 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
   provenance are verified; human-quality certification, sealed-holdout access,
   and production claims remain incomplete
 
+## For AI Agents
+
+P.O.W.E.R. is designed to be operated by human workflows and AI agents alike.
+Agents (Antigravity, OpenCode, Claude Code, Gemini, Devin, DeepSeek) should read
+the role-specific guides before touching a vault:
+
+- **[Getting Started](https://github.com/weby-homelab/power-framework/blob/main/docs/getting-started.md)** — first install, first vault, first query
+- **[CLI Reference](https://github.com/weby-homelab/power-framework/blob/main/docs/cli.md)** — every command, flag, and exit code
+- **[MCP Server](https://github.com/weby-homelab/power-framework/blob/main/docs/mcp-server.md)** — the 17 governed MCP tools for MCP-compatible clients
+- **[AI Agent Migration Guide](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.md)** — 5-phase protocol for adopting an existing vault
+
 ## Quick Start
 
 ```bash
@@ -87,6 +98,40 @@ pip install --user --break-system-packages -e ".[dev]"
 > fi
 > power --version
 > ```
+
+## Windows 11 Installation
+
+P.O.W.E.R. runs natively on Windows 11 (Python 3.11+). The CLI works in
+PowerShell 5.1/7 and Windows Terminal; `power rename` uses `os.replace()`, so
+renaming onto an existing destination works on Windows instead of raising
+`FileExistsError`.
+
+```powershell
+# 1. Install Python 3.11+ from python.org (tick "Add python.exe to PATH")
+py -m pip install --user "git+https://github.com/weby-homelab/power-framework.git@v3.3.2"
+
+# 2. Verify — `power` lands in %USERPROFILE%\AppData\Roaming\Python\Scripts
+power --version
+```
+
+For development (editable, easy update):
+
+```powershell
+git clone https://github.com/weby-homelab/power-framework.git C:\dev\power-framework
+cd C:\dev\power-framework
+py -m pip install --user -e ".[dev]"
+git pull origin main   # update anytime
+```
+
+Notes:
+
+- **PATH** — ensure `%USERPROFILE%\AppData\Roaming\Python\Scripts` is on `PATH`
+  (PowerShell: `$env:Path += ";$env:APPDATA\Python\Scripts"` for the session,
+  or set it in System Properties → Environment Variables).
+- **MCP clients** — use `"command": "py", "args": ["-m", "power_framework.mcp"]`
+  in Claude Desktop / OpenCode configs on Windows.
+- **POWER_VAULT_DIR** — set the env var via System Properties → Environment
+  Variables when you want the MCP server to skip the interactive vault prompt.
 
 ## What's Inside
 
@@ -192,7 +237,7 @@ power archive <path>           Auto-archive stale notes to 04_Archive/
 power suggest-related <path>   Suggest cross-note relations for Graph RAG
 power cron <path>              Run automated maintenance (lint + index + rot)
 power synthesize <path>        Auto-ingest a session synthesis note
-power rename <path> <name>     Rename a note and update related paths
+power rename <path> --old OLD --new NEW   Rename a note and update related paths
 ```
 
 ### Ingest Examples
