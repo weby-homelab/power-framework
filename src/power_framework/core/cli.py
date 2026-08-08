@@ -17,6 +17,7 @@ import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 try:  # resource is POSIX-only; Windows uses the no-limit path.
     import resource
@@ -33,6 +34,12 @@ from .domains import (
 )
 from .healer import heal_vault
 from .ignore import should_skip
+from .importer import (
+    ImportPolicy,
+    apply_import_plan,
+    build_import_plan,
+    format_import_report,
+)
 from .indexer import generate_log_initial, run_generate_hierarchical_index
 from .linter import (
     archive_stale_notes,
@@ -62,6 +69,9 @@ from .synthesize import synthesize_session_ingest
 from .utils import __version__, atomic_write
 
 logger = logging.getLogger("power")
+
+if TYPE_CHECKING:
+    from .generation_index import GenerationReport
 
 TEMPLATE_NOTE = """\
 ---
@@ -255,6 +265,88 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     logger.info("Created note: %s", note_path.relative_to(vault_dir))
     if domain:
         logger.info("Domain routing: %s (template: %s)", domain.name, domain.template)
+    return 0
+
+
+def _resolve_import_target(vault_dir: Path, relative_path: str) -> Path:
+    """Resolve an import target inside the vault's documented note scope."""
+    candidate = Path(relative_path).expanduser()
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise ValueError("--into must be a relative path inside the vault")
+    target = (vault_dir / candidate).resolve()
+    try:
+        target.relative_to(vault_dir)
+    except ValueError as exc:
+        raise ValueError("--into must stay inside the vault") from exc
+    if not candidate.parts or candidate.parts[0] not in (*VAULT_STRUCTURE, "00_Inbox"):
+        raise ValueError("--into must start with a P.A.R.A. or PROTOCOLS folder")
+    return target
+
+
+def _cmd_import(args: argparse.Namespace) -> int:
+    """Preflight and import Markdown notes with an explicit compatibility policy."""
+    vault_dir = _resolve_path(args.path)
+    source_dir = Path(args.source).expanduser().resolve()
+    if not source_dir.is_dir():
+        logger.error("Import source directory not found: %s", source_dir)
+        return 1
+    if not vault_dir.is_dir():
+        logger.error("Vault not found: %s", vault_dir)
+        return 1
+
+    try:
+        target_dir = _resolve_import_target(vault_dir, args.into)
+    except ValueError as exc:
+        logger.error("Invalid import target: %s", exc)
+        return 1
+    if source_dir == vault_dir or source_dir.is_relative_to(vault_dir):
+        logger.error("Import source must be outside the target vault: %s", source_dir)
+        return 1
+    if target_dir.is_relative_to(source_dir):
+        logger.error("Import target must not be inside the source directory: %s", source_dir)
+        return 1
+
+    plan = build_import_plan(source_dir, target_dir, ImportPolicy(args.policy))
+    logger.info(format_import_report(plan, dry_run=args.dry_run))
+    if plan.excluded and not args.allow_partial:
+        logger.error(
+            "Import failed closed: %d note(s) are excluded; pass --allow-partial to import the rest.",
+            len(plan.excluded),
+        )
+        return 1
+    if args.dry_run or not plan.will_write:
+        return 0
+
+    from .generation_index import IndexGenerationError, sync_vault_atomically
+
+    try:
+
+        def apply_and_index() -> tuple[int, tuple[str, GenerationReport]]:
+            written = apply_import_plan(plan, allow_partial=args.allow_partial)
+            index_message = run_generate_hierarchical_index(vault_dir)
+            sync_report = sync_vault_atomically(vault_dir, sync_embeddings=False)
+            return written, (index_message, sync_report)
+
+        written, result = execute_vault_mutation(vault_dir, apply_and_index)
+    except (IndexGenerationError, OSError, ValueError) as exc:
+        logger.error("Import apply failed: %s", exc)
+        return 1
+
+    index_message, sync_report = result
+    logger.info("Imported %d note(s).", written)
+    logger.info("%s", index_message)
+    if sync_report.invalid_sources:
+        logger.error(
+            "Import produced a partial searchable index: %d note(s) excluded.",
+            sync_report.invalid_sources,
+        )
+        if not args.allow_partial:
+            return 1
+    logger.info(
+        "FTS index ready: %d/%d notes indexed.",
+        sync_report.actual_files,
+        sync_report.total_scanned,
+    )
     return 0
 
 
@@ -666,6 +758,41 @@ def main() -> None:
         help="Domain slug; without it, configured domain rules route the note automatically",
     )
     p_ingest.set_defaults(func=_cmd_ingest)
+
+    p_import = subparsers.add_parser(
+        "import",
+        help="Preflight and import Markdown notes from another vault",
+    )
+    p_import.add_argument("source", help="Source directory containing Markdown notes")
+    p_import.add_argument(
+        "--into",
+        required=True,
+        help="Vault-relative destination folder, for example 03_Resources",
+    )
+    p_import.add_argument(
+        "--path",
+        default=None,
+        help="Target vault path (defaults to POWER_VAULT_DIR or the current directory)",
+    )
+    p_import.add_argument(
+        "--policy",
+        choices=[policy.value for policy in ImportPolicy],
+        default=ImportPolicy.STRICT.value,
+        help="Foreign frontmatter policy (default: strict)",
+    )
+    p_import.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Only print the deterministic plan; do not write notes or indexes",
+    )
+    p_import.add_argument(
+        "--allow-partial",
+        action="store_true",
+        default=False,
+        help="Import valid notes even when some source notes remain excluded",
+    )
+    p_import.set_defaults(func=_cmd_import)
 
     p_search = subparsers.add_parser("search", help="Full-text search across vault notes")
     p_search.add_argument("path", help="Path to the vault directory")

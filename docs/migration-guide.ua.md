@@ -52,8 +52,9 @@ rollback path.
   регенерує index, дописує `log.md` та запускає lint.
 - MCP `read_sub_index` і `ensure_sub_index` приймають канонічні P.A.R.A.
   categories, а не довільні source folders.
-- CLI `power ingest` створює нову нотатку, але не імпортує body наявної. Це не
-  batch migration command.
+- CLI `power ingest` створює нову нотатку, але не імпортує body наявної. Для
+  bounded batch import використовуйте `power import`: це єдина команда, яка
+  приймає source directory і формує preflight report.
 - `power heal` виправляє missing/invalid frontmatter fields, але не класифікує
   довільні top-level folders, не ремонтує wikilinks і не викликає LLM.
 - `power rename` за замовчуванням працює як dry run і оновлює paths у metadata
@@ -61,6 +62,35 @@ rollback path.
 
 Саме тому протокол використовує staging vault і migration manifest, а не
 видає одну команду за lossless migration.
+
+### Обмежений fast path імпорту
+
+Якщо destination folder і mapping імен уже відомі, `power import` дає
+виконуваний preflight без зміни source:
+
+```bash
+power import /absolute/path/to/source --into 03_Resources \
+  --path /absolute/path/to/vault --policy quarantine --dry-run
+```
+
+Політика `strict` за замовчуванням відхиляє note, якщо відоме поле має
+foreign value. Явна `quarantine` переносить foreign `status` у `x-status`, а
+foreign shape `related` — у `x-related`, зберігаючи оригінальне значення та
+Markdown body. `type`, malformed YAML/frontmatter та інші schema failures
+залишаються excluded. Звіт до будь-якого write показує scanned, importable,
+quarantined, unchanged, excluded, collision і field-level counts.
+
+Після перевірки звіту застосуйте імпорт:
+
+```bash
+power import /absolute/path/to/source --into 03_Resources \
+  --path /absolute/path/to/vault --policy quarantine
+power index /absolute/path/to/vault --strict
+power search /absolute/path/to/vault "known phrase" --mode fts
+```
+
+`--allow-partial` використовуйте лише коли названі exclusions прийнятні.
+Source залишається незмінним; destination collision ніколи не перезаписується.
 
 ## Шестифазний протокол
 

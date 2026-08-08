@@ -53,7 +53,8 @@ An agent must read the relevant documents before changing data:
 - MCP `read_sub_index` and `ensure_sub_index` accept canonical P.A.R.A.
   categories, not arbitrary source folders.
 - CLI `power ingest` creates a new note but does not import an existing note
-  body. It is not a batch migration command.
+  body. For a bounded batch import, use `power import`; it is the only command
+  that accepts an explicit source directory and produces a preflight report.
 - `power heal` repairs missing/invalid frontmatter fields; it does not classify
   arbitrary top-level folders, repair wikilinks, or call an LLM.
 - `power rename` is dry-run by default and updates `related` metadata paths. It
@@ -61,6 +62,37 @@ An agent must read the relevant documents before changing data:
 
 These constraints are why this protocol uses a staging vault and a migration
 manifest instead of pretending that one command performs a lossless migration.
+
+### Bounded import fast path
+
+For a source tree whose destination folder and filename mapping are already
+known, `power import` provides the executable preflight without mutating the
+source:
+
+```bash
+power import /absolute/path/to/source --into 03_Resources \
+  --path /absolute/path/to/vault --policy quarantine --dry-run
+```
+
+The default `strict` policy rejects a source note whose known field uses a
+foreign value. The explicit `quarantine` policy moves a foreign `status` to
+`x-status` and a foreign `related` shape to `x-related`, preserving the
+original value and Markdown body. `type`, malformed YAML/frontmatter, and
+other schema failures remain excluded. The report lists scanned, importable,
+quarantined, unchanged, excluded, collision, and per-field counts before any
+write.
+
+Apply only after reviewing the report:
+
+```bash
+power import /absolute/path/to/source --into 03_Resources \
+  --path /absolute/path/to/vault --policy quarantine
+power index /absolute/path/to/vault --strict
+power search /absolute/path/to/vault "known phrase" --mode fts
+```
+
+Use `--allow-partial` only when the named exclusions are acceptable. The
+source remains unchanged; a conflicting destination is never overwritten.
 
 ## Six-phase protocol
 
