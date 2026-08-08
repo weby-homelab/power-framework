@@ -40,14 +40,20 @@ jobs:
           uv run power init $vault
           uv run power ingest $vault --type Resource --title "First Note" --description "Windows smoke note"
           uv run power index $vault --strict
-          uv run power lint $vault
+          $lintResult = uv run power lint $vault
+          $lintText = $lintResult -join [Environment]::NewLine
+          if ($LASTEXITCODE -ne 0 -or $lintText -match "[\\/]_index\.md") {
+            throw "Lint treated a generated sub-index as an orphan note"
+          }
+          $lintText
           uv run power markdown-check $vault
           uv run power sync $vault --fts-only
           $searchResult = uv run power search $vault "Windows smoke" --mode fts
-          if ($LASTEXITCODE -ne 0 -or $searchResult -notmatch "First Note") {
+          $searchText = $searchResult -join [Environment]::NewLine
+          if ($LASTEXITCODE -ne 0 -or $searchText -notmatch "First Note") {
             throw "FTS acceptance check did not return First Note"
           }
-          $searchResult
+          $searchText
           uv run power status $vault
 
   test:

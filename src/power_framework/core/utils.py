@@ -251,12 +251,15 @@ def is_excluded_dir(dirname: str) -> bool:
 
 def is_excluded_orphan(filename: str, rel_path: str) -> bool:
     """Check if file should be excluded from orphan detection."""
-    is_root_daily_log = "/" not in rel_path and bool(
-        re.match(r"^\d{4}-\d{2}-\d{2}_.*\.md$", filename)
+    normalized_rel_path = rel_path.replace("\\", "/")
+    normalized_filename = normalized_rel_path.rsplit("/", 1)[-1]
+    is_root_daily_log = "/" not in normalized_rel_path and bool(
+        re.match(r"^\d{4}-\d{2}-\d{2}_.*\.md$", normalized_filename)
     )
     return (
         filename in EXCLUDED_ORPHAN_FILES
-        or rel_path.startswith(("04_Archive/", "06_Daily_Logs/"))
+        or normalized_filename in EXCLUDED_ORPHAN_FILES
+        or normalized_rel_path.startswith(("04_Archive/", "06_Daily_Logs/"))
         or is_root_daily_log
     )
 
