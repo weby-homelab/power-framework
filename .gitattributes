@@ -1,0 +1,2 @@
+# Keep the release lock's Git-blob representation stable across Windows checkouts.
+release/models.lock.json text eol=lf

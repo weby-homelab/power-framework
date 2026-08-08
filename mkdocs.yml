@@ -70,6 +70,7 @@ nav:
       - M2 Human Evaluation: m2-human-evaluation.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md
       - Windows 11 25H2 Validation: tests/windows-11-25h2-validation.md
+      - Windows 11 25H2 Validation after CRLF fix: tests/windows-11-25h2-v3.3.2-validation-fixed.md
   - Changelog: CHANGELOG.md
   - Contributing: contributing.md
 
