@@ -322,6 +322,7 @@ def _cmd_import(args: argparse.Namespace) -> int:
     try:
 
         def apply_and_index() -> tuple[int, tuple[str, GenerationReport]]:
+            """Write the planned notes, then publish catalog and FTS state."""
             written = apply_import_plan(plan, allow_partial=args.allow_partial)
             index_message = run_generate_hierarchical_index(vault_dir)
             sync_report = sync_vault_atomically(vault_dir, sync_embeddings=False)

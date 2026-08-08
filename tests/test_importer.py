@@ -18,11 +18,13 @@ from power_framework.core.searcher import search_vault
 
 
 def _write_note(path: Path, frontmatter: str, body: str) -> None:
+    """Write one minimal Markdown note into a temporary source tree."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"---\n{frontmatter}\n---\n\n{body}\n", encoding="utf-8")
 
 
 def _foreign_source(tmp_path: Path) -> Path:
+    """Build a source tree containing valid, foreign, and fatal metadata cases."""
     source = tmp_path / "source"
     _write_note(
         source / "valid.md",
@@ -50,6 +52,7 @@ def _foreign_source(tmp_path: Path) -> Path:
 
 
 def test_import_plan_is_write_free_and_policy_explicit(tmp_path: Path) -> None:
+    """Verify strict and quarantine plans account for every source note pre-write."""
     source = _foreign_source(tmp_path)
     target = tmp_path / "vault" / "03_Resources"
 
@@ -76,6 +79,7 @@ def test_import_plan_is_write_free_and_policy_explicit(tmp_path: Path) -> None:
 
 
 def test_import_dry_run_does_not_mutate_vault(sample_vault: Path, tmp_path: Path) -> None:
+    """Verify dry-run reports exclusions without creating notes or indexes."""
     source = _foreign_source(tmp_path)
     with (
         patch.object(
@@ -104,6 +108,7 @@ def test_import_dry_run_does_not_mutate_vault(sample_vault: Path, tmp_path: Path
 
 
 def test_quarantine_import_is_searchable_and_idempotent(sample_vault: Path, tmp_path: Path) -> None:
+    """Verify quarantine apply preserves values, searchability, and rerun stability."""
     source = _foreign_source(tmp_path)
     args = [
         "power",
