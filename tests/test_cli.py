@@ -238,6 +238,101 @@ def test_sync_rejects_contradictory_coverage_flags(sample_vault: Path) -> None:
     assert exc.value.code == 2
 
 
+def test_sync_dirty_vault_has_no_silent_omissions(
+    sample_vault: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Exercise the frozen P5.0.1 cases in one real CLI coverage receipt."""
+    unicode_note = sample_vault / "03_Resources" / "Україна — AutoCAD.md"
+    unicode_content = (
+        "---\n"
+        "type: Resource\n"
+        'title: "Український AutoCAD довідник"\n'
+        'description: "CRLF and backslash regression"\n'
+        "timestamp: 2026-01-01T00:00:00+00:00\n"
+        "---\n\n"
+        "dirty-coverage-token\n"
+        "MTEXT codes: \\P and \\fArial\n"
+        "Windows path: C:\\Users\\Alice\\Vault\n"
+    )
+    unicode_note.write_bytes(unicode_content.replace("\n", "\r\n").encode("utf-8"))
+
+    invalid_notes = {
+        "foreign-status.md": (
+            "---\n"
+            "type: Project\n"
+            "title: Foreign status\n"
+            "description: Foreign lifecycle vocabulary\n"
+            "status: verified-external\n"
+            "timestamp: 2026-01-01T00:00:00+00:00\n"
+            "---\n\nBody.\n"
+        ),
+        "wikilink-related.md": (
+            "---\n"
+            "type: Project\n"
+            "title: Wikilink relation\n"
+            "description: Obsidian wikilink relation\n"
+            "related: [[Назва]]\n"
+            "timestamp: 2026-01-01T00:00:00+00:00\n"
+            "---\n\nBody.\n"
+        ),
+        "malformed-backslash.md": (
+            "---\n"
+            "type: Resource\n"
+            'title: "MTEXT \\q"\n'
+            'description: "Malformed user escape"\n'
+            "timestamp: 2026-01-01T00:00:00+00:00\n"
+            "---\n\nBody.\n"
+        ),
+    }
+    invalid_paths = []
+    for filename, content in invalid_notes.items():
+        path = sample_vault / "03_Resources" / filename
+        path.write_text(content, encoding="utf-8")
+        invalid_paths.append(path.relative_to(sample_vault).as_posix())
+
+    with (
+        caplog.at_level("INFO"),
+        patch.object(
+            sys,
+            "argv",
+            ["power", "sync", str(sample_vault), "--fts-only"],
+        ),
+        pytest.raises(SystemExit) as strict_exc,
+    ):
+        main()
+
+    assert strict_exc.value.code == 1
+    messages = [record.message for record in caplog.records]
+    assert any("Coverage: 9 notes scanned, 6 indexed, 3 excluded." in m for m in messages)
+    assert any("Exclusion reasons: invalid_metadata=3" in m for m in messages)
+    for rel_path in invalid_paths:
+        assert any(f"excluded: {rel_path} (invalid_metadata)" in m for m in messages)
+
+    from power_framework.core.searcher import search_vault
+
+    assert search_vault(sample_vault, "dirty-coverage-token", mode="fts")
+
+    caplog.clear()
+    with (
+        caplog.at_level("INFO"),
+        patch.object(
+            sys,
+            "argv",
+            ["power", "sync", str(sample_vault), "--fts-only", "--allow-partial"],
+        ),
+        pytest.raises(SystemExit) as partial_exc,
+    ):
+        main()
+
+    assert partial_exc.value.code == 0
+    partial_messages = [record.message for record in caplog.records]
+    assert any("Continuing because --allow-partial was requested." in m for m in partial_messages)
+    assert all(
+        any(f"excluded: {rel_path} (invalid_metadata)" in m for m in partial_messages)
+        for rel_path in invalid_paths
+    )
+
+
 def test_ingest_creates_note(sample_vault: Path) -> None:
     with (
         patch.object(
