@@ -228,8 +228,15 @@ power heal PATH [--no-dry-run] [--limit N]
 | `--limit` | Heal at most `N` notes in this run. |
 
 The healer can infer canonical-folder type, filename title, first-paragraph
-description, timestamp, and type casing. It does not repair wikilinks or use an
-LLM.
+description, timestamp, and type casing. Invalid foreign `status` and `related`
+values are retained under additive `x-status`/`x-related` keys before cosmetic
+fixes. It does not repair wikilinks or use an LLM.
+
+Each note is isolated. Read, validation, transformation, backup, and write
+failures are named in the final report; the original note is left untouched
+when a live write fails. The command returns exit code `1` if any note fails,
+including in dry-run mode, and never reports a failed run as “No notes needed
+healing”.
 
 ### `markdown-check`
 

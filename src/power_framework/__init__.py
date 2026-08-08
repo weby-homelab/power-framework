@@ -9,7 +9,7 @@ Modules:
 from __future__ import annotations
 
 from .core import cli_main
-from .core.healer import heal_frontmatter, heal_vault
+from .core.healer import HealFailure, HealReport, heal_frontmatter, heal_vault, heal_vault_report
 from .core.indexer import (
     generate_log_initial,
     run_generate_hierarchical_index,
@@ -46,6 +46,8 @@ __all__ = [
     "NOTE_TYPE_ORDER",
     "PARA_FOLDERS",
     "VAULT_STRUCTURE",
+    "HealFailure",
+    "HealReport",
     "NoteFile",
     "NoteType",
     "OKFMetadata",
@@ -64,6 +66,7 @@ __all__ = [
     "get_cache_dir",
     "heal_frontmatter",
     "heal_vault",
+    "heal_vault_report",
     "read_file_content",
     "resolve_vault_path",
     "run_generate_hierarchical_index",

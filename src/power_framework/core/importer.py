@@ -132,7 +132,7 @@ def _safe_quarantine_field(data: dict[str, object], base: str, value: object) ->
     return candidate
 
 
-def _normalize_foreign_fields(
+def normalize_foreign_fields(
     source: Mapping[str, object],
     policy: ImportPolicy,
 ) -> tuple[dict[str, object], list[QuarantineChange]]:
@@ -167,6 +167,11 @@ def _normalize_foreign_fields(
             changes.append(QuarantineChange("related", quarantined, "foreign relation shape"))
 
     return data, changes
+
+
+# Kept as a private alias for callers that used the pre-release helper while the
+# importer API is still settling.  New code should use the explicit public name.
+_normalize_foreign_fields = normalize_foreign_fields
 
 
 def _validation_reason(data: Mapping[str, object], error: ValidationError) -> str:
@@ -205,7 +210,7 @@ def _plan_item(source: Path, relative: str, destination: Path, policy: ImportPol
         item.excluded_reason = "invalid_yaml"
         return item
 
-    normalized, changes = _normalize_foreign_fields(data, policy)
+    normalized, changes = normalize_foreign_fields(data, policy)
     item.changes = changes
     try:
         metadata = OKFMetadata.model_validate(normalized)

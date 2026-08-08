@@ -32,7 +32,7 @@ from .domains import (
     render_domain_template,
     route_domain,
 )
-from .healer import heal_vault
+from .healer import heal_vault_report
 from .ignore import should_skip
 from .importer import (
     ImportPolicy,
@@ -543,13 +543,13 @@ def _cmd_heal(args: argparse.Namespace) -> int:
     limit = getattr(args, "limit", None)
 
     if dry_run:
-        report = heal_vault(vault_dir, dry_run=True, limit=limit)
+        result = heal_vault_report(vault_dir, dry_run=True, limit=limit)
     else:
-        report = execute_vault_mutation(
-            vault_dir, lambda: heal_vault(vault_dir, dry_run=False, limit=limit)
+        result = execute_vault_mutation(
+            vault_dir, lambda: heal_vault_report(vault_dir, dry_run=False, limit=limit)
         )
-    logger.info(report)
-    return 0
+    logger.info(result.format())
+    return result.exit_code
 
 
 def _cmd_rename(args: argparse.Namespace) -> int:

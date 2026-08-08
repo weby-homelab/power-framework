@@ -14,16 +14,20 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import yaml
 
 from .constants import SKIP_FILES
 from .ignore import should_skip
+from .importer import ImportPolicy, normalize_foreign_fields
 from .models import NoteType
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 from .parser import (
@@ -56,6 +60,79 @@ DEFAULT_EXCLUDED = frozenset(
         ".agents",
     }
 )
+
+HealFailureStage = Literal["read", "validation", "transform", "backup", "write"]
+
+
+class HealValidationError(ValueError):
+    """Raised when an existing frontmatter block cannot be parsed safely."""
+
+
+@dataclass(frozen=True)
+class HealFailure:
+    """One note that could not be healed, including the failed operation."""
+
+    path: str
+    stage: HealFailureStage
+    error_type: str
+    message: str
+
+    def format(self) -> str:
+        """Render a stable, actionable failure receipt line."""
+        return f"  {self.path} [{self.stage}]: {self.error_type}: {self.message}"
+
+
+@dataclass
+class HealReport:
+    """Structured result for a vault healing run."""
+
+    vault_dir: Path
+    dry_run: bool
+    scanned: int = 0
+    healed: int = 0
+    changes_log: list[str] = dataclass_field(default_factory=list)
+    failures: list[HealFailure] = dataclass_field(default_factory=list)
+
+    @property
+    def exit_code(self) -> int:
+        """Return nonzero whenever a note could not be processed safely."""
+        return 1 if self.failures else 0
+
+    def format(self) -> str:
+        """Render the human-facing report used by CLI and MCP callers."""
+        lines = [
+            "=== Frontmatter Heal Report ===",
+            f"Vault: {self.vault_dir}",
+            f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}",
+            f"Notes scanned: {self.scanned}",
+            f"Notes healed: {self.healed}",
+            f"Notes failed: {len(self.failures)}",
+            "",
+        ]
+        if self.changes_log:
+            lines.append("Changes:")
+            lines.extend(self.changes_log)
+            lines.append("")
+        elif not self.failures:
+            lines.append("No notes needed healing.")
+            lines.append("")
+
+        if self.failures:
+            lines.append("Failed (left untouched):")
+            lines.extend(failure.format() for failure in self.failures)
+            lines.append("")
+
+        return "\n".join(lines)
+
+
+def _literal_replacement(text: str) -> Callable[[re.Match[str]], str]:
+    """Return a ``re.sub`` replacement that inserts *text* verbatim.
+
+    A string replacement is parsed as a template. User frontmatter can contain
+    valid backslash sequences such as AutoCAD ``\\P``, ``\\fArial`` or a
+    Windows path, so generated YAML must never be interpreted as a template.
+    """
+    return lambda _match: text
 
 
 def _infer_title_from_filename(filepath: Path) -> str:
@@ -181,9 +258,22 @@ def heal_frontmatter(
     fm_data: dict = {}
 
     if had_no_fm:
+        if content.startswith("---"):
+            raise HealValidationError("frontmatter block is missing or malformed")
         changes.append("No frontmatter found — created minimal frontmatter")
     else:
-        fm_data = parse_frontmatter(content) or {}
+        parsed_fm = parse_frontmatter(content)
+        if parsed_fm is None:
+            raise HealValidationError("frontmatter YAML is invalid")
+        fm_data = parsed_fm
+        fm_data, quarantine_changes = normalize_foreign_fields(
+            fm_data,
+            ImportPolicy.QUARANTINE,
+        )
+        changes.extend(
+            f"Quarantined foreign {change.field}: preserved as {change.quarantine_field}"
+            for change in quarantine_changes
+        )
 
     note_type: str | None = fm_data.get("type")
     title: str | None = fm_data.get("title")
@@ -258,7 +348,7 @@ def heal_frontmatter(
     if raw_fm is not None:
         healed = re.sub(
             r"^---.*?\n---\n?",
-            new_fm + "\n",
+            _literal_replacement(new_fm + "\n"),
             content,
             count=1,
             flags=re.DOTALL,
@@ -269,8 +359,12 @@ def heal_frontmatter(
     return healed, changes
 
 
-def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) -> str:
-    """Scan vault and heal all notes with missing/invalid frontmatter. Returns formatted report.
+def heal_vault_report(
+    vault_dir: Path,
+    dry_run: bool = True,
+    limit: int | None = None,
+) -> HealReport:
+    """Scan notes independently and return a typed healing receipt.
 
     Args:
         vault_dir: Path to the vault root.
@@ -278,8 +372,7 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
         limit: When set, stop after healing at most ``limit`` notes. Useful for
             large vaults / batch processing.
     """
-    healed_count = 0
-    changes_log: list[str] = []
+    report = HealReport(vault_dir=vault_dir, dry_run=dry_run)
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
@@ -290,49 +383,63 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
         if filepath.name in DEFAULT_EXCLUDED:
             continue
 
+        report.scanned += 1
         try:
             content = read_file_content(filepath)
         except Exception as exc:
-            logger.debug("Cannot read %s: %s", filepath, exc)
+            logger.warning("Cannot read %s: %s: %s", rel, type(exc).__name__, exc)
+            report.failures.append(HealFailure(str(rel), "read", type(exc).__name__, str(exc)))
             continue
         if not content.strip():
             continue
 
-        healed, changes = heal_frontmatter(content, filepath, vault_dir)
+        try:
+            healed, changes = heal_frontmatter(content, filepath, vault_dir)
+        except HealValidationError as exc:
+            logger.warning("Cannot validate %s: %s", rel, exc)
+            report.failures.append(
+                HealFailure(str(rel), "validation", type(exc).__name__, str(exc))
+            )
+            continue
+        except Exception as exc:
+            logger.warning("Cannot heal %s: %s: %s", rel, type(exc).__name__, exc)
+            report.failures.append(HealFailure(str(rel), "transform", type(exc).__name__, str(exc)))
+            continue
         if not changes:
             continue
 
-        if limit is not None and healed_count >= limit:
+        if limit is not None and report.healed >= limit:
             break
 
-        healed_count += 1
-        if dry_run:
-            changes_log.append(f"  {rel}:")
-            changes_log.extend(f"    - {c}" for c in changes)
-        else:
-            backup_path = create_backup(filepath)
-            atomic_write(filepath, healed)
-            changes_log.append(f"  {rel}:")
-            changes_log.extend(f"    - {c}" for c in changes)
-            if backup_path:
-                changes_log.append(f"    (backup: {backup_path.name})")
+        backup_path: Path | None = None
+        if not dry_run:
+            try:
+                backup_path = create_backup(filepath)
+            except Exception as exc:
+                logger.warning("Cannot back up %s: %s: %s", rel, type(exc).__name__, exc)
+                report.failures.append(
+                    HealFailure(str(rel), "backup", type(exc).__name__, str(exc))
+                )
+                continue
+            try:
+                atomic_write(filepath, healed)
+            except Exception as exc:
+                logger.warning("Cannot write %s: %s: %s", rel, type(exc).__name__, exc)
+                report.failures.append(HealFailure(str(rel), "write", type(exc).__name__, str(exc)))
+                continue
 
-    lines = [
-        "=== Frontmatter Heal Report ===",
-        f"Vault: {vault_dir}",
-        f"Mode: {'DRY RUN' if dry_run else 'LIVE'}",
-        f"Notes healed: {healed_count}",
-        "",
-    ]
-    if changes_log:
-        lines.append("Changes:")
-        lines.extend(changes_log)
-        lines.append("")
-    else:
-        lines.append("No notes needed healing.")
-        lines.append("")
+        report.healed += 1
+        report.changes_log.append(f"  {rel}:")
+        report.changes_log.extend(f"    - {change}" for change in changes)
+        if backup_path:
+            report.changes_log.append(f"    (backup: {backup_path.name})")
 
-    return "\n".join(lines)
+    return report
+
+
+def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) -> str:
+    """Backward-compatible string wrapper around :func:`heal_vault_report`."""
+    return heal_vault_report(vault_dir, dry_run=dry_run, limit=limit).format()
 
 
 def propagate_rename(
@@ -405,7 +512,7 @@ def propagate_rename(
             new_fm = _format_frontmatter(fm_data, note_type, title, description, parsed_timestamp)
             healed = re.sub(
                 r"^---.*?\n---\n?",
-                new_fm + "\n",
+                _literal_replacement(new_fm + "\n"),
                 content,
                 count=1,
                 flags=re.DOTALL,
