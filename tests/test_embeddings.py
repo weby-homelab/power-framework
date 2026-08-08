@@ -65,7 +65,9 @@ class TestEmbeddingManager:
         monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
         assert embeddings.select_onnx_providers(FakeOrt())
 
-    def test_gpu_downgraded_to_cpu_at_session_creation_fails_closed(self):
+    def test_gpu_downgraded_to_cpu_at_session_creation_fails_closed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
         """A provider can be listed and still fail to load; only the session knows."""
 
         class FakeSession:
@@ -73,6 +75,7 @@ class TestEmbeddingManager:
             def get_providers():
                 return ["CPUExecutionProvider"]
 
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
         providers: list[object] = [
             ("CUDAExecutionProvider", {}),
             ("CPUExecutionProvider", {}),
@@ -80,24 +83,74 @@ class TestEmbeddingManager:
         with pytest.raises(RuntimeError, match="requested_onnx_provider_not_bound"):
             embeddings.verify_bound_provider(FakeSession(), providers, "POWER_EMBED_DEVICE")
 
-    def test_bound_gpu_provider_is_accepted(self):
+    def test_auto_may_fall_back_to_cpu_without_raising(self, monkeypatch: pytest.MonkeyPatch):
+        """Under `auto` a CPU binding is the documented fallback, not a failure.
+
+        `auto` still puts the GPU provider first in the list, so inspecting the
+        request list alone cannot tell an auto fallback from an explicit
+        downgrade — the mode has to be read.
+        """
+
+        class FakeSession:
+            @staticmethod
+            def get_providers():
+                return ["CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "auto")
+        providers: list[object] = [("CUDAExecutionProvider", {}), ("CPUExecutionProvider", {})]
+        assert (
+            embeddings.verify_bound_provider(FakeSession(), providers, "POWER_EMBED_DEVICE")
+            == "CPUExecutionProvider"
+        )
+
+    def test_rocm_provider_name_is_matched_case_insensitively(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A build may spell it differently from our constant; exact match then
+        silently reports the device as unavailable on a working ROCm host."""
+
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["ROCmExecutionProvider", "CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "rocm")
+        providers = embeddings.select_onnx_providers(FakeOrt())
+        # The name ORT reported wins, not our constant.
+        assert providers[0][0] == "ROCmExecutionProvider"
+        assert providers[0][1]["device_id"] == 0
+
+    def test_auto_selects_rocm_regardless_of_spelling(self, monkeypatch: pytest.MonkeyPatch):
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["ROCmExecutionProvider", "CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "auto")
+        providers = embeddings.select_onnx_providers(FakeOrt())
+        assert providers[0][0] == "ROCmExecutionProvider"
+        assert providers[0][1]["device_id"] == 0
+
+    def test_bound_gpu_provider_is_accepted(self, monkeypatch: pytest.MonkeyPatch):
         class FakeSession:
             @staticmethod
             def get_providers():
                 return ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
         providers: list[object] = [("CUDAExecutionProvider", {}), ("CPUExecutionProvider", {})]
         assert (
             embeddings.verify_bound_provider(FakeSession(), providers, "POWER_EMBED_DEVICE")
             == "CUDAExecutionProvider"
         )
 
-    def test_explicit_cpu_is_not_treated_as_a_downgrade(self):
+    def test_explicit_cpu_is_not_treated_as_a_downgrade(self, monkeypatch: pytest.MonkeyPatch):
         class FakeSession:
             @staticmethod
             def get_providers():
                 return ["CPUExecutionProvider"]
 
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
         providers: list[object] = [("CPUExecutionProvider", {})]
         assert (
             embeddings.verify_bound_provider(FakeSession(), providers, "POWER_EMBED_DEVICE")

@@ -96,23 +96,52 @@ def _preload_gpu_runtime(ort: Any) -> None:
         logger.debug("onnxruntime.preload_dlls() failed: %s", exc)
 
 
+#: Providers that accept a ``device_id`` option, compared case-insensitively.
+_DEVICE_ID_PROVIDERS = frozenset({"cudaexecutionprovider", "rocmexecutionprovider"})
+
+
+def requested_device(env_var: str = "POWER_EMBED_DEVICE") -> str:
+    """Return the normalized device mode requested through *env_var*."""
+    return os.getenv(env_var, os.getenv("POWER_EMBED_DEVICE", "auto")).strip().lower()
+
+
+def _resolve_provider_name(candidate: str, available: set[str]) -> str | None:
+    """Match a provider name against what ORT reports, ignoring case.
+
+    ONNX Runtime spells the ROCm provider ``ROCMExecutionProvider``; an exact
+    comparison against a differently-cased constant silently never matches, so
+    the device would look unavailable on a working ROCm build.
+    """
+    if candidate in available:
+        return candidate
+    lowered = candidate.lower()
+    return next((name for name in available if name.lower() == lowered), None)
+
+
 def verify_bound_provider(session: Any, providers: list[object], env_var: str) -> str:
     """Return the provider the session actually bound, failing closed on downgrade.
 
     ``get_available_providers()`` reports what the build was compiled with, not
-    what can load. An explicit GPU request that silently lands on CPU is a
-    ~50x slowdown with no error, so compare the request against the binding.
+    what can load, so a GPU provider can pass the availability check and still
+    be dropped at session creation — a ~50x slowdown with no error.
+
+    Only an **explicit** device request is fail-closed. Under ``auto`` a CPU
+    binding is the documented fallback, not a failure, so it is logged and
+    accepted.
     """
     bound = list(session.get_providers())
     actual = bound[0] if bound else "unknown"
-    requested_name = providers[0][0] if isinstance(providers[0], tuple) else str(providers[0])
+    requested = requested_device(env_var)
 
-    logger.info("ONNX Runtime provider bound: %s", actual)
-    if requested_name != "CPUExecutionProvider" and actual == "CPUExecutionProvider":
+    logger.info("ONNX Runtime device=%s bound %s", requested, actual)
+    if requested in {"auto", "cpu"}:
+        return actual
+    if actual == "CPUExecutionProvider":
+        requested_name = providers[0][0] if isinstance(providers[0], tuple) else str(providers[0])
         raise RuntimeError(
             f"requested_onnx_provider_not_bound:{requested_name}; "
             f"session bound {bound}. The provider is compiled in but its runtime "
-            f"libraries failed to load. Set {env_var}=cpu to accept CPU explicitly."
+            f"libraries failed to load. Set {env_var}=auto to allow the CPU fallback."
         )
     return actual
 
@@ -127,7 +156,7 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
     """
     _preload_gpu_runtime(ort)
     available = set(ort.get_available_providers())
-    requested = os.getenv(env_var, os.getenv("POWER_EMBED_DEVICE", "auto")).lower()
+    requested = requested_device(env_var)
     if requested not in {"auto", "cpu", "cuda", "rocm", "directml"}:
         raise ValueError(f"invalid_{env_var.lower()}:{requested}")
 
@@ -140,39 +169,42 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
 
     gpu_candidates = {
         "cuda": "CUDAExecutionProvider",
-        "rocm": "ROCmExecutionProvider",
+        "rocm": "ROCMExecutionProvider",
         "directml": "DmlExecutionProvider",
     }
     if requested != "auto":
-        provider_name = gpu_candidates[requested]
-        if provider_name not in available:
+        resolved = _resolve_provider_name(gpu_candidates[requested], available)
+        if resolved is None:
             raise RuntimeError(
-                f"requested_onnx_provider_unavailable:{provider_name}; available={sorted(available)}"
+                f"requested_onnx_provider_unavailable:{gpu_candidates[requested]}; "
+                f"available={sorted(available)}"
             )
+        provider_name = resolved
         options: dict[str, object] = {}
-        if provider_name in {"CUDAExecutionProvider", "ROCmExecutionProvider"}:
+        if provider_name.lower() in _DEVICE_ID_PROVIDERS:
             options = {
                 "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
                 "arena_extend_strategy": "kSameAsRequested",
             }
         return [(provider_name, options), cpu_provider]
 
-    for provider_name in (
+    for candidate in (
         "CUDAExecutionProvider",
-        "ROCmExecutionProvider",
+        "ROCMExecutionProvider",
         "DmlExecutionProvider",
     ):
-        if provider_name in available:
+        auto_name = _resolve_provider_name(candidate, available)
+        if auto_name is not None:
             options = (
                 {
                     "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
                     "arena_extend_strategy": "kSameAsRequested",
                 }
-                if provider_name in {"CUDAExecutionProvider", "ROCmExecutionProvider"}
+                if auto_name.lower() in _DEVICE_ID_PROVIDERS
                 else {}
             )
-            logger.info("ONNX Runtime device=auto selected %s", provider_name)
-            return [(provider_name, options), cpu_provider]
+            logger.info("ONNX Runtime device=auto selected %s", auto_name)
+            return [(auto_name, options), cpu_provider]
 
     logger.info("ONNX Runtime device=auto selected CPUExecutionProvider")
     return [cpu_provider]
