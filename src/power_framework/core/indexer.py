@@ -48,7 +48,7 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md"):
             continue
-        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
+        if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
 
         try:
@@ -57,7 +57,7 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
             if metadata is None:
                 continue
 
-            rel_path = str(filepath.relative_to(vault_dir))
+            rel_path = filepath.relative_to(vault_dir).as_posix()
             note_type = metadata.type
             title = metadata.title
             desc = metadata.description
@@ -89,7 +89,7 @@ def scan_folder_notes(
             continue
 
         rel_path = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel_path)):
+        if should_skip(vault_dir, rel_path.as_posix()):
             continue
 
         top_folder = rel_path.parts[0]
@@ -101,7 +101,7 @@ def scan_folder_notes(
             metadata: OKFMetadata | None = validate_metadata(content)
             if metadata is None:
                 if invalid_notes is not None:
-                    invalid_notes.append((str(rel_path), "Invalid OKF metadata"))
+                    invalid_notes.append((rel_path.as_posix(), "Invalid OKF metadata"))
                 continue
 
             tags = metadata.tags if metadata.tags else []
@@ -112,7 +112,7 @@ def scan_folder_notes(
             related = metadata.related if metadata.related else []
 
             note_info = {
-                "rel_path": str(rel_path),
+                "rel_path": rel_path.as_posix(),
                 "title": metadata.title,
                 "description": metadata.description,
                 "note_type": metadata.type,
@@ -208,12 +208,12 @@ def _scan_folder_notes_incremental(
         if filepath.name in {"index.md", "log.md", "_index.md"}:
             continue
         rel_path = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel_path)) or not rel_path.parts:
+        if should_skip(vault_dir, rel_path.as_posix()) or not rel_path.parts:
             continue
         top_folder = rel_path.parts[0]
         if top_folder not in INDEX_FOLDERS:
             continue
-        rel_path_str = str(rel_path)
+        rel_path_str = rel_path.as_posix()
         seen_paths.add(rel_path_str)
 
         try:
@@ -221,7 +221,7 @@ def _scan_folder_notes_incremental(
             signature = {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size}
         except OSError:
             changed_folders.add(top_folder)
-            invalid_notes.append((str(rel_path), "read_error"))
+            invalid_notes.append((rel_path.as_posix(), "read_error"))
             continue
 
         cached_entry = cached_entries.get(rel_path_str)
@@ -235,9 +235,9 @@ def _scan_folder_notes_incremental(
                 folder_notes.setdefault(top_folder, []).append(note_info)
             else:
                 invalid_notes.append(
-                    (str(rel_path), str(cached_entry.get("reason", "invalid_metadata")))
+                    (rel_path.as_posix(), str(cached_entry.get("reason", "invalid_metadata")))
                 )
-            next_entries[str(rel_path)] = cached_entry
+            next_entries[rel_path.as_posix()] = cached_entry
             continue
 
         changed_folders.add(top_folder)
@@ -248,8 +248,8 @@ def _scan_folder_notes_incremental(
             metadata = None
         if metadata is None:
             reason = "Invalid OKF metadata"
-            invalid_notes.append((str(rel_path), reason))
-            next_entries[str(rel_path)] = {
+            invalid_notes.append((rel_path.as_posix(), reason))
+            next_entries[rel_path.as_posix()] = {
                 "signature": signature,
                 "valid": False,
                 "reason": reason,
@@ -259,7 +259,7 @@ def _scan_folder_notes_incremental(
 
         note_info = _note_info_from_metadata(filepath, vault_dir, metadata)
         folder_notes.setdefault(top_folder, []).append(note_info)
-        next_entries[str(rel_path)] = {
+        next_entries[rel_path.as_posix()] = {
             "signature": signature,
             "valid": True,
             "note": _serialise_note_info(note_info),
@@ -310,7 +310,7 @@ def scan_root_daily_logs(vault_dir: Path) -> list[dict]:
         rel_path = filepath.relative_to(vault_dir)
         if filepath.name in {"index.md", "log.md", "_index.md"}:
             continue
-        if len(rel_path.parts) != 1 or should_skip(vault_dir, str(rel_path)):
+        if len(rel_path.parts) != 1 or should_skip(vault_dir, rel_path.as_posix()):
             continue
 
         try:
@@ -320,7 +320,7 @@ def scan_root_daily_logs(vault_dir: Path) -> list[dict]:
                 continue
             root_logs.append(
                 {
-                    "rel_path": str(rel_path),
+                    "rel_path": rel_path.as_posix(),
                     "title": metadata.title,
                     "description": metadata.description,
                 }

@@ -307,11 +307,13 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         and hasattr(resource, "RLIMIT_AS")
     ):
         try:
-            _, hard = resource.getrlimit(resource.RLIMIT_AS)
+            getrlimit = getattr(resource, "getrlimit")  # noqa: B009 - optional POSIX module.
+            setrlimit = getattr(resource, "setrlimit")  # noqa: B009 - optional POSIX module.
+            _, hard = getrlimit(resource.RLIMIT_AS)
             new_soft = (
                 min(vmem_limit_mb * 1024 * 1024, hard) if hard > 0 else vmem_limit_mb * 1024 * 1024
             )
-            resource.setrlimit(resource.RLIMIT_AS, (new_soft, hard))
+            setrlimit(resource.RLIMIT_AS, (new_soft, hard))
             logger.info("Applied virtual-memory cap: %d MB", vmem_limit_mb)
         except (ValueError, OSError) as e:  # pragma: no cover
             logger.warning("Could not apply vmem cap: %s", e)
@@ -493,7 +495,7 @@ def _cmd_markdown_check(args: argparse.Namespace) -> int:
     total_issues = 0
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        if should_skip(vault_dir, rel.as_posix()):
             continue
         if filepath.name in SKIP_FILES:
             continue

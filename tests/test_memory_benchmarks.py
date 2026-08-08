@@ -429,8 +429,8 @@ Preferred text editor is Neovim.
         scorer = FreshnessScorer()
         scores = scorer.score_all(vault)
 
-        old_rel = str(old_pref.relative_to(vault))
-        new_rel = str(new_pref.relative_to(vault))
+        old_rel = old_pref.relative_to(vault).as_posix()
+        new_rel = new_pref.relative_to(vault).as_posix()
 
         # Newer preferences must have higher freshness score than the stale ones
         assert scores[new_rel] > scores[old_rel]

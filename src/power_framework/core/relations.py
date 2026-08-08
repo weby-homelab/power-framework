@@ -148,7 +148,7 @@ def suggest_related(
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        if should_skip(vault_dir, rel.as_posix()):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
@@ -162,7 +162,7 @@ def suggest_related(
         if metadata is None:
             continue
 
-        rel_path = str(rel)
+        rel_path = rel.as_posix()
         kw_text = f"{metadata.title} {metadata.description} {content}"
         keywords = _extract_keywords(kw_text)
         tags = metadata.tags or []
@@ -445,7 +445,7 @@ def suggest_related_v2(
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        if should_skip(vault_dir, rel.as_posix()):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
@@ -457,7 +457,7 @@ def suggest_related_v2(
         if metadata is None:
             continue
 
-        rel_path = str(rel)
+        rel_path = rel.as_posix()
         kw_text = f"{metadata.title} {metadata.description} {content}"
         keywords = _extract_keywords(kw_text)
         tags = metadata.tags or []
@@ -616,7 +616,7 @@ def suggest_related_semantic(
     notes: dict[str, str] = {}
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        if should_skip(vault_dir, rel.as_posix()):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
@@ -624,7 +624,7 @@ def suggest_related_semantic(
             content = read_file_content(filepath)
         except Exception:  # noqa: S112
             continue
-        rel_path = str(rel)
+        rel_path = rel.as_posix()
         if rel_path == target_path:
             target_text = content
             continue

@@ -113,7 +113,7 @@ def should_skip(vault_dir: Path, rel_path: str) -> bool:
 def iter_markdown(vault_dir: Path) -> Iterator[tuple[Path, str]]:
     """Yield ``(filepath, rel_path)`` for every in-scope, non-ignored ``.md`` file."""
     for filepath in vault_dir.rglob("*.md"):
-        rel_path = str(filepath.relative_to(vault_dir))
+        rel_path = filepath.relative_to(vault_dir).as_posix()
         if should_skip(vault_dir, rel_path):
             continue
         yield filepath, rel_path

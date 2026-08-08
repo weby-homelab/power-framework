@@ -39,7 +39,9 @@ _compatibility_lock = threading.RLock()
 def _lock_descriptor(descriptor: int) -> None:
     """Acquire an exclusive advisory lock on one byte of the lock file."""
     if fcntl is not None:
-        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        flock = getattr(fcntl, "flock")  # noqa: B009 - optional POSIX module.
+        lock_ex = getattr(fcntl, "LOCK_EX")  # noqa: B009 - optional POSIX module.
+        flock(descriptor, lock_ex)
         return
     if msvcrt is not None:  # pragma: no cover - Windows-only branch
         # ``msvcrt.locking`` locks bytes, so make the lock file non-empty
@@ -55,7 +57,9 @@ def _lock_descriptor(descriptor: int) -> None:
 def _unlock_descriptor(descriptor: int) -> None:
     """Release a lock acquired by :func:`_lock_descriptor`."""
     if fcntl is not None:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        flock = getattr(fcntl, "flock")  # noqa: B009 - optional POSIX module.
+        lock_un = getattr(fcntl, "LOCK_UN")  # noqa: B009 - optional POSIX module.
+        flock(descriptor, lock_un)
         return
     if msvcrt is not None:  # pragma: no cover - Windows-only branch
         os.lseek(descriptor, 0, os.SEEK_SET)

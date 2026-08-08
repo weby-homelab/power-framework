@@ -89,7 +89,7 @@ class TestFreshnessScorer:
         scorer = FreshnessScorer()
         scores = scorer.score_all(vault)
         assert len(scores) == 1
-        rel_path = str(note.relative_to(vault))
+        rel_path = note.relative_to(vault).as_posix()
         assert scores[rel_path] > 0.8  # freshly created, should be very fresh
 
     def test_old_daily_log_is_stale(self, tmp_path: Path):
@@ -106,7 +106,7 @@ class TestFreshnessScorer:
 
         scorer = FreshnessScorer()
         scores = scorer.score_all(vault)
-        rel_path = str(note.relative_to(vault))
+        rel_path = note.relative_to(vault).as_posix()
         assert scores[rel_path] < 0.3  # >18 months old, daily log half-life 30d
 
     def test_resource_ages_slower(self, tmp_path: Path):
@@ -123,7 +123,7 @@ class TestFreshnessScorer:
 
         scorer = FreshnessScorer()
         scores = scorer.score_all(vault)
-        rel_path = str(note.relative_to(vault))
+        rel_path = note.relative_to(vault).as_posix()
         # Resource half-life is 365d, ~13 months old
         assert 0.3 < scores[rel_path] < 1.0
 

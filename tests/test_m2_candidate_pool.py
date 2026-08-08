@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import stat
 from pathlib import Path
 
@@ -76,7 +77,8 @@ def test_pool_is_deterministic_and_hash_bound(tmp_path: Path) -> None:
     assert first["policy_sha256"] == MODULE.sha256_file(inputs[0])
     assert first["source_receipt_sha256"] == MODULE.sha256_file(inputs[3])
     assert all(len(row["random_negative_ids"]) == 2 for row in first["queries"])
-    assert stat.S_IMODE(first_path.stat().st_mode) == 0o600
+    if os.name != "nt":
+        assert stat.S_IMODE(first_path.stat().st_mode) == 0o600
 
 
 def test_pending_policy_is_fail_closed(tmp_path: Path) -> None:

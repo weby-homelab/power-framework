@@ -84,7 +84,7 @@ class ContentDedupDetector:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if should_skip(vault_dir, str(rel)):
+            if should_skip(vault_dir, rel.as_posix()):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -99,7 +99,7 @@ class ContentDedupDetector:
             if len(body) < 50:
                 continue
 
-            rel_path = str(rel)
+            rel_path = rel.as_posix()
             try:
                 vec = self.embedder.embed(body)
             except Exception as exc:
@@ -166,7 +166,7 @@ class ContradictionDetector:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if should_skip(vault_dir, str(rel)):
+            if should_skip(vault_dir, rel.as_posix()):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -181,7 +181,7 @@ class ContradictionDetector:
             if len(body) < 50:
                 continue
 
-            rel_path = str(rel)
+            rel_path = rel.as_posix()
             notes[rel_path] = body
             try:
                 embeddings[rel_path] = self.embedder.embed(body)
@@ -356,7 +356,7 @@ class FreshnessScorer:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if should_skip(vault_dir, str(rel)):
+            if should_skip(vault_dir, rel.as_posix()):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -383,7 +383,7 @@ class FreshnessScorer:
 
             half_life = TYPE_HALF_LIFE_DAYS.get(note_type, DEFAULT_HALF_LIFE_DAYS)
             score = 2.0 ** (-age / half_life) if half_life > 0 else 1.0
-            scores[str(rel)] = round(min(1.0, max(0.0, score)), 4)
+            scores[rel.as_posix()] = round(min(1.0, max(0.0, score)), 4)
 
         return scores
 
@@ -410,7 +410,7 @@ class LinkRotChecker:
 
         for filepath in vault_dir.rglob("*.md"):
             rel = filepath.relative_to(vault_dir)
-            if should_skip(vault_dir, str(rel)):
+            if should_skip(vault_dir, rel.as_posix()):
                 continue
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
@@ -422,7 +422,7 @@ class LinkRotChecker:
                 continue
 
             urls = self.EXTERNAL_LINK_PATTERN.findall(content)
-            to_check.extend((str(rel), url) for url in urls)
+            to_check.extend((rel.as_posix(), url) for url in urls)
 
         if not to_check:
             return results

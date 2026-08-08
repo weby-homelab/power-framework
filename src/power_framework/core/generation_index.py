@@ -139,7 +139,7 @@ def _source_inventory(vault_dir: Path) -> SourceInventory:
     for path in sorted(vault_dir.rglob("*.md")):
         if path.name in {"index.md", "log.md", "_index.md"}:
             continue
-        rel_path = str(path.relative_to(vault_dir))
+        rel_path = path.relative_to(vault_dir).as_posix()
         if should_skip(vault_dir, rel_path):
             continue
         total_scanned += 1

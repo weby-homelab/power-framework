@@ -26,7 +26,7 @@ def get_index_coverage(vault_dir: Path) -> tuple[int, int]:
         for filepath in root.rglob("*.md"):
             if filepath.name in ("index.md", "log.md", "_index.md"):
                 continue
-            if should_skip(root, str(filepath.relative_to(root))):
+            if should_skip(root, filepath.relative_to(root).as_posix()):
                 continue
             total += 1
     except OSError:
