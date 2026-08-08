@@ -283,7 +283,7 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        if should_skip(vault_dir, rel.as_posix()):
             continue
         if any(part in DEFAULT_EXCLUDED for part in rel.parts):
             continue

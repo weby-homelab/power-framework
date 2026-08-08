@@ -456,7 +456,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        if should_skip(vault_dir, rel.as_posix()):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
@@ -471,7 +471,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
             continue
 
         title = str(fm.get("title", ""))
-        rel_path = str(rel)
+        rel_path = rel.as_posix()
 
         # Track titles for redundancy check
         if title:
@@ -580,12 +580,12 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        if should_skip(vault_dir, rel.as_posix()):
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
         # Skip notes already in archive
-        rel_str = str(rel)
+        rel_str = rel.as_posix()
         if rel_str.startswith("04_Archive/"):
             continue
 
@@ -622,11 +622,11 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
             continue
 
         if dry_run:
-            moved.append(f"  {rel_str} -> {archive_target.relative_to(vault_dir)}")
+            moved.append(f"  {rel_str} -> {archive_target.relative_to(vault_dir).as_posix()}")
         else:
             archive_dir.mkdir(parents=True, exist_ok=True)
             shutil.move(str(filepath), str(archive_target))
-            moved.append(f"  {rel_str} -> {archive_target.relative_to(vault_dir)}")
+            moved.append(f"  {rel_str} -> {archive_target.relative_to(vault_dir).as_posix()}")
 
     lines = [
         "=== Archive Stale Notes ===",
@@ -686,7 +686,7 @@ def run_status_report(vault_dir: Path) -> str:
             continue
 
         rel_path = filepath.relative_to(vault_dir)
-        rel_path_str = str(rel_path)
+        rel_path_str = rel_path.as_posix()
 
         if should_skip(vault_dir, rel_path_str):
             continue

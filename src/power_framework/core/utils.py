@@ -87,10 +87,14 @@ def atomic_write(filepath: Path, content: str, encoding: str = "utf-8") -> None:
         suffix=".tmp",
     )
     try:
-        with os.fdopen(fd, "w", encoding=encoding) as f:
+        file_obj = os.fdopen(fd, "w", encoding=encoding)
+        fd = -1
+        with file_obj as f:
             f.write(content)
         os.replace(tmp_path, filepath)
     except Exception:
+        if fd >= 0:
+            os.close(fd)
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
         raise
@@ -114,13 +118,12 @@ def resolve_path_in_vault(
 
     if not raw_path or any(ord(char) < 32 or ord(char) == 127 for char in decoded_path):
         raise ValueError("Invalid vault-relative path")
-    if "\\" in decoded_path:
-        raise ValueError("Windows path separators are not allowed")
-
     windows_path = PureWindowsPath(decoded_path)
     posix_path = Path(decoded_path)
     if posix_path.is_absolute() or windows_path.is_absolute() or windows_path.drive:
         raise ValueError("Absolute paths are not allowed")
+    if "\\" in decoded_path:
+        raise ValueError("Windows path separators are not allowed")
 
     path_parts = Path(decoded_path).parts
     if not path_parts or any(part in {".", ".."} for part in path_parts):

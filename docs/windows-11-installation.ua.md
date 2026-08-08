@@ -12,9 +12,10 @@ MCP-клієнт. Усі команди наведено для PowerShell.
   актуального Microsoft Visual C++ Runtime.
 - P.O.W.E.R. `v3.3.2` має автоматизований кросплатформний regression-тест
   поведінки rename-overwrite у Windows.
-- Release pipeline `v3.3.2` не запускався на фізичному хості Windows 11 25H2.
-  Виконайте acceptance-перевірки нижче на цільовій машині; Linux CI не є
-  прямою сертифікацією Windows.
+- Фізичну перевірку Windows 11 25H2 завершено 2026-08-08 для follow-up revision
+  `4e5b2b9`; див. [звіт перевірки](tests/windows-11-25h2-validation.md).
+  Це підтверджує follow-up source/build і не переміщує та не перевидає
+  незмінні release-артефакти `v3.3.2`.
 
 Офіційні передумови:
 

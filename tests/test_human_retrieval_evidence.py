@@ -139,7 +139,7 @@ def test_evidence_file_binds_each_artifact_to_its_declared_hash(tmp_path: Path) 
         content = f"{key}\n"
         (tmp_path / filename).write_text(content, encoding="utf-8")
         manifest[f"{key}_sha256" if key != "raw_judgments" else "raw_judgments_sha256"] = (
-            hashlib.sha256(content.encode()).hexdigest()
+            hashlib.sha256((tmp_path / filename).read_bytes()).hexdigest()
         )
     manifest["adjudicated_qrels_sha256"] = hashlib.sha256(
         (tmp_path / artifacts["adjudicated_qrels"]).read_bytes()

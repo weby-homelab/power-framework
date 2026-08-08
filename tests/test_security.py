@@ -109,6 +109,10 @@ class TestVaultRelativeWritePaths:
     """Tests for centralized validation of untrusted note paths."""
 
     _allowed_directories = ("01_Projects", "06_Daily_Logs")
+    _requires_windows_symlink_privilege = pytest.mark.skipif(
+        os.name == "nt",
+        reason="Windows symlink creation requires SeCreateSymbolicLinkPrivilege",
+    )
 
     def test_allows_existing_nested_markdown_path(self, sample_vault: Path):
         target = resolve_path_in_vault(
@@ -139,6 +143,7 @@ class TestVaultRelativeWritePaths:
         with pytest.raises(ValueError, match="Absolute"):
             resolve_path_in_vault(sample_vault, str(outside_path), self._allowed_directories)
 
+    @_requires_windows_symlink_privilege
     def test_rejects_symlinked_parent_that_escapes_vault(self, sample_vault: Path, tmp_path: Path):
         outside_directory = tmp_path / "outside"
         outside_directory.mkdir()
@@ -169,6 +174,7 @@ class TestVaultRelativeWritePaths:
         with pytest.raises(ValueError, match=r"path|Path|Absolute|Invalid"):
             resolve_path_in_vault(sample_vault, traversal_path, self._allowed_directories)
 
+    @_requires_windows_symlink_privilege
     def test_rejects_symlink_parent_escape(self, sample_vault: Path, tmp_path: Path):
         outside_dir = tmp_path / "outside"
         outside_dir.mkdir()
@@ -181,6 +187,7 @@ class TestVaultRelativeWritePaths:
                 self._allowed_directories,
             )
 
+    @_requires_windows_symlink_privilege
     def test_rejects_symlink_target_to_external_file(self, sample_vault: Path, tmp_path: Path):
         outside_file = tmp_path / "outside.md"
         outside_file.write_text("hack")
@@ -193,6 +200,7 @@ class TestVaultRelativeWritePaths:
                 self._allowed_directories,
             )
 
+    @_requires_windows_symlink_privilege
     def test_atomic_write_rejects_symlinked_note_without_changing_sentinel(
         self,
         sample_vault: Path,

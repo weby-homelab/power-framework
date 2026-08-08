@@ -359,7 +359,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
-        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
+        if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
 
         try:
@@ -372,7 +372,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
             if score == 0:
                 continue
 
-            rel_path = str(filepath.relative_to(vault_dir))
+            rel_path = filepath.relative_to(vault_dir).as_posix()
             results.append(
                 SearchResult(
                     rel_path=rel_path,
@@ -436,11 +436,11 @@ def _sync_vault_to_db(
     for filepath in vault_dir.rglob("*.md"):
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
-        if should_skip(vault_dir, str(filepath.relative_to(vault_dir))):
+        if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
 
         try:
-            rel_path = str(filepath.relative_to(vault_dir))
+            rel_path = filepath.relative_to(vault_dir).as_posix()
             mtime = filepath.stat().st_mtime
             disk_files[rel_path] = mtime
         except Exception:  # noqa: S112

@@ -29,7 +29,11 @@ def smoke_artifact(artifact: Path, root: Path) -> None:
     name = artifact.stem.replace("-", "_")
     venv_dir = root / f"venv-{name}"
     _run([sys.executable, "-m", "venv", "--system-site-packages", str(venv_dir)], cwd=root)
-    python = venv_dir / "bin" / "python"
+    python = (
+        venv_dir
+        / ("Scripts" if sys.platform == "win32" else "bin")
+        / ("python.exe" if sys.platform == "win32" else "python")
+    )
     _run(
         [str(python), "-m", "pip", "install", "--force-reinstall", str(artifact)],
         cwd=root,
