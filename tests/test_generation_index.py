@@ -219,6 +219,8 @@ def test_invalid_sources_are_explicitly_recorded(
     report = sync_vault_atomically(vault, sync_embeddings=False)
 
     assert (report.total_scanned, report.invalid_sources, report.expected_files) == (2, 1, 1)
+    assert report.excluded_sources == {"01_Projects/Invalid.md": "invalid_metadata"}
+    assert report.excluded_reason_counts == {"invalid_metadata": 1}
     with closing(sqlite3.connect(_state_db_path(vault))) as conn:
         invalid_count = conn.execute(
             "SELECT COUNT(*) FROM generation_invalid_sources WHERE generation_id = ?",
@@ -229,6 +231,43 @@ def test_invalid_sources_are_explicitly_recorded(
             (report.generation_id,),
         ).fetchone()[0]
     assert (invalid_count, reason) == (1, "invalid_metadata")
+
+
+def test_excluded_source_change_during_sync_keeps_previous_active_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A note becoming valid during sync must invalidate the source snapshot."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "excluded-change", "stable-token")
+    invalid = vault / "01_Projects" / "Invalid.md"
+    invalid.write_text("# no frontmatter\n", encoding="utf-8")
+    sync_vault_atomically(vault, sync_embeddings=False)
+    active_db = _active_db(vault)
+    before = active_db.read_bytes()
+
+    from power_framework.core import searcher
+
+    original_sync = searcher._sync_vault_to_db
+
+    def sync_then_repair_excluded(*args: object, **kwargs: object) -> None:
+        original_sync(*args, **kwargs)
+        invalid.write_text(
+            "---\n"
+            "type: Project\n"
+            "title: Repaired\n"
+            "description: repaired note\n"
+            "timestamp: 2026-07-27T00:00:00+00:00\n"
+            "---\n\nrepaired-token\n",
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(searcher, "_sync_vault_to_db", sync_then_repair_excluded)
+    with pytest.raises(IndexGenerationError, match=r"snapshot changed during sync.*Invalid.md"):
+        sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert active_db.read_bytes() == before
+    assert search_vault(vault, "stable-token", mode="fts")
+    assert not search_vault(vault, "repaired-token", mode="fts")
 
 
 def test_legacy_search_database_is_imported_before_removal(

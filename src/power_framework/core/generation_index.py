@@ -6,6 +6,7 @@ import hashlib
 import os
 import sqlite3
 import uuid
+from collections import Counter
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -49,6 +50,24 @@ class GenerationReport:
     actual_chunks: int
     total_scanned: int
     invalid_sources: int
+    excluded_sources: dict[str, str]
+    excluded_reason_counts: dict[str, int]
+
+
+def _excluded_reason_counts(excluded_sources: dict[str, str]) -> dict[str, int]:
+    """Return deterministic counts for the reasons in an exclusion ledger."""
+    return dict(sorted(Counter(excluded_sources.values()).items()))
+
+
+def list_invalid_sources(vault_dir: Path) -> dict[str, str]:
+    """Return the deterministic path/reason ledger for the next sync.
+
+    The generation state database intentionally stores only hashes for excluded
+    paths. This read-only inventory helper exposes the same path/reason data
+    used by a sync without persisting user paths in the state store.
+    """
+    root = Path(vault_dir).expanduser().resolve()
+    return dict(_source_inventory(root).invalid_sources)
 
 
 def _state_db_path(vault_dir: Path) -> Path:
@@ -167,7 +186,7 @@ def _snapshot_hash(sources: dict[str, str]) -> str:
     return digest.hexdigest()
 
 
-def _assert_source_snapshot_unchanged(vault_dir: Path, expected_sources: dict[str, str]) -> None:
+def _assert_source_snapshot_unchanged(vault_dir: Path, expected_inventory: SourceInventory) -> None:
     """Reject a build when source content changed after staging began.
 
     A path-only coverage check cannot prove that the staged rows describe the
@@ -175,7 +194,26 @@ def _assert_source_snapshot_unchanged(vault_dir: Path, expected_sources: dict[st
     BLAKE2 identities again immediately before publication so callers retry
     instead of activating a stale generation.
     """
-    current_sources = _source_inventory(vault_dir).valid_sources
+    current_inventory = _source_inventory(vault_dir)
+    expected_sources = {
+        **{
+            path: f"valid:{content_hash}"
+            for path, content_hash in expected_inventory.valid_sources.items()
+        },
+        **{
+            path: f"excluded:{reason}"
+            for path, reason in expected_inventory.invalid_sources.items()
+        },
+    }
+    current_sources = {
+        **{
+            path: f"valid:{content_hash}"
+            for path, content_hash in current_inventory.valid_sources.items()
+        },
+        **{
+            path: f"excluded:{reason}" for path, reason in current_inventory.invalid_sources.items()
+        },
+    }
     if current_sources == expected_sources:
         return
 
@@ -503,7 +541,7 @@ def _migrate_legacy_database(
                 staging_conn, set(inventory.valid_sources), sync_embeddings
             )
             staging_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        _assert_source_snapshot_unchanged(vault_dir, inventory.valid_sources)
+        _assert_source_snapshot_unchanged(vault_dir, inventory)
         _publish(
             vault_dir,
             generation_id,
@@ -534,6 +572,8 @@ def _migrate_legacy_database(
         actual_chunks=actual_chunks,
         total_scanned=inventory.total_scanned,
         invalid_sources=len(inventory.invalid_sources),
+        excluded_sources=dict(inventory.invalid_sources),
+        excluded_reason_counts=_excluded_reason_counts(inventory.invalid_sources),
     )
 
 
@@ -578,7 +618,7 @@ def sync_vault_atomically(
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
             )
-            _assert_source_snapshot_unchanged(root, sources)
+            _assert_source_snapshot_unchanged(root, inventory)
             actual_files, actual_chunks, provider, model = _validate_staging(
                 conn, set(sources), sync_embeddings
             )
@@ -612,4 +652,6 @@ def sync_vault_atomically(
         actual_chunks=actual_chunks,
         total_scanned=inventory.total_scanned,
         invalid_sources=len(inventory.invalid_sources),
+        excluded_sources=dict(inventory.invalid_sources),
+        excluded_reason_counts=_excluded_reason_counts(inventory.invalid_sources),
     )

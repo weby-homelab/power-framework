@@ -132,6 +132,112 @@ def test_index_strict_reports_invalid_notes(tmp_path: Path) -> None:
     assert (tmp_path / "index.md").exists()
 
 
+def _add_invalid_note(vault: Path) -> Path:
+    invalid = vault / "03_Resources" / "invalid_sync.md"
+    invalid.write_text("# no frontmatter\n", encoding="utf-8")
+    return invalid
+
+
+def test_sync_clean_vault_has_zero_exit_and_coverage_ledger(
+    sample_vault: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    with (
+        caplog.at_level("INFO"),
+        patch.object(
+            sys,
+            "argv",
+            ["power", "sync", str(sample_vault), "--fts-only"],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 0
+    assert any(
+        "Coverage: 5 notes scanned, 5 indexed, 0 excluded." in r.message for r in caplog.records
+    )
+
+
+def test_sync_default_fails_closed_and_names_excluded_note(
+    sample_vault: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    invalid = _add_invalid_note(sample_vault)
+    with (
+        caplog.at_level("INFO"),
+        patch.object(
+            sys,
+            "argv",
+            ["power", "sync", str(sample_vault), "--fts-only"],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 1
+    messages = [record.message for record in caplog.records]
+    assert any(
+        "Coverage: 6 notes scanned, 5 indexed, 1 excluded." in message for message in messages
+    )
+    assert any("Exclusion reasons: invalid_metadata=1" in message for message in messages)
+    assert any(
+        f"excluded: {invalid.relative_to(sample_vault).as_posix()} (invalid_metadata)" in message
+        for message in messages
+    )
+
+
+def test_sync_strict_fails_closed_and_allow_partial_is_explicit(
+    sample_vault: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _add_invalid_note(sample_vault)
+    with (
+        caplog.at_level("INFO"),
+        patch.object(
+            sys,
+            "argv",
+            ["power", "sync", str(sample_vault), "--fts-only", "--strict"],
+        ),
+        pytest.raises(SystemExit) as strict_exc,
+    ):
+        main()
+    assert strict_exc.value.code == 1
+
+    caplog.clear()
+    with (
+        caplog.at_level("INFO"),
+        patch.object(
+            sys,
+            "argv",
+            ["power", "sync", str(sample_vault), "--fts-only", "--allow-partial"],
+        ),
+        pytest.raises(SystemExit) as partial_exc,
+    ):
+        main()
+    assert partial_exc.value.code == 0
+    assert any(
+        "Continuing because --allow-partial was requested." in r.message for r in caplog.records
+    )
+
+
+def test_sync_rejects_contradictory_coverage_flags(sample_vault: Path) -> None:
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "sync",
+                str(sample_vault),
+                "--fts-only",
+                "--strict",
+                "--allow-partial",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 2
+
+
 def test_ingest_creates_note(sample_vault: Path) -> None:
     with (
         patch.object(
