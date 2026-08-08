@@ -9,6 +9,7 @@ Scans the vault for OKF-annotated notes and generates hierarchical index files:
 from __future__ import annotations
 
 import json
+import posixpath
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -413,6 +414,23 @@ def generate_main_index_content(
     return "\n".join(lines)
 
 
+def _catalog_link(folder: str, rel_path: str) -> str:
+    """Render a catalog entry path as a resolvable Markdown link.
+
+    A backtick code span is stripped before link extraction, so a catalog built
+    from code spans contributes no inbound links at all and every note it lists
+    is then reported as an orphan by ``power lint`` — the index the product
+    generates fails the check the product itself runs.
+
+    GFM targets resolve relative to the *source* file, and the sub-index lives
+    at ``<folder>/_index.md``, so the target is made relative to ``folder``.
+    Angle brackets keep paths containing spaces valid.
+    """
+    normalized = rel_path.replace("\\", "/")
+    target = posixpath.relpath(normalized, folder)
+    return f"[{normalized}](<{target}>)"
+
+
 def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
     """Generate a detailed _index.md for a specific P.A.R.A. folder."""
     display_name = folder.replace("_", " ")
@@ -440,7 +458,7 @@ def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
 
         for note in sorted_notes:
             lines.append(f"## {note['title']}")
-            lines.append(f"- **Path:** `{note['rel_path']}`")
+            lines.append(f"- **Path:** {_catalog_link(folder, note['rel_path'])}")
             lines.append(f"- **Type:** {note['note_type']}")
             lines.append(f"- **Description:** {truncate_for_catalog(note['description'])}")
             if note.get("tags"):

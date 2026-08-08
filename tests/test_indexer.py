@@ -17,6 +17,7 @@ from power_framework.core.indexer import (
     scan_vault_notes,
     truncate_for_catalog,
 )
+from power_framework.core.linter import run_lint_report
 
 
 class TestScanVaultNotes:
@@ -184,6 +185,25 @@ class TestGenerateSubIndexContent:
         content = generate_sub_index_content("01_Projects", folder_notes["01_Projects"])
         assert "## Test Project" in content
         assert "## Weby-QRank Architecture" in content
+
+    def test_catalog_entry_is_a_resolvable_link_not_a_code_span(self, sample_vault: Path):
+        """A code span is stripped before link extraction, so a catalog built
+        from code spans contributes no inbound links and lint calls every note
+        it lists an orphan — the generated index failing the product's own check.
+        """
+        folder_notes = scan_folder_notes(sample_vault)
+        content = generate_sub_index_content("01_Projects", folder_notes["01_Projects"])
+        note = folder_notes["01_Projects"][0]
+        rel = note["rel_path"].replace("\\", "/")
+        target = rel.split("/", 1)[1]  # relative to the folder the index lives in
+
+        assert f"`{note['rel_path']}`" not in content
+        assert f"[{rel}](<{target}>)" in content
+
+    def test_generated_index_leaves_no_orphans(self, sample_vault: Path):
+        """index -> lint must not report the notes the index just catalogued."""
+        run_generate_hierarchical_index(sample_vault)
+        assert "Orphan notes" not in run_lint_report(sample_vault)
 
     def test_contains_note_metadata(self, sample_vault: Path):
         folder_notes = scan_folder_notes(sample_vault)
