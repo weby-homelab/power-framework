@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from power_framework.core import healer as healer_module
 from power_framework.core.healer import (
     _extract_first_paragraph,
     _infer_title_from_filename,
     heal_frontmatter,
     heal_vault,
+    propagate_rename,
 )
 
 
@@ -137,3 +139,89 @@ class TestHealVault:
         assert "LIVE" in report
         content = note.read_text()
         assert "type: Project" in content
+
+
+class TestHealBackslashEscapes:
+    r"""Frontmatter is user data and may legitimately contain backslashes.
+
+    Recognized fields are routed through ``_escape_yaml``, which doubles the
+    backslash, so they never triggered this. Unrecognized fields go through
+    ``yaml.safe_dump`` and keep a single backslash; the resulting frontmatter
+    was then passed to ``re.sub`` as a *string* replacement, where ``\P``
+    (AutoCAD MTEXT) is an unknown group escape and raises ``re.error``.
+    """
+
+    def test_mtext_escape_in_custom_field_does_not_raise(self, tmp_path: Path):
+        note = tmp_path / "cable_table.md"
+        note.write_text(
+            "---\n"
+            "smoke: 'MTEXT guard: (cd:ParseDecimal \"{\\fArial|b0;7.5\\P}\")'\n"
+            "timestamp: 2026-01-01T00:00:00\n"
+            "---\n\nBody text here.\n",
+            encoding="utf-8",
+        )
+        healed, changes = heal_frontmatter(note.read_text(encoding="utf-8"), note)
+        assert changes
+        assert "fArial" in healed
+
+    def test_windows_path_in_custom_field_does_not_raise(self, tmp_path: Path):
+        note = tmp_path / "note.md"
+        note.write_text(
+            "---\n"
+            "source_dir: 'C:\\Users\\Public\\vault'\n"
+            "timestamp: 2026-01-01T00:00:00\n"
+            "---\n\nBody text here.\n",
+            encoding="utf-8",
+        )
+        healed, changes = heal_frontmatter(note.read_text(encoding="utf-8"), note)
+        assert changes
+        assert "Users" in healed
+
+    def test_propagate_rename_survives_backslash_frontmatter(self, tmp_path: Path):
+        """`power rename` rewrites frontmatter through the same code path."""
+        vault = tmp_path / "vault"
+        (vault / "02_Areas").mkdir(parents=True)
+        note = vault / "02_Areas" / "referrer.md"
+        note.write_text(
+            "---\n"
+            "type: Area\n"
+            'title: "Referrer"\n'
+            'description: "Points at the renamed note"\n'
+            "source_dir: 'C:\\Users\\Public\\vault'\n"
+            "related:\n"
+            '  - path: "03_Resources/old_name.md"\n'
+            "    relation: depends_on\n"
+            "timestamp: 2026-01-01T00:00:00\n"
+            "---\n\nBody text here.\n",
+            encoding="utf-8",
+        )
+        updated, _log = propagate_rename(
+            vault, "03_Resources/old_name.md", "03_Resources/new_name.md", dry_run=False
+        )
+        assert updated == 1
+        assert "03_Resources/new_name.md" in note.read_text(encoding="utf-8")
+
+    def test_one_unhealable_note_does_not_abort_the_vault(self, tmp_path: Path, monkeypatch):
+        """A single failing note must cost one note, not the whole run."""
+        vault = tmp_path / "vault"
+        (vault / "01_Projects").mkdir(parents=True)
+        for name in ("a_note.md", "poison.md", "z_note.md"):
+            (vault / "01_Projects" / name).write_text(
+                '---\ndescription: "Desc"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text.',
+                encoding="utf-8",
+            )
+
+        real_heal = healer_module.heal_frontmatter
+
+        def explode(content, filepath, vault_dir=None):
+            if filepath.name == "poison.md":
+                raise ValueError("simulated per-note failure")
+            return real_heal(content, filepath, vault_dir)
+
+        monkeypatch.setattr(healer_module, "heal_frontmatter", explode)
+        report = heal_vault(vault, dry_run=False)
+
+        assert "Notes healed: 2" in report
+        assert "Notes failed: 1" in report
+        assert "poison.md" in report
+        assert "type: Project" in (vault / "01_Projects" / "z_note.md").read_text(encoding="utf-8")

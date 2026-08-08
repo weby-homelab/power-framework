@@ -24,6 +24,7 @@ from .ignore import should_skip
 from .models import NoteType
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 from .parser import (
@@ -96,6 +97,19 @@ def _extract_first_paragraph(content: str) -> str:
             if clean:
                 return clean[:150]
     return ""
+
+
+def _literal_replacement(text: str) -> Callable[[re.Match[str]], str]:
+    """Return a re.sub replacement that inserts *text* verbatim.
+
+    A ``str`` replacement is parsed as a template, so a backslash carried over
+    from a note's own frontmatter — AutoCAD MTEXT codes such as ``\\P``, a
+    Windows path, LaTeX — is read as a group reference and raises ``re.error``.
+    Recognized fields are protected by ``_escape_yaml`` doubling the backslash;
+    unrecognized ones are rendered by ``yaml.safe_dump`` and keep a single one.
+    A callable replacement is never parsed.
+    """
+    return lambda _match: text
 
 
 def _escape_yaml(value: str) -> str:
@@ -258,7 +272,7 @@ def heal_frontmatter(
     if raw_fm is not None:
         healed = re.sub(
             r"^---.*?\n---\n?",
-            new_fm + "\n",
+            _literal_replacement(new_fm + "\n"),
             content,
             count=1,
             flags=re.DOTALL,
@@ -280,6 +294,7 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
     """
     healed_count = 0
     changes_log: list[str] = []
+    failures: list[tuple[str, str]] = []
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
@@ -298,30 +313,42 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
         if not content.strip():
             continue
 
-        healed, changes = heal_frontmatter(content, filepath, vault_dir)
+        # One unhealable note must never cost the rest of the vault: record it
+        # and carry on, so a 2 000-note run reports 1 failure instead of 0
+        # successes.
+        try:
+            healed, changes = heal_frontmatter(content, filepath, vault_dir)
+        except Exception as exc:
+            logger.warning("Cannot heal %s: %s: %s", rel, type(exc).__name__, exc)
+            failures.append((rel.as_posix(), f"{type(exc).__name__}: {exc}"))
+            continue
         if not changes:
             continue
 
         if limit is not None and healed_count >= limit:
             break
 
+        backup_path: Path | None = None
+        if not dry_run:
+            try:
+                backup_path = create_backup(filepath)
+                atomic_write(filepath, healed)
+            except OSError as exc:
+                logger.warning("Cannot write %s: %s", rel, exc)
+                failures.append((rel.as_posix(), f"{type(exc).__name__}: {exc}"))
+                continue
         healed_count += 1
-        if dry_run:
-            changes_log.append(f"  {rel}:")
-            changes_log.extend(f"    - {c}" for c in changes)
-        else:
-            backup_path = create_backup(filepath)
-            atomic_write(filepath, healed)
-            changes_log.append(f"  {rel}:")
-            changes_log.extend(f"    - {c}" for c in changes)
-            if backup_path:
-                changes_log.append(f"    (backup: {backup_path.name})")
+        changes_log.append(f"  {rel}:")
+        changes_log.extend(f"    - {c}" for c in changes)
+        if backup_path:
+            changes_log.append(f"    (backup: {backup_path.name})")
 
     lines = [
         "=== Frontmatter Heal Report ===",
         f"Vault: {vault_dir}",
         f"Mode: {'DRY RUN' if dry_run else 'LIVE'}",
         f"Notes healed: {healed_count}",
+        f"Notes failed: {len(failures)}",
         "",
     ]
     if changes_log:
@@ -330,6 +357,11 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
         lines.append("")
     else:
         lines.append("No notes needed healing.")
+        lines.append("")
+
+    if failures:
+        lines.append("Failed (left untouched):")
+        lines.extend(f"  {rel_path}: {reason}" for rel_path, reason in failures)
         lines.append("")
 
     return "\n".join(lines)
@@ -405,7 +437,7 @@ def propagate_rename(
             new_fm = _format_frontmatter(fm_data, note_type, title, description, parsed_timestamp)
             healed = re.sub(
                 r"^---.*?\n---\n?",
-                new_fm + "\n",
+                _literal_replacement(new_fm + "\n"),
                 content,
                 count=1,
                 flags=re.DOTALL,
