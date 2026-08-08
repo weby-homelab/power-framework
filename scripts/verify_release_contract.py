@@ -65,8 +65,14 @@ def _load_package_version(path: Path) -> str:
 
 
 def _sha256(path: Path) -> str:
-    """Return the checksum of an immutable tracked input."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Return a checkout-stable checksum for the tracked JSON input.
+
+    Git stores this release metadata with LF line endings. Windows checkouts
+    can materialize the same JSON with CRLF, so hash the canonical text form
+    while retaining byte-exact hashing for every non-CRLF byte.
+    """
+    content = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(content).hexdigest()
 
 
 def _git(repo: Path, *args: str) -> tuple[int, str, str]:

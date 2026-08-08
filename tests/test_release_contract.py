@@ -44,6 +44,16 @@ def test_model_lock_version_must_match_project_version(tmp_path: Path) -> None:
     assert "does not match project version" in result.stderr
 
 
+def test_model_lock_hash_is_stable_for_windows_crlf_checkout(tmp_path: Path) -> None:
+    canonical = MODELS_LOCK.read_bytes().replace(b"\r\n", b"\n")
+    crlf_lock = tmp_path / "models.lock.json"
+    crlf_lock.write_bytes(canonical.replace(b"\n", b"\r\n"))
+
+    result = _run_validator("--models-lock", str(crlf_lock))
+
+    assert result.returncode == 0, result.stderr
+
+
 def test_dirty_source_cannot_be_a_release_baseline(tmp_path: Path) -> None:
     baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     baseline["source"]["clean"] = False
