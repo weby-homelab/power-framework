@@ -6,7 +6,7 @@ This reference is aligned with the executable P.O.W.E.R. `v3.3.2` parser.
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,search,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,search,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename,doctor} ...
 ```
 
 ## Global options
@@ -266,3 +266,23 @@ CLI commands with an optional path resolve `POWER_VAULT_DIR` first. The legacy
 `POWER_VAULT_PATH` alias is accepted by the implementation, but new
 configurations should use `POWER_VAULT_DIR`, which is also the canonical MCP
 boundary.
+
+### `doctor`
+
+Diagnose the runtime in one pass: interpreter, platform, package version, ONNX
+Runtime providers, the provider a real session actually binds, and — when a
+vault path is given — the active search generation and how many notes the next
+sync would exclude.
+
+```text
+power doctor [PATH]
+```
+
+The provider list reported by ONNX Runtime is compiled-in, not necessarily
+loadable. When the pinned embedding model is already cached, `doctor` builds a
+real session and reports the **bound** provider; a GPU that silently binds CPU
+is a ~50x slowdown with no error message, and this is the check that catches
+it. The probe never downloads model assets.
+
+Exit `1` only when diagnosis itself is impossible (onnxruntime missing, vault
+path not found); findings alone do not fail the command.

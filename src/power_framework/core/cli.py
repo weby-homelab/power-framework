@@ -373,6 +373,137 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     return 0
 
 
+def _doctor_bind_check() -> None:
+    """Report the provider a REAL session binds, when it can be done offline.
+
+    ``get_available_providers()`` reports what the ORT build was compiled with,
+    not what can load: a GPU provider can be listed and still silently bind CPU
+    at session creation — a ~50x slowdown with no error. Only a live session
+    answers truthfully. The probe runs solely when the pinned embedding model is
+    already in the local cache, so `doctor` never triggers a multi-GB download.
+    """
+    import time
+
+    from .embeddings import BGE_M3_ONNX_REPO, BGE_M3_ONNX_REVISION, BGEM3OnnxManager
+
+    try:
+        from huggingface_hub import hf_hub_download
+
+        for filename in ("model.onnx", "model.onnx.data", "tokenizer.json"):
+            hf_hub_download(
+                BGE_M3_ONNX_REPO,
+                filename,
+                revision=BGE_M3_ONNX_REVISION,
+                local_files_only=True,
+            )
+    except Exception:
+        logger.info(
+            "Bound provider  : unknown — embedding model not cached; "
+            "run 'power sync' once, then re-run doctor to verify the real binding"
+        )
+        return
+
+    try:
+        manager = BGEM3OnnxManager()
+        start = time.perf_counter()
+        manager.embed("doctor probe")
+        elapsed = time.perf_counter() - start
+        session = manager._session  # diagnostic introspection of the live session
+        bound = session.get_providers()[0] if session is not None else "unknown"
+        logger.info("Bound provider  : %s (probe embed %.2fs)", bound, elapsed)
+    except Exception as exc:
+        logger.error("Bound provider  : session creation failed (%s)", exc)
+
+
+def _doctor_vault_check(vault_dir: Path) -> int:
+    """Report active-generation coverage and what the next sync would drop."""
+    import sqlite3
+    from contextlib import closing
+
+    from .generation_index import (
+        IndexGenerationError,
+        list_invalid_sources,
+        resolve_active_generation_path,
+    )
+
+    if not vault_dir.exists():
+        logger.error("Vault           : not found: %s", vault_dir)
+        return 1
+    logger.info("Vault           : %s", vault_dir)
+
+    try:
+        active = resolve_active_generation_path(vault_dir)
+    except IndexGenerationError as exc:
+        logger.error("Search index    : generation state unreadable (%s)", exc)
+        active = None
+    if active is None:
+        logger.warning("Search index    : no active generation — run 'power sync'")
+    else:
+        with closing(sqlite3.connect(f"file:{active.as_posix()}?mode=ro", uri=True)) as conn:
+            files = conn.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0]
+            chunks = conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+        logger.info("Search index    : %s (%d files, %d chunks)", active.name, files, chunks)
+
+    invalid = list_invalid_sources(vault_dir)
+    if invalid:
+        logger.warning(
+            "Excluded now    : %d note(s) would be dropped by the next sync "
+            "and are invisible to search",
+            len(invalid),
+        )
+        for rel_path, reason in sorted(invalid.items())[:5]:
+            logger.warning("  excluded: %s (%s)", rel_path, reason)
+        if len(invalid) > 5:
+            logger.warning("  ... and %d more; run 'power index PATH --strict'", len(invalid) - 5)
+    else:
+        logger.info("Excluded now    : 0 — every scanned note is indexable")
+    return 0
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    """Diagnose runtime, ONNX device binding, and index coverage in one pass."""
+    import platform
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as dist_version
+
+    logger.info("=== P.O.W.E.R. Doctor ===")
+    logger.info("Python          : %s (%s)", platform.python_version(), sys.executable)
+    logger.info("Platform        : %s", platform.platform())
+    try:
+        logger.info("power-framework : %s", dist_version("power-framework"))
+    except PackageNotFoundError:
+        logger.warning("power-framework : distribution metadata unavailable")
+
+    logger.info("POWER_EMBED_DEVICE : %s", os.getenv("POWER_EMBED_DEVICE", "auto"))
+    try:
+        import onnxruntime as ort  # type: ignore[import-untyped]
+    except ImportError as exc:
+        logger.error("onnxruntime     : import failed (%s)", exc)
+        return 1
+    logger.info("onnxruntime     : %s", ort.__version__)
+
+    preload = getattr(ort, "preload_dlls", None)
+    if preload is None:
+        logger.info("preload_dlls()  : not provided by this onnxruntime build")
+    else:
+        try:
+            preload()
+            logger.info("preload_dlls()  : OK")
+        except Exception as exc:
+            logger.warning("preload_dlls()  : failed (%s)", exc)
+
+    logger.info("Providers listed: %s", ", ".join(ort.get_available_providers()))
+    logger.info(
+        "NOTE: listed providers are compiled-in, not necessarily loadable; "
+        "only a real session proves the binding."
+    )
+    _doctor_bind_check()
+
+    if getattr(args, "path", None):
+        return _doctor_vault_check(_resolve_path(args.path))
+    return 0
+
+
 def _cmd_rot(args: argparse.Namespace) -> int:
     """Run ROT (Redundant, Outdated, Trivial) audit."""
     vault_dir = _resolve_path(args.path)
@@ -879,6 +1010,18 @@ def main() -> None:
         help="Actually apply changes (default: dry run)",
     )
     p_rename.set_defaults(func=_cmd_rename)
+
+    p_doctor = subparsers.add_parser(
+        "doctor",
+        help="Diagnose runtime, ONNX device binding, and index coverage in one pass",
+    )
+    p_doctor.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help="Optional vault path to also check index coverage and exclusions",
+    )
+    p_doctor.set_defaults(func=_cmd_doctor)
 
     args = parser.parse_args()
 
