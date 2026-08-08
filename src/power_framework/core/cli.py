@@ -78,6 +78,20 @@ Your content here.
 """
 
 
+def _configure_windows_utf8_streams() -> None:
+    """Keep CLI reports printable when Windows inherits a legacy code page."""
+    if os.name != "nt":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                # Captured/embedded streams may reject runtime reconfiguration.
+                continue
+
+
 def _resolve_path(path_str: str) -> Path:
     """Resolve a vault path from CLI argument or environment variable."""
     if path_str:
@@ -565,6 +579,7 @@ def _cmd_memory(args: argparse.Namespace) -> int:
 
 def main() -> None:
     """P.O.W.E.R. CLI entry point."""
+    _configure_windows_utf8_streams()
     parser = argparse.ArgumentParser(
         prog="power",
         description="AI-Native Toolkit for Second Brain — validate, index, and manage your knowledge base.",

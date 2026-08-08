@@ -11,10 +11,33 @@ from unittest.mock import patch
 import pytest
 
 from power_framework.core import DEFAULT_SEARCH_MODE
-from power_framework.core.cli import main
+from power_framework.core.cli import _configure_windows_utf8_streams, main
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+class _ReconfigurableStream:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, str]] = []
+
+    def reconfigure(self, **kwargs: str) -> None:
+        self.calls.append(kwargs)
+
+
+def test_windows_cli_configures_utf8_streams() -> None:
+    stdout = _ReconfigurableStream()
+    stderr = _ReconfigurableStream()
+
+    with (
+        patch("power_framework.core.cli.os.name", "nt"),
+        patch.object(sys, "stdout", stdout),
+        patch.object(sys, "stderr", stderr),
+    ):
+        _configure_windows_utf8_streams()
+
+    assert stdout.calls == [{"encoding": "utf-8", "errors": "replace"}]
+    assert stderr.calls == [{"encoding": "utf-8", "errors": "replace"}]
 
 
 def test_init_creates_vault(tmp_path: Path) -> None:
