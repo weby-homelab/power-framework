@@ -1,61 +1,65 @@
-# About P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
+# P.O.W.E.R. Framework 3.3.2
 
-P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, automated scripts, and LLM-based autonomous agents. The name is an acronym representing its core components: P.A.R.A., OKF, Wiki, and Execution Rules. It integrates these distinct architectural frameworks to construct a coherent, self-validating, and token-efficient Second Brain.
+P.O.W.E.R. is a local-first, Git-native toolkit for structured knowledge bases. It combines
+P.A.R.A., validated OKF frontmatter, hierarchical indexes, full-text and semantic retrieval,
+and an MCP interface for AI agents.
 
-## Why P.O.W.E.R.?
+## Start here
 
-Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for AI-first knowledge management:
+- [Clean installation (English)](getting-started.md)
+- [Чисте встановлення (українською)](getting-started.ua.md)
+- [Windows 11 25H2 installation](windows-11-installation.md)
+- [Встановлення на Windows 11 25H2](windows-11-installation.ua.md)
+- [Migration from an existing knowledge base](migration-guide.md)
+- [Міграція з наявної бази знань](migration-guide.ua.md)
+- [Інвентаризація документації](documentation-inventory.ua.md)
 
-- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`)
-- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by ~75%
-- **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
-- **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field; A2 scoring adds type-based exponential decay freshness
-- **Content Deduplication** — TF-Vector cosine similarity detects near-duplicate notes without external embeddings
-- **Pluggable Embeddings** — canonical backend **`BAAI/bge-m3`** (1024d, direct ONNX Runtime + tokenizers, ~1.6 GB peak, strong UA↔EN). Legacy `fastembed` (MiniLM-L12-v2), `qwen3` (Qwen3-0.6B ONNX), and `ollama` backends remain opt-in via `POWER_EMBED_PROVIDER`
-- **WAL-mode parallel safety** — all SQLite connections use `journal_mode=WAL` + `busy_timeout=30000` for lock-free concurrent FTS / vector search
-- **Link Rot Detection** — HTTP HEAD checks for broken external links (SSRF-protected)
-- **Frontmatter Healer** — auto-fills missing title, description, type, and timestamp across the vault
-- **Markdown Quality Checks** — detects trailing whitespace, inconsistent list markers, header jumps, missing code language
-- **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
-- **MCP-native** — all 12 tools exposed to any MCP-compatible AI client (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Cursor), powered by FastMCP 3.x
-- **3.1 release preparation with explicit gates** — hermetic tests, CodeQL scanning, a pinned model manifest (`release/models.lock.json`), and the tracked [P.O.W.E.R. 3.1 trust-release baseline](adr/0001-power-3.1-trust-release-baseline.md). The project remains beta/research until all P0/P1 gates and reproducible model-backed evidence are closed.
+These guides pin the immutable `v3.3.2` release artifact, use an isolated virtual
+environment, and include acceptance checks. The migration guides keep the source immutable,
+reconcile every file by manifest and hash, and make cutover reversible.
 
-## Features
+## Executable contract
 
-- **`power init`** — Scaffold an OKF-compliant vault directory structure
-- **`power status`** — Display vault dashboard (statistics, PARA distribution, health metrics)
-- **`power lint`** — Health-check metadata, broken links, orphans, stale/expired notes
-- **`power index`** — Compile hierarchical indexes (`index.md` + per-folder `_index.md`)
-- **`power ingest`** — Create new notes with validated frontmatter (supports `owner`, `status`, `expiry`, `related`)
-- **`power search`** — Full-text vault search with relevance scoring (FTS5 / Vector / Hybrid / Reranked modes; `reranked` is canonical)
-- **`power rot`** — ROT Audit: detect redundant, outdated, trivial notes; `--extended` for A2 scoring
-- **`power archive`** — Auto-archive stale notes to `04_Archive/` with dry-run preview
-- **`power heal`** — Auto-fill missing frontmatter fields (title, description, type, timestamp)
-- **`power markdown-check`** — Detect trailing whitespace, inconsistent list markers, header jumps, missing code language
-- **`power suggest-related`** — Suggest cross-note relations for Graph RAG enrichment
-- **`power cron`** — Run automated maintenance (lint + index + rot audit)
-- **MCP Server** — 12 tools (`lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`, `search_vault_tool`, `synthesize_session`, `rot_audit`, `archive_notes`, `suggest_related_tool`, `heal_frontmatter_tool`, `check_markdown_tool`)
-- **Knowledge Graph** — `related` field for explicit cross-note graph links
-- **Governance** — `owner`, `status`, `expiry` fields tracked in sub-indexes
+- Python 3.11 or newer.
+- 16 top-level CLI commands; see the [CLI reference](cli.md).
+- 17 MCP tools; see the [MCP server reference](mcp-server.md).
+- `semantic` is the default search mode; `reranked` is an explicit opt-in.
+- The generated root index and MCP sub-index operations cover the canonical P.A.R.A.
+  directories. Arbitrary source layouts must be mapped during migration.
+- The canonical dense backend is `BAAI/bge-m3`; model-backed checks download large artifacts.
+  FTS5 works without model downloads.
 
-!!! note "Bilingual UA/EN vaults"
-For Ukrainian/English vaults, benchmark your own corpus before selecting a
-retrieval mode. Historical real-vault scores are diagnostic only and are not
-release evidence. The committed POWER 3.1 benchmark is synthetic and suitable
-for hermetic CI regression gates, not for production-quality claims. See the
-[trust-release baseline](adr/0001-power-3.1-trust-release-baseline.md) and
-[`benchmarks/power31/README.md`](https://github.com/weby-homelab/power-framework/tree/main/benchmarks/power31).
-
-## Quick start
+## Minimal quick start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.2
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install \
+  "https://github.com/weby-homelab/power-framework/releases/download/v3.3.2/power_framework-3.3.2-py3-none-any.whl"
 
-power init ~/my-vault
-power lint ~/my-vault
-power index ~/my-vault
+power init ./my-vault
+power index ./my-vault --strict
+power lint ./my-vault
+power sync ./my-vault --fts-only
 ```
 
-## License
+On Windows, use the dedicated PowerShell guide rather than translating these POSIX commands.
+
+## Claims and evidence
+
+Historical vault measurements and synthetic benchmarks are useful diagnostics, not universal
+performance guarantees. The [POWER 3.1 trust-release baseline](adr/0001-power-3.1-trust-release-baseline.md)
+defines the evidence boundary. The [hierarchical-index reports](hierarchical-index-migration.md)
+are explicitly preserved as v1.6 historical snapshots.
+
+## More documentation
+
+- [Architecture](architecture.md)
+- [Security threat model](threat-model.md)
+- [POWER 3.3.2 release notes](release-3.3.2.md)
+- [M2 human-evaluation contract](m2-human-evaluation.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](contributing.md)
 
 GPLv3 — Built in Ukraine ⚡

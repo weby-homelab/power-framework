@@ -349,10 +349,10 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
 
     for filepath in vault_dir.rglob("*.md"):
         rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, str(rel)):
+        rel_path = rel.as_posix()
+        if should_skip(vault_dir, rel_path):
             continue
 
-        rel_path = str(filepath.relative_to(vault_dir))
         all_files[rel_path] = filepath
         basename_map.setdefault(clean_note_name(filepath.name), []).append(rel_path)
 

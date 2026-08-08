@@ -1,14 +1,15 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`) + MCP server (12 tools).
+Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 16 top-level
+commands) + MCP server (17 tools).
 
 ## Project Structure
 
 ```
 src/power_framework/       # Core library
   core/                    #   models, parser, indexer, linter, searcher, embedder
-  mcp/                     #   FastMCP-3.x server (12 async tools)
-tests/                     # Pytest suite (270+, 81%+ coverage)
+  mcp/                     #   FastMCP-3.x server (17 async tools)
+tests/                     # Pytest suite; CI enforces coverage >=70%
 scripts/                   # Dev/CI utilities
 docs/                      # MkDocs-material documentation site
 skills/                    # MCP skill definitions
@@ -41,9 +42,9 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 | `core/parser.py`      | Safe YAML frontmatter parsing                          |
 | `core/indexer.py`     | Hierarchical index generation (index.md + _index.md)   |
 | `core/linter.py`      | Health checks: links, metadata, orphans, stale/expired |
-| `core/searcher.py`    | FTS5/Vector/Hybrid search (3 modes)                    |
+| `core/searcher.py`    | FTS5/dense/hybrid/reranked search (`semantic` default) |
 | `core/embeddings.py`  | BGE-M3 ONNX (1024d) + MiniLM fallback                  |
-| `mcp/power_server.py` | FastMCP 3.x, 12 async tools, HTTP transport + /health  |
+| `mcp/power_server.py` | FastMCP 3.x, 17 async tools, HTTP transport + /health  |
 
 ## Workflow
 

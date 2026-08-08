@@ -303,6 +303,20 @@ class TestExclusionHelpers:
         assert is_excluded_orphan("test.md", "06_Daily_Logs/test.md")
         assert not is_excluded_orphan("test.md", "01_Projects/test.md")
 
+    def test_excluded_orphan_files_normalizes_windows_paths(self):
+        assert is_excluded_orphan(
+            r"01_Projects\_index.md",
+            r"01_Projects\_index.md",
+        )
+        assert is_excluded_orphan(
+            r"04_Archive\old.md",
+            r"04_Archive\old.md",
+        )
+        assert not is_excluded_orphan(
+            r"01_Projects\active.md",
+            r"01_Projects\active.md",
+        )
+
 
 def test_atomic_write_exception(tmp_path: Path):
     from unittest.mock import patch

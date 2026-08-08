@@ -1,569 +1,461 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.3.2)"
-description: "Step-by-step protocol for any LLM-based AI agent to autonomously migrate an Obsidian vault to a P.O.W.E.R. 3.3.2 OKF-compliant structure while retaining its chosen folder layout."
-tags: [power, migration, guide, ai-agents, mcp, bge-m3, graphrag, methodologies]
-timestamp: 2026-08-07T21:10:00
+title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.3.2"
+description: "Fail-closed, manifest-driven protocol for migrating an existing Markdown knowledge base to a verified P.O.W.E.R. vault without modifying the source."
+tags: [power, migration, guide, ai-agents, safety, verification]
+timestamp: 2026-08-08T12:00:00+03:00
 ---
 
-# AI Agent Migration Guide: Migrate Any Obsidian Vault to P.O.W.E.R. (v3.3.2)
+# AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.3.2
 
-**Target audience:** AI agents (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) with MCP access to P.O.W.E.R.
+This guide is written as an execution contract for any AI agent with filesystem
+access. It migrates a Markdown or Obsidian knowledge base into the canonical
+P.O.W.E.R. structure while preserving source content, attachments, provenance,
+and a rollback path.
 
-**Goal:** Transform any unstructured or existing Obsidian vault into a P.O.W.E.R.-compliant knowledge base with validated OKF metadata, any chosen organizational methodology (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or custom/hybrid), and hierarchical indexes — fully autonomously.
+For a new empty vault, stop here and use [Getting Started](getting-started.md).
+For Windows 11 25H2 runtime setup, first use the
+[Windows installation guide](windows-11-installation.md).
 
-## Repository Instruction Index (Read Me First)
+## Repository instruction index
 
-For any AI agent onboarding into this repository: this repository contains all the detailed, step-by-step instructions you need for every setup path. Read the relevant guide below before starting work:
+An agent must read the relevant documents before changing data:
 
-1. **Fresh installation from zero on a clean knowledge base** — see [Getting Started](getting-started.md): install the framework, create a vault with `power init`, add notes with `power ingest`, validate with `power lint`, build indexes with `power index`, and start the MCP server (`python -m power_framework.mcp`).
-2. **Correct migration from any existing knowledge base to P.O.W.E.R.** — this guide (`docs/migration-guide.md`): migrate any existing Obsidian vault (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or unstructured/hybrid) with zero data loss, following the 6 phases below.
-3. **Full Windows 11 installation instructions** — see `README.md` → **Windows 11 Installation**: Python 3.11+ from python.org, `py -m pip install --user git+https://github.com/weby-homelab/power-framework.git@v3.3.2`, `PATH` setup for `%APPDATA%\Python\Scripts`, and MCP client configuration using `"command": "py", "args": ["-m", "power_framework.mcp"]`.
+1. [Clean installation](getting-started.md) — isolated runtime, empty vault,
+   first note, validation, FTS, and MCP preflight.
+2. This migration guide — discovery, backup, manifest, transformation,
+   canonical placement, link repair, and acceptance gates.
+3. [Windows 11 25H2 installation](windows-11-installation.md) — exact
+   PowerShell paths, Visual C++ requirement, and target-host checks.
+4. [CLI reference](cli.md) and [MCP server contract](mcp-server.md) — current
+   commands, parameters, rate limits, and security boundaries.
 
-If you are starting from an empty vault, read `docs/getting-started.md` first, then use this guide only when you need to migrate an existing vault.
+## What “migrate any knowledge base” means
 
----
+- P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, flat folders,
+  and hybrid trees are supported as **source classifications**.
+- The destination uses canonical P.O.W.E.R. top-level folders so hierarchical
+  indexing and the 17 MCP tools have their documented behavior.
+- A non-Markdown system must first export notes to Markdown and attachments to
+  files. Vendor database extraction is outside P.O.W.E.R.'s current CLI.
+- Unknown frontmatter fields may be retained, but the required OKF fields must
+  validate.
+- The source is never migrated in place. It remains unchanged until the user
+  separately decides how long to retain it.
 
-## Overview
+## Current tool boundary (do not assume more)
 
-This protocol enables any LLM-based AI agent to migrate an existing Obsidian vault by combining:
+- `power init` accepts only a new or empty directory.
+- `power index` catalogs `00_Inbox`, `01_Projects`, `02_Areas`,
+  `03_Resources`, `04_Archive`, `06_Daily_Logs`, and `PROTOCOLS`.
+- MCP `ingest_note` writes only within the approved P.A.R.A. folders, is rate
+  limited, regenerates the index, appends `log.md`, and runs lint.
+- MCP `read_sub_index` and `ensure_sub_index` accept canonical P.A.R.A.
+  categories, not arbitrary source folders.
+- CLI `power ingest` creates a new note but does not import an existing note
+  body. It is not a batch migration command.
+- `power heal` repairs missing/invalid frontmatter fields; it does not classify
+  arbitrary top-level folders, repair wikilinks, or call an LLM.
+- `power rename` is dry-run by default and updates `related` metadata paths. It
+  does not promise a complete rewrite of every Markdown or Obsidian link.
 
-- **MCP tools** — `ingest_note`, `lint_vault`, `generate_index`, `read_sub_index`, `search_vault_tool`
-- **Filesystem access** — reading existing `.md` files, moving files, updating link paths
-- **LLM intelligence** — classifying notes across methodologies (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal), extracting titles, generating descriptions
-- **Folder-layout compatibility** — P.O.W.E.R. can index and validate notes in an existing folder tree. `power init` creates the default P.A.R.A. scaffold; an optional `.power/domains.yaml` registry adds domain templates, routing rules, and search priorities. OKF validation remains independent of the folder layout.
+These constraints are why this protocol uses a staging vault and a migration
+manifest instead of pretending that one command performs a lossless migration.
 
-The agent follows 6 phases. Each phase has clear success criteria.
+## Six-phase protocol
 
----
+1. Authorization and immutable source snapshot
+2. Inventory and classification manifest
+3. Destination initialization and staged transformation
+4. Attachments, links, and graph relations
+5. Executable validation and reconciliation
+6. Cutover, rollback record, and maintenance
 
-## Phase 1: Discovery
-
-**Goal:** Understand the vault's current state and detect its existing or intended methodology.
-
-### Steps
-
-1. **Scan the vault directory** — list all `.md` files recursively, excluding `.git/`, `node_modules/`, `__pycache__/`, `.venv/`.
-
-2. **Read each `.md` file** — capture full content. Note:
-    - Does it already have YAML frontmatter?
-    - Does it have `type`, `title`, `description` fields?
-    - What is the current folder structure and naming convention?
-
-3. **Identify existing patterns & DETECT VAULT METHODOLOGY**:
-    - **P.A.R.A.** — folders `01_Projects`, `02_Areas`, `03_Resources`, `04_Archive`.
-    - **C.O.D.E.** — workflow folders `01_Capture`, `02_Organize`, `03_Distill`, `04_Express`.
-    - **GTD (Getting Things Done)** — folders `00_Inbox`, `01_Next_Actions`, `02_Waiting_For`, `03_Someday`, `04_Projects`.
-    - **Zettelkasten** — UID presence in filenames (`202607242115_...`), folders `fleeting`, `literature`, `permanent`, `index`.
-    - **LYT (Linking Your Thinking)** — content maps `Home.md`, `*_MOC.md`, `MOCs/` folder.
-    - **Johnny.Decimal** — decimal folder index (`10-19_...`, `20-29_...`).
-    - **Unstructured / Hybrid** — flat folder structure or arbitrary directory tree.
-
-4. **Run `lint_vault(vault_path)`** — baseline health check. Record how many notes are missing metadata and broken links.
-
-5. **🛡️ Create Mandatory Safety Backup (Zero Data Loss Rule)** — BEFORE modifying, moving, or ingesting files, create an intact tarball or snapshot of the vault:
-   ```bash
-   tar -czf vault_backup_$(date +%Y%m%d_%H%M%S).tar.gz /path/to/vault
-   ```
-   *Never proceed with destructive operations without a verified backup.*
-
-**Success criteria:** You have a complete inventory of all notes, detected vault methodology, baseline lint metrics, and an intact raw backup archive.
-
----
-
-## Phase 2: Classification & Methodology Mapping
-
-**Goal:** Analyze each note, determine its OKF metadata (`type`, `title`, `description`, `tags`), and map it to the selected methodology.
-
-### Methodology Support & OKF Type Mapping
-
-Every note is assigned a valid `type` from the OKF `NoteType` enum (or extended semantic types in custom setups). The table below is a migration-planning aid, not a set of CLI templates:
-
-| Methodology | Primary Focus | Folder Skeleton | Initial Mapping to OKF `NoteType` |
-| :--- | :--- | :--- | :--- |
-| **P.A.R.A.** | Actions & Deadlines | `01_Projects`, `02_Areas`, `03_Resources`, `04_Archive` | `Project`, `Area`, `Resource`, `Archive`, `Daily Log`, `System Guide` |
-| **C.O.D.E.** | Distillation & Content Pipeline | `01_Capture`, `02_Organize`, `03_Distill`, `04_Express` | `Capture` (`Resource`), `Organize` (`Area`/`Project`), `Distill` (`Resource`), `Express` (`Project`/`Resource`) |
-| **GTD** | Task Processing & Inbox Zero | `00_Inbox`, `01_Next_Actions`, `02_Waiting_For`, `03_Someday`, `04_Projects` | `Resource` (Inbox/Ref), `Project` (Next/Projects), `Area` (Waiting), `Archive` (Someday) |
-| **Zettelkasten** | Atomic UID Concept Graph | `fleeting/`, `literature/`, `permanent/`, `index/` | `Resource` (Fleeting/Lit), `Area`/`Resource` (Permanent), `System Guide` (Index/Hubs) |
-| **LYT** | Maps of Content (MOCs) | `Home.md`, `MOCs/`, `Notes/`, `Archives/` | `System Guide` (Home), `Area` (MOCs), `Resource` (Notes), `Archive` (Archives) |
-| **Johnny.Decimal** | Strict Decimal Index | `10-19_...`, `20-29_...`, `30-39_...` | `Area` (Category index), `Project` (Sub-category), `Resource` (Leaf notes) |
-| **Custom / Hybrid** | Arbitrary Tree | Custom (User/Agent choice) | Assign `type:` based on semantic content |
-
-### For each note, extract:
-
-1. **`title`** — the note's H1 heading or filename (1-200 chars)
-2. **`description`** — one-line summary of what this note is about (1-150 chars)
-3. **`type`** — the corresponding OKF `NoteType` (see table above)
-4. **`tags`** — relevant keywords (optional, list of strings)
-5. **`resource`** — if the note references an external URL (optional)
-6. **`owner`** — owner or responsible developer/agent (optional)
-7. **`status`** — status of the note: `active`, `review`, or `archived` (optional, defaults to `active`)
-8. **`related`** — structured list of relationships to other files for GraphRAG (optional)
-
-### Classification heuristics
-
-- **Folder & Methodology hints:** Use folder hints (e.g., `01_Capture/` in C.O.D.E. → `Resource`, `permanent/` in Zettelkasten → `Area`/`Resource`).
-- **Content Analysis:** Journal entries → `Daily Log`; AI operational rules → `System Guide`; reference guides → `Resource`.
-- **Link Graph Density:** Notes with high incoming wikilinks (MOCs / Indexes) → `Area` or `System Guide`.
-- **Default fallback:** When uncertain, assign `Resource`.
-
-**Success criteria:** Every note has a draft `(type, title, description, tags, target_path)` tuple ready.
+Do not skip a phase. A later success does not erase an earlier missing gate.
 
 ---
 
-## Phase 3: Migration & Skeleton Generation
+## Phase 1: Authorization and immutable source snapshot
 
-**Goal:** Create each note in the designated methodology folder with validated OKF frontmatter and rebuild indexes.
+### 1.1 Resolve exact paths
 
-### Step 3a: Prepare the vault skeleton
+Record absolute paths for:
 
-`power init /path/to/vault` creates the default P.A.R.A. structure. Do not run it in a non-empty vault unless that structure is intended. For C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, or a custom layout, retain or create the required folders directly, then add `.power/domains.yaml` if automatic domain placement and templates are wanted, and run `lint` and `index`. The global `power init --template` option is not currently supported; domain templates are selected by the registry during `power ingest`.
+- `SOURCE` — the existing knowledge base;
+- `DESTINATION` — a new sibling directory;
+- `BACKUP` — a snapshot outside both source and destination;
+- `WORK` — manifests, reports, and temporary transformed copies.
 
-### Step 3b: Ingest each note
+Reject a plan where any path is empty, `/`, a user home directory, or an
+ancestor of another target. Do not follow unresolved environment variables or
+broad globs for deletion or overwrite operations.
 
-For every classified note, call the MCP tool `ingest_note`:
+### 1.2 Record source state
 
-```jsonc
-{
-    "name": "01_Projects/My-Project", // Methodology path + filename (no .md)
-    "note_type": "Project", // From NoteType enum
-    "title": "My Project", // Human title
-    "description": "Building the next big thing", // 1-150 chars
-    "content": "<full markdown body here>", // Original content
-    "tags": ["active", "dev"], // Optional
-    "resource": "https://github.com/...", // Optional
-}
+Before changing anything, record:
+
+- UTC timestamp, host, OS, and P.O.W.E.R. version;
+- source file count and total bytes by extension;
+- Git commit/status when the source is a Git repository;
+- unreadable files, symlinks, duplicate relative paths, and case-only filename
+  collisions (important when moving to Windows);
+- excluded/generated directories such as `.git`, `.obsidian`, `.venv`,
+  `node_modules`, caches, and existing search databases.
+
+### 1.3 Create and verify a backup
+
+Use a filesystem snapshot or an archive/copy appropriate for the host. The
+backup must be outside the source tree and must not contain secrets that were
+excluded by authorization.
+
+Verification requires:
+
+- archive/copy command exit code `0`;
+- the backup can be listed or mounted;
+- source and backup inventories agree for all authorized files;
+- SHA-256 values agree for attachments and original Markdown bytes.
+
+Do not begin Phase 2 with an unverified backup. Never put a backup archive
+inside the vault where it can be indexed or committed.
+
+**Phase 1 receipt:** exact paths, source Git state, inventory totals, backup
+location, verification command, exit code, and digest/count comparison.
+
+---
+
+## Phase 2: Inventory and classification manifest
+
+### 2.1 Build the complete inventory
+
+Inventory, without editing:
+
+- every Markdown file and its relative path, size, and SHA-256;
+- every attachment and its relative path, size, and SHA-256;
+- encoding/BOM and line-ending anomalies;
+- existing YAML frontmatter and required-field validity;
+- wikilinks, embeds, Markdown links, and `related` paths;
+- filename stems that are ambiguous under Obsidian-style basename links;
+- external URLs (record only; do not send private content to a remote service).
+
+Exclude only explicitly authorized generated/vendor trees. Preserve the
+exclusion list in the manifest so counts are explainable.
+
+### 2.2 Detect source methodology
+
+Use directory and content signals as hints, never as proof:
+
+| Source pattern | Typical signal | Initial POWER target |
+| --- | --- | --- |
+| P.A.R.A. | Projects, Areas, Resources, Archive | matching canonical folder |
+| C.O.D.E. | Capture, Organize, Distill, Express | Inbox/Resource/Area/Project by content |
+| GTD | Inbox, Next Actions, Waiting, Someday, Projects | Inbox/Project/Area/Archive |
+| Zettelkasten | fleeting, literature, permanent, UID names | Resource; hubs may be Area/System Guide |
+| LYT | Home, MOCs, Notes, Archives | System Guide/Area/Resource/Archive |
+| Johnny.Decimal | numeric category ranges | Area/Project/Resource by semantic role |
+| Flat or hybrid | no reliable folder contract | classify note by note; fallback Resource |
+
+### 2.3 Create a migration manifest
+
+One manifest row per source item must contain at least:
+
+```text
+source_path
+source_kind                 # markdown | attachment | config | excluded
+source_sha256
+detected_methodology
+target_path
+okf_type
+title
+description
+link_rewrites_planned
+status                      # planned | transformed | verified | blocked
+reason
 ```
 
-For Zettelkasten:
-```jsonc
-{
-    "name": "permanent/202607242115-my-atomic-idea",
-    "note_type": "Resource",
-    "title": "Atomic Concept of Vector Indexing",
-    "description": "Explaining ONNX vector indexing in Zettelkasten format",
-    "content": "<markdown content>"
-}
+For notes, also store a normalized **body hash** after removing only the old
+frontmatter. This allows the destination frontmatter to change while proving
+that the note body was not silently lost.
+
+### 2.4 Classify OKF metadata
+
+Required fields:
+
+```yaml
+type: Project | Area | Resource | Daily Log | Archive | System Guide
+title: "Human-readable title"
+description: "Single-line catalog summary"
+timestamp: 2026-08-08T12:00:00+03:00
 ```
 
-For C.O.D.E.:
-```jsonc
-{
-    "name": "01_Capture/Raw-Idea-Note",
-    "note_type": "Resource",
-    "title": "Raw Idea Note",
-    "description": "Captured raw note for future distillation",
-    "content": "<markdown content>"
-}
-```
+Optional current fields include `resource`, `tags`, `owner`, `status`,
+`expiry`, `related`, `okf_version`, and `memory`. Preserve unknown metadata
+unless it is unsafe or collides with the validated schema.
 
-**Important rules:**
+Classification rules:
 
-- `name` includes the target methodology folder path + filename (hyphens or underscores, no spaces)
-- `note_type` must match OKF enum (`Project`, `Area`, `Resource`, `Archive`, `Daily Log`, `System Guide`)
-- `content` is the **full original markdown body** — strip any old YAML frontmatter first
-- The `ingest_note` tool automatically:
-    - Validates all metadata via Pydantic v2
-    - Writes the file with proper OKF frontmatter
-    - Regenerates the hierarchical index
-    - Appends an entry to `log.md`
-    - Runs a lint check
+- active outcome with a finish condition → `Project`;
+- ongoing responsibility → `Area`;
+- reference, atomic note, clipping, or uncertain item → `Resource`;
+- temporal journal/session record → `Daily Log`;
+- completed or intentionally retired material → `Archive`;
+- agent protocol, MOC/system hub, or operating rule → `System Guide`.
 
-### Step 3c: Batch efficiency
+Do not fabricate provenance, owners, dates, or relationships. Mark uncertain
+rows `blocked` or use the conservative `Resource` fallback with a reason.
 
-For large vaults (>50 notes), group ingests by category. This keeps the index regenerations predictable.
+**Phase 2 receipt:** total/excluded/classified/blocked counts, collision report,
+manifest checksum, and zero unaccounted authorized source files.
 
-### Step 3d: Vector Embedding Indexing (`power sync`)
+---
 
-After completing note ingests, compute BGE-M3 dense vector embeddings to enable `reranked` and `semantic` search modes:
+## Phase 3: Destination initialization and staged transformation
+
+### 3.1 Install and preflight P.O.W.E.R.
+
+Use the pinned `v3.3.2` environment from Getting Started and verify:
 
 ```bash
-power sync /path/to/vault
+power --version
+python -c 'import power_framework.mcp, onnxruntime; print("imports: OK")'
 ```
-*Note:* Running `power sync` chunks documents, extracts GraphRAG entity connections, and generates 1024d dense embeddings into `.power_search.db`.
 
-**Success criteria:** All notes are created in the target methodology folders with valid OKF frontmatter. Navigation indexes and vector embedding databases (`.power_search.db`) are synchronized.
+Use the interpreter that actually owns the `power` executable.
 
----
-
-## Phase 4: Verification
-
-**Goal:** Confirm the vault is fully healthy.
-
-### Steps
-
-1. **Run `lint_vault(vault_path)`** — expect:
-
-    ```
-    ✅ OKF Metadata: 0 errors
-    ✅ Internal Links: 0 broken
-    ✅ Orphans: 0 (or expected daily logs)
-    ```
-
-2. **Spot-check a few files** — read 3-5 random notes to verify frontmatter is correct and content is intact.
-
-3. **Test hierarchical indexing** — call `read_sub_index(category="<methodology_folder>", vault_path=...)` (e.g. `01_Projects`, `permanent`, or `01_Capture`) and verify it returns a valid sub-index.
-
-4. **Verify Vector & Reranked Search** — call `search_vault_tool(query="test", search_mode="reranked", vault_path=...)` and verify results return without `power sync` warnings.
-
-**Success criteria:** Lint passes with zero errors. Vector search operates cleanly without warnings. Spot checks pass.
-
----
-
-## Phase 5: Cleanup (Optional)
-
-**Goal:** Remove old, unstructured files once migration is verified.
-
-### Steps
-
-1. List remaining files outside target methodology folders
-2. For each:
-    - If it was successfully migrated (content now exists in a target methodology folder), delete it
-    - If it wasn't migrated, investigate and classify it
-3. After all deletions, run `generate_index(vault_path)` to refresh
-4. Run final `lint_vault(vault_path)` to confirm
-
-**⚠️ Warning:** Only delete files after **full verification**. Prefer moving to archive folders (e.g., `04_Archive/` or `Archives/`) over deletion for safety.
-
----
-
-## Phase 6: Post-Migration Self-Maintenance & Git Sync
-
-**Goal:** Ensure the knowledge base remains healthy between AI agent sessions, and synchronize the changes with a remote repository.
-
----
-
-### Step 6a: Installing and Configuring P.O.W.E.R. Framework (v3.3.2)
-
-For autonomous operation on the target host, install the P.O.W.E.R. toolkit (v3.3.2) globally or in the project's virtual environment:
+### 3.2 Initialize the empty destination
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git
+power init /absolute/path/to/destination
 ```
 
-#### 🧠 Embedding & Reranker Stack Configuration (v3.3.2 canonical stack)
+The command must exit `0`. Do not copy source files into the destination before
+this step, and do not bypass the non-empty-directory guard.
 
-Starting with version 3.0+, the canonical default embedding engine is **`bge-m3`** (`aapot/bge-m3-onnx`, embedding dimension **1024**), running on direct **ONNX Runtime** + `tokenizers` (`BGEM3OnnxManager`). This is paired with the Apache-2.0 **`onnx-community/bge-reranker-v2-m3-ONNX`** cross-encoder reranker.
+### 3.3 Transform in small batches
 
-Direct ONNX loading resolves fastembed registry issues, tames the BFCArena memory allocator, and enables adaptive batch halving to prevent OOM spikes on 8–12 GB RAM hosts.
+For each Markdown note:
 
-To configure thread bounds and memory limits, set environment variables (loaded automatically from `.env`):
+1. read the source bytes once;
+2. separate old frontmatter from the body without changing the body;
+3. build validated OKF frontmatter from the approved manifest row;
+4. choose a unique target under a canonical P.O.W.E.R. folder;
+5. write to a temporary/staging path, then atomically place the completed file;
+6. record destination byte hash and normalized body hash;
+7. mark the row `transformed`, never `verified` yet.
 
-```bash
-export POWER_EMBED_PROVIDER=bge-m3           # Canonical default provider (aapot/bge-m3-onnx)
-export POWER_EMBED_NUM_THREADS=2             # Cap CPU execution threads
-export POWER_EMBED_BATCH_SIZE=8              # Batch size for embedding generation
-```
+Use batches small enough to review and retry. Do not regenerate the entire
+index after every note in a large migration.
 
-When using `bge-m3` or other ONNX models from HuggingFace, set the following to prevent symlink traversal issues:
+### 3.4 When MCP `ingest_note` is appropriate
 
-```bash
-export HF_HUB_DISABLE_SYMLINKS=1
-```
+It is suitable for a small number of individual notes when:
 
-Configure the MCP server integration in your AI agent client or IDE configuration file (e.g., `cline_config.json`, `opencode.jsonc`, Cursor/Windsurf settings, etc.).
+- the target begins with an approved P.A.R.A. folder;
+- `content` is the complete body without the old frontmatter;
+- rate limits and per-note index/lint cost are acceptable;
+- the returned lint report is inspected.
 
-Configure LLM endpoints (`POWER_LLM_*`) for automated audits, query expansion, and metadata healing. Use the direct `"opencode"` base option for local OpenCode CLI offloading:
+For a large vault, use controlled filesystem transformation and run the CLI
+gates once per batch. Do not claim that MCP supports arbitrary target folders.
 
-```json
-"mcpServers": {
-  "power": {
-    "command": "python",
-    "args": ["-m", "power_framework.mcp"],
-    "env": {
-      "POWER_VAULT_PATH": "/absolute/path/to/your/second-brain",
-      "POWER_LLM_API_BASE": "http://localhost:8080/v1", // Set to "opencode" to run local CLI directly
-      "POWER_LLM_API_KEY": "local",
-      "POWER_LLM_MODEL": "opencode/deepseek-v4-flash-free"
-    },
-    "enabled": true
-  }
-}
-```
+### 3.5 Reconcile each batch
 
-This grants your agent access to validation (`lint_vault`), automated indexing (`generate_index`, `read_sub_index`), and search (`search_vault_tool`).
+After a batch, prove:
 
----
+- each transformed source row has exactly one destination;
+- every destination has valid required frontmatter;
+- source and destination normalized body hashes match;
+- no target collision overwrote a prior note;
+- blocked rows remain visible in the manifest.
 
-### Step 6b: Context Optimization (Ignore Files)
-
-To prevent cluttering the AI agent's context with redundant files (binary assets, caches, Git directory logs), create an ignore configuration file (e.g., `.geminiignore`, `.cursorignore`, or `.gitignore` depending on your IDE) in the workspace root:
-
-```
-.git/
-.gitignore
-.geminiignore
-.cursorignore
-__pycache__/
-*.pyc
-.venv/
-venv/
-node_modules/
-*.db
-*.key
-*.pem
-*.crt
-*.log
-```
+**Phase 3 receipt:** batch range, created files, matching body hashes, failed
+rows, and retry actions.
 
 ---
 
-### Step 6c: Configure AI Agent Instructions and Rules
+## Phase 4: Attachments, links, and graph relations
 
-Provide project rules and context to your agent using system rule files (e.g., `.clinerules`, `.cursorrules`, `.windsurfrules`) or an instructions array in the agent's client configuration.
-Recommended instruction file structure:
+### 4.1 Copy attachments losslessly
 
-- **`RULES.md` / `INSTRUCTIONS.md`** — General agent behavior and guidelines.
-- **`MASTER-LESSONS-LEARNED.md`** — A log of lessons learned and edge-cases to prevent repeat errors.
-- **`power/SKILL.md`** — Guidelines for adhering to vault knowledge methodologies.
+Preserve attachment bytes and, where possible, relative layout. Verify SHA-256
+equality after copying. Do not embed attachment contents into prompts merely to
+move them.
 
----
+### 4.2 Rewrite links from the manifest mapping
 
-### Step 6d: Fixing Internal Wikilinks
+Handle each syntax independently:
 
-Since files are moved into target methodology folders (e.g., `01_Projects/`, `01_Capture/`, `permanent/`, etc.), old direct wikilinks may require updating. The AI agent must verify and update references like `[[Note Name]]` to the relative path format `[[Methodology Folder/Note Name|Alias]]`.
-The P.O.W.E.R. Linter automatically checks for broken links, and corrections can be made using a link repair script or code editing tools.
+- `[[Note]]` and `[[folder/Note|Alias]]` wikilinks;
+- `![[attachment.png]]` embeds;
+- `[label](relative/path.md)` Markdown links;
+- image/file paths;
+- OKF `related[].path` values.
 
----
+Resolve source-relative Markdown links and vault/basename wikilinks according to
+their actual semantics. If two notes share a basename, do not guess; use the
+manifest target or mark the link blocked.
 
-### Step 6e: Automating Index Updates (`_index.md`)
+`power rename` can help with `related` metadata for one known rename, but it is
+not a universal wikilink migration engine.
 
-The `_index.md` file in each target methodology category folder serves as a navigation map and is generated automatically using the `power index` command.
-_Agent Rule:_ After any change to the note structure (adding, moving, or deleting files), always regenerate the indexes using the MCP tool `generate_index` or the CLI `power index`.
+### 4.3 Build graph relations conservatively
 
----
-
-### Step 6f: Excluding System Folders
-
-Ensure that the vault validator and indexer ignore system and configuration directories (e.g., `.git/`, `.obsidian/`) to prevent false alarms about missing metadata or broken links in temp files.
-
----
-
-### Step 6g: Daily Maintenance Protocol
-
-Each session working with the vault should conclude with a maintenance cycle:
-
-1. **Save session log** — Create a note in `06_Daily_Logs/` (type: `Daily Log`) describing the work done.
-2. **Rebuild index** — Run `power index` to update `index.md` and `_index.md`.
-3. **Synchronize Vector Database** — Run `power sync` to compute BGE-M3 embeddings and refresh GraphRAG links.
-4. **Log the change** — Add a brief entry to the central `log.md`.
-5. **Validate status (Lint)** — Run `power lint` to confirm no regressions are present (zero errors required).
-
----
-
-### Step 6h: Cross-Session Continuity Checklist
-
-Before beginning a new work session, the AI agent should:
-
-1. Read the general project rules and system instructions.
-2. Read the `MASTER-LESSONS-LEARNED.md` error log.
-3. Run `power lint` to check the current health of the database.
-4. Read the index `index.md` and the change log `log.md`.
-
----
-
-### Step 6i: Git Sync, Credentials Purge & GPG Signing
-
-Set up a synchronization pipeline to preserve history and enable collaboration without risking credential leaks:
-
-1. **🔒 Credentials Purge Mandate (CRITICAL)**: Never hardcode or commit tokens, passwords, API keys, private keys (`.pem`, `.key`), or `.env` files into Git. Verify `git diff --cached` before committing to ensure no credentials are stage-exposed.
-2. **Committer Identity**: Configure Git's `user.name` and `user.email` to match your developer profile. Avoid committing as unconfigured system users like `root`.
-3. **Security Configurations**: Add confidential files (keys, passwords, `.env`, temporary export files, `.power_search.db`) to `.gitignore`.
-4. **GPG Signing**: Enable GPG-signed commits (`commit -S`) using your configured GPG key fingerprint (`2D49E810C7F2527E` or personal key).
-5. **Git Workflow (PR Workflow)**:
-    - Perform work on dedicated feature branches (`feature/*` or `fix/*`).
-    - Audit changes via dual-side `git diff` inspection (verify added `+` and removed `-` lines).
-    - Merge changes into the main branch via a Pull Request after local tests (`verify.sh`, `pytest`) pass.
-    - Clean up merged branches post-merge via GitHub API/scripts without deleting unmerged branches with active PRs.
-
----
-
-### Step 6j: Multi-Mode Search (FTS + Vector + Hybrid + Semantic + Reranked)
-
-The P.O.W.E.R. framework (v3.3.2) includes a built-in search engine supporting distinct search strategies:
-
-| Mode                 | Description                                                                                              | Best for                                    |
-| -------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `reranked` (explicit opt-in) | Canonical POWER 3.2 pipeline: RRF merge of FTS5 + BGE-M3 Dense + BGE Reranker v2 M3              | Highest-precision multilingual ranking when requested      |
-| `fts`                | SQLite FTS5 with weighted BM25 scoring                                                                   | Exact keyword & phrase matching             |
-| `vector`             | TF-vector cosine similarity (pure Python, zero deps)                                                     | Lexical similarity comparison               |
-| `hybrid`             | RRF (Reciprocal Rank Fusion) merge of FTS + Vector                                                       | Balanced lexical recall                     |
-| `semantic`           | Dense embedding cosine similarity (**BGE-M3** 1024d via direct ONNX Runtime)                             | Fast multilingual semantic discovery        |
-
-_Search Guidelines for AI Agents:_
-
-1. **Token Efficiency**: Use `search_vault_tool(query, max_results=20, search_mode="semantic")` (or `"hybrid"`) instead of listing files. This saves up to 95%+ of context tokens.
-2. **Mode Selection**:
-    - **FTS** — for precise keyword match: `search_vault_tool(query='"Docker Compose"')`
-    - **Semantic** — for bilingual and conceptual searches: `search_vault_tool(query="оркестрація контейнерів", search_mode="semantic")`
-    - **Hybrid Reranked** — for advanced cross-lingual ranking: `search_vault_tool(query="server deployment", search_mode="hybrid_reranked")`
-3. **CLI Usage**: `power search /vault "query" --mode semantic`
-4. **Query Syntax**:
-    - **Phrase Search**: Use double quotes for exact phrases, e.g., `search_vault_tool(query='"Docker Compose"')`
-    - **Prefix Matching**: Words are automatically matched using prefix wildcards (e.g., `dock*` matches `docker`, `docking`, etc.)
-    - **Sanitization**: Avoid passing special search query operators (except double quotes) as they can cause syntax errors in SQLite FTS5.
-5. **Git Hygiene**: The database file `.power_search.db` is ignored via `*.db` in `.gitignore` and `.geminiignore`. Under no circumstances should this file be committed to the repository.
-
----
-
-### Step 6k: Typed Relationships for GraphRAG
-
-For semantic indexing, the framework supports typed graph relationships inside the `related` block of OKF metadata:
-
-- **`extends`** — Current note extends another note's concept.
-- **`depends_on`** — Current note depends on another note/infrastructure.
-- **`governed_by`** — Current note is governed by another protocol/rules.
-- **`contradicts`** — Current note contradicts details in another note (helps linter/ROT audit detect stale data).
-- **`part_of`** — Current note is a sub-module of a larger system.
-
-Example format:
+Valid forms include a legacy path string or a typed relation:
 
 ```yaml
 related:
-    - path: "02_Areas/Infra_Security.md"
-      relation: "depends_on"
-      confidence: 0.95
+  - path: 02_Areas/Infrastructure.md
+    relation: depends_on
+    confidence: 0.95
 ```
+
+Only carry or add a relationship when evidence exists. Do not infer a graph
+edge merely because two filenames share a word.
+
+**Phase 4 receipt:** attachment count/hash reconciliation, links examined,
+links rewritten, ambiguous links blocked, and remaining broken-link count.
 
 ---
 
-### Step 6l: ROT Audits & Auto-Healing
+## Phase 5: Executable validation and reconciliation
 
-The framework includes tools to clean up redundant, outdated, and trivial (ROT) notes, and to automatically repair metadata:
+### 5.1 Markdown and OKF gates
 
-- **`power rot /path/to/vault`** — Detects duplicate notes using dense embedding similarity and checks for logical contradictions using the LLM.
-- **`power heal /path/to/vault`** — Automatically fixes markdown formatting issues and calls the LLM to generate missing `description` or `tags` based on document content.
+```bash
+power index /absolute/path/to/destination --strict
+power lint /absolute/path/to/destination
+power markdown-check /absolute/path/to/destination
+power status /absolute/path/to/destination
+```
+
+Required result:
+
+- every command exits `0`;
+- strict indexing skips zero invalid notes;
+- broken internal links are zero;
+- any orphan/stale warnings are individually explained, not hidden;
+- the status counts agree with the manifest's verified Markdown rows.
+
+### 5.2 Search gates
+
+First prove FTS without model downloads:
+
+```bash
+power sync /absolute/path/to/destination --fts-only
+power search /absolute/path/to/destination "known phrase" --mode fts
+```
+
+Use several known phrases from different source categories and record expected
+target paths. Then, only when resources permit, prove dense search:
+
+```bash
+power sync /absolute/path/to/destination
+power search /absolute/path/to/destination "known concept" --mode semantic
+power search /absolute/path/to/destination "known concept" --mode reranked
+```
+
+Semantic/reranked readiness remains pending if model download, validation, or
+search fails. An FTS pass does not prove dense quality.
+
+### 5.3 Final losslessness reconciliation
+
+The migration is not complete until all are true:
+
+- authorized source Markdown count = verified destination note count;
+- every source note has one manifest target or an explicitly approved exclusion;
+- normalized source/destination body hashes match for every migrated note;
+- source/destination attachment hashes match;
+- no unexpected destination file exists;
+- blocked and ambiguous items count is zero, or the user explicitly accepts a
+  documented exception;
+- the source tree still matches its Phase 1 inventory.
+
+Spot checks are useful but never replace full manifest reconciliation.
+
+**Phase 5 receipt:** command outputs/exit codes, lint issue counts, index counts,
+search cases, manifest totals, and hash reconciliation.
 
 ---
 
-## Example: Full Migration Transcript
+## Phase 6: Cutover, rollback record, and maintenance
 
-Here is what a complete migration looks like from the agent's perspective:
+### 6.1 Cutover
 
-```
-Agent: Scanning vault at /Users/alice/obsidian...
-Agent: Found 47 .md files, 12 folders
-Agent: Detected multi-methodology vault structure (Zettelkasten + C.O.D.E. + P.A.R.A.)
-Agent: 31 have frontmatter, 16 are raw markdown
-Agent: Running classification on all notes into OKF NoteTypes...
+Point applications and MCP clients to the destination only after Phase 5
+passes. Configure the canonical variable:
 
-Note "Daily Thoughts 2026-06-15" → Daily Log (06_Daily_Logs/)
-Note "Project Alpha Requirements" → Project (01_Projects/)
-Note "Raw Idea Note" → Resource (01_Capture/)
-Note "202607242115-vector-indexing" → Resource (permanent/)
-Note "Docker Cheatsheet" → Resource (03_Resources/)
-Note "Old Meeting Notes 2024" → Archive (04_Archive/)
-...
-
-Agent: Migrating via ingest_note MCP tool into target methodology folders...
-  ✅ 01_Projects/Project-Alpha-Requirements.md
-  ✅ 01_Capture/Raw-Idea-Note.md
-  ✅ permanent/202607242115-vector-indexing.md
-  ✅ 03_Resources/Docker-Cheatsheet.md
-  ✅ 04_Archive/Old-Meeting-Notes-2024.md
-  ✅ 06_Daily_Logs/2026-06-15_Daily-Thoughts.md
-  ... (47 notes total)
-
-Agent: Running lint...
-  ✅ OKF Metadata: 0 errors
-  ✅ Internal Links: 0 broken
-  ✅ Orphans: 3 notes (all in 06_Daily_Logs — exempt)
-
-Agent: Initiating Phase 6: Sync & Publish...
-Agent: Importing GPG key and configuring Git identity
-Agent: Creating signed commit on branch feature/power-migration
-Agent: Pushing changes to GitHub and opening Pull Request
-Agent: Verifying CI/CD build workflow status...
-  ✅ MkDocs build success: https://weby-homelab.github.io/power-framework/
-
-Agent: Migration and publication completed successfully. Vault is P.O.W.E.R.-compliant.
+```text
+POWER_VAULT_DIR=/absolute/path/to/destination
 ```
 
----
+Restart long-lived MCP clients and run their preflight with the exact configured
+Python. Keep the source and verified backup read-only during the observation
+period.
+
+### 6.2 Git is optional and separately authorized
+
+A local vault does not require a remote repository. If Git publication is
+authorized:
+
+- exclude `.env`, credentials, private keys, model/search databases, backups,
+  and raw private evaluation data;
+- inspect `git diff --cached` before committing;
+- work on a feature branch and use the repository's review/signing policy;
+- never import a private signing key or push merely because migration passed.
+
+Private-vault synchronization is not public publication.
+
+### 6.3 Rollback record
+
+Record:
+
+- source, backup, destination, and manifest paths;
+- source and destination Git state if applicable;
+- exact last passing gate and timestamps;
+- how to repoint clients to the unchanged source;
+- unresolved exceptions and their owners.
+
+Do not delete the source or backup as part of this protocol. Retention and
+destruction require a separate explicit decision.
+
+### 6.4 Ongoing maintenance
+
+After structural changes:
+
+```bash
+power index /absolute/path/to/destination --strict
+power lint /absolute/path/to/destination
+power markdown-check /absolute/path/to/destination
+```
+
+Run `power sync` when retrieval indexes need refreshing. Read `index.md`, then
+the relevant canonical `_index.md`, then specific notes. Preserve a dated change
+record in the vault according to its local operating rules.
+
+## Final acceptance checklist
+
+- Verified backup exists outside source and destination.
+- Manifest accounts for every authorized source file with zero unexplained rows.
+- Source remains unchanged and can be restored/read.
+- Destination notes use canonical folders and valid OKF metadata.
+- Body and attachment hash reconciliation passes.
+- Link ambiguity is zero or explicitly accepted; broken links are zero.
+- `index --strict`, `lint`, and `markdown-check` exit `0`.
+- FTS sync/search pass with recorded known-result cases.
+- Dense/reranked status is stated as verified or pending based on target-host
+  evidence, never inferred from FTS.
+- MCP uses the exact installed interpreter and `POWER_VAULT_DIR`.
+- Cutover and Git/publication were performed only with explicit authorization.
+- Rollback instructions and retained backup paths are recorded.
 
 ## Troubleshooting
 
-| Issue                                        | Cause                                         | Fix                                                           |
-| -------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
-| `ingest_note` returns "Note already exists"  | Note was already migrated                     | Skip and move to next                                         |
-| Lint reports missing `type`                  | Note lacks frontmatter                        | Re-ingest with explicit `note_type`                           |
-| Broken links after migration                 | Internal `[[links]]` target filenames changed | Run the auto-repair script from Step 6d                       |
-| `read_sub_index` returns "No notes found"    | Category folder is empty or not indexed       | Run `generate_index(vault_path)` first                        |
-| Too many orphans in `04_Archive/`            | Archived notes by definition have few links   | This is expected — archive orphans are normal                 |
-| Lint reports 200+ extra notes                | `.git/` directory is not excluded             | Update linter to skip hidden dirs (v1.5.0+ does)              |
-| `_index.md` has no frontmatter               | Using an older version of the framework       | Upgrade to v3.3.2 or re-run `generate_index`                  |
-| `pip install` fails with PEP 668             | System Python blocks direct install           | Use a venv: `/path/to/venv/bin/pip install ...`               |
-| `External data path escapes model directory` | ONNX Runtime security constraint              | Set `HF_HUB_DISABLE_SYMLINKS=1` in environment before running |
-
----
-
-## Appendices
-
-### A. Folder-Type Mapping for All Methodologies
-
-| Methodology | Folder / Skeleton | `note_type` | Typical Content |
-| :--- | :--- | :--- | :--- |
-| **P.A.R.A.** | `00_Inbox/` | Any | Unprocessed drafts (classified and moved) |
-| | `01_Projects/` | `Project` | Active projects with deadlines & deliverables |
-| | `02_Areas/` | `Area` | Ongoing areas of responsibility |
-| | `03_Resources/` | `Resource` | Reference material, guides, external links |
-| | `04_Archive/` | `Archive` | Completed or obsolete material |
-| | `06_Daily_Logs/` | `Daily Log` | Temporal journal entries & session logs |
-| | `PROTOCOLS/` | `System Guide` | AI agent instructions & system rules |
-| **C.O.D.E.** | `01_Capture/` | `Resource` | Incoming clippings, bookmarks & raw ideas |
-| | `02_Organize/` | `Area` / `Project` | Notes organized by area or active project |
-| | `03_Distill/` | `Resource` | Distilled summaries & core insights |
-| | `04_Express/` | `Project` / `Resource` | Published articles, reports & outputs |
-| **GTD** | `00_Inbox/` | `Resource` | Raw incoming tasks & notes |
-| | `01_Next_Actions/` | `Project` | Specific immediate actionable items |
-| | `02_Waiting_For/` | `Area` | Delegated / pending response tasks |
-| | `03_Someday/` | `Archive` / `Resource` | Future / optional ideas & aspirations |
-| | `04_Projects/` | `Project` | Multi-step goal-oriented projects |
-| **Zettelkasten** | `fleeting/` | `Resource` | Temporary quick thoughts |
-| | `literature/` | `Resource` | Book / source reading notes |
-| | `permanent/` | `Area` / `Resource` | Atomic conceptual notes with UID prefixes |
-| | `index/` | `System Guide` | Navigation hubs, MOCs & structured indexes |
-| **LYT** | `Home.md` | `System Guide` | Home entry point navigation hub |
-| | `MOCs/` | `Area` | Maps of Content (topic maps) |
-| | `Notes/` | `Resource` | Atomic thematic notes |
-| | `Archives/` | `Archive` | Outdated MOC maps & notes |
-| **Johnny.Decimal** | `10-19_Admin/` | `Area` | Administrative & organizational documents |
-| | `20-29_Engineering/`| `Area` / `Project` | Engineering specs & development |
-| | `30-39_Ops/` | `Area` | Operations instructions & monitoring |
-| **Custom / Hybrid** | Custom tree | `type:` from OKF enum | `type:` assigned based on semantic content |
-
-### B. Required MCP Tools
-
-| Tool                                                                          | Used in Phase    |
-| ----------------------------------------------------------------------------- | ---------------- |
-| `ingest_note(name, note_type, title, description, content, tags?, resource?)` | Phase 3          |
-| `lint_vault(vault_path?)`                                                     | Phase 1, 4, 5, 6 |
-| `generate_index(vault_path?)`                                                 | Phase 5, 6       |
-| `read_sub_index(category, vault_path?)`                                       | Phase 4, 6       |
-| `search_vault_tool(query, max_results?, search_mode?, vault_path?)`           | Phase 4, 6       |
-
-### C. Quick-Reference: OKF Frontmatter Fields
-
-```yaml
----
-type: Project | Area | Resource | Daily Log | Archive | System Guide
-title: "Human-readable title (1-200 chars)"
-description: "Single-line summary (1-150 chars)"
-resource: "https://..." # Optional
-tags: [tag1, tag2] # Optional
-owner: "developer-or-agent" # Optional
-status: active | review | archived # Optional
-timestamp: 2026-07-15T02:00:00 # Auto-generated
-related: # Optional GraphRAG links
-    - path: "02_Areas/Infra_Security.md"
-      relation: depends_on
-      confidence: 0.95
----
-```
-
----
-
-<p align="center">
-  Built for AI agents, by AI agents ⚡<br>
-  &copy; 2026 Weby Homelab
-</p>
+| Problem | Correct response |
+| --- | --- |
+| `power init` rejects the source | Expected: it is non-empty. Create a separate destination. |
+| `ingest_note` rejects a custom folder | MCP writes are restricted to approved P.A.R.A. folders. Map the note to a canonical target. |
+| `read_sub_index` rejects a source category | It accepts canonical P.A.R.A. categories. Use the destination mapping and generated canonical index. |
+| `power heal` leaves notes invalid | Custom folders may not provide a type hint. Add approved `type`, `title`, `description`, and `timestamp` from the manifest, then validate again. |
+| Links break after moving notes | Apply the source→target mapping separately to wikilinks, Markdown links, embeds, and `related`; do not assume `power rename` rewrites all forms. |
+| `index --strict` fails | Inspect every skipped path; do not continue to cutover with a partial catalog. |
+| Dense sync fails | Record semantic/reranked as pending and keep FTS operational; do not downgrade the evidence claim silently. |
+| Counts match but hashes do not | Migration is not lossless. Restore/retransform the mismatched rows before cutover. |
