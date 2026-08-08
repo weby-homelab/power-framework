@@ -10,12 +10,23 @@ Supports:
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from datetime import date as date_type
 from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
+
+#: Env var controlling what happens to a known field holding a foreign value.
+#: ``reject`` (default) keeps the existing strict contract; ``quarantine``
+#: moves the value to an ``x-`` key so the note survives an import.
+FOREIGN_FRONTMATTER_ENV = "POWER_FOREIGN_FRONTMATTER"
+
+
+def foreign_frontmatter_quarantined() -> bool:
+    """Return True when foreign field values should be quarantined, not rejected."""
+    return os.getenv(FOREIGN_FRONTMATTER_ENV, "reject").strip().lower() == "quarantine"
 
 
 class TypedRelation(BaseModel):
@@ -198,6 +209,39 @@ class OKFMetadata(BaseModel):
 
     # Unknown fields must survive parsing and healing during the v0.2 rollout.
     model_config = ConfigDict(extra="allow", use_enum_values=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def quarantine_foreign_governance_fields(cls, data: object) -> object:
+        """Opt-in: keep a note valid when an optional field uses a foreign vocabulary.
+
+        Off by default — strict rejection stays the contract. When
+        ``POWER_FOREIGN_FRONTMATTER=quarantine`` is set, an out-of-schema value
+        in ``status`` or ``related`` is moved to an ``x-``-prefixed key instead
+        of failing the whole note, so importing a vault written by another tool
+        does not silently drop every note whose ``status:`` says ``draft``.
+
+        ``type`` is deliberately never covered: it is the one field POWER
+        cannot work without.
+        """
+        if not isinstance(data, dict) or not foreign_frontmatter_quarantined():
+            return data
+
+        status = data.get("status")
+        if status is not None and not isinstance(status, NoteStatus):
+            try:
+                NoteStatus(str(status).strip().lower())
+            except ValueError:
+                data = {**data, "status": None, "x-status": status}
+
+        related = data.get("related")
+        if related is not None:
+            try:
+                cls.coerce_related(related)
+            except (ValueError, TypeError):
+                data = {**data, "related": [], "x-related": related}
+
+        return data
 
     @field_validator("title")
     @classmethod

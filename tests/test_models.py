@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import ClassVar
 
 import pytest
 from pydantic import ValidationError
@@ -350,3 +351,61 @@ class TestOKFMetadata:
         assert meta.status == "active"
         assert meta.expiry.isoformat() == "2027-01-01"
         assert any(r.path == "03_Resources/Guide.md" for r in meta.related)
+
+
+class TestForeignFrontmatterTolerance:
+    """A foreign vocabulary in an optional field must not delete the note.
+
+    Measured on a real 2790-note Obsidian vault: 366 notes carried a `status:`
+    outside the OKF enum (`verified-external`, `audited`, `stub`, `production`,
+    `draft`, `legacy`) and 2 wrote `related:` as Obsidian wikilinks. All 368
+    failed validation as a whole and never reached the search index.
+    """
+
+    BASE: ClassVar[dict[str, object]] = {
+        "type": "Resource",
+        "title": "T",
+        "description": "D",
+        "timestamp": datetime(2026, 1, 1, tzinfo=UTC),
+    }
+
+    @pytest.fixture(autouse=True)
+    def _enable_quarantine(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_FOREIGN_FRONTMATTER", "quarantine")
+
+    @pytest.mark.parametrize(
+        "value", ["verified-external", "audited", "stub", "production", "draft", "legacy"]
+    )
+    def test_foreign_status_keeps_the_note_and_preserves_the_value(self, value: str):
+        note = OKFMetadata.model_validate({**self.BASE, "status": value})
+        assert note.status is None
+        assert getattr(note, "x-status", None) == value or note.model_extra["x-status"] == value
+
+    def test_valid_status_is_untouched(self):
+        note = OKFMetadata.model_validate({**self.BASE, "status": "archived"})
+        assert note.status == "archived"
+        assert "x-status" not in (note.model_extra or {})
+
+    def test_wikilink_related_keeps_the_note_and_preserves_the_value(self):
+        raw = [["Some Note"]]  # YAML reads `related: [[Some Note]]` as a nested list
+        note = OKFMetadata.model_validate({**self.BASE, "related": raw})
+        assert note.related == []
+        assert note.model_extra["x-related"] == raw
+
+    def test_valid_related_is_untouched(self):
+        note = OKFMetadata.model_validate(
+            {**self.BASE, "related": [{"path": "02_Areas/x.md", "relation": "depends_on"}]}
+        )
+        assert len(note.related) == 1
+        assert "x-related" not in (note.model_extra or {})
+
+    def test_default_stays_strict(self, monkeypatch: pytest.MonkeyPatch):
+        """Without the opt-in the existing reject contract is unchanged."""
+        monkeypatch.delenv("POWER_FOREIGN_FRONTMATTER", raising=False)
+        with pytest.raises(ValidationError):
+            OKFMetadata.model_validate({**self.BASE, "status": "draft"})
+
+    def test_missing_type_still_fails(self):
+        """Tolerance must not weaken the one field POWER cannot work without."""
+        with pytest.raises(ValidationError):
+            OKFMetadata.model_validate({k: v for k, v in self.BASE.items() if k != "type"})
