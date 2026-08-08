@@ -133,17 +133,22 @@ present. History returns append-only transaction receipts without note content.
 Build the active search generation atomically.
 
 ```text
-power sync PATH [--fts-only] [--force]
+power sync PATH [--fts-only] [--force] [--strict]
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--fts-only` | Build the lightweight FTS index and skip embeddings. |
 | `--force` | Force a full dense rebuild, for example after a model/dimension change. |
+| `--strict` | Exit non-zero when any note is excluded from the search index, listing each excluded note and the reason. Mirrors `index --strict`. |
 
 Full sync downloads and validates the pinned embedding assets as needed. It can
 be resource intensive and fails closed if the generation contract cannot be
 satisfied.
+
+Every sync prints a coverage ledger — notes scanned, indexed, and excluded by
+metadata validation. An excluded note is invisible to **every** search mode, so
+a non-zero excluded count deserves attention even without `--strict`.
 
 ### `rot`
 

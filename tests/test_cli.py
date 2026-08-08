@@ -400,3 +400,75 @@ def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
     ):
         main()
     assert exc2.value.code == 1
+
+
+class TestSyncCoverage:
+    """A sync that drops notes must say so; --strict must refuse to pretend.
+
+    Measured origin: on a real 2790-note vault, sync silently excluded 384
+    notes (13.8%) and printed only what it indexed — the hole was found by
+    querying the generation database directly.
+    """
+
+    @staticmethod
+    def _make_vault(tmp_path):
+        import argparse
+
+        from power_framework.core.cli import _cmd_init
+
+        vault = tmp_path / "vault"
+        _cmd_init(argparse.Namespace(path=str(vault)))
+        (vault / "03_Resources" / "good.md").write_text(
+            '---\ntype: Resource\ntitle: "Good"\ndescription: "Valid note"\n'
+            "timestamp: 2026-01-01T00:00:00\n---\n\nBody.\n",
+            encoding="utf-8",
+        )
+        return vault
+
+    @staticmethod
+    def _sync(vault, strict):
+        import argparse
+
+        from power_framework.core.cli import _cmd_sync
+
+        return _cmd_sync(
+            argparse.Namespace(path=str(vault), fts_only=True, force=False, strict=strict)
+        )
+
+    def test_coverage_ledger_is_always_printed(self, tmp_path, caplog):
+        import logging
+
+        vault = self._make_vault(tmp_path)
+        with caplog.at_level(logging.INFO):
+            assert self._sync(vault, strict=False) == 0
+        assert any("Coverage:" in r.getMessage() for r in caplog.records)
+
+    def test_excluded_note_warns_but_does_not_fail_by_default(self, tmp_path, caplog):
+        import logging
+
+        vault = self._make_vault(tmp_path)
+        (vault / "03_Resources" / "broken.md").write_text(
+            "---\ntype: NotARealType\ntitle: Broken\n---\n\nBody.\n", encoding="utf-8"
+        )
+        with caplog.at_level(logging.INFO):
+            assert self._sync(vault, strict=False) == 0
+        rendered = [r.getMessage() for r in caplog.records]
+        assert any("1 excluded" in m for m in rendered)
+        assert any("not searchable" in m for m in rendered)
+
+    def test_strict_fails_and_names_the_excluded_note(self, tmp_path, caplog):
+        import logging
+
+        vault = self._make_vault(tmp_path)
+        (vault / "03_Resources" / "broken.md").write_text(
+            "---\ntype: NotARealType\ntitle: Broken\n---\n\nBody.\n", encoding="utf-8"
+        )
+        with caplog.at_level(logging.INFO):
+            assert self._sync(vault, strict=True) == 1
+        rendered = [r.getMessage() for r in caplog.records]
+        assert any("broken.md" in m for m in rendered)
+        assert any("Strict sync failed" in m for m in rendered)
+
+    def test_strict_passes_on_a_clean_vault(self, tmp_path):
+        vault = self._make_vault(tmp_path)
+        assert self._sync(vault, strict=True) == 0

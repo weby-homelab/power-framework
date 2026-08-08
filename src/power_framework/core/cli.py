@@ -343,6 +343,33 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         report.expected_files,
         report.actual_chunks,
     )
+    # Coverage is the invariant, not a detail: a note excluded by validation is
+    # invisible to every search mode afterwards, and a sync that only reports
+    # what it indexed is indistinguishable from a healthy one. Always print the
+    # ledger; under --strict, name the offenders and refuse to pretend.
+    logger.info(
+        "Coverage: %d notes scanned, %d indexed, %d excluded (invalid metadata).",
+        report.total_scanned,
+        report.actual_files,
+        report.invalid_sources,
+    )
+    if report.invalid_sources:
+        if getattr(args, "strict", False):
+            from .generation_index import list_invalid_sources
+
+            for rel_path, reason in sorted(list_invalid_sources(vault_dir).items()):
+                logger.error("  excluded: %s (%s)", rel_path, reason)
+            logger.error(
+                "Strict sync failed: %d note(s) are excluded from the search index.",
+                report.invalid_sources,
+            )
+            return 1
+        logger.warning(
+            "%d note(s) are not searchable. Run 'power sync --strict' to fail on "
+            "this, or 'power index %s --strict' to list them.",
+            report.invalid_sources,
+            vault_dir,
+        )
     return 0
 
 
@@ -713,6 +740,15 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Force a full rebuild of dense embeddings (required after changing the embedding model/dimension)",
+    )
+    p_sync.add_argument(
+        "--strict",
+        action="store_true",
+        default=False,
+        help=(
+            "Exit non-zero when any note is excluded from the search index, "
+            "listing each excluded note and the reason (mirrors 'index --strict')"
+        ),
     )
     p_sync.set_defaults(func=_cmd_sync)
 

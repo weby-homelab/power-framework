@@ -131,6 +131,19 @@ def _init_state_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def list_invalid_sources(vault_dir: Path) -> dict[str, str]:
+    """Return {rel_path: reason} for every note the next sync would exclude.
+
+    The generation store persists only a *hash* of each excluded path
+    (``generation_invalid_sources``), so the names cannot be recovered from the
+    database after the fact. Callers that need to show the offenders — e.g.
+    ``power sync --strict`` — re-scan the inventory, which is a frontmatter-only
+    pass and cheap relative to a sync.
+    """
+    root = Path(vault_dir).expanduser().resolve()
+    return dict(_source_inventory(root).invalid_sources)
+
+
 def _source_inventory(vault_dir: Path) -> SourceInventory:
     """Account for every candidate source before staging begins."""
     valid_sources: dict[str, str] = {}
