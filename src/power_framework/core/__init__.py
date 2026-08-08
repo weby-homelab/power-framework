@@ -17,7 +17,7 @@ from __future__ import annotations
 from .chunker import SemanticChunker
 from .cli import main as cli_main
 from .embeddings import get_embedding_manager
-from .healer import heal_frontmatter, heal_vault
+from .healer import HealFailure, HealReport, heal_frontmatter, heal_vault, heal_vault_report
 from .indexer import (
     generate_index_content,
     generate_log_initial,
@@ -135,6 +135,8 @@ __all__ = [
     "ContradictionDetector",
     "EmbeddingManager",
     "FreshnessScorer",
+    "HealFailure",
+    "HealReport",
     "KnowledgeGraph",
     "LinkRotChecker",
     "LintResult",
@@ -189,6 +191,7 @@ __all__ = [
     "has_type_field",
     "heal_frontmatter",
     "heal_vault",
+    "heal_vault_report",
     "normalize_as_of",
     "normalize_search_mode",
     "normalize_temporal_view",
