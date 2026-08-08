@@ -12,6 +12,7 @@ from power_framework.core.healer import (
     heal_vault,
     propagate_rename,
 )
+from power_framework.core.parser import parse_frontmatter
 
 
 class TestInferTitleFromFilename:
@@ -162,7 +163,13 @@ class TestHealBackslashEscapes:
         )
         healed, changes = heal_frontmatter(note.read_text(encoding="utf-8"), note)
         assert changes
-        assert "fArial" in healed
+        # Absence of an exception is not the contract: the escapes must come
+        # through byte-for-byte, not be consumed as re template references.
+        assert r"\fArial|b0;7.5\P" in healed
+        assert (
+            parse_frontmatter(healed)["smoke"]
+            == r'MTEXT guard: (cd:ParseDecimal "{\fArial|b0;7.5\P}")'
+        )
 
     def test_windows_path_in_custom_field_does_not_raise(self, tmp_path: Path):
         note = tmp_path / "note.md"
@@ -175,7 +182,7 @@ class TestHealBackslashEscapes:
         )
         healed, changes = heal_frontmatter(note.read_text(encoding="utf-8"), note)
         assert changes
-        assert "Users" in healed
+        assert parse_frontmatter(healed)["source_dir"] == r"C:\Users\Public\vault"
 
     def test_propagate_rename_survives_backslash_frontmatter(self, tmp_path: Path):
         """`power rename` rewrites frontmatter through the same code path."""
@@ -199,7 +206,10 @@ class TestHealBackslashEscapes:
             vault, "03_Resources/old_name.md", "03_Resources/new_name.md", dry_run=False
         )
         assert updated == 1
-        assert "03_Resources/new_name.md" in note.read_text(encoding="utf-8")
+        rewritten = note.read_text(encoding="utf-8")
+        assert "03_Resources/new_name.md" in rewritten
+        # The unrelated backslash field must survive the rewrite untouched.
+        assert parse_frontmatter(rewritten)["source_dir"] == r"C:\Users\Public\vault"
 
     def test_one_unhealable_note_does_not_abort_the_vault(self, tmp_path: Path, monkeypatch):
         """A single failing note must cost one note, not the whole run."""
@@ -225,3 +235,40 @@ class TestHealBackslashEscapes:
         assert "Notes failed: 1" in report
         assert "poison.md" in report
         assert "type: Project" in (vault / "01_Projects" / "z_note.md").read_text(encoding="utf-8")
+
+    def test_write_failure_other_than_oserror_is_captured(self, tmp_path: Path, monkeypatch):
+        """`atomic_write` can fail on encoding or a rejected path, not just OSError."""
+        vault = tmp_path / "vault"
+        (vault / "01_Projects").mkdir(parents=True)
+        (vault / "01_Projects" / "note.md").write_text(
+            '---\ndescription: "Desc"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text.',
+            encoding="utf-8",
+        )
+
+        def refuse(*_args, **_kwargs):
+            raise ValueError("simulated non-OSError write failure")
+
+        monkeypatch.setattr(healer_module, "atomic_write", refuse)
+        report = heal_vault(vault, dry_run=False)
+
+        assert "Notes healed: 0" in report
+        assert "Notes failed: 1" in report
+        assert "ValueError" in report
+
+    def test_total_failure_is_not_reported_as_a_clean_vault(self, tmp_path: Path, monkeypatch):
+        """ "No notes needed healing" next to "Notes failed: N" reads as success."""
+        vault = tmp_path / "vault"
+        (vault / "01_Projects").mkdir(parents=True)
+        (vault / "01_Projects" / "note.md").write_text(
+            '---\ndescription: "Desc"\ntimestamp: 2026-01-01T00:00:00\n---\n\nBody text.',
+            encoding="utf-8",
+        )
+
+        def explode(*_args, **_kwargs):
+            raise ValueError("simulated per-note failure")
+
+        monkeypatch.setattr(healer_module, "heal_frontmatter", explode)
+        report = heal_vault(vault, dry_run=False)
+
+        assert "Notes failed: 1" in report
+        assert "No notes needed healing" not in report

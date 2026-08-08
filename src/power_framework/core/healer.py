@@ -333,8 +333,11 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
             try:
                 backup_path = create_backup(filepath)
                 atomic_write(filepath, healed)
-            except OSError as exc:
-                logger.warning("Cannot write %s: %s", rel, exc)
+            except Exception as exc:
+                # Not just OSError: atomic_write and create_backup can fail on
+                # encoding, permissions or a rejected path, and any of those
+                # must cost one note rather than the run.
+                logger.warning("Cannot write %s: %s: %s", rel, type(exc).__name__, exc)
                 failures.append((rel.as_posix(), f"{type(exc).__name__}: {exc}"))
                 continue
         healed_count += 1
@@ -355,7 +358,10 @@ def heal_vault(vault_dir: Path, dry_run: bool = True, limit: int | None = None) 
         lines.append("Changes:")
         lines.extend(changes_log)
         lines.append("")
-    else:
+    elif not failures:
+        # Only claim a clean vault when nothing failed. Saying "no notes needed
+        # healing" next to "Notes failed: 2790" reads as success and is how a
+        # total failure gets mistaken for a no-op.
         lines.append("No notes needed healing.")
         lines.append("")
 
