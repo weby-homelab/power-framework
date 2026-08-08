@@ -78,6 +78,45 @@ def _env_flag(name: str) -> bool:
     return os.getenv(name, "").lower() in {"1", "true", "yes"}
 
 
+def _preload_gpu_runtime(ort: Any) -> None:
+    """Make the pip-installed CUDA/cuDNN runtime loadable before probing providers.
+
+    ``onnxruntime-gpu`` resolves its provider DLLs against the ``nvidia-*``
+    wheels, but Python 3.8+ on Windows ignores ``PATH`` for extension-module
+    DLL resolution. Without ``preload_dlls()`` the CUDA provider is *listed* by
+    ``get_available_providers()`` and still fails to load at session creation,
+    which is exactly the case the availability check below cannot see.
+    """
+    preload = getattr(ort, "preload_dlls", None)
+    if preload is None:
+        return
+    try:
+        preload()
+    except Exception as exc:  # pragma: no cover - defensive, never fatal
+        logger.debug("onnxruntime.preload_dlls() failed: %s", exc)
+
+
+def verify_bound_provider(session: Any, providers: list[object], env_var: str) -> str:
+    """Return the provider the session actually bound, failing closed on downgrade.
+
+    ``get_available_providers()`` reports what the build was compiled with, not
+    what can load. An explicit GPU request that silently lands on CPU is a
+    ~50x slowdown with no error, so compare the request against the binding.
+    """
+    bound = list(session.get_providers())
+    actual = bound[0] if bound else "unknown"
+    requested_name = providers[0][0] if isinstance(providers[0], tuple) else str(providers[0])
+
+    logger.info("ONNX Runtime provider bound: %s", actual)
+    if requested_name != "CPUExecutionProvider" and actual == "CPUExecutionProvider":
+        raise RuntimeError(
+            f"requested_onnx_provider_not_bound:{requested_name}; "
+            f"session bound {bound}. The provider is compiled in but its runtime "
+            f"libraries failed to load. Set {env_var}=cpu to accept CPU explicitly."
+        )
+    return actual
+
+
 def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list[object]:
     """Select ONNX Runtime providers with explicit and automatic device modes.
 
@@ -86,6 +125,7 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
     fail-closed when unavailable, preventing a requested GPU benchmark from
     silently running on a different backend.
     """
+    _preload_gpu_runtime(ort)
     available = set(ort.get_available_providers())
     requested = os.getenv(env_var, os.getenv("POWER_EMBED_DEVICE", "auto")).lower()
     if requested not in {"auto", "cpu", "cuda", "rocm", "directml"}:
@@ -585,6 +625,7 @@ class BGEM3OnnxManager:
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort)
             self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            verify_bound_provider(self._session, providers, "POWER_EMBED_DEVICE")
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
             # Probe: eagerly verify the backend can allocate and produce a

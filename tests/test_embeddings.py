@@ -36,6 +36,74 @@ class TestEmbeddingManager:
         with pytest.raises(RuntimeError, match="requested_onnx_provider_unavailable"):
             embeddings.select_onnx_providers(FakeOrt())
 
+    def test_preload_dlls_is_called_before_probing_providers(self, monkeypatch: pytest.MonkeyPatch):
+        """Availability is meaningless until the GPU runtime DLLs are loadable."""
+        calls: list[str] = []
+
+        class FakeOrt:
+            @staticmethod
+            def preload_dlls():
+                calls.append("preload")
+
+            @staticmethod
+            def get_available_providers():
+                calls.append("probe")
+                return ["CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
+        embeddings.select_onnx_providers(FakeOrt())
+        assert calls == ["preload", "probe"]
+
+    def test_missing_preload_dlls_is_tolerated(self, monkeypatch: pytest.MonkeyPatch):
+        """Older onnxruntime builds have no preload_dlls(); that must not break."""
+
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
+        assert embeddings.select_onnx_providers(FakeOrt())
+
+    def test_gpu_downgraded_to_cpu_at_session_creation_fails_closed(self):
+        """A provider can be listed and still fail to load; only the session knows."""
+
+        class FakeSession:
+            @staticmethod
+            def get_providers():
+                return ["CPUExecutionProvider"]
+
+        providers: list[object] = [
+            ("CUDAExecutionProvider", {}),
+            ("CPUExecutionProvider", {}),
+        ]
+        with pytest.raises(RuntimeError, match="requested_onnx_provider_not_bound"):
+            embeddings.verify_bound_provider(FakeSession(), providers, "POWER_EMBED_DEVICE")
+
+    def test_bound_gpu_provider_is_accepted(self):
+        class FakeSession:
+            @staticmethod
+            def get_providers():
+                return ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+        providers: list[object] = [("CUDAExecutionProvider", {}), ("CPUExecutionProvider", {})]
+        assert (
+            embeddings.verify_bound_provider(FakeSession(), providers, "POWER_EMBED_DEVICE")
+            == "CUDAExecutionProvider"
+        )
+
+    def test_explicit_cpu_is_not_treated_as_a_downgrade(self):
+        class FakeSession:
+            @staticmethod
+            def get_providers():
+                return ["CPUExecutionProvider"]
+
+        providers: list[object] = [("CPUExecutionProvider", {})]
+        assert (
+            embeddings.verify_bound_provider(FakeSession(), providers, "POWER_EMBED_DEVICE")
+            == "CPUExecutionProvider"
+        )
+
     def test_ollama_attempt_does_not_require_sigalrm(self, monkeypatch: pytest.MonkeyPatch):
         manager = embeddings.OllamaEmbeddingManager()
         monkeypatch.delattr(signal, "SIGALRM", raising=False)

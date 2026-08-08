@@ -7,7 +7,7 @@ import os
 import time
 from typing import Protocol
 
-from .embeddings import select_onnx_providers
+from .embeddings import select_onnx_providers, verify_bound_provider
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +225,7 @@ class BGEM3Reranker:
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort, env_var="POWER_RERANKER_DEVICE")
             self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            verify_bound_provider(self._session, providers, "POWER_RERANKER_DEVICE")
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
 
