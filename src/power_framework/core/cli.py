@@ -343,6 +343,31 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         report.expected_files,
         report.actual_chunks,
     )
+    logger.info(
+        "Coverage: %d notes scanned, %d indexed, %d excluded.",
+        report.total_scanned,
+        report.actual_files,
+        report.invalid_sources,
+    )
+    if report.excluded_reason_counts:
+        reasons = ", ".join(
+            f"{reason}={count}" for reason, count in report.excluded_reason_counts.items()
+        )
+        logger.info("Exclusion reasons: %s", reasons)
+    if report.excluded_sources:
+        allow_partial = getattr(args, "allow_partial", False)
+        level = logger.warning if allow_partial else logger.error
+        level(
+            "%d note(s) are not searchable. %s",
+            report.invalid_sources,
+            "Continuing because --allow-partial was requested."
+            if allow_partial
+            else "Sync failed closed; pass --allow-partial to accept a partial index.",
+        )
+        for rel_path, reason in sorted(report.excluded_sources.items()):
+            level("  excluded: %s (%s)", rel_path, reason)
+        if not allow_partial:
+            return 1
     return 0
 
 
@@ -713,6 +738,19 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Force a full rebuild of dense embeddings (required after changing the embedding model/dimension)",
+    )
+    sync_coverage = p_sync.add_mutually_exclusive_group()
+    sync_coverage.add_argument(
+        "--strict",
+        action="store_true",
+        default=False,
+        help="Fail when any note is excluded (the default coverage policy)",
+    )
+    sync_coverage.add_argument(
+        "--allow-partial",
+        action="store_true",
+        default=False,
+        help="Accept excluded notes and exit zero with a complete exclusion receipt",
     )
     p_sync.set_defaults(func=_cmd_sync)
 

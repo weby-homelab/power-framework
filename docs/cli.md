@@ -133,17 +133,20 @@ present. History returns append-only transaction receipts without note content.
 Build the active search generation atomically.
 
 ```text
-power sync PATH [--fts-only] [--force]
+power sync PATH [--fts-only] [--force] [--strict | --allow-partial]
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--fts-only` | Build the lightweight FTS index and skip embeddings. |
 | `--force` | Force a full dense rebuild, for example after a model/dimension change. |
+| `--strict` | Explicitly select the default fail-closed coverage policy; the command exits non-zero when notes are excluded. |
+| `--allow-partial` | Explicitly accept excluded notes, continue with a warning, and exit zero with the complete path/reason receipt. Mutually exclusive with `--strict`. |
 
-Full sync downloads and validates the pinned embedding assets as needed. It can
-be resource intensive and fails closed if the generation contract cannot be
-satisfied.
+Every sync prints scanned, indexed and excluded note counts plus deterministic
+exclusion reasons. Full sync downloads and validates the pinned embedding assets
+as needed. It can be resource intensive. The default is fail-closed when any
+note is excluded; use `--allow-partial` only when a partial index is deliberate.
 
 ### `rot`
 
