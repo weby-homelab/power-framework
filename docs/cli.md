@@ -6,7 +6,7 @@ This reference is aligned with the executable P.O.W.E.R. `v3.3.2` parser.
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,search,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -91,6 +91,30 @@ power ingest PATH --type TYPE --title TITLE --description DESCRIPTION
 | `--domain` | Explicit domain slug from `.power/domains.yaml`; otherwise configured rules may route the note. |
 
 Without a domain registry, note type determines the canonical target folder.
+
+### `import`
+
+Preflight and import an existing Markdown tree into a canonical vault folder.
+The source is never modified. The command scans every source note and builds
+the complete report before creating a destination file or search index.
+
+```text
+power import SOURCE --into VAULT_FOLDER [--path VAULT]
+                    [--policy strict|quarantine] [--dry-run]
+                    [--allow-partial]
+```
+
+| Flag | Description |
+| --- | --- |
+| `--into` | Required vault-relative destination beginning with `00_Inbox`, a P.A.R.A. folder, or `PROTOCOLS`. |
+| `--path` | Target vault; defaults to `POWER_VAULT_DIR`, `POWER_VAULT_PATH`, or the current directory. |
+| `--policy` | `strict` (default) rejects foreign known values; explicit `quarantine` retains `status`/`related` values under additive `x-status`/`x-related` fields. |
+| `--dry-run` | Print the deterministic coverage, quarantine, exclusion, and collision report without writing anything. |
+| `--allow-partial` | Explicitly permit importing valid notes when fatal source notes or collisions remain excluded. |
+
+`type` remains fatal. A successful apply regenerates the hierarchical catalog
+and builds an FTS index, so imported notes are searchable immediately. Dense
+embeddings remain an explicit follow-up through `power sync PATH`.
 
 ### `search`
 

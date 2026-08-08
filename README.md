@@ -47,7 +47,7 @@ the role-specific guides before touching a vault:
   executable acceptance gate, FTS, and MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.md)** — complete PowerShell
   installation, Visual C++ prerequisite, exact interpreter paths, and checks
-- **[CLI reference](docs/cli.md)** — all 16 commands, flags, and actual exit behavior
+- **[CLI reference](docs/cli.md)** — all 17 commands, flags, and actual exit behavior
 - **[MCP server](docs/mcp-server.md)** — all 17 governed tools, rate limits,
   configured-vault boundary, and untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.md)** — 6-phase, manifest/hash-driven
@@ -99,7 +99,7 @@ coverage from checks that must pass on the target Windows host.
 
 | Feature                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI**                          | 16 commands, including `power memory` for explicit proposal, approval, validation, and history                                                                                                                                                                                                                                                                                                                                                                                      |
+| **CLI**                          | 17 commands, including `power import` for preflighted Markdown migration and `power memory` for explicit proposal, approval, validation, and history                                                                                                                                                                                                                                                                                                                            |
 | **MCP Server**                   | 17 tools, including governed memory context, proposal, apply, validation, and history operations                                                                                                                                                                                                                                                                                                                                                                                    |
 | **OKF Validation**               | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                             |
 | **Knowledge Graph (Graph RAG)**  | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                                                                             |
@@ -204,6 +204,8 @@ power lint <path>              Scan for broken links, missing metadata, orphans
 power index <path>             Generate hierarchical index (index.md + _index.md files)
 power search <path> <query>    Full-text search with relevance scoring
 power ingest <path> [options]  Create a new note with validated OKF metadata
+power import <dir> --into FOLDER [options]
+                                Preflight/import an existing Markdown tree
 power memory <operation>       Governed memory context, proposal, apply, validation, and history
 power sync <path>              Build FTS and dense search indexes
 power rot <path>               ROT Audit — detect redundant, outdated, trivial notes
@@ -475,7 +477,7 @@ flowchart TD
 | `core/markdown_checks.py`                 | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                                                                           |
 | `core/constants.py`                       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
 | `core/utils.py`                           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                                                                                    |
-| `core/cli.py`                             | Command-line interface with 16 commands, including transactional memory workflows                                                                                                                                                  |
+| `core/cli.py`                             | Command-line interface with 17 commands, including preflighted import and transactional memory workflows                                                                                                                           |
 | `mcp/power_server.py`                     | FastMCP 3.x server with 17 async tools, loopback HTTP transport, and `/health`                                                                                                                                                     |
 
 All components share `power_framework.core` as the single source of truth.

@@ -45,7 +45,7 @@ P.O.W.E.R. створений для роботи як людьми, так і A
   vault, executable acceptance gate, FTS і MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.ua.md)** — повне
   PowerShell-встановлення, Visual C++ prerequisite, точні interpreter paths і checks
-- **[CLI reference](docs/cli.md)** — усі 16 команд, flags і реальна exit behavior
+- **[CLI reference](docs/cli.md)** — усі 17 команд, flags і реальна exit behavior
 - **[MCP server](docs/mcp-server.md)** — усі 17 governed tools, rate limits,
   configured-vault boundary і untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.ua.md)** — 6-фазна manifest/hash-driven
@@ -98,7 +98,7 @@ venv interpreter, troubleshooting, rollback і uninstall.
 
 | Функція                          | Що робить                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **CLI**                          | 16 команд, включно з `power memory` для явного proposal, approval, validation та history                                                                                                                                                                                                                                                                                                                                                                                             |
+| **CLI**                          | 17 команд, включно з `power import` для preflighted Markdown migration та `power memory` для явного proposal, approval, validation та history                                                                                                                                                                                                                                                                                                                                     |
 | **MCP Server**                   | 17 інструментів, включно з керованими операціями memory context, proposal, apply, validation та history                                                                                                                                                                                                                                                                                                                                                                              |
 | **OKF Validation**               | Pydantic v2 схеми забезпечують строгі OKF-метадані на кожній нотатці з governance-полями (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                               |
 | **Knowledge Graph (Graph RAG)**  | Поле `related` в OKF frontmatter з підтримкою `TypedRelation` (path, relation, confidence), BFS обходом та експортом підграфів у Mermaid-діаграми (`to_mermaid`)                                                                                                                                                                                                                                                                                                                     |
@@ -201,6 +201,8 @@ power lint <path>              Сканування на биті посилан
 power index <path>             Згенерувати ієрархічний індекс (index.md + _index.md)
 power search <path> <query>    Повнотекстовий пошук з релевантним ранжуванням
 power ingest <path> [опції]    Створити нову нотатку з валідованими OKF метаданими
+power import <dir> --into FOLDER [опції]
+                                Перевірити/імпортувати наявне Markdown-дерево
 power memory <операція>        Керований memory context, proposal, apply, validation та history
 power sync <path>              Побудувати FTS і dense-індекси пошуку
 power rot <path>               ROT Audit — виявити дублікати, застарілі, тривіальні
@@ -472,7 +474,7 @@ flowchart TD
 | `core/markdown_checks.py`                 | Перевірки якості Markdown: trailing whitespace, списки, заголовки                                                                                                                                                                                      |
 | `core/constants.py`                       | Централізовані списки виключень та системні константи                                                                                                                                                                                                  |
 | `core/utils.py`                           | Захист від path traversal, атомарний запис, бекапи, rate limiter                                                                                                                                                                                       |
-| `core/cli.py`                             | Командний рядок із 16 командами, включно з transactional memory workflows                                                                                                                                                                              |
+| `core/cli.py`                             | Командний рядок із 17 командами, включно з preflighted import і transactional memory workflows                                                                                                                                             |
 | `mcp/power_server.py`                     | FastMCP 3.x сервер із 17 async tools, loopback HTTP transport та `/health`                                                                                                                                                                             |
 
 Всі компоненти використовують `power_framework.core` як єдине джерело правди.
