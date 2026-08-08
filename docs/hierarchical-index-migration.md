@@ -11,7 +11,14 @@ timestamp: 2026-07-03T02:20:00
 **Date:** July 3, 2026
 **Version:** P.O.W.E.R. v1.6.0
 **Author:** Weby Homelab AI Team
-**Status:** Completed, Production
+**Status:** Historical v1.6 snapshot; superseded as a current installation/migration contract
+
+!!! warning "Historical evidence, not a current guarantee"
+    This report preserves measurements from one 324-note vault and the implementation state
+    of v1.6. It does not establish universal token complexity or current production
+    performance. For current operations, use the [clean-install guide](getting-started.md),
+    [existing-vault migration guide](migration-guide.md), and current
+    [CLI](cli.md)/[MCP](mcp-server.md) references.
 
 ---
 
@@ -312,7 +319,9 @@ Agent needs info from **one category**:
 | 1,000 | ~80,000 | ~2,500 | 97% |
 | 5,000 | ~400,000 | ~5,000 | 99% |
 
-**Conclusion:** The larger the vault, the greater the savings. The hierarchical model scales at **O(log n)**, while the flat model scales at **O(n)**.
+**Historical observation:** selective reading reduced tokens in this measured vault. The
+generated catalogs still grow with the number of notes they contain, so this report does not
+claim asymptotic `O(log n)` behavior.
 
 ---
 
@@ -365,9 +374,13 @@ Agent needs info from **one category**:
 
 1. **NameError in f-string:** `f"[{_index.md}]"` interprets `_index` as a variable. Correct: `f"[_index.md]"`. This bug broke 7 tests at once.
 
-2. **PEP 668 (Externally-Managed Environments):** On Ubuntu 24.04+, `pip3 install` is blocked. Solution: use venv or `--break-system-packages`. For opencode MCP servers, use the dedicated venv at `/root/.config/opencode/venv/`.
+2. **PEP 668 (Externally-Managed Environments):** system Python may reject a
+   direct `pip` install. Current guidance is to create a dedicated venv and
+   configure each MCP client with that venv's exact interpreter path.
 
-3. **Git rebase conflicts:** When the remote branch has divergent commits, `git reset --hard origin/main` + force push is cleaner than resolving 6-file merge conflicts.
+3. **Git rebase conflicts:** the original migration encountered divergent history. Current
+   guidance is to inspect refs and preserve local work, then use a reviewable branch/PR; never
+   use a destructive reset or force-push as a generic migration step.
 
 4. **Backward compatibility:** `run_generate_index()` (flat mode) is preserved for backward compatibility. Existing code won't break.
 
@@ -403,7 +416,7 @@ Agent needs info from **one category**:
 ### Achievements
 
 1. **75-94% token savings** on typical AI agent queries to Second Brain
-2. **Scalable architecture** — O(log n) instead of O(n)
+2. **Selective navigation** — agents can read a relevant sub-index instead of the entire vault
 3. **On-demand access** — agents read only relevant categories
 4. **Backward compatible** — existing code continues to work
 5. **100/100 tests** — full coverage of new functionality

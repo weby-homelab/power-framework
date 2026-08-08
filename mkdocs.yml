@@ -31,7 +31,12 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
+  - Getting Started:
+      - Clean Install (EN): getting-started.md
+      - Чисте встановлення (UA): getting-started.ua.md
+      - Windows 11 25H2 (EN): windows-11-installation.md
+      - Windows 11 25H2 (UA): windows-11-installation.ua.md
+      - Documentation Inventory (UA): documentation-inventory.ua.md
   - CLI Reference: cli.md
   - MCP Server: mcp-server.md
   - Migration Guides:
@@ -62,7 +67,6 @@ nav:
   - POWER 3.1 Release Evidence: release-3.1.md
   - POWER 3.3.2 Release Notes: release-3.3.2.md
   - Release Governance:
-      - ROADMAP POWER: https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md
       - M2 Human Evaluation: m2-human-evaluation.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md
   - Changelog: CHANGELOG.md

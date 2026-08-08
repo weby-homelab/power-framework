@@ -1,118 +1,203 @@
-# Getting Started
+# Getting Started from a Clean Knowledge Base
 
-## Installation
+This is the authoritative clean-install path for P.O.W.E.R. `v3.3.2`. It
+creates a new vault only. For existing notes, use the
+[migration guide](migration-guide.md) instead of running `power init` in place.
+
+Windows 11 25H2 users should follow the complete
+[Windows installation guide](windows-11-installation.md), which uses exact
+PowerShell paths and includes MCP acceptance checks.
+
+## 1. Prerequisites
+
+- Python 3.11 or newer (`python3 --version`)
+- `venv` and `pip` for that interpreter
+- Network access to GitHub Releases and the configured Python package index
+- Git only when installing from a Git tag or source checkout
+
+Use an isolated virtual environment. Avoid modifying an operating-system Python
+or relying on `--break-system-packages` for a normal installation.
+
+## 2. Install the versioned release
+
+On Linux or macOS:
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.2
+python3 -m venv "$HOME/.local/share/power-framework/venv"
+POWER_PYTHON="$HOME/.local/share/power-framework/venv/bin/python"
+POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
+
+"$POWER_PYTHON" -m pip install --upgrade pip
+"$POWER_PYTHON" -m pip install \
+  https://github.com/weby-homelab/power-framework/releases/download/v3.3.2/power_framework-3.3.2-py3-none-any.whl
 ```
 
-Alternatively, install from a GitHub Release:
+The release wheel pins the P.O.W.E.R. source version. Its dependencies are
+resolved from the configured Python package index.
+
+Verify the executable, package metadata, and MCP import:
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.3.2/power_framework-3.3.2-py3-none-any.whl
+"$POWER_CLI" --version
+"$POWER_PYTHON" -c \
+  'from importlib.metadata import version; print(version("power-framework"))'
+"$POWER_PYTHON" -c \
+  'import power_framework.mcp, onnxruntime; print("imports: OK")'
 ```
 
-Verify:
+Both version commands must report `3.3.2`; the final command must print
+`imports: OK`.
+
+### Alternative: install from the pinned tag
+
+This path requires Git:
 
 ```bash
-power --version
+"$POWER_PYTHON" -m pip install \
+  'git+https://github.com/weby-homelab/power-framework.git@v3.3.2'
 ```
 
-## Create a vault
+Do not use an unpinned `main` install when reproducibility matters.
+
+## 3. Initialize an empty vault
+
+Choose a new path. `power init` refuses a non-empty directory by design.
 
 ```bash
-power init my-vault
+POWER_VAULT="$HOME/Documents/power-vault"
+"$POWER_CLI" init "$POWER_VAULT"
 ```
 
-Creates the P.A.R.A. directory structure:
+The command creates the canonical vault structure:
 
-```
-vault/
+```text
+power-vault/
 ├── 00_Inbox/
 ├── 01_Projects/
 ├── 02_Areas/
 ├── 03_Resources/
 ├── 04_Archive/
-├── 05_Templates/       # Note templates (default.md with OKF frontmatter)
+├── 05_Templates/
+│   └── default.md
 ├── 06_Daily_Logs/
 ├── PROTOCOLS/
 ├── index.md
 └── log.md
 ```
 
-## Add notes
+Per-folder `_index.md` files are created by `power index`, not by `power init`.
+
+## 4. Add the first note
 
 ```bash
-power ingest ~/my-vault --type Project --title "My Project" --description "A new project"
+"$POWER_CLI" ingest "$POWER_VAULT" \
+  --type Resource \
+  --title "First note" \
+  --description "Clean-install acceptance note" \
+  --tags power acceptance
 ```
 
-## Run health checks
+Supported note types are `Project`, `Area`, `Resource`, `Daily Log`, `Archive`,
+and `System Guide`. `power ingest` routes them into the canonical POWER folders.
+
+## 5. Run the clean-vault acceptance gate
 
 ```bash
-power lint ~/my-vault
+"$POWER_CLI" index "$POWER_VAULT" --strict
+"$POWER_CLI" lint "$POWER_VAULT"
+"$POWER_CLI" markdown-check "$POWER_VAULT"
 ```
 
-## Auto-heal frontmatter
+All three commands must exit `0`. An orphan warning for a first note with no
+inbound links is informational; invalid OKF metadata and broken internal links
+are not acceptable.
+
+Build and verify lightweight search without downloading dense models:
 
 ```bash
-power heal ~/my-vault                  # Preview (dry run)
-power heal ~/my-vault --no-dry-run     # Apply fixes
+"$POWER_CLI" sync "$POWER_VAULT" --fts-only
+"$POWER_CLI" search "$POWER_VAULT" "acceptance" --mode fts
 ```
 
-## Check markdown quality
+The result must contain `First note`.
+
+## 6. Optional dense search
+
+The first full synchronization downloads and validates pinned model assets and
+can require substantial time, network traffic, disk space, and memory:
 
 ```bash
-power markdown-check ~/my-vault
+"$POWER_CLI" sync "$POWER_VAULT"
+"$POWER_CLI" search "$POWER_VAULT" "clean installation" --mode semantic
 ```
 
-## Generate index
+Do not claim semantic or reranked readiness unless both full sync and a search
+in the selected mode succeed on the target host. FTS remains available if the
+dense model gate fails.
+
+## 7. Configure MCP for an AI agent
+
+The MCP server requires one existing configured vault root. Point the client to
+the same virtual-environment interpreter used above:
+
+```json
+{
+  "mcpServers": {
+    "power": {
+      "command": "/home/YOU/.local/share/power-framework/venv/bin/python",
+      "args": ["-m", "power_framework.mcp"],
+      "env": {
+        "POWER_VAULT_DIR": "/home/YOU/Documents/power-vault"
+      }
+    }
+  }
+}
+```
+
+Preflight the exact interpreter and vault before restarting the client:
 
 ```bash
-power index ~/my-vault
+POWER_VAULT_DIR="$POWER_VAULT" "$POWER_PYTHON" -c \
+  'import os; from pathlib import Path; import power_framework.mcp; p=Path(os.environ["POWER_VAULT_DIR"]); assert p.is_dir(); print("MCP preflight: OK")'
 ```
 
-## Search the vault
+Restart long-lived MCP clients after changing their configuration or Python
+environment. See [MCP Server](mcp-server.md) for the 17-tool contract and
+transport security boundary.
+
+## 8. Daily operating sequence
+
+After changing notes:
 
 ```bash
-power search ~/my-vault "my query"
-power search ~/my-vault "my query" --mode hybrid --max-results 10
+"$POWER_CLI" index "$POWER_VAULT" --strict
+"$POWER_CLI" lint "$POWER_VAULT"
+"$POWER_CLI" markdown-check "$POWER_VAULT"
 ```
 
-## ROT audit with extended scoring
+Run `power sync` only when the searchable source set changed and the FTS/dense
+index must be refreshed. Read `index.md`, then the relevant canonical
+`_index.md`; do not load every Markdown file merely to discover the vault.
+
+## 9. Upgrade or uninstall
+
+Upgrade to an explicitly selected release and re-run the acceptance gate. To
+remove the Python application without deleting the vault:
 
 ```bash
-power rot ~/my-vault --extended
+"$POWER_PYTHON" -m pip uninstall power-framework
 ```
 
-## Archive stale notes
+The vault is ordinary Markdown and is independent of the Python runtime. Back
+it up before removing either location.
 
-```bash
-power archive ~/my-vault                  # Preview (dry run)
-power archive ~/my-vault --no-dry-run     # Move to 04_Archive/
-```
+## Acceptance checklist
 
-## Suggest related notes (Graph RAG)
-
-```bash
-power suggest-related ~/my-vault
-```
-
-## Cron maintenance
-
-```bash
-power cron ~/my-vault
-```
-
-## MCP server
-
-Start the MCP server for AI agent integration:
-
-```bash
-# Local (stdio)
-python -m power_framework.mcp
-
-# HTTP (Docker / remote)
-POWER_MCP_TRANSPORT=http python -m power_framework.mcp
-```
-
-See [MCP Server](mcp-server.md) for full documentation.
+- Python is 3.11+ and the selected interpreter is inside the dedicated venv.
+- CLI and distribution metadata both report `3.3.2`.
+- `power_framework.mcp` and `onnxruntime` import successfully.
+- `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.
+- FTS sync exits `0` and FTS search returns the first note.
+- MCP preflight uses the same interpreter and prints `MCP preflight: OK`.
+- Dense/reranked readiness is recorded only after the optional target-host gate
+  passes.

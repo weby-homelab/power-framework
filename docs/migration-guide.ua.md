@@ -1,569 +1,456 @@
 ---
 type: Resource
-title: "Ґайд міграції для AI-агента: як перенести будь-який Obsidian Vault у структуру P.O.W.E.R. (v3.3.2)"
-description: "Покроковий протокол для будь-якого LLM-агента для автономної міграції Obsidian Vault у OKF-сумісну структуру P.O.W.E.R. 3.3.2 зі збереженням обраного дерева папок."
-tags: [power, migration, guide, ai-agents, mcp, bge-m3, graphrag, methodologies]
-timestamp: 2026-08-07T21:10:00
+title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.3.2"
+description: "Fail-closed manifest-driven протокол міграції наявної Markdown-бази знань у перевірений P.O.W.E.R. vault без зміни джерела."
+tags: [power, migration, guide, ai-agents, safety, verification]
+timestamp: 2026-08-08T12:00:00+03:00
 ---
 
-# Ґайд міграції для AI-агента: як перенести будь-який Obsidian Vault у структуру P.O.W.E.R. (v3.3.2)
+# Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.3.2
 
-**Цільова аудиторія:** AI-агенти (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) з MCP-доступом до P.O.W.E.R.
+Цей гід є execution contract для будь-якого AI-агента з доступом до файлової
+системи. Він переносить Markdown або Obsidian knowledge base у канонічну
+структуру P.O.W.E.R. зі збереженням source content, attachments, provenance і
+rollback path.
 
-**Мета:** Перетворити будь-який неструктурований або існуючий Obsidian Vault у P.O.W.E.R.-сумісну базу знань з валідованими OKF-метаданими, довільною обраною методологією (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або кастомною/гібридною) та ієрархічними індексами — повністю автономно.
+Для нового порожнього vault використовуйте
+[«Початок роботи»](getting-started.ua.md). Для runtime setup на Windows 11 25H2
+спочатку виконайте [Windows-гід](windows-11-installation.ua.md).
 
-## Індекс інструкцій репозиторію (прочитати першим)
+## Індекс інструкцій репозиторію
 
-Для будь-якого AI-агента, який починає роботу з цим репозиторієм: тут є всі детальні покрокові інструкції для кожного шляху впровадження. Прочитайте відповідний гід, перш ніж починати роботу:
+Перед зміною даних агент має прочитати релевантні документи:
 
-1. **Установка з нуля на чисту базу знань** — див. [Початок роботи](getting-started.md): встановлення фреймворку, створення vault через `power init`, додавання нотаток через `power ingest`, валідація через `power lint`, побудова індексів через `power index` та запуск MCP-сервера (`python -m power_framework.mcp`).
-2. **Коректна міграція з будь-якої існуючої бази на P.O.W.E.R.** — цей гід (`docs/migration-guide.ua.md`): міграція будь-якого існуючого Obsidian Vault (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або неструктурованого/гібридного) з нульовою втратою даних, згідно з 6 фазами нижче.
-3. **Повна інструкція встановлення на Windows 11** — див. `README.ua.md` → розділ **«Установка на Windows 11»**: Python 3.11+ з python.org, `py -m pip install --user git+https://github.com/weby-homelab/power-framework.git@v3.3.2`, налаштування `PATH` для `%APPDATA%\Python\Scripts` та конфігурація MCP-клієнтів з `"command": "py", "args": ["-m", "power_framework.mcp"]`.
+1. [Чиста установка](getting-started.ua.md) — isolated runtime, empty vault,
+   перша нотатка, validation, FTS і MCP preflight.
+2. Цей migration guide — discovery, backup, manifest, transformation,
+   canonical placement, link repair і acceptance gates.
+3. [Windows 11 25H2](windows-11-installation.ua.md) — точні PowerShell-шляхи,
+   Visual C++ requirement і target-host checks.
+4. [CLI reference](cli.md) і [MCP server contract](mcp-server.md) — актуальні
+   команди, параметри, rate limits і security boundaries.
 
-Якщо ви починаєте з порожнього vault — спочатку прочитайте `docs/getting-started.md`, а цей гід використовуйте лише для міграції вже існуючого vault.
+## Що означає «міграція будь-якої бази знань»
 
----
+- P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, flat folders та
+  hybrid trees підтримуються як **класифікації джерела**.
+- Destination використовує канонічні top-level folders P.O.W.E.R., щоб
+  hierarchical index і 17 MCP tools мали задокументовану поведінку.
+- Не-Markdown система має спочатку експортувати нотатки у Markdown, а
+  attachments — у файли. Vendor database extraction не реалізовано в CLI.
+- Невідомі frontmatter fields можна зберегти, але required OKF fields мають
+  пройти validation.
+- Source ніколи не мігрується in place. Він залишається незмінним до окремого
+  рішення користувача щодо retention.
 
-## Огляд
+## Реальна межа інструментів
 
-Цей протокол дозволяє будь-якому LLM-агенту виконати міграцію, комбінуючи:
+- `power init` приймає лише новий або порожній каталог.
+- `power index` каталогізує `00_Inbox`, `01_Projects`, `02_Areas`,
+  `03_Resources`, `04_Archive`, `06_Daily_Logs` і `PROTOCOLS`.
+- MCP `ingest_note` пише лише у дозволені P.A.R.A. folders, має rate limit,
+  регенерує index, дописує `log.md` та запускає lint.
+- MCP `read_sub_index` і `ensure_sub_index` приймають канонічні P.A.R.A.
+  categories, а не довільні source folders.
+- CLI `power ingest` створює нову нотатку, але не імпортує body наявної. Це не
+  batch migration command.
+- `power heal` виправляє missing/invalid frontmatter fields, але не класифікує
+  довільні top-level folders, не ремонтує wikilinks і не викликає LLM.
+- `power rename` за замовчуванням працює як dry run і оновлює paths у metadata
+  `related`. Він не гарантує повний rewrite кожного Markdown/Obsidian link.
 
-- **MCP-інструменти** — `ingest_note`, `lint_vault`, `generate_index`, `read_sub_index`, `search_vault_tool`
-- **Доступ до файлової системи** — читання `.md` файлів, переміщення та виправлення посилань
-- **Інтелект LLM** — класифікація нотаток за методологіями (P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal), визначення тайтлів, генерація описів
-- **Сумісність зі структурою папок** — P.O.W.E.R. 3.3.2 може індексувати й перевіряти нотатки у наявному дереві папок. `power init` створює лише стандартний скелет P.A.R.A.; вибір шаблону методології ще не реалізований. OKF-валідація та підтримувані режими пошуку не залежать від структури папок.
+Саме тому протокол використовує staging vault і migration manifest, а не
+видає одну команду за lossless migration.
 
-Агент виконує 6 фаз. Кожна фаза має чіткі критерії успіху.
+## Шестифазний протокол
 
----
+1. Авторизація й незмінний snapshot джерела
+2. Інвентаризація та classification manifest
+3. Ініціалізація destination і staged transformation
+4. Attachments, links і graph relations
+5. Executable validation та reconciliation
+6. Cutover, rollback record і maintenance
 
-## Фаза 1: Дослідження (Discovery)
-
-**Мета:** Зрозуміти поточний стан Vault та виявити його існуючу або бажану методологію.
-
-### Кроки
-
-1. **Проскануйте директорію Vault** — знайдіть всі `.md` файли рекурсивно, виключаючи `.git/`, `node_modules/`, `__pycache__/`, `.venv/`.
-
-2. **Прочитайте кожен `.md` файл** — захопіть повний вміст. Зверніть увагу:
-    - Чи є вже YAML frontmatter?
-    - Чи є поля `type`, `title`, `description`?
-    - Яка поточна структура папок та номенклатура імен файлів?
-
-3. **Визначте існуючі патерни та ДЕТЕКТУЙТЕ МЕТОДОЛОГІЮ сховища**:
-    - **P.A.R.A.** — папки `01_Projects`, `02_Areas`, `03_Resources`, `04_Archive`.
-    - **C.O.D.E.** — папки workflow `01_Capture`, `02_Organize`, `03_Distill`, `04_Express`.
-    - **GTD (Getting Things Done)** — папки `00_Inbox`, `01_Next_Actions`, `02_Waiting_For`, `03_Someday`, `04_Projects`.
-    - **Zettelkasten** — наявність UID у назвах файлів (`202607242115_...`), папки `fleeting`, `literature`, `permanent`, `index`.
-    - **LYT (Linking Your Thinking)** — картки контенту `Home.md`, `*_MOC.md`, папка `MOCs/`.
-    - **Johnny.Decimal** — десятинна ієрархія папок (`10-19_...`, `20-29_...`).
-    - **Неструктурована / Гібридна** — пласка структура без папок або довільне дерево.
-
-4. **Запустіть `lint_vault(vault_path)`** — базова перевірка здоров'я. Запишіть скільки нотаток не мають метаданих та скільки битих посилань.
-
-5. **🛡️ Створіть Обов'язкову Резервну Копію (Правило Нульової Втрати Даних)** — ПЕРЕД модифікацією, переміщенням чи інгестом файлів, створіть повний архів Vault:
-   ```bash
-   tar -czf vault_backup_$(date +%Y%m%d_%H%M%S).tar.gz /шлях/до/vault
-   ```
-   *Категорично заборонено виконувати масові або деструктивні операції без верифікованого бэкапу.*
-
-**Критерій успіху:** Ви маєте повний інвентар нотаток, детектовану методологію сховища, початкові метрики linter та збережений архівний бэкап.
-
----
-
-## Фаза 2: Класифікація та Маппінг Методологій
-
-**Мета:** Проаналізувати кожну нотатку, визначити її метадані OKF (`type`, `title`, `description`, `tags`) та адаптувати до обраної методології.
-
-### Підтримка методологій та маппінг типів OKF
-
-Кожна нотатка отримує валідний `type` з OKF `NoteType` enum (або розширений семантичний тип у кастомних конфігураціях). Таблиця нижче допомагає спланувати міграцію, але не описує шаблони CLI:
-
-| Методологія | Головний Фокус | Структура Папок | Маппінг початкових типів на OKF `NoteType` |
-| :--- | :--- | :--- | :--- |
-| **P.A.R.A.** | Дії та Дедлайни | `01_Projects`, `02_Areas`, `03_Resources`, `04_Archive` | `Project`, `Area`, `Resource`, `Archive`, `Daily Log`, `System Guide` |
-| **C.O.D.E.** | Дистиляція та генерація контенту | `01_Capture`, `02_Organize`, `03_Distill`, `04_Express` | `Capture` (`Resource`), `Organize` (`Area`/`Project`), `Distill` (`Resource`), `Express` (`Project`/`Resource`) |
-| **GTD** | Опрацювання задач і Inbox Zero | `00_Inbox`, `01_Next_Actions`, `02_Waiting_For`, `03_Someday`, `04_Projects` | `Resource` (Inbox/Ref), `Project` (Next/Projects), `Area` (Waiting), `Archive` (Someday) |
-| **Zettelkasten** | Атомарний граф з UID | `fleeting/`, `literature/`, `permanent/`, `index/` | `Resource` (Fleeting/Lit), `Area`/`Resource` (Permanent), `System Guide` (Index/Hubs) |
-| **LYT** | Карти контенту (MOCs) | `Home.md`, `MOCs/`, `Notes/`, `Archives/` | `System Guide` (Home), `Area` (MOCs), `Resource` (Notes), `Archive` (Archives) |
-| **Johnny.Decimal** | Десятинний індекс | `10-19_...`, `20-29_...`, `30-39_...` | `Area` (Category index), `Project` (Sub-category), `Resource` (Leaf notes) |
-| **Custom / Hybrid** | Довільна структура | Будь-яка (на розсуд користувача/агента) | Визначення `type:` за семантичним змістом нотатки |
-
-### Для кожної нотатки визначте:
-
-1. **`title`** — заголовок H1 або ім'я файлу (1-200 символів)
-2. **`description`** — опис в один рядок (1-150 символів)
-3. **`type`** — відповідний OKF `NoteType` (див. таблицю)
-4. **`tags`** — релевантні ключові слова (опціонально, список рядків)
-5. **`resource`** — якщо нотатка посилається на зовнішній URL (опціонально)
-6. **`owner`** — власник або відповідальний розробник/агент (опціонально)
-7. **`status`** — статус нотатки: `active`, `review` або `archived` (опціонально, за замовчуванням `active`)
-8. **`related`** — структурований список зв'язків з іншими файлами для GraphRAG (опціонально)
-
-### Евристики класифікації
-
-- **Аналіз назви папки та методології:** Використовуйте підказки методології (наприклад, `01_Capture/` у C.O.D.E. → `Resource`, `permanent/` у Zettelkasten → `Area`/`Resource`).
-- **Аналіз вмісту:** Щоденникові записи → `Daily Log`; протоколи дій для ШІ → `System Guide`; референсні статті → `Resource`.
-- **Графовий аналіз посилань:** Нотатки з високою кількістю вхідних посилань (MOC / Index) → `Area` або `System Guide`.
-- **За замовчуванням:** При невизначеності призначайте `Resource`.
-
-**Критерій успіху:** Кожна нотатка має чернетку `(type, title, description, tags, target_path)`.
+Не пропускайте фазу. Успіх пізнішого gate не компенсує відсутній попередній.
 
 ---
 
-## Фаза 3: Міграція та Генерація Скелету
+## Фаза 1: Авторизація й незмінний snapshot джерела
 
-**Мета:** Створити нотатки у відповідній папці обраної методології з валідованим OKF frontmatter та перебудувати індекси.
+### 1.1 Визначте точні шляхи
 
-### Крок 3a: Ініціалізація або підготовка скелету Vault
+Запишіть абсолютні шляхи:
 
-`power init /шлях/до/vault` створює стандартну структуру P.A.R.A. Не запускайте її в непорожньому Vault, якщо саме така структура не потрібна. Для C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal або довільної структури збережіть чи створіть потрібні папки, а за потреби додайте `.power/domains.yaml` для автоматичного розміщення, шаблонів і пріоритетів пошуку, потім запустіть `lint` та `index`. Глобальний параметр `power init --template` наразі не підтримується; доменні шаблони обираються реєстром під час `power ingest`.
+- `SOURCE` — наявна база знань;
+- `DESTINATION` — новий sibling directory;
+- `BACKUP` — snapshot поза source і destination;
+- `WORK` — manifests, reports і тимчасові transformed copies.
 
-### Крок 3b: Інгест кожної нотатки
+Відхиліть план, якщо шлях порожній, дорівнює `/`, є home directory або ancestor
+іншої цілі. Не використовуйте unresolved environment variables чи broad globs
+для delete/overwrite operations.
 
-Для кожної класифікованої нотатки викличте MCP-інструмент `ingest_note`:
+### 1.2 Зафіксуйте стан source
 
-```jsonc
-{
-    "name": "01_Projects/My-Project", // Шлях методології + ім'я файлу (без .md)
-    "note_type": "Project", // З NoteType enum
-    "title": "My Project", // Людський заголовок
-    "description": "Будуємо наступну велику річ", // 1-150 символів
-    "content": "<повний вміст markdown>", // Оригінальний вміст
-    "tags": ["active", "dev"], // Опціонально
-    "resource": "https://github.com/...", // Опціонально
-}
+До будь-яких змін запишіть:
+
+- UTC timestamp, host, OS і P.O.W.E.R. version;
+- count і total bytes за extension;
+- Git commit/status, якщо source є Git repository;
+- unreadable files, symlinks, duplicate relative paths і case-only filename
+  collisions, особливо перед перенесенням на Windows;
+- excluded/generated directories: `.git`, `.obsidian`, `.venv`,
+  `node_modules`, caches і наявні search databases.
+
+### 1.3 Створіть і перевірте backup
+
+Використайте filesystem snapshot або archive/copy, відповідний хосту. Backup
+має бути поза source tree і не повинен захоплювати secrets, виключені scope.
+
+Verification вимагає:
+
+- exit code backup-команди `0`;
+- backup можна прочитати, перелічити або змонтувати;
+- source і backup inventories збігаються для всіх authorized files;
+- SHA-256 збігаються для attachments і original Markdown bytes.
+
+Не починайте Фазу 2 з неперевіреним backup. Не кладіть archive у vault, де він
+може потрапити в index або Git.
+
+**Receipt Фази 1:** exact paths, source Git state, inventory totals, backup
+location, verification command, exit code і digest/count comparison.
+
+---
+
+## Фаза 2: Інвентаризація та classification manifest
+
+### 2.1 Побудуйте повний inventory
+
+Без редагування зафіксуйте:
+
+- кожний Markdown file: relative path, size, SHA-256;
+- кожний attachment: relative path, size, SHA-256;
+- encoding/BOM і line-ending anomalies;
+- existing YAML frontmatter та validity required fields;
+- wikilinks, embeds, Markdown links і `related` paths;
+- filename stems, неоднозначні для basename wikilinks;
+- external URLs; не надсилайте private content remote service.
+
+Виключайте лише явно authorized generated/vendor trees. Збережіть exclusion
+list у manifest, щоб counts були пояснюваними.
+
+### 2.2 Визначте source methodology
+
+Directory/content signals — лише hints, а не доказ:
+
+| Source pattern | Типовий signal | Початковий POWER target |
+| --- | --- | --- |
+| P.A.R.A. | Projects, Areas, Resources, Archive | відповідний canonical folder |
+| C.O.D.E. | Capture, Organize, Distill, Express | Inbox/Resource/Area/Project за content |
+| GTD | Inbox, Next Actions, Waiting, Someday, Projects | Inbox/Project/Area/Archive |
+| Zettelkasten | fleeting, literature, permanent, UID names | Resource; hubs можуть бути Area/System Guide |
+| LYT | Home, MOCs, Notes, Archives | System Guide/Area/Resource/Archive |
+| Johnny.Decimal | numeric category ranges | Area/Project/Resource за semantic role |
+| Flat/hybrid | немає надійного folder contract | note-by-note; fallback Resource |
+
+### 2.3 Створіть migration manifest
+
+Мінімальні поля для кожного source item:
+
+```text
+source_path
+source_kind                 # markdown | attachment | config | excluded
+source_sha256
+detected_methodology
+target_path
+okf_type
+title
+description
+link_rewrites_planned
+status                      # planned | transformed | verified | blocked
+reason
 ```
 
-Для Zettelkasten:
-```jsonc
-{
-    "name": "permanent/202607242115-my-atomic-idea",
-    "note_type": "Resource",
-    "title": "Atomic Concept of Vector Indexing",
-    "description": "Explaining ONNX vector indexing in Zettelkasten format",
-    "content": "<markdown content>"
-}
+Для нотатки також запишіть нормалізований **body hash** після вилучення лише
+старого frontmatter. Це дозволяє змінити destination frontmatter і водночас
+довести, що body не було непомітно втрачено.
+
+### 2.4 Класифікуйте OKF metadata
+
+Required fields:
+
+```yaml
+type: Project | Area | Resource | Daily Log | Archive | System Guide
+title: "Людинозрозумілий заголовок"
+description: "Однорядковий catalog summary"
+timestamp: 2026-08-08T12:00:00+03:00
 ```
 
-Для C.O.D.E.:
-```jsonc
-{
-    "name": "01_Capture/Raw-Idea-Note",
-    "note_type": "Resource",
-    "title": "Raw Idea Note",
-    "description": "Captured raw note for future distillation",
-    "content": "<markdown content>"
-}
-```
+Поточні optional fields: `resource`, `tags`, `owner`, `status`, `expiry`,
+`related`, `okf_version` і `memory`. Зберігайте unknown metadata, якщо воно не
+небезпечне й не конфліктує з validated schema.
 
-**Важливі правила:**
+Classification rules:
 
-- `name` включає шлях відповідно до обраної методології (P.A.R.A., C.O.D.E., Zettelkasten тощо) + ім'я файлу (підкреслення або дефіси, без пробілів).
-- `note_type` має відповідати OKF enum (`Project`, `Area`, `Resource`, `Archive`, `Daily Log`, `System Guide`).
-- `content` — це **повний оригінальний markdown** — спочатку видаліть старий YAML frontmatter.
-- Інструмент `ingest_note` автоматично:
-    - Валідує всі метадані через Pydantic v2
-    - Записує файл з правильним OKF frontmatter
-    - Перебудовує ієрархічний індекс
-    - Додає запис у `log.md`
-    - Запускає перевірку lint
+- active outcome з finish condition → `Project`;
+- ongoing responsibility → `Area`;
+- reference, atomic note, clipping або uncertain item → `Resource`;
+- temporal journal/session record → `Daily Log`;
+- completed або intentionally retired material → `Archive`;
+- agent protocol, MOC/system hub або operating rule → `System Guide`.
 
-### Крок 3c: Пакетна ефективність
+Не вигадуйте provenance, owner, dates або relations. Позначайте uncertain rows
+як `blocked` або використовуйте conservative `Resource` із записаною причиною.
 
-Для великих Vault (>50 нотаток) групуйте інгести за категоріями. Це робить перебудову індексу передбачуваною.
+**Receipt Фази 2:** total/excluded/classified/blocked counts, collision report,
+manifest checksum і нуль unaccounted authorized files.
 
-### Крок 3d: Векторне Індексування (`power sync`)
+---
 
-Після завершення інгесту нотаток розрахуйте густі BGE-M3 ембеддінги для підтримки режимів пошуку `reranked` та `semantic`:
+## Фаза 3: Ініціалізація destination і staged transformation
+
+### 3.1 Встановіть і перевірте P.O.W.E.R.
+
+Використовуйте pinned `v3.3.2` environment із clean-install гіда:
 
 ```bash
-power sync /шлях/до/vault
+power --version
+python -c 'import power_framework.mcp, onnxruntime; print("imports: OK")'
 ```
-*Примітка:* Запуск `power sync` чанкує документи, витягує зв'язки GraphRAG та розраховує 1024d ембеддінги у базі `.power_search.db`.
 
-**Критерій успіху:** Всі нотатки створено у цільових папках обраної методології з валідним OKF frontmatter. Навігаційні індекси та векторна база (`.power_search.db`) повністю синхронізовані.
+`python` має бути тим interpreter, якому належить executable `power`.
 
----
-
-## Фаза 4: Верифікація
-
-**Мета:** Підтвердити, що Vault повністю здоровий.
-
-### Кроки
-
-1. **Запустіть `lint_vault(vault_path)`** — очікуйте:
-
-    ```
-    ✅ OKF Metadata: 0 помилок
-    ✅ Internal Links: 0 битих
-    ✅ Orphans: 0 (або очікувані в Daily Logs)
-    ```
-
-2. **Вибірково перевірте файли** — прочитайте 3-5 випадкових нотаток, щоб переконатися, що frontmatter правильний і вміст цілий.
-
-3. **Перевірте ієрархічний індекс** — викличте `read_sub_index(category="<директорія_методології>", vault_path=...)` (наприклад, `01_Projects`, `permanent` або `01_Capture`) і переконайтеся, що повертається валідний sub-index.
-
-4. **Перевірте Векторний та Reranked пошук** — викличте `search_vault_tool(query="test", search_mode="reranked", vault_path=...)` і переконайтеся, що пошук працює без попереджень про `power sync`.
-
-**Критерій успіху:** Lint проходить з нульовими помилками. Векторний пошук працює чисто без варнінгів. Вибіркова перевірка проходить.
-
----
-
-## Фаза 5: Прибирання (Опціонально)
-
-**Мета:** Видалити старий, неструктурований файли після верифікації міграції.
-
-### Кроки
-
-1. Знайдіть файли, що залишилися поза папками обраної методології.
-2. Для кожного:
-    - Якщо успішно мігровано (вміст існує у структурі цільової методології) — видаліть
-    - Якщо не мігровано — дослідіть і класифікуйте
-3. Після всіх видалень запустіть `generate_index(vault_path)` для оновлення
-4. Виконайте фінальний `lint_vault(vault_path)`
-
-**⚠️ Увага:** Видаляйте файли тільки після **повної верифікації**. Для безпеки краще переміщувати в архівні папки (наприклад, `04_Archive/` або `Archives/`), ніж видаляти.
-
----
-
-## Фаза 6: Післяміграційне самопідтримання та Синхронізація (Post-Migration Maintenance & Sync)
-
-**Мета:** Гарантувати постійне збереження здоров'я бази знань між сесіями роботи AI-агентів, а також синхронізувати зміни із віддаленим сховищем.
-
----
-
-### Крок 6a: Встановлення та Налаштування P.O.W.E.R. Framework (v3.3.2)
-
-Для автономної роботи агента на цільовому хості встановіть інструментарій P.O.W.E.R. (v3.3.2) глобально або у віртуальне середовище проєкту:
+### 3.2 Ініціалізуйте порожній destination
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git
+power init /absolute/path/to/destination
 ```
 
-#### 🧠 Налаштування стеку Embeddings & Reranker (канонічний стек v3.3.2)
+Команда має завершитися з кодом `0`. Не копіюйте source files до цього кроку й
+не обходьте non-empty-directory guard.
 
-Починаючи з версії 3.0+, канонічним провайдером за замовчуванням є **`bge-m3`** (`aapot/bge-m3-onnx`, розмірність векторів **1024**), який працює на прямому **ONNX Runtime** + `tokenizers` (`BGEM3OnnxManager`). Він функціонує в парі з крос-енкодером **`onnx-community/bge-reranker-v2-m3-ONNX`** (Apache-2.0).
+### 3.3 Трансформуйте малими batches
 
-Пряме завантаження через ONNX Runtime усуває проблеми реєстру fastembed, приборкує алокатор пам'яті BFCArena та забезпечує адаптивне зменшення розміру батчу при навантаженні, запобігаючи OOM-сплескам на хостах з 8–12 GB RAM.
+Для кожної Markdown note:
 
-Для конфігурації лімітів потоків та пам'яті встановіть змінні оточення (автоматично завантажуються з `.env`):
+1. прочитайте source bytes один раз;
+2. відокремте old frontmatter від body без зміни body;
+3. побудуйте validated OKF frontmatter з approved manifest row;
+4. оберіть unique target у canonical P.O.W.E.R. folder;
+5. запишіть temporary/staging file і лише потім atomically place result;
+6. запишіть destination byte hash і normalized body hash;
+7. позначте row `transformed`, але ще не `verified`.
 
-```bash
-export POWER_EMBED_PROVIDER=bge-m3           # Канонічний провайдер за замовчуванням (aapot/bge-m3-onnx)
-export POWER_EMBED_NUM_THREADS=2             # Обмеження кількості потоків CPU
-export POWER_EMBED_BATCH_SIZE=8              # Розмір батчу для генерації ембеддінгів
-```
+Batch має бути достатньо малим для review/retry. Не регенеруйте весь index
+після кожної нотатки у великій міграції.
 
-При використанні `bge-m3` або інших ONNX-моделей з HuggingFace встановіть наступну змінну для запобігання помилкам обходу симлінків:
+### 3.4 Коли доречний MCP `ingest_note`
 
-```bash
-export HF_HUB_DISABLE_SYMLINKS=1
-```
+Він придатний для невеликої кількості окремих notes, якщо:
 
-Налаштуйте інтеграцію MCP-сервера у вашому клієнті AI-агента або конфігураційному файлі IDE (наприклад, `cline_config.json`, `opencode.jsonc`, налаштуваннях Cursor/Windsurf тощо).
+- target починається з дозволеного P.A.R.A. folder;
+- `content` є повним body без old frontmatter;
+- rate limit і per-note index/lint cost прийнятні;
+- агент читає returned lint report.
 
-Ви можете налаштувати LLM-сервери (`POWER_LLM_*`) для автоматичного аудиту та оновлення метаданих. Застосуйте параметр `"opencode"` для прямої роботи через локальний CLI OpenCode без додаткових інференс-серверів:
+Для великого vault використовуйте controlled filesystem transformation і CLI
+gates раз на batch. Не заявляйте підтримку arbitrary target folders через MCP.
 
-```json
-"mcpServers": {
-  "power": {
-    "command": "python",
-    "args": ["-m", "power_framework.mcp"],
-    "env": {
-      "POWER_VAULT_PATH": "/absolute/path/to/your/second-brain",
-      "POWER_LLM_API_BASE": "http://localhost:8080/v1", // Вкажіть "opencode" для прямого виклику локального CLI
-      "POWER_LLM_API_KEY": "local",
-      "POWER_LLM_MODEL": "opencode/deepseek-v4-flash-free"
-    },
-    "enabled": true
-  }
-}
-```
+### 3.5 Reconcile кожний batch
 
-Це надає вашому агенту доступ до інструментів валідації (`lint_vault`), автоматичного індексування (`generate_index`, `read_sub_index`) та пошуку (`search_vault_tool`).
+Доведіть:
 
----
+- кожен transformed source row має рівно один destination;
+- кожен destination має valid required frontmatter;
+- normalized source/destination body hashes збігаються;
+- target collision не перезаписав попередню note;
+- blocked rows залишаються видимими в manifest.
 
-### Крок 6b: Оптимізація контексту (Файли ігнорування)
-
-Для запобігання переповненню контексту AI-агента зайвими файлами (бінарними файлами, кешами, системними папками Git) створіть файл конфігурації ігнорування (наприклад, `.geminiignore`, `.cursorignore` або `.gitignore` залежно від вашого IDE) у корені робочого простору:
-
-```
-.git/
-.gitignore
-.geminiignore
-.cursorignore
-__pycache__/
-*.pyc
-.venv/
-venv/
-node_modules/
-*.db
-*.key
-*.pem
-*.crt
-*.log
-```
+**Receipt Фази 3:** batch range, created files, matching body hashes, failed rows
+і retry actions.
 
 ---
 
-### Крок 6c: Конфігурація інструкцій та правил для AI-агентів
+## Фаза 4: Attachments, links і graph relations
 
-Налаштуйте передачу правил проєкту вашому агенту через системні файли правил (наприклад, `.clinerules`, `.cursorrules`, `.windsurfrules`) або секцію інструкцій у конфігурації клієнта.
-Приклад структури файлів інструкцій:
+### 4.1 Скопіюйте attachments losslessly
 
-- **`RULES.md` / `INSTRUCTIONS.md`** — загальні правила поведінки агента.
-- **`MASTER-LESSONS-LEARNED.md`** — журнал засвоєних уроків та edge-cases для запобігання повторенню помилок.
-- **`power/SKILL.md`** — правила роботи з методологіями знань та структурою Vault.
+Збережіть bytes і, де можливо, relative layout. Після copy перевірте SHA-256.
+Не вставляйте attachment contents у prompts лише заради перенесення.
 
----
+### 4.2 Перепишіть links за manifest mapping
 
-### Крок 6d: Виправлення внутрішніх вікіпосилань
+Опрацьовуйте синтаксиси окремо:
 
-Оскільки файли переміщуються у папки обраної методології (наприклад, `01_Projects/`, `01_Capture/`, `permanent/` тощо), старі прямі вікіпосилання можуть потребувати оновлення. AI-агент має перевірити та оновити посилання `[[Назва нотатки]]` на релевантний відносний шлях у форматі `[[Папка методології/Назва нотатки|Аліас]]`.
-P.O.W.E.R. Linter автоматично перевіряє биті посилання, а оновлення виконується через скрипт автокорекції або інструменти редагування коду.
+- `[[Note]]` і `[[folder/Note|Alias]]` wikilinks;
+- `![[attachment.png]]` embeds;
+- `[label](relative/path.md)` Markdown links;
+- image/file paths;
+- OKF `related[].path`.
 
----
+Source-relative Markdown links і vault/basename wikilinks мають різну
+семантику. Якщо дві notes мають однаковий basename, не вгадуйте: використайте
+manifest target або залиште link `blocked`.
 
-### Крок 6e: Автоматичне оновлення індексів (`_index.md`)
+`power rename` може допомогти з `related` для одного known rename, але не є
+універсальним wikilink migration engine.
 
-Файли `_index.md` для кожної папки обраної методології є обов'язковими навігаційними картами. Вони генеруються автоматично через команду `power index`.
-_Правило для агента:_ Після будь-якої зміни структури нотаток (додавання, переміщення, видалення) завжди виконуйте регенерацію індексів за допомогою MCP-інструменту `generate_index` або CLI `power index`.
+### 4.3 Створюйте graph relations консервативно
 
----
-
-### Крок 6f: Виключення системних папок
-
-Переконайтеся, що валідатор та генератор індексу ігнорують приховані та системні папки (наприклад, `.git/`, `.obsidian/`), щоб уникновувати помилкових попереджень про відсутність метаданих або битих посилань у тимчасових файлах.
-
----
-
-### Крок 6g: Щоденний протокол обслуговування (Daily Maintenance)
-
-Сесія роботи з базою знань має завершуватися циклом самопідтримання:
-
-1. **Збереження логу сесії** — створення нотатки в `06_Daily_Logs/` (тип: `Daily Log`) з описом виконаної роботи.
-2. **Перебудова індексу** — виконання `power index` для оновлення `index.md` та `_index.md`.
-3. **Синхронізація векторної бази** — виконання `power sync` для розрахунку BGE-M3 ембеддінгів та оновлення зв'язків GraphRAG.
-4. **Оновлення журналу змін** — додавання стислого запису в загальний `log.md`.
-5. **Валідація стану (Lint)** — запуск `power lint` для підтвердження відсутності регресій (вимога: 0 помилок).
-
----
-
-### Крок 6h: Чек-лист безперервності між сесіями
-
-Перед початком нової робочої сесії AI-агент повинен:
-
-1. Прочитати загальні правила проєкту та інструкції.
-2. Ознайомитися з `MASTER-LESSONS-LEARNED.md` (журналом помилок).
-3. Запустити `power lint` для перевірки поточного стану бази знань.
-4. Прочитати навігаційний індекс `index.md` та історію змін `log.md`.
-
----
-
-### Крок 6i: Синхронізація з Git, Очищення Секретів та GPG-підпис
-
-Для збереження історії та спільного доступу без ризику витоку секретів:
-
-1. **🔒 Обов'язкове Очищення Секретів (Credentials Purge Mandate)**: Категорично заборонено залишати секрети (токени, паролі, API ключі, приватні `.key`/`.pem` файли) у нотатках чи комітити `.env` у Git. Перевіряйте `git diff --cached` перед комітом.
-2. **Ідентичність комітера:** Налаштуйте `user.name` та `user.email` у Git відповідно до вашого профілю розробника (уникайте коммітів від імен `root` чи `localhost`).
-3. **Конфігурація безпеки:** Додайте конфіденційні файли (ключі, паролі, `.env`, тимчасові файли експорту, `.power_search.db`) у `.gitignore`.
-4. **GPG-підпис:** Використовуйте підписані коміти (`commit -S`) за допомогою вашого GPG-ключа (`2D49E810C7F2527E` або персонального).
-5. **Робочий процес Git (PR Workflow):**
-    - Робота над змінами має вестися в окремих гілках (`feature/*` або `fix/*`).
-    - Обов'язковий двосторонній аудит `git diff` (перевірка доданих `+` та вилучених `-` рядків).
-    - Публікація в `main` через Pull Request після проходження локальних тестів (`verify.sh`, `pytest`).
-    - Очищення злитих гілок після мерджу за допомогою скриптів/API без видалення незалитих гілок з відкритими PR.
-
----
-
-### Крок 6j: Багатомодовий пошук (FTS + Vector + Hybrid + Semantic + Reranked)
-
-Фреймворк P.O.W.E.R. (v3.3.2) включає вбудовану пошукову систему, яка підтримує різні стратегії пошуку:
-
-| Режим                 | Опис                                                                                                      | Коли використовувати                         |
-| --------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `reranked` (default)  | Канонічний пайплайн POWER 3.2: RRF-злиття FTS5 + BGE-M3 Dense + BGE Reranker v2 M3                       | Найвища точність багатомовного ранжування    |
-| `fts`                 | SQLite FTS5 з ваговим BM25 скорингом                                                                      | Точний пошук за ключовими словами та фразами |
-| `vector`              | TF-векторна косинусна схожість (pure Python, zero deps)                                                   | Порівняння лексичної схожості                |
-| `hybrid`              | RRF (Reciprocal Rank Fusion) злиття FTS + Vector                                                          | Баланс лексичного покриття                   |
-| `semantic`            | Косинусна схожість густих векторів (**BGE-M3** 1024d через прямий ONNX Runtime)                           | Швидкий багатомовний семантичний пошук       |
-
-_Правила використання пошуку для AI-агентів:_
-
-1. **Економія токенів:** Використовуйте `search_vault_tool(query, max_results=20, search_mode="semantic")` (або `"hybrid"`) замість лістингу файлів. Це знижує споживання контексту на 95%+.
-2. **Вибір режиму:**
-    - **FTS** — для точних запитів: `search_vault_tool(query='"Docker Compose"')`
-    - **Semantic** — для двомовних та концептуальних пошуків: `search_vault_tool(query="оркестрація деплою", search_mode="semantic")`
-    - **Hybrid Reranked** — для точного концептуального ранжування: `search_vault_tool(query="налаштування сервера", search_mode="hybrid_reranked")`
-3. **CLI використання:** `power search /vault "запит" --mode semantic`
-4. **Синтаксис запитів:**
-    - **Пошук за фразою:** Використовуйте подвійні лапки для точних фраз, наприклад: `search_vault_tool(query='"Docker Compose"')`
-    - **Пошук за префіксом:** Скрипт автоматично додає зірочку `*` до кожного слова (наприклад, `dock*` знайде `docker`, `docking` тощо) для гнучкості.
-    - **Уникайте спецсимво символів:** Не передавайте спецсимволи (окрім подвійних лапок), оскільки вони можуть викликати синтаксичну помилку в SQLite FTS5.
-5. **Безпека:** Файл бази даних `.power_search.db` автоматично додається до `.gitignore` та `.geminiignore` (через маску `*.db`), тому його **категорично заборонено** комітити в Git.
-
----
-
-### Крок 6k: Типізовані зв'язки для GraphRAG
-
-Для семантичного індексування зв'язків фреймворк підтримує типізовані графи всередині блоку `related` метаданих OKF:
-
-- **`extends`** — поточна нотатка розширює концепцію іншої нотатки.
-- **`depends_on`** — поточна нотатка залежить від іншої нотатки або інфраструктури.
-- **`governed_by`** — регулюється правилами чи безпековим мандатом іншої нотатки.
-- **`contradicts`** — суперечить фактам в іншій нотатці (допомагає знаходити застарілі дані).
-- **`part_of`** — є суб-модулем або частиною більшої системи.
-
-Приклад структури:
+Підтримується legacy path string або typed relation:
 
 ```yaml
 related:
-    - path: "02_Areas/Infra_Security.md"
-      relation: "depends_on"
-      confidence: 0.95
+  - path: 02_Areas/Infrastructure.md
+    relation: depends_on
+    confidence: 0.95
 ```
 
----
+Переносьте або додавайте relation лише за наявності evidence. Однакове слово у
+filenames не є достатнім доказом graph edge.
 
-### Крок 6l: ROT-аудит та авто-лікування (Heal)
-
-Система надає інструменти для очищення Redundant, Outdated, Trivial (ROT) нотаток та відновлення поламаних метаданих:
-
-- **`power rot /шлях/до/vault`** — запуск семантичного виявлення дублікатів через густі ембеддінги та пошук фактів-суперечностей за допомогою LLM.
-- **`power heal /шлях/до/vault`** — авто-виправлення поламаних вікіпосилань та виклик LLM для генерації пропущених полів `description` або `tags` на основі контенту.
+**Receipt Фази 4:** attachment count/hash reconciliation, links examined,
+rewritten, ambiguous/blocked і remaining broken-link count.
 
 ---
 
-## Приклад: Повний транскрипт міграції
+## Фаза 5: Executable validation та reconciliation
 
-Ось як виглядає повна міграція з точки зору агента:
+### 5.1 Markdown і OKF gates
 
-```
-Agent: Сканую Vault /Users/alice/obsidian...
-Agent: Знайдено 47 .md файлів, 12 папок
-Agent: Детектовано структуру методологій (Zettelkasten + C.O.D.E. + P.A.R.A.)
-Agent: 31 мають frontmatter, 16 — сирий markdown
-Agent: Запускаю класифікацію всіх нотаток за OKF NoteType...
-
-Нотатка "Daily Thoughts 2026-06-15" → Daily Log (06_Daily_Logs/)
-Нотатка "Project Alpha Requirements" → Project (01_Projects/)
-Нотатка "Raw Idea Note" → Resource (01_Capture/)
-Нотатка "202607242115-vector-indexing" → Resource (permanent/)
-Нотатка "Docker Cheatsheet" → Resource (03_Resources/)
-Нотатка "Old Meeting Notes 2024" → Archive (04_Archive/)
-...
-
-Agent: Мігрую через MCP-інструмент ingest_note у відповідні папки методологій...
-  ✅ 01_Projects/Project-Alpha-Requirements.md
-  ✅ 01_Capture/Raw-Idea-Note.md
-  ✅ permanent/202607242115-vector-indexing.md
-  ✅ 03_Resources/Docker-Cheatsheet.md
-  ✅ 04_Archive/Old-Meeting-Notes-2024.md
-  ✅ 06_Daily_Logs/2026-06-15_Daily-Thoughts.md
-  ... (всього 47 нотаток)
-
-Agent: Запускаю lint...
-  ✅ OKF Metadata: 0 помилок
-  ✅ Internal Links: 0 битих
-  ✅ Orphans: 3 нотатки (всі в 06_Daily_Logs — виключення)
-
-Agent: Запускаю Фазу 6: Синхронізація та Публікація...
-Agent: Імпортую GPG-ключ та налаштовую ідентичність Git
-Agent: Створюю підписаний коміт у гілці feature/power-migration
-Agent: Надсилаю зміни до GitHub та створюю Pull Request
-Agent: Перевіряю статус CI/CD воркфлоу...
-  ✅ Збірка MkDocs успішна: https://weby-homelab.github.io/power-framework/
-
-Agent: Міграцію та публікацію успішно завершено. Vault сумісний з P.O.W.E.R.
+```bash
+power index /absolute/path/to/destination --strict
+power lint /absolute/path/to/destination
+power markdown-check /absolute/path/to/destination
+power status /absolute/path/to/destination
 ```
 
----
+Required result:
 
-## Вирішення проблем
+- кожна команда завершується з кодом `0`;
+- strict index пропускає нуль invalid notes;
+- broken internal links = 0;
+- orphan/stale warnings пояснено індивідуально, а не приховано;
+- status counts збігаються з verified Markdown rows у manifest.
 
-| Проблема                                     | Причина                                            | Виправлення                                                      |
-| -------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
-| `ingest_note` повертає "Note already exists" | Нотатку вже мігровано                              | Пропустіть і йдіть далі                                          |
-| Lint повідомляє про відсутній `type`         | Нотатка не має frontmatter                         | Переінгестіть з явним `note_type`                                |
-| Бите посилання після міграції                | `[[посилання]]` змінили імена файлів               | Запустіть скрипт авто-ремонту з Кроку 6d                         |
-| `read_sub_index` повертає "No notes found"   | Папка категорії порожня або не проіндексована      | Спочатку запустіть `generate_index(vault_path)`                  |
-| Забагато orphans в `04_Archive/`             | Архівні нотатки за визначенням мають мало посилань | Це очікувано — orphans в архіві нормальні                        |
-| Lint повідомляє 200+ зайвих нотаток          | Директорію `.git/` не виключено                    | Оновіть лінтер для пропуску прихованих папок (v1.5.0+ робить це) |
-| `_index.md` не має frontmatter               | Використовується стара версія фреймворку           | Оновіться до v3.3.2 або перезапустіть `generate_index`           |
-| `pip install` падає з PEP 668                | Системний Python блокує пряме встановлення         | Використовуйте venv: `/шлях/до/venv/bin/pip install ...`         |
-| `External data path escapes model directory` | Обмеження безпеки ONNX Runtime                     | Встановіть `HF_HUB_DISABLE_SYMLINKS=1` в оточенні перед запуском |
+### 5.2 Search gates
 
----
+Спочатку доведіть FTS без model downloads:
 
-## Додатки
-
-### A. Відповідність папок та типів для всіх методологій
-
-| Методологія | Папка / Шаблон | `note_type` | Типовий вміст |
-| :--- | :--- | :--- | :--- |
-| **P.A.R.A.** | `00_Inbox/` | Будь-який | Необроблені чернетки (класифікуються та переносяться) |
-| | `01_Projects/` | `Project` | Активні проекти з дедлайнами та результатами |
-| | `02_Areas/` | `Area` | Постійні сфери відповідальності |
-| | `03_Resources/` | `Resource` | Довідники, гайди, зовнішні посилання |
-| | `04_Archive/` | `Archive` | Завершені або застарілі матеріали |
-| | `06_Daily_Logs/` | `Daily Log` | Часозалежні щоденникові записи та сесійні логи |
-| | `PROTOCOLS/` | `System Guide` | Інструкції для AI-агентів та системні правила |
-| **C.O.D.E.** | `01_Capture/` | `Resource` | Вхідні витримки, закладки та сирі ідеї |
-| | `02_Organize/` | `Area` / `Project` | Впорядковані за сферами та проєктами нотатки |
-| | `03_Distill/` | `Resource` | Дистильовані конспекти та квінтесенція знань |
-| | `04_Express/` | `Project` / `Resource` | Готові статті, публікації та звітні матеріали |
-| **GTD** | `00_Inbox/` | `Resource` | Сирий потік вхідних завдань та нотаток |
-| | `01_Next_Actions/` | `Project` | Наступні конкретні точкові дії |
-| | `02_Waiting_For/` | `Area` | Завдання на контролі / очікуванні відповіді |
-| | `03_Someday/` | `Archive` / `Resource` | Ідеї та плани "Колись / Можливо" |
-| | `04_Projects/` | `Project` | Багатокрокові цільові проекти |
-| **Zettelkasten** | `fleeting/` | `Resource` | Тимчасові швидкі нотатки та думки |
-| | `literature/` | `Resource` | Нотатки за прочитаними джерелами / книгами |
-| | `permanent/` | `Area` / `Resource` | Атомарні концептуальні нотатки з UID префіксами |
-| | `index/` | `System Guide` | Навігаційні хаби, MOC та структуровані індекси |
-| **LYT** | `Home.md` | `System Guide` | Головний вхідний навігаційний хаб |
-| | `MOCs/` | `Area` | Maps of Content (Карти змісту та теми) |
-| | `Notes/` | `Resource` | Атомарні тематичні нотатки |
-| | `Archives/` | `Archive` | Застарілі MOC-карти та нотатки |
-| **Johnny.Decimal** | `10-19_Admin/` | `Area` | Адміністративні та організаційні документи |
-| | `20-29_Engineering/`| `Area` / `Project` | Інженерні специфікації та розробка |
-| | `30-39_Ops/` | `Area` | Операційні інструкції та моніторинг |
-| **Custom / Hybrid** | Будь-яка структура | `type:` з OKF enum | Визначення `type:` за семантичним змістом нотатки |
-
-### B. Необхідні MCP-інструменти
-
-| Інструмент                                                                    | Використовується у фазі |
-| ----------------------------------------------------------------------------- | ----------------------- |
-| `ingest_note(name, note_type, title, description, content, tags?, resource?)` | Фаза 3                  |
-| `lint_vault(vault_path?)`                                                     | Фаза 1, 4, 5, 6         |
-| `generate_index(vault_path?)`                                                 | Фаза 5, 6               |
-| `read_sub_index(category, vault_path?)`                                       | Фаза 4, 6               |
-| `search_vault_tool(query, max_results?, search_mode?, vault_path?)`           | Фаза 4, 6               |
-
-### C. Швидка довідка: поля OKF Frontmatter
-
-```yaml
----
-type: Project | Area | Resource | Daily Log | Archive | System Guide
-title: "Людський заголовок (1-200 символів)"
-description: "Опис в один рядок (1-150 символів)"
-resource: "https://..." # Опціонально
-tags: [tag1, tag2] # Опціонально
-owner: "developer-or-agent" # Опціонально
-status: active | review | archived # Опціонально
-timestamp: 2026-07-15T02:00:00 # Авто-генерується
-related: # Опціональні зв'язки GraphRAG
-    - path: "02_Areas/Infra_Security.md"
-      relation: depends_on
-      confidence: 0.95
----
+```bash
+power sync /absolute/path/to/destination --fts-only
+power search /absolute/path/to/destination "known phrase" --mode fts
 ```
 
+Використайте кілька known phrases із різних source categories і запишіть
+expected target paths. Лише за наявності ресурсів перевіряйте dense search:
+
+```bash
+power sync /absolute/path/to/destination
+power search /absolute/path/to/destination "known concept" --mode semantic
+power search /absolute/path/to/destination "known concept" --mode reranked
+```
+
+Semantic/reranked readiness залишається pending, якщо model download,
+validation або search падає. FTS pass не доводить dense quality.
+
+### 5.3 Фінальна losslessness reconciliation
+
+Міграція не завершена, доки не виконано все:
+
+- authorized source Markdown count = verified destination note count;
+- кожна source note має один manifest target або approved exclusion;
+- normalized body hashes збігаються для кожної migrated note;
+- attachment hashes source/destination збігаються;
+- немає unexpected destination files;
+- blocked/ambiguous items = 0 або user explicitly accepts documented exception;
+- source tree досі збігається з inventory Фази 1.
+
+Spot checks корисні, але не замінюють full manifest reconciliation.
+
+**Receipt Фази 5:** command outputs/exit codes, lint issue counts, index counts,
+search cases, manifest totals і hash reconciliation.
+
 ---
 
-<p align="center">
-  Створено AI-агентами для AI-агентів ⚡<br>
-  &copy; 2026 Weby Homelab
-</p>
+## Фаза 6: Cutover, rollback record і maintenance
+
+### 6.1 Cutover
+
+Переналаштовуйте applications і MCP clients на destination лише після проходу
+Фази 5. Канонічна variable:
+
+```text
+POWER_VAULT_DIR=/absolute/path/to/destination
+```
+
+Перезапустіть long-lived MCP clients і запустіть preflight через точно
+configured Python. Source і verified backup залишайте read-only протягом
+observation period.
+
+### 6.2 Git опційний і потребує окремої авторизації
+
+Local vault не потребує remote repository. Якщо Git publication авторизовано:
+
+- виключіть `.env`, credentials, private keys, model/search databases, backups
+  і raw private evaluation data;
+- перевірте `git diff --cached` перед commit;
+- працюйте у feature branch за review/signing policy репозиторію;
+- не імпортуйте private signing key і не push лише тому, що migration passed.
+
+Синхронізація private vault не є public publication.
+
+### 6.3 Rollback record
+
+Запишіть:
+
+- source, backup, destination і manifest paths;
+- source/destination Git state, якщо застосовно;
+- exact last passing gate і timestamps;
+- як repoint clients на unchanged source;
+- unresolved exceptions та owner.
+
+Не видаляйте source або backup у межах цього протоколу. Retention/destruction
+потребують окремого explicit decision.
+
+### 6.4 Ongoing maintenance
+
+Після structural changes:
+
+```bash
+power index /absolute/path/to/destination --strict
+power lint /absolute/path/to/destination
+power markdown-check /absolute/path/to/destination
+```
+
+Запускайте `power sync`, коли retrieval indexes треба оновити. Читайте
+`index.md`, потім релевантний canonical `_index.md`, потім specific notes.
+Зберігайте dated change record за local operating rules vault.
+
+## Фінальний acceptance checklist
+
+- Verified backup існує поза source і destination.
+- Manifest враховує кожний authorized source file без unexplained rows.
+- Source незмінний і придатний до restore/read.
+- Destination notes лежать у canonical folders і мають valid OKF metadata.
+- Body й attachment hash reconciliation проходить.
+- Link ambiguity = 0 або explicitly accepted; broken links = 0.
+- `index --strict`, `lint` і `markdown-check` завершуються з кодом `0`.
+- FTS sync/search проходять із записаними known-result cases.
+- Dense/reranked status позначено verified або pending за target-host evidence.
+- MCP використовує точний installed interpreter і `POWER_VAULT_DIR`.
+- Cutover і Git/publication відбулися лише з explicit authorization.
+- Rollback instructions і retained backup paths записано.
+
+## Усунення проблем
+
+| Проблема | Коректна дія |
+| --- | --- |
+| `power init` відхиляє source | Очікувано: він непорожній. Створіть окремий destination. |
+| `ingest_note` відхиляє custom folder | MCP write обмежено дозволеними P.A.R.A. folders. Зіставте note з canonical target. |
+| `read_sub_index` відхиляє source category | Він приймає canonical P.A.R.A. categories. Використайте destination mapping та generated canonical index. |
+| `power heal` залишає notes invalid | Custom folders можуть не мати type hint. Додайте approved `type`, `title`, `description`, `timestamp` із manifest і validate again. |
+| Links ламаються після move | Застосуйте source→target mapping окремо до wikilinks, Markdown links, embeds і `related`; не вважайте, що `power rename` переписує все. |
+| `index --strict` падає | Дослідіть кожний skipped path; не робіть cutover із partial catalog. |
+| Dense sync падає | Позначте semantic/reranked pending і залиште FTS operational; не знижуйте evidence claim мовчки. |
+| Counts збігаються, hashes — ні | Міграція не lossless. Відновіть/перетрансформуйте mismatched rows до cutover. |

@@ -26,6 +26,17 @@ def test_ci_keeps_blocking_test_and_security_jobs() -> None:
     assert "  security:" in ci_text
 
 
+def test_ci_has_windows_runtime_smoke_for_documented_lifecycle() -> None:
+    ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
+
+    assert "  windows-runtime-smoke:" in ci_text
+    assert "runs-on: windows-latest" in ci_text
+    assert "uv sync --locked" in ci_text
+    assert "uv run power index $vault --strict" in ci_text
+    assert "uv run power sync $vault --fts-only" in ci_text
+    assert 'uv run power search $vault "Windows smoke" --mode fts' in ci_text
+
+
 def test_current_python_support_starts_at_3_11() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
     pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")

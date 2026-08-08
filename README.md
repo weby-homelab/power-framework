@@ -23,7 +23,9 @@ P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, a
 Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for **AI-first knowledge management**:
 
 - **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`)
-- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` cuts AI agent context usage by up to **95%**
+- **Token-efficient indexing** — hierarchical `index.md` + per-folder
+  `_index.md` supports selective agent navigation; the linked historical v1.6.0
+  report measured scenario-specific savings, not a universal release guarantee
 - **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
@@ -41,15 +43,22 @@ P.O.W.E.R. is designed to be operated by human workflows and AI agents alike.
 Agents (Antigravity, OpenCode, Claude Code, Gemini, Devin, DeepSeek) should read
 the role-specific guides before touching a vault:
 
-- **[Getting Started](https://github.com/weby-homelab/power-framework/blob/main/docs/getting-started.md)** — first install, first vault, first query
-- **[CLI Reference](https://github.com/weby-homelab/power-framework/blob/main/docs/cli.md)** — every command, flag, and exit code
-- **[MCP Server](https://github.com/weby-homelab/power-framework/blob/main/docs/mcp-server.md)** — the 17 governed MCP tools for MCP-compatible clients
-- **[AI Agent Migration Guide](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.md)** — 5-phase protocol for adopting an existing vault
+- **[Clean installation](docs/getting-started.md)** — isolated runtime, new vault,
+  executable acceptance gate, FTS, and MCP preflight
+- **[Windows 11 25H2](docs/windows-11-installation.md)** — complete PowerShell
+  installation, Visual C++ prerequisite, exact interpreter paths, and checks
+- **[CLI reference](docs/cli.md)** — all 16 commands, flags, and actual exit behavior
+- **[MCP server](docs/mcp-server.md)** — all 17 governed tools, rate limits,
+  configured-vault boundary, and untrusted retrieval contract
+- **[Migration guide](docs/migration-guide.md)** — 6-phase, manifest/hash-driven
+  migration from any Markdown source methodology into a canonical POWER vault
+- **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
+  entry points, linked documents, corrected drift, and evidence boundaries
 
 ## Quick Start
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.2
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.3.2/power_framework-3.3.2-py3-none-any.whl
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -58,157 +67,33 @@ power heal ~/my-vault          # Auto-fix missing/invalid frontmatter
 power markdown-check ~/my-vault  # Check markdown quality issues
 ```
 
-## Development Install (editable + easy update)
+## Development install
 
-For a **permanent, always-updatable** CLI on your workstation (WS), install in
-_editable_ mode from a local clone. This binds `power` to the repo so code
-changes take effect immediately — no reinstall needed.
-
-```bash
-# 1. Clone once
-git clone https://github.com/weby-homelab/power-framework.git /tmp/power-framework
-cd /tmp/power-framework
-
-# 2. Editable install into user-site (survives reboots, no venv required)
-pip install --user --break-system-packages -e ".[dev]"
-
-# 3. Verify — `power` is now on PATH (via ~/.local/bin)
-power --version
-```
-
-Update to the latest code anytime with:
+Contributors should clone into a durable development directory, create a venv,
+and follow [CONTRIBUTING.md](CONTRIBUTING.md). Inspect local changes before
+pulling; documentation does not provide an updater that resets a working tree.
 
 ```bash
-cd /tmp/power-framework && git pull origin main && power --version
-# If pyproject.toml changed (new deps/version), reinstall:
-pip install --user --break-system-packages -e ".[dev]"
-```
-
-> 💡 **One-liner updater.** Save this as `/root/.local/bin/power-update` and
-> `chmod +x` it, then just run `power-update` to pull + reinstall automatically:
->
-> ```bash
-> #!/usr/bin/env bash
-> set -euo pipefail
-> REPO="/tmp/power-framework"
-> cd "$REPO"
-> git fetch origin main && git reset --hard origin/main
-> if git diff --name-only HEAD@{1} HEAD | grep -q pyproject.toml; then
->   pip install --user --break-system-packages -e ".[dev]" >/dev/null 2>&1
-> fi
-> power --version
-> ```
-
-## Windows 11 Installation
-
-P.O.W.E.R. runs natively on Windows 11 (Python 3.11+, 64-bit). The CLI works in
-PowerShell 5.1/7 and Windows Terminal; `power rename` uses `os.replace()`, so
-renaming onto an existing destination works on Windows instead of raising
-`FileExistsError`.
-
-### Prerequisites
-
-1. **Python 3.11+** — download the 64-bit installer from
-   [python.org](https://www.python.org/downloads/windows/). On the first setup
-   screen check **"Add python.exe to PATH"**, then click _Install Now_.
-2. **Git for Windows** — from [git-scm.com](https://git-scm.com/download/win)
-   (required for `pip install git+...`).
-3. **Windows Terminal / PowerShell** — built into Windows 11 (Win+X → Terminal).
-
-### Option A: Virtual environment (recommended)
-
-Isolates P.O.W.E.R. and its model dependencies from your global Python:
-
-```powershell
-# 1. Create a tools folder and virtual environment
-mkdir %USERPROFILE%\power-tools
-cd %USERPROFILE%\power-tools
-python -m venv .venv
-
-# 2. Activate it (PowerShell)
-.\.venv\Scripts\Activate.ps1
-
-# 3. Install P.O.W.E.R. 3.3.2
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.2
-
-# 4. Verify
+git clone https://github.com/weby-homelab/power-framework.git
+cd power-framework
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install uv==0.11.33
+uv sync --locked --group dev
 power --version
 ```
 
-> `power` remains available only while the venv is active. Re-activate with
-> `.\.venv\Scripts\Activate.ps1` (or add a shortcut in your PowerShell profile).
-> On first dense search (`power sync`), model assets (BGE-M3 + reranker ONNX,
-> SHA-256 pinned) download automatically into the venv cache.
+## Windows 11 25H2 installation
 
-### Option B: User-site install (global, no venv)
+Use the dedicated [Windows 11 25H2 guide](docs/windows-11-installation.md).
+It covers Python/Visual C++ prerequisites, an isolated venv without mandatory
+script activation, the immutable release wheel, exact PowerShell syntax, clean
+vault acceptance checks, dense-search evidence boundaries, MCP configuration
+with the venv interpreter, troubleshooting, rollback, and uninstall.
 
-```powershell
-py -m pip install --user "git+https://github.com/weby-homelab/power-framework.git@v3.3.2"
-power --version
-```
-
-Scripts are placed in `%USERPROFILE%\AppData\Roaming\Python\Scripts`. If
-`power` is not recognized, close and reopen the terminal, or add that directory
-to your `PATH` (System Properties → Environment Variables; PowerShell:
-`$env:Path += ";$env:APPDATA\Python\Scripts"` for the session).
-
-For development (editable, easy update):
-
-```powershell
-git clone https://github.com/weby-homelab/power-framework.git C:\dev\power-framework
-cd C:\dev\power-framework
-py -m pip install --user -e ".[dev]"
-git pull origin main   # update anytime
-```
-
-### Create a vault and run first checks
-
-```powershell
-power init C:\Users\you\my-vault
-power lint C:\Users\you\my-vault
-power index C:\Users\you\my-vault
-power status C:\Users\you\my-vault
-```
-
-### MCP setup on Windows (Claude Desktop)
-
-Edit `%APPDATA%\Claude\claude_desktop_config.json`:
-
-```json
-{
-    "mcpServers": {
-        "power": {
-            "command": "py",
-            "args": ["-m", "power_framework.mcp"],
-            "env": {
-                "POWER_VAULT_DIR": "C:\\Users\\you\\my-vault"
-            }
-        }
-    }
-}
-```
-
-Notes:
-
-- **MCP clients** — use `"command": "py"` (the Windows Python launcher; not
-  `python3`) in Claude Desktop / OpenCode configs on Windows.
-- **Escape backslashes** in JSON (`\\`) or use forward slashes: `C:/Users/you/my-vault`.
-- **Venv path** — if you used Option A, point `command` at the full path:
-  `C:\Users\you\power-tools\.venv\Scripts\python.exe`.
-- **POWER_VAULT_DIR** — set the env var via System Properties → Environment
-  Variables (or the `env` block above) when you want the MCP server to skip the
-  interactive vault prompt.
-
-### Troubleshooting on Windows 11
-
-| Symptom                                          | Fix                                                                                                       |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `'power' is not recognized`                      | Reopen the terminal, or add `%USERPROFILE%\AppData\Roaming\Python\Scripts` (or venv `Scripts`) to `PATH`. |
-| `pip install git+...` fails                      | Install [Git for Windows](https://git-scm.com/download/win) and restart the terminal.                     |
-| `python` not found                               | Reinstall Python and check **"Add python.exe to PATH"**; restart the terminal.                            |
-| SmartScreen/Defender warning during `power sync` | Expected on first model download; assets are SHA-256 pinned and validated fail-closed.                    |
-
-## What's Inside
+Direct Windows runtime execution was not part of the `v3.3.2` Linux release
+pipeline; the guide explicitly separates automated cross-platform regression
+coverage from checks that must pass on the target Windows host.
 
 ## What's Inside
 
@@ -231,7 +116,7 @@ Notes:
 | **Hierarchical Index**           | `index.md` (navigation map) + per-folder `_index.md` (detailed catalogs) for token-efficient AI reading (~75-94% token savings)                                                                                                                                                                                                                                                                                                                                                     |
 | **Graph RAG v2**                 | Phase 3 relation suggester: explicit OKF `related` links contribute a strong curated signal, fused with keyword/tag overlap into a **weighted, bidirectional similarity graph** with weighted BFS and degree/weight centrality (`power suggest-related --v2`). Confident predictions only, no fabricated links.                                                                                                                                                                     |
 | **ColBERT Opt-In Reranker**      | Phase 3 `POWER_RERANKER=colbert` enables late-interaction ColBERT reranking (requires ≥16 GB RAM, otherwise skipped); it is **off by default**. The canonical fallback is the license-clean BGE ONNX reranker; Jina is available only through its explicit non-commercial opt-in.                                                                                                                                                                                                   |
-| **Synthesize Auto-Ingest**       | Phase 3 `power synthesize <path>` CLI (mirrors the MCP `synthesize_session` tool) auto-classifies OKF metadata, writes atomically, regenerates the hierarchical index, appends to `log.md`, and runs the lint report — the Auto-Ingest Feedback Loop.                                                                                                                                                                                                                               |
+| **Synthesize Auto-Ingest**       | `power synthesize <path>` mirrors MCP `synthesize_session`: the caller supplies classification and content; POWER validates metadata, writes through the vault mutation boundary, regenerates the hierarchical index, appends `log.md`, and runs lint.                                                                                                                                                                                                                           |
 | **Search-quality metric status** | The former `UDCG@5` value is a legacy normalized discounted lexical proxy, not EACL-2026 UDCG, and is diagnostic only. No release-quality claim is made until true UDCG has paper-backed reference vectors.                                                                                                                                                                                                                                                                         |
 | **CI/CD**                        | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest.                                                                                                                                                                                                                                                                                                                  |
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
@@ -245,27 +130,41 @@ Notes:
 
 ## Migration Report
 
-Read the full technical report on the transition from flat to hierarchical indexing:
+Read the historical v1.6.0 snapshot of the transition from flat to hierarchical
+indexing. Its measured vault counts, token estimates, source paths, test counts,
+and MCP inventory are historical evidence, not the current `v3.3.2` contract:
 
-- **[English: Hierarchical Index Migration Report](https://github.com/weby-homelab/power-framework/blob/main/docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
-- **[Українська: Звіт міграції на ієрархічний індекс](https://github.com/weby-homelab/power-framework/blob/main/docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
+- **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
+- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
 
 ### AI Agent Migration Guide
 
-Step-by-step protocol for any AI agent (Antigravity, OpenCode, Claude Code CLI, Gemini 2.0, DeepSeek-R1, Devin) to autonomously migrate an existing knowledge base into P.O.W.E.R. structure:
+Six-phase, fail-closed protocol for any AI agent to migrate an existing
+Markdown knowledge base into the canonical P.O.W.E.R. structure with an
+immutable source, verified backup, manifest, body/attachment hashes, link
+reconciliation, executable gates, and rollback record:
 
-- **[English: AI Agent Migration Guide](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.md)** — 5-phase protocol with MCP tools, classification heuristics, and troubleshooting
-- **[Українська: Ґайд міграції для AI-агента](https://github.com/weby-homelab/power-framework/blob/main/docs/migration-guide.ua.md)** — покроковий протокол для будь-якого AI-агента
+- **[English: AI Agent Migration Guide](docs/migration-guide.md)** — current 6-phase protocol and real MCP/CLI boundaries
+- **[Українська: Ґайд міграції для AI-агента](docs/migration-guide.ua.md)** — покроковий протокол для будь-якого AI-агента
 
 ## 🗂️ Methodology compatibility
 
-P.O.W.E.R. can index, search, and validate notes in an existing vault regardless of its folder scheme, including P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, and custom layouts. `power init <path>` creates the default P.A.R.A. scaffold, while an optional `.power/domains.yaml` registry adds explicit domain placement, per-domain templates, routing rules, and search priorities.
+P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, flat, and custom
+trees are supported as **source methodologies** for migration. Full P.O.W.E.R.
+hierarchical navigation uses the canonical top-level folders created by
+`power init`; MCP note writes and sub-index reads also enforce their documented
+canonical scope. Follow the migration guide instead of assuming an arbitrary
+existing tree already has the full POWER contract.
 
-For another layout, create or retain its folders, then use P.O.W.E.R. to ingest notes and run `lint`, `index`, and `search`. OKF metadata validation and the available search tools work independently of the folder names.
+Lint and content search can inspect valid notes outside canonical folders, but
+`power index` catalogs only `00_Inbox`, `01_Projects`, `02_Areas`,
+`03_Resources`, `04_Archive`, `06_Daily_Logs`, and `PROTOCOLS`. This distinction
+prevents a partial in-place adoption from being described as a completed
+migration.
 
 ### Domain-first placement and retrieval
 
-For a domain-oriented vault, create `.power/domains.yaml` and keep directory and
+For domain routing inside the canonical vault, create `.power/domains.yaml` and keep directory and
 filename names meaningful: these are the first navigation signals for an AI
 agent. OKF frontmatter remains the validated provenance and lifecycle contract,
 not the only routing mechanism. A minimal registry is:
@@ -283,6 +182,7 @@ domains:
       search_priority: [semantic, fts]
 ```
 
+Keep domain paths under a cataloged canonical folder, as in the example.
 `power ingest` routes by these rules (or accepts `--domain research`) and uses
 the selected template. `power search ... --mode auto --domain research` follows
 the domain priority and scopes candidates to the domain path. Only retrieval
@@ -338,7 +238,7 @@ power search ~/my-vault "experiment" --mode auto --domain research
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
 
 ```bash
-pip install git+https://github.com/weby-homelab/power-framework.git@v3.3.2
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.3.2/power_framework-3.3.2-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -682,7 +582,7 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux
+operatingSystem: Linux, macOS, Windows
 softwareVersion: 3.3.2
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
