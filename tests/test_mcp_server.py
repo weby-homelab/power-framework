@@ -25,6 +25,7 @@ from power_framework.mcp.power_server import (
     read_memory_history,
     read_sub_index,
     search_vault_tool,
+    sync_vault,
     synthesize_session,
     validate_memory_state,
 )
@@ -348,3 +349,48 @@ def test_run_requires_configured_vault_root(monkeypatch: pytest.MonkeyPatch) -> 
 
     with pytest.raises(RuntimeError, match="POWER_VAULT_DIR"):
         power_server.run()
+
+
+async def test_ingested_note_is_searchable_after_sync_vault(sample_vault: Path) -> None:
+    """The write -> retrieve loop must be closeable from inside MCP alone.
+
+    Without a sync tool an agent can save a note through `ingest_note` and then
+    fail to find it through `search_vault_tool`, because the hierarchical index
+    and the search database are different artifacts.
+    """
+    marker = "zyrgqx7marker"
+    # Establish an index first: with no index at all a search can still answer
+    # from a fresh scan, which hides the staleness this test is about.
+    await sync_vault(fts_only=True, vault_path=str(sample_vault))
+
+    await ingest_note(
+        name="03_Resources/sync_probe",
+        note_type="Resource",
+        title="Sync Probe",
+        description=f"Probe note carrying {marker}",
+        content=f"# Probe\n\nBody mentioning {marker}.\n",
+        vault_path=str(sample_vault),
+    )
+
+    before = json.loads(
+        await search_vault_tool(query=marker, search_mode="fts", vault_path=str(sample_vault))
+    )
+    assert before["result_count"] == 0
+
+    report = await sync_vault(fts_only=True, vault_path=str(sample_vault))
+    assert "Notes indexed:" in report
+
+    after = json.loads(
+        await search_vault_tool(query=marker, search_mode="fts", vault_path=str(sample_vault))
+    )
+    assert after["result_count"] > 0
+
+
+async def test_sync_vault_reports_excluded_notes(sample_vault: Path) -> None:
+    """A note dropped by validation is invisible to search; say so, do not imply success."""
+    (sample_vault / "03_Resources" / "broken.md").write_text(
+        "---\ntype: NotARealType\ntitle: Broken\n---\n\nBody.\n", encoding="utf-8"
+    )
+    report = await sync_vault(fts_only=True, vault_path=str(sample_vault))
+    assert "Notes excluded (invalid metadata): 1" in report
+    assert "not searchable" in report

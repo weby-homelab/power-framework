@@ -29,7 +29,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
-- **MCP-native** — expose 17 tools to MCP-compatible AI clients through FastMCP 3.x
+- **MCP-native** — expose 18 tools to MCP-compatible AI clients through FastMCP 3.x
 - **Windows-safe rename** — `power rename` uses `os.replace()` for the physical
   move, so renaming onto an existing destination works on Windows instead of
   raising `FileExistsError`
@@ -48,7 +48,7 @@ the role-specific guides before touching a vault:
 - **[Windows 11 25H2](docs/windows-11-installation.md)** — complete PowerShell
   installation, Visual C++ prerequisite, exact interpreter paths, and checks
 - **[CLI reference](docs/cli.md)** — all 16 commands, flags, and actual exit behavior
-- **[MCP server](docs/mcp-server.md)** — all 17 governed tools, rate limits,
+- **[MCP server](docs/mcp-server.md)** — all 18 governed tools, rate limits,
   configured-vault boundary, and untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.md)** — 6-phase, manifest/hash-driven
   migration from any Markdown source methodology into a canonical POWER vault
@@ -100,7 +100,7 @@ coverage from checks that must pass on the target Windows host.
 | Feature                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **CLI**                          | 16 commands, including `power memory` for explicit proposal, approval, validation, and history                                                                                                                                                                                                                                                                                                                                                                                      |
-| **MCP Server**                   | 17 tools, including governed memory context, proposal, apply, validation, and history operations                                                                                                                                                                                                                                                                                                                                                                                    |
+| **MCP Server**                   | 18 tools, including governed memory context, proposal, apply, validation, and history operations                                                                                                                                                                                                                                                                                                                                                                                    |
 | **OKF Validation**               | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                             |
 | **Knowledge Graph (Graph RAG)**  | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                                                                             |
 | **Freshness Monitoring**         | Linter flags stale/expired notes by checking `expiry` dates, ensuring your vault stays current                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -476,7 +476,7 @@ flowchart TD
 | `core/constants.py`                       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
 | `core/utils.py`                           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                                                                                    |
 | `core/cli.py`                             | Command-line interface with 16 commands, including transactional memory workflows                                                                                                                                                  |
-| `mcp/power_server.py`                     | FastMCP 3.x server with 17 async tools, loopback HTTP transport, and `/health`                                                                                                                                                     |
+| `mcp/power_server.py`                     | FastMCP 3.x server with 18 async tools, loopback HTTP transport, and `/health`                                                                                                                                                     |
 
 All components share `power_framework.core` as the single source of truth.
 

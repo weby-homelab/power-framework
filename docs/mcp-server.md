@@ -101,6 +101,26 @@ limit 5 calls per minute.
 generate_index(vault_path?: string) -> string
 ```
 
+### 2b. `sync_vault`
+
+Rebuild the search index so newly written notes become findable. `ingest_note`
+and `synthesize_session` write the note and refresh the hierarchical index, but
+the search database is a separate artifact — until it is rebuilt,
+`search_vault_tool` cannot return the note that was just saved. Write path;
+rate limit 5 calls per minute.
+
+```text
+sync_vault(fts_only?: boolean, force_rebuild?: boolean, vault_path?: string) -> string
+```
+
+`fts_only=true` builds only the lexical index and downloads no model assets.
+`force_rebuild=true` re-embeds every chunk, which is required after changing the
+embedding model or dimension.
+
+The returned report states how many notes were scanned, indexed and **excluded**
+by validation. Excluded notes are not searchable; run `power index <vault>
+--strict` to list them by name.
+
 ### 3. `read_sub_index`
 
 Read an existing canonical P.A.R.A. `_index.md`; does not generate it.

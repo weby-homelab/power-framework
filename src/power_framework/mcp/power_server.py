@@ -176,6 +176,62 @@ async def generate_index(vault_path: str | None = None) -> str:
 
 
 @mcp.tool
+async def sync_vault(
+    fts_only: bool = False,
+    force_rebuild: bool = False,
+    vault_path: str | None = None,
+) -> str:
+    """Rebuild the search index so newly written notes become findable.
+
+    ``ingest_note`` and ``synthesize_session`` write the note and refresh the
+    hierarchical index, but the search database is a separate artifact — until
+    it is rebuilt, ``search_vault_tool`` cannot return the note that was just
+    saved. Call this after writing notes.
+
+    Set ``fts_only=True`` for the fast lexical index without embedding model
+    downloads; ``force_rebuild=True`` re-embeds everything (needed after
+    changing the embedding model or dimension).
+    """
+    if not _index_limiter.is_allowed("sync_vault"):
+        remaining = _index_limiter.remaining("sync_vault")
+        raise ToolError(
+            f"Rate limit exceeded. Try again later. ({remaining} requests remaining in window)"
+        )
+
+    path = _get_vault_path(vault_path)
+
+    def _run() -> str:
+        from power_framework.core.generation_index import sync_vault_atomically
+
+        report = sync_vault_atomically(
+            path,
+            sync_embeddings=not fts_only,
+            force_rebuild=force_rebuild,
+        )
+        # Report coverage, not just success: a note excluded by validation is
+        # invisible to search afterwards, and silence there is indistinguishable
+        # from a healthy index.
+        lines = [
+            "=== Vault Sync ===",
+            f"Generation: {report.generation_id}",
+            f"Mode: {'FTS only' if fts_only else 'FTS + embeddings'}",
+            f"Notes scanned: {report.total_scanned}",
+            f"Notes indexed: {report.actual_files}",
+            f"Notes excluded (invalid metadata): {report.invalid_sources}",
+            f"Chunks: {report.actual_chunks}",
+        ]
+        if report.invalid_sources:
+            lines.append("")
+            lines.append(
+                "Excluded notes are not searchable. Run 'power index <vault> --strict' "
+                "to list them, or heal_frontmatter_tool to repair them."
+            )
+        return "\n".join(lines)
+
+    return await run_vault_mutation(path, _run)
+
+
+@mcp.tool
 async def read_sub_index(category: str, vault_path: str | None = None) -> str:
     """Read the sub-index (_index.md) for a specific P.A.R.A. category. Use this after identifying the relevant category from the main index. Read-only — does not generate files."""
     path = _get_vault_path(vault_path)
