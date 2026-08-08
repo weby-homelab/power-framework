@@ -53,11 +53,10 @@
 ## Межі перевірки
 
 Локальний smoke test підтверджує створення чистої бази, ingest, strict index, lint,
-Markdown-перевірку, FTS sync/search і status. Windows-команди звірено з PowerShell,
-офіційними prerequisites і шляхами venv; прямий запуск на Windows 11 25H2 має
-виконати цільовий хост після публікації змін. Доданий `windows-latest` CI smoke
-перевіряє загальний Windows runtime, але не є доказом саме Windows 11 25H2.
-Це обмеження не можна підмінювати Linux-успіхом.
+Markdown-перевірку, FTS sync/search і status. Фізичну перевірку Windows 11 25H2
+виконано для follow-up revision `4e5b2b9`; результати наведено у [звіті
+перевірки](tests/windows-11-25h2-validation.md). `windows-latest` CI smoke
+перевіряє загальний Windows runtime, але не замінює доказ цільового хоста.
 
 Автоматичний gate `scripts/check_doc_drift.py` перевіряє поточні кількості CLI/MCP,
 пошуковий контракт, заборонені застарілі шаблони та всі локальні Markdown-посилання

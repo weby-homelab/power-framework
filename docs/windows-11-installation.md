@@ -12,9 +12,10 @@ MCP client. It uses PowerShell syntax throughout.
   Microsoft Visual C++ runtime.
 - P.O.W.E.R. `v3.3.2` includes an automated cross-platform regression for the
   Windows rename-overwrite behavior.
-- The `v3.3.2` release was not executed on a physical Windows 11 25H2 host by
-  the release pipeline. Follow the acceptance checks below on the target
-  machine; do not interpret Linux CI as direct Windows certification.
+- Physical Windows 11 25H2 validation was completed on 2026-08-08 for follow-up
+  revision `4e5b2b9`; see the [validation report](tests/windows-11-25h2-validation.md).
+  This validates the follow-up source/build and does not move or reissue the
+  immutable `v3.3.2` release artifacts.
 
 Official prerequisites:
 

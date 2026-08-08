@@ -69,6 +69,7 @@ nav:
   - Release Governance:
       - M2 Human Evaluation: m2-human-evaluation.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md
+      - Windows 11 25H2 Validation: tests/windows-11-25h2-validation.md
   - Changelog: CHANGELOG.md
   - Contributing: contributing.md
 
