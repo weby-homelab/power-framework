@@ -1,6 +1,6 @@
 ---
 name: power
-version: 3.2.7
+version: 3.3.2
 description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
 ---
 
@@ -28,46 +28,41 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 
 Скілл містить автоматизовані скрипти у каталозі `scripts/` та CLI:
 
-### Scripts
-
-1.  **`lint_brain.py`** — скрипт лінтера + ROT аудиту (v3.2.7):
-
-```bash
-python3 .agents/skills/power/scripts/lint_brain.py
-```
-
-2.  **`generate_index.py`** — скрипт автоматичної побудови ієрархічного індексу:
-
-```bash
-python3 .agents/skills/power/scripts/generate_index.py
-```
-
-### CLI (power, 15 команд)
+### CLI (power, 17 команд)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
-3. `power index <path>` — генерація ієрархічного індексу
+3. `power index <path> [--strict]` — генерація рекурсивних каталогів
 4. `power ingest <path>` — створення нотатки з OKF метаданими
-5. `power search <path> <query>` — повнотекстовий пошук
-6. `power sync <path>` — побудова FTS і dense-індексу
-7. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
-8. `power archive <path>` — архівування застарілих нотаток
-9. `power status <path>` — панель стану vault
-10. `power cron <path>` — автоматичне обслуговування
-11. `power heal <path>` — автовиправлення frontmatter
-12. `power markdown-check <path>` — перевірка якості Markdown
-13. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
-14. `power synthesize <path>` — створення підсумкової нотатки сесії
-15. `power rename <path> --old <old_path> --new <new_path>` — перейменування нотатки з оновленням зв'язків Graph RAG
+5. `power import <source> --into <folder>` — preflight-імпорт наявного дерева Markdown
+6. `power search <path> <query>` — пошук (`semantic` за замовчуванням)
+7. `power memory <sub> <path>` — керована транзакційна пам'ять
+8. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
+9. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
+10. `power archive <path>` — архівування застарілих нотаток
+11. `power status <path>` — панель стану vault
+12. `power cron <path>` — автоматичне обслуговування
+13. `power heal <path>` — автовиправлення frontmatter
+14. `power markdown-check <path>` — перевірка якості Markdown
+15. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
+16. `power synthesize <path>` — створення підсумкової нотатки сесії
+17. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
 
-### MCP Tools (12) — FastMCP 3.x (v3.2.7)
+### MCP Tools (18) — FastMCP 3.x (v3.3.2)
 
-- `lint_vault`, `generate_index`, `read_sub_index`, `ensure_sub_index`, `ingest_note`
-- `search_vault_tool`, `synthesize_session`
-- `rot_audit`, `archive_notes`, `suggest_related_tool`
-- `heal_frontmatter_tool`, `check_markdown_tool`
+- Індекси й каталог: `generate_index`, `read_sub_index`, `ensure_sub_index`
+- Запис: `ingest_note`, `synthesize_session`
+- Пошук: `search_vault_tool`, `sync_vault`, `suggest_related_tool`
+- Здоров'я: `lint_vault`, `heal_frontmatter_tool`, `check_markdown_tool`
+- Обслуговування: `rot_audit`, `archive_notes`
+- Керована пам'ять: `get_memory_context`, `propose_memory_change`,
+  `apply_memory_change`, `validate_memory_state`, `read_memory_history`
 
-### Конфігурація (v3.2.7)
+**Записав нотатку — виклич `sync_vault`.** `ingest_note` і `synthesize_session`
+оновлюють ієрархічний каталог, але база пошуку — окремий артефакт: доти
+`search_vault_tool` щойно збережену нотатку не поверне.
+
+### Конфігурація (v3.3.2)
 
 - **Модель ембеддінгів** — канонічно `BAAI/bge-m3` (1024 dim) через direct ONNX Runtime. BGE-M3 natively підтримує **dense + sparse + ColBERT** в одній моделі, що дозволяє гібридний пошук (RRF) без окремого BM25. Провайдер змінюється через `POWER_EMBED_PROVIDER`; `fastembed`/MiniLM лишається полегшеним opt-in fallback.
 - **Реранкер за замовчуванням** — `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0, UA+EN). `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) лишається явним opt-in.
@@ -77,7 +72,12 @@ python3 .agents/skills/power/scripts/generate_index.py
   - `POWER_EMBED_COMMIT_EVERY` (за замовчуванням `50`) — частота збереження векторів у SQLite для зниження навантаження на диск.
   - `POWER_SYNC_VMEM_LIMIT_MB` (за замовчуванням `0` = вимкнено) — опціональний ліміт віртуальної пам'яті (RLIMIT_AS) процесу синхронізації.
 - **ROT аудит (A2)** — паралельна перевірка посилань через `ThreadPoolExecutor(max_workers=16)`.
-- **MCP ентрі-поінт** — `/root/geminicli/.agents/mcp_servers/power_server.py` → `power_framework.mcp`
+- **MCP ентрі-поінт** — `python -m power_framework.mcp`, запущений тим самим
+  інтерпретатором, у якому встановлено пакет; `POWER_VAULT_DIR` обов'язковий
+  і задає єдиний доступний vault.
+- **Пристрій ONNX** — `POWER_EMBED_DEVICE` / `POWER_RERANKER_DEVICE`
+  (`auto`, `cpu`, `cuda`, `rocm`, `directml`). `auto` може лягти на CPU;
+  явний прискорювач fail-closed, якщо сесія не прив'язала запитаний провайдер.
 
 ---
 
@@ -135,10 +135,12 @@ timestamp: YYYY-MM-DDTHH:MM:SS+TZ
 
 ### Крок 2. Автоматична генерація ієрархічного каталогу (Index)
 
-Після додавання/зміни файлу виконайте скрипт генерації індексу. Він автоматично оновить `index.md`, рекурсивні `_index.md` каталоги та сторінки `_index-N.md` у межах 32 KiB:
+Після додавання/зміни файлу виконайте генерацію індексу. Вона автоматично
+оновить `index.md`, рекурсивні `_index.md` каталоги та сторінки `_index-N.md`
+у межах 32 KiB:
 
 ```bash
-python3 .agents/skills/power/scripts/generate_index.py
+power index <path>
 ```
 
 ### Крок 3. Додавання запису у Change Log
@@ -157,7 +159,7 @@ python3 .agents/skills/power/scripts/generate_index.py
 Запустіть скрипт лінтера, щоб перевірити, чи не з'явилися нові биті посилання чи сторінки-сироти:
 
 ```bash
-python3 .agents/skills/power/scripts/lint_brain.py
+power lint <path>
 ```
 
 _Якщо лінтер звітує про помилки (наприклад, broken links у Home.md), негайно виправте їх._
