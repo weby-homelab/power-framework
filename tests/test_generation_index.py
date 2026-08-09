@@ -233,6 +233,22 @@ def test_invalid_sources_are_explicitly_recorded(
     assert (invalid_count, reason) == (1, "invalid_metadata")
 
 
+def test_sync_can_fail_closed_before_publishing_excluded_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "strict-inventory", "valid-token")
+    invalid = vault / "01_Projects" / "Invalid.md"
+    invalid.write_text("# no frontmatter\n", encoding="utf-8")
+
+    with pytest.raises(IndexGenerationError, match=r"sync failed closed.*Invalid\.md"):
+        sync_vault_atomically(vault, sync_embeddings=False, allow_partial=False)
+
+    assert resolve_active_generation_path(vault) is None
+    report = sync_vault_atomically(vault, sync_embeddings=False, allow_partial=True)
+    assert report.invalid_sources == 1
+
+
 def test_excluded_source_change_during_sync_keeps_previous_active_index(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

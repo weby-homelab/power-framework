@@ -35,7 +35,7 @@ rollback path.
 - P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, flat folders та
   hybrid trees підтримуються як **класифікації джерела**.
 - Destination використовує канонічні top-level folders P.O.W.E.R., щоб
-  hierarchical index і 17 MCP tools мали задокументовану поведінку.
+  hierarchical index і 18 MCP tools мали задокументовану поведінку.
 - Не-Markdown система має спочатку експортувати нотатки у Markdown, а
   attachments — у файли. Vendor database extraction не реалізовано в CLI.
 - Невідомі frontmatter fields можна зберегти, але required OKF fields мають

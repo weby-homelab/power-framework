@@ -34,7 +34,7 @@ mypy src/power_framework/  # type check
 ```
 src/power_framework/
 ├── core/          # CLI, models, parser, indexer, linter, searcher, embeddings, reranker
-├── mcp/           # FastMCP 3.x server — 12 async tools
+├── mcp/           # FastMCP 3.x server — 18 async tools
 tests/             # pytest, asyncio_mode=auto, coverage >= 70%
 scripts/           # utility scripts (excluded from ruff T20/S310)
 ```

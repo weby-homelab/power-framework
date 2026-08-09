@@ -578,12 +578,30 @@ def _migrate_legacy_database(
 
 
 def sync_vault_atomically(
-    vault_dir: Path, *, sync_embeddings: bool, force_rebuild: bool = False
+    vault_dir: Path,
+    *,
+    sync_embeddings: bool,
+    force_rebuild: bool = False,
+    allow_partial: bool = True,
 ) -> GenerationReport:
-    """Build a complete staged generation and atomically publish it on success."""
+    """Build a complete staged generation and atomically publish it on success.
+
+    ``allow_partial=False`` rejects an inventory containing invalid sources
+    before a new generation is staged. The default remains permissive for the
+    low-level compatibility API; CLI and MCP callers expose explicit
+    fail-closed policy at their user-facing boundaries.
+    """
     root = Path(vault_dir).expanduser().resolve()
     ensure_vault_identity(root)
     inventory = _source_inventory(root)
+    if inventory.invalid_sources and not allow_partial:
+        details = "; ".join(
+            f"{rel_path} ({reason})"
+            for rel_path, reason in sorted(inventory.invalid_sources.items())
+        )
+        raise IndexGenerationError(
+            f"sync failed closed: {len(inventory.invalid_sources)} source(s) excluded; {details}"
+        )
     sources = inventory.valid_sources
     snapshot_hash = _snapshot_hash(sources)
     migrated = _migrate_legacy_database(
