@@ -40,7 +40,7 @@ from .temporal import (
     resolve_temporal_statuses,
     scan_temporal_records,
 )
-from .vault_storage import vault_db_path
+from .vault_storage import existing_vault_db_path, vault_db_path
 
 if TYPE_CHECKING:
     from datetime import date
@@ -78,9 +78,9 @@ def _db_path(vault_dir: Path | None = None) -> Path:
     return vault_db_path(vault_dir)
 
 
-def _read_db_path(vault_dir: Path) -> Path:
+def _read_db_path(vault_dir: Path) -> Path | None:
     """Resolve the immutable active DB, retaining legacy fallback only before migration."""
-    return resolve_active_generation_path(vault_dir) or _db_path(vault_dir)
+    return resolve_active_generation_path(vault_dir) or existing_vault_db_path(vault_dir)
 
 
 def _open_readonly_db(db_path: Path) -> sqlite3.Connection:
@@ -230,7 +230,7 @@ def validate_dense_index(vault_dir: Path) -> int:
     receiving FTS results from a different retrieval contract.
     """
     db_path = _read_db_path(vault_dir)
-    if not db_path.exists():
+    if db_path is None or not db_path.exists():
         raise DenseIndexUnavailableError(
             f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
         )
@@ -819,6 +819,11 @@ def _fts_search(
 
     db_path = _read_db_path(vault_dir)
 
+    if db_path is None:
+        fallback = _scan_and_search(vault_dir, [term.strip('"') for term in terms])
+        fallback.sort(key=lambda result: (-result.score, -result.match_count, result.title))
+        return fallback[:max_results]
+
     conn: sqlite3.Connection | None = None
     try:
         conn = _open_readonly_db(db_path)
@@ -1069,8 +1074,12 @@ def _semantic_search(
     if not query or not query.strip():
         return []
 
-    db_path = _read_db_path(vault_dir)
     index_dimension = validate_dense_index(vault_dir)
+    db_path = _read_db_path(vault_dir)
+    if db_path is None:  # pragma: no cover - validation above guarantees a path
+        raise DenseIndexUnavailableError(
+            f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
+        )
 
     def _dense_failure(reason: str) -> None:
         raise DenseIndexUnavailableError(

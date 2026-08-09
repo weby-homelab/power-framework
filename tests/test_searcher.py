@@ -228,7 +228,8 @@ class TestSearchModeContract:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         monkeypatch.setattr(
-            "power_framework.core.searcher._db_path", lambda _vault=None: tmp_path / "missing.db"
+            "power_framework.core.searcher._read_db_path",
+            lambda _vault=None: tmp_path / "missing.db",
         )
 
         with pytest.raises(DenseIndexUnavailableError, match="power sync"):
@@ -238,7 +239,8 @@ class TestSearchModeContract:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         monkeypatch.setattr(
-            "power_framework.core.searcher._db_path", lambda _vault=None: tmp_path / "missing.db"
+            "power_framework.core.searcher._read_db_path",
+            lambda _vault=None: tmp_path / "missing.db",
         )
         monkeypatch.setattr(
             "power_framework.core.searcher.get_embedding_manager",
@@ -258,7 +260,9 @@ class TestSearchModeContract:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         db_path = tmp_path / "index.db"
-        monkeypatch.setattr("power_framework.core.searcher._db_path", lambda _vault=None: db_path)
+        monkeypatch.setattr(
+            "power_framework.core.searcher._read_db_path", lambda _vault=None: db_path
+        )
         with closing(sqlite3.connect(db_path)) as conn:
             _init_db(conn)
             conn.execute(
@@ -274,7 +278,9 @@ class TestSearchModeContract:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         db_path = tmp_path / "index.db"
-        monkeypatch.setattr("power_framework.core.searcher._db_path", lambda _vault=None: db_path)
+        monkeypatch.setattr(
+            "power_framework.core.searcher._read_db_path", lambda _vault=None: db_path
+        )
         monkeypatch.setattr(
             "power_framework.core.searcher.configured_embedding_identity",
             lambda: ("PinnedProvider", "example/model@revision"),
@@ -314,7 +320,8 @@ class TestSearchModeContract:
             "Kittens are cute and semantically distinct from rocket science.\n"
         )
         monkeypatch.setattr(
-            "power_framework.core.searcher._db_path", lambda _vault=None: tmp_path / "missing.db"
+            "power_framework.core.searcher._read_db_path",
+            lambda _vault=None: tmp_path / "missing.db",
         )
         monkeypatch.setenv("POWER_ALLOW_DENSE_FALLBACK", "1")
 
@@ -327,7 +334,8 @@ class TestSearchModeContract:
     ):
         """Default behavior (no fallback flag): missing dense index => fail closed."""
         monkeypatch.setattr(
-            "power_framework.core.searcher._db_path", lambda _vault=None: tmp_path / "missing.db"
+            "power_framework.core.searcher._read_db_path",
+            lambda _vault=None: tmp_path / "missing.db",
         )
         monkeypatch.delenv("POWER_ALLOW_DENSE_FALLBACK", raising=False)
 

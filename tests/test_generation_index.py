@@ -67,6 +67,22 @@ def test_vault_identity_and_database_namespace_are_stable_and_isolated(
     assert str(first.resolve()) not in json.dumps(identity_json)
 
 
+def test_read_only_generation_probe_does_not_create_vault_state_or_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing generation must remain a pure observation."""
+    from power_framework.core import vault_storage
+
+    cache_root = tmp_path / "cache"
+    monkeypatch.setattr(vault_storage, "get_cache_dir", lambda *, create=True: cache_root)
+    vault = tmp_path / "ephemeral"
+    vault.mkdir()
+
+    assert resolve_active_generation_path(vault) is None
+    assert not (vault / ".power").exists()
+    assert not cache_root.exists()
+
+
 def test_failed_generation_keeps_the_previous_active_index(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

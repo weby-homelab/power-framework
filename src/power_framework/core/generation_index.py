@@ -15,7 +15,13 @@ from pathlib import Path
 from .db import _init_db
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
-from .vault_storage import ensure_vault_identity, vault_cache_dir, vault_db_path
+from .vault_storage import (
+    ensure_vault_identity,
+    existing_vault_cache_dir,
+    existing_vault_db_path,
+    vault_cache_dir,
+    vault_db_path,
+)
 
 
 class IndexGenerationError(RuntimeError):
@@ -74,8 +80,18 @@ def _state_db_path(vault_dir: Path) -> Path:
     return vault_cache_dir(vault_dir) / "generation-state.db"
 
 
+def _existing_state_db_path(vault_dir: Path) -> Path | None:
+    cache_dir = existing_vault_cache_dir(vault_dir)
+    return cache_dir / "generation-state.db" if cache_dir is not None else None
+
+
 def _generation_path(vault_dir: Path, generation_id: str) -> Path:
     return vault_cache_dir(vault_dir) / "generations" / f"{generation_id}.db"
+
+
+def _existing_generation_path(vault_dir: Path, generation_id: str) -> Path | None:
+    cache_dir = existing_vault_cache_dir(vault_dir)
+    return cache_dir / "generations" / f"{generation_id}.db" if cache_dir is not None else None
 
 
 def _add_column_if_missing(conn: sqlite3.Connection, name: str, declaration: str) -> None:
@@ -321,7 +337,9 @@ def _verified_generation_path(
     expected_sha256: str,
     expected_size: int,
 ) -> Path:
-    path = _generation_path(vault_dir, generation_id)
+    path = _existing_generation_path(vault_dir, generation_id)
+    if path is None:
+        raise ActiveGenerationError(f"active generation namespace is missing: {generation_id}")
     if not path.is_file():
         raise ActiveGenerationError(f"active generation file is missing: {generation_id}")
     actual_sha256, actual_size = _file_identity(path)
@@ -348,8 +366,8 @@ def resolve_active_generation_path(vault_dir: Path) -> Path | None:
     root = Path(vault_dir).expanduser().resolve()
     if not root.is_dir():
         return None
-    state_path = _state_db_path(root)
-    if not state_path.exists():
+    state_path = _existing_state_db_path(root)
+    if state_path is None or not state_path.exists():
         return None
     try:
         with closing(sqlite3.connect(f"file:{state_path}?mode=ro", uri=True, timeout=30)) as conn:
@@ -373,8 +391,8 @@ def resolve_active_generation_path(vault_dir: Path) -> Path | None:
 def active_dense_chunk_count(vault_dir: Path) -> int:
     """Return active dense chunk count, failing closed on unreadable state."""
     active = resolve_active_generation_path(vault_dir)
-    database = active or vault_db_path(vault_dir)
-    if not database.is_file():
+    database = active or existing_vault_db_path(vault_dir)
+    if database is None or not database.is_file():
         return 0
     try:
         with closing(

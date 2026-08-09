@@ -28,7 +28,7 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 
 Скілл містить автоматизовані скрипти у каталозі `scripts/` та CLI:
 
-### CLI (power, 17 команд)
+### CLI (power, 18 команд)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
@@ -36,17 +36,18 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 4. `power ingest <path>` — створення нотатки з OKF метаданими
 5. `power import <source> --into <folder>` — preflight-імпорт наявного дерева Markdown
 6. `power search <path> <query>` — пошук (`semantic` за замовчуванням)
-7. `power memory <sub> <path>` — керована транзакційна пам'ять
-8. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
-9. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
-10. `power archive <path>` — архівування застарілих нотаток
-11. `power status <path>` — панель стану vault
-12. `power cron <path>` — автоматичне обслуговування
-13. `power heal <path>` — автовиправлення frontmatter
-14. `power markdown-check <path>` — перевірка якості Markdown
-15. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
-16. `power synthesize <path>` — створення підсумкової нотатки сесії
-17. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
+7. `power cache list|prune [--no-dry-run] [--include-unknown]` — аудит і безпечне очищення cache namespace
+8. `power memory <sub> <path>` — керована транзакційна пам'ять
+9. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
+10. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
+11. `power archive <path>` — архівування застарілих нотаток
+12. `power status <path>` — панель стану vault
+13. `power cron <path>` — автоматичне обслуговування
+14. `power heal <path>` — автовиправлення frontmatter
+15. `power markdown-check <path>` — перевірка якості Markdown
+16. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
+17. `power synthesize <path>` — створення підсумкової нотатки сесії
+18. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
 
 ### MCP Tools (18) — FastMCP 3.x (v3.3.2)
 

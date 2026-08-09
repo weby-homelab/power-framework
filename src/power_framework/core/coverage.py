@@ -8,7 +8,7 @@ from contextlib import closing
 from pathlib import Path
 
 from .ignore import should_skip
-from .vault_storage import vault_db_path
+from .vault_storage import existing_vault_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ def get_index_coverage(vault_dir: Path) -> tuple[int, int]:
         logger.debug("Unable to calculate total vault coverage", exc_info=True)
 
     indexed = 0
-    db_path = vault_db_path(root)
-    if not db_path.exists():
+    db_path = existing_vault_db_path(root)
+    if db_path is None or not db_path.exists():
         return indexed, total
     try:
         with closing(sqlite3.connect(str(db_path), timeout=30)) as conn:
