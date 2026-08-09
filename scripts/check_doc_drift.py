@@ -54,6 +54,7 @@ HIERARCHICAL = REPO_ROOT / "docs" / "hierarchical-index-migration.md"
 HIERARCHICAL_UA = REPO_ROOT / "docs" / "hierarchical-index-migration.ua.md"
 INVENTORY_UA = REPO_ROOT / "docs" / "documentation-inventory.ua.md"
 AGENT_INSTRUCTIONS = REPO_ROOT / ".agents" / "AGENTS.md"
+AGENT_SKILL = REPO_ROOT / "skills" / "power" / "SKILL.md"
 CURRENT_DOCUMENTS = {
     "README": README,
     "README.ua": README_UA,
@@ -73,6 +74,7 @@ CURRENT_DOCUMENTS = {
     "Hierarchical report UA": HIERARCHICAL_UA,
     "Documentation inventory UA": INVENTORY_UA,
     "Agent instructions": AGENT_INSTRUCTIONS,
+    "Agent skill": AGENT_SKILL,
 }
 
 # Canonical provider -> the human-readable token(s) the README MUST contain to
@@ -297,6 +299,31 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
             errors.append(f"{label} does not declare all {len(mcp_tools)} MCP tools.")
     if f"{len(mcp_tools)} tools" not in documents["Agent instructions"]:
         errors.append(f"Agent instructions do not declare `{len(mcp_tools)} tools`.")
+
+    # The bundled skill is what an agent actually loads, so it drifts with the
+    # same consequences as the reference docs and is checked the same way.
+    skill = documents["Agent skill"]
+    if f"{len(mcp_tools)} tools" not in skill and f"MCP Tools ({len(mcp_tools)})" not in skill:
+        errors.append(f"Agent skill does not declare `{len(mcp_tools)} tools`.")
+    # The skill is authored in Ukrainian, so match the count next to the "CLI"
+    # marker rather than an English noun.
+    if not re.search(rf"CLI[^\n]*\b{len(cli_commands)}\b", skill):
+        errors.append(f"Agent skill does not declare all {len(cli_commands)} CLI commands.")
+    errors.extend(
+        f"Agent skill is missing executable tool `{tool}`."
+        for tool in mcp_tools
+        if f"`{tool}`" not in skill
+    )
+    # Pin the frontmatter field itself: "3.3.2 appears somewhere in the body"
+    # would still pass while the declared skill version rots.
+    if not re.search(rf"^version:\s*{re.escape(facts['version'])}\s*$", skill, re.M):
+        errors.append(f"Agent skill frontmatter does not declare version {facts['version']}.")
+    for pattern, description in {
+        r"/root/": "absolute path from a foreign machine",
+        r"POWER_VAULT_PATH": "legacy MCP vault variable",
+    }.items():
+        if re.search(pattern, skill):
+            errors.append(f"Agent skill contains a forbidden {description}.")
     return errors
 
 
