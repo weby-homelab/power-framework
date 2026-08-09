@@ -626,3 +626,92 @@ def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
     ):
         main()
     assert exc2.value.code == 1
+
+
+class TestCachePrune:
+    """Prune must require proof that a vault is gone, never assume it.
+
+    Measured origin: 2072 cache namespaces accumulated in 13 hours of ordinary
+    development, 1325 of them empty, while exactly one vault existed on disk.
+    """
+
+    @staticmethod
+    def _cache(command, **kw):
+        import argparse
+
+        from power_framework.core.cli import _cmd_cache
+
+        ns = argparse.Namespace(cache_command=command, dry_run=True, include_unknown=False)
+        for key, value in kw.items():
+            setattr(ns, key, value)
+        return _cmd_cache(ns)
+
+    @staticmethod
+    def _make_vault(tmp_path, name):
+        import argparse
+
+        from power_framework.core.cli import _cmd_init
+        from power_framework.core.vault_storage import vault_cache_dir
+
+        vault = tmp_path / name
+        _cmd_init(argparse.Namespace(path=str(vault)))
+        return vault, vault_cache_dir(vault)
+
+    def test_cache_dir_records_its_source_vault(self, tmp_path, monkeypatch):
+        from power_framework.core import utils
+
+        monkeypatch.setattr(utils, "get_cache_dir", lambda: tmp_path / "cache")
+        from pathlib import Path
+
+        from power_framework.core.vault_storage import read_cache_source
+
+        vault, namespace = self._make_vault(tmp_path, "v1")
+        source = read_cache_source(namespace)
+        assert source is not None
+        assert Path(source["vault_path"]) == vault.resolve()
+
+    def test_live_vault_is_never_pruned(self, tmp_path, monkeypatch):
+        from power_framework.core import utils, vault_storage
+
+        monkeypatch.setattr(utils, "get_cache_dir", lambda: tmp_path / "cache")
+        monkeypatch.setattr(vault_storage, "get_cache_dir", lambda: tmp_path / "cache")
+
+        _vault, namespace = self._make_vault(tmp_path, "live")
+        report = vault_storage.prune_vault_caches(dry_run=False)
+        assert namespace.is_dir()
+        assert "live 1" in report
+
+    def test_deleted_vault_is_pruned(self, tmp_path, monkeypatch):
+        import shutil
+
+        from power_framework.core import utils, vault_storage
+
+        monkeypatch.setattr(utils, "get_cache_dir", lambda: tmp_path / "cache")
+        monkeypatch.setattr(vault_storage, "get_cache_dir", lambda: tmp_path / "cache")
+
+        vault, namespace = self._make_vault(tmp_path, "doomed")
+        shutil.rmtree(vault)
+        assert namespace.is_dir()
+
+        preview = vault_storage.prune_vault_caches(dry_run=True)
+        assert "Would remove: 1" in preview
+        assert namespace.is_dir(), "dry run must not delete"
+
+        vault_storage.prune_vault_caches(dry_run=False)
+        assert not namespace.exists()
+
+    def test_unattributable_namespace_is_kept_unless_asked(self, tmp_path, monkeypatch):
+        from power_framework.core import utils, vault_storage
+
+        monkeypatch.setattr(utils, "get_cache_dir", lambda: tmp_path / "cache")
+        monkeypatch.setattr(vault_storage, "get_cache_dir", lambda: tmp_path / "cache")
+
+        legacy = tmp_path / "cache" / "vaults" / "00000000-0000-4000-8000-000000000000"
+        legacy.mkdir(parents=True)
+        (legacy / "search.db").write_bytes(b"x")
+
+        vault_storage.prune_vault_caches(dry_run=False)
+        assert legacy.is_dir(), "a namespace with no source record is not proof of death"
+
+        vault_storage.prune_vault_caches(dry_run=False, include_unknown=True)
+        assert not legacy.exists()

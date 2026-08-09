@@ -683,6 +683,32 @@ def _cmd_synthesize(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_cache(args: argparse.Namespace) -> int:
+    """Inspect or prune per-vault cache namespaces."""
+    from .vault_storage import classify_cache_namespaces, prune_vault_caches
+
+    if args.cache_command == "list":
+        namespaces = classify_cache_namespaces()
+        total = sum(n.size_bytes for n in namespaces)
+        logger.info("=== Cache Namespaces ===")
+        logger.info("Count: %d  Total: %.1f MB", len(namespaces), total / 1024 / 1024)
+        for namespace in namespaces:
+            logger.info(
+                "  %s  %-7s %8.0f KB  %s",
+                namespace.vault_id,
+                namespace.verdict,
+                namespace.size_bytes / 1024,
+                namespace.detail,
+            )
+        return 0
+
+    logger.info(
+        "%s",
+        prune_vault_caches(dry_run=args.dry_run, include_unknown=args.include_unknown),
+    )
+    return 0
+
+
 def _cmd_memory(args: argparse.Namespace) -> int:
     vault_dir = _resolve_path(args.path)
     if args.memory_command == "context":
@@ -833,6 +859,34 @@ def main() -> None:
     )
     p_search.add_argument("--domain", default=None, help="Optional domain slug to scope the search")
     p_search.set_defaults(func=_cmd_search)
+
+    p_cache = subparsers.add_parser(
+        "cache", help="Inspect or prune per-vault cache namespaces in the user cache"
+    )
+    cache_sub = p_cache.add_subparsers(dest="cache_command", required=True)
+    cache_sub.add_parser(
+        "list", help="Show every cache namespace and whether its vault still exists"
+    )
+    p_prune = cache_sub.add_parser(
+        "prune", help="Remove cache namespaces whose vault is provably gone"
+    )
+    p_prune.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        default=True,
+        help="Actually delete; default is a preview only",
+    )
+    p_prune.add_argument(
+        "--include-unknown",
+        action="store_true",
+        default=False,
+        help=(
+            "Also remove namespaces with no source record. These predate the "
+            "back-reference and cannot be attributed to any vault"
+        ),
+    )
+    p_cache.set_defaults(func=_cmd_cache)
 
     p_memory = subparsers.add_parser("memory", help="Human-governed transactional memory workflow")
     memory_sub = p_memory.add_subparsers(dest="memory_command", required=True)
