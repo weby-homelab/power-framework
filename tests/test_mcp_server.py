@@ -305,6 +305,21 @@ async def test_sync_vault_fails_closed_and_can_explicitly_allow_partial(
     assert "not searchable" in report
 
 
+async def test_sync_vault_dense_loss_requires_explicit_acceptance(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MCP must expose the shared dense-loss refusal and explicit opt-in."""
+    from power_framework.core import generation_index
+
+    monkeypatch.setattr(power_server._index_limiter, "is_allowed", lambda _: True)
+    monkeypatch.setattr(generation_index, "active_dense_chunk_count", lambda _: 3)
+    with pytest.raises(ToolError, match=r"Refusing --fts-only.*3 chunks"):
+        await sync_vault(fts_only=True, vault_path=str(sample_vault))
+
+    report = await sync_vault(fts_only=True, accept_dense_loss=True, vault_path=str(sample_vault))
+    assert "Mode: FTS only" in report
+
+
 async def test_synthesize_session_serializes_write_and_stores_candidate_triplets(
     sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

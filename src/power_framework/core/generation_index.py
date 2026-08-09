@@ -370,6 +370,24 @@ def resolve_active_generation_path(vault_dir: Path) -> Path | None:
     return _verified_generation_path(root, generation_id, str(db_sha256), int(db_size))
 
 
+def active_dense_chunk_count(vault_dir: Path) -> int:
+    """Return active dense chunk count, failing closed on unreadable state."""
+    active = resolve_active_generation_path(vault_dir)
+    database = active or vault_db_path(vault_dir)
+    if not database.is_file():
+        return 0
+    try:
+        with closing(
+            sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True, timeout=30)
+        ) as conn:
+            row = conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()
+    except sqlite3.Error as exc:
+        raise ActiveGenerationError("active generation dense state is unreadable") from exc
+    if row is None:
+        raise ActiveGenerationError("active generation dense state returned no count")
+    return int(row[0])
+
+
 def _cleanup_generations(vault_dir: Path) -> None:
     """Best-effort retention, called only after an active-generation readback."""
     with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
@@ -583,6 +601,7 @@ def sync_vault_atomically(
     sync_embeddings: bool,
     force_rebuild: bool = False,
     allow_partial: bool = True,
+    accept_dense_loss: bool = False,
 ) -> GenerationReport:
     """Build a complete staged generation and atomically publish it on success.
 
@@ -590,9 +609,19 @@ def sync_vault_atomically(
     before a new generation is staged. The default remains permissive for the
     low-level compatibility API; CLI and MCP callers expose explicit
     fail-closed policy at their user-facing boundaries.
+    ``accept_dense_loss=True`` is required to replace an active dense
+    generation with an FTS-only generation.
     """
     root = Path(vault_dir).expanduser().resolve()
     ensure_vault_identity(root)
+    if not sync_embeddings and not accept_dense_loss:
+        existing_chunks = active_dense_chunk_count(root)
+        if existing_chunks:
+            raise IndexGenerationError(
+                "Refusing --fts-only: the vault has an active dense index "
+                f"({existing_chunks} chunks). Pass accept_dense_loss=True "
+                "to explicitly discard the embeddings (CLI: --accept-dense-loss)."
+            )
     inventory = _source_inventory(root)
     if inventory.invalid_sources and not allow_partial:
         details = "; ".join(

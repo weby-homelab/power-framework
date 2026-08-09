@@ -412,3 +412,44 @@ def test_chunk_identity_is_content_addressed_and_path_independent() -> None:
     assert first != changed_source
     assert first != changed_section
     assert "::chunk_" not in first
+
+
+def test_library_fts_only_requires_explicit_dense_loss_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The shared library boundary must enforce the same fail-closed policy as CLI/MCP."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "library-guard", "stable-token")
+    sync_vault_atomically(vault, sync_embeddings=False)
+
+    from power_framework.core import generation_index
+
+    monkeypatch.setattr(generation_index, "active_dense_chunk_count", lambda _: 7)
+    with pytest.raises(IndexGenerationError, match=r"Refusing --fts-only.*7 chunks"):
+        sync_vault_atomically(vault, sync_embeddings=False)
+
+    report = sync_vault_atomically(vault, sync_embeddings=False, accept_dense_loss=True)
+    assert report.actual_files == 1
+
+
+def test_legacy_dense_state_is_also_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pre-generation dense DBs must not bypass the downgrade guard during migration."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "legacy-guard", "legacy-token")
+    legacy = vault_db_path(vault)
+    with closing(sqlite3.connect(legacy)) as conn:
+        _init_db(conn)
+        conn.execute(
+            "INSERT INTO chunk_embeddings(chunk_id, rel_path, embedding, content, mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("legacy", "01_Projects/Test.md", b"\\x00\\x00\\x80?", "legacy", 0.0),
+        )
+        conn.commit()
+
+    from power_framework.core.generation_index import active_dense_chunk_count
+
+    assert active_dense_chunk_count(vault) == 1
+    with pytest.raises(IndexGenerationError, match=r"Refusing --fts-only.*1 chunks"):
+        sync_vault_atomically(vault, sync_embeddings=False)

@@ -179,6 +179,7 @@ async def generate_index(vault_path: str | None = None) -> str:
 @mcp.tool
 async def sync_vault(
     fts_only: bool = True,
+    accept_dense_loss: bool = False,
     force_rebuild: bool = False,
     allow_partial: bool = False,
     vault_path: str | None = None,
@@ -194,6 +195,8 @@ async def sync_vault(
     without downloading or loading an embedding model. Set ``fts_only=False``
     for the dense index and ``force_rebuild=True`` after changing the embedding
     model or dimension. Invalid notes fail closed unless ``allow_partial=True``.
+    When ``fts_only=True`` would discard an active dense index, the call fails
+    closed unless ``accept_dense_loss=True`` is explicit.
     """
     if not _index_limiter.is_allowed("sync_vault"):
         remaining = _index_limiter.remaining("sync_vault")
@@ -227,6 +230,7 @@ async def sync_vault(
                 sync_embeddings=not fts_only,
                 force_rebuild=force_rebuild,
                 allow_partial=allow_partial,
+                accept_dense_loss=accept_dense_loss,
             )
         except IndexGenerationError as exc:
             raise ToolError(f"Vault sync failed; previous index remains active: {exc}") from exc

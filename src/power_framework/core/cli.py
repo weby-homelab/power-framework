@@ -389,26 +389,6 @@ def _cmd_sync(args: argparse.Namespace) -> int:
 
     sync_embeddings = not getattr(args, "fts_only", False)
 
-    # An --fts-only run publishes a generation with zero chunks. When sources
-    # changed, that generation SUPERSEDES a dense one, and every dense search
-    # mode starts failing with DenseIndexUnavailableError — a working vault is
-    # downgraded by a flag whose name promises only to skip work.
-    if not sync_embeddings and not getattr(args, "accept_dense_loss", False):
-        existing_chunks = _active_chunk_count(vault_dir)
-        if existing_chunks:
-            logger.error(
-                "Refusing --fts-only: this vault has an active dense index (%d chunks). "
-                "Rebuilding FTS-only would replace it with a chunkless generation and "
-                "break semantic, hybrid and reranked search.",
-                existing_chunks,
-            )
-            logger.error(
-                "Run 'power sync %s' to keep dense search, or pass --accept-dense-loss "
-                "to discard the embeddings deliberately.",
-                vault_dir,
-            )
-            return 1
-
     # v2.2.0 low-RAM guard: cap the address space so an over-sized embedding
     # batch cannot trigger the kernel OOM-killer and take down the host. This is
     # an OPT-IN backstop (default 0 = disabled) because some backends (e.g.
@@ -439,6 +419,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         vault_dir,
     )
     force_rebuild = getattr(args, "force", False)
+    accept_dense_loss = getattr(args, "accept_dense_loss", False)
     try:
         report = execute_vault_mutation(
             vault_dir,
@@ -446,6 +427,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
                 vault_dir,
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
+                accept_dense_loss=accept_dense_loss,
             ),
         )
     except IndexGenerationError as exc:
@@ -484,26 +466,6 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         if not allow_partial:
             return 1
     return 0
-
-
-def _active_chunk_count(vault_dir: Path) -> int:
-    """Return the chunk count of the active generation, 0 when there is none."""
-    import sqlite3
-    from contextlib import closing
-
-    from .generation_index import IndexGenerationError, resolve_active_generation_path
-
-    try:
-        active = resolve_active_generation_path(vault_dir)
-    except IndexGenerationError:
-        return 0
-    if active is None or not active.is_file():
-        return 0
-    try:
-        with closing(sqlite3.connect(f"file:{active.as_posix()}?mode=ro", uri=True)) as conn:
-            return int(conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0])
-    except sqlite3.Error:
-        return 0
 
 
 def _cmd_rot(args: argparse.Namespace) -> int:

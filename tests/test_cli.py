@@ -673,24 +673,24 @@ class TestFtsOnlyDenseGuard:
     def test_fts_only_refuses_to_discard_an_existing_dense_index(self, tmp_path, caplog):
         import logging
 
-        from power_framework.core.cli import _active_chunk_count
+        from power_framework.core.generation_index import active_dense_chunk_count
 
         vault, note = self._vault_with_dense(tmp_path)
-        assert _active_chunk_count(vault) > 0
+        assert active_dense_chunk_count(vault) > 0
 
         note.write_text(self.NOTE.format(body="Body EDITED."), encoding="utf-8")
         with caplog.at_level(logging.INFO):
             assert self._sync(vault, fts_only=True) == 1
         assert any("Refusing --fts-only" in r.getMessage() for r in caplog.records)
-        assert _active_chunk_count(vault) > 0, "the dense index must survive a refusal"
+        assert active_dense_chunk_count(vault) > 0, "the dense index must survive a refusal"
 
     def test_explicit_opt_in_still_allows_the_downgrade(self, tmp_path):
-        from power_framework.core.cli import _active_chunk_count
+        from power_framework.core.generation_index import active_dense_chunk_count
 
         vault, note = self._vault_with_dense(tmp_path)
         note.write_text(self.NOTE.format(body="Body EDITED."), encoding="utf-8")
         assert self._sync(vault, fts_only=True, accept_dense_loss=True) == 0
-        assert _active_chunk_count(vault) == 0
+        assert active_dense_chunk_count(vault) == 0
 
     def test_fts_only_is_unaffected_when_there_is_no_dense_index(self, tmp_path):
         import argparse
