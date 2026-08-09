@@ -626,3 +626,65 @@ def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
     ):
         main()
     assert exc2.value.code == 1
+
+
+class TestDoctor:
+    """doctor must report what the provider list cannot: the actual binding."""
+
+    @staticmethod
+    def _doctor(path):
+        import argparse
+
+        from power_framework.core.cli import _cmd_doctor
+
+        return _cmd_doctor(argparse.Namespace(path=path))
+
+    def test_reports_runtime_and_the_listed_vs_bound_caveat(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.INFO):
+            assert self._doctor(None) == 0
+        rendered = [r.getMessage() for r in caplog.records]
+        assert any("P.O.W.E.R. Doctor" in m for m in rendered)
+        assert any("onnxruntime" in m for m in rendered)
+        assert any("Providers listed" in m for m in rendered)
+        # The distinction the whole command exists for.
+        assert any("not what can load" in m for m in rendered)
+        assert any("Bound provider" in m for m in rendered)
+
+    def test_missing_vault_fails(self, tmp_path, monkeypatch):
+        from power_framework.core import cli as cli_mod
+
+        monkeypatch.setattr(cli_mod, "_doctor_bind_check", lambda: None)
+        assert self._doctor(str(tmp_path / "no-such-vault")) == 1
+
+    def test_vault_section_reports_index_and_names_exclusions(self, tmp_path, caplog, monkeypatch):
+        import argparse
+        import logging
+
+        from power_framework.core import cli as cli_mod
+        from power_framework.core.cli import _cmd_init, _cmd_sync
+
+        monkeypatch.setattr(cli_mod, "_doctor_bind_check", lambda: None)
+        vault = tmp_path / "vault"
+        _cmd_init(argparse.Namespace(path=str(vault)))
+        (vault / "03_Resources" / "good.md").write_text(
+            '---\ntype: Resource\ntitle: "Good"\ndescription: "Valid"\n'
+            "timestamp: 2026-01-01T00:00:00\n---\n\nBody.\n",
+            encoding="utf-8",
+        )
+        _cmd_sync(
+            argparse.Namespace(
+                path=str(vault), fts_only=True, force=False, strict=False, allow_partial=True
+            )
+        )
+        (vault / "03_Resources" / "broken.md").write_text(
+            "---\ntype: NotARealType\ntitle: Broken\n---\n\nBody.\n", encoding="utf-8"
+        )
+
+        with caplog.at_level(logging.INFO):
+            assert self._doctor(str(vault)) == 0
+        rendered = [r.getMessage() for r in caplog.records]
+        assert any("Search index" in m and "files" in m for m in rendered)
+        assert any("Excluded now" in m and "1" in m for m in rendered)
+        assert any("broken.md" in m for m in rendered)

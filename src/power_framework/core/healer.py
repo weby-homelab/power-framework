@@ -388,7 +388,9 @@ def heal_vault_report(
             content = read_file_content(filepath)
         except Exception as exc:
             logger.warning("Cannot read %s: %s: %s", rel, type(exc).__name__, exc)
-            report.failures.append(HealFailure(str(rel), "read", type(exc).__name__, str(exc)))
+            report.failures.append(
+                HealFailure(rel.as_posix(), "read", type(exc).__name__, str(exc))
+            )
             continue
         if not content.strip():
             continue
@@ -398,12 +400,14 @@ def heal_vault_report(
         except HealValidationError as exc:
             logger.warning("Cannot validate %s: %s", rel, exc)
             report.failures.append(
-                HealFailure(str(rel), "validation", type(exc).__name__, str(exc))
+                HealFailure(rel.as_posix(), "validation", type(exc).__name__, str(exc))
             )
             continue
         except Exception as exc:
             logger.warning("Cannot heal %s: %s: %s", rel, type(exc).__name__, exc)
-            report.failures.append(HealFailure(str(rel), "transform", type(exc).__name__, str(exc)))
+            report.failures.append(
+                HealFailure(rel.as_posix(), "transform", type(exc).__name__, str(exc))
+            )
             continue
         if not changes:
             continue
@@ -418,14 +422,16 @@ def heal_vault_report(
             except Exception as exc:
                 logger.warning("Cannot back up %s: %s: %s", rel, type(exc).__name__, exc)
                 report.failures.append(
-                    HealFailure(str(rel), "backup", type(exc).__name__, str(exc))
+                    HealFailure(rel.as_posix(), "backup", type(exc).__name__, str(exc))
                 )
                 continue
             try:
                 atomic_write(filepath, healed)
             except Exception as exc:
                 logger.warning("Cannot write %s: %s: %s", rel, type(exc).__name__, exc)
-                report.failures.append(HealFailure(str(rel), "write", type(exc).__name__, str(exc)))
+                report.failures.append(
+                    HealFailure(rel.as_posix(), "write", type(exc).__name__, str(exc))
+                )
                 continue
 
         report.healed += 1
