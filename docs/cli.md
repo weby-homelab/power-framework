@@ -137,6 +137,12 @@ power search PATH QUERY [--max-results N] [--mode MODE]
 Dense modes require a compatible full `power sync`; `fts` requires at least an
 FTS sync. `reranked` is explicit opt-in, not the default.
 
+ONNX-backed embedding and reranking honor `POWER_EMBED_DEVICE` and
+`POWER_RERANKER_DEVICE` (`auto`, `cpu`, `cuda`, `rocm`, or `directml`). `auto`
+may fall back to CPU; an explicit accelerator mode fails closed if the created
+session does not bind the requested provider. The actual bound provider is
+logged during initialization.
+
 ### `memory`
 
 Human-governed transactional memory workflow.

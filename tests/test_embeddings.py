@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import inspect
 import signal
+import sys
+from types import ModuleType
 from typing import TYPE_CHECKING
 
 import pytest
@@ -35,6 +37,81 @@ class TestEmbeddingManager:
         monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
         with pytest.raises(RuntimeError, match="requested_onnx_provider_unavailable"):
             embeddings.select_onnx_providers(FakeOrt())
+
+    def test_preload_dlls_runs_before_provider_probe(self, monkeypatch: pytest.MonkeyPatch):
+        calls: list[str] = []
+
+        class FakeOrt:
+            @staticmethod
+            def preload_dlls():
+                calls.append("preload")
+
+            @staticmethod
+            def get_available_providers():
+                calls.append("probe")
+                return ["CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
+        embeddings.select_onnx_providers(FakeOrt())
+        assert calls == ["preload", "probe"]
+
+    def test_missing_preload_dlls_does_not_break_cpu(self, monkeypatch: pytest.MonkeyPatch):
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
+        assert embeddings.select_onnx_providers(FakeOrt())[0][0] == "CPUExecutionProvider"
+
+    def test_rocm_provider_name_is_resolved_case_insensitively(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["ROCmExecutionProvider", "CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "rocm")
+        providers = embeddings.select_onnx_providers(FakeOrt())
+        assert providers[0][0] == "ROCmExecutionProvider"
+        assert providers[0][1]["device_id"] == 0
+
+    def test_directml_provider_can_be_selected_and_verified(self, monkeypatch: pytest.MonkeyPatch):
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["DmlExecutionProvider", "CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "directml")
+        providers = embeddings.select_onnx_providers(FakeOrt())
+        assert providers[0][0] == "DmlExecutionProvider"
+        assert (
+            embeddings.verify_bound_provider(
+                self._fake_session(["DmlExecutionProvider", "CPUExecutionProvider"]),
+                providers,
+                "POWER_EMBED_DEVICE",
+            )
+            == "DmlExecutionProvider"
+        )
+
+    def test_preload_failure_is_visible_but_not_fatal_for_cpu(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ):
+        class FakeOrt:
+            @staticmethod
+            def preload_dlls():
+                raise OSError("missing optional GPU runtime")
+
+            @staticmethod
+            def get_available_providers():
+                return ["CPUExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
+        with caplog.at_level("WARNING"):
+            providers = embeddings.select_onnx_providers(FakeOrt())
+        assert providers[0][0] == "CPUExecutionProvider"
+        assert "preload_dlls() failed" in caplog.text
 
     def test_ollama_attempt_does_not_require_sigalrm(self, monkeypatch: pytest.MonkeyPatch):
         manager = embeddings.OllamaEmbeddingManager()
@@ -103,3 +180,120 @@ class TestEmbeddingManager:
         monkeypatch.setenv("POWER_EMBED_PROVIDER", "totally-unknown-backend")
         with pytest.raises(RuntimeError, match=r"unknown_embed_provider"):
             embeddings.get_embedding_manager()
+
+    @staticmethod
+    def _fake_session(providers: list[str]):
+        class FakeSession:
+            @staticmethod
+            def get_providers():
+                return providers
+
+        return FakeSession()
+
+    def test_explicit_gpu_binding_must_match_requested_provider(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
+        providers: list[object] = [
+            ("CUDAExecutionProvider", {}),
+            ("CPUExecutionProvider", {}),
+        ]
+        with pytest.raises(RuntimeError, match="requested_onnx_provider_not_bound"):
+            embeddings.verify_bound_provider(
+                self._fake_session(["ROCmExecutionProvider", "CPUExecutionProvider"]),
+                providers,
+                "POWER_EMBED_DEVICE",
+            )
+
+    def test_auto_cpu_fallback_is_visible_but_allowed(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "auto")
+        providers: list[object] = [
+            ("CUDAExecutionProvider", {}),
+            ("CPUExecutionProvider", {}),
+        ]
+        assert (
+            embeddings.verify_bound_provider(
+                self._fake_session(["CPUExecutionProvider"]),
+                providers,
+                "POWER_EMBED_DEVICE",
+            )
+            == "CPUExecutionProvider"
+        )
+
+    def test_explicit_gpu_binding_is_case_insensitive(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
+        providers: list[object] = [("CUDAExecutionProvider", {}), ("CPUExecutionProvider", {})]
+        assert (
+            embeddings.verify_bound_provider(
+                self._fake_session(["CUDAExecutionProvider", "CPUExecutionProvider"]),
+                providers,
+                "POWER_EMBED_DEVICE",
+            )
+            == "CUDAExecutionProvider"
+        )
+
+    def test_explicit_cpu_binding_is_checked(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cpu")
+        providers: list[object] = [("CPUExecutionProvider", {})]
+        assert (
+            embeddings.verify_bound_provider(
+                self._fake_session(["CPUExecutionProvider"]),
+                providers,
+                "POWER_EMBED_DEVICE",
+            )
+            == "CPUExecutionProvider"
+        )
+
+    def test_explicit_gpu_empty_binding_fails_closed(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
+        providers: list[object] = [("CUDAExecutionProvider", {}), ("CPUExecutionProvider", {})]
+        with pytest.raises(RuntimeError, match="requested_onnx_provider_not_bound"):
+            embeddings.verify_bound_provider(
+                self._fake_session([]), providers, "POWER_EMBED_DEVICE"
+            )
+
+    def test_requested_device_inherits_embedding_mode_for_reranker(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv("POWER_RERANKER_DEVICE", raising=False)
+        monkeypatch.setenv("POWER_EMBED_DEVICE", " CUDA ")
+        assert embeddings.requested_device("POWER_RERANKER_DEVICE") == "cuda"
+        monkeypatch.setenv("POWER_RERANKER_DEVICE", "")
+        assert embeddings.requested_device("POWER_RERANKER_DEVICE") == "auto"
+
+    def test_failed_binding_does_not_retain_an_unsafe_embedder_session(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        class FakeOptions:
+            pass
+
+        class FakeSession:
+            def __init__(self, *args: object, **kwargs: object):
+                pass
+
+            @staticmethod
+            def get_providers():
+                return ["CPUExecutionProvider"]
+
+        fake_ort = ModuleType("onnxruntime")
+        fake_ort.SessionOptions = FakeOptions
+        fake_ort.InferenceSession = FakeSession
+        fake_ort.get_available_providers = lambda: [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider",
+        ]
+        fake_hub = ModuleType("huggingface_hub")
+        fake_hub.hf_hub_download = lambda *args, **kwargs: "unused-model-file"
+        fake_tokenizers = ModuleType("tokenizers")
+        fake_tokenizers.Tokenizer = object
+        monkeypatch.setitem(sys.modules, "onnxruntime", fake_ort)
+        monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
+        monkeypatch.setitem(sys.modules, "tokenizers", fake_tokenizers)
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
+        monkeypatch.setenv("POWER_ALLOW_UNVERIFIED_MODELS", "1")
+
+        manager = embeddings.BGEM3OnnxManager(repo="example/repo", revision="dev")
+        with pytest.raises(RuntimeError, match="requested_onnx_provider_not_bound"):
+            manager.embed("provider probe")
+        assert manager._session is None
+        assert manager.active_provider is None

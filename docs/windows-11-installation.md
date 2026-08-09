@@ -255,6 +255,7 @@ runtime. Back it up before deleting either directory.
 | `DLL load failed` while importing `onnxruntime` | Install or repair the current Visual C++ 2015–2022 Redistributable matching the host architecture, then reopen Terminal. |
 | `pip install git+...` fails | Install Git for Windows, or use the release-wheel path, which does not require Git. |
 | MCP client reports module not found | Its `command` points to the wrong Python. Use the full `.venv\Scripts\python.exe` path and restart the client. |
+| Explicit `POWER_EMBED_DEVICE=cuda` fails with `requested_onnx_provider_not_bound` | This is the fail-closed GPU contract: the session did not bind CUDA. Keep the error, verify the pip `nvidia-*` runtime and `onnxruntime-gpu`, or set `POWER_EMBED_DEVICE=auto` only when CPU fallback is intended. |
 | `power init` refuses the directory | The target is not empty. Do not bypass the guard; use a new path or follow the migration guide. |
 | Dense sync fails | Keep the failure closed. Check disk space, network/proxy access, the exact model error, and retry; FTS remains available through `sync --fts-only` and `search --mode fts`. |
 

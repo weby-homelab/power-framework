@@ -253,6 +253,7 @@ runtime. Зробіть backup перед видаленням будь-яког
 | `DLL load failed` під час import `onnxruntime` | Встановіть або відновіть актуальний Visual C++ 2015–2022 Redistributable для архітектури хоста, потім відкрийте Terminal знову. |
 | `pip install git+...` падає | Встановіть Git for Windows або використовуйте release wheel, який не потребує Git. |
 | MCP-клієнт повідомляє `module not found` | Його `command` вказує на неправильний Python. Використайте повний шлях `.venv\Scripts\python.exe` і перезапустіть клієнт. |
+| Явний `POWER_EMBED_DEVICE=cuda` завершується `requested_onnx_provider_not_bound` | Це fail-closed GPU-контракт: сесія не прив'язала CUDA. Не приховуйте помилку; перевірте `nvidia-*` runtime, `onnxruntime-gpu`, або задайте `POWER_EMBED_DEVICE=auto` лише коли CPU fallback справді потрібен. |
 | `power init` відмовляється працювати | Каталог не порожній. Не обходьте захисну перевірку; оберіть новий шлях або migration guide. |
 | Dense sync падає | Залишайте failure closed. Перевірте диск, network/proxy та точну model error; FTS доступний через `sync --fts-only` і `search --mode fts`. |
 

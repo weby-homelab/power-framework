@@ -78,6 +78,74 @@ def _env_flag(name: str) -> bool:
     return os.getenv(name, "").lower() in {"1", "true", "yes"}
 
 
+def _preload_gpu_runtime(ort: Any) -> None:
+    """Load pip-owned GPU DLLs before asking ONNX Runtime about providers."""
+    preload = getattr(ort, "preload_dlls", None)
+    if preload is None:
+        return
+    try:
+        preload()
+    except Exception as exc:  # pragma: no cover - defensive backend boundary
+        logger.warning("onnxruntime.preload_dlls() failed: %s", exc)
+
+
+_DEVICE_ID_PROVIDERS = frozenset({"cudaexecutionprovider", "rocmexecutionprovider"})
+
+
+def requested_device(env_var: str = "POWER_EMBED_DEVICE") -> str:
+    """Return the normalized device mode for an embedding or reranker session."""
+    value = os.getenv(env_var)
+    if value is None and env_var != "POWER_EMBED_DEVICE":
+        value = os.getenv("POWER_EMBED_DEVICE")
+    return (value or "auto").strip().lower()
+
+
+def _resolve_provider_name(candidate: str, available: set[str]) -> str | None:
+    """Resolve an ORT provider name case-insensitively against the build."""
+    if candidate in available:
+        return candidate
+    lowered = candidate.casefold()
+    return next((name for name in available if name.casefold() == lowered), None)
+
+
+def _provider_name(provider: object) -> str:
+    """Extract a provider name from ORT's tuple or string configuration."""
+    return str(provider[0]) if isinstance(provider, tuple) else str(provider)
+
+
+def verify_bound_provider(session: Any, providers: list[object], env_var: str) -> str:
+    """Return the active provider and fail closed on an explicit mismatch.
+
+    ``get_available_providers()`` describes compiled support, while
+    ``InferenceSession.get_providers()`` describes what actually loaded. Auto
+    mode may bind CPU; an explicit mode must bind the requested provider.
+    """
+    bound = list(session.get_providers())
+    actual = bound[0] if bound else "unknown"
+    requested = requested_device(env_var)
+    logger.info("ONNX Runtime device=%s bound provider=%s", requested, actual)
+
+    if requested == "auto":
+        return actual
+
+    expected = (
+        "CPUExecutionProvider"
+        if requested == "cpu"
+        else (_provider_name(providers[0]) if providers else "unknown")
+    )
+    if actual.casefold() != expected.casefold():
+        fallback_hint = (
+            f"Set {env_var}=auto to allow CPU fallback."
+            if requested != "cpu"
+            else f"Set {env_var}=auto to permit fallback."
+        )
+        raise RuntimeError(
+            f"requested_onnx_provider_not_bound:{expected}; session bound {bound}. "
+            f"The requested provider may be compiled in but unavailable at runtime. {fallback_hint}"
+        )
+    return actual
+
+
 def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list[object]:
     """Select ONNX Runtime providers with explicit and automatic device modes.
 
@@ -86,8 +154,9 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
     fail-closed when unavailable, preventing a requested GPU benchmark from
     silently running on a different backend.
     """
+    _preload_gpu_runtime(ort)
     available = set(ort.get_available_providers())
-    requested = os.getenv(env_var, os.getenv("POWER_EMBED_DEVICE", "auto")).lower()
+    requested = requested_device(env_var)
     if requested not in {"auto", "cpu", "cuda", "rocm", "directml"}:
         raise ValueError(f"invalid_{env_var.lower()}:{requested}")
 
@@ -100,35 +169,37 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
 
     gpu_candidates = {
         "cuda": "CUDAExecutionProvider",
-        "rocm": "ROCmExecutionProvider",
+        "rocm": "ROCMExecutionProvider",
         "directml": "DmlExecutionProvider",
     }
     if requested != "auto":
-        provider_name = gpu_candidates[requested]
-        if provider_name not in available:
+        provider_name = _resolve_provider_name(gpu_candidates[requested], available)
+        if provider_name is None:
             raise RuntimeError(
-                f"requested_onnx_provider_unavailable:{provider_name}; available={sorted(available)}"
+                f"requested_onnx_provider_unavailable:{gpu_candidates[requested]}; "
+                f"available={sorted(available)}"
             )
         options: dict[str, object] = {}
-        if provider_name in {"CUDAExecutionProvider", "ROCmExecutionProvider"}:
+        if provider_name.casefold() in _DEVICE_ID_PROVIDERS:
             options = {
                 "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
                 "arena_extend_strategy": "kSameAsRequested",
             }
         return [(provider_name, options), cpu_provider]
 
-    for provider_name in (
+    for candidate in (
         "CUDAExecutionProvider",
-        "ROCmExecutionProvider",
+        "ROCMExecutionProvider",
         "DmlExecutionProvider",
     ):
-        if provider_name in available:
+        provider_name = _resolve_provider_name(candidate, available)
+        if provider_name is not None:
             options = (
                 {
                     "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
                     "arena_extend_strategy": "kSameAsRequested",
                 }
-                if provider_name in {"CUDAExecutionProvider", "ROCmExecutionProvider"}
+                if provider_name.casefold() in _DEVICE_ID_PROVIDERS
                 else {}
             )
             logger.info("ONNX Runtime device=auto selected %s", provider_name)
@@ -510,6 +581,7 @@ class BGEM3OnnxManager:
         self._session: Any | None = None
         self._tokenizer: Any | None = None
         self._dim = BGE_M3_DIM
+        self.active_provider: str | None = None
 
     @property
     def dimension(self) -> int:
@@ -584,7 +656,10 @@ class BGEM3OnnxManager:
             so.intra_op_num_threads = max(1, EMBED_NUM_THREADS)
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort)
-            self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            active_provider = verify_bound_provider(session, providers, "POWER_EMBED_DEVICE")
+            self._session = session
+            self.active_provider = active_provider
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
             # Probe: eagerly verify the backend can allocate and produce a
@@ -593,6 +668,7 @@ class BGEM3OnnxManager:
             probe = self._embed_raw(["probe"])
             if probe is None or len(probe) != 1 or len(probe[0]) != self._dim:
                 self._session = None
+                self.active_provider = None
                 raise RuntimeError("bge_m3_onnx_probe_failed")
 
     def _embed_raw(self, texts: list[str]) -> list[list[float]] | None:

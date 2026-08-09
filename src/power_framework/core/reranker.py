@@ -7,7 +7,7 @@ import os
 import time
 from typing import Protocol
 
-from .embeddings import select_onnx_providers
+from .embeddings import select_onnx_providers, verify_bound_provider
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,7 @@ class BGEM3Reranker:
         self.model_name = f"{repo}@{revision}"
         self._session: object | None = None
         self._tokenizer: object | None = None
+        self.active_provider: str | None = None
 
     def _lazy_init(self) -> None:
         if self._session is not None:
@@ -224,7 +225,10 @@ class BGEM3Reranker:
             so.intra_op_num_threads = max(1, int(os.getenv("POWER_EMBED_NUM_THREADS", "2")))
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort, env_var="POWER_RERANKER_DEVICE")
-            self._session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
+            active_provider = verify_bound_provider(session, providers, "POWER_RERANKER_DEVICE")
+            self._session = session
+            self.active_provider = active_provider
             self._tokenizer = Tokenizer.from_file(tok_path)
             self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
 
@@ -232,6 +236,7 @@ class BGEM3Reranker:
             probe = self._rerank_raw("probe query", "probe passage")
             if probe is None or len(probe) != 1:
                 self._session = None
+                self.active_provider = None
                 raise RuntimeError("bge_reranker_onnx_probe_failed")
 
     def _rerank_batch(self, query: str, documents: list[str]) -> list[float] | None:

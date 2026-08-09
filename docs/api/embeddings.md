@@ -20,6 +20,29 @@ get_embedding_manager(provider: str | None = None) -> (
 - `provider`: overrides `POWER_EMBED_PROVIDER`. One of `bge-m3` (default),
   `fastembed`, `qwen3`, `ollama`. Legacy providers are opt-in for debugging only.
 
+### ONNX device/provider contract
+
+The canonical ONNX managers select the device from `POWER_EMBED_DEVICE`; the
+reranker uses `POWER_RERANKER_DEVICE` and falls back to the embedding setting
+when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, and
+`directml`.
+
+- `auto` may bind `CPUExecutionProvider`, but logs the provider actually bound
+  by the created `InferenceSession`.
+- An explicit GPU device fails closed when the session binds CPU or a different
+  provider. It never silently turns a requested GPU run into a CPU benchmark.
+- Before provider probing, POWER calls the optional
+  `onnxruntime.preload_dlls()` hook used by pip-installed CUDA/cuDNN wheels.
+- Provider names are resolved case-insensitively because ONNX Runtime builds
+  differ in the spelling of the ROCm provider.
+- `BGEM3OnnxManager.active_provider` and `BGEM3Reranker.active_provider` hold
+  the verified provider after successful session creation; a failed check does
+  not retain the invalid session.
+
+`POWER_EMBED_DEVICE=cuda` and `POWER_RERANKER_DEVICE=cuda` are therefore
+runtime assertions, not performance hints. Set the corresponding variable to
+`auto` when CPU fallback is intended.
+
 ### Canonical — `BGEM3OnnxManager`
 
 ```python

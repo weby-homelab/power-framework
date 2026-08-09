@@ -37,6 +37,8 @@ jobs:
 
           uv run power --version
           uv run python -c "import power_framework.mcp, onnxruntime; print('imports: OK')"
+          $env:POWER_EMBED_DEVICE = "auto"
+          uv run python -c "import onnxruntime as ort; from power_framework.core.embeddings import select_onnx_providers; selected = select_onnx_providers(ort); print('available providers:', ort.get_available_providers()); print('selected providers:', selected); assert any((p[0] if isinstance(p, tuple) else p) == 'CPUExecutionProvider' for p in selected)"
           uv run power init $vault
           uv run power ingest $vault --type Resource --title "First Note" --description "Windows smoke note"
           uv run power index $vault --strict
