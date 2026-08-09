@@ -88,7 +88,7 @@ deliberately enables a risky integration.
 ## Report a vulnerability
 
 **Do not create a public GitHub issue for a suspected vulnerability.** Report it
-privately by email to **rekvizitor.ua@gmail.com**.
+privately by email to **contact@weby.guru**.
 
 Do not attach a full vault, credentials, tokens, private keys, model caches, or
 unredacted logs. Use a minimal reproduction with synthetic data and redact
