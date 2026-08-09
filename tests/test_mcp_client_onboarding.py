@@ -107,13 +107,22 @@ async def test_each_documented_shape_reaches_golden_stdio_workflow(
         assert all(tool.outputSchema and tool.annotations for tool in tools)
 
         await client.call_tool("get_memory_context", {"query": "golden onboarding"})
-        await client.call_tool(
+        proposal_result = await client.call_tool(
             "propose_memory_change",
             {
                 "path": "01_Projects/golden-onboarding.md",
-                "content": "proposal only",
+                "content": (
+                    "---\n"
+                    "type: Project\n"
+                    'title: "Golden onboarding"\n'
+                    'description: "Durable proposal only"\n'
+                    "timestamp: 2026-08-10T00:00:00Z\n"
+                    "---\n\nproposal only\n"
+                ),
             },
         )
+        assert proposal_result
 
     assert not (sample_vault / "01_Projects" / "golden-onboarding.md").exists()
     assert not (sample_vault / ".power" / "memory-history.jsonl").exists()
+    assert list((sample_vault / ".power" / "proposals").glob("*.json"))

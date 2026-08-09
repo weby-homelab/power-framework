@@ -140,7 +140,7 @@ claude mcp add --transport stdio \
 ## Golden onboarding task
 
 Після зміни конфігурації перезапустіть або reload-ніть клієнт. Перше завдання
-має бути навмисно read-only:
+має бути read-only до явного кроку створення proposal:
 
 1. Відкрийте MCP status view клієнта (`/mcp`, якщо підтримується) і перевірте,
    що `power` підключений та має 18 інструментів.
@@ -149,16 +149,18 @@ claude mcp add --transport stdio \
 3. Попросіть агента викликати `get_memory_context` для короткого запиту. Це не
    має створити файл, namespace, index або запис history.
 4. Попросіть агента викликати `propose_memory_change` для нової нотатки, але не
-   схвалюйте її. Proposal є даними для рев'ю; цільова нотатка має залишитися
-   відсутньою.
+   схвалюйте її. Це створює лише durable content-addressed запис proposal;
+   цільова нотатка, каталог і пошукова projection мають залишитися відсутніми.
 
 Тільки після явного схвалення людиною або дозволеним workflow агент може
-викликати `apply_memory_change` з `approved=true`. Після цього він має
-викликати `validate_memory_state` і завершити workflow vault командами:
+викликати `apply_memory_change` з `approved=true`. Сам цей виклик замикає
+workflow note → index → blocking-lint → search і повертає receipt без вмісту
+нотатки. Агент має перевірити receipt, викликати `validate_memory_state` та
+знайти унікальний маркер пошуком у режимі з receipt (`fts`, якщо dense
+projection відсутня). Окремі дубльовані виклики `sync` або `index` не потрібні;
+після цього виконайте решту quality gate:
 
 ```bash
-power sync /absolute/path/to/vault --strict
-power index /absolute/path/to/vault --strict
 power lint /absolute/path/to/vault
 power markdown-check /absolute/path/to/vault
 ```

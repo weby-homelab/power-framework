@@ -632,6 +632,11 @@ def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
     ):
         main()
     assert exc1.value.code == 0
+    from power_framework.core.searcher import search_vault
+
+    assert search_vault(vault, "duplicate", mode="fts")[0].rel_path == (
+        "01_Projects/duplicate_test.md"
+    )
 
     # Second ingest without --overwrite
     with (
@@ -654,6 +659,46 @@ def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
     ):
         main()
     assert exc2.value.code == 1
+
+
+def test_memory_apply_cli_publishes_search_projection(sample_vault, capsys) -> None:
+    import json
+    from unittest.mock import patch
+
+    from power_framework.core.cli import main
+    from power_framework.core.memory_api import propose_change
+    from power_framework.core.searcher import search_vault
+
+    marker = "cli-closed-mutation-marker"
+    proposal = propose_change(
+        sample_vault,
+        "01_Projects/CliTransaction.md",
+        '---\ntype: Project\ntitle: "CLI transaction"\ndescription: "CLI transaction"\ntimestamp: 2026-07-29T00:00:00Z\n---\n\n'
+        + marker
+        + "\n",
+    )
+
+    with (
+        patch(
+            "sys.argv",
+            [
+                "power",
+                "memory",
+                "apply",
+                str(sample_vault),
+                json.dumps(proposal),
+                "--approved",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 0
+    assert search_vault(sample_vault, marker, mode="fts")[0].rel_path == (
+        "01_Projects/CliTransaction.md"
+    )
+    assert "search_generation" in capsys.readouterr().out
 
 
 class TestFtsOnlyDenseGuard:

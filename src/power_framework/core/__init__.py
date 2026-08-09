@@ -49,7 +49,14 @@ from .markdown_checks import (
     fix_list_markers,
     fix_trailing_whitespace,
 )
-from .memory_api import apply_change, get_context, propose_change, read_history, validate_state
+from .memory_api import (
+    apply_change,
+    commit_note_change,
+    get_context,
+    propose_change,
+    read_history,
+    validate_state,
+)
 from .models import (
     MAX_DESCRIPTION_LENGTH,
     MAX_TITLE_LENGTH,
@@ -172,6 +179,7 @@ __all__ = [
     "check_trailing_whitespace",
     "clean_note_name",
     "cli_main",
+    "commit_note_change",
     "create_backup",
     "enqueue_write",
     "extract_frontmatter_raw",

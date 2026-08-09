@@ -130,6 +130,15 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
     assert search.annotations.readOnlyHint is True
     assert search.meta["power.risk"]["egress"] == "model_download"
 
+    proposal = by_name["propose_memory_change"]
+    assert proposal.annotations is not None
+    assert proposal.annotations.readOnlyHint is False
+    assert proposal.annotations.destructiveHint is False
+    assert proposal.annotations.idempotentHint is True
+    assert proposal.meta == {
+        "power.risk": {"local_only": True, "egress": "none", "approval": "caller"}
+    }
+
 
 async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections() -> None:
     async with Client(power_server.mcp) as client:
@@ -245,16 +254,26 @@ async def test_search_vault_finds_notes(sample_vault: Path) -> None:
 
 
 async def test_transactional_memory_tools_share_approval_and_history(sample_vault: Path) -> None:
+    marker = "mcp-closed-mutation-marker"
     proposal = json.loads(
         await propose_memory_change(
             path="01_Projects/FromTransaction.md",
-            content='---\ntype: Project\ntitle: "From transaction"\ndescription: "MCP transaction"\ntimestamp: 2026-07-29T00:00:00Z\n---\n',
+            content='---\ntype: Project\ntitle: "From transaction"\ndescription: "MCP transaction"\ntimestamp: 2026-07-29T00:00:00Z\n---\n\n'
+            + marker
+            + "\n",
             vault_path=str(sample_vault),
         )
     )
     with pytest.raises(ToolError, match="approved"):
         await apply_memory_change(proposal=proposal, approved=False, vault_path=str(sample_vault))
-    await apply_memory_change(proposal=proposal, approved=True, vault_path=str(sample_vault))
+    receipt = json.loads(
+        await apply_memory_change(proposal=proposal, approved=True, vault_path=str(sample_vault))
+    )
+    assert receipt["search_mode"] == "fts"
+    search_envelope = json.loads(
+        await search_vault_tool(query=marker, search_mode="fts", vault_path=str(sample_vault))
+    )
+    assert search_envelope["results"][0]["source"]["path"] == ("01_Projects/FromTransaction.md")
     assert json.loads(await read_memory_history(vault_path=str(sample_vault)))[0]["path"]
     assert isinstance(await validate_memory_state(vault_path=str(sample_vault)), bool)
 
@@ -412,7 +431,7 @@ async def test_ingest_note_tool(sample_vault: Path) -> None:
 async def test_mcp_write_search_loop_survives_a_fresh_process(
     sample_vault: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """MCP-only ingest plus sync must be visible after the server restarts."""
+    """MCP-only ingest is immediately visible after the server restarts."""
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     marker = "mcp-fresh-process-acceptance-7f3c"
 
@@ -429,10 +448,7 @@ async def test_mcp_write_search_loop_survives_a_fresh_process(
     before = json.loads(
         await search_vault_tool(query=marker, search_mode="fts", vault_path=str(sample_vault))
     )
-    assert before["result_count"] == 0
-
-    report = await sync_vault(fts_only=True, vault_path=str(sample_vault))
-    assert "Notes excluded (invalid metadata): 0" in report
+    assert before["result_count"] == 1
 
     source_root = Path(__file__).resolve().parents[1] / "src"
     script = (
