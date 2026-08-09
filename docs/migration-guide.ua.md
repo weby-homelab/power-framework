@@ -63,6 +63,23 @@ rollback path.
 Саме тому протокол використовує staging vault і migration manifest, а не
 видає одну команду за lossless migration.
 
+## Версійовані executable facts
+
+Цей гід перевірено проти pinned release `v3.4.0`. CI звіряє ці факти з
+executable capability manifest, щоб агент не успадковував старий migration
+recipe:
+
+- поточна surface — 19 top-level CLI commands і 18 MCP tools;
+- режим пошуку за замовчуванням — `semantic`; `reranked` є explicit opt-in;
+- database і cache paths належать runtime. Для active paths і state використовуйте
+  `power doctor DESTINATION --json`; не hard-code-ьте vault-local database
+  filename;
+- `power heal` виправляє frontmatter, але не ремонтує wikilinks. Для foreign
+  frontmatter shapes `power import --policy quarantine` зберігає values як
+  `x-status` або `x-related` до strict validation gate;
+- VRAM, latency і dense/reranked readiness — evidence конкретного host, а не
+  фіксована обіцянка. Записуйте `power doctor` і sync result для actual host.
+
 ### Обмежений fast path імпорту
 
 Якщо destination folder і mapping імен уже відомі, `power import` дає
