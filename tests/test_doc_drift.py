@@ -59,6 +59,30 @@ def test_interface_gate_rejects_stale_architecture_count() -> None:
     assert any("Architecture" in error and "19 CLI commands" in error for error in errors)
 
 
+def test_interface_gate_rejects_stale_getting_started_count() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    documents["Getting Started"] = documents["Getting Started"].replace(
+        "18-tool contract", "17-tool contract", 1
+    )
+
+    errors = gate["check_interfaces"](documents, facts)
+
+    assert any("Getting Started" in error and "18 MCP tools" in error for error in errors)
+
+
+def test_interface_gate_rejects_incomplete_mcp_risk_contract() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    facts["interfaces"]["mcp_tool_contracts"][0]["risk"].pop("approval")
+
+    errors = gate["check_interfaces"](documents, facts)
+
+    assert any("missing risk field `approval`" in error for error in errors)
+
+
 def test_agent_skill_gate_rejects_wrong_index_workflow() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()

@@ -155,14 +155,30 @@ def _get_http_transport_config() -> tuple[str, int]:
     return host, port
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
 async def lint_vault(vault_path: str | None = None) -> str:
     """Run the P.O.W.E.R. health check / linter to verify note metadata, link integrity, and check for orphans."""
     path = _get_vault_path(vault_path)
     return await run_blocking(lambda: run_lint_report(path))
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
+)
 async def generate_index(vault_path: str | None = None) -> str:
     """Compile the vault hierarchical index: a summary index.md plus per-folder _index.md files."""
     if not _index_limiter.is_allowed("generate_index"):
@@ -176,7 +192,15 @@ async def generate_index(vault_path: str | None = None) -> str:
     return await run_vault_mutation(path, lambda: run_generate_hierarchical_index(path))
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "model_download", "approval": "caller"}},
+)
 async def sync_vault(
     fts_only: bool = True,
     accept_dense_loss: bool = False,
@@ -260,7 +284,15 @@ async def sync_vault(
     return await run_vault_mutation(path, _run)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
 async def read_sub_index(category: str, vault_path: str | None = None) -> str:
     """Read the sub-index (_index.md) for a specific P.A.R.A. category. Use this after identifying the relevant category from the main index. Read-only — does not generate files."""
     path = _get_vault_path(vault_path)
@@ -279,7 +311,15 @@ async def read_sub_index(category: str, vault_path: str | None = None) -> str:
     return f"No _index.md found for {category}. Use ensure_sub_index to generate it."
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
+)
 async def ensure_sub_index(category: str, vault_path: str | None = None) -> str:
     """Generate and read a sub-index (_index.md) for a P.A.R.A. category. Use this when _index.md is missing and you need to generate it."""
     path = _get_vault_path(vault_path)
@@ -305,7 +345,15 @@ async def ensure_sub_index(category: str, vault_path: str | None = None) -> str:
     return await run_vault_mutation(path, _gen_and_read)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
+)
 async def ingest_note(
     name: str,
     note_type: str,
@@ -381,7 +429,15 @@ async def ingest_note(
     return await run_vault_mutation(path, _write_and_index)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
 async def get_memory_context(query: str, vault_path: str | None = None) -> str:
     """Read transactional-memory context without changing vault state."""
     path = _get_vault_path(vault_path)
@@ -390,7 +446,15 @@ async def get_memory_context(query: str, vault_path: str | None = None) -> str:
     )
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
 async def propose_memory_change(path: str, content: str, vault_path: str | None = None) -> str:
     """Create a reviewable, content-addressed memory proposal."""
     root = _get_vault_path(vault_path)
@@ -399,7 +463,15 @@ async def propose_memory_change(path: str, content: str, vault_path: str | None 
     )
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "explicit"}},
+)
 async def apply_memory_change(
     proposal: dict[str, str], approved: bool, vault_path: str | None = None
 ) -> str:
@@ -412,21 +484,45 @@ async def apply_memory_change(
     return json.dumps(receipt, sort_keys=True)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
 async def validate_memory_state(vault_path: str | None = None) -> bool:
     """Validate the vault after a transactional-memory operation."""
     root = _get_vault_path(vault_path)
     return await run_blocking(lambda: validate_state(root))
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
 async def read_memory_history(vault_path: str | None = None) -> str:
     """Read append-only transaction receipts without note content."""
     root = _get_vault_path(vault_path)
     return json.dumps(await run_blocking(lambda: read_history(root)), sort_keys=True)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "model_download", "approval": "none"}},
+)
 async def search_vault_tool(
     query: str,
     max_results: int = 20,
@@ -487,7 +583,15 @@ async def search_vault_tool(
     return await run_blocking(_do_search)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
+)
 async def synthesize_session(
     name: str,
     title: str,
@@ -544,14 +648,30 @@ async def synthesize_session(
     return await run_vault_mutation(path, _write_and_index)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "model_download", "approval": "none"}},
+)
 async def rot_audit(vault_path: str | None = None, extended: bool = False) -> str:
     """Run the P.O.W.E.R. ROT audit: find Redundant, Outdated, and Trivial notes across the vault. Use extended=True for A2 scoring (content dedup, link rot, freshness, usage)."""
     path = _get_vault_path(vault_path)
     return await run_blocking(lambda: run_rot_report(path, extended=extended))
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "explicit"}},
+)
 async def archive_notes(dry_run: bool = True, vault_path: str | None = None) -> str:
     """Move stale/expired notes to 04_Archive. Use dry_run=True (default) to preview first."""
     path = _get_vault_path(vault_path)
@@ -560,7 +680,15 @@ async def archive_notes(dry_run: bool = True, vault_path: str | None = None) -> 
     return await run_vault_mutation(path, lambda: archive_stale_notes(path, dry_run=False))
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "model_download", "approval": "none"}},
+)
 async def suggest_related_tool(
     target_path: str | None = None,
     max_results: int = 5,
@@ -585,7 +713,15 @@ async def suggest_related_tool(
     return await run_blocking(_do_suggest)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "explicit"}},
+)
 async def heal_frontmatter_tool(
     dry_run: bool = True,
     vault_path: str | None = None,
@@ -597,7 +733,15 @@ async def heal_frontmatter_tool(
     return await run_vault_mutation(path, lambda: heal_vault(path, dry_run=False))
 
 
-@mcp.tool
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
 async def check_markdown_tool(
     vault_path: str | None = None,
 ) -> str:

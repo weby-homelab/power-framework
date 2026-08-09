@@ -40,7 +40,52 @@
         "schema_version": { "const": 1 },
         "source": { "const": "power_framework.core.capabilities" },
         "version": { "type": "string" },
-        "interfaces": { "type": "object" },
+        "interfaces": {
+          "type": "object",
+          "required": ["cli_commands", "mcp_tools", "mcp_tool_contracts"],
+          "properties": {
+            "cli_commands": { "type": "array", "items": { "type": "string" } },
+            "mcp_tools": { "type": "array", "items": { "type": "string" } },
+            "mcp_tool_contracts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "annotations", "risk"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "annotations": {
+                    "type": "object",
+                    "required": [
+                      "readOnlyHint",
+                      "destructiveHint",
+                      "idempotentHint",
+                      "openWorldHint"
+                    ],
+                    "properties": {
+                      "readOnlyHint": { "type": "boolean" },
+                      "destructiveHint": { "type": "boolean" },
+                      "idempotentHint": { "type": "boolean" },
+                      "openWorldHint": { "type": "boolean" }
+                    },
+                    "additionalProperties": false
+                  },
+                  "risk": {
+                    "type": "object",
+                    "required": ["local_only", "egress", "approval"],
+                    "properties": {
+                      "local_only": { "const": true },
+                      "egress": { "enum": ["none", "model_download"] },
+                      "approval": { "enum": ["none", "caller", "explicit"] }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "search": { "type": "object" },
         "models": { "type": "object" },
         "storage": { "type": "object" },

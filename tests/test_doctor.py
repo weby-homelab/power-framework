@@ -48,6 +48,28 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
     assert parsed["capabilities"] == capabilities.manifest()
     assert len(parsed["capabilities"]["interfaces"]["cli_commands"]) == 19
     assert len(parsed["capabilities"]["interfaces"]["mcp_tools"]) == 18
+    contracts = parsed["capabilities"]["interfaces"]["mcp_tool_contracts"]
+    assert [contract["name"] for contract in contracts] == parsed["capabilities"]["interfaces"][
+        "mcp_tools"
+    ]
+    assert all(
+        set(contract["annotations"])
+        == {
+            "readOnlyHint",
+            "destructiveHint",
+            "idempotentHint",
+            "openWorldHint",
+        }
+        for contract in contracts
+    )
+    assert all(
+        set(contract["risk"]) == {"local_only", "egress", "approval"} for contract in contracts
+    )
+    archive_contract = next(
+        contract for contract in contracts if contract["name"] == "archive_notes"
+    )
+    assert archive_contract["annotations"]["destructiveHint"] is True
+    assert archive_contract["risk"]["approval"] == "explicit"
     assert parsed["capabilities"]["search"]["default_mode"] == "semantic"
 
 

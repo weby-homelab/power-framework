@@ -43,24 +43,60 @@ def _cli_commands() -> list[str]:
     return commands
 
 
-def _mcp_tools() -> list[str]:
-    """Read FastMCP tool decorators without importing FastMCP or the server."""
+def _literal_dict(node: ast.AST) -> dict[str, Any]:
+    """Read a literal decorator mapping without importing the MCP server."""
+    try:
+        value = ast.literal_eval(node)
+    except (ValueError, SyntaxError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _mcp_tool_contracts() -> list[dict[str, Any]]:
+    """Read FastMCP tool contracts without importing FastMCP or the server."""
     source = ast.parse(_read_source(_package_root() / "mcp" / "power_server.py"))
-    tools: list[str] = []
+    contracts: list[dict[str, Any]] = []
     for node in ast.walk(source):
         if not isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)):
             continue
         for decorator in node.decorator_list:
+            if isinstance(decorator, ast.Attribute):
+                tool_call = decorator
+            elif isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute):
+                tool_call = decorator.func
+            else:
+                continue
             if not (
-                isinstance(decorator, ast.Attribute)
-                and decorator.attr == "tool"
-                and isinstance(decorator.value, ast.Name)
-                and decorator.value.id == "mcp"
+                tool_call.attr == "tool"
+                and isinstance(tool_call.value, ast.Name)
+                and tool_call.value.id == "mcp"
             ):
                 continue
-            tools.append(node.name)
+            annotations: dict[str, Any] = {}
+            risk: dict[str, Any] = {}
+            if isinstance(decorator, ast.Call):
+                for keyword in decorator.keywords:
+                    if keyword.arg == "annotations":
+                        annotations = _literal_dict(keyword.value)
+                    elif keyword.arg == "meta":
+                        meta = _literal_dict(keyword.value)
+                        risk_value = meta.get("power.risk")
+                        if isinstance(risk_value, dict):
+                            risk = risk_value
+            contracts.append(
+                {
+                    "name": node.name,
+                    "annotations": annotations,
+                    "risk": risk,
+                }
+            )
             break
-    return tools
+    return contracts
+
+
+def _mcp_tools() -> list[str]:
+    """Return tool names while preserving the public manifest shape."""
+    return [contract["name"] for contract in _mcp_tool_contracts()]
 
 
 def _environment_variables() -> list[str]:
@@ -138,6 +174,7 @@ def manifest() -> dict[str, Any]:
         "interfaces": {
             "cli_commands": _cli_commands(),
             "mcp_tools": _mcp_tools(),
+            "mcp_tool_contracts": _mcp_tool_contracts(),
         },
         "search": {
             "default_mode": DEFAULT_SEARCH_MODE,
