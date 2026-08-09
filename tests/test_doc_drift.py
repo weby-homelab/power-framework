@@ -41,7 +41,7 @@ def test_current_docs_match_executable_interfaces_and_safe_onboarding() -> None:
     documents = gate["_read_current_documents"]()
 
     assert len(facts["cli_commands"]) == 17
-    assert len(facts["mcp_tools"]) == 17
+    assert len(facts["mcp_tools"]) == 18
     assert gate["check_interfaces"](documents, facts) == []
     assert gate["check_onboarding"](documents, facts) == []
     assert gate["check_links"](documents, facts) == []

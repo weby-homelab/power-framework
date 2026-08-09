@@ -46,7 +46,7 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 - **[Windows 11 25H2](docs/windows-11-installation.ua.md)** — повне
   PowerShell-встановлення, Visual C++ prerequisite, точні interpreter paths і checks
 - **[CLI reference](docs/cli.md)** — усі 17 команд, flags і реальна exit behavior
-- **[MCP server](docs/mcp-server.md)** — усі 17 governed tools, rate limits,
+- **[MCP server](docs/mcp-server.md)** — усі 18 governed tools, rate limits,
   configured-vault boundary і untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.ua.md)** — 6-фазна manifest/hash-driven
   міграція з будь-якої Markdown source methodology у canonical POWER vault
@@ -475,7 +475,7 @@ flowchart TD
 | `core/constants.py`                       | Централізовані списки виключень та системні константи                                                                                                                                                                                                  |
 | `core/utils.py`                           | Захист від path traversal, атомарний запис, бекапи, rate limiter                                                                                                                                                                                       |
 | `core/cli.py`                             | Командний рядок із 17 командами, включно з preflighted import і transactional memory workflows                                                                                                                                             |
-| `mcp/power_server.py`                     | FastMCP 3.x сервер із 17 async tools, loopback HTTP transport та `/health`                                                                                                                                                                             |
+| `mcp/power_server.py`                     | FastMCP 3.x сервер із 18 async tools, loopback HTTP transport та `/health`                                                                                                                                                                             |
 
 Всі компоненти використовують `power_framework.core` як єдине джерело правди.
 

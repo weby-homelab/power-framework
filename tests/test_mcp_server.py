@@ -5,9 +5,12 @@ Tests for P.O.W.E.R. MCP Server tool calls using FastMCP functions directly.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 from contextlib import closing
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -25,12 +28,10 @@ from power_framework.mcp.power_server import (
     read_memory_history,
     read_sub_index,
     search_vault_tool,
+    sync_vault,
     synthesize_session,
     validate_memory_state,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 async def test_read_sub_index_existing_category(sample_vault: Path) -> None:
@@ -226,6 +227,82 @@ async def test_ingest_note_tool(sample_vault: Path) -> None:
             content="Hello world",
             vault_path=str(sample_vault),
         )
+
+
+async def test_mcp_write_search_loop_survives_a_fresh_process(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MCP-only ingest plus sync must be visible after the server restarts."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    marker = "mcp-fresh-process-acceptance-7f3c"
+
+    await sync_vault(fts_only=True, vault_path=str(sample_vault))
+    await ingest_note(
+        name="03_Resources/fresh-process-probe",
+        note_type="Resource",
+        title="Fresh process probe",
+        description=f"A restart acceptance note carrying {marker}",
+        content=f"# Probe\n\nThe body contains {marker}.\n",
+        vault_path=str(sample_vault),
+    )
+
+    before = json.loads(
+        await search_vault_tool(query=marker, search_mode="fts", vault_path=str(sample_vault))
+    )
+    assert before["result_count"] == 0
+
+    report = await sync_vault(fts_only=True, vault_path=str(sample_vault))
+    assert "Notes excluded (invalid metadata): 0" in report
+
+    source_root = Path(__file__).resolve().parents[1] / "src"
+    script = (
+        "import json, sys\n"
+        "from power_framework.core.searcher import search_vault\n"
+        "results = search_vault(sys.argv[1], sys.argv[2], mode='fts')\n"
+        "print(json.dumps([result.rel_path for result in results]))\n"
+    )
+    child_env = os.environ.copy()
+    child_env.pop("POWER_SEARCH_DB", None)
+    child_env["PYTHONPATH"] = os.pathsep.join(
+        [str(source_root), child_env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+    completed = subprocess.run(  # noqa: S603 - executable and script are fixed by this test.
+        [sys.executable, "-c", script, str(sample_vault), marker],
+        capture_output=True,
+        check=False,
+        env=child_env,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "03_Resources/fresh-process-probe.md" in json.loads(completed.stdout)
+
+    with pytest.raises(ToolError, match="Dense index"):
+        await search_vault_tool(
+            query=marker,
+            search_mode="semantic",
+            vault_path=str(sample_vault),
+        )
+
+
+async def test_sync_vault_fails_closed_and_can_explicitly_allow_partial(
+    sample_vault: Path,
+) -> None:
+    """Coverage omissions are an explicit MCP error, never an implied success."""
+    await sync_vault(fts_only=True, vault_path=str(sample_vault))
+    invalid = sample_vault / "03_Resources" / "broken-sync-note.md"
+    invalid.write_text("# no OKF frontmatter\n", encoding="utf-8")
+
+    with pytest.raises(ToolError, match=r"failed closed.*broken-sync-note\.md"):
+        await sync_vault(fts_only=True, vault_path=str(sample_vault))
+
+    report = await sync_vault(
+        fts_only=True,
+        allow_partial=True,
+        vault_path=str(sample_vault),
+    )
+    assert "Notes excluded (invalid metadata): 1" in report
+    assert "- 03_Resources/broken-sync-note.md: invalid_metadata" in report
+    assert "not searchable" in report
 
 
 async def test_synthesize_session_serializes_write_and_stores_candidate_triplets(

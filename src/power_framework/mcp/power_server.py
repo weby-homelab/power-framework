@@ -5,6 +5,7 @@ P.O.W.E.R. MCP Server (FastMCP 3.x).
 Exposes MCP tools for AI agent interaction with the knowledge vault:
 - lint_vault: Health check for metadata, links, and orphans
 - generate_index: Compile hierarchical catalog (index.md + _index.md files)
+- sync_vault: Publish an atomic FTS/dense search-index generation
 - read_sub_index: Read a specific category sub-index on-demand (read-only)
 - ensure_sub_index: Generate and read a category sub-index (write path)
 - ingest_note: Create a new note with validated OKF frontmatter
@@ -173,6 +174,86 @@ async def generate_index(vault_path: str | None = None) -> str:
     path = _get_vault_path(vault_path)
     # Serialize index regeneration within this vault while preserving other-vault parallelism.
     return await run_vault_mutation(path, lambda: run_generate_hierarchical_index(path))
+
+
+@mcp.tool
+async def sync_vault(
+    fts_only: bool = True,
+    force_rebuild: bool = False,
+    allow_partial: bool = False,
+    vault_path: str | None = None,
+) -> str:
+    """Publish an atomic search-index generation for the configured vault.
+
+    ``ingest_note`` and ``synthesize_session`` write the note and refresh the
+    hierarchical index, but the search database is a separate artifact — until
+    it is rebuilt, ``search_vault_tool`` cannot return the note that was just
+    saved. Call this after writing notes.
+
+    The default is ``fts_only=True`` so an agent can close the write/search loop
+    without downloading or loading an embedding model. Set ``fts_only=False``
+    for the dense index and ``force_rebuild=True`` after changing the embedding
+    model or dimension. Invalid notes fail closed unless ``allow_partial=True``.
+    """
+    if not _index_limiter.is_allowed("sync_vault"):
+        remaining = _index_limiter.remaining("sync_vault")
+        raise ToolError(
+            f"Rate limit exceeded. Try again later. ({remaining} requests remaining in window)"
+        )
+
+    path = _get_vault_path(vault_path)
+
+    def _run() -> str:
+        from power_framework.core.generation_index import (
+            IndexGenerationError,
+            list_invalid_sources,
+            sync_vault_atomically,
+        )
+
+        invalid_sources = list_invalid_sources(path)
+        if invalid_sources and not allow_partial:
+            details = "; ".join(
+                f"{rel_path} ({reason})" for rel_path, reason in sorted(invalid_sources.items())
+            )
+            raise ToolError(
+                "Vault sync failed closed: "
+                f"{len(invalid_sources)} note(s) are excluded and remain unsearchable. "
+                f"Excluded: {details}. Pass allow_partial=True only to publish the valid subset."
+            )
+
+        try:
+            report = sync_vault_atomically(
+                path,
+                sync_embeddings=not fts_only,
+                force_rebuild=force_rebuild,
+                allow_partial=allow_partial,
+            )
+        except IndexGenerationError as exc:
+            raise ToolError(f"Vault sync failed; previous index remains active: {exc}") from exc
+
+        lines = [
+            "=== Vault Sync ===",
+            f"Generation: {report.generation_id}",
+            f"Mode: {'FTS only' if fts_only else 'FTS + embeddings'}",
+            f"Notes scanned: {report.total_scanned}",
+            f"Notes indexed: {report.actual_files}",
+            f"Notes excluded (invalid metadata): {report.invalid_sources}",
+            f"Chunks: {report.actual_chunks}",
+        ]
+        if report.invalid_sources:
+            lines.append("")
+            lines.append("Exclusion reasons:")
+            lines.extend(
+                f"- {rel_path}: {reason}"
+                for rel_path, reason in sorted(report.excluded_sources.items())
+            )
+            lines.append(
+                "Excluded notes are not searchable. Run 'power index <vault> --strict' "
+                "to list them, or heal_frontmatter_tool to repair them."
+            )
+        return "\n".join(lines)
+
+    return await run_vault_mutation(path, _run)
 
 
 @mcp.tool
@@ -373,15 +454,23 @@ async def search_vault_tool(
         raise ToolError(str(exc)) from exc
 
     def _do_search() -> str:
-        results = search_vault(
-            path,
-            query,
-            max_results=max_results,
-            mode=search_mode,
-            temporal_view=temporal_view,
-            as_of=normalized_as_of,
-            domain=domain,
-        )
+        try:
+            results = search_vault(
+                path,
+                query,
+                max_results=max_results,
+                mode=search_mode,
+                temporal_view=temporal_view,
+                as_of=normalized_as_of,
+                domain=domain,
+            )
+        except RuntimeError as exc:
+            from power_framework.core.generation_index import ActiveGenerationError
+            from power_framework.core.searcher import DenseIndexUnavailableError
+
+            if not isinstance(exc, (ActiveGenerationError, DenseIndexUnavailableError)):
+                raise
+            raise ToolError(str(exc)) from exc
         return format_untrusted_search_envelope(
             results,
             query,

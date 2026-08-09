@@ -35,7 +35,7 @@ An agent must read the relevant documents before changing data:
 - P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, flat folders,
   and hybrid trees are supported as **source classifications**.
 - The destination uses canonical P.O.W.E.R. top-level folders so hierarchical
-  indexing and the 17 MCP tools have their documented behavior.
+  indexing and the 18 MCP tools have their documented behavior.
 - A non-Markdown system must first export notes to Markdown and attachments to
   files. Vendor database extraction is outside P.O.W.E.R.'s current CLI.
 - Unknown frontmatter fields may be retained, but the required OKF fields must
