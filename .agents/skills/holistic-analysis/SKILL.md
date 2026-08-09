@@ -1,6 +1,6 @@
 ---
 name: holistic-analysis
-version: 3.2.1
+version: 3.4.0
 description: "Perform holistic codebase analysis, step-by-step verified execution, and global quality audit for P.O.W.E.R. vaults. Trigger when analyzing, refactoring, or auditing a project before making changes."
 ---
 
@@ -42,7 +42,7 @@ Verify against this checklist:
 - Are background threads constrained (`ThreadPoolExecutor` instead of raw threads)?
 - Is the image/codebase clean (no systemd artifacts, no empty directories)?
 - Does the vault pass `power lint` with exit code 0?
-- Are all 12 MCP tools functional via the FastMCP 3.x server?
+- Are all 18 MCP tools functional via the FastMCP 3.x server?
 - Is the `models.lock.json` SHA-pinned for both `canonical_embedding` and `canonical_reranker`?
 - Does the semantic GT (`--gt-mode semantic`) show `ndcg@5(reranked) > ndcg@5(fts)`?
 
@@ -55,7 +55,7 @@ Verify against this checklist:
 | Decoupled license badge & ruff format compliance | All source files pass `ruff format`; badge is decoupled from content flow |
 | P.O.W.E.R. 3.2.0 test evidence report | Comprehensive gate documentation added to `docs/tests/` |
 
-## Release Status (v3.2.1 — Stable)
+## Historical Release Status (v3.2.1 — Stable)
 
 All 6 WTF remediation items from the 3.1→3.2.0 plan are complete:
 

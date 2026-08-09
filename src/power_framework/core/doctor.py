@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+from .capabilities import manifest as capability_manifest
 from .coverage import get_index_coverage
 from .generation_index import (
     IndexGenerationError,
@@ -409,6 +410,7 @@ def run_doctor(vault_dir: Path | None = None) -> dict[str, Any]:
             "power_framework": package_version,
         },
         "configuration": {},
+        "capabilities": capability_manifest(),
         "embedding": {},
         "vault": None,
         "issues": [],

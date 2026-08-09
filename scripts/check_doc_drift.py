@@ -28,9 +28,9 @@ Exit code 0 = in sync, 1 = drift detected.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
@@ -56,6 +56,7 @@ INVENTORY_UA = REPO_ROOT / "docs" / "documentation-inventory.ua.md"
 AGENT_INSTRUCTIONS = REPO_ROOT / ".agents" / "AGENTS.md"
 AGENT_SKILL = REPO_ROOT / "skills" / "power" / "SKILL.md"
 WORKSPACE_AGENT_SKILL = REPO_ROOT / ".agents" / "skills" / "power" / "SKILL.md"
+HOLISTIC_SKILL = REPO_ROOT / ".agents" / "skills" / "holistic-analysis" / "SKILL.md"
 CURRENT_DOCUMENTS = {
     "README": README,
     "README.ua": README_UA,
@@ -77,6 +78,7 @@ CURRENT_DOCUMENTS = {
     "Agent instructions": AGENT_INSTRUCTIONS,
     "Agent skill": AGENT_SKILL,
     "Workspace agent skill": WORKSPACE_AGENT_SKILL,
+    "Holistic skill": HOLISTIC_SKILL,
 }
 
 # Canonical provider -> the human-readable token(s) the README MUST contain to
@@ -100,59 +102,11 @@ _STALE_DEFAULT_MARKERS = {
 
 
 def _load_code_facts() -> dict[str, Any]:
-    """Import the code and read the canonical stack constants."""
-    import inspect
-
+    """Load the canonical runtime manifest; this gate only consumes facts."""
     sys.path.insert(0, str(REPO_ROOT / "src"))
-    from power_framework.core import reranker
-    from power_framework.core.embeddings import (
-        BGE_M3_ONNX_REPO,
-        BGE_M3_ONNX_REVISION,
-        EMBED_PROVIDER,
-    )
-    from power_framework.core.reranker import (
-        BGE_RERANKER_ONNX_REPO,
-        BGE_RERANKER_ONNX_REVISION,
-    )
-    from power_framework.core.searcher import SEARCH_MODE_REGISTRY, search_vault
+    from power_framework.core.capabilities import manifest
 
-    cli_source = (REPO_ROOT / "src" / "power_framework" / "core" / "cli.py").read_text(
-        encoding="utf-8"
-    )
-    mcp_source = (REPO_ROOT / "src" / "power_framework" / "mcp" / "power_server.py").read_text(
-        encoding="utf-8"
-    )
-    cli_commands = tuple(re.findall(r"subparsers\.add_parser\(\s*[\"']([^\"']+)", cli_source))
-    mcp_tools = tuple(
-        re.findall(r"@mcp\.tool\s+(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)", mcp_source)
-    )
-    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
-        version = tomllib.load(handle)["project"]["version"]
-
-    # The canonical search mode is the default argument of search_vault.
-    sig = inspect.signature(search_vault)
-    default_mode = sig.parameters["mode"].default
-
-    return {
-        "embedder": EMBED_PROVIDER,
-        "reranker": reranker.DEFAULT_RERANKER_MODEL,
-        "mode": default_mode,
-        "embedding_model": f"{BGE_M3_ONNX_REPO}@{BGE_M3_ONNX_REVISION}",
-        "reranker_model": f"{BGE_RERANKER_ONNX_REPO}@{BGE_RERANKER_ONNX_REVISION}",
-        "registry": tuple(
-            (
-                mode,
-                " + ".join(spec.candidate_sources),
-                spec.fusion or "—",
-                "yes" if spec.reranker else "no",
-                "yes" if spec.requires_dense_index else "no",
-            )
-            for mode, spec in sorted(SEARCH_MODE_REGISTRY.items())
-        ),
-        "cli_commands": cli_commands,
-        "mcp_tools": mcp_tools,
-        "version": version,
-    }
+    return manifest()
 
 
 def _read_current_documents() -> dict[str, str]:
@@ -222,28 +176,35 @@ def check_mode(readme: str, mode: str) -> list[str]:
 def check_retrieval_registry(documents: dict[str, str], facts: dict[str, Any]) -> list[str]:
     """Require the generated architecture table to equal the code registry."""
     errors: list[str] = []
+    search = facts["search"]
+    models = facts["models"]
     architecture = documents["Architecture"]
     expected_header = "| Mode | Candidate sources | Fusion | Reranker | Requires dense index |"
     if expected_header not in architecture:
         errors.append("Architecture is missing the canonical retrieval-registry table header.")
-    for mode, sources, fusion, reranker, dense in facts["registry"]:
+    for spec in search["registry"]:
+        mode = spec["mode"]
+        sources = " + ".join(spec["candidate_sources"])
+        fusion = spec["fusion"] or "—"
+        reranker = "yes" if spec["reranker"] else "no"
+        dense = "yes" if spec["requires_dense_index"] else "no"
         fusion_cell = f"`{fusion}`" if fusion != "—" else fusion
         expected_row = f"| `{mode}` | `{sources}` | {fusion_cell} | {reranker} | {dense} |"
         if expected_row not in architecture:
             errors.append(
                 f"Architecture retrieval row does not match code registry: {expected_row}"
             )
-    expected_default = f"The current default is `{facts['mode']}`"
+    expected_default = f"The current default is `{search['default_mode']}`"
     if expected_default not in architecture:
-        errors.append(f"Architecture does not declare the code default `{facts['mode']}`.")
+        errors.append(f"Architecture does not declare the code default `{search['default_mode']}`.")
     for key, label in (("embedding_model", "embedding"), ("reranker_model", "reranker")):
-        if facts[key] not in architecture:
+        if models[key] not in architecture:
             errors.append(
-                f"Architecture does not name the pinned canonical {label} model `{facts[key]}`."
+                f"Architecture does not name the pinned canonical {label} model `{models[key]}`."
             )
 
     searcher_api = documents["Searcher API"]
-    if f"The current default is `{facts['mode']}`, not `reranked`." not in searcher_api:
+    if f"The current default is `{search['default_mode']}`, not `reranked`." not in searcher_api:
         errors.append(
             "Searcher API does not declare the current semantic default and reranked opt-in."
         )
@@ -276,8 +237,9 @@ def check_retrieval_registry(documents: dict[str, str], facts: dict[str, Any]) -
 def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[str]:
     """Require public interface inventories to match executable source exactly."""
     errors: list[str] = []
-    cli_commands = facts["cli_commands"]
-    mcp_tools = facts["mcp_tools"]
+    interfaces = facts["interfaces"]
+    cli_commands = interfaces["cli_commands"]
+    mcp_tools = interfaces["mcp_tools"]
     if len(cli_commands) != len(set(cli_commands)):
         errors.append("CLI source contains duplicate top-level command declarations.")
     if len(mcp_tools) != len(set(mcp_tools)):
@@ -294,7 +256,7 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
         if f"`{tool}`" not in documents["MCP"]
     )
 
-    for label in ("README", "README.ua", "Docs index"):
+    for label in ("README", "README.ua", "Docs index", "Architecture"):
         cli_count = re.search(rf"(?:all )?{len(cli_commands)} .*commands", documents[label], re.I)
         cli_count = cli_count or f"{len(cli_commands)} команд" in documents[label]
         if not cli_count:
@@ -307,6 +269,36 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
             rf"\b(?!{len(mcp_tools)}\b)\d+ інструмент", documents[label]
         ):
             errors.append(f"{label} contains a stale MCP tools count.")
+    mcp_count = re.search(rf"{len(mcp_tools)} .*tools", documents["MCP"], re.I)
+    if not mcp_count:
+        errors.append(f"MCP does not declare all {len(mcp_tools)} MCP tools.")
+    inventory = documents["Documentation inventory UA"]
+    if not re.search(
+        rf"\| `docs/cli\.md` \|.*\| {len(cli_commands)} команд \|", inventory
+    ):
+        errors.append(
+            "Documentation inventory UA does not declare the current CLI count."
+        )
+    if not re.search(
+        rf"\| `docs/mcp-server\.md` \|.*\| {len(mcp_tools)} інструментів \|",
+        inventory,
+    ):
+        errors.append(
+            "Documentation inventory UA does not declare the current MCP count."
+        )
+    expected_inventory_history = (
+        f"- `12` MCP-інструментів замінено на фактичні `{len(mcp_tools)}`; "
+        f"CLI задокументовано як `{len(cli_commands)}`"
+    )
+    if expected_inventory_history not in inventory:
+        errors.append(
+            "Documentation inventory UA contains a stale historical interface count."
+        )
+    holistic = documents["Holistic skill"]
+    if f"all {len(mcp_tools)} MCP tools" not in holistic:
+        errors.append(f"Holistic skill does not declare all {len(mcp_tools)} MCP tools.")
+    if re.search(r"all 12 MCP tools", holistic):
+        errors.append("Holistic skill contains a stale MCP tools count.")
     if f"{len(mcp_tools)} tools" not in documents["Agent instructions"]:
         errors.append(f"Agent instructions do not declare `{len(mcp_tools)} tools`.")
 
@@ -320,6 +312,32 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
                 facts["version"],
             )
         )
+
+    external_skill = Path(
+        os.getenv(
+            "POWER_GLOBAL_SKILL_PATH",
+            str(Path.home() / ".opencode" / "skills" / "power" / "SKILL.md"),
+        )
+    )
+    if external_skill.is_file():
+        try:
+            external_text = external_skill.read_text(encoding="utf-8")
+        except OSError as exc:
+            errors.append(f"Global agent skill could not be read: {exc}.")
+        else:
+            errors.extend(
+                _check_agent_skill(
+                    "Global OpenCode skill",
+                    external_text,
+                    cli_commands,
+                    mcp_tools,
+                    facts["version"],
+                )
+            )
+            if external_text != documents["Agent skill"]:
+                errors.append(
+                    "Global OpenCode skill is not byte-identical to the repository Agent skill."
+                )
     return errors
 
 
@@ -445,10 +463,10 @@ def check_links(documents: dict[str, str], _facts: dict[str, Any]) -> list[str]:
 
 
 CHECKS = {
-    "embedder": lambda r, f: check_embedder(r, f["embedder"]),
-    "reranker": lambda r, f: check_reranker(r, f["reranker"]),
-    "mode": lambda r, f: check_mode(r, f["mode"]),
-    "version": lambda r, f: check_version(r, f["embedder"]),
+    "embedder": lambda r, f: check_embedder(r, f["models"]["embedder"]),
+    "reranker": lambda r, f: check_reranker(r, f["models"]["reranker"]),
+    "mode": lambda r, f: check_mode(r, f["search"]["default_mode"]),
+    "version": lambda r, f: check_version(r, f["models"]["embedder"]),
     "retrieval": check_retrieval_registry,
     "interfaces": check_interfaces,
     "onboarding": check_onboarding,
@@ -486,16 +504,18 @@ def main() -> int:
         for e in all_errors:
             print(f"  - {e}", file=sys.stderr)
         print(
-            f"\nCode facts: embedder={facts['embedder']!r} reranker={facts['reranker']!r} "
-            f"mode={facts['mode']!r}",
+            f"\nCode facts: embedder={facts['models']['embedder']!r} "
+            f"reranker={facts['models']['reranker']!r} "
+            f"mode={facts['search']['default_mode']!r}",
             file=sys.stderr,
         )
         return 1
 
     print(
         f"Doc-drift check passed: current public docs match code "
-        f"(embedder={facts['embedder']}, reranker={facts['reranker'].rsplit('/', 1)[-1]}, "
-        f"mode={facts['mode']})."
+        f"(embedder={facts['models']['embedder']}, "
+        f"reranker={facts['models']['reranker'].rsplit('/', 1)[-1]}, "
+        f"mode={facts['search']['default_mode']})."
     )
     return 0
 

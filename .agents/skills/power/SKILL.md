@@ -64,6 +64,15 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 оновлюють ієрархічний каталог, але база пошуку — окремий артефакт: доти
 `search_vault_tool` щойно збережену нотатку не поверне.
 
+### Agent discovery contract
+
+Перед роботою агент може виконати `power doctor [<path>] --json` і читати
+`capabilities` як machine-readable source of truth для CLI/MCP inventory,
+пошукового default/registry, моделей, cache/DB paths та environment contract.
+`read_only=true` і `network_access=false` є частиною цього report. Числа й
+шляхи в цьому Skill — навігаційна підказка; якщо вони розходяться з doctor,
+агент зупиняється та використовує doctor report як authoritative fact.
+
 ### Конфігурація (v3.4.0)
 
 - **Модель ембеддінгів** — канонічно `BAAI/bge-m3` (1024 dim) через direct ONNX Runtime. BGE-M3 natively підтримує **dense + sparse + ColBERT** в одній моделі, що дозволяє гібридний пошук (RRF) без окремого BM25. Провайдер змінюється через `POWER_EMBED_PROVIDER`; `fastembed`/MiniLM лишається полегшеним opt-in fallback.
