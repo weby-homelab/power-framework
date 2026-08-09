@@ -25,6 +25,7 @@ except ImportError:  # pragma: no cover - exercised on Windows
     resource = None  # type: ignore[assignment]
 
 from .constants import SKIP_FILES
+from .doctor import render_doctor, report_as_json, run_doctor
 from .domains import (
     DomainConfigError,
     domain_template_path,
@@ -711,6 +712,17 @@ def _cmd_cache(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    """Run read-only runtime and vault diagnostics for humans or agents."""
+    vault_dir = _resolve_path(args.path) if getattr(args, "path", None) else None
+    report = run_doctor(vault_dir)
+    if getattr(args, "json", False):
+        print(report_as_json(report), end="")
+    else:
+        logger.info(render_doctor(report))
+    return int(report["exit_code"])
+
+
 def _cmd_memory(args: argparse.Namespace) -> int:
     vault_dir = _resolve_path(args.path)
     if args.memory_command == "context":
@@ -889,6 +901,24 @@ def main() -> None:
         ),
     )
     p_cache.set_defaults(func=_cmd_cache)
+
+    p_doctor = subparsers.add_parser(
+        "doctor",
+        help="Diagnose runtime, ONNX provider binding, and index coverage without writes",
+    )
+    p_doctor.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help="Optional vault path to inspect without creating cache or index state",
+    )
+    p_doctor.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit the versioned machine-readable report to stdout",
+    )
+    p_doctor.set_defaults(func=_cmd_doctor)
 
     p_memory = subparsers.add_parser("memory", help="Human-governed transactional memory workflow")
     memory_sub = p_memory.add_subparsers(dest="memory_command", required=True)

@@ -314,8 +314,10 @@ def get_embedding_cache_dir() -> Path:
     return cache_dir
 
 
-# Ensure fastembed (and qwen3-embed) use the persistent cache dir.
-os.environ.setdefault("FASTEMBED_CACHE_DIR", str(get_embedding_cache_dir()))
+# Ensure fastembed (and qwen3-embed) use the persistent cache dir without
+# creating it during a read-only import. The directory is created only when a
+# model-backed operation explicitly asks for ``get_embedding_cache_dir()``.
+os.environ.setdefault("FASTEMBED_CACHE_DIR", str(get_cache_dir(create=False) / "embeddings"))
 
 
 def validate_path_in_vault(filepath: Path, vault_dir: Path) -> Path:

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weby-homelab.github.io/power-framework/schemas/doctor-report-v1.json",
+  "title": "P.O.W.E.R. doctor report v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "command",
+    "status",
+    "runtime",
+    "configuration",
+    "embedding",
+    "vault",
+    "issues",
+    "exit_code"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "doctor" },
+    "status": { "enum": ["ok", "degraded", "error"] },
+    "runtime": { "type": "object" },
+    "configuration": { "type": "object" },
+    "embedding": { "type": "object" },
+    "vault": { "type": ["object", "null"] },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": { "type": "string" },
+          "severity": { "enum": ["warning", "error"] },
+          "message": { "type": "string" },
+          "remediation": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "exit_code": { "enum": [0, 1] }
+  }
+}
