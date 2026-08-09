@@ -1,6 +1,6 @@
 # MCP Server (FastMCP 3.x)
 
-P.O.W.E.R. `v3.3.2` exposes 18 governed tools through the
+P.O.W.E.R. `v3.4.0` exposes 18 governed tools through the
 [Model Context Protocol](https://modelcontextprotocol.io), powered by
 [FastMCP 3.x](https://gofastmcp.com). MCP-compatible agents can validate,
 index, retrieve, and perform bounded writes in one configured vault.

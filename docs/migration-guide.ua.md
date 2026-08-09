@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.3.2"
+title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.4.0"
 description: "Fail-closed manifest-driven протокол міграції наявної Markdown-бази знань у перевірений P.O.W.E.R. vault без зміни джерела."
 tags: [power, migration, guide, ai-agents, safety, verification]
 timestamp: 2026-08-08T12:00:00+03:00
 ---
 
-# Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.3.2
+# Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.4.0
 
 Цей гід є execution contract для будь-якого AI-агента з доступом до файлової
 системи. Він переносить Markdown або Obsidian knowledge base у канонічну
@@ -241,7 +241,7 @@ manifest checksum і нуль unaccounted authorized files.
 
 ### 3.1 Встановіть і перевірте P.O.W.E.R.
 
-Використовуйте pinned `v3.3.2` environment із clean-install гіда:
+Використовуйте pinned `v3.4.0` environment із clean-install гіда:
 
 ```bash
 power --version

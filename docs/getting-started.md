@@ -1,6 +1,6 @@
 # Getting Started from a Clean Knowledge Base
 
-This is the authoritative clean-install path for P.O.W.E.R. `v3.3.2`. It
+This is the authoritative clean-install path for P.O.W.E.R. `v3.4.0`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
 
@@ -29,7 +29,7 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.3.2/power_framework-3.3.2-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
 ```
 
 The release wheel pins the P.O.W.E.R. source version. Its dependencies are
@@ -45,7 +45,7 @@ Verify the executable, package metadata, and MCP import:
   'import power_framework.mcp, onnxruntime; print("imports: OK")'
 ```
 
-Both version commands must report `3.3.2`; the final command must print
+Both version commands must report `3.4.0`; the final command must print
 `imports: OK`.
 
 ### Alternative: install from the pinned tag
@@ -54,7 +54,7 @@ This path requires Git:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.3.2'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.4.0'
 ```
 
 Do not use an unpinned `main` install when reproducibility matters.
@@ -195,7 +195,7 @@ it up before removing either location.
 ## Acceptance checklist
 
 - Python is 3.11+ and the selected interpreter is inside the dedicated venv.
-- CLI and distribution metadata both report `3.3.2`.
+- CLI and distribution metadata both report `3.4.0`.
 - `power_framework.mcp` and `onnxruntime` import successfully.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.
 - FTS sync exits `0` and FTS search returns the first note.
