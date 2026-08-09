@@ -34,10 +34,10 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
 3. `power index <path> [--strict]` — генерація рекурсивних каталогів
 4. `power ingest <path>` — створення нотатки з OKF метаданими
-5. `power import <source> --into <folder>` — préflight-імпорт наявного дерева Markdown
+5. `power import <source> --into <folder>` — preflight-імпорт наявного дерева Markdown
 6. `power search <path> <query>` — пошук (`semantic` за замовчуванням)
 7. `power memory <sub> <path>` — керована транзакційна пам'ять
-8. `power sync <path> [--fts-only] [--strict|--allow-partial]` — побудова індексу пошуку
+8. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
 9. `power rot <path>` — ROT аудит (дублікати, застарілі, тривіальні)
 10. `power archive <path>` — архівування застарілих нотаток
 11. `power status <path>` — панель стану vault
@@ -135,10 +135,12 @@ timestamp: YYYY-MM-DDTHH:MM:SS+TZ
 
 ### Крок 2. Автоматична генерація ієрархічного каталогу (Index)
 
-Після додавання/зміни файлу виконайте скрипт генерації індексу. Він автоматично оновить `index.md`, рекурсивні `_index.md` каталоги та сторінки `_index-N.md` у межах 32 KiB:
+Після додавання/зміни файлу виконайте генерацію індексу. Вона автоматично
+оновить `index.md`, рекурсивні `_index.md` каталоги та сторінки `_index-N.md`
+у межах 32 KiB:
 
 ```bash
-power lint <path>
+power index <path>
 ```
 
 ### Крок 3. Додавання запису у Change Log
