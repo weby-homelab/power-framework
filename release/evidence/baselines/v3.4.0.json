@@ -2,8 +2,8 @@
   "schema_version": 1,
   "release": "3.4.0",
   "source": {
-    "commit": "fd01a084b449af3e319b267dc020980c72beb5ac",
-    "tree": "6ba1b8fe7aeb095ccca172269e81b0e8fb80df2f",
+    "commit": "98c33340cef96409bc7e49d3174a97efbde8f7ac",
+    "tree": "97d8019ce2f07633e9ada9e214fad4f19a0d69c2",
     "tag": "v3.4.0",
     "clean": true
   },
