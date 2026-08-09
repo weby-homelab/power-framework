@@ -319,6 +319,9 @@ class TestSearchModeContract:
 
         assert [result.rel_path for result in results] == ["near.md", "far.md"]
         assert results[0].score > results[1].score
+        # The snippet must still be the text of the winning chunk, even though
+        # chunk text is no longer carried through the scan.
+        assert [result.snippet for result in results] == ["near", "far"]
 
     def test_dense_index_validation_requires_matching_manifest(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
