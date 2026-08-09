@@ -16,6 +16,7 @@ from unittest.mock import Mock
 import pytest
 from fastmcp.exceptions import ToolError
 
+from power_framework.core.capabilities import manifest
 from power_framework.core.parser import validate_metadata
 from power_framework.mcp import power_server
 from power_framework.mcp.power_server import (
@@ -32,6 +33,29 @@ from power_framework.mcp.power_server import (
     synthesize_session,
     validate_memory_state,
 )
+
+
+async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
+    tools = await power_server.mcp.list_tools()
+
+    assert len(tools) == 18
+    by_name = {tool.name: tool for tool in tools}
+    assert set(by_name) == set(manifest()["interfaces"]["mcp_tools"])
+
+    archive = by_name["archive_notes"]
+    assert archive.annotations is not None
+    assert archive.annotations.readOnlyHint is False
+    assert archive.annotations.destructiveHint is True
+    assert archive.annotations.idempotentHint is False
+    assert archive.annotations.openWorldHint is False
+    assert archive.meta == {
+        "power.risk": {"local_only": True, "egress": "none", "approval": "explicit"}
+    }
+
+    search = by_name["search_vault_tool"]
+    assert search.annotations is not None
+    assert search.annotations.readOnlyHint is True
+    assert search.meta["power.risk"]["egress"] == "model_download"
 
 
 async def test_read_sub_index_existing_category(sample_vault: Path) -> None:

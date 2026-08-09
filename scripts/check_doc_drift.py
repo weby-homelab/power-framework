@@ -240,10 +240,28 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
     interfaces = facts["interfaces"]
     cli_commands = interfaces["cli_commands"]
     mcp_tools = interfaces["mcp_tools"]
+    mcp_contracts = interfaces["mcp_tool_contracts"]
     if len(cli_commands) != len(set(cli_commands)):
         errors.append("CLI source contains duplicate top-level command declarations.")
     if len(mcp_tools) != len(set(mcp_tools)):
         errors.append("MCP source contains duplicate tool declarations.")
+    contract_names = [contract.get("name") for contract in mcp_contracts]
+    if contract_names != mcp_tools:
+        errors.append("MCP capability contracts do not match the executable tool inventory.")
+    for contract in mcp_contracts:
+        name = contract.get("name", "<unknown>")
+        annotations = contract.get("annotations", {})
+        risk = contract.get("risk", {})
+        errors.extend(
+            f"MCP tool `{name}` is missing boolean annotation `{field}`."
+            for field in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint")
+            if not isinstance(annotations.get(field), bool)
+        )
+        errors.extend(
+            f"MCP tool `{name}` is missing risk field `{field}`."
+            for field in ("local_only", "egress", "approval")
+            if field not in risk
+        )
 
     errors.extend(
         f"CLI reference is missing executable command `power {command}`."
@@ -261,7 +279,7 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
         cli_count = cli_count or f"{len(cli_commands)} команд" in documents[label]
         if not cli_count:
             errors.append(f"{label} does not declare all {len(cli_commands)} CLI commands.")
-        mcp_count = re.search(rf"{len(mcp_tools)} .*tools", documents[label], re.I)
+        mcp_count = re.search(rf"{len(mcp_tools)}(?:[- ]+)?(?:MCP )?tools?", documents[label], re.I)
         mcp_count = mcp_count or f"{len(mcp_tools)} інструмент" in documents[label]
         if not mcp_count:
             errors.append(f"{label} does not declare all {len(mcp_tools)} MCP tools.")
@@ -269,6 +287,11 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
             rf"\b(?!{len(mcp_tools)}\b)\d+ інструмент", documents[label]
         ):
             errors.append(f"{label} contains a stale MCP tools count.")
+    for label in ("Getting Started", "Getting Started UA"):
+        mcp_count = re.search(rf"{len(mcp_tools)}(?:[- ]+)?(?:MCP )?tools?", documents[label], re.I)
+        mcp_count = mcp_count or f"{len(mcp_tools)} інструмент" in documents[label]
+        if not mcp_count:
+            errors.append(f"{label} does not declare all {len(mcp_tools)} MCP tools.")
     mcp_count = re.search(rf"{len(mcp_tools)} .*tools", documents["MCP"], re.I)
     if not mcp_count:
         errors.append(f"MCP does not declare all {len(mcp_tools)} MCP tools.")
