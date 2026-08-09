@@ -60,6 +60,19 @@ PARA_FOLDERS_: tuple[str, ...] = (
 # but it must still be indexed when it is part of the vault scope.
 INDEX_FOLDERS: tuple[str, ...] = (*PARA_FOLDERS_, "PROTOCOLS")
 
+# Generated catalog pages are deliberately bounded so the navigation map stays
+# useful to agents even when a vault contains thousands of notes.
+INDEX_MAX_BYTES = 32 * 1024
+
 SKIP_FILES: frozenset[str] = frozenset({"index.md", "log.md", "_index.md"})
 
 SYSTEM_SKIP_PARTS: tuple[str, ...] = (".git", "05_Templates", ".system_generated")
+
+
+def is_catalog_filename(filename: str) -> bool:
+    """Return whether *filename* is a generated hierarchical catalog page."""
+    if filename == "_index.md":
+        return True
+    if not (filename.startswith("_index-") and filename.endswith(".md")):
+        return False
+    return filename[len("_index-") : -len(".md")].isdigit()

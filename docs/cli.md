@@ -21,14 +21,14 @@ power [-h] [-v] [--verbose]
 
 - `0` means the command completed its executable contract.
 - `1` is used for command-level failure such as a missing vault, blocking lint
-  issues, an invalid domain registry, or strict index skips.
+  issues, an invalid domain registry, or strict index skips/conflicts.
 - `2` is emitted by `argparse` for invalid command-line syntax or choices.
 - `lint` can report non-blocking warnings, such as an orphan note, and still
   exit `0`; inspect the report as well as the code.
 - `markdown-check`, `rot`, `status`, and `cron` are reporting commands and do
   not currently fail merely because their report contains findings.
 - `index --strict` is the automation-safe index gate: it exits non-zero when
-  invalid notes are skipped.
+  invalid notes are skipped or a foreign nested catalog prevents a safe write.
 
 ## Commands
 
@@ -56,7 +56,7 @@ Blocking issues produce exit `1`; informational warnings can coexist with exit
 
 ### `index`
 
-Generate `index.md` and per-canonical-folder `_index.md` files.
+Generate `index.md` and recursive per-canonical-folder catalog files.
 
 ```text
 power index PATH [--strict]
@@ -64,10 +64,19 @@ power index PATH [--strict]
 
 | Flag | Description |
 | --- | --- |
-| `--strict` | Exit non-zero when invalid notes were skipped. Recommended for CI and migration gates. |
+| `--strict` | Exit non-zero when invalid notes were skipped or catalog conflicts were preserved. Recommended for CI and migration gates. |
 
 The catalog scope is `00_Inbox`, `01_Projects`, `02_Areas`, `03_Resources`,
 `04_Archive`, `06_Daily_Logs`, and `PROTOCOLS`.
+
+Each indexed directory receives an owned `_index.md`. Nested directories are
+linked from their parent catalog, and every catalog is paginated at a hard
+32 KiB UTF-8 limit as `_index.md`, `_index-2.md`, and so on. Generated pages
+use explicit relative Markdown links and carry an `x-generated-by: power`
+marker. Existing unmarked nested `_index.md` and `_index-N.md` files are
+preserved and reported as conflicts. An unmarked top-level `_index.md` is
+upgraded only when it has POWER's legacy catalog frontmatter; otherwise it is
+also preserved. Remove or rename conflicts before using `--strict`.
 
 ### `ingest`
 

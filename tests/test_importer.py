@@ -143,4 +143,9 @@ def test_quarantine_import_is_searchable_and_idempotent(sample_vault: Path, tmp_
     with patch.object(sys, "argv", args), pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 0
-    assert len(list((sample_vault / "03_Resources" / "imported").glob("*.md"))) == 3
+    imported_notes = [
+        path
+        for path in (sample_vault / "03_Resources" / "imported").glob("*.md")
+        if not path.name.startswith("_index")
+    ]
+    assert len(imported_notes) == 3

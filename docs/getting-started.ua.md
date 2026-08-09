@@ -86,7 +86,8 @@ power-vault/
 └── log.md
 ```
 
-Файли `_index.md` у папках створює `power index`, а не `power init`.
+Каталоги `_index.md` у canonical і вкладених теках створює `power index`, а не
+`power init`; великі каталоги розбиваються на обмежені сторінки `_index-N.md`.
 
 ## 4. Додайте першу нотатку
 

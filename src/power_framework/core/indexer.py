@@ -9,18 +9,21 @@ Scans the vault for OKF-annotated notes and generates hierarchical index files:
 from __future__ import annotations
 
 import json
+import posixpath
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .constants import INDEX_FOLDERS
+from .constants import INDEX_FOLDERS, INDEX_MAX_BYTES, is_catalog_filename
 from .ignore import should_skip
 from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, OKFMetadata, TypedRelation
 from .parser import read_file_content, validate_metadata
 from .utils import atomic_write
 from .vault_storage import vault_cache_dir
 
-INDEX_CACHE_SCHEMA_VERSION = 2
-INDEX_RENDERER_VERSION = 1
+INDEX_CACHE_SCHEMA_VERSION = 3
+INDEX_RENDERER_VERSION = 2
+CATALOG_MARKER = "x-generated-by: power"
 
 
 def truncate_for_catalog(description: str, max_length: int = MAX_DESCRIPTION_LENGTH) -> str:
@@ -46,7 +49,7 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
     concepts: dict[str, list[tuple[str, str, str]]] = {}
 
     for filepath in vault_dir.rglob("*.md"):
-        if filepath.name in ("index.md", "log.md"):
+        if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
@@ -82,10 +85,8 @@ def scan_folder_notes(
     """
     folder_notes: dict[str, list[dict]] = {}
 
-    excluded_names = frozenset({"index.md", "log.md", "_index.md"})
-
     for filepath in vault_dir.rglob("*.md"):
-        if filepath.name in excluded_names:
+        if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue
 
         rel_path = filepath.relative_to(vault_dir)
@@ -138,7 +139,7 @@ def _note_info_from_metadata(filepath: Path, vault_dir: Path, metadata: OKFMetad
     """Build the catalog representation shared by full and incremental scans."""
     rel_path = filepath.relative_to(vault_dir)
     return {
-        "rel_path": str(rel_path),
+        "rel_path": rel_path.as_posix(),
         "title": metadata.title,
         "description": metadata.description,
         "note_type": metadata.type,
@@ -167,6 +168,7 @@ def _serialise_note_info(note: dict) -> dict:
 def _deserialise_note_info(note: dict) -> dict:
     """Restore typed relations after loading the incremental catalog cache."""
     restored = dict(note)
+    restored["rel_path"] = str(restored.get("rel_path", "")).replace("\\", "/")
     restored["related"] = [
         relation if isinstance(relation, TypedRelation) else TypedRelation.model_validate(relation)
         for relation in note.get("related", [])
@@ -174,10 +176,28 @@ def _deserialise_note_info(note: dict) -> dict:
     return restored
 
 
+def _ancestor_dirs(rel_path: Path) -> list[str]:
+    """Return the note's catalog directory and all indexed ancestors."""
+    if not rel_path.parts or rel_path.parts[0] not in INDEX_FOLDERS:
+        return []
+    parent = rel_path.parent
+    if str(parent) == ".":
+        return []
+    parts = parent.parts
+    return ["/".join(parts[:index]) for index in range(len(parts), 0, -1)]
+
+
 def _scan_folder_notes_incremental(
     vault_dir: Path,
-) -> tuple[dict[str, list[dict]], list[tuple[str, str]], int, set[str]]:
-    """Scan changed notes and report the folders whose catalogs need rendering.
+) -> tuple[
+    dict[str, list[dict]],
+    list[tuple[str, str]],
+    int,
+    set[str],
+    dict[str, list[dict]],
+    bool,
+]:
+    """Scan notes and identify exact catalog directories affected by changes.
 
     The cache lives outside the Markdown vault content under POWER's stable
     per-vault cache namespace. File size and nanosecond mtime form the cheap
@@ -200,12 +220,13 @@ def _scan_folder_notes_incremental(
         cached_entries = {}
 
     folder_notes: dict[str, list[dict]] = {}
+    directory_notes: dict[str, list[dict]] = {}
     invalid_notes: list[tuple[str, str]] = []
     next_entries: dict[str, dict] = {}
-    changed_folders: set[str] = set() if cache_is_current else set(INDEX_FOLDERS)
+    changed_dirs: set[str] = set()
     seen_paths: set[str] = set()
     for filepath in sorted(vault_dir.rglob("*.md")):
-        if filepath.name in {"index.md", "log.md", "_index.md"}:
+        if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue
         rel_path = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel_path.as_posix()) or not rel_path.parts:
@@ -220,7 +241,7 @@ def _scan_folder_notes_incremental(
             stat = filepath.stat()
             signature = {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size}
         except OSError:
-            changed_folders.add(top_folder)
+            changed_dirs.update(_ancestor_dirs(rel_path))
             invalid_notes.append((rel_path.as_posix(), "read_error"))
             continue
 
@@ -233,14 +254,19 @@ def _scan_folder_notes_incremental(
             note_info = _deserialise_note_info(cached_entry["note"])
             if cached_entry.get("valid", False):
                 folder_notes.setdefault(top_folder, []).append(note_info)
+                directory = "/".join(rel_path.parts[:-1])
+                directory_notes.setdefault(directory, []).append(note_info)
             else:
                 invalid_notes.append(
                     (rel_path.as_posix(), str(cached_entry.get("reason", "invalid_metadata")))
                 )
-            next_entries[rel_path.as_posix()] = cached_entry
+            next_entries[rel_path.as_posix()] = {
+                **cached_entry,
+                "note": _serialise_note_info(note_info),
+            }
             continue
 
-        changed_folders.add(top_folder)
+        changed_dirs.update(_ancestor_dirs(rel_path))
 
         try:
             metadata = validate_metadata(read_file_content(filepath))
@@ -259,20 +285,20 @@ def _scan_folder_notes_incremental(
 
         note_info = _note_info_from_metadata(filepath, vault_dir, metadata)
         folder_notes.setdefault(top_folder, []).append(note_info)
+        directory = "/".join(rel_path.parts[:-1])
+        directory_notes.setdefault(directory, []).append(note_info)
         next_entries[rel_path.as_posix()] = {
             "signature": signature,
             "valid": True,
             "note": _serialise_note_info(note_info),
         }
 
-    # A deleted note is not visited above. Mark its former folder so the
-    # stale catalog row is removed on this run.
+    # A deleted note is not visited above. Mark its former directory and all
+    # ancestors so stale rows and descendant counts are removed on this run.
     for cached_path in cached_entries:
         if cached_path in seen_paths:
             continue
-        cached_parts = Path(cached_path).parts
-        if cached_parts and cached_parts[0] in INDEX_FOLDERS:
-            changed_folders.add(cached_parts[0])
+        changed_dirs.update(_ancestor_dirs(Path(cached_path)))
 
     atomic_write(
         cache_path,
@@ -287,7 +313,14 @@ def _scan_folder_notes_incremental(
         )
         + "\n",
     )
-    return folder_notes, invalid_notes, len(next_entries), changed_folders
+    return (
+        folder_notes,
+        invalid_notes,
+        len(next_entries),
+        changed_dirs,
+        directory_notes,
+        not cache_is_current,
+    )
 
 
 def scan_folder_notes_incremental(
@@ -299,7 +332,7 @@ def scan_folder_notes_incremental(
     hierarchical generator; the internal helper additionally reports the
     folders whose rendered indexes are stale.
     """
-    folder_notes, invalid_notes, entry_count, _ = _scan_folder_notes_incremental(vault_dir)
+    folder_notes, invalid_notes, entry_count, _, _, _ = _scan_folder_notes_incremental(vault_dir)
     return folder_notes, invalid_notes, entry_count
 
 
@@ -308,7 +341,7 @@ def scan_root_daily_logs(vault_dir: Path) -> list[dict]:
     root_logs: list[dict] = []
     for filepath in vault_dir.glob("*.md"):
         rel_path = filepath.relative_to(vault_dir)
-        if filepath.name in {"index.md", "log.md", "_index.md"}:
+        if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue
         if len(rel_path.parts) != 1 or should_skip(vault_dir, rel_path.as_posix()):
             continue
@@ -413,53 +446,194 @@ def generate_main_index_content(
     return "\n".join(lines)
 
 
-def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
-    """Generate a detailed _index.md for a specific P.A.R.A. folder."""
-    display_name = folder.replace("_", " ")
+def _catalog_link(folder: str, rel_path: str) -> str:
+    """Render a vault-relative path as an explicit relative Markdown link."""
+    normalized = rel_path.replace("\\", "/")
+    target = posixpath.relpath(normalized, folder)
+    if not target.startswith((".", "/")):
+        target = f"./{target}"
+    return f"[{normalized}](<{target}>)"
 
-    lines = [
+
+def _catalog_page_filename(page: int) -> str:
+    """Return the stable filename for a one-based catalog page."""
+    return "_index.md" if page == 1 else f"_index-{page}.md"
+
+
+def _catalog_header(folder: str, page: int, page_count: int) -> list[str]:
+    """Build the machine-readable header shared by every catalog page."""
+    display_name = folder.replace("_", " ")
+    return [
         "---",
         "type: System Guide",
-        f'title: "{display_name} Sub-Index"',
-        f'description: "Detailed catalog of all notes in {display_name}"',
+        f"title: {json.dumps(f'{display_name} Sub-Index', ensure_ascii=False)}",
+        f"description: {json.dumps(f'Detailed catalog of all notes in {display_name}', ensure_ascii=False)}",
         f"timestamp: {datetime.now(UTC).isoformat()}",
+        CATALOG_MARKER,
+        f"x-index-renderer: {INDEX_RENDERER_VERSION}",
+        f"x-index-directory: {json.dumps(folder)}",
+        f"x-index-page: {page}",
+        f"x-index-pages: {page_count}",
         "---",
         "",
     ]
 
-    if not notes:
-        lines.append(f"# {display_name}")
-        lines.append("")
-        lines.append("_No notes in this category yet._")
-        lines.append("")
+
+def _catalog_navigation(folder: str, page: int, page_count: int) -> list[str]:
+    """Build page and parent navigation without linking outside the vault scope."""
+    links: list[str] = []
+    if page > 1:
+        links.append(f"[Previous](<./{_catalog_page_filename(page - 1)}>)")
+    links.append(f"Page {page} of {page_count}")
+    if page < page_count:
+        links.append(f"[Next](<./{_catalog_page_filename(page + 1)}>)")
+
+    lines = [" | ".join(links)]
+    parent = Path(folder).parent.as_posix()
+    if parent != ".":
+        lines.append("[Parent catalog](<../_index.md>)")
+    lines.append("")
+    return lines
+
+
+def _note_catalog_block(folder: str, note: dict) -> str:
+    """Render one note entry, including a link that resolves from its catalog."""
+    lines = [
+        f"## {note['title']}",
+        f"- **Path:** {_catalog_link(folder, note['rel_path'])}",
+        f"- **Type:** {note['note_type']}",
+        f"- **Description:** {truncate_for_catalog(note['description'])}",
+    ]
+    if note.get("tags"):
+        tags_str = ", ".join(note["tags"])
+        lines.append(f"- **Tags:** [{tags_str}]")
+    if note.get("owner"):
+        lines.append(f"- **Owner:** {note['owner']}")
+    if note.get("status"):
+        lines.append(f"- **Status:** {note['status']}")
+    if note.get("expiry"):
+        lines.append(f"- **Review by:** {note['expiry']}")
+    if note.get("related"):
+        rel_str = ", ".join(r.path for r in note["related"])
+        lines.append(f"- **Related:** {rel_str}")
+    if note.get("timestamp"):
+        lines.append(f"- **Updated:** {note['timestamp'][:10]}")
+    return "\n".join(lines) + "\n"
+
+
+def _child_catalog_block(folder: str, child: str, note_count: int) -> str:
+    """Render one nested-directory entry for its parent catalog."""
+    child_name = Path(child).name.replace("_", " ")
+    child_path = f"{child}/_index.md"
+    return "\n".join(
+        [
+            f"## {child_name}",
+            f"- **Folder:** {_catalog_link(folder, child_path)}",
+            f"- **Notes:** {note_count}",
+            "",
+        ]
+    )
+
+
+def _catalog_blocks(
+    folder: str,
+    notes: list[dict],
+    child_dirs: list[str],
+    note_counts: dict[str, int],
+) -> list[str]:
+    """Build deterministic, independently paginable directory entries."""
+    blocks = [
+        _child_catalog_block(folder, child, note_counts.get(child, 0))
+        for child in sorted(child_dirs)
+    ]
+    blocks.extend(
+        _note_catalog_block(folder, note)
+        for note in sorted(notes, key=lambda item: (item["title"].casefold(), item["rel_path"]))
+    )
+    return blocks
+
+
+def _render_catalog_page(folder: str, blocks: list[str], page: int, page_count: int) -> str:
+    """Render one catalog page from already partitioned entry blocks."""
+    display_name = folder.replace("_", " ")
+    lines = _catalog_header(folder, page, page_count)
+    lines.append(f"# {display_name} — Detailed Index")
+    lines.append("")
+    lines.extend(_catalog_navigation(folder, page, page_count))
+    if blocks:
+        lines.extend(blocks)
     else:
-        lines.append(f"# {display_name} — Detailed Index")
+        lines.append("_No notes or nested folders in this category yet._")
         lines.append("")
-
-        sorted_notes = sorted(notes, key=lambda x: x["title"])
-
-        for note in sorted_notes:
-            lines.append(f"## {note['title']}")
-            lines.append(f"- **Path:** `{note['rel_path']}`")
-            lines.append(f"- **Type:** {note['note_type']}")
-            lines.append(f"- **Description:** {truncate_for_catalog(note['description'])}")
-            if note.get("tags"):
-                tags_str = ", ".join(note["tags"])
-                lines.append(f"- **Tags:** [{tags_str}]")
-            if note.get("owner"):
-                lines.append(f"- **Owner:** {note['owner']}")
-            if note.get("status"):
-                lines.append(f"- **Status:** {note['status']}")
-            if note.get("expiry"):
-                lines.append(f"- **Review by:** {note['expiry']}")
-            if note.get("related"):
-                rel_str = ", ".join(r.path for r in note["related"])
-                lines.append(f"- **Related:** {rel_str}")
-            if note.get("timestamp"):
-                lines.append(f"- **Updated:** {note['timestamp'][:10]}")
-            lines.append("")
-
     return "\n".join(lines)
+
+
+def _generate_catalog_pages(
+    folder: str,
+    notes: list[dict],
+    child_dirs: list[str] | None = None,
+    note_counts: dict[str, int] | None = None,
+    max_bytes: int | None = None,
+) -> dict[str, str]:
+    """Render a directory catalog into deterministic UTF-8-bounded pages."""
+    if max_bytes is None:
+        max_bytes = INDEX_MAX_BYTES
+    if max_bytes <= 0:
+        raise ValueError("INDEX_MAX_BYTES must be positive")
+
+    blocks = _catalog_blocks(folder, notes, child_dirs or [], note_counts or {})
+    pages: list[list[str]] = []
+    if not blocks:
+        pages.append([])
+    else:
+        # The largest possible page number is a safe upper bound for navigation
+        # overhead; the actual page count can only be smaller after partitioning.
+        page_hint = len(blocks)
+        current: list[str] = []
+        for block in blocks:
+            candidate = [*current, block]
+            rendered = _render_catalog_page(folder, candidate, page_hint, page_hint)
+            if len(rendered.encode("utf-8")) <= max_bytes:
+                current = candidate
+                continue
+            if not current:
+                raise ValueError(
+                    f"catalog_entry_exceeds_limit:{folder}:{len(block.encode('utf-8'))}"
+                )
+            pages.append(current)
+            current = [block]
+            single = _render_catalog_page(folder, current, page_hint, page_hint)
+            if len(single.encode("utf-8")) > max_bytes:
+                raise ValueError(
+                    f"catalog_entry_exceeds_limit:{folder}:{len(block.encode('utf-8'))}"
+                )
+        if current:
+            pages.append(current)
+
+    page_count = len(pages)
+    rendered_pages = {
+        _catalog_page_filename(page): _render_catalog_page(folder, page_blocks, page, page_count)
+        for page, page_blocks in enumerate(pages, start=1)
+    }
+    oversized = [
+        (filename, len(content.encode("utf-8")))
+        for filename, content in rendered_pages.items()
+        if len(content.encode("utf-8")) > max_bytes
+    ]
+    if oversized:
+        filename, size = oversized[0]
+        raise ValueError(f"catalog_page_exceeds_limit:{folder}/{filename}:{size}")
+    return rendered_pages
+
+
+def generate_sub_index_content(folder: str, notes: list[dict]) -> str:
+    """Generate the first bounded page of a directory catalog.
+
+    The two-argument signature remains stable for library and MCP callers.
+    Hierarchical generation adds nested-directory entries through the internal
+    paginated renderer.
+    """
+    return _generate_catalog_pages(folder, notes)["_index.md"]
 
 
 def run_generate_index(vault_dir: Path) -> str:
@@ -484,15 +658,182 @@ def run_generate_sub_index(vault_dir: Path, folder: str) -> str:
 
     Returns a summary message.
     """
+    normalized_folder = Path(folder).as_posix()
     folder_notes = scan_folder_notes(vault_dir)
-    notes = folder_notes.get(folder, [])
+    directory_notes = _directory_notes_from_folder_notes(folder_notes)
+    desired_dirs = _desired_catalog_dirs(directory_notes)
+    children = _catalog_children(desired_dirs)
+    counts = _catalog_note_counts(directory_notes)
+    notes = (
+        folder_notes.get(normalized_folder, [])
+        if normalized_folder in INDEX_FOLDERS
+        else directory_notes.get(normalized_folder, [])
+    )
+    pages = _generate_catalog_pages(
+        normalized_folder,
+        notes,
+        children.get(normalized_folder, []),
+        counts,
+    )
+    conflicts: list[str] = []
+    _write_catalog_pages(vault_dir, normalized_folder, pages, conflicts)
+    result = f"Generated {normalized_folder}/_index.md with {len(notes)} entries."
+    if conflicts:
+        result += "\nWARNING: catalog conflicts preserved:\n" + "\n".join(
+            f"  - {path}" for path in conflicts
+        )
+    return result
 
-    sub_index_path = vault_dir / folder / "_index.md"
-    sub_index_path.parent.mkdir(parents=True, exist_ok=True)
-    content = generate_sub_index_content(folder, notes)
-    atomic_write(sub_index_path, content)
 
-    return f"Generated {folder}/_index.md with {len(notes)} entries."
+def _directory_notes_from_folder_notes(
+    folder_notes: dict[str, list[dict]],
+) -> dict[str, list[dict]]:
+    """Group top-level scan results by the exact directory containing each note."""
+    directory_notes: dict[str, list[dict]] = {}
+    for notes in folder_notes.values():
+        for note in notes:
+            directory = Path(note["rel_path"]).parent.as_posix()
+            directory_notes.setdefault(directory, []).append(note)
+    return directory_notes
+
+
+def _desired_catalog_dirs(directory_notes: dict[str, list[dict]]) -> set[str]:
+    """Return top-level catalog roots plus every indexed note ancestor."""
+    desired = set(INDEX_FOLDERS)
+    for directory in directory_notes:
+        desired.update(_ancestor_dirs(Path(directory) / "_note.md"))
+    return desired
+
+
+def _catalog_children(desired_dirs: set[str]) -> dict[str, list[str]]:
+    """Build an immediate-child map for recursive catalog navigation."""
+    children: dict[str, list[str]] = {directory: [] for directory in desired_dirs}
+    for directory in desired_dirs:
+        parent = Path(directory).parent.as_posix()
+        if parent in children:
+            children[parent].append(directory)
+    return children
+
+
+def _catalog_note_counts(directory_notes: dict[str, list[dict]]) -> dict[str, int]:
+    """Count direct and descendant notes for every catalog directory."""
+    counts: dict[str, int] = dict.fromkeys(INDEX_FOLDERS, 0)
+    for directory, notes in directory_notes.items():
+        for ancestor in _ancestor_dirs(Path(directory) / "_note.md"):
+            counts[ancestor] = counts.get(ancestor, 0) + len(notes)
+    return counts
+
+
+def _existing_catalog_dirs(vault_dir: Path) -> set[str]:
+    """Find existing generated-catalog directories inside indexed roots."""
+    directories: set[str] = set()
+    for filepath in vault_dir.rglob("*.md"):
+        if not is_catalog_filename(filepath.name):
+            continue
+        rel_path = filepath.relative_to(vault_dir)
+        if should_skip(vault_dir, rel_path.as_posix()) or not rel_path.parts:
+            continue
+        if rel_path.parts[0] in INDEX_FOLDERS:
+            directories.add(rel_path.parent.as_posix())
+    return directories
+
+
+def _catalog_files(vault_dir: Path, folder: str) -> list[Path]:
+    """Return generated-page-shaped files in one catalog directory."""
+    directory = vault_dir / Path(folder)
+    if not directory.is_dir():
+        return []
+    return sorted(path for path in directory.glob("_index*.md") if is_catalog_filename(path.name))
+
+
+def _is_owned_catalog(path: Path, vault_dir: Path) -> bool:
+    """Recognize POWER catalogs without taking ownership of foreign files."""
+    if not path.exists():
+        return False
+    relative_dir = path.parent.relative_to(vault_dir).as_posix()
+    try:
+        prefix = path.read_text(encoding="utf-8", errors="ignore")[:4096]
+    except OSError:
+        return False
+    if CATALOG_MARKER in prefix:
+        return True
+    # v1 catalogs had no marker. Upgrade only the exact POWER-generated
+    # frontmatter shape; an unmarked hand-maintained top-level catalog must be
+    # preserved and reported as a conflict.
+    if path.name == "_index.md" and relative_dir in INDEX_FOLDERS:
+        display_name = relative_dir.replace("_", " ")
+        return (
+            f'title: "{display_name} Sub-Index"' in prefix
+            and f'description: "Detailed catalog of all notes in {display_name}"' in prefix
+        )
+    return False
+
+
+def _catalog_is_current(path: Path, vault_dir: Path) -> bool:
+    """Return whether a catalog landing page and all declared pages are current."""
+    if not _is_owned_catalog(path, vault_dir):
+        return False
+    try:
+        content = path.read_text(encoding="utf-8", errors="ignore")[:4096]
+    except OSError:
+        return False
+    if f"x-index-renderer: {INDEX_RENDERER_VERSION}" not in content:
+        return False
+    page_line = next(
+        (line for line in content.splitlines() if line.startswith("x-index-pages:")),
+        "",
+    )
+    try:
+        page_count = int(page_line.split(":", 1)[1].strip())
+    except (IndexError, ValueError):
+        return False
+    folder = path.parent.relative_to(vault_dir).as_posix()
+    expected = {
+        vault_dir / folder / _catalog_page_filename(page) for page in range(1, page_count + 1)
+    }
+    existing = set(_catalog_files(vault_dir, folder))
+    return existing == expected and all(
+        (vault_dir / folder / _catalog_page_filename(page)).exists()
+        and _is_owned_catalog(vault_dir / folder / _catalog_page_filename(page), vault_dir)
+        for page in range(1, page_count + 1)
+    )
+
+
+def _write_catalog_pages(
+    vault_dir: Path, folder: str, pages: dict[str, str], conflicts: list[str]
+) -> bool:
+    """Atomically write owned pages and remove obsolete owned pagination files."""
+    directory = vault_dir / Path(folder)
+    directory.mkdir(parents=True, exist_ok=True)
+    existing = _catalog_files(vault_dir, folder)
+    expected = {directory / filename for filename in pages}
+    blocking = [
+        path
+        for path in [*expected, *existing]
+        if path.exists() and path not in expected and not _is_owned_catalog(path, vault_dir)
+    ]
+    blocking.extend(
+        path for path in expected if path.exists() and not _is_owned_catalog(path, vault_dir)
+    )
+    if blocking:
+        conflicts.extend(sorted({path.relative_to(vault_dir).as_posix() for path in blocking}))
+        return False
+
+    for filename, content in pages.items():
+        atomic_write(directory / filename, content)
+    for path in existing:
+        if path not in expected and _is_owned_catalog(path, vault_dir):
+            path.unlink()
+    return True
+
+
+def _remove_stale_catalog_dir(vault_dir: Path, folder: str, conflicts: list[str]) -> None:
+    """Remove only POWER-owned pages from a directory no longer in the index."""
+    for path in _catalog_files(vault_dir, folder):
+        if _is_owned_catalog(path, vault_dir):
+            path.unlink()
+        else:
+            conflicts.append(path.relative_to(vault_dir).as_posix())
 
 
 def run_generate_hierarchical_index(vault_dir: Path) -> str:
@@ -501,8 +842,23 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
 
     Returns a summary message.
     """
-    folder_notes, invalid_notes, _, changed_folders = _scan_folder_notes_incremental(vault_dir)
+    (
+        folder_notes,
+        invalid_notes,
+        _,
+        changed_dirs,
+        directory_notes,
+        force_render,
+    ) = _scan_folder_notes_incremental(vault_dir)
     root_daily_logs = scan_root_daily_logs(vault_dir)
+    desired_dirs = _desired_catalog_dirs(directory_notes)
+    children = _catalog_children(desired_dirs)
+    note_counts = _catalog_note_counts(directory_notes)
+    existing_dirs = _existing_catalog_dirs(vault_dir)
+    conflicts: list[str] = []
+
+    for stale_dir in sorted(existing_dirs - desired_dirs, key=lambda item: (item.count("/"), item)):
+        _remove_stale_catalog_dir(vault_dir, stale_dir, conflicts)
 
     total_notes = sum(len(notes) for notes in folder_notes.values()) + len(root_daily_logs)
 
@@ -510,15 +866,47 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
     main_content = generate_main_index_content(folder_notes, root_daily_logs)
     atomic_write(main_index_path, main_content)
 
+    generated_pages = 0
+    written_catalogs: set[str] = set()
+    try:
+        for folder in sorted(desired_dirs, key=lambda item: (item.count("/"), item)):
+            landing = vault_dir / folder / "_index.md"
+            if (
+                force_render
+                or folder in changed_dirs
+                or not _catalog_is_current(landing, vault_dir)
+            ):
+                notes = (
+                    folder_notes.get(folder, [])
+                    if folder in INDEX_FOLDERS
+                    else directory_notes.get(folder, [])
+                )
+                pages = _generate_catalog_pages(
+                    folder,
+                    notes,
+                    children.get(folder, []),
+                    note_counts,
+                )
+                if _write_catalog_pages(vault_dir, folder, pages, conflicts):
+                    generated_pages += len(pages)
+                    written_catalogs.add(folder)
+    except Exception:
+        # The scan cache is written before rendering for incremental callers.
+        # Never let a failed render make the next run believe the old catalog
+        # is current; the next invocation will perform a safe full rebuild.
+        cache_path = vault_cache_dir(vault_dir) / "hierarchical-index-cache.json"
+        with suppress(FileNotFoundError):
+            cache_path.unlink()
+        raise
+
     sub_index_results = ["  index.md (navigation map)"]
     for folder in INDEX_FOLDERS:
-        notes = folder_notes.get(folder, [])
-        sub_index_path = vault_dir / folder / "_index.md"
-        sub_index_path.parent.mkdir(parents=True, exist_ok=True)
-        if folder in changed_folders or not sub_index_path.exists():
-            sub_content = generate_sub_index_content(folder, notes)
-            atomic_write(sub_index_path, sub_content)
-        sub_index_results.append(f"  {folder}/_index.md ({len(notes)} notes)")
+        landing = vault_dir / folder / "_index.md"
+        note_count = len(folder_notes.get(folder, []))
+        available = folder in written_catalogs or _catalog_is_current(landing, vault_dir)
+        suffix = f"({note_count} notes)" if available else f"NOT WRITTEN ({note_count} notes)"
+        sub_index_results.append(f"  {folder}/_index.md {suffix}")
+    sub_index_results.append(f"  generated catalog pages: {generated_pages}")
 
     lines = [
         f"Generated hierarchical index with {total_notes} total notes:",
@@ -526,6 +914,9 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
     if invalid_notes:
         lines.append(f"WARNING: skipped invalid notes ({len(invalid_notes)}):")
         lines.extend(f"  - {path}: {reason}" for path, reason in sorted(invalid_notes))
+    if conflicts:
+        lines.append(f"WARNING: catalog conflicts preserved ({len(set(conflicts))}):")
+        lines.extend(f"  - {path}" for path in sorted(set(conflicts)))
     lines.extend(sub_index_results)
 
     return "\n".join(lines)

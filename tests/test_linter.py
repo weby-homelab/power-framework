@@ -62,6 +62,13 @@ class TestRunLintVault:
         result = run_lint_vault(vault_with_issues)
         assert result.total_notes == 5
 
+    def test_generated_catalog_pages_are_not_counted_as_notes(self, sample_vault: Path):
+        from power_framework.core.indexer import run_generate_hierarchical_index
+
+        run_generate_hierarchical_index(sample_vault)
+        result = run_lint_vault(sample_vault)
+        assert result.total_notes == 5
+
     def test_daily_logs_excluded_from_orphans(self, sample_vault: Path):
         result = run_lint_vault(sample_vault)
         orphan_paths = result.orphans

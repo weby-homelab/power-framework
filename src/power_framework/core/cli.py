@@ -176,8 +176,10 @@ def _cmd_index(args: argparse.Namespace) -> int:
 
     msg = execute_vault_mutation(vault_dir, lambda: run_generate_hierarchical_index(vault_dir))
     logger.info("Generated hierarchical index:\n%s", msg)
-    if args.strict and "WARNING: skipped invalid notes (" in msg:
-        logger.error("Strict index check failed: invalid notes were skipped")
+    if args.strict and (
+        "WARNING: skipped invalid notes (" in msg or "WARNING: catalog conflicts preserved (" in msg
+    ):
+        logger.error("Strict index check failed: notes or catalog files were skipped")
         return 1
     return 0
 

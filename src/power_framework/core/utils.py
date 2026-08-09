@@ -19,7 +19,7 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 from urllib.parse import unquote
 
-from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES
+from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES, is_catalog_filename
 
 
 def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Path:
@@ -262,6 +262,7 @@ def is_excluded_orphan(filename: str, rel_path: str) -> bool:
     return (
         filename in EXCLUDED_ORPHAN_FILES
         or normalized_filename in EXCLUDED_ORPHAN_FILES
+        or is_catalog_filename(normalized_filename)
         or normalized_rel_path.startswith(("04_Archive/", "06_Daily_Logs/"))
         or is_root_daily_log
     )

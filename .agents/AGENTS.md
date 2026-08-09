@@ -1,6 +1,6 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 16 top-level
+Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 17 top-level
 commands) + MCP server (18 tools).
 
 ## Project Structure
@@ -40,7 +40,7 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 | --------------------- | ------------------------------------------------------ |
 | `core/models.py`      | Pydantic v2 OKF schemas + Graph RAG fields             |
 | `core/parser.py`      | Safe YAML frontmatter parsing                          |
-| `core/indexer.py`     | Hierarchical index generation (index.md + _index.md)   |
+| `core/indexer.py`     | Recursive bounded catalog generation (index.md + _index*.md) |
 | `core/linter.py`      | Health checks: links, metadata, orphans, stale/expired |
 | `core/searcher.py`    | FTS5/dense/hybrid/reranked search (`semantic` default) |
 | `core/embeddings.py`  | BGE-M3 ONNX (1024d) + MiniLM fallback                  |

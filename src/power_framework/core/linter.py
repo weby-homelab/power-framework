@@ -24,6 +24,7 @@ from datetime import date as date_type
 from pathlib import Path
 from urllib.parse import unquote
 
+from .constants import is_catalog_filename
 from .ignore import should_skip
 from .parser import (
     has_frontmatter,
@@ -356,7 +357,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
         all_files[rel_path] = filepath
         basename_map.setdefault(clean_note_name(filepath.name), []).append(rel_path)
 
-    result.total_notes = len(all_files)
+    result.total_notes = sum(not is_catalog_filename(Path(rel_path).name) for rel_path in all_files)
 
     for rel_path, abs_path in all_files.items():
         try:
@@ -458,7 +459,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
 
         try:
