@@ -63,6 +63,23 @@ An agent must read the relevant documents before changing data:
 These constraints are why this protocol uses a staging vault and a migration
 manifest instead of pretending that one command performs a lossless migration.
 
+## Version-stamped executable facts
+
+This guide is verified against the pinned `v3.4.0` release. CI checks these
+facts against the executable capability manifest so an agent does not inherit
+an older migration recipe:
+
+- the current surface is 19 top-level CLI commands and 18 MCP tools;
+- the default search mode is `semantic`; `reranked` is explicit opt-in;
+- database and cache paths are runtime-owned. Use `power doctor DESTINATION
+  --json` to read the active paths and state; never hard-code a vault-local
+  database filename;
+- `power heal` repairs frontmatter, not wikilinks. For foreign frontmatter
+  shapes, `power import --policy quarantine` preserves values as `x-status` or
+  `x-related` before the strict validation gate;
+- VRAM, latency, and dense/reranked readiness are target-host evidence, not a
+  fixed promise. Record `power doctor` and sync results for the actual host.
+
 ### Bounded import fast path
 
 For a source tree whose destination folder and filename mapping are already

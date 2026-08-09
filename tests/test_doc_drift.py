@@ -48,6 +48,33 @@ def test_current_docs_match_executable_interfaces_and_safe_onboarding() -> None:
     assert gate["check_links"](documents, facts) == []
 
 
+def test_current_migration_guides_match_versioned_runtime_facts() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+
+    assert gate["check_migration_guide"](documents, facts) == []
+
+
+def test_migration_gate_rejects_stale_runtime_claims() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    documents["Migration"] = documents["Migration"].replace(
+        "default search mode is `semantic`", "default search mode is `reranked`", 1
+    )
+    documents["Migration UA"] = documents["Migration UA"].replace(
+        "режим пошуку за замовчуванням — `semantic`",
+        "режим пошуку за замовчуванням — `reranked`",
+        1,
+    )
+
+    errors = gate["check_migration_guide"](documents, facts)
+
+    assert any("Migration" in error and "semantic" in error for error in errors)
+    assert any("Migration UA" in error and "semantic" in error for error in errors)
+
+
 def test_interface_gate_rejects_stale_architecture_count() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()

@@ -451,6 +451,68 @@ def check_onboarding(documents: dict[str, str], facts: dict[str, Any]) -> list[s
             for marker in ("SHA-256", "--strict", "rollback")
             if marker.lower() not in migration_doc.lower()
         )
+    errors.extend(check_migration_guide(documents, facts))
+    return errors
+
+
+def check_migration_guide(documents: dict[str, str], facts: dict[str, Any]) -> list[str]:
+    """Keep the migration guide's versioned safety claims executable and current."""
+    errors: list[str] = []
+    version = facts["version"]
+    mcp_count = len(facts["interfaces"]["mcp_tools"])
+    default_mode = facts["search"]["default_mode"]
+    required_markers = {
+        "Migration": (
+            f"v{version}",
+            f"{mcp_count} MCP tools",
+            f"default search mode is `{default_mode}`",
+            "power doctor DESTINATION",
+            "--json",
+            "--policy quarantine",
+            "x-status",
+            "x-related",
+            "does not promise a complete rewrite",
+            "not wikilinks",
+        ),
+        "Migration UA": (
+            f"v{version}",
+            f"{mcp_count} MCP tools",
+            f"режим пошуку за замовчуванням — `{default_mode}`",
+            "power doctor DESTINATION",
+            "--json",
+            "--policy quarantine",
+            "x-status",
+            "x-related",
+            "не гарантує повний rewrite",
+            "але не ремонтує wikilinks",
+        ),
+    }
+    for label, markers in required_markers.items():
+        document = documents[label]
+        errors.extend(
+            f"{label} is missing versioned executable migration fact `{marker}`."
+            for marker in markers
+            if marker not in document
+        )
+
+    stale_claims = {
+        r"\b(?:12|17) MCP tools?\b": "stale MCP tool count",
+        r"\b(?:12|17) MCP[- ]інструмент": "stale MCP tool count",
+        r"reranked.{0,40}(?:canonical|default|канонічн|за замовчуванням)": (
+            "reranked presented as the default"
+        ),
+        r"\.power_search\.db": "hard-coded legacy database path",
+        r"HF_HUB_DISABLE_SYMLINKS": "obsolete manual symlink workaround",
+        r"(?:3-6|3\u20136)\s*KB": "unbounded catalog-size promise",
+        r"(?:2-3|2\u20133)\s*GB": "unverified VRAM promise",
+    }
+    for label in ("Migration", "Migration UA"):
+        document = documents[label]
+        errors.extend(
+            f"{label} contains {description} (matched /{pattern}/)."
+            for pattern, description in stale_claims.items()
+            if re.search(pattern, document, flags=re.IGNORECASE)
+        )
     return errors
 
 
