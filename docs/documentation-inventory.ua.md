@@ -19,8 +19,8 @@
 | `docs/windows-11-installation.ua.md` | Українська Windows-процедура | Семантично паритетна |
 | `docs/migration-guide.md` | Міграція наявної бази | Шість fail-closed фаз |
 | `docs/migration-guide.ua.md` | Українська міграція | Семантично паритетна |
-| `docs/cli.md` | Виконуваний CLI-контракт | 19 команд |
-| `docs/mcp-server.md` | Виконуваний MCP-контракт | 18 інструментів |
+| `docs/cli.md` | Виконуваний CLI-контракт | 20 команд |
+| `docs/mcp-server.md` | Виконуваний MCP-контракт | 19 інструментів |
 | `docs/mcp-client-onboarding.md` | Golden onboarding для чотирьох клієнтів | stdio shape + proposal gate |
 | `docs/mcp-client-onboarding.ua.md` | Український golden onboarding | Семантично паритетний |
 
@@ -39,7 +39,8 @@
 
 ## Усунений дрейф
 
-- `12` MCP-інструментів замінено на фактичні `18`; CLI задокументовано як `19`
+- Старий MCP-інвентар замінено на фактичні `19` інструментів; CLI
+  задокументовано як `20` top-level команд.
   топ-рівневих команд.
 - `reranked` більше не називається стандартним режимом: код використовує `semantic`,
   а reranking вмикається явно.

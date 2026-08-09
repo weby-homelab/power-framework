@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import time
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -36,10 +39,18 @@ def get_context(vault_dir: Path, query: str, max_results: int = 5) -> list[Searc
     return search_vault(vault_dir, query, max_results=max_results, mode="fts")
 
 
-def propose_change(vault_dir: Path, rel_path: str, content: str) -> dict[str, str]:
+def propose_change(
+    vault_dir: Path,
+    rel_path: str,
+    content: str,
+    *,
+    idempotency_key: str | None = None,
+) -> dict[str, str]:
     """Persist a content-addressed proposal without writing the target note."""
     if not isinstance(rel_path, str) or not isinstance(content, str):
         raise ValueError("proposal path and content must be strings")
+    if idempotency_key is not None:
+        _validate_idempotency_key(idempotency_key)
     target = resolve_path_in_vault(vault_dir, rel_path, allowed_directories=PARA_FOLDERS)
     if validate_metadata(content) is None:
         raise ValueError("proposal content has invalid or missing OKF metadata")
@@ -63,6 +74,7 @@ def propose_change(vault_dir: Path, rel_path: str, content: str) -> dict[str, st
         record = {
             **payload,
             "proposal_id": proposal_id,
+            "idempotency_key": idempotency_key or proposal_id,
             "schema_version": 1,
             "created_at": datetime.now(UTC).isoformat(),
         }
@@ -84,11 +96,24 @@ def commit_note_change(
     operation: str = "memory.apply",
     log_entry: str | None = None,
     proposal_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, str]:
     """Commit one note through the shared write → verify → publish workflow."""
 
     def mutate() -> dict[str, str]:
         target = resolve_path_in_vault(vault_dir, rel_path, allowed_directories)
+        if idempotency_key is not None:
+            _validate_idempotency_key(idempotency_key)
+            prior_receipt = _find_idempotent_receipt(vault_dir, idempotency_key)
+            if prior_receipt is not None:
+                expected_after = hashlib.sha256(content.encode()).hexdigest()
+                if (
+                    prior_receipt.get("operation") == operation
+                    and prior_receipt.get("path") == rel_path
+                    and prior_receipt.get("after_sha256") == expected_after
+                ):
+                    return prior_receipt
+                raise RuntimeError("idempotency key was already used for a different mutation")
         target_snapshot = _capture_file(target)
         before = target_snapshot.content if target_snapshot.existed else ""
         before_sha256 = hashlib.sha256(before.encode()).hexdigest()
@@ -110,15 +135,22 @@ def commit_note_change(
         log_snapshot = _capture_file(log_file)
         published_search = False
         has_dense = False
+        started_at = time.perf_counter()
         receipt = {
+            "receipt_schema": "power.receipt.v1",
             "operation": operation,
             "path": rel_path,
             "before_sha256": before_sha256,
             "after_sha256": hashlib.sha256(content.encode()).hexdigest(),
             "at": datetime.now(UTC).isoformat(),
+            "trace_id": uuid.uuid4().hex,
+            "span_id": uuid.uuid4().hex[:16],
+            "status": "ok",
         }
         if proposal_id is not None:
             receipt["proposal_id"] = proposal_id
+        if idempotency_key is not None:
+            receipt["idempotency_key"] = idempotency_key
 
         try:
             atomic_write_in_vault(
@@ -161,6 +193,7 @@ def commit_note_change(
                     "notes_indexed": str(report.actual_files),
                     "notes_excluded": str(report.invalid_sources),
                     "lint_orphans": str(len(lint_result.orphans)),
+                    "duration_ms": f"{(time.perf_counter() - started_at) * 1000:.3f}",
                 }
             )
             _append_receipt(history, receipt)
@@ -209,7 +242,12 @@ def commit_note_change(
     return execute_vault_mutation(vault_dir, mutate)
 
 
-def apply_change(vault_dir: Path, proposal: dict[str, str], approved: bool) -> dict[str, str]:
+def apply_change(
+    vault_dir: Path,
+    proposal: dict[str, str],
+    approved: bool,
+    idempotency_key: str | None = None,
+) -> dict[str, str]:
     """Apply an approved proposal through the shared mutation boundary."""
     if not approved:
         raise PermissionError("proposal requires explicit approved=True")
@@ -226,6 +264,9 @@ def apply_change(vault_dir: Path, proposal: dict[str, str], approved: bool) -> d
     before_sha256 = values["before_sha256"]
     after_sha256 = values["after_sha256"]
     proposal_id = values["proposal_id"]
+    proposal_key = proposal.get("idempotency_key")
+    if proposal_key is not None and not isinstance(proposal_key, str):
+        raise ValueError("proposal field 'idempotency_key' must be a string")
     for field, digest in (("before_sha256", before_sha256), ("after_sha256", after_sha256)):
         if not _is_sha256(digest):
             raise ValueError(f"proposal field '{field}' must be a SHA-256 hex digest")
@@ -244,6 +285,13 @@ def apply_change(vault_dir: Path, proposal: dict[str, str], approved: bool) -> d
     stored = _read_proposal_file(_proposal_path(vault_dir, proposal_id))
     if _proposal_payload(stored) != payload:
         raise ValueError("proposal does not match its durable record")
+    stored_key = _proposal_idempotency_key(stored)
+    if proposal_key is not None and proposal_key != stored_key:
+        raise ValueError("proposal idempotency key does not match its durable record")
+    if idempotency_key is not None:
+        _validate_idempotency_key(idempotency_key)
+        if idempotency_key != stored_key:
+            raise ValueError("idempotency key does not match its durable proposal")
     return commit_note_change(
         vault_dir,
         rel_path,
@@ -252,12 +300,18 @@ def apply_change(vault_dir: Path, proposal: dict[str, str], approved: bool) -> d
         allowed_directories=PARA_FOLDERS,
         operation="memory.apply",
         proposal_id=proposal_id,
+        idempotency_key=stored_key,
     )
 
 
 def _is_sha256(value: str) -> bool:
     """Return whether a value is a lowercase SHA-256 hex digest."""
     return len(value) == 64 and all(character in "0123456789abcdef" for character in value)
+
+
+def _validate_idempotency_key(value: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", value):
+        raise ValueError("idempotency_key must be a safe token")
 
 
 def _proposal_payload(proposal: dict[str, object]) -> dict[str, str]:
@@ -298,7 +352,18 @@ def _read_proposal_file(path: Path) -> dict[str, object]:
         raise ValueError("durable proposal has an invalid proposal_id")
     if _proposal_id(payload) != stored_id:
         raise ValueError("durable proposal content address does not match")
+    _proposal_idempotency_key(proposal)
     return proposal
+
+
+def _proposal_idempotency_key(proposal: dict[str, object]) -> str:
+    """Read the key while preserving compatibility with v3.4.2 proposals."""
+    proposal_id = proposal.get("proposal_id")
+    key = proposal.get("idempotency_key", proposal_id)
+    if not isinstance(key, str):
+        raise ValueError("durable proposal has an invalid idempotency_key")
+    _validate_idempotency_key(key)
+    return key
 
 
 def _public_proposal(proposal: dict[str, object]) -> dict[str, str]:
@@ -310,7 +375,12 @@ def _public_proposal(proposal: dict[str, object]) -> dict[str, str]:
         raise ValueError("proposal has an invalid proposal_id")
     if not isinstance(created_at, str):
         raise ValueError("proposal has an invalid created_at")
-    return {**payload, "proposal_id": proposal_id, "created_at": created_at}
+    return {
+        **payload,
+        "proposal_id": proposal_id,
+        "idempotency_key": _proposal_idempotency_key(proposal),
+        "created_at": created_at,
+    }
 
 
 def _capture_file(path: Path) -> _FileSnapshot:
@@ -375,6 +445,29 @@ def _append_receipt(history: Path, receipt: dict[str, str]) -> None:
     history.parent.mkdir(parents=True, exist_ok=True)
     previous = history.read_text(encoding="utf-8") if history.exists() else ""
     atomic_write(history, previous + json.dumps(receipt, sort_keys=True) + "\n")
+
+
+def _find_idempotent_receipt(vault_dir: Path, idempotency_key: str) -> dict[str, str] | None:
+    """Find one prior receipt without treating malformed history as success."""
+    history = vault_dir / ".power" / "memory-history.jsonl"
+    if not history.exists():
+        return None
+    try:
+        lines = history.read_text(encoding="utf-8").splitlines()
+        records = [json.loads(line) for line in lines if line]
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("memory history is unreadable; refusing idempotent replay") from exc
+    for record in records:
+        if not isinstance(record, dict):
+            raise RuntimeError("memory history contains an invalid receipt")
+        if not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in record.items()
+        ):
+            raise RuntimeError("memory history contains a non-content-free receipt")
+        if record.get("idempotency_key") != idempotency_key:
+            continue
+        return record
+    return None
 
 
 def _append_text(path: Path, entry: str) -> None:

@@ -17,6 +17,14 @@ from __future__ import annotations
 from .chunker import SemanticChunker
 from .cli import main as cli_main
 from .embeddings import get_embedding_manager
+from .handoff import (
+    WorkPacket,
+    WorkPacketState,
+    advance_work_packet,
+    create_work_packet,
+    list_work_packets,
+    read_work_packet,
+)
 from .healer import HealFailure, HealReport, heal_frontmatter, heal_vault, heal_vault_report
 from .indexer import (
     generate_index_content,
@@ -165,8 +173,11 @@ __all__ = [
     "TemporalView",
     "TypedRelation",
     "UsageTracker",
+    "WorkPacket",
+    "WorkPacketState",
     "WritePolicy",
     "__version__",
+    "advance_work_packet",
     "apply_change",
     "archive_stale_notes",
     "atomic_write",
@@ -181,6 +192,7 @@ __all__ = [
     "cli_main",
     "commit_note_change",
     "create_backup",
+    "create_work_packet",
     "enqueue_write",
     "extract_frontmatter_raw",
     "fix_all",
@@ -200,6 +212,7 @@ __all__ = [
     "heal_frontmatter",
     "heal_vault",
     "heal_vault_report",
+    "list_work_packets",
     "normalize_as_of",
     "normalize_search_mode",
     "normalize_temporal_view",
@@ -207,6 +220,7 @@ __all__ = [
     "propose_change",
     "read_file_content",
     "read_history",
+    "read_work_packet",
     "resolve_path_in_vault",
     "resolve_vault_path",
     "run_blocking",

@@ -33,6 +33,12 @@ from .domains import (
     render_domain_template,
     route_domain,
 )
+from .handoff import (
+    advance_work_packet,
+    create_work_packet,
+    list_work_packets,
+    read_work_packet,
+)
 from .healer import heal_vault_report
 from .ignore import should_skip
 from .importer import (
@@ -768,6 +774,59 @@ def _cmd_memory(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_handoff(args: argparse.Namespace) -> int:
+    """Create, inspect, or advance one durable cross-agent work packet."""
+    vault_dir = _resolve_path(args.path)
+    try:
+        if args.handoff_command == "create":
+            result = create_work_packet(
+                vault_dir,
+                task_id=args.task_id,
+                objective=args.objective,
+                owner=args.owner,
+                actor=args.actor,
+                scope=args.scope,
+                authority=args.authority,
+                source_revision=args.source_revision,
+                next_action=args.next_action,
+                profile=args.profile,
+                required_approval=args.required_approval,
+                idempotency_key=args.idempotency_key,
+            )
+        elif args.handoff_command == "show":
+            result = read_work_packet(vault_dir, args.task_id)
+        elif args.handoff_command == "list":
+            result = {"packets": list_work_packets(vault_dir)}
+        else:
+            result = advance_work_packet(
+                vault_dir,
+                args.task_id,
+                action=args.handoff_command,
+                idempotency_key=args.idempotency_key,
+                actor=args.actor,
+                approved=args.approved,
+                next_action=args.next_action,
+                blocker=args.blocker,
+                required_approval=args.required_approval,
+                receipt_id=args.receipt_id,
+                changed_artifacts=args.changed_artifacts,
+                open_gates=args.open_gates,
+                phase=args.phase,
+            )
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        logger.error("Handoff transaction failed: %s", exc)
+        return 1
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def main() -> None:
     """P.O.W.E.R. CLI entry point."""
     _configure_windows_utf8_streams()
@@ -967,6 +1026,54 @@ def main() -> None:
     p_history = memory_sub.add_parser("history")
     p_history.add_argument("path")
     p_memory.set_defaults(func=_cmd_memory)
+
+    p_handoff = subparsers.add_parser(
+        "handoff", help="Persist and advance a durable cross-agent work packet"
+    )
+    handoff_sub = p_handoff.add_subparsers(dest="handoff_command", required=True)
+    p_handoff_create = handoff_sub.add_parser("create")
+    p_handoff_create.add_argument("path")
+    p_handoff_create.add_argument("--task-id", required=True)
+    p_handoff_create.add_argument("--objective", required=True)
+    p_handoff_create.add_argument("--owner", required=True)
+    p_handoff_create.add_argument("--actor", required=True)
+    p_handoff_create.add_argument("--scope", nargs="*", default=[])
+    p_handoff_create.add_argument(
+        "--authority", choices=["read-only", "propose", "apply"], default="read-only"
+    )
+    p_handoff_create.add_argument("--source-revision", default="unknown")
+    p_handoff_create.add_argument("--next-action", default="inspect")
+    p_handoff_create.add_argument(
+        "--profile", choices=["standard", "maintenance"], default="standard"
+    )
+    p_handoff_create.add_argument("--required-approval", default=None)
+    p_handoff_create.add_argument("--idempotency-key", default=None)
+    p_handoff_create.set_defaults(func=_cmd_handoff)
+
+    p_handoff_list = handoff_sub.add_parser("list")
+    p_handoff_list.add_argument("path")
+    p_handoff_list.set_defaults(func=_cmd_handoff)
+
+    p_handoff_show = handoff_sub.add_parser("show")
+    p_handoff_show.add_argument("path")
+    p_handoff_show.add_argument("--task-id", required=True)
+    p_handoff_show.set_defaults(func=_cmd_handoff)
+
+    for handoff_action in ("resume", "checkpoint", "input-required", "complete", "fail", "cancel"):
+        transition = handoff_sub.add_parser(handoff_action)
+        transition.add_argument("path")
+        transition.add_argument("--task-id", required=True)
+        transition.add_argument("--idempotency-key", required=True)
+        transition.add_argument("--actor", required=True)
+        transition.add_argument("--approved", action="store_true")
+        transition.add_argument("--next-action", default=None)
+        transition.add_argument("--blocker", default=None)
+        transition.add_argument("--required-approval", default=None)
+        transition.add_argument("--receipt-id", default=None)
+        transition.add_argument("--changed-artifacts", nargs="*", default=None)
+        transition.add_argument("--open-gates", nargs="*", default=None)
+        transition.add_argument("--phase", default=None)
+        transition.set_defaults(func=_cmd_handoff)
 
     p_sync = subparsers.add_parser(
         "sync", help="Build the search index for the vault (FTS + dense embeddings)"

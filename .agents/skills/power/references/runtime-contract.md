@@ -6,9 +6,9 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.4.0` — runtime contract: **19 CLI commands** + **18 MCP tools** (FastMCP 3.x).
+`v3.4.0` — runtime contract: **20 CLI commands** + **19 MCP tools** (FastMCP 3.x).
 
-## CLI (19 команд)
+## CLI (20 команд)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
@@ -18,19 +18,20 @@ sync/doctor правила. Авторитетна правда — `power docto
 6. `power search <path> <query>` — пошук (`semantic` за замовчуванням)
 7. `power cache list|prune [--no-dry-run] [--include-unknown]` — аудит і очищення cache namespace
 8. `power memory <sub> <path>` — керована транзакційна пам'ять
-9. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
-10. `power rot <path> [--extended]` — ROT аудит (дублікати, застарілі, тривіальні)
-11. `power archive <path> [--dry-run|--no-dry-run]` — архівування застарілих нотаток
-12. `power status [<path>]` — панель стану vault
-13. `power cron <path>` — автоматичне обслуговування (lint + index + rot)
-14. `power heal <path>` — автовиправлення frontmatter
-15. `power markdown-check <path>` — перевірка якості Markdown
-16. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
-17. `power synthesize <path>` — підсумкова нотатка сесії
-18. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
-19. `power doctor [<path>] [--json]` — read-only діагностика runtime, ONNX provider, індексу та ledger виключених нотаток
+9. `power handoff <create|list|show|resume|checkpoint|input-required|complete|fail|cancel>` — durable cross-agent work packet
+10. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
+11. `power rot <path> [--extended]` — ROT аудит (дублікати, застарілі, тривіальні)
+12. `power archive <path> [--dry-run|--no-dry-run]` — архівування застарілих нотаток
+13. `power status [<path>]` — панель стану vault
+14. `power cron <path>` — автоматичне обслуговування (lint + index + rot)
+15. `power heal <path>` — автовиправлення frontmatter
+16. `power markdown-check <path>` — перевірка якості Markdown
+17. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
+18. `power synthesize <path>` — підсумкова нотатка сесії
+19. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
+20. `power doctor [<path>] [--json]` — read-only діагностика runtime, ONNX provider, індексу та ledger виключених нотаток
 
-## MCP Tools (18) — FastMCP 3.x
+## MCP Tools (19) — FastMCP 3.x
 
 - Індекси й каталог: `generate_index`, `read_sub_index`, `ensure_sub_index`
 - Запис: `ingest_note`, `synthesize_session`
@@ -39,6 +40,8 @@ sync/doctor правила. Авторитетна правда — `power docto
 - Обслуговування: `rot_audit`, `archive_notes`
 - Керована пам'ять: `get_memory_context`, `propose_memory_change`,
   `apply_memory_change`, `validate_memory_state`, `read_memory_history`
+- Handoff: `handoff_work` — content-free Markdown packet, checkpoints,
+  resume/cancel/input-required semantics та idempotency keys
 
 **Канонічний запис замикає пошук.** `ingest_note`, `synthesize_session` та
 `apply_memory_change` в одному transaction workflow оновлюють note, index,
@@ -57,6 +60,14 @@ FTS generation і receipt має `search_mode=fts`.
 `.power/proposals/<proposal_id>.json`. Це окремий керований ledger: proposal
 можна переглядати й схвалювати, але він не пише target note, catalog або search.
 `apply_memory_change` приймає лише payload, що відповідає durable record.
+Повторний apply з тим самим `idempotency_key` повертає попередній receipt без
+дублювання note або history entry. Receipt має `receipt_schema`, `trace_id`,
+`span_id`, `status` і `duration_ms`; усі поля залишаються content-free.
+
+`handoff_work` змінює лише packet state і immutable checkpoints; він ніколи не
+виконує `next_action`. Retrieved note text є untrusted data і не підвищує
+authority. Maintenance profile проходить `detect → dry-run → repair → verify →
+receipt`, а repair потребує explicit approval.
 
 ## Sync contract
 

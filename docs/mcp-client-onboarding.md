@@ -141,9 +141,9 @@ After changing a client configuration, restart or reload that client. The
 first task is read-only until the explicit proposal step:
 
 1. Open the client's MCP status view (`/mcp` where supported) and confirm that
-   `power` is connected and exposes 18 tools.
+   `power` is connected and exposes 19 tools.
 2. Ask the agent to list tools, resources, resource templates, and prompts.
-   POWER should expose 18 tools and no resources, templates, or prompts.
+   POWER should expose 19 tools and no resources, templates, or prompts.
 3. Ask the agent to call `get_memory_context` for a short query. This must not
    create a file, namespace, index, or history entry.
 4. Ask the agent to call `propose_memory_change` for a new note, but do not

@@ -701,6 +701,48 @@ def test_memory_apply_cli_publishes_search_projection(sample_vault, capsys) -> N
     assert "search_generation" in capsys.readouterr().out
 
 
+def test_handoff_cli_persists_and_resumes_packet(sample_vault, capsys) -> None:
+    from unittest.mock import patch
+
+    commands = [
+        [
+            "power",
+            "handoff",
+            "create",
+            str(sample_vault),
+            "--task-id",
+            "cli-handoff",
+            "--objective",
+            "Continue the verified workflow",
+            "--owner",
+            "human",
+            "--actor",
+            "agent-a",
+        ],
+        [
+            "power",
+            "handoff",
+            "resume",
+            str(sample_vault),
+            "--task-id",
+            "cli-handoff",
+            "--idempotency-key",
+            "cli-resume-1",
+            "--actor",
+            "agent-b",
+        ],
+    ]
+    for argv in commands:
+        with patch.object(sys, "argv", argv), pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code == 0
+
+    result = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert result["state"] == "working"
+    assert result["checkpoint"] == 1
+    assert (sample_vault / ".power" / "work-packets" / "cli-handoff.md").exists()
+
+
 class TestFtsOnlyDenseGuard:
     """`--fts-only` must not silently discard an existing dense index.
 

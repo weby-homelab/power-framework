@@ -6,7 +6,7 @@ This reference is aligned with the executable P.O.W.E.R. `v3.4.0` parser.
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,import,search,cache,doctor,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,cache,doctor,memory,handoff,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -177,6 +177,39 @@ and record a content-free receipt. If any phase fails, the note, generated
 catalogs, history, and active search projection are restored. A vault with an
 active dense projection refreshes it; a vault without one publishes FTS and
 reports `search_mode=fts` in the receipt. History never returns note content.
+The proposal and receipt also carry an `idempotency_key`; replaying the same
+approved proposal returns the original receipt without duplicating the note or
+history entry.
+
+### `handoff`
+
+Persist and advance one durable, content-free work packet for another agent.
+The packet is Markdown under `.power/work-packets/`, with immutable checkpoint
+copies. POWER records state and approval requirements but never executes the
+packet's `next_action`.
+
+```text
+power handoff create PATH --task-id ID --objective TEXT --owner OWNER --actor ACTOR
+                           [--scope PATH ...] [--authority read-only|propose|apply]
+                           [--source-revision SHA] [--next-action TEXT]
+                           [--profile standard|maintenance]
+                           [--required-approval CLASS] [--idempotency-key KEY]
+power handoff list PATH
+power handoff show PATH --task-id ID
+power handoff {resume,checkpoint,input-required,complete,fail,cancel} PATH
+                           --task-id ID --idempotency-key KEY --actor ACTOR
+                           [--approved] [--next-action TEXT] [--blocker TEXT]
+                           [--required-approval CLASS] [--receipt-id ID]
+                           [--changed-artifacts PATH ...] [--open-gates GATE ...]
+                           [--phase detect|dry-run|repair|verify|receipt]
+```
+
+`resume`, `checkpoint`, and terminal transitions are idempotent by key.
+`input-required` records a blocker; resuming it requires explicit approval.
+The `maintenance` profile enforces `detect → dry-run → repair → verify →
+receipt`, and `repair` requires explicit approval. Packet fields contain
+metadata, paths, gate names, and receipt IDs only; retrieved note text remains
+untrusted data and is never an instruction channel.
 
 ### `sync`
 

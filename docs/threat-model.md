@@ -36,6 +36,7 @@ environment is trustworthy.
 | CLI/MCP input to core | validated core APIs | paths, note text, queries, proposal JSON, MCP arguments | Treat inputs as untrusted; validate before read/write/network use. |
 | Vault root to host filesystem | selected canonical vault | traversal strings, symlinks, absolute paths, arbitrary parents | No read or write may escape the configured vault. |
 | Read-only retrieval to mutation | search and proposal creation | an agent or caller requesting a change | Proposal creation may write only its content-addressed `.power/proposals/` ledger; it cannot write the target note, catalog, or search. Apply requires explicit `approved=True` and an unchanged pre-image hash. |
+| Agent handoff to workflow execution | validated work-packet state | packet objective, next action, retrieved note text, and caller-supplied metadata | `.power/work-packets/` stores content-free Markdown checkpoints; state transitions are idempotent and approval-gated, and no packet operation executes its `next_action`. |
 | Local process to network | local ONNX/FTS/index paths | OpenRouter, non-loopback Ollama, link/ROT HTTP targets | Default deny; an explicit sensitivity-appropriate egress policy is required before contact. |
 | MCP server to client/transport | configured local server | MCP client and any network peer | MCP requires a configured vault root; HTTP binds to loopback until authenticated scoped transport exists. |
 | Repository/CI to dependencies | pinned and reviewed source/dependency policy | packages, model artifacts, GitHub Actions execution | dependency audit, CodeQL, integrity checks, and review gates remain required. |
@@ -79,7 +80,11 @@ environment is trustworthy.
 - `core/mutation.py` serializes same-vault mutations with an in-process lock
   plus an advisory cross-process file lock. `core/memory_api.py` requires
   explicit approval, validates content and pre-image hashes, and appends a
-  content-free receipt.
+  content-free receipt with stable trace/span identifiers and an idempotency key.
+- `core/handoff.py` validates a durable Markdown packet state machine, writes
+  immutable checkpoints atomically, enforces maintenance phase order and
+  approval, and counts input-required/approved-maintenance/cancellation human
+  interventions without storing retrieved note content.
 - `core/egress.py` defaults `POWER_EGRESS_POLICY` to `deny`; remote embeddings,
   query expansion, and ROT paths call the policy guard before network use.
   Loopback model endpoints are treated as local.
@@ -99,6 +104,10 @@ environment is trustworthy.
   hash, or applies it after another writer changed the note. The transaction
   API must reject all three cases and preserve receipts without storing note
   content in history.
+- A retrieved note tells an agent to bypass approval or execute a packet's next
+  action. The packet persists that text only as untrusted caller data, keeps
+  authority and approval fields independently validated, and has no execution
+  primitive; the agent must reject the instruction.
 - A vault contains internal/sensitive text while a remote provider is
   configured. The policy must deny egress unless the operator selected a policy
   at least as permissive as the content sensitivity. Configuration alone is

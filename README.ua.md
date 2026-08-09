@@ -29,7 +29,7 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Knowledge Graph** — поле `related` зв'язує нотатки між собою для Graph RAG
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
-- **MCP-нативний** — 18 інструментів доступні MCP-сумісним AI-клієнтам через FastMCP 3.x
+- **MCP-нативний** — 19 інструментів доступні MCP-сумісним AI-клієнтам через FastMCP 3.x
 - **Windows-safe rename** — `power rename` використовує `os.replace()` для
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
@@ -45,8 +45,8 @@ P.O.W.E.R. створений для роботи як людьми, так і A
   vault, executable acceptance gate, FTS і MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.ua.md)** — повне
   PowerShell-встановлення, Visual C++ prerequisite, точні interpreter paths і checks
-- **[CLI reference](docs/cli.md)** — усі 19 команд, flags і реальна exit behavior
-- **[MCP server](docs/mcp-server.md)** — усі 18 governed tools, rate limits,
+- **[CLI reference](docs/cli.md)** — усі 20 команд, flags і реальна exit behavior
+- **[MCP server](docs/mcp-server.md)** — усі 19 governed tools, rate limits,
   configured-vault boundary і untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.ua.md)** — 6-фазна manifest/hash-driven
   міграція з будь-якої Markdown source methodology у canonical POWER vault
@@ -103,8 +103,8 @@ rollback і uninstall.
 
 | Функція                          | Що робить                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **CLI**                          | 19 команд, включно з `power doctor` для read-only діагностики runtime/index, `power cache` для гігієни namespace, `power import` для preflighted Markdown migration та `power memory` для явного proposal, approval, validation та history                                                                                                                                                                                                                                                                                           |
-| **MCP Server**                   | 18 інструментів, включно з керованими операціями memory context, proposal, apply, validation та history                                                                                                                                                                                                                                                                                                                                                                              |
+| **CLI**                          | 20 команд, включно з `power doctor` для read-only діагностики runtime/index, `power cache` для гігієни namespace, `power import` для preflighted Markdown migration, `power memory` для явного proposal/approval та `power handoff` для durable cross-agent work packets                                                                                                                                                                                                                                                                                           |
+| **MCP Server**                   | 19 інструментів, включно з керованими операціями memory context, proposal, apply, validation, history та `handoff_work`                                                                                                                                                                                                                                                                                                                                                                              |
 | **OKF Validation**               | Pydantic v2 схеми забезпечують строгі OKF-метадані на кожній нотатці з governance-полями (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                               |
 | **Knowledge Graph (Graph RAG)**  | Поле `related` в OKF frontmatter з підтримкою `TypedRelation` (path, relation, confidence), BFS обходом та експортом підграфів у Mermaid-діаграми (`to_mermaid`)                                                                                                                                                                                                                                                                                                                     |
 | **Freshness Monitoring**         | Лінтер виявляє застарілі нотатки за полем `expiry`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -417,7 +417,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI-Агент (FastMCP 3.x)"]
-        Tools[["🔌 18 асинхронних інструментів MCP"]]:::agent
+        Tools[["🔌 19 асинхронних інструментів MCP"]]:::agent
         Search[["🔍 Гібридний / Reranked пошук"]]:::agent
         ROT{{"🛠️ Аудит ROT та суперечностей (Semantic/LLM)"}}:::agent
     end
@@ -485,8 +485,8 @@ flowchart TD
 | `core/markdown_checks.py`                 | Перевірки якості Markdown: trailing whitespace, списки, заголовки                                                                                                                                                                                      |
 | `core/constants.py`                       | Централізовані списки виключень та системні константи                                                                                                                                                                                                  |
 | `core/utils.py`                           | Захист від path traversal, атомарний запис, бекапи, rate limiter                                                                                                                                                                                       |
-| `core/cli.py`                             | Командний рядок із 19 командами, включно з read-only doctor diagnostics, cache hygiene, preflighted import і transactional memory workflows                                                                                                                               |
-| `mcp/power_server.py`                     | FastMCP 3.x сервер із 18 async tools, loopback HTTP transport та `/health`                                                                                                                                                                             |
+| `core/cli.py`                             | Командний рядок із 20 командами, включно з read-only doctor diagnostics, cache hygiene, preflighted import, transactional memory і durable handoff workflows                                                                                                                               |
+| `mcp/power_server.py`                     | FastMCP 3.x сервер із 19 async tools, loopback HTTP transport та `/health`                                                                                                                                                                             |
 
 Всі компоненти використовують `power_framework.core` як єдине джерело правди.
 

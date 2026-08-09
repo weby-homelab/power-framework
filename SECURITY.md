@@ -57,6 +57,12 @@ The following boundaries are part of the current contract:
   creation is an explicit, non-destructive ledger write limited to the
   content-addressed `.power/proposals/` record; it cannot write the target note,
   catalog, or search projection.
+- Durable work packets are control-plane Markdown under `.power/work-packets/`.
+  They contain only state, authority, paths, gate names, receipt IDs, and the
+  next action; `handoff_work` and `power handoff` never execute that action.
+  Repeated calls with one idempotency key return the original checkpoint or
+  receipt, and maintenance repair/cancel/input-required transitions enforce
+  explicit approval.
 
 Retrieved text, generated catalogs, model output, remote responses, and error
 messages must be treated as untrusted data at every downstream boundary. Logs,
@@ -75,7 +81,11 @@ CI gates:
   being treated as executable input.
 - Mutation APIs use same-vault serialization, explicit approval for governed
   memory changes, durable content-addressed proposals, pre-image hashes, and
-  content-free receipts.
+  content-free receipts with stable trace/span identifiers and idempotency keys.
+- Work-packet state transitions are schema-validated and checkpointed
+  atomically; retrieved text remains in the untrusted-data boundary, and human
+  intervention is counted from `input-required`, approved repair, and approved
+  cancellation transitions rather than inferred from note text.
 - `POWER_EGRESS_POLICY` is checked before remote operations and rejects unknown
   policy or sensitivity values.
 - The MCP server requires a configured vault root, constrains tool paths and
