@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .chunker import SemanticChunker
+from .constants import is_catalog_filename
 from .db import _init_db
 from .domains import DomainConfigError, resolve_search_policy
 from .embeddings import configured_embedding_identity, get_embedding_manager
@@ -357,7 +358,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
     results: list[SearchResult] = []
 
     for filepath in vault_dir.rglob("*.md"):
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
@@ -434,7 +435,9 @@ def _sync_vault_to_db(
 
     disk_files: dict[str, float] = {}
     for filepath in vault_dir.rglob("*.md"):
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+        # Generated catalogs are navigation, not knowledge. Keep every page
+        # out of both sparse and dense indexes, including `_index-N.md` pages.
+        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
@@ -1102,7 +1105,9 @@ def _semantic_search(
         conn = _open_readonly_db(db_path)
 
         cursor = conn.cursor()
-        cursor.execute("SELECT rel_path, embedding, content FROM chunk_embeddings")
+        # Chunk text is needed only for the few winners that become snippets.
+        # Avoid pulling the whole corpus body through SQLite on every query.
+        cursor.execute("SELECT chunk_id, rel_path, embedding FROM chunk_embeddings")
         rows = cursor.fetchall()
     except Exception as exc:
         _dense_failure(f"db error: {type(exc).__name__}")
@@ -1120,36 +1125,57 @@ def _semantic_search(
     if q_norm == 0:
         _dense_failure("zero query embedding")
 
-    chunk_scores: list[tuple[float, str, str]] = []
-    for rel_path, blob, content in rows:
-        try:
-            dim = len(blob) // 4
-            chunk_vec = np.frombuffer(blob, dtype=np.float32)
-            if chunk_vec.shape[0] != dim:
-                continue
-        except Exception:  # noqa: S112
-            continue
+    # Score the complete corpus in one matrix multiplication. The former code
+    # vectorized only the inner dimension and still paid Python/NumPy dispatch
+    # once per chunk.
+    dim = int(q_arr.shape[0])
+    expected_bytes = dim * 4
+    usable = [row for row in rows if len(row[2]) == expected_bytes]
+    if not usable:
+        _dense_failure(f"no dense vectors of width {dim}")
 
-        # Vectorized cosine similarity (Performance Plan §5): one dot + norm
-        # instead of a Python loop over every dimension.
-        d_norm = float(np.linalg.norm(chunk_vec))
-        if d_norm == 0:
-            continue
-        similarity = float(np.dot(q_arr, chunk_vec) / (q_norm * d_norm))
-        if similarity <= 0:
-            continue
-        chunk_scores.append((similarity, rel_path, content))
+    matrix = np.frombuffer(b"".join(row[2] for row in usable), dtype=np.float32).reshape(
+        len(usable), dim
+    )
+    norms = np.linalg.norm(matrix, axis=1)
+    similarities = np.zeros(len(usable), dtype=np.float32)
+    np.divide(matrix @ q_arr, norms * q_norm, out=similarities, where=norms > 0)
+
+    chunk_scores: list[tuple[float, str, str]] = [
+        (float(similarities[i]), usable[i][1], usable[i][0])
+        for i in np.nonzero(similarities > 0)[0]
+    ]
 
     if not chunk_scores:
         return []
 
     doc_best: dict[str, tuple[float, str]] = {}
-    for similarity, rel_path, content in chunk_scores:
+    for similarity, rel_path, chunk_id in chunk_scores:
         if rel_path not in doc_best or similarity > doc_best[rel_path][0]:
-            doc_best[rel_path] = (similarity, content)
+            doc_best[rel_path] = (similarity, chunk_id)
 
     scored_docs = sorted(doc_best.items(), key=lambda x: -x[1][0])
     top_paths = [rel for rel, _ in scored_docs[:max_results]]
+
+    snippets: dict[str, str] = {}
+    wanted = [doc_best[rel][1] for rel in top_paths]
+    if wanted:
+        conn = None
+        try:
+            conn = _open_readonly_db(db_path)
+            placeholders = ",".join("?" * len(wanted))
+            snippets = dict(
+                conn.execute(
+                    f"SELECT chunk_id, content FROM chunk_embeddings "  # noqa: S608
+                    f"WHERE chunk_id IN ({placeholders})",
+                    wanted,
+                ).fetchall()
+            )
+        except Exception as exc:
+            _dense_failure(f"db error: {type(exc).__name__}")
+        finally:
+            if conn is not None:
+                conn.close()
 
     results: list[SearchResult] = []
     for rel_path in top_paths:
@@ -1159,7 +1185,7 @@ def _semantic_search(
             metadata = validate_metadata(content)
             if metadata is None:
                 continue
-            similarity, snippet = doc_best[rel_path]
+            similarity, chunk_id = doc_best[rel_path]
             results.append(
                 SearchResult(
                     rel_path=rel_path,
@@ -1167,7 +1193,7 @@ def _semantic_search(
                     description=metadata.description,
                     note_type=metadata.type,
                     score=similarity,
-                    snippet=snippet,
+                    snippet=snippets.get(chunk_id, ""),
                     match_count=1,
                     tags=metadata.tags,
                 )

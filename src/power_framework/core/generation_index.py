@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .constants import is_catalog_filename
 from .db import _init_db
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
@@ -172,7 +173,7 @@ def _source_inventory(vault_dir: Path) -> SourceInventory:
     invalid_sources: dict[str, str] = {}
     total_scanned = 0
     for path in sorted(vault_dir.rglob("*.md")):
-        if path.name in {"index.md", "log.md", "_index.md"}:
+        if path.name in {"index.md", "log.md"} or is_catalog_filename(path.name):
             continue
         rel_path = path.relative_to(vault_dir).as_posix()
         if should_skip(vault_dir, rel_path):

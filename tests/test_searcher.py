@@ -256,6 +256,70 @@ class TestSearchModeContract:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master")}
         assert "dense_index_manifest" in tables
 
+    def test_dense_scan_ranks_by_cosine_and_preserves_winner_snippets(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        import struct
+
+        db_path = tmp_path / "index.db"
+        monkeypatch.setattr(
+            "power_framework.core.searcher._read_db_path", lambda _vault=None: db_path
+        )
+        monkeypatch.setattr(
+            "power_framework.core.searcher.configured_embedding_identity",
+            lambda: ("PinnedProvider", "example/model@revision"),
+        )
+
+        class _Embedder:
+            def embed(self, _query):
+                return [1.0, 0.0, 0.0, 0.0]
+
+        monkeypatch.setattr(
+            "power_framework.core.searcher.get_embedding_manager", lambda: _Embedder()
+        )
+
+        for name in ("near.md", "far.md", "orthogonal.md"):
+            (tmp_path / name).write_text(
+                "---\n"
+                "type: Resource\n"
+                f'title: "{name}"\n'
+                'description: "d"\n'
+                "timestamp: 2026-07-21T00:00:00Z\n"
+                "---\n\nbody\n",
+                encoding="utf-8",
+            )
+
+        def vec(*values):
+            return struct.pack(f"<{len(values)}f", *values)
+
+        with closing(sqlite3.connect(db_path)) as conn:
+            _init_db(conn)
+            conn.executemany(
+                "INSERT INTO chunk_embeddings VALUES (?, ?, ?, ?, ?)",
+                [
+                    ("c1", "near.md", vec(1.0, 0.0, 0.0, 0.0), "near", 0.0),
+                    ("c2", "far.md", vec(0.3, 0.95, 0.0, 0.0), "far", 0.0),
+                    ("c3", "orthogonal.md", vec(0.0, 0.0, 1.0, 0.0), "orth", 0.0),
+                ],
+            )
+            conn.executemany(
+                "INSERT INTO dense_index_manifest VALUES (?, ?)",
+                [
+                    ("schema_version", "2"),
+                    ("embedding_dimension", "4"),
+                    ("chunk_count", "3"),
+                    ("embedding_provider", "PinnedProvider"),
+                    ("embedding_model", "example/model@revision"),
+                ],
+            )
+            conn.commit()
+
+        results = _semantic_search(tmp_path, "query", max_results=5)
+
+        assert [result.rel_path for result in results] == ["near.md", "far.md"]
+        assert results[0].score > results[1].score
+        assert [result.snippet for result in results] == ["near", "far"]
+
     def test_dense_index_validation_requires_matching_manifest(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -919,6 +983,37 @@ class TestVectorSearch:
         assert conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM dense_index_manifest").fetchone()[0] == 0
         conn.close()
+
+    def test_generated_catalog_pages_never_enter_the_index(self, tmp_path: Path):
+        folder = tmp_path / "03_Resources"
+        folder.mkdir(parents=True)
+        catalog = (
+            "---\n"
+            "type: System Guide\n"
+            'title: "03 Resources Sub-Index"\n'
+            'description: "Detailed catalog of all notes in 03 Resources"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "x-generated-by: power\n"
+            "---\n\n# catalog\n"
+        )
+        for name in ("_index.md", "_index-2.md", "_index-17.md"):
+            (folder / name).write_text(catalog, encoding="utf-8")
+        (folder / "Real Note.md").write_text(
+            "---\n"
+            "type: Resource\n"
+            'title: "Real Note"\n'
+            'description: "Actual knowledge"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "---\n\nbody\n",
+            encoding="utf-8",
+        )
+
+        with closing(sqlite3.connect(tmp_path / "search.db")) as conn:
+            _init_db(conn)
+            _sync_vault_to_db(tmp_path, conn, sync_embeddings=False)
+            indexed = {row[0] for row in conn.execute("SELECT rel_path FROM file_metadata")}
+
+        assert indexed == {"03_Resources/Real Note.md"}
 
     def test_finds_relevant_note(self, sample_vault: Path):
         results = _vector_search(sample_vault, "project architecture")

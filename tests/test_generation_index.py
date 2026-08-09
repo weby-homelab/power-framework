@@ -249,6 +249,34 @@ def test_invalid_sources_are_explicitly_recorded(
     assert (invalid_count, reason) == (1, "invalid_metadata")
 
 
+def test_generated_catalog_pages_are_outside_generation_coverage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "catalog-boundary", "valid-token")
+    catalog = (
+        "---\n"
+        "type: System Guide\n"
+        'title: "Generated catalog"\n'
+        'description: "Navigation only"\n'
+        "timestamp: 2026-07-27T00:00:00Z\n"
+        "x-generated-by: power\n"
+        "---\n\n# catalog\n"
+    )
+    catalog_dir = vault / "03_Resources"
+    catalog_dir.mkdir(parents=True)
+    for name in ("_index.md", "_index-2.md", "_index-17.md"):
+        (catalog_dir / name).write_text(catalog, encoding="utf-8")
+
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert (report.total_scanned, report.expected_files, report.actual_files) == (1, 1, 1)
+    assert report.excluded_sources == {}
+    with closing(sqlite3.connect(_active_db(vault))) as conn:
+        indexed = {row[0] for row in conn.execute("SELECT rel_path FROM file_metadata")}
+    assert indexed == {"01_Projects/Test.md"}
+
+
 def test_sync_can_fail_closed_before_publishing_excluded_sources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
