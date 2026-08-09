@@ -294,11 +294,12 @@ class RateLimiter:
         return max(0, self.max_calls - active)
 
 
-def get_cache_dir() -> Path:
-    """Return the cache directory for power-framework (XDG-compliant)."""
+def get_cache_dir(*, create: bool = True) -> Path:
+    """Return the cache directory, optionally without creating it."""
     cache_home = os.getenv("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
     cache_dir = Path(cache_home) / "power-framework"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    if create:
+        cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 
 
