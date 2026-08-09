@@ -1120,25 +1120,32 @@ def _semantic_search(
     if q_norm == 0:
         _dense_failure("zero query embedding")
 
-    chunk_scores: list[tuple[float, str, str]] = []
-    for rel_path, blob, content in rows:
-        try:
-            dim = len(blob) // 4
-            chunk_vec = np.frombuffer(blob, dtype=np.float32)
-            if chunk_vec.shape[0] != dim:
-                continue
-        except Exception:  # noqa: S112
-            continue
+    # One matmul over the whole corpus instead of a Python loop over rows. The
+    # previous form vectorized the inner dimension but still paid interpreter
+    # and numpy-dispatch overhead per chunk, three calls at a time.
+    #
+    # Rows of another width are dropped rather than scored, so that `reshape`
+    # cannot raise on a ragged corpus. `validate_dense_index` already rejects a
+    # mixed-width index earlier, so this is a guard on the invariant rather than
+    # a reachable code path -- unlike the `chunk_vec.shape[0] != dim` check it
+    # replaces, which compared a value with itself and could never fire.
+    dim = int(q_arr.shape[0])
+    expected_bytes = dim * 4
+    usable = [row for row in rows if len(row[1]) == expected_bytes]
+    if not usable:
+        _dense_failure(f"no dense vectors of width {dim}")
 
-        # Vectorized cosine similarity (Performance Plan §5): one dot + norm
-        # instead of a Python loop over every dimension.
-        d_norm = float(np.linalg.norm(chunk_vec))
-        if d_norm == 0:
-            continue
-        similarity = float(np.dot(q_arr, chunk_vec) / (q_norm * d_norm))
-        if similarity <= 0:
-            continue
-        chunk_scores.append((similarity, rel_path, content))
+    matrix = np.frombuffer(b"".join(row[1] for row in usable), dtype=np.float32).reshape(
+        len(usable), dim
+    )
+    norms = np.linalg.norm(matrix, axis=1)
+    similarities = np.zeros(len(usable), dtype=np.float32)
+    np.divide(matrix @ q_arr, norms * q_norm, out=similarities, where=norms > 0)
+
+    chunk_scores: list[tuple[float, str, str]] = [
+        (float(similarities[i]), usable[i][0], usable[i][2])
+        for i in np.nonzero(similarities > 0)[0]
+    ]
 
     if not chunk_scores:
         return []
