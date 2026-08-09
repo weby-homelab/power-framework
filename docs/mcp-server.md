@@ -44,6 +44,11 @@ authenticated, scope-aware gateway and explicit threat model.
 
 ## Client configuration
 
+For the complete four-client setup and the golden read-only onboarding task,
+see [MCP client onboarding](mcp-client-onboarding.md). The examples below show
+the shared stdio shape; always use the exact interpreter where
+`power-framework` is installed.
+
 Point the client to the exact interpreter where `power-framework` is installed:
 
 ```json
