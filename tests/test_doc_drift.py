@@ -86,6 +86,17 @@ def test_interface_gate_rejects_stale_architecture_count() -> None:
     assert any("Architecture" in error and "19 CLI commands" in error for error in errors)
 
 
+def test_interface_gate_rejects_stale_readme_mcp_count() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    documents["README"] = documents["README"].replace("18 Async MCP Tools", "17 Async MCP Tools", 1)
+
+    errors = gate["check_interfaces"](documents, facts)
+
+    assert any("README" in error and "stale MCP tools count" in error for error in errors)
+
+
 def test_interface_gate_rejects_stale_getting_started_count() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()

@@ -283,10 +283,20 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
         mcp_count = mcp_count or f"{len(mcp_tools)} інструмент" in documents[label]
         if not mcp_count:
             errors.append(f"{label} does not declare all {len(mcp_tools)} MCP tools.")
-        if label == "README.ua" and re.search(
-            rf"\b(?!{len(mcp_tools)}\b)\d+ інструмент", documents[label]
-        ):
-            errors.append(f"{label} contains a stale MCP tools count.")
+        numeric_mcp_claims = re.findall(
+            r"\b(\d+)(?:[- ]+)?(?:Async )?MCP tools?\b", documents[label], re.I
+        )
+        numeric_mcp_claims.extend(
+            re.findall(r"\b(\d+)\s+MCP[- ]?інструмент(?:ів)?", documents[label], re.I)
+        )
+        numeric_mcp_claims.extend(
+            re.findall(r"\b(\d+)\s+інструмент(?:ів)?", documents[label], re.I)
+        )
+        errors.extend(
+            f"{label} contains stale MCP tools count `{claim}`; expected `{len(mcp_tools)}`."
+            for claim in numeric_mcp_claims
+            if int(claim) != len(mcp_tools)
+        )
     for label in ("Getting Started", "Getting Started UA"):
         mcp_count = re.search(rf"{len(mcp_tools)}(?:[- ]+)?(?:MCP )?tools?", documents[label], re.I)
         mcp_count = mcp_count or f"{len(mcp_tools)} інструмент" in documents[label]

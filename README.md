@@ -416,7 +416,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI Agent (FastMCP 3.x)"]
-        Tools[["🔌 17 Async MCP Tools (stdio/HTTP)"]]:::agent
+        Tools[["🔌 18 Async MCP Tools (stdio/HTTP)"]]:::agent
         Search[["🔍 Hybrid / Reranked Search"]]:::agent
         ROT{{"🛠️ ROT & Contradiction Audit (Semantic/LLM)"}}:::agent
     end
