@@ -273,27 +273,19 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
     if not mcp_count:
         errors.append(f"MCP does not declare all {len(mcp_tools)} MCP tools.")
     inventory = documents["Documentation inventory UA"]
-    if not re.search(
-        rf"\| `docs/cli\.md` \|.*\| {len(cli_commands)} команд \|", inventory
-    ):
-        errors.append(
-            "Documentation inventory UA does not declare the current CLI count."
-        )
+    if not re.search(rf"\| `docs/cli\.md` \|.*\| {len(cli_commands)} команд \|", inventory):
+        errors.append("Documentation inventory UA does not declare the current CLI count.")
     if not re.search(
         rf"\| `docs/mcp-server\.md` \|.*\| {len(mcp_tools)} інструментів \|",
         inventory,
     ):
-        errors.append(
-            "Documentation inventory UA does not declare the current MCP count."
-        )
+        errors.append("Documentation inventory UA does not declare the current MCP count.")
     expected_inventory_history = (
         f"- `12` MCP-інструментів замінено на фактичні `{len(mcp_tools)}`; "
         f"CLI задокументовано як `{len(cli_commands)}`"
     )
     if expected_inventory_history not in inventory:
-        errors.append(
-            "Documentation inventory UA contains a stale historical interface count."
-        )
+        errors.append("Documentation inventory UA contains a stale historical interface count.")
     holistic = documents["Holistic skill"]
     if f"all {len(mcp_tools)} MCP tools" not in holistic:
         errors.append(f"Holistic skill does not declare all {len(mcp_tools)} MCP tools.")
