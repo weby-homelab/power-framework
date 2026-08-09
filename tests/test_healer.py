@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -11,6 +11,7 @@ from power_framework.core.cli import _cmd_heal
 from power_framework.core.healer import (
     _extract_first_paragraph,
     _infer_title_from_filename,
+    _report_path,
     heal_frontmatter,
     heal_vault,
     heal_vault_report,
@@ -233,6 +234,13 @@ def test_heal_report_isolates_transform_failures_and_returns_nonzero(
     assert "No notes needed healing" not in report.format()
     assert "type: Project" in good.read_text(encoding="utf-8")
     assert "type: Project" not in bad.read_text(encoding="utf-8")
+
+
+def test_heal_failure_paths_use_posix_separators_on_windows() -> None:
+    """Failure receipts remain portable when the vault runs on Windows."""
+    rel = PureWindowsPath(r"01_Projects\unreadable.md")
+
+    assert _report_path(rel) == "01_Projects/unreadable.md"
 
 
 def test_heal_report_isolates_invalid_frontmatter_as_validation_failure(tmp_path: Path):
