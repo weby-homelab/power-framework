@@ -626,3 +626,80 @@ def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
     ):
         main()
     assert exc2.value.code == 1
+
+
+class TestFtsOnlyDenseGuard:
+    """`--fts-only` must not silently discard an existing dense index.
+
+    Reproduced on a real vault: an fts-only refresh after editing notes replaced
+    a 19 893-chunk generation with a chunkless one, and every dense search mode
+    then raised DenseIndexUnavailableError.
+    """
+
+    NOTE = (
+        '---\ntype: Resource\ntitle: "N"\ndescription: "note"\n'
+        "timestamp: 2026-01-01T00:00:00\n---\n\n{body}\n"
+    )
+
+    @staticmethod
+    def _sync(vault, *, fts_only, accept_dense_loss=False):
+        import argparse
+
+        from power_framework.core.cli import _cmd_sync
+
+        return _cmd_sync(
+            argparse.Namespace(
+                path=str(vault),
+                fts_only=fts_only,
+                force=False,
+                strict=False,
+                allow_partial=True,
+                accept_dense_loss=accept_dense_loss,
+            )
+        )
+
+    def _vault_with_dense(self, tmp_path):
+        import argparse
+
+        from power_framework.core.cli import _cmd_init
+
+        vault = tmp_path / "vault"
+        _cmd_init(argparse.Namespace(path=str(vault)))
+        note = vault / "03_Resources" / "n.md"
+        note.write_text(self.NOTE.format(body="Body one."), encoding="utf-8")
+        self._sync(vault, fts_only=False)
+        return vault, note
+
+    def test_fts_only_refuses_to_discard_an_existing_dense_index(self, tmp_path, caplog):
+        import logging
+
+        from power_framework.core.cli import _active_chunk_count
+
+        vault, note = self._vault_with_dense(tmp_path)
+        assert _active_chunk_count(vault) > 0
+
+        note.write_text(self.NOTE.format(body="Body EDITED."), encoding="utf-8")
+        with caplog.at_level(logging.INFO):
+            assert self._sync(vault, fts_only=True) == 1
+        assert any("Refusing --fts-only" in r.getMessage() for r in caplog.records)
+        assert _active_chunk_count(vault) > 0, "the dense index must survive a refusal"
+
+    def test_explicit_opt_in_still_allows_the_downgrade(self, tmp_path):
+        from power_framework.core.cli import _active_chunk_count
+
+        vault, note = self._vault_with_dense(tmp_path)
+        note.write_text(self.NOTE.format(body="Body EDITED."), encoding="utf-8")
+        assert self._sync(vault, fts_only=True, accept_dense_loss=True) == 0
+        assert _active_chunk_count(vault) == 0
+
+    def test_fts_only_is_unaffected_when_there_is_no_dense_index(self, tmp_path):
+        import argparse
+
+        from power_framework.core.cli import _cmd_init
+
+        vault = tmp_path / "fresh"
+        _cmd_init(argparse.Namespace(path=str(vault)))
+        (vault / "03_Resources" / "n.md").write_text(
+            self.NOTE.format(body="Body."), encoding="utf-8"
+        )
+        assert self._sync(vault, fts_only=True) == 0
