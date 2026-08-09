@@ -132,6 +132,31 @@ def test_index_strict_reports_invalid_notes(tmp_path: Path) -> None:
     assert (tmp_path / "index.md").exists()
 
 
+def test_index_strict_reports_foreign_nested_catalog(tmp_path: Path) -> None:
+    nested = tmp_path / "01_Projects" / "nested"
+    nested.mkdir(parents=True)
+    (nested / "Note.md").write_text(
+        "---\n"
+        "type: Project\n"
+        'title: "Note"\n'
+        'description: "Nested note"\n'
+        "timestamp: 2026-08-09T00:00:00Z\n"
+        "---\n\n# Note\n",
+        encoding="utf-8",
+    )
+    foreign = nested / "_index.md"
+    foreign.write_text("# Hand-maintained catalog\n", encoding="utf-8")
+
+    with (
+        patch.object(sys, "argv", ["power", "index", str(tmp_path), "--strict"]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 1
+    assert foreign.read_text(encoding="utf-8") == "# Hand-maintained catalog\n"
+
+
 def _add_invalid_note(vault: Path) -> Path:
     invalid = vault / "03_Resources" / "invalid_sync.md"
     invalid.write_text("# no frontmatter\n", encoding="utf-8")

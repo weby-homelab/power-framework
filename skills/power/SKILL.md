@@ -89,7 +89,7 @@ P.O.W.E.R. використовує **ієрархічну індексацію*
 vault/
 ├── index.md              # Navigation map (small, ~2KB)
 ├── 01_Projects/
-│   └── _index.md         # Detailed entries for Projects
+│   └── _index.md         # Detailed entries; nested folders have their own catalogs
 ├── 02_Areas/
 │   └── _index.md         # Detailed entries for Areas
 ├── 03_Resources/
@@ -110,7 +110,7 @@ vault/
 | --------------------------------- | ---------- | --------------------- |
 | Read all `.md` files              | 🔴 ~50K+   | Full but wasteful     |
 | Read only `index.md`              | 🟢 ~2K     | Insufficient          |
-| `index.md` + relevant `_index.md` | 🟡 ~5-8K   | **Optimal balance**   |
+| `index.md` + relevant catalog pages | 🟡 bounded | **Read only the needed page; each generated page is ≤32 KiB** |
 | + specific notes                  | 🟡 ~10-15K | **Precise, targeted** |
 
 ---
@@ -135,7 +135,7 @@ timestamp: YYYY-MM-DDTHH:MM:SS+TZ
 
 ### Крок 2. Автоматична генерація ієрархічного каталогу (Index)
 
-Після додавання/зміни файлу виконайте скрипт генерації індексу. Він автоматично оновить `index.md` та всі `_index.md` файли:
+Після додавання/зміни файлу виконайте скрипт генерації індексу. Він автоматично оновить `index.md`, рекурсивні `_index.md` каталоги та сторінки `_index-N.md` у межах 32 KiB:
 
 ```bash
 python3 .agents/skills/power/scripts/generate_index.py

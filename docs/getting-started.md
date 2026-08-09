@@ -85,7 +85,8 @@ power-vault/
 └── log.md
 ```
 
-Per-folder `_index.md` files are created by `power index`, not by `power init`.
+Canonical and nested-folder `_index.md` catalog files are created by `power index`,
+not by `power init`; large catalogs are emitted as bounded `_index-N.md` pages.
 
 ## 4. Add the first note
 

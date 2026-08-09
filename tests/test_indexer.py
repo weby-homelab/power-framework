@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path  # noqa: TC003
 
+import pytest
+
 from power_framework.core.indexer import (
+    _generate_catalog_pages,
     generate_index_content,
     generate_main_index_content,
     generate_sub_index_content,
@@ -17,6 +21,21 @@ from power_framework.core.indexer import (
     scan_vault_notes,
     truncate_for_catalog,
 )
+
+
+def _write_note(path: Path, title: str, description: str = "Test description") -> None:
+    """Write a minimal valid note for catalog integration fixtures."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "---\n"
+        "type: Project\n"
+        f"title: '{title}'\n"
+        f"description: '{description}'\n"
+        "timestamp: 2026-01-01T00:00:00\n"
+        "---\n\n"
+        f"# {title}\n",
+        encoding="utf-8",
+    )
 
 
 class TestScanVaultNotes:
@@ -206,6 +225,26 @@ class TestGenerateSubIndexContent:
         assert "00 Inbox" in content
         assert "## " not in content.split("---")[2]
 
+    def test_nested_catalog_link_is_explicitly_relative(self):
+        note = {
+            "rel_path": "03_Resources/wiki/techniques/Space Note.md",
+            "title": "Space Note",
+            "description": "A note",
+            "note_type": "Resource",
+            "tags": [],
+            "timestamp": "2026-01-01",
+            "filename": "Space Note.md",
+            "owner": "",
+            "status": "",
+            "expiry": "",
+            "related": [],
+        }
+        content = generate_sub_index_content("03_Resources/wiki/techniques", [note])
+
+        assert "`03_Resources/wiki/techniques/Space Note.md`" not in content
+        assert "[03_Resources/wiki/techniques/Space Note.md](<./Space Note.md>)" in content
+        assert "x-generated-by: power" in content
+
 
 class TestRunGenerateIndex:
     """Tests for flat index generation (legacy)."""
@@ -318,6 +357,181 @@ class TestRunGenerateHierarchicalIndex:
         assert (sample_vault / "03_Resources" / "_index.md").exists()
         assert (sample_vault / "06_Daily_Logs" / "_index.md").exists()
 
+    def test_recursive_catalogs_resolve_duplicate_nested_names(self, tmp_path: Path):
+        _write_note(tmp_path / "01_Projects" / "Top.md", "Top")
+        _write_note(tmp_path / "01_Projects" / "nested" / "Same.md", "Nested Same")
+        _write_note(tmp_path / "01_Projects" / "nested" / "deep" / "Same.md", "Deep Same")
+
+        run_generate_hierarchical_index(tmp_path)
+
+        from power_framework.core.linter import run_lint_vault
+
+        report = run_lint_vault(tmp_path)
+        assert report.orphans == []
+        assert report.broken_links == []
+        assert report.ambiguous_links == []
+        assert (tmp_path / "01_Projects" / "nested" / "deep" / "_index.md").exists()
+        parent = (tmp_path / "01_Projects" / "_index.md").read_text(encoding="utf-8")
+        assert "<./nested/_index.md>" in parent
+
+    def test_catalog_pages_obey_budget_and_partition_entries(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from power_framework.core import indexer
+
+        monkeypatch.setattr(indexer, "INDEX_MAX_BYTES", 2048)
+        for index in range(30):
+            _write_note(
+                tmp_path / "01_Projects" / f"Note {index:03}.md",
+                f"Note {index:03}",
+                "x" * 120,
+            )
+
+        run_generate_hierarchical_index(tmp_path)
+        pages = sorted((tmp_path / "01_Projects").glob("_index*.md"))
+        assert len(pages) > 1
+        assert all(len(page.read_bytes()) <= 2048 for page in pages)
+        assert sum(page.read_text(encoding="utf-8").count("- **Path:**") for page in pages) == 30
+
+        from power_framework.core.linter import run_lint_vault
+
+        report = run_lint_vault(tmp_path)
+        assert report.orphans == []
+        assert report.broken_links == []
+
+        stale_page = tmp_path / "01_Projects" / "_index-99.md"
+        stale_page.write_text(pages[0].read_text(encoding="utf-8"), encoding="utf-8")
+        run_generate_hierarchical_index(tmp_path)
+        assert not stale_page.exists()
+
+    def test_renderer_migrates_legacy_cached_catalog(self, tmp_path: Path):
+        from power_framework.core.vault_storage import vault_cache_dir
+
+        _write_note(tmp_path / "01_Projects" / "Legacy.md", "Legacy")
+        run_generate_hierarchical_index(tmp_path)
+        catalog = tmp_path / "01_Projects" / "_index.md"
+        catalog.write_text(
+            "---\n"
+            "type: System Guide\n"
+            'title: "01 Projects Sub-Index"\n'
+            'description: "Detailed catalog of all notes in 01 Projects"\n'
+            "---\n\n"
+            "legacy `01_Projects/Legacy.md` catalog\n",
+            encoding="utf-8",
+        )
+        cache_path = vault_cache_dir(tmp_path) / "hierarchical-index-cache.json"
+        cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        cache["renderer_version"] = 1
+        cache_path.write_text(json.dumps(cache), encoding="utf-8")
+
+        run_generate_hierarchical_index(tmp_path)
+
+        content = catalog.read_text(encoding="utf-8")
+        assert "x-generated-by: power" in content
+        assert "<./Legacy.md>" in content
+        assert "`01_Projects/Legacy.md`" not in content
+
+    def test_failed_render_invalidates_incremental_cache(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from power_framework.core import indexer
+
+        note = tmp_path / "01_Projects" / "Note.md"
+        _write_note(note, "Note")
+        run_generate_hierarchical_index(tmp_path)
+        note.write_text(note.read_text(encoding="utf-8") + "\nChanged.\n", encoding="utf-8")
+
+        original_generate = indexer._generate_catalog_pages
+
+        def fail_once(*args, **kwargs):
+            raise RuntimeError("synthetic catalog failure")
+
+        monkeypatch.setattr(indexer, "_generate_catalog_pages", fail_once)
+        with pytest.raises(RuntimeError, match="synthetic catalog failure"):
+            run_generate_hierarchical_index(tmp_path)
+
+        rendered_folders: list[str] = []
+
+        def record_render(*args, **kwargs):
+            rendered_folders.append(args[0])
+            return original_generate(*args, **kwargs)
+
+        monkeypatch.setattr(indexer, "_generate_catalog_pages", record_render)
+        run_generate_hierarchical_index(tmp_path)
+        assert "01_Projects" in rendered_folders
+
+    def test_deleted_nested_directory_removes_owned_catalog(self, tmp_path: Path):
+        note_path = tmp_path / "01_Projects" / "nested" / "Gone.md"
+        _write_note(note_path, "Gone")
+        run_generate_hierarchical_index(tmp_path)
+        nested_index = note_path.parent / "_index.md"
+        assert nested_index.exists()
+
+        note_path.unlink()
+        run_generate_hierarchical_index(tmp_path)
+
+        assert not nested_index.exists()
+        parent = (tmp_path / "01_Projects" / "_index.md").read_text(encoding="utf-8")
+        assert "nested/_index.md" not in parent
+        note_path.parent.rmdir()
+
+    def test_foreign_nested_catalog_is_preserved_and_reported(self, tmp_path: Path):
+        note_path = tmp_path / "01_Projects" / "nested" / "Foreign.md"
+        _write_note(note_path, "Foreign")
+        foreign_index = note_path.parent / "_index.md"
+        foreign_index.write_text("# Hand-maintained catalog\n", encoding="utf-8")
+
+        result = run_generate_hierarchical_index(tmp_path)
+
+        assert foreign_index.read_text(encoding="utf-8") == "# Hand-maintained catalog\n"
+        assert "WARNING: catalog conflicts preserved" in result
+
+    def test_foreign_top_level_catalog_is_preserved_and_reported(self, tmp_path: Path):
+        _write_note(tmp_path / "01_Projects" / "Note.md", "Note")
+        foreign_index = tmp_path / "01_Projects" / "_index.md"
+        foreign_index.write_text("# Hand-maintained top-level catalog\n", encoding="utf-8")
+
+        result = run_generate_hierarchical_index(tmp_path)
+
+        assert foreign_index.read_text(encoding="utf-8") == "# Hand-maintained top-level catalog\n"
+        assert "WARNING: catalog conflicts preserved" in result
+        assert "01_Projects/_index.md NOT WRITTEN" in result
+
+    def test_non_numeric_index_name_remains_a_note(self, tmp_path: Path):
+        _write_note(tmp_path / "01_Projects" / "_index-foo.md", "Reserved-looking note")
+
+        result = run_generate_hierarchical_index(tmp_path)
+
+        assert "1 total notes" in result
+        assert (tmp_path / "01_Projects" / "_index.md").exists()
+        assert "Reserved-looking note" in (tmp_path / "01_Projects" / "_index.md").read_text(
+            encoding="utf-8"
+        )
+
+    def test_large_catalog_renderer_profile_is_bounded(self):
+        notes = [
+            {
+                "rel_path": f"03_Resources/wiki/batch/Note {index:05}.md",
+                "title": f"Note {index:05}",
+                "description": "description " * 10,
+                "note_type": "Resource",
+                "tags": [],
+                "timestamp": "2026-01-01",
+                "filename": f"Note {index:05}.md",
+                "owner": "",
+                "status": "",
+                "expiry": "",
+                "related": [],
+            }
+            for index in range(10_000)
+        ]
+
+        pages = _generate_catalog_pages("03_Resources/wiki/batch", notes)
+
+        assert pages
+        assert all(len(content.encode("utf-8")) <= 32 * 1024 for content in pages.values())
+        assert sum(content.count("- **Path:**") for content in pages.values()) == 10_000
+
     def test_main_index_links_to_sub_indexes(self, sample_vault: Path):
         run_generate_hierarchical_index(sample_vault)
         main_index = sample_vault / "index.md"
@@ -337,14 +551,15 @@ class TestRunGenerateHierarchicalIndex:
 
         from power_framework.core import indexer
 
-        original_generate = indexer.generate_sub_index_content
+        original_generate = indexer._generate_catalog_pages
         rendered_folders: list[str] = []
 
-        def record_render(folder: str, notes: list[dict]) -> str:
+        def record_render(*args, **kwargs):
+            folder = args[0]
             rendered_folders.append(folder)
-            return original_generate(folder, notes)
+            return original_generate(*args, **kwargs)
 
-        monkeypatch.setattr(indexer, "generate_sub_index_content", record_render)
+        monkeypatch.setattr(indexer, "_generate_catalog_pages", record_render)
         run_generate_hierarchical_index(sample_vault)
         assert rendered_folders == []
 
@@ -353,7 +568,7 @@ class TestRunGenerateHierarchicalIndex:
             note_path.read_text(encoding="utf-8") + "\nChanged.\n", encoding="utf-8"
         )
         run_generate_hierarchical_index(sample_vault)
-        assert rendered_folders == ["01_Projects"]
+        assert "01_Projects" in rendered_folders
 
     def test_overwrites_existing_indexes(self, sample_vault: Path):
         main_index = sample_vault / "index.md"
@@ -361,7 +576,15 @@ class TestRunGenerateHierarchicalIndex:
 
         sub_index = sample_vault / "01_Projects" / "_index.md"
         sub_index.parent.mkdir(parents=True, exist_ok=True)
-        sub_index.write_text("Old sub content")
+        sub_index.write_text(
+            "---\n"
+            "type: System Guide\n"
+            'title: "01 Projects Sub-Index"\n'
+            'description: "Detailed catalog of all notes in 01 Projects"\n'
+            "---\n\n"
+            "Old sub content",
+            encoding="utf-8",
+        )
 
         run_generate_hierarchical_index(sample_vault)
 

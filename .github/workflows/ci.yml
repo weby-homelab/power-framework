@@ -41,6 +41,29 @@ jobs:
           uv run python -c "import onnxruntime as ort; from power_framework.core.embeddings import select_onnx_providers; selected = select_onnx_providers(ort); print('available providers:', ort.get_available_providers()); print('selected providers:', selected); assert any((p[0] if isinstance(p, tuple) else p) == 'CPUExecutionProvider' for p in selected)"
           uv run power init $vault
           uv run power ingest $vault --type Resource --title "First Note" --description "Windows smoke note"
+          $nestedA = Join-Path $vault "03_Resources\Nested Space"
+          $nestedB = Join-Path $vault "03_Resources\Nested Space\Deep"
+          New-Item -ItemType Directory -Force $nestedB | Out-Null
+          @"
+          ---
+          type: Resource
+          title: "Duplicate A"
+          description: "Nested Windows smoke note A"
+          timestamp: 2026-08-09T00:00:00Z
+          ---
+
+          # Duplicate A
+          "@ | Set-Content -Encoding utf8 (Join-Path $nestedA "Same Name.md")
+          @"
+          ---
+          type: Resource
+          title: "Duplicate B"
+          description: "Nested Windows smoke note B"
+          timestamp: 2026-08-09T00:00:00Z
+          ---
+
+          # Duplicate B
+          "@ | Set-Content -Encoding utf8 (Join-Path $nestedB "Same Name.md")
           uv run power index $vault --strict
           $lintResult = uv run power lint $vault
           $lintText = $lintResult -join [Environment]::NewLine
