@@ -68,6 +68,11 @@ class HealValidationError(ValueError):
     """Raised when an existing frontmatter block cannot be parsed safely."""
 
 
+def _report_path(path: Path) -> str:
+    """Render a vault-relative path with stable POSIX separators."""
+    return path.as_posix()
+
+
 @dataclass(frozen=True)
 class HealFailure:
     """One note that could not be healed, including the failed operation."""
@@ -388,7 +393,9 @@ def heal_vault_report(
             content = read_file_content(filepath)
         except Exception as exc:
             logger.warning("Cannot read %s: %s: %s", rel, type(exc).__name__, exc)
-            report.failures.append(HealFailure(str(rel), "read", type(exc).__name__, str(exc)))
+            report.failures.append(
+                HealFailure(_report_path(rel), "read", type(exc).__name__, str(exc))
+            )
             continue
         if not content.strip():
             continue
@@ -398,12 +405,14 @@ def heal_vault_report(
         except HealValidationError as exc:
             logger.warning("Cannot validate %s: %s", rel, exc)
             report.failures.append(
-                HealFailure(str(rel), "validation", type(exc).__name__, str(exc))
+                HealFailure(_report_path(rel), "validation", type(exc).__name__, str(exc))
             )
             continue
         except Exception as exc:
             logger.warning("Cannot heal %s: %s: %s", rel, type(exc).__name__, exc)
-            report.failures.append(HealFailure(str(rel), "transform", type(exc).__name__, str(exc)))
+            report.failures.append(
+                HealFailure(_report_path(rel), "transform", type(exc).__name__, str(exc))
+            )
             continue
         if not changes:
             continue
@@ -418,14 +427,16 @@ def heal_vault_report(
             except Exception as exc:
                 logger.warning("Cannot back up %s: %s: %s", rel, type(exc).__name__, exc)
                 report.failures.append(
-                    HealFailure(str(rel), "backup", type(exc).__name__, str(exc))
+                    HealFailure(_report_path(rel), "backup", type(exc).__name__, str(exc))
                 )
                 continue
             try:
                 atomic_write(filepath, healed)
             except Exception as exc:
                 logger.warning("Cannot write %s: %s: %s", rel, type(exc).__name__, exc)
-                report.failures.append(HealFailure(str(rel), "write", type(exc).__name__, str(exc)))
+                report.failures.append(
+                    HealFailure(_report_path(rel), "write", type(exc).__name__, str(exc))
+                )
                 continue
 
         report.healed += 1
