@@ -18,7 +18,13 @@ Checks:
     mode      — README must name the canonical search mode
     version   — README must not reference a stale default provider
     retrieval — Architecture/API tables must match the code retrieval registry
-    interfaces — CLI/MCP references and counts must match executable source
+    interfaces — CLI/MCP references and counts must match executable source;
+      agent skills are validated progressively: the concise SKILL.md body must
+      carry the workflow markers and relative links, while the referenced
+      files (references/agent-workflow.md, references/runtime-contract.md) carry
+      the versioned facts checked against the capability manifest. Every
+      existing global OpenCode skill copy under ~/.opencode and
+      ~/.config/opencode is audited unless POWER_GLOBAL_SKILL_PATH is set.
     onboarding — install/migration guides must use the current safe contract
     links      — local Markdown targets in canonical docs must exist
 
@@ -57,6 +63,8 @@ AGENT_INSTRUCTIONS = REPO_ROOT / ".agents" / "AGENTS.md"
 AGENT_SKILL = REPO_ROOT / "skills" / "power" / "SKILL.md"
 WORKSPACE_AGENT_SKILL = REPO_ROOT / ".agents" / "skills" / "power" / "SKILL.md"
 HOLISTIC_SKILL = REPO_ROOT / ".agents" / "skills" / "holistic-analysis" / "SKILL.md"
+AGENT_SKILL_WORKFLOW = REPO_ROOT / "skills" / "power" / "references" / "agent-workflow.md"
+AGENT_SKILL_RUNTIME = REPO_ROOT / "skills" / "power" / "references" / "runtime-contract.md"
 CURRENT_DOCUMENTS = {
     "README": README,
     "README.ua": README_UA,
@@ -79,6 +87,8 @@ CURRENT_DOCUMENTS = {
     "Agent skill": AGENT_SKILL,
     "Workspace agent skill": WORKSPACE_AGENT_SKILL,
     "Holistic skill": HOLISTIC_SKILL,
+    "Agent skill workflow reference": AGENT_SKILL_WORKFLOW,
+    "Agent skill runtime reference": AGENT_SKILL_RUNTIME,
 }
 
 # Canonical provider -> the human-readable token(s) the README MUST contain to
@@ -197,7 +207,10 @@ def check_retrieval_registry(documents: dict[str, str], facts: dict[str, Any]) -
     expected_default = f"The current default is `{search['default_mode']}`"
     if expected_default not in architecture:
         errors.append(f"Architecture does not declare the code default `{search['default_mode']}`.")
-    for key, label in (("embedding_model", "embedding"), ("reranker_model", "reranker")):
+    for key, label in (
+        ("embedding_model", "embedding"),
+        ("reranker_model", "reranker"),
+    ):
         if models[key] not in architecture:
             errors.append(
                 f"Architecture does not name the pinned canonical {label} model `{models[key]}`."
@@ -254,7 +267,12 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
         risk = contract.get("risk", {})
         errors.extend(
             f"MCP tool `{name}` is missing boolean annotation `{field}`."
-            for field in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint")
+            for field in (
+                "readOnlyHint",
+                "destructiveHint",
+                "idempotentHint",
+                "openWorldHint",
+            )
             if not isinstance(annotations.get(field), bool)
         )
         errors.extend(
@@ -327,90 +345,204 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
     if f"{len(mcp_tools)} tools" not in documents["Agent instructions"]:
         errors.append(f"Agent instructions do not declare `{len(mcp_tools)} tools`.")
 
-    for label in ("Agent skill", "Workspace agent skill"):
-        errors.extend(
-            _check_agent_skill(
-                label,
-                documents[label],
-                cli_commands,
-                mcp_tools,
-                facts["version"],
-            )
-        )
+    # Progressive agent skills: the concise body plus referenced files are
+    # validated against the manifest for every repository copy.
+    for label, skill_path in (
+        ("Agent skill", AGENT_SKILL),
+        ("Workspace agent skill", WORKSPACE_AGENT_SKILL),
+    ):
+        errors.extend(_check_skill_copy(label, skill_path, facts))
+    if documents["Agent skill"] != documents["Workspace agent skill"]:
+        errors.append("Workspace agent skill is not byte-identical to the repository Agent skill.")
 
-    external_skill = Path(
-        os.getenv(
-            "POWER_GLOBAL_SKILL_PATH",
-            str(Path.home() / ".opencode" / "skills" / "power" / "SKILL.md"),
+    # Every existing global OpenCode skill copy is audited; a single explicit
+    # POWER_GLOBAL_SKILL_PATH overrides the ~/.opencode / ~/.config discovery.
+    canonical_root = AGENT_SKILL.parent
+    for root in _discover_global_skill_roots():
+        errors.extend(
+            _check_skill_copy(f"Global OpenCode skill ({root})", root / "SKILL.md", facts)
         )
-    )
-    if external_skill.is_file():
-        try:
-            external_text = external_skill.read_text(encoding="utf-8")
-        except OSError as exc:
-            errors.append(f"Global agent skill could not be read: {exc}.")
-        else:
-            errors.extend(
-                _check_agent_skill(
-                    "Global OpenCode skill",
-                    external_text,
-                    cli_commands,
-                    mcp_tools,
-                    facts["version"],
-                )
-            )
-            if external_text != documents["Agent skill"]:
+        for relative in (
+            "SKILL.md",
+            "references/agent-workflow.md",
+            "references/runtime-contract.md",
+        ):
+            global_file = root / relative
+            if not global_file.is_file():
                 errors.append(
-                    "Global OpenCode skill is not byte-identical to the repository Agent skill."
+                    f"Global OpenCode skill is missing `{relative}` relative to the repository skill."
+                )
+            elif global_file.read_text(encoding="utf-8") != (canonical_root / relative).read_text(
+                encoding="utf-8"
+            ):
+                errors.append(
+                    f"Global OpenCode skill is not byte-identical to the repository `{relative}`."
                 )
     return errors
 
 
-def _check_agent_skill(
-    label: str,
-    skill: str,
-    cli_commands: tuple[str, ...],
-    mcp_tools: tuple[str, ...],
-    version: str,
-) -> list[str]:
-    """Check every agent-loaded skill copy against the executable contract."""
+# Workflow markers the concise progressive skill body and its referenced
+# workflow file must carry. The body is NOT required to enumerate every
+# CLI/MCP entry inline; that inventory lives in the referenced contract.
+_WORKFLOW_MARKERS: tuple[tuple[str, str, str], ...] = (
+    (
+        r"discover\s*→\s*inspect\s*→\s*retrieve\s*→\s*propose\s*→\s*apply\s*→\s*verify\s*→\s*handoff",
+        "complete agent workflow",
+        "discover → inspect → retrieve → propose → apply → verify → handoff",
+    ),
+    (r"power index\b", "index command", "power index"),
+    (r"power lint\b", "lint command", "power lint"),
+    (
+        r"power sync\b[^\n]*--accept-dense-loss",
+        "explicit dense-loss policy",
+        "--accept-dense-loss",
+    ),
+    (r"power doctor\b", "doctor discovery", "power doctor"),
+    (r"power ingest\b", "ingest mutation", "power ingest"),
+    (r"power memory\b", "memory mutation", "power memory"),
+    (r"power markdown-check\b", "markdown validation", "power markdown-check"),
+    (r"untrusted\s+content", "untrusted-content warning", "untrusted content"),
+)
+
+# Progressive-disclosure references a skill body must link to (relative links).
+_SKILL_REFERENCE_LINKS = (
+    "references/agent-workflow.md",
+    "references/runtime-contract.md",
+)
+
+# Referenced fact files that carry the executable contract, validated against
+# the capability manifest instead of being repeated inline in the skill body.
+_RUNTIME_CONTRACT_MARKERS = (
+    "power index",
+    "power lint",
+    "power sync",
+    "power doctor",
+    "--accept-dense-loss",
+    "--fts-only",
+    "--strict",
+    "--allow-partial",
+    "--force",
+)
+
+# Forbidden patterns that would leak a foreign environment into a portable skill.
+_FORBIDDEN_SKILL_PATTERNS: dict[str, str] = {
+    r"/root/": "absolute path from a foreign machine",
+    r"POWER_VAULT_PATH": "legacy MCP vault variable",
+}
+
+
+def _discover_global_skill_roots() -> list[Path]:
+    """Locate global OpenCode skill copies to audit.
+
+    When `POWER_GLOBAL_SKILL_PATH` is explicitly set it is the only audited
+    location. Otherwise every existing OpenCode global skills directory is
+    checked: `~/.opencode/skills/power` and `~/.config/opencode/skills/power`.
+    """
+    explicit = os.getenv("POWER_GLOBAL_SKILL_PATH")
+    if explicit:
+        configured = Path(explicit).expanduser()
+        root = (
+            configured.parent
+            if configured.is_file() or configured.name == "SKILL.md"
+            else configured
+        )
+        return [root] if root.is_dir() else []
+    home = Path.home()
+    return [
+        root
+        for root in (
+            home / ".opencode" / "skills" / "power",
+            home / ".config" / "opencode" / "skills" / "power",
+        )
+        if root.is_dir()
+    ]
+
+
+def _check_skill_body(label: str, body: str, facts: dict[str, Any]) -> list[str]:
+    """Check the concise progressive skill body against the manifest."""
     errors: list[str] = []
     prefix = f"{label}"
-    cli_section = skill.split("### MCP Tools", 1)[0]
-    mcp_section = skill.split("### MCP Tools", 1)[1].split("**Записав", 1)[0]
-    if f"{len(mcp_tools)} tools" not in skill and f"MCP Tools ({len(mcp_tools)})" not in skill:
-        errors.append(f"{prefix} does not declare `{len(mcp_tools)} tools`.")
-    if not re.search(rf"CLI[^\n]*\b{len(cli_commands)}\b", skill):
-        errors.append(f"{prefix} does not declare all {len(cli_commands)} CLI commands.")
-    errors.extend(
-        f"{prefix} is missing executable CLI command `power {command}`."
-        for command in cli_commands
-        if f"`power {command}" not in cli_section
-    )
-    errors.extend(
-        f"{prefix} is missing executable tool `{tool}`."
-        for tool in mcp_tools
-        if f"`{tool}`" not in mcp_section
-    )
-    if not re.search(rf"^version:\s*{re.escape(version)}\s*$", skill, re.M):
-        errors.append(f"{prefix} frontmatter does not declare version {version}.")
-    for pattern, description in {
-        r"/root/": "absolute path from a foreign machine",
-        r"POWER_VAULT_PATH": "legacy MCP vault variable",
-    }.items():
-        if re.search(pattern, skill):
-            errors.append(f"{prefix} contains a forbidden {description}.")
-    for pattern, description, marker in (
-        (r"### Крок 2.*?```bash\s*power index\b", "index command", "power index"),
-        (r"### Крок 4.*?```bash\s*power lint\b", "lint command", "power lint"),
-        (
-            r"power sync[^\n]*--accept-dense-loss",
-            "explicit dense-loss policy",
-            "--accept-dense-loss",
-        ),
-    ):
-        if not re.search(pattern, skill, re.DOTALL):
+    if not re.search(rf"^version:\s*{re.escape(facts['version'])}\s*$", body, re.M):
+        errors.append(f"{prefix} frontmatter does not declare version {facts['version']}.")
+    for pattern, description, marker in _WORKFLOW_MARKERS:
+        if not re.search(pattern, body, re.DOTALL):
             errors.append(f"{prefix} is missing the current {description} marker `{marker}`.")
+    errors.extend(
+        f"{prefix} does not link to the progressive-disclosure reference `{reference}`."
+        for reference in _SKILL_REFERENCE_LINKS
+        if f"]({reference})" not in body
+    )
+    for pattern, description in _FORBIDDEN_SKILL_PATTERNS.items():
+        if re.search(pattern, body):
+            errors.append(f"{prefix} contains a forbidden {description}.")
+    return errors
+
+
+def _check_reference_file(label: str, reference: Path, facts: dict[str, Any]) -> list[str]:
+    """Validate a referenced fact file against the executable capability manifest."""
+    errors: list[str] = []
+    prefix = f"{label} references/{reference.name}"
+    text = reference.read_text(encoding="utf-8")
+    for pattern, description in _FORBIDDEN_SKILL_PATTERNS.items():
+        if re.search(pattern, text):
+            errors.append(f"{prefix} contains a forbidden {description}.")
+    if reference.name == "runtime-contract.md":
+        version = facts["version"]
+        cli_commands = facts["interfaces"]["cli_commands"]
+        mcp_tools = facts["interfaces"]["mcp_tools"]
+        if version not in text:
+            errors.append(f"{prefix} does not declare runtime version {version}.")
+        errors.extend(
+            f"{prefix} is missing executable CLI command `power {command}`."
+            for command in cli_commands
+            if f"`power {command}" not in text
+        )
+        errors.extend(
+            f"{prefix} is missing executable MCP tool `{tool}`."
+            for tool in mcp_tools
+            if f"`{tool}`" not in text
+        )
+        if not re.search(rf"(?:all )?{len(cli_commands)} .*commands", text, re.I):
+            errors.append(f"{prefix} does not declare all {len(cli_commands)} CLI commands.")
+        if not re.search(rf"{len(mcp_tools)}(?:[- ]+)?(?:MCP )?tools?", text, re.I):
+            errors.append(f"{prefix} does not declare all {len(mcp_tools)} MCP tools.")
+        errors.extend(
+            f"{prefix} is missing the executable sync/doctor contract marker `{marker}`."
+            for marker in _RUNTIME_CONTRACT_MARKERS
+            if marker not in text
+        )
+    elif reference.name == "agent-workflow.md":
+        for pattern, description, marker in _WORKFLOW_MARKERS:
+            if not re.search(pattern, text, re.DOTALL):
+                errors.append(f"{prefix} is missing the {description} marker `{marker}`.")
+        errors.extend(
+            f"{prefix} is missing the workflow marker `{marker}`."
+            for marker in ("OKF", "index.md", "log.md", "GPG")
+            if marker not in text
+        )
+    return errors
+
+
+def _check_skill_copy(label: str, skill_path: Path, facts: dict[str, Any]) -> list[str]:
+    """Validate one self-contained skill copy: progressive SKILL.md + references/.
+
+    The skill body is concise and progressive: it links to `references/` files
+    instead of enumerating the full runtime inventory inline. Those referenced
+    files are validated against the executable capability manifest.
+    """
+    errors: list[str] = []
+    if not skill_path.is_file():
+        errors.append(f"{label} is missing SKILL.md at {skill_path}.")
+        return errors
+    body = skill_path.read_text(encoding="utf-8")
+    errors.extend(_check_skill_body(label, body, facts))
+    root = skill_path.parent
+    for name in _SKILL_REFERENCE_LINKS:
+        reference = root / "references" / Path(name).name
+        if not reference.is_file():
+            errors.append(f"{label} is missing referenced file `{name}`.")
+            continue
+        errors.extend(_check_reference_file(label, reference, facts))
     return errors
 
 
