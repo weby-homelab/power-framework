@@ -163,7 +163,7 @@ POWER_VAULT_DIR="$POWER_VAULT" "$POWER_PYTHON" -c \
 ```
 
 Restart long-lived MCP clients after changing their configuration or Python
-environment. See [MCP Server](mcp-server.md) for the 18-tool contract and
+environment. See [MCP Server](mcp-server.md) for the 19-tool contract and
 transport security boundary.
 
 ## 8. Daily operating sequence

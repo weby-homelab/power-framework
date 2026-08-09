@@ -31,10 +31,29 @@ def test_memory_transaction_requires_approval_and_records_history(sample_vault):
     assert read_history(sample_vault)[0]["after_sha256"] == receipt["after_sha256"]
     assert receipt["search_mode"] == "fts"
     assert receipt["notes_excluded"] == "0"
+    assert receipt["receipt_schema"] == "power.receipt.v1"
+    assert len(receipt["trace_id"]) == 32
+    assert len(receipt["span_id"]) == 16
+    assert receipt["status"] == "ok"
+    assert float(receipt["duration_ms"]) >= 0
     assert search_vault(sample_vault, search_marker, max_results=5, mode="fts")[0].rel_path == (
         "01_Projects/Transaction.md"
     )
     assert validate_state(sample_vault) is True
+
+
+def test_memory_apply_replay_with_same_idempotency_key_is_not_a_duplicate(sample_vault):
+    proposal = propose_change(
+        sample_vault,
+        "01_Projects/Idempotent.md",
+        '---\ntype: Project\ntitle: "Idempotent"\ndescription: "idempotent"\ntimestamp: 2026-07-29T00:00:00Z\n---\nonce\n',
+    )
+    first = apply_change(sample_vault, proposal, approved=True)
+    replay = apply_change(sample_vault, proposal, approved=True)
+
+    assert proposal["idempotency_key"] == first["idempotency_key"]
+    assert replay == first
+    assert len(read_history(sample_vault)) == 1
 
 
 def test_memory_transaction_rejects_stale_proposal(sample_vault):

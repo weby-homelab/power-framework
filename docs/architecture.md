@@ -8,7 +8,7 @@ src/power_framework/
 ├── py.typed            # PEP 561 marker
 ├── core/
 │   ├── __init__.py     # Re-exports all core modules
-│   ├── cli.py          # CLI entry point (argparse) — 19 commands
+│   ├── cli.py          # CLI entry point (argparse) — 20 commands
 │   ├── constants.py    # Centralized constants (exclusion lists, skip files, system dirs)
 │   ├── healer.py       # Frontmatter Healer
 │   ├── markdown_checks.py  # Markdown quality checks
@@ -28,7 +28,7 @@ src/power_framework/
 └── mcp/
     ├── __init__.py     # Package marker
     ├── __main__.py     # python -m entry point
-    └── power_server.py # FastMCP 3.x server (18 tools + health)
+    └── power_server.py # FastMCP 3.x server (19 tools + health)
 
 tests/
 ├── test_cli.py         # CLI functional tests

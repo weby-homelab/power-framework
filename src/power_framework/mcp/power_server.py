@@ -27,7 +27,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -49,18 +49,22 @@ from power_framework.core import (
     OKFMetadata,
     RateLimiter,
     WritePolicy,
+    advance_work_packet,
     apply_change,
     archive_stale_notes,
     build_frontmatter,
     commit_note_change,
+    create_work_packet,
     format_relation_suggestions,
     format_untrusted_search_envelope,
     get_context,
     heal_vault,
+    list_work_packets,
     normalize_search_mode,
     propose_change,
     read_file_content,
     read_history,
+    read_work_packet,
     resolve_path_in_vault,
     resolve_vault_path,
     run_blocking,
@@ -528,6 +532,108 @@ async def read_memory_history(vault_path: str | None = None) -> str:
     """Read append-only transaction receipts without note content."""
     root = _get_vault_path(vault_path)
     return json.dumps(await run_blocking(lambda: read_history(root)), sort_keys=True)
+
+
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
+)
+async def handoff_work(
+    action: Literal[
+        "create",
+        "list",
+        "show",
+        "resume",
+        "checkpoint",
+        "input-required",
+        "complete",
+        "fail",
+        "cancel",
+    ],
+    task_id: str | None = None,
+    objective: str | None = None,
+    owner: str | None = None,
+    actor: str = "agent",
+    scope: list[str] | None = None,
+    authority: Literal["read-only", "propose", "apply"] = "read-only",
+    source_revision: str = "unknown",
+    next_action: str | None = None,
+    profile: Literal["standard", "maintenance"] = "standard",
+    required_approval: str | None = None,
+    idempotency_key: str | None = None,
+    approved: bool = False,
+    blocker: str | None = None,
+    receipt_id: str | None = None,
+    changed_artifacts: list[str] | None = None,
+    open_gates: list[str] | None = None,
+    phase: Literal["detect", "dry-run", "repair", "verify", "receipt"] | None = None,
+    vault_path: str | None = None,
+) -> str:
+    """Create/read/advance a content-free work packet; never execute its next action."""
+    root = _get_vault_path(vault_path)
+    try:
+        if action == "create":
+            if not task_id or objective is None or owner is None:
+                raise ToolError("create requires task_id, objective, and owner")
+            result = await run_blocking(
+                lambda: create_work_packet(
+                    root,
+                    task_id=task_id,
+                    objective=objective,
+                    owner=owner,
+                    actor=actor,
+                    scope=scope,
+                    authority=authority,
+                    source_revision=source_revision,
+                    next_action=next_action or "inspect",
+                    profile=profile,
+                    required_approval=required_approval,
+                    idempotency_key=idempotency_key,
+                )
+            )
+        elif action == "list":
+            result = await run_blocking(lambda: {"packets": list_work_packets(root)})
+        elif action == "show":
+            if not task_id:
+                raise ToolError("show requires task_id")
+            result = await run_blocking(lambda: read_work_packet(root, task_id))
+        else:
+            if not task_id or not idempotency_key:
+                raise ToolError(f"{action} requires task_id and idempotency_key")
+            result = await run_blocking(
+                lambda: advance_work_packet(
+                    root,
+                    task_id,
+                    action=action,
+                    idempotency_key=idempotency_key,
+                    actor=actor,
+                    approved=approved,
+                    next_action=next_action,
+                    blocker=blocker,
+                    required_approval=required_approval,
+                    receipt_id=receipt_id,
+                    changed_artifacts=changed_artifacts,
+                    open_gates=open_gates,
+                    phase=phase,
+                )
+            )
+    except ToolError:
+        raise
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        raise ToolError(str(exc)) from exc
+    return json.dumps(result, ensure_ascii=False, sort_keys=True)
 
 
 @mcp.tool(

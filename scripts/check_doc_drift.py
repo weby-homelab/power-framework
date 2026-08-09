@@ -337,8 +337,8 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
     ):
         errors.append("Documentation inventory UA does not declare the current MCP count.")
     expected_inventory_history = (
-        f"- `12` MCP-інструментів замінено на фактичні `{len(mcp_tools)}`; "
-        f"CLI задокументовано як `{len(cli_commands)}`"
+        f"- Старий MCP-інвентар замінено на фактичні `{len(mcp_tools)}` інструментів; "
+        f"CLI\n  задокументовано як `{len(cli_commands)}` top-level команд."
     )
     if expected_inventory_history not in inventory:
         errors.append("Documentation inventory UA contains a stale historical interface count.")

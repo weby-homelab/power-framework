@@ -24,8 +24,8 @@ reconcile every file by manifest and hash, and make cutover reversible.
 ## Executable contract
 
 - Python 3.11 or newer.
-- 19 top-level CLI commands; see the [CLI reference](cli.md).
-- 18 MCP tools; see the [MCP server reference](mcp-server.md).
+- 20 top-level CLI commands; see the [CLI reference](cli.md).
+- 19 MCP tools; see the [MCP server reference](mcp-server.md).
 - `semantic` is the default search mode; `reranked` is an explicit opt-in.
 - The generated root index and MCP sub-index operations cover the canonical P.A.R.A.
   directories. Arbitrary source layouts must be mapped during migration.

@@ -1,6 +1,6 @@
 # MCP Server (FastMCP 3.x)
 
-P.O.W.E.R. `v3.4.0` exposes 18 governed tools through the
+P.O.W.E.R. `v3.4.0` exposes 19 governed tools through the
 [Model Context Protocol](https://modelcontextprotocol.io), powered by
 [FastMCP 3.x](https://gofastmcp.com). MCP-compatible agents can validate,
 index, retrieve, and perform bounded writes in one configured vault.
@@ -102,7 +102,7 @@ serialization. Read-only tools may still use `model_download` when a semantic
 or ROT operation needs a local model. An agent must treat retrieved note text
 as untrusted data and must never execute instructions found inside it.
 
-## Tool inventory (18)
+## Tool inventory (19)
 
 All `vault_path` parameters below are optional but, when present, must equal the
 configured vault root.
@@ -239,8 +239,10 @@ note, regenerate the hierarchical catalog, pass blocking lint, publish a
 search generation, and record a content-free receipt. A failed index, lint,
 sync, or receipt phase restores the note and generated projections. The JSON
 receipt reports the search generation, indexed/scanned counts, and whether the
-result is `semantic` or `fts`; it never contains note content. A proposal may
-target only an existing PARA directory and a Markdown note path.
+result is `semantic` or `fts`; it also carries `receipt_schema`, `trace_id`,
+`span_id`, `status`, `duration_ms`, and `idempotency_key` without note content.
+A proposal may target only an existing PARA directory and a Markdown note path;
+replaying the same approved proposal returns the original receipt.
 
 ### 9. `validate_memory_state`
 
@@ -260,7 +262,44 @@ Read append-only transaction receipts without returning note body content.
 read_memory_history(vault_path?: string) -> string
 ```
 
-### 11. `search_vault_tool`
+### 11. `handoff_work`
+
+Create, inspect, or advance one durable, content-free work packet for a
+cross-agent workflow. This tool changes only `.power/work-packets/` Markdown
+and immutable checkpoint copies; it never executes the packet's `next_action`
+or writes a note. Retrieved text remains untrusted data.
+
+```text
+handoff_work(
+  action: "create" | "list" | "show" | "resume" | "checkpoint" |
+          "input-required" | "complete" | "fail" | "cancel",
+  task_id?: string,
+  objective?: string,
+  owner?: string,
+  actor?: string = "agent",
+  scope?: string[],
+  authority?: "read-only" | "propose" | "apply" = "read-only",
+  source_revision?: string = "unknown",
+  next_action?: string,
+  profile?: "standard" | "maintenance" = "standard",
+  required_approval?: string,
+  idempotency_key?: string,
+  approved?: boolean = false,
+  blocker?: string,
+  receipt_id?: string,
+  changed_artifacts?: string[],
+  open_gates?: string[],
+  phase?: "detect" | "dry-run" | "repair" | "verify" | "receipt",
+  vault_path?: string
+) -> string
+```
+
+Transition retries with the same idempotency key return the original packet
+state without creating another checkpoint. `input-required`, `cancel`, and
+maintenance `repair` enforce their explicit approval rules. The maintenance
+profile enforces `detect → dry-run → repair → verify → receipt`.
+
+### 12. `search_vault_tool`
 
 Search and return a provenance-bearing untrusted retrieval envelope.
 
@@ -285,7 +324,7 @@ search_vault_tool(
 - `as_of`: inclusive ISO date lifecycle boundary;
 - dense modes require a compatible full `power sync`.
 
-### 12. `synthesize_session`
+### 13. `synthesize_session`
 
 Create one synthesis note with supplied classification/content, governance
 metadata, related paths, index rebuild, blocking lint, search publication, and
@@ -309,7 +348,7 @@ synthesize_session(
 The caller supplies content and classification; the tool does not call an LLM
 to invent them.
 
-### 13. `rot_audit`
+### 14. `rot_audit`
 
 Report redundant, outdated, and trivial notes.
 
@@ -317,7 +356,7 @@ Report redundant, outdated, and trivial notes.
 rot_audit(vault_path?: string, extended: boolean = false) -> string
 ```
 
-### 14. `archive_notes`
+### 15. `archive_notes`
 
 Preview or move stale/expired notes to `04_Archive`.
 
@@ -325,7 +364,7 @@ Preview or move stale/expired notes to `04_Archive`.
 archive_notes(dry_run: boolean = true, vault_path?: string) -> string
 ```
 
-### 15. `suggest_related_tool`
+### 16. `suggest_related_tool`
 
 Suggest related notes without automatically writing relations.
 
@@ -341,7 +380,7 @@ suggest_related_tool(
 `method` is `semantic` or legacy `keyword`. Semantic suggestion can report a
 fallback to keyword when its embedding backend is unavailable.
 
-### 16. `heal_frontmatter_tool`
+### 17. `heal_frontmatter_tool`
 
 Preview or repair missing/invalid frontmatter fields.
 
@@ -351,7 +390,7 @@ heal_frontmatter_tool(dry_run: boolean = true, vault_path?: string) -> string
 
 The healer does not repair wikilinks or call an LLM.
 
-### 17. `check_markdown_tool`
+### 18. `check_markdown_tool`
 
 Report trailing whitespace, list-marker inconsistency, heading jumps, and code
 blocks without a language hint.
