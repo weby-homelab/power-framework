@@ -586,13 +586,17 @@ def _generate_catalog_pages(
     if not blocks:
         pages.append([])
     else:
-        # The largest possible page number is a safe upper bound for navigation
-        # overhead; the actual page count can only be smaller after partitioning.
+        # Upper bound for navigation overhead. The page number must be both
+        # greater than 1 and less than the page count, otherwise the probe drops
+        # the "Previous" or "Next" link that a real middle page carries and the
+        # bound is short by the width of a whole element -- wider page *numbers*
+        # do not compensate for a missing *link*.
         page_hint = len(blocks)
+        count_hint = page_hint + 1
         current: list[str] = []
         for block in blocks:
             candidate = [*current, block]
-            rendered = _render_catalog_page(folder, candidate, page_hint, page_hint)
+            rendered = _render_catalog_page(folder, candidate, page_hint, count_hint)
             if len(rendered.encode("utf-8")) <= max_bytes:
                 current = candidate
                 continue
@@ -602,7 +606,7 @@ def _generate_catalog_pages(
                 )
             pages.append(current)
             current = [block]
-            single = _render_catalog_page(folder, current, page_hint, page_hint)
+            single = _render_catalog_page(folder, current, page_hint, count_hint)
             if len(single.encode("utf-8")) > max_bytes:
                 raise ValueError(
                     f"catalog_entry_exceeds_limit:{folder}:{len(block.encode('utf-8'))}"
