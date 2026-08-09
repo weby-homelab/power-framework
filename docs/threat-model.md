@@ -35,7 +35,7 @@ environment is trustworthy.
 | --- | --- | --- | --- |
 | CLI/MCP input to core | validated core APIs | paths, note text, queries, proposal JSON, MCP arguments | Treat inputs as untrusted; validate before read/write/network use. |
 | Vault root to host filesystem | selected canonical vault | traversal strings, symlinks, absolute paths, arbitrary parents | No read or write may escape the configured vault. |
-| Read-only retrieval to mutation | search and proposal creation | an agent or caller requesting a change | A proposal cannot write; apply requires explicit `approved=True` and an unchanged pre-image hash. |
+| Read-only retrieval to mutation | search and proposal creation | an agent or caller requesting a change | Proposal creation may write only its content-addressed `.power/proposals/` ledger; it cannot write the target note, catalog, or search. Apply requires explicit `approved=True` and an unchanged pre-image hash. |
 | Local process to network | local ONNX/FTS/index paths | OpenRouter, non-loopback Ollama, link/ROT HTTP targets | Default deny; an explicit sensitivity-appropriate egress policy is required before contact. |
 | MCP server to client/transport | configured local server | MCP client and any network peer | MCP requires a configured vault root; HTTP binds to loopback until authenticated scoped transport exists. |
 | Repository/CI to dependencies | pinned and reviewed source/dependency policy | packages, model artifacts, GitHub Actions execution | dependency audit, CodeQL, integrity checks, and review gates remain required. |
@@ -95,7 +95,7 @@ environment is trustworthy.
 - A malicious note or MCP argument attempts `../`, a symlink swap, or an
   absolute filename to overwrite a host file. Path and atomic-write controls
   must reject it before a file descriptor outside the vault is used.
-- An agent submits a memory proposal without approval, tampers with its content
+- An agent submits a memory proposal without approval, tampers with its durable content
   hash, or applies it after another writer changed the note. The transaction
   API must reject all three cases and preserve receipts without storing note
   content in history.

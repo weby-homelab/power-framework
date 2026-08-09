@@ -100,6 +100,10 @@ power ingest PATH --type TYPE --title TITLE --description DESCRIPTION
 | `--domain` | Explicit domain slug from `.power/domains.yaml`; otherwise configured rules may route the note. |
 
 Without a domain registry, note type determines the canonical target folder.
+The command uses the closed mutation workflow: it validates the note, updates
+the catalog and blocking lint, publishes the search generation, appends the
+operational log when present, and emits a content-free transaction receipt in
+the history ledger. No separate `power sync` or `power index` is required.
 
 ### `import`
 
@@ -164,8 +168,15 @@ power memory validate PATH
 power memory history PATH
 ```
 
-`apply` does not mutate memory unless the proposal is valid and `--approved` is
-present. History returns append-only transaction receipts without note content.
+`propose` validates and persists a content-addressed proposal under
+`.power/proposals/<proposal_id>.json`; it never writes the target note, index,
+or search projection. `apply` does not mutate memory unless the durable
+proposal is valid and `--approved` is present. After approval it runs one closed workflow: write the note, regenerate
+the hierarchical catalog, pass blocking lint, publish a searchable generation,
+and record a content-free receipt. If any phase fails, the note, generated
+catalogs, history, and active search projection are restored. A vault with an
+active dense projection refreshes it; a vault without one publishes FTS and
+reports `search_mode=fts` in the receipt. History never returns note content.
 
 ### `sync`
 
@@ -282,8 +293,10 @@ command reports suggestions; it does not automatically write them.
 
 ### `synthesize`
 
-Create one session synthesis note with validated metadata, index rebuild, and
-log maintenance.
+Create one session synthesis note with validated metadata, index rebuild,
+blocking lint, search publication, and log maintenance. The optional graph
+triplet extraction runs after the core transaction and cannot make a committed
+Markdown note disappear.
 
 ```text
 power synthesize PATH --name NAME --title TITLE --description DESCRIPTION

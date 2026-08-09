@@ -51,8 +51,8 @@ from power_framework.core import (
     WritePolicy,
     apply_change,
     archive_stale_notes,
-    atomic_write_in_vault,
     build_frontmatter,
+    commit_note_change,
     format_relation_suggestions,
     format_untrusted_search_envelope,
     get_context,
@@ -417,30 +417,32 @@ async def ingest_note(
     full_content = f"{frontmatter}\n\n{content}\n"
 
     def _write_and_index() -> str:
-        atomic_write_in_vault(path, name, full_content, allowed_directories=PARA_FOLDERS)
-        index_result = run_generate_hierarchical_index(path)
-
-        log_file = path / "log.md"
-        if log_file.exists():
-            date_str = datetime.now(UTC).strftime("%Y-%m-%d")
-            log_entry = (
-                f"\n## [{date_str}] ingest | Created {title}\n"
-                f"- **Action:** Created note '{name}' of type {note_type} via MCP tool ingest_note.\n"
-                f"- **Result:** Saved note to {name} and compiled hierarchical index.\n"
-            )
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(log_entry)
-
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        log_entry = (
+            f"\n## [{date_str}] ingest | Created {title}\n"
+            f"- **Action:** Created note '{name}' of type {note_type} via MCP tool ingest_note.\n"
+            f"- **Result:** Saved note to {name} and compiled hierarchical index.\n"
+        )
+        receipt = commit_note_change(
+            path,
+            name,
+            full_content,
+            require_absent=True,
+            allowed_directories=PARA_FOLDERS,
+            operation="mcp.ingest_note",
+            log_entry=log_entry,
+        )
         lint_result = run_lint_report(path)
         return (
             f"Note '{name}' has been successfully ingested!\n"
-            f"{index_result}\n"
-            f"Action appended to log.md.\n\n"
+            f"{receipt['index_summary']}\n"
+            f"Search projection: {receipt['search_mode']} ({receipt['search_generation']})\n"
+            f"Action appended to log.md when the log exists.\n\n"
             f"Linting Check:\n{lint_result}"
         )
 
-    # Serialize the write/index/log through the shared vault mutation boundary.
-    return await run_vault_mutation(path, _write_and_index)
+    # The shared transaction owns the mutation lock and all projections.
+    return await run_blocking(_write_and_index)
 
 
 @mcp.tool(
@@ -462,15 +464,15 @@ async def get_memory_context(query: str, vault_path: str | None = None) -> str:
 
 @mcp.tool(
     annotations={
-        "readOnlyHint": True,
+        "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": False,
     },
-    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
 )
 async def propose_memory_change(path: str, content: str, vault_path: str | None = None) -> str:
-    """Create a reviewable, content-addressed memory proposal."""
+    """Persist a reviewable, content-addressed memory proposal without applying it."""
     root = _get_vault_path(vault_path)
     return json.dumps(
         await run_blocking(lambda: propose_change(root, path, content)), sort_keys=True
@@ -493,7 +495,7 @@ async def apply_memory_change(
     root = _get_vault_path(vault_path)
     try:
         receipt = await run_blocking(lambda: apply_change(root, proposal, approved))
-    except (PermissionError, RuntimeError, ValueError) as exc:
+    except (PermissionError, RuntimeError, ValueError, OSError) as exc:
         raise ToolError(str(exc)) from exc
     return json.dumps(receipt, sort_keys=True)
 
@@ -658,8 +660,8 @@ async def synthesize_session(
             timestamp=timestamp,
         )
 
-    # Serialize the write/index/log through the shared vault mutation boundary.
-    return await run_vault_mutation(path, _write_and_index)
+    # The shared transaction owns the mutation lock and all projections.
+    return await run_blocking(_write_and_index)
 
 
 @mcp.tool(

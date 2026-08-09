@@ -138,7 +138,7 @@ project or user configuration scopes.
 ## Golden onboarding task
 
 After changing a client configuration, restart or reload that client. The
-first task is deliberately read-only:
+first task is read-only until the explicit proposal step:
 
 1. Open the client's MCP status view (`/mcp` where supported) and confirm that
    `power` is connected and exposes 18 tools.
@@ -147,16 +147,19 @@ first task is deliberately read-only:
 3. Ask the agent to call `get_memory_context` for a short query. This must not
    create a file, namespace, index, or history entry.
 4. Ask the agent to call `propose_memory_change` for a new note, but do not
-   approve it. A proposal is reviewable data; the target note must still be
-   absent.
+   approve it. This creates only a durable content-addressed proposal ledger
+   entry; the target note, catalog, and search projection must remain absent.
 
 Only after a human or an explicitly authorized workflow approves the exact
-proposal may the agent call `apply_memory_change` with `approved=true`. It must
-then call `validate_memory_state` and finish the vault workflow with:
+proposal may the agent call `apply_memory_change` with `approved=true`. That
+call itself closes the note → index → blocking-lint → search workflow and
+returns a content-free receipt. The agent must verify the receipt, call
+`validate_memory_state`, and search for a unique marker using the receipt's
+`search_mode` (`fts` when no dense projection exists). No redundant `sync` or
+`index` call is needed; finish the vault workflow with the remaining quality
+gate:
 
 ```bash
-power sync /absolute/path/to/vault --strict
-power index /absolute/path/to/vault --strict
 power lint /absolute/path/to/vault
 power markdown-check /absolute/path/to/vault
 ```
@@ -169,7 +172,7 @@ change the configured vault boundary.
 
 The repository test suite parses all four documented configuration shapes and
 uses each one to connect to a real local stdio P.O.W.E.R. process. It verifies
-the tool inventory, empty discovery collections, and proposal-without-write
+the tool inventory, empty discovery collections, and proposal-without-target-note-write
 behavior. This proves the shared MCP wire contract and the examples' shape;
 it does not pretend to be a full GUI/in-process test of every third-party
 client. On a host where a client is installed, its own status view is the final

@@ -53,7 +53,10 @@ The following boundaries are part of the current contract:
   responsible for enforcing user identity and approval policy.
 - Memory and other destructive mutations must retain their explicit approval,
   pre-image/concurrency checks, serialization, and atomic-write boundaries.
-  A read, proposal, or diagnostic operation must not silently become a write.
+  A read or diagnostic operation must not silently become a write. Proposal
+  creation is an explicit, non-destructive ledger write limited to the
+  content-addressed `.power/proposals/` record; it cannot write the target note,
+  catalog, or search projection.
 
 Retrieved text, generated catalogs, model output, remote responses, and error
 messages must be treated as untrusted data at every downstream boundary. Logs,
@@ -71,7 +74,8 @@ CI gates:
   supported schema while compatibility fields are handled as data rather than
   being treated as executable input.
 - Mutation APIs use same-vault serialization, explicit approval for governed
-  memory changes, pre-image hashes, and content-free receipts.
+  memory changes, durable content-addressed proposals, pre-image hashes, and
+  content-free receipts.
 - `POWER_EGRESS_POLICY` is checked before remote operations and rejects unknown
   policy or sensitivity values.
 - The MCP server requires a configured vault root, constrains tool paths and

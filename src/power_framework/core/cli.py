@@ -50,7 +50,14 @@ from .linter import (
     run_status_report,
 )
 from .markdown_checks import check_all as check_markdown_issues
-from .memory_api import apply_change, get_context, propose_change, read_history, validate_state
+from .memory_api import (
+    apply_change,
+    commit_note_change,
+    get_context,
+    propose_change,
+    read_history,
+    validate_state,
+)
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .mutation import execute_vault_mutation
 from .parser import build_frontmatter, read_file_content
@@ -264,8 +271,27 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         }
         rendered = render_domain_template(template, values).strip()
         body = rendered if rendered.startswith("---") else f"{fm}\n\n{rendered}\n"
-    execute_vault_mutation(vault_dir, lambda: atomic_write(note_path, body))
+    relative_name = note_path.relative_to(vault_dir).as_posix()
+    date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+    log_entry = (
+        f"\n## [{date_str}] ingest | Created {title}\n"
+        f"- **Action:** Created note '{relative_name}' of type {note_type} via CLI ingest.\n"
+        f"- **Result:** Saved note and compiled hierarchical index.\n"
+    )
+    try:
+        receipt = commit_note_change(
+            vault_dir,
+            relative_name,
+            body,
+            require_absent=not args.overwrite,
+            operation="cli.ingest",
+            log_entry=log_entry,
+        )
+    except (FileExistsError, RuntimeError, ValueError, OSError) as exc:
+        logger.error("Ingest transaction failed: %s", exc)
+        return 1
     logger.info("Created note: %s", note_path.relative_to(vault_dir))
+    logger.info("Search projection: %s (%s)", receipt["search_mode"], receipt["search_generation"])
     if domain:
         logger.info("Domain routing: %s (template: %s)", domain.name, domain.template)
     return 0
@@ -665,21 +691,18 @@ def _cmd_synthesize(args: argparse.Namespace) -> int:
         logger.error("Vault not found: %s", vault_dir)
         return 1
     try:
-        report = execute_vault_mutation(
-            vault_dir,
-            lambda: synthesize_session_ingest(
-                name=args.name,
-                title=args.title,
-                description=args.description,
-                content=args.content,
-                note_type=args.note_type,
-                tags=args.tags,
-                related=args.related,
-                owner=args.owner,
-                vault_path=str(vault_dir),
-            ),
+        report = synthesize_session_ingest(
+            name=args.name,
+            title=args.title,
+            description=args.description,
+            content=args.content,
+            note_type=args.note_type,
+            tags=args.tags,
+            related=args.related,
+            owner=args.owner,
+            vault_path=str(vault_dir),
         )
-    except FileExistsError as e:
+    except (FileExistsError, RuntimeError, ValueError, OSError) as e:
         logger.error(str(e))
         return 1
     logger.info(report)
@@ -725,17 +748,23 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
 def _cmd_memory(args: argparse.Namespace) -> int:
     vault_dir = _resolve_path(args.path)
-    if args.memory_command == "context":
-        print(json.dumps([item.rel_path for item in get_context(vault_dir, args.query)]))
-    elif args.memory_command == "propose":
-        print(json.dumps(propose_change(vault_dir, args.note_path, args.content), sort_keys=True))
-    elif args.memory_command == "apply":
-        proposal = json.loads(args.proposal)
-        print(json.dumps(apply_change(vault_dir, proposal, args.approved), sort_keys=True))
-    elif args.memory_command == "validate":
-        print(json.dumps({"valid": validate_state(vault_dir)}))
-    else:
-        print(json.dumps(read_history(vault_dir), sort_keys=True))
+    try:
+        if args.memory_command == "context":
+            print(json.dumps([item.rel_path for item in get_context(vault_dir, args.query)]))
+        elif args.memory_command == "propose":
+            print(
+                json.dumps(propose_change(vault_dir, args.note_path, args.content), sort_keys=True)
+            )
+        elif args.memory_command == "apply":
+            proposal = json.loads(args.proposal)
+            print(json.dumps(apply_change(vault_dir, proposal, args.approved), sort_keys=True))
+        elif args.memory_command == "validate":
+            print(json.dumps({"valid": validate_state(vault_dir)}))
+        else:
+            print(json.dumps(read_history(vault_dir), sort_keys=True))
+    except (PermissionError, RuntimeError, ValueError, OSError) as exc:
+        logger.error("Memory transaction failed: %s", exc)
+        return 1
     return 0
 
 

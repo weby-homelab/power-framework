@@ -40,9 +40,23 @@ sync/doctor правила. Авторитетна правда — `power docto
 - Керована пам'ять: `get_memory_context`, `propose_memory_change`,
   `apply_memory_change`, `validate_memory_state`, `read_memory_history`
 
-**Записав нотатку — виклич `sync_vault`.** `ingest_note` і `synthesize_session`
-оновлюють ієрархічний каталог, але база пошуку — окремий артефакт: доти
-`search_vault_tool` щойно збережену нотатку не поверне.
+**Канонічний запис замикає пошук.** `ingest_note`, `synthesize_session` та
+`apply_memory_change` в одному transaction workflow оновлюють note, index,
+blocking lint, search generation і receipt. Окремий `sync_vault` потрібен для
+імпорту, вже змінених зовнішнім способом нотаток або явного dense rebuild.
+
+**Керована mutation-транзакція замкнена.** `power memory apply` та
+`apply_memory_change` після явного схвалення виконують в одному fail-closed
+workflow: перевірка OKF, запис note, ієрархічний index, blocking lint, пошукова
+generation і content-free receipt. При помилці index/lint/sync/receipt note,
+каталоги, history та активна пошукова projection відновлюються. На vault з
+активною dense projection оновлюється semantic generation; без неї публікується
+FTS generation і receipt має `search_mode=fts`.
+
+`propose_memory_change` спочатку валідовує post-image і зберігає його в
+`.power/proposals/<proposal_id>.json`. Це окремий керований ledger: proposal
+можна переглядати й схвалювати, але він не пише target note, catalog або search.
+`apply_memory_change` приймає лише payload, що відповідає durable record.
 
 ## Sync contract
 

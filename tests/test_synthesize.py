@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 from power_framework.core.parser import validate_metadata
@@ -16,49 +14,35 @@ def test_synthesize_session_ingest_success(tmp_path):
     log_file = tmp_path / "log.md"
     log_file.write_text("# Log\n", encoding="utf-8")
 
-    with (
-        patch(
-            "power_framework.core.synthesize.run_generate_hierarchical_index",
-            return_value="Index updated",
-        ),
-        patch("power_framework.core.synthesize.run_lint_report", return_value="Lint clean"),
-    ):
-        report = synthesize_session_ingest(
-            name="01_Projects/session1.md",
-            title="Session 1",
-            description="First session synthesis",
-            content="Session notes content.",
-            vault_path=tmp_path,
-        )
-        assert "synthesized and ingested" in report
-        note = tmp_path / "01_Projects" / "session1.md"
-        assert note.exists()
-        metadata = validate_metadata(note.read_text(encoding="utf-8"))
-        assert metadata is not None
-        assert metadata.okf_version == "0.2"
-        assert metadata.related == []
-        assert metadata.memory is not None
-        assert metadata.memory.kind == "episodic"
-        assert metadata.memory.sources == ["power://synthesize_session"]
-        assert metadata.memory.evidence[0].startswith("sha256:")
+    report = synthesize_session_ingest(
+        name="01_Projects/session1.md",
+        title="Session 1",
+        description="First session synthesis",
+        content="Session notes content.",
+        vault_path=tmp_path,
+    )
+    assert "synthesized and ingested" in report
+    note = tmp_path / "01_Projects" / "session1.md"
+    assert note.exists()
+    metadata = validate_metadata(note.read_text(encoding="utf-8"))
+    assert metadata is not None
+    assert metadata.okf_version == "0.2"
+    assert metadata.related == []
+    assert metadata.memory is not None
+    assert metadata.memory.kind == "episodic"
+    assert metadata.memory.sources == ["power://synthesize_session"]
+    assert metadata.memory.evidence[0].startswith("sha256:")
 
 
 def test_synthesize_session_ingest_keeps_legacy_related_compact(tmp_path):
-    with (
-        patch(
-            "power_framework.core.synthesize.run_generate_hierarchical_index",
-            return_value="Index updated",
-        ),
-        patch("power_framework.core.synthesize.run_lint_report", return_value="Lint clean"),
-    ):
-        synthesize_session_ingest(
-            name="session-related.md",
-            title="Session with relation",
-            description="Synthesis with a legacy relation",
-            content="Content",
-            related=["01_Projects/Dependency.md"],
-            vault_path=tmp_path,
-        )
+    synthesize_session_ingest(
+        name="session-related.md",
+        title="Session with relation",
+        description="Synthesis with a legacy relation",
+        content="Content",
+        related=["01_Projects/Dependency.md"],
+        vault_path=tmp_path,
+    )
 
     content = (tmp_path / "session-related.md").read_text(encoding="utf-8")
     assert "related: [01_Projects/Dependency.md]" in content
@@ -78,19 +62,12 @@ def test_synthesize_session_ingest_exists_error(tmp_path):
 
 
 def test_synthesize_session_ingest_adds_md_extension(tmp_path):
-    with (
-        patch(
-            "power_framework.core.synthesize.run_generate_hierarchical_index",
-            return_value="Index updated",
-        ),
-        patch("power_framework.core.synthesize.run_lint_report", return_value="Lint clean"),
-    ):
-        report = synthesize_session_ingest(
-            name="session_no_ext",
-            title="Session No Ext",
-            description="Synthesis without ext",
-            content="Content",
-            vault_path=tmp_path,
-        )
-        assert (tmp_path / "session_no_ext.md").exists()
-        assert "synthesized and ingested" in report
+    report = synthesize_session_ingest(
+        name="session_no_ext",
+        title="Session No Ext",
+        description="Synthesis without ext",
+        content="Content",
+        vault_path=tmp_path,
+    )
+    assert (tmp_path / "session_no_ext.md").exists()
+    assert "synthesized and ingested" in report

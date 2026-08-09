@@ -7,9 +7,9 @@ server into a reusable, framework-agnostic core function so it can be invoked:
   * programmatically after an agent session (the Auto-Ingest Feedback Loop),
   * and still by the MCP ``synthesize_session`` tool (which now delegates here).
 
-Every synthesized note gets auto-classified OKF frontmatter, Graph-RAG related
-links, atomic write, hierarchical-index regeneration, log append, and a lint
-report — exactly mirroring the MCP behavior.
+Every synthesized note gets auto-classified OKF frontmatter, hierarchical-index
+regeneration, blocking lint, search publication, log append, and a receipt. The
+optional Graph-RAG candidate projection runs after that core transaction.
 """
 
 from __future__ import annotations
@@ -19,11 +19,11 @@ import hashlib
 import logging
 from pathlib import Path
 
-from .indexer import run_generate_hierarchical_index
 from .linter import run_lint_report
+from .memory_api import commit_note_change
 from .models import MemoryKind, MemoryMetadata, NoteType, OKFMetadata, TypedRelation, WritePolicy
 from .parser import build_frontmatter
-from .utils import atomic_write
+from .utils import resolve_path_in_vault
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def synthesize_session_ingest(
     if not name.endswith(".md"):
         name += ".md"
 
-    target_file = vault / name
+    target_file = resolve_path_in_vault(vault, name)
     if target_file.exists():
         raise FileExistsError(f"Note already exists at {name}")
 
@@ -83,10 +83,25 @@ def synthesize_session_ingest(
     frontmatter = build_frontmatter(metadata)
     full_content = f"{frontmatter}\n\n{content}\n"
 
-    target_file.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(target_file, full_content)
+    date_str = ts.strftime("%Y-%m-%d")
+    log_entry = (
+        f"\n## [{date_str}] synthesize | {title}\n"
+        f"- **Action:** Created session note '{name}' of type {note_type}.\n"
+        f"- **Related:** {', '.join(related) if related else 'none'}\n"
+        f"- **Owner:** {owner or 'unassigned'}\n"
+        f"- **Result:** Saved to {name} and compiled hierarchical index.\n"
+    )
+    receipt = commit_note_change(
+        vault,
+        name,
+        full_content,
+        require_absent=True,
+        operation="synthesize.session",
+        log_entry=log_entry,
+    )
 
-    # WTF #5 remediation: grow the auto knowledge graph from the note body.
+    # Graph extraction is deliberately an optional projection.  A failure here
+    # must not invalidate the already verified Markdown/search transaction.
     try:
         from .graph_extraction import store_note_triplets
 
@@ -94,26 +109,12 @@ def synthesize_session_ingest(
     except Exception as exc:
         logger.warning("Triplet extraction failed for %s: %s", name, exc)
 
-    index_result = run_generate_hierarchical_index(vault)
-
-    log_file = vault / "log.md"
-    if log_file.exists():
-        date_str = ts.strftime("%Y-%m-%d")
-        log_entry = (
-            f"\n## [{date_str}] synthesize | {title}\n"
-            f"- **Action:** Created session note '{name}' of type {note_type}.\n"
-            f"- **Related:** {', '.join(related) if related else 'none'}\n"
-            f"- **Owner:** {owner or 'unassigned'}\n"
-            f"- **Result:** Saved to {name} and compiled hierarchical index.\n"
-        )
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(log_entry)
-
     lint_result = run_lint_report(vault)
 
     return (
         f"Session note '{name}' has been synthesized and ingested!\n"
-        f"{index_result}\n"
-        f"Action appended to log.md.\n\n"
+        f"{receipt['index_summary']}\n"
+        f"Search projection: {receipt['search_mode']} ({receipt['search_generation']})\n"
+        f"Action appended to log.md when the log exists.\n\n"
         f"Linting Check:\n{lint_result}"
     )

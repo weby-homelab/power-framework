@@ -126,11 +126,12 @@ generate_index(vault_path?: string) -> string
 
 ### 2b. `sync_vault`
 
-Publish a complete immutable search-index generation so notes written through
-`ingest_note` or `synthesize_session` become findable. This is a separate
-artifact from the hierarchical Markdown index; an MCP agent should call it
-after a write and before searching for the new note. Write path; rate limit 5
-calls per minute.
+Publish a complete immutable search-index generation for existing notes,
+imports, or an explicit dense rebuild. The canonical write tools
+`ingest_note`, `synthesize_session`, and `apply_memory_change` already publish
+their search projection as part of one closed transaction. This remains a
+separate artifact from the hierarchical Markdown index; rate limit 5 calls per
+minute.
 
 ```text
 sync_vault(
@@ -179,8 +180,9 @@ It has the same category boundary as `read_sub_index`.
 ### 5. `ingest_note`
 
 Create one note with validated OKF metadata, regenerate the hierarchical index,
-append `log.md`, and return a lint report. Write path; rate limit 10 calls per
-minute.
+pass blocking lint, publish the search projection, append `log.md` when it
+exists, and return a receipt-backed lint report. Write path; rate limit 10 calls
+per minute.
 
 ```text
 ingest_note(
@@ -210,7 +212,10 @@ get_memory_context(query: string, vault_path?: string) -> string
 
 ### 7. `propose_memory_change`
 
-Create a reviewable, content-addressed proposal; does not apply it.
+Validate and persist a reviewable, content-addressed proposal under
+`.power/proposals/<proposal_id>.json`; it does not write the target note,
+catalog, or search projection. The response includes `proposal_id`, the
+pre-image hash, the post-image hash, and the proposed content for approval.
 
 ```text
 propose_memory_change(path: string, content: string, vault_path?: string) -> string
@@ -228,11 +233,20 @@ apply_memory_change(
 ) -> string
 ```
 
-An unapproved or stale/invalid proposal is rejected.
+An unapproved, stale, invalid, or non-durable proposal is rejected before any
+target-note write. After explicit approval, POWER executes one closed workflow: atomically write the
+note, regenerate the hierarchical catalog, pass blocking lint, publish a
+search generation, and record a content-free receipt. A failed index, lint,
+sync, or receipt phase restores the note and generated projections. The JSON
+receipt reports the search generation, indexed/scanned counts, and whether the
+result is `semantic` or `fts`; it never contains note content. A proposal may
+target only an existing PARA directory and a Markdown note path.
 
 ### 9. `validate_memory_state`
 
-Validate the transactional-memory state after an operation.
+Validate the transactional-memory state after an operation. Returns `false`
+for blocking metadata, link, or freshness failures; orphan notes remain visible
+as non-blocking lint warnings.
 
 ```text
 validate_memory_state(vault_path?: string) -> boolean
@@ -274,8 +288,9 @@ search_vault_tool(
 ### 12. `synthesize_session`
 
 Create one synthesis note with supplied classification/content, governance
-metadata, related paths, index rebuild, and log maintenance. Write path; rate
-limit 10 calls per minute.
+metadata, related paths, index rebuild, blocking lint, search publication, and
+log maintenance. Graph-triplet extraction remains an optional projection after
+the core transaction. Write path; rate limit 10 calls per minute.
 
 ```text
 synthesize_session(
