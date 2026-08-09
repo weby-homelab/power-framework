@@ -56,10 +56,14 @@ the role-specific guides before touching a vault:
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
 
-## Quick Start
+## Quick Start (Linux/macOS)
+
+The commands below are the shortest supported path for Linux and macOS. They
+assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
+you want POWER to manage.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -68,11 +72,12 @@ power heal ~/my-vault          # Auto-fix missing/invalid frontmatter
 power markdown-check ~/my-vault  # Check markdown quality issues
 ```
 
-## Development install
+## Development install (Linux/macOS)
 
-Contributors should clone into a durable development directory, create a venv,
-and follow [CONTRIBUTING.md](CONTRIBUTING.md). Inspect local changes before
-pulling; documentation does not provide an updater that resets a working tree.
+Contributors on Linux or macOS should clone into a durable development
+directory, create a venv, and follow [CONTRIBUTING.md](CONTRIBUTING.md). Inspect
+local changes before pulling; documentation does not provide an updater that
+resets a working tree.
 
 ```bash
 git clone https://github.com/weby-homelab/power-framework.git
@@ -86,11 +91,12 @@ power --version
 
 ## Windows 11 25H2 installation
 
-Use the dedicated [Windows 11 25H2 guide](docs/windows-11-installation.md).
-It covers Python/Visual C++ prerequisites, an isolated venv without mandatory
-script activation, the immutable release wheel, exact PowerShell syntax, clean
-vault acceptance checks, dense-search evidence boundaries, MCP configuration
-with the venv interpreter, troubleshooting, rollback, and uninstall.
+Windows users should use the dedicated [Windows 11 25H2
+guide](docs/windows-11-installation.md) instead of the Linux/macOS shell
+commands above. It contains the complete PowerShell installation, Python and
+Visual C++ prerequisites, isolated venv setup, immutable release wheel,
+acceptance checks, MCP configuration, troubleshooting, rollback, and uninstall
+steps.
 
 Direct Windows runtime execution was not part of the `v3.4.0` Linux release
 pipeline; the guide explicitly separates automated cross-platform regression

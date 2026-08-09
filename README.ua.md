@@ -53,10 +53,14 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
 
-## Швидкий старт
+## Швидкий старт (Linux/macOS)
+
+Наведені нижче команди — найкоротший підтримуваний шлях для Linux і macOS.
+Потрібен Python 3.11+ і terminal shell; `~/my-vault` — каталог vault, яким
+керуватиме POWER.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -65,11 +69,12 @@ power heal ~/my-vault      # Автовиправлення відсутньог
 power markdown-check ~/my-vault  # Перевірка якості Markdown
 ```
 
-## Розробницька установка
+## Розробницька установка (Linux/macOS)
 
-Contributors мають clone у durable development directory, створити venv і
-виконати [CONTRIBUTING.md](CONTRIBUTING.md). Перед pull перевіряйте local
-changes; документація не пропонує updater, який reset робоче дерево.
+Учасникам на Linux або macOS слід clone у durable development directory,
+створити venv і виконати [CONTRIBUTING.md](CONTRIBUTING.md). Перед pull
+перевіряйте local changes; документація не пропонує updater, який reset робоче
+дерево.
 
 ```bash
 git clone https://github.com/weby-homelab/power-framework.git
@@ -83,12 +88,12 @@ power --version
 
 ## Встановлення на Windows 11 25H2
 
-Використовуйте окремий
-[гід Windows 11 25H2](docs/windows-11-installation.ua.md). Він описує
-Python/Visual C++ prerequisites, isolated venv без обов'язкової script
-activation, immutable release wheel, точний PowerShell syntax, clean-vault
-acceptance checks, dense-search evidence boundaries, MCP configuration через
-venv interpreter, troubleshooting, rollback і uninstall.
+Користувачам Windows слід використовувати окремий детальний
+[гід Windows 11 25H2](docs/windows-11-installation.ua.md), а не наведені вище
+Linux/macOS shell-команди. Гід описує Python/Visual C++ prerequisites,
+isolated venv, immutable release wheel, точний PowerShell syntax, clean-vault
+acceptance checks, MCP configuration через venv interpreter, troubleshooting,
+rollback і uninstall.
 
 Прямий Windows runtime запуск не входив у Linux release pipeline `v3.4.0`;
 гід явно розділяє автоматизований cross-platform regression і checks, які
