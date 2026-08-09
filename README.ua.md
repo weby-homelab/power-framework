@@ -29,7 +29,7 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Knowledge Graph** — поле `related` зв'язує нотатки між собою для Graph RAG
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
-- **MCP-нативний** — 17 інструментів доступні MCP-сумісним AI-клієнтам через FastMCP 3.x
+- **MCP-нативний** — 18 інструментів доступні MCP-сумісним AI-клієнтам через FastMCP 3.x
 - **Windows-safe rename** — `power rename` використовує `os.replace()` для
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
@@ -99,7 +99,7 @@ venv interpreter, troubleshooting, rollback і uninstall.
 | Функція                          | Що робить                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **CLI**                          | 17 команд, включно з `power import` для preflighted Markdown migration та `power memory` для явного proposal, approval, validation та history                                                                                                                                                                                                                                                                                                                                     |
-| **MCP Server**                   | 17 інструментів, включно з керованими операціями memory context, proposal, apply, validation та history                                                                                                                                                                                                                                                                                                                                                                              |
+| **MCP Server**                   | 18 інструментів, включно з керованими операціями memory context, proposal, apply, validation та history                                                                                                                                                                                                                                                                                                                                                                              |
 | **OKF Validation**               | Pydantic v2 схеми забезпечують строгі OKF-метадані на кожній нотатці з governance-полями (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                               |
 | **Knowledge Graph (Graph RAG)**  | Поле `related` в OKF frontmatter з підтримкою `TypedRelation` (path, relation, confidence), BFS обходом та експортом підграфів у Mermaid-діаграми (`to_mermaid`)                                                                                                                                                                                                                                                                                                                     |
 | **Freshness Monitoring**         | Лінтер виявляє застарілі нотатки за полем `expiry`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -406,7 +406,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI-Агент (FastMCP 3.x)"]
-        Tools[["🔌 17 асинхронних інструментів MCP"]]:::agent
+        Tools[["🔌 18 асинхронних інструментів MCP"]]:::agent
         Search[["🔍 Гібридний / Reranked пошук"]]:::agent
         ROT{{"🛠️ Аудит ROT та суперечностей (Semantic/LLM)"}}:::agent
     end
