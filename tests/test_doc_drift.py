@@ -47,6 +47,36 @@ def test_current_docs_match_executable_interfaces_and_safe_onboarding() -> None:
     assert gate["check_links"](documents, facts) == []
 
 
+def test_agent_skill_gate_rejects_wrong_index_workflow() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    marker = "```bash\npower index <path>\n```"
+    assert marker in documents["Agent skill"]
+    documents["Agent skill"] = documents["Agent skill"].replace(
+        marker, "```bash\npower lint <path>\n```", 1
+    )
+
+    errors = gate["check_interfaces"](documents, facts)
+
+    assert any("Agent skill" in error and "index command" in error for error in errors)
+
+
+def test_agent_skill_gate_covers_workspace_copy_and_readme_ua() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    documents["Workspace agent skill"] = documents["Workspace agent skill"].replace(
+        "`sync_vault`", "`missing_tool`", 1
+    )
+    documents["README.ua"] = documents["README.ua"].replace("18 інструментів", "17 інструментів", 1)
+
+    errors = gate["check_interfaces"](documents, facts)
+
+    assert any("Workspace agent skill" in error and "sync_vault" in error for error in errors)
+    assert any("README.ua" in error and "MCP tools" in error for error in errors)
+
+
 def test_onboarding_gate_rejects_unsafe_windows_launcher() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()

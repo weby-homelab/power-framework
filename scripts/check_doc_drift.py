@@ -55,6 +55,7 @@ HIERARCHICAL_UA = REPO_ROOT / "docs" / "hierarchical-index-migration.ua.md"
 INVENTORY_UA = REPO_ROOT / "docs" / "documentation-inventory.ua.md"
 AGENT_INSTRUCTIONS = REPO_ROOT / ".agents" / "AGENTS.md"
 AGENT_SKILL = REPO_ROOT / "skills" / "power" / "SKILL.md"
+WORKSPACE_AGENT_SKILL = REPO_ROOT / ".agents" / "skills" / "power" / "SKILL.md"
 CURRENT_DOCUMENTS = {
     "README": README,
     "README.ua": README_UA,
@@ -75,6 +76,7 @@ CURRENT_DOCUMENTS = {
     "Documentation inventory UA": INVENTORY_UA,
     "Agent instructions": AGENT_INSTRUCTIONS,
     "Agent skill": AGENT_SKILL,
+    "Workspace agent skill": WORKSPACE_AGENT_SKILL,
 }
 
 # Canonical provider -> the human-readable token(s) the README MUST contain to
@@ -292,38 +294,80 @@ def check_interfaces(documents: dict[str, str], facts: dict[str, Any]) -> list[s
         if f"`{tool}`" not in documents["MCP"]
     )
 
-    for label in ("README", "Docs index"):
-        if not re.search(rf"(?:all )?{len(cli_commands)} .*commands", documents[label], re.I):
+    for label in ("README", "README.ua", "Docs index"):
+        cli_count = re.search(rf"(?:all )?{len(cli_commands)} .*commands", documents[label], re.I)
+        cli_count = cli_count or f"{len(cli_commands)} команд" in documents[label]
+        if not cli_count:
             errors.append(f"{label} does not declare all {len(cli_commands)} CLI commands.")
-        if not re.search(rf"{len(mcp_tools)} .*tools", documents[label], re.I):
+        mcp_count = re.search(rf"{len(mcp_tools)} .*tools", documents[label], re.I)
+        mcp_count = mcp_count or f"{len(mcp_tools)} інструмент" in documents[label]
+        if not mcp_count:
             errors.append(f"{label} does not declare all {len(mcp_tools)} MCP tools.")
+        if label == "README.ua" and re.search(
+            rf"\b(?!{len(mcp_tools)}\b)\d+ інструмент", documents[label]
+        ):
+            errors.append(f"{label} contains a stale MCP tools count.")
     if f"{len(mcp_tools)} tools" not in documents["Agent instructions"]:
         errors.append(f"Agent instructions do not declare `{len(mcp_tools)} tools`.")
 
-    # The bundled skill is what an agent actually loads, so it drifts with the
-    # same consequences as the reference docs and is checked the same way.
-    skill = documents["Agent skill"]
+    for label in ("Agent skill", "Workspace agent skill"):
+        errors.extend(
+            _check_agent_skill(
+                label,
+                documents[label],
+                cli_commands,
+                mcp_tools,
+                facts["version"],
+            )
+        )
+    return errors
+
+
+def _check_agent_skill(
+    label: str,
+    skill: str,
+    cli_commands: tuple[str, ...],
+    mcp_tools: tuple[str, ...],
+    version: str,
+) -> list[str]:
+    """Check every agent-loaded skill copy against the executable contract."""
+    errors: list[str] = []
+    prefix = f"{label}"
+    cli_section = skill.split("### MCP Tools", 1)[0]
+    mcp_section = skill.split("### MCP Tools", 1)[1].split("**Записав", 1)[0]
     if f"{len(mcp_tools)} tools" not in skill and f"MCP Tools ({len(mcp_tools)})" not in skill:
-        errors.append(f"Agent skill does not declare `{len(mcp_tools)} tools`.")
-    # The skill is authored in Ukrainian, so match the count next to the "CLI"
-    # marker rather than an English noun.
+        errors.append(f"{prefix} does not declare `{len(mcp_tools)} tools`.")
     if not re.search(rf"CLI[^\n]*\b{len(cli_commands)}\b", skill):
-        errors.append(f"Agent skill does not declare all {len(cli_commands)} CLI commands.")
+        errors.append(f"{prefix} does not declare all {len(cli_commands)} CLI commands.")
     errors.extend(
-        f"Agent skill is missing executable tool `{tool}`."
-        for tool in mcp_tools
-        if f"`{tool}`" not in skill
+        f"{prefix} is missing executable CLI command `power {command}`."
+        for command in cli_commands
+        if f"`power {command}" not in cli_section
     )
-    # Pin the frontmatter field itself: "3.3.2 appears somewhere in the body"
-    # would still pass while the declared skill version rots.
-    if not re.search(rf"^version:\s*{re.escape(facts['version'])}\s*$", skill, re.M):
-        errors.append(f"Agent skill frontmatter does not declare version {facts['version']}.")
+    errors.extend(
+        f"{prefix} is missing executable tool `{tool}`."
+        for tool in mcp_tools
+        if f"`{tool}`" not in mcp_section
+    )
+    if not re.search(rf"^version:\s*{re.escape(version)}\s*$", skill, re.M):
+        errors.append(f"{prefix} frontmatter does not declare version {version}.")
     for pattern, description in {
         r"/root/": "absolute path from a foreign machine",
         r"POWER_VAULT_PATH": "legacy MCP vault variable",
     }.items():
         if re.search(pattern, skill):
-            errors.append(f"Agent skill contains a forbidden {description}.")
+            errors.append(f"{prefix} contains a forbidden {description}.")
+    for pattern, description, marker in (
+        (r"### Крок 2.*?```bash\s*power index\b", "index command", "power index"),
+        (r"### Крок 4.*?```bash\s*power lint\b", "lint command", "power lint"),
+        (
+            r"power sync[^\n]*--accept-dense-loss",
+            "explicit dense-loss policy",
+            "--accept-dense-loss",
+        ),
+    ):
+        if not re.search(pattern, skill, re.DOTALL):
+            errors.append(f"{prefix} is missing the current {description} marker `{marker}`.")
     return errors
 
 
