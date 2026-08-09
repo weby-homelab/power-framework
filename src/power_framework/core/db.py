@@ -118,6 +118,12 @@ def _init_db(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS temporal_records (
+            rel_path TEXT PRIMARY KEY,
+            memory_json TEXT
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS doc_embeddings (
             rel_path TEXT PRIMARY KEY,
             embedding BLOB,

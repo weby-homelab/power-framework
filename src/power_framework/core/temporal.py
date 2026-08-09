@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
 from collections import defaultdict, deque
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from .ignore import should_skip
+from .models import MemoryMetadata
 from .parser import read_file_content, validate_metadata
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from .models import MemoryMetadata
 
 
 class TemporalStatus(StrEnum):
@@ -77,6 +79,54 @@ def scan_temporal_records(vault_dir: Path) -> dict[str, TemporalRecord]:
             continue
         if metadata is not None:
             records[rel_path] = TemporalRecord(rel_path, metadata.memory)
+    return records
+
+
+def load_temporal_records(db_path: Path | None) -> dict[str, TemporalRecord] | None:
+    """Load temporal metadata from a complete indexed projection.
+
+    The projection contains lifecycle metadata only, never note content. ``None``
+    means the database is legacy, incomplete, or malformed and callers must
+    fall back to the authoritative Markdown scan instead of trusting partial
+    derived state.
+    """
+    if db_path is None or not db_path.is_file():
+        return None
+    try:
+        with closing(
+            sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True, timeout=30)
+        ) as conn:
+            table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'temporal_records'"
+            ).fetchone()
+            if table is None:
+                return None
+            expected_paths = {
+                str(row[0]) for row in conn.execute("SELECT rel_path FROM file_metadata").fetchall()
+            }
+            actual_paths = {
+                str(row[0])
+                for row in conn.execute("SELECT rel_path FROM temporal_records").fetchall()
+            }
+            if expected_paths != actual_paths:
+                return None
+            rows = conn.execute(
+                "SELECT rel_path, memory_json FROM temporal_records ORDER BY rel_path"
+            ).fetchall()
+    except (OSError, sqlite3.Error):
+        return None
+
+    records: dict[str, TemporalRecord] = {}
+    try:
+        for rel_path, memory_json in rows:
+            memory = (
+                None
+                if memory_json is None
+                else MemoryMetadata.model_validate(json.loads(memory_json))
+            )
+            records[str(rel_path)] = TemporalRecord(str(rel_path), memory)
+    except (TypeError, ValueError):
+        return None
     return records
 
 

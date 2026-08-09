@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import os
+import sqlite3
+from contextlib import closing
 from datetime import date, datetime
 
 import pytest
 from pydantic import ValidationError
 
+from power_framework.core.db import _init_db
 from power_framework.core.healer import heal_frontmatter
 from power_framework.core.models import MemoryMetadata, OKFMetadata
 from power_framework.core.parser import build_frontmatter, validate_metadata
+from power_framework.core.searcher import _sync_vault_to_db
 from power_framework.core.temporal import (
     TemporalRecord,
     TemporalStatus,
+    load_temporal_records,
     resolve_temporal_statuses,
 )
 
@@ -131,3 +137,66 @@ def test_competing_supersession_is_explicitly_conflicted() -> None:
     statuses = resolve_temporal_statuses(records, date(2026, 7, 10))
 
     assert set(statuses.values()) == {TemporalStatus.CONFLICTED}
+
+
+def test_incomplete_temporal_projection_fails_closed_to_disk_fallback(tmp_path) -> None:
+    database = tmp_path / "search.db"
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        conn.execute("INSERT INTO file_metadata(rel_path, mtime) VALUES (?, ?)", ("note.md", 0))
+        conn.commit()
+
+    assert load_temporal_records(database) is None
+
+
+def test_temporal_projection_with_same_count_but_wrong_path_fails_closed(tmp_path) -> None:
+    database = tmp_path / "search.db"
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        conn.execute("INSERT INTO file_metadata(rel_path, mtime) VALUES (?, ?)", ("note.md", 0))
+        conn.execute(
+            "INSERT INTO temporal_records(rel_path, memory_json) VALUES (?, ?)",
+            ("stale.md", None),
+        )
+        conn.commit()
+
+    assert load_temporal_records(database) is None
+
+
+def test_temporal_projection_updates_when_a_note_changes(tmp_path) -> None:
+    note = tmp_path / "03_Resources" / "temporal.md"
+    note.parent.mkdir()
+    note.write_text(
+        "---\n"
+        "type: Resource\n"
+        'title: "Temporal"\n'
+        'description: "Temporal projection"\n'
+        "timestamp: 2026-07-10T00:00:00Z\n"
+        "memory:\n"
+        "  kind: semantic\n"
+        "  valid_from: 2026-01-01\n"
+        "---\n\nbody\n",
+        encoding="utf-8",
+    )
+    database = tmp_path / "search.db"
+
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        _sync_vault_to_db(tmp_path, conn, sync_embeddings=False)
+        first = load_temporal_records(database)
+        assert first is not None
+        assert first["03_Resources/temporal.md"].memory is not None
+        assert first["03_Resources/temporal.md"].memory.valid_from == date(2026, 1, 1)
+
+        original_mtime = note.stat().st_mtime
+        note.write_text(
+            note.read_text(encoding="utf-8").replace("2026-01-01", "2027-01-01"),
+            encoding="utf-8",
+        )
+        os.utime(note, (original_mtime + 1, original_mtime + 1))
+        _sync_vault_to_db(tmp_path, conn, sync_embeddings=False)
+        second = load_temporal_records(database)
+
+    assert second is not None
+    assert second["03_Resources/temporal.md"].memory is not None
+    assert second["03_Resources/temporal.md"].memory.valid_from == date(2027, 1, 1)

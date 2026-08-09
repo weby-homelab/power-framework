@@ -36,6 +36,7 @@ from .query_expansion import QueryExpander
 from .temporal import (
     TemporalStatus,
     includes_temporal_status,
+    load_temporal_records,
     normalize_as_of,
     normalize_temporal_view,
     resolve_temporal_statuses,
@@ -465,6 +466,9 @@ def _sync_vault_to_db(
             "DELETE FROM chunk_embeddings WHERE rel_path = ?", [(r,) for r in to_delete]
         )
         cursor.executemany("DELETE FROM tf_vectors WHERE rel_path = ?", [(r,) for r in to_delete])
+        cursor.executemany(
+            "DELETE FROM temporal_records WHERE rel_path = ?", [(r,) for r in to_delete]
+        )
 
     embedder = get_embedding_manager() if sync_embeddings else None
 
@@ -507,6 +511,7 @@ def _sync_vault_to_db(
                     cursor.execute("DELETE FROM doc_embeddings WHERE rel_path = ?", (rel_path,))
                     cursor.execute("DELETE FROM chunk_embeddings WHERE rel_path = ?", (rel_path,))
                     cursor.execute("DELETE FROM tf_vectors WHERE rel_path = ?", (rel_path,))
+                    cursor.execute("DELETE FROM temporal_records WHERE rel_path = ?", (rel_path,))
                     continue
                 changed.append((rel_path, content, metadata, mtime))
             except Exception as e:
@@ -540,6 +545,15 @@ def _sync_vault_to_db(
                 "INSERT OR REPLACE INTO file_metadata (rel_path, mtime) VALUES (?, ?)",
                 (rel_path, mtime),
             )
+            memory_json = (
+                None
+                if metadata.memory is None
+                else json.dumps(metadata.memory.model_dump(mode="json"), sort_keys=True)
+            )
+            cursor.execute(
+                "INSERT OR REPLACE INTO temporal_records (rel_path, memory_json) VALUES (?, ?)",
+                (rel_path, memory_json),
+            )
 
             full_text = " ".join(
                 [metadata.title, " ".join(metadata.tags), metadata.description, content]
@@ -553,6 +567,38 @@ def _sync_vault_to_db(
         except Exception as e:
             logger.warning("FTS/TF write failed for %s: %s", rel_path, e)
             continue
+
+    # Backfill the metadata-only projection for legacy databases after schema
+    # creation or a database backup. A partial projection is never trusted by
+    # retrieval, so rebuild it from already-indexed note content in one sync.
+    expected_temporal_paths = {
+        str(row[0]) for row in cursor.execute("SELECT rel_path FROM file_metadata").fetchall()
+    }
+    actual_temporal_paths = {
+        str(row[0]) for row in cursor.execute("SELECT rel_path FROM temporal_records").fetchall()
+    }
+    if expected_temporal_paths != actual_temporal_paths:
+        cursor.execute("DELETE FROM temporal_records")
+        temporal_rows: list[tuple[str, str | None]] = []
+        for rel_path, indexed_content in cursor.execute(
+            "SELECT rel_path, content FROM fts_notes"
+        ).fetchall():
+            try:
+                indexed_metadata = validate_metadata(indexed_content)
+            except Exception:  # noqa: S112
+                continue
+            if indexed_metadata is None:
+                continue
+            memory_json = (
+                None
+                if indexed_metadata.memory is None
+                else json.dumps(indexed_metadata.memory.model_dump(mode="json"), sort_keys=True)
+            )
+            temporal_rows.append((rel_path, memory_json))
+        cursor.executemany(
+            "INSERT OR REPLACE INTO temporal_records (rel_path, memory_json) VALUES (?, ?)",
+            temporal_rows,
+        )
 
     if not sync_embeddings and (changed or invalid_changed or to_delete):
         # A lightweight FTS sync cannot refresh dense vectors for changed
@@ -1439,7 +1485,9 @@ def _filter_temporal_results(
     max_results: int,
 ) -> list[SearchResult]:
     """Attach resolved status and filter ranked results at the retrieval boundary."""
-    statuses = resolve_temporal_statuses(scan_temporal_records(vault_dir), as_of)
+    indexed_records = load_temporal_records(_read_db_path(vault_dir))
+    records = indexed_records if indexed_records is not None else scan_temporal_records(vault_dir)
+    statuses = resolve_temporal_statuses(records, as_of)
     filtered: list[SearchResult] = []
     for result in results:
         status = statuses.get(result.rel_path, TemporalStatus.CURRENT)
