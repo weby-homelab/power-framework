@@ -3,15 +3,27 @@
 from __future__ import annotations
 
 import runpy
+import shutil
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOC_DRIFT_SCRIPT = REPO_ROOT / "scripts" / "check_doc_drift.py"
+REPO_SKILL_ROOT = REPO_ROOT / "skills" / "power"
 
 
 def _load_gate() -> dict[str, Any]:
     return runpy.run_path(str(DOC_DRIFT_SCRIPT))
+
+
+def _copy_repo_skill(dest: Path) -> Path:
+    """Copy the canonical repository skill tree into a temp skill root."""
+    root = dest / "power"
+    (root / "references").mkdir(parents=True)
+    shutil.copy(REPO_SKILL_ROOT / "SKILL.md", root / "SKILL.md")
+    for name in ("agent-workflow.md", "runtime-contract.md"):
+        shutil.copy(REPO_SKILL_ROOT / "references" / name, root / "references" / name)
+    return root
 
 
 def test_current_docs_match_the_executable_retrieval_contract() -> None:
@@ -35,8 +47,11 @@ def test_retrieval_gate_rejects_a_missing_canonical_row() -> None:
     assert any("semantic" in error and "does not match" in error for error in errors)
 
 
-def test_current_docs_match_executable_interfaces_and_safe_onboarding() -> None:
+def test_current_docs_match_executable_interfaces_and_safe_onboarding(
+    monkeypatch, tmp_path: Path
+) -> None:
     gate = _load_gate()
+    monkeypatch.setenv("POWER_GLOBAL_SKILL_PATH", str(tmp_path / "no-global-copy"))
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
 
@@ -121,33 +136,36 @@ def test_interface_gate_rejects_incomplete_mcp_risk_contract() -> None:
     assert any("missing risk field `approval`" in error for error in errors)
 
 
-def test_agent_skill_gate_rejects_wrong_index_workflow() -> None:
+def test_skill_body_gate_rejects_wrong_index_workflow() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()
-    documents = gate["_read_current_documents"]()
-    marker = "```bash\npower index <path>\n```"
-    assert marker in documents["Agent skill"]
-    documents["Agent skill"] = documents["Agent skill"].replace(
-        marker, "```bash\npower lint <path>\n```", 1
-    )
+    body = (REPO_SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    assert "power index <path>" in body
+    body = body.replace("power index", "power lint")
 
-    errors = gate["check_interfaces"](documents, facts)
+    errors = gate["_check_skill_body"]("Agent skill", body, facts)
 
     assert any("Agent skill" in error and "index command" in error for error in errors)
 
 
-def test_agent_skill_gate_covers_workspace_copy_and_readme_ua() -> None:
+def test_skill_gate_covers_workspace_references_and_readme_ua(monkeypatch, tmp_path: Path) -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
-    documents["Workspace agent skill"] = documents["Workspace agent skill"].replace(
-        "`sync_vault`", "`missing_tool`", 1
-    )
-    documents["README.ua"] = documents["README.ua"].replace("18 інструментів", "17 інструментів", 1)
 
+    root = _copy_repo_skill(tmp_path)
+    runtime = root / "references" / "runtime-contract.md"
+    runtime.write_text(
+        runtime.read_text(encoding="utf-8").replace("`sync_vault`", "`missing_tool`"),
+        encoding="utf-8",
+    )
+    errors = gate["_check_skill_copy"]("Workspace agent skill", root / "SKILL.md", facts)
+    assert any("Workspace agent skill" in error and "sync_vault" in error for error in errors)
+
+    monkeypatch.setenv("POWER_GLOBAL_SKILL_PATH", str(tmp_path / "no-global-copy"))
+    documents["README.ua"] = documents["README.ua"].replace("18 інструментів", "17 інструментів", 1)
     errors = gate["check_interfaces"](documents, facts)
 
-    assert any("Workspace agent skill" in error and "sync_vault" in error for error in errors)
     assert any("README.ua" in error and "MCP tools" in error for error in errors)
 
 
@@ -171,3 +189,119 @@ def test_link_gate_rejects_missing_local_target() -> None:
     errors = gate["check_links"](documents, facts)
 
     assert any("does-not-exist.md" in error for error in errors)
+
+
+def test_skill_gate_rejects_missing_references(tmp_path: Path) -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    root = _copy_repo_skill(tmp_path)
+    shutil.rmtree(root / "references")
+
+    errors = gate["_check_skill_copy"]("Test skill", root / "SKILL.md", facts)
+
+    assert any(
+        "missing referenced file `references/agent-workflow.md`" in error for error in errors
+    )
+    assert any(
+        "missing referenced file `references/runtime-contract.md`" in error for error in errors
+    )
+
+
+def test_skill_body_gate_rejects_missing_workflow_markers() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    body = "---\nname: power\nversion: 3.4.0\n---\n\nOnly lint here: `power lint <path>`\n"
+
+    errors = gate["_check_skill_body"]("Broken skill", body, facts)
+
+    assert any("Broken skill" in error and "complete agent workflow" in error for error in errors)
+    assert any("Broken skill" in error and "index command" in error for error in errors)
+    assert any("Broken skill" in error and "doctor discovery" in error for error in errors)
+    assert any(
+        "progressive-disclosure reference `references/runtime-contract.md`" in error
+        for error in errors
+    )
+
+
+def test_skill_gate_rejects_stale_reference_facts(tmp_path: Path) -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    root = _copy_repo_skill(tmp_path)
+    runtime = root / "references" / "runtime-contract.md"
+    runtime.write_text(
+        runtime.read_text(encoding="utf-8")
+        .replace("18 MCP tools", "17 MCP tools", 1)
+        .replace("`sync_vault`", "`missing_tool`"),
+        encoding="utf-8",
+    )
+
+    errors = gate["_check_skill_copy"]("Stale skill", root / "SKILL.md", facts)
+
+    assert any(
+        "Stale skill" in error and "does not declare all 18 MCP tools" in error for error in errors
+    )
+    assert any(
+        "Stale skill" in error and "missing executable MCP tool `sync_vault`" in error
+        for error in errors
+    )
+
+
+def test_fresh_agent_contract_exposes_safe_full_workflow() -> None:
+    skill = (REPO_SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    workflow = (REPO_SKILL_ROOT / "references" / "agent-workflow.md").read_text(encoding="utf-8")
+    runtime = (REPO_SKILL_ROOT / "references" / "runtime-contract.md").read_text(encoding="utf-8")
+    contract = "\n".join((skill, workflow, runtime))
+
+    for marker in (
+        "discover → inspect → retrieve → propose → apply → verify → handoff",
+        "power doctor",
+        "power ingest",
+        "power memory",
+        "power sync <path> --strict",
+        "power index <path> --strict",
+        "power lint <path>",
+        "power markdown-check <path>",
+        "log.md",
+        "untrusted content",
+    ):
+        assert marker in contract
+
+
+def test_global_skill_discovery_checks_both_opencode_paths(monkeypatch, tmp_path: Path) -> None:
+    gate = _load_gate()
+    home = tmp_path / "fake-home"
+    for relative in (".opencode/skills/power", ".config/opencode/skills/power"):
+        (home / relative).mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.delenv("POWER_GLOBAL_SKILL_PATH", raising=False)
+
+    roots = gate["_discover_global_skill_roots"]()
+
+    expected = {
+        home / ".opencode" / "skills" / "power",
+        home / ".config" / "opencode" / "skills" / "power",
+    }
+    assert {Path(r) for r in roots} == expected
+
+
+def test_global_skill_discovery_respects_explicit_env_override(monkeypatch, tmp_path: Path) -> None:
+    gate = _load_gate()
+    explicit = tmp_path / "explicit-skill"
+    explicit.mkdir(parents=True)
+    monkeypatch.setenv("POWER_GLOBAL_SKILL_PATH", str(explicit))
+
+    roots = gate["_discover_global_skill_roots"]()
+
+    assert [Path(r) for r in roots] == [explicit]
+
+
+def test_global_skill_discovery_accepts_explicit_skill_file(monkeypatch, tmp_path: Path) -> None:
+    gate = _load_gate()
+    skill_file = tmp_path / "power" / "SKILL.md"
+    skill_file.parent.mkdir(parents=True)
+    skill_file.write_text("", encoding="utf-8")
+    monkeypatch.setenv("POWER_GLOBAL_SKILL_PATH", str(skill_file))
+
+    roots = gate["_discover_global_skill_roots"]()
+
+    assert [Path(r) for r in roots] == [skill_file.parent]
