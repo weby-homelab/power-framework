@@ -532,6 +532,39 @@ class TestRunGenerateHierarchicalIndex:
         assert all(len(content.encode("utf-8")) <= 32 * 1024 for content in pages.values())
         assert sum(content.count("- **Path:**") for content in pages.values()) == 10_000
 
+    def test_variable_width_catalog_stays_bounded(self):
+        # The uniform-size profile above never lands a page within the width of
+        # one navigation link, so it stays green while the bound is short. Real
+        # vaults have variable titles; sweeping the limit shifts where pages
+        # break and reaches the boundary deterministically.
+        notes = [
+            {
+                "rel_path": f"03_Resources/wiki/batch/Note {index}.md",
+                "title": "N" * (1 + index % 37),
+                "description": "d" * (1 + index % 53),
+                "note_type": "Resource",
+                "tags": [],
+                "timestamp": "2026-01-01",
+                "filename": f"Note {index}.md",
+                "owner": "",
+                "status": "",
+                "expiry": "",
+                "related": [],
+            }
+            for index in range(400)
+        ]
+
+        for max_bytes in range(2048, 2048 + 96):
+            pages = _generate_catalog_pages(
+                "03_Resources/wiki/batch", notes, max_bytes=max_bytes
+            )
+            oversized = {
+                name: len(content.encode("utf-8"))
+                for name, content in pages.items()
+                if len(content.encode("utf-8")) > max_bytes
+            }
+            assert not oversized, f"max_bytes={max_bytes} produced {oversized}"
+
     def test_main_index_links_to_sub_indexes(self, sample_vault: Path):
         run_generate_hierarchical_index(sample_vault)
         main_index = sample_vault / "index.md"
