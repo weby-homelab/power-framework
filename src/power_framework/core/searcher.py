@@ -42,6 +42,7 @@ from .temporal import (
     resolve_temporal_statuses,
     scan_temporal_records,
 )
+from .timing import timing_span
 from .vault_storage import existing_vault_db_path, vault_db_path
 
 if TYPE_CHECKING:
@@ -82,7 +83,8 @@ def _db_path(vault_dir: Path | None = None) -> Path:
 
 def _read_db_path(vault_dir: Path) -> Path | None:
     """Resolve the immutable active DB, retaining legacy fallback only before migration."""
-    return resolve_active_generation_path(vault_dir) or existing_vault_db_path(vault_dir)
+    with timing_span("generation_resolve"):
+        return resolve_active_generation_path(vault_dir) or existing_vault_db_path(vault_dir)
 
 
 def _open_readonly_db(db_path: Path) -> sqlite3.Connection:
@@ -878,43 +880,44 @@ def _fts_search(
         conn = _open_readonly_db(db_path)
 
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT
-                rel_path,
-                title,
-                description,
-                note_type,
-                -bm25(fts_notes, 10.0, 5.0, 3.0, 1.0) as score,
-                snippet(fts_notes, 3, '...', '...', '...', 15) as snippet_text,
-                tags
-            FROM fts_notes
-            WHERE fts_notes MATCH ?
-            ORDER BY score DESC
-            LIMIT ?
-            """,
-            (fts_query, max_results),
-        )
-
-        rows = cursor.fetchall()
+        with timing_span("sqlite_read"):
+            cursor.execute(
+                """
+                SELECT
+                    rel_path,
+                    title,
+                    description,
+                    note_type,
+                    -bm25(fts_notes, 10.0, 5.0, 3.0, 1.0) as score,
+                    snippet(fts_notes, 3, '...', '...', '...', 15) as snippet_text,
+                    tags
+                FROM fts_notes
+                WHERE fts_notes MATCH ?
+                ORDER BY score DESC
+                LIMIT ?
+                """,
+                (fts_query, max_results),
+            )
+            rows = cursor.fetchall()
 
         results: list[SearchResult] = []
-        for row in rows:
-            rel_path, title, description, note_type, score, snippet, tags_str = row
-            tags = tags_str.split(" ") if tags_str else []
-            match_count = 1
-            results.append(
-                SearchResult(
-                    rel_path=rel_path,
-                    title=title,
-                    description=description,
-                    note_type=note_type,
-                    score=float(score),
-                    snippet=snippet,
-                    match_count=match_count,
-                    tags=tags,
+        with timing_span("result_materialization"):
+            for row in rows:
+                rel_path, title, description, note_type, score, snippet, tags_str = row
+                tags = tags_str.split(" ") if tags_str else []
+                match_count = 1
+                results.append(
+                    SearchResult(
+                        rel_path=rel_path,
+                        title=title,
+                        description=description,
+                        note_type=note_type,
+                        score=float(score),
+                        snippet=snippet,
+                        match_count=match_count,
+                        tags=tags,
+                    )
                 )
-            )
 
         return results
     except ActiveGenerationError:
@@ -1001,20 +1004,21 @@ def _vector_search(
             _init_db(conn)
 
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM tf_vectors")
-        if cursor.fetchone()[0] == 0:
-            if active_generation_path is not None:
-                return []
-            # Materialize TF vectors (cheap FTS-only sync) so direct
-            # _vector_search calls work even before an explicit index.
-            _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
+        with timing_span("sqlite_read"):
+            cursor.execute("SELECT COUNT(*) FROM tf_vectors")
+            if cursor.fetchone()[0] == 0:
+                if active_generation_path is not None:
+                    return []
+                # Materialize TF vectors (cheap FTS-only sync) so direct
+                # _vector_search calls work even before an explicit index.
+                _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
 
-        cursor.execute("""
-            SELECT t.rel_path, t.tf_data, f.title, f.description, f.note_type, f.tags, f.content
-            FROM tf_vectors t
-            JOIN fts_notes f ON t.rel_path = f.rel_path
-        """)
-        rows = cursor.fetchall()
+            cursor.execute("""
+                SELECT t.rel_path, t.tf_data, f.title, f.description, f.note_type, f.tags, f.content
+                FROM tf_vectors t
+                JOIN fts_notes f ON t.rel_path = f.rel_path
+            """)
+            rows = cursor.fetchall()
     except ActiveGenerationError:
         raise
     except Exception:
@@ -1025,39 +1029,40 @@ def _vector_search(
 
     scored: list[tuple[float, SearchResult]] = []
 
-    for rel_path, tf_data_str, title, description, note_type, tags_str, content in rows:
-        try:
-            filepath = vault_dir / rel_path
-            if not filepath.is_file():
-                continue
-            if should_skip(vault_dir, rel_path):
-                continue
+    with timing_span("scoring"):
+        for rel_path, tf_data_str, title, description, note_type, tags_str, content in rows:
+            try:
+                filepath = vault_dir / rel_path
+                if not filepath.is_file():
+                    continue
+                if should_skip(vault_dir, rel_path):
+                    continue
 
-            doc_vec = json.loads(tf_data_str)
-            similarity = _cosine_similarity(query_vec, doc_vec)
+                doc_vec = json.loads(tf_data_str)
+                similarity = _cosine_similarity(query_vec, doc_vec)
 
-            if similarity == 0:
-                continue
+                if similarity == 0:
+                    continue
 
-            tags = tags_str.split(" ") if tags_str else []
-            snippet = _make_snippet(content, query_tokens)
-            scored.append(
-                (
-                    similarity,
-                    SearchResult(
-                        rel_path=rel_path,
-                        title=title,
-                        description=description,
-                        note_type=note_type,
-                        score=similarity,
-                        snippet=snippet,
-                        match_count=len(query_tokens),
-                        tags=tags,
-                    ),
+                tags = tags_str.split(" ") if tags_str else []
+                snippet = _make_snippet(content, query_tokens)
+                scored.append(
+                    (
+                        similarity,
+                        SearchResult(
+                            rel_path=rel_path,
+                            title=title,
+                            description=description,
+                            note_type=note_type,
+                            score=similarity,
+                            snippet=snippet,
+                            match_count=len(query_tokens),
+                            tags=tags,
+                        ),
+                    )
                 )
-            )
-        except Exception:  # noqa: S112
-            continue
+            except Exception:  # noqa: S112
+                continue
 
     scored.sort(key=lambda x: (-x[0], x[1].title))
     return [r for _, r in scored[:max_results]]
@@ -1136,8 +1141,10 @@ def _semantic_search(
         )
 
     try:
-        embedder = get_embedding_manager()
-        query_vec = embedder.embed(query)
+        with timing_span("embedding_session_startup"):
+            embedder = get_embedding_manager()
+        with timing_span("query_embedding"):
+            query_vec = embedder.embed(query)
     except Exception as exc:
         _dense_failure(f"embedder error: {type(exc).__name__}")
 
@@ -1153,8 +1160,9 @@ def _semantic_search(
         cursor = conn.cursor()
         # Chunk text is needed only for the few winners that become snippets.
         # Avoid pulling the whole corpus body through SQLite on every query.
-        cursor.execute("SELECT chunk_id, rel_path, embedding FROM chunk_embeddings")
-        rows = cursor.fetchall()
+        with timing_span("sqlite_read"):
+            cursor.execute("SELECT chunk_id, rel_path, embedding FROM chunk_embeddings")
+            rows = cursor.fetchall()
     except Exception as exc:
         _dense_failure(f"db error: {type(exc).__name__}")
     finally:
@@ -1166,31 +1174,32 @@ def _semantic_search(
 
     import numpy as np
 
-    q_arr = np.asarray(query_vec, dtype=np.float32)
-    q_norm = float(np.linalg.norm(q_arr))
-    if q_norm == 0:
-        _dense_failure("zero query embedding")
+    with timing_span("scoring"):
+        q_arr = np.asarray(query_vec, dtype=np.float32)
+        q_norm = float(np.linalg.norm(q_arr))
+        if q_norm == 0:
+            _dense_failure("zero query embedding")
 
-    # Score the complete corpus in one matrix multiplication. The former code
-    # vectorized only the inner dimension and still paid Python/NumPy dispatch
-    # once per chunk.
-    dim = int(q_arr.shape[0])
-    expected_bytes = dim * 4
-    usable = [row for row in rows if len(row[2]) == expected_bytes]
-    if not usable:
-        _dense_failure(f"no dense vectors of width {dim}")
+        # Score the complete corpus in one matrix multiplication. The former code
+        # vectorized only the inner dimension and still paid Python/NumPy dispatch
+        # once per chunk.
+        dim = int(q_arr.shape[0])
+        expected_bytes = dim * 4
+        usable = [row for row in rows if len(row[2]) == expected_bytes]
+        if not usable:
+            _dense_failure(f"no dense vectors of width {dim}")
 
-    matrix = np.frombuffer(b"".join(row[2] for row in usable), dtype=np.float32).reshape(
-        len(usable), dim
-    )
-    norms = np.linalg.norm(matrix, axis=1)
-    similarities = np.zeros(len(usable), dtype=np.float32)
-    np.divide(matrix @ q_arr, norms * q_norm, out=similarities, where=norms > 0)
+        matrix = np.frombuffer(b"".join(row[2] for row in usable), dtype=np.float32).reshape(
+            len(usable), dim
+        )
+        norms = np.linalg.norm(matrix, axis=1)
+        similarities = np.zeros(len(usable), dtype=np.float32)
+        np.divide(matrix @ q_arr, norms * q_norm, out=similarities, where=norms > 0)
 
-    chunk_scores: list[tuple[float, str, str]] = [
-        (float(similarities[i]), usable[i][1], usable[i][0])
-        for i in np.nonzero(similarities > 0)[0]
-    ]
+        chunk_scores: list[tuple[float, str, str]] = [
+            (float(similarities[i]), usable[i][1], usable[i][0])
+            for i in np.nonzero(similarities > 0)[0]
+        ]
 
     if not chunk_scores:
         return []
@@ -1210,13 +1219,14 @@ def _semantic_search(
         try:
             conn = _open_readonly_db(db_path)
             placeholders = ",".join("?" * len(wanted))
-            snippets = dict(
-                conn.execute(
-                    f"SELECT chunk_id, content FROM chunk_embeddings "  # noqa: S608
-                    f"WHERE chunk_id IN ({placeholders})",
-                    wanted,
-                ).fetchall()
-            )
+            with timing_span("sqlite_read"):
+                snippets = dict(
+                    conn.execute(
+                        f"SELECT chunk_id, content FROM chunk_embeddings "  # noqa: S608
+                        f"WHERE chunk_id IN ({placeholders})",
+                        wanted,
+                    ).fetchall()
+                )
         except Exception as exc:
             _dense_failure(f"db error: {type(exc).__name__}")
         finally:
@@ -1224,28 +1234,29 @@ def _semantic_search(
                 conn.close()
 
     results: list[SearchResult] = []
-    for rel_path in top_paths:
-        filepath = vault_dir / rel_path
-        try:
-            content = read_file_content(filepath)
-            metadata = validate_metadata(content)
-            if metadata is None:
-                continue
-            similarity, chunk_id = doc_best[rel_path]
-            results.append(
-                SearchResult(
-                    rel_path=rel_path,
-                    title=metadata.title,
-                    description=metadata.description,
-                    note_type=metadata.type,
-                    score=similarity,
-                    snippet=snippets.get(chunk_id, ""),
-                    match_count=1,
-                    tags=metadata.tags,
+    with timing_span("result_materialization"):
+        for rel_path in top_paths:
+            filepath = vault_dir / rel_path
+            try:
+                content = read_file_content(filepath)
+                metadata = validate_metadata(content)
+                if metadata is None:
+                    continue
+                similarity, chunk_id = doc_best[rel_path]
+                results.append(
+                    SearchResult(
+                        rel_path=rel_path,
+                        title=metadata.title,
+                        description=metadata.description,
+                        note_type=metadata.type,
+                        score=similarity,
+                        snippet=snippets.get(chunk_id, ""),
+                        match_count=1,
+                        tags=metadata.tags,
+                    )
                 )
-            )
-        except Exception:  # noqa: S112
-            continue
+            except Exception:  # noqa: S112
+                continue
 
     return results
 
@@ -1485,8 +1496,11 @@ def _filter_temporal_results(
     max_results: int,
 ) -> list[SearchResult]:
     """Attach resolved status and filter ranked results at the retrieval boundary."""
-    indexed_records = load_temporal_records(_read_db_path(vault_dir))
-    records = indexed_records if indexed_records is not None else scan_temporal_records(vault_dir)
+    with timing_span("temporal_metadata"):
+        indexed_records = load_temporal_records(_read_db_path(vault_dir))
+        records = (
+            indexed_records if indexed_records is not None else scan_temporal_records(vault_dir)
+        )
     statuses = resolve_temporal_statuses(records, as_of)
     filtered: list[SearchResult] = []
     for result in results:
@@ -1553,8 +1567,10 @@ def _hybrid_reranked_search(
         except Exception:
             documents.append("")
 
-    reranker = _get_reranker()
-    reranked_scores = reranker.rerank(query, documents)
+    with timing_span("reranker_session_startup"):
+        reranker = _get_reranker()
+    with timing_span("reranker_scoring"):
+        reranked_scores = reranker.rerank(query, documents)
 
     for result, score in zip(rerank_pool, reranked_scores, strict=False):
         result.score = score
