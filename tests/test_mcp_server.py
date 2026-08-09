@@ -13,7 +13,9 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import Mock
 
+import httpx
 import pytest
+from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 from power_framework.core.capabilities import manifest
@@ -56,6 +58,52 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
     assert search.annotations is not None
     assert search.annotations.readOnlyHint is True
     assert search.meta["power.risk"]["egress"] == "model_download"
+
+
+async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections() -> None:
+    async with Client(power_server.mcp) as client:
+        tools = await client.list_tools()
+        resources = await client.list_resources()
+        resource_templates = await client.list_resource_templates()
+        prompts = await client.list_prompts()
+        tools_again = await client.list_tools()
+
+    expected_names = manifest()["interfaces"]["mcp_tools"]
+    assert [tool.name for tool in tools] == expected_names
+    assert [tool.name for tool in tools_again] == expected_names
+    assert [tool.name for tool in tools_again] == [tool.name for tool in tools]
+    assert resources == []
+    assert resource_templates == []
+    assert prompts == []
+    assert all(tool.outputSchema for tool in tools)
+    assert all(tool.annotations for tool in tools)
+    assert all(tool.meta and tool.meta.get("power.risk") for tool in tools)
+
+
+async def test_http_health_route_reports_vault_readiness(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("POWER_VAULT_DIR", str(tmp_path))
+
+    transport = httpx.ASGITransport(app=power_server.mcp.http_app(transport="http"))
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+async def test_http_health_route_fails_closed_without_vault(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("POWER_VAULT_DIR", str(tmp_path / "missing-vault"))
+
+    transport = httpx.ASGITransport(app=power_server.mcp.http_app(transport="http"))
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "error"
 
 
 async def test_read_sub_index_existing_category(sample_vault: Path) -> None:

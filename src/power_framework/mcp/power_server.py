@@ -32,9 +32,13 @@ from typing import TYPE_CHECKING
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
+from starlette.responses import JSONResponse
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from starlette.requests import Request
+    from starlette.responses import Response
 
 from power_framework.core import (
     DEFAULT_SEARCH_MODE,
@@ -153,6 +157,16 @@ def _get_http_transport_config() -> tuple[str, int]:
         raise ValueError("POWER_MCP_PORT must be an integer between 1 and 65535")
 
     return host, port
+
+
+@mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
+async def health_check(_request: Request) -> Response:
+    """Report whether the configured vault boundary is ready for HTTP clients."""
+    try:
+        _require_configured_vault_root()
+    except RuntimeError as exc:
+        return JSONResponse({"status": "error", "detail": str(exc)}, status_code=503)
+    return JSONResponse({"status": "ok"})
 
 
 @mcp.tool(
