@@ -173,14 +173,18 @@ Build the active search generation atomically.
 
 ```text
 power sync PATH [--fts-only] [--force] [--strict | --allow-partial]
+                [--accept-dense-loss]
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--fts-only` | Build the lightweight FTS index and skip embeddings. |
+| `--accept-dense-loss` | Allow `--fts-only` to replace an existing dense index. Without it, such a run is refused. |
 | `--force` | Force a full dense rebuild, for example after a model/dimension change. |
 | `--strict` | Explicitly select the default fail-closed coverage policy; the command exits non-zero when notes are excluded. |
 | `--allow-partial` | Explicitly accept excluded notes, continue with a warning, and exit zero with the complete path/reason receipt. Mutually exclusive with `--strict`. |
+
+An `--fts-only` run publishes a generation with zero chunks. When sources changed, that generation supersedes a dense one and every dense search mode then fails, so `--fts-only` is refused on a vault that already has an active dense index unless `--accept-dense-loss` is passed.
 
 Every sync prints scanned, indexed and excluded note counts plus deterministic
 exclusion reasons. Full sync downloads and validates the pinned embedding assets

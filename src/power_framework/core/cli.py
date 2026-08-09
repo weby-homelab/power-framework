@@ -419,6 +419,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         vault_dir,
     )
     force_rebuild = getattr(args, "force", False)
+    accept_dense_loss = getattr(args, "accept_dense_loss", False)
     try:
         report = execute_vault_mutation(
             vault_dir,
@@ -426,6 +427,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
                 vault_dir,
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
+                accept_dense_loss=accept_dense_loss,
             ),
         )
     except IndexGenerationError as exc:
@@ -862,6 +864,15 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Only build the lightweight FTS index (skip embedding generation)",
+    )
+    p_sync.add_argument(
+        "--accept-dense-loss",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow --fts-only to replace an existing dense index, discarding "
+            "embeddings and disabling semantic/hybrid/reranked search"
+        ),
     )
     p_sync.add_argument(
         "--force",

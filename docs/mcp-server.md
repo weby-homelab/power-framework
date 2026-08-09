@@ -112,6 +112,7 @@ calls per minute.
 ```text
 sync_vault(
   fts_only: boolean = true,
+  accept_dense_loss: boolean = false,
   force_rebuild: boolean = false,
   allow_partial: boolean = false,
   vault_path?: string
@@ -125,6 +126,11 @@ indexed, excluded, and chunk counts plus exclusion reasons. Invalid notes fail
 closed by default and are named in the `ToolError`; `allow_partial=true` is an
 explicit request to publish only the valid subset. Dense search remains
 fail-closed until a compatible dense generation exists.
+
+If the vault already has an active dense index, an FTS-only sync is refused
+because source changes would discard that capability. Pass
+`accept_dense_loss=true` only when the agent or operator explicitly accepts
+losing semantic, hybrid, and reranked search until the next dense rebuild.
 
 ### 3. `read_sub_index`
 
