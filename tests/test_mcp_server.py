@@ -4,8 +4,10 @@ Tests for P.O.W.E.R. MCP Server tool calls using FastMCP functions directly.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -35,6 +37,75 @@ from power_framework.mcp.power_server import (
     synthesize_session,
     validate_memory_state,
 )
+
+
+def _free_tcp_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _mcp_process_env(vault_path: Path, transport: str, port: int | None = None) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update(
+        {
+            "POWER_VAULT_DIR": str(vault_path),
+            "POWER_MCP_TRANSPORT": transport,
+        }
+    )
+    if port is not None:
+        env["POWER_MCP_HOST"] = "127.0.0.1"
+        env["POWER_MCP_PORT"] = str(port)
+    return env
+
+
+async def _assert_wire_contract(client: Client[object]) -> None:
+    tools = await client.list_tools()
+    resources = await client.list_resources()
+    resource_templates = await client.list_resource_templates()
+    prompts = await client.list_prompts()
+
+    expected_names = manifest()["interfaces"]["mcp_tools"]
+    assert [tool.name for tool in tools] == expected_names
+    assert resources == []
+    assert resource_templates == []
+    assert prompts == []
+    assert all(tool.outputSchema for tool in tools)
+    assert all(tool.annotations for tool in tools)
+    assert all(tool.meta and tool.meta.get("power.risk") for tool in tools)
+
+
+async def _stop_mcp_process(process: asyncio.subprocess.Process) -> None:
+    if process.returncode is None:
+        process.terminate()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5)
+        except TimeoutError:
+            process.kill()
+            await process.wait()
+    if process.stderr is not None:
+        await process.stderr.read()
+
+
+async def _wait_for_http_health(process: asyncio.subprocess.Process, url: str) -> None:
+    deadline = asyncio.get_running_loop().time() + 15
+    last_error = "server did not become ready"
+    async with httpx.AsyncClient(timeout=1) as http_client:
+        while asyncio.get_running_loop().time() < deadline:
+            if process.returncode is not None:
+                stderr = await process.stderr.read() if process.stderr is not None else b""
+                raise AssertionError(
+                    f"MCP HTTP process exited with {process.returncode}: {stderr.decode(errors='replace')}"
+                )
+            try:
+                response = await http_client.get(url)
+                if response.status_code == 200 and response.json() == {"status": "ok"}:
+                    return
+                last_error = f"health returned {response.status_code}: {response.text}"
+            except (httpx.HTTPError, ValueError) as exc:
+                last_error = str(exc)
+            await asyncio.sleep(0.1)
+    raise AssertionError(last_error)
 
 
 async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
@@ -78,6 +149,43 @@ async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections(
     assert all(tool.outputSchema for tool in tools)
     assert all(tool.annotations for tool in tools)
     assert all(tool.meta and tool.meta.get("power.risk") for tool in tools)
+
+
+async def test_mcp_stdio_process_preserves_wire_contract(sample_vault: Path) -> None:
+    config = {
+        "mcpServers": {
+            "power": {
+                "command": sys.executable,
+                "args": ["-m", "power_framework.mcp"],
+                "env": _mcp_process_env(sample_vault, "stdio"),
+            }
+        }
+    }
+
+    async with Client(config) as client:
+        await _assert_wire_contract(client)
+
+
+async def test_mcp_http_process_reports_health_and_preserves_wire_contract(
+    sample_vault: Path,
+) -> None:
+    port = _free_tcp_port()
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "power_framework.mcp",
+        cwd=str(Path(__file__).parents[1]),
+        env=_mcp_process_env(sample_vault, "http", port),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        base_url = f"http://127.0.0.1:{port}"
+        await _wait_for_http_health(process, f"{base_url}/health")
+        async with Client(f"{base_url}/mcp") as client:
+            await _assert_wire_contract(client)
+    finally:
+        await _stop_mcp_process(process)
 
 
 async def test_http_health_route_reports_vault_readiness(
