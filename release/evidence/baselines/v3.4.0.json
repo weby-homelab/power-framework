@@ -17,15 +17,15 @@
     "os": "ubuntu-latest"
   },
   "validation": {
-    "passed": 707,
+    "passed": 821,
     "skipped": 10,
-    "coverage_percent": 79.54,
+    "coverage_percent": 80.49,
     "warning_count": 0,
     "warning_policy": "Local full framework gate; skipped tests are explicit optional neural/quality gates.",
     "skipped_optional_gates": [
-      "real-vault neural evaluation",
-      "target-host cgroup memory matrix",
-      "persistent MCP latency matrix"
+      "real-vault neural determinism and retrieval evaluation",
+      "real-vault search-quality evaluation",
+      "target-host Windows performance matrix"
     ]
   },
   "benchmark": {
