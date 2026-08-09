@@ -29,6 +29,25 @@ def _identity_path(vault_dir: Path) -> Path:
     return vault_dir / ".power" / "vault.json"
 
 
+def _load_vault_identity(identity_path: Path) -> VaultIdentity:
+    try:
+        raw = json.loads(identity_path.read_text(encoding="utf-8"))
+        identity = VaultIdentity(
+            vault_id=str(raw["vault_id"]),
+            schema_version=int(raw["schema_version"]),
+            created_at=str(raw["created_at"]),
+        )
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f"Invalid vault identity at {identity_path}") from exc
+    try:
+        uuid.UUID(identity.vault_id)
+    except ValueError as exc:
+        raise ValueError(f"Invalid vault UUID at {identity_path}") from exc
+    if identity.schema_version != VAULT_SCHEMA_VERSION:
+        raise ValueError(f"Unsupported vault identity schema at {identity_path}")
+    return identity
+
+
 def ensure_vault_identity(vault_dir: Path) -> VaultIdentity:
     """Load or atomically create the stable identity stored inside a vault."""
     root = Path(vault_dir).expanduser().resolve()
@@ -36,22 +55,7 @@ def ensure_vault_identity(vault_dir: Path) -> VaultIdentity:
         raise NotADirectoryError(f"Vault path is not a directory: {root}")
     identity_path = _identity_path(root)
     if identity_path.exists():
-        try:
-            raw = json.loads(identity_path.read_text(encoding="utf-8"))
-            identity = VaultIdentity(
-                vault_id=str(raw["vault_id"]),
-                schema_version=int(raw["schema_version"]),
-                created_at=str(raw["created_at"]),
-            )
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            raise ValueError(f"Invalid vault identity at {identity_path}") from exc
-        try:
-            uuid.UUID(identity.vault_id)
-        except ValueError as exc:
-            raise ValueError(f"Invalid vault UUID at {identity_path}") from exc
-        if identity.schema_version != VAULT_SCHEMA_VERSION:
-            raise ValueError(f"Unsupported vault identity schema at {identity_path}")
-        return identity
+        return _load_vault_identity(identity_path)
 
     identity = VaultIdentity(
         vault_id=str(uuid.uuid4()),
@@ -73,6 +77,17 @@ def ensure_vault_identity(vault_dir: Path) -> VaultIdentity:
         + "\n",
     )
     return identity
+
+
+def read_vault_identity(vault_dir: Path) -> VaultIdentity | None:
+    """Read an existing vault identity without creating vault state."""
+    root = Path(vault_dir).expanduser().resolve()
+    if not root.is_dir():
+        return None
+    identity_path = _identity_path(root)
+    if not identity_path.is_file():
+        return None
+    return _load_vault_identity(identity_path)
 
 
 CACHE_SOURCE_FILE = "source.json"
@@ -110,7 +125,27 @@ def read_cache_source(namespace: Path) -> dict[str, str] | None:
         raw = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return raw if isinstance(raw, dict) else None
+    if not isinstance(raw, dict):
+        return None
+    vault_id = raw.get("vault_id")
+    vault_path = raw.get("vault_path")
+    schema_version = raw.get("schema_version")
+    if (
+        not isinstance(vault_id, str)
+        or not isinstance(vault_path, str)
+        or not vault_path.strip()
+        or not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or schema_version != 1
+    ):
+        return None
+    try:
+        uuid.UUID(vault_id)
+    except ValueError:
+        return None
+    if not Path(vault_path).expanduser().is_absolute():
+        return None
+    return {"vault_id": vault_id, "vault_path": vault_path, "schema_version": str(schema_version)}
 
 
 def vault_cache_dir(vault_dir: Path) -> Path:
@@ -120,6 +155,25 @@ def vault_cache_dir(vault_dir: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     _write_cache_source(path, Path(vault_dir).expanduser().resolve(), identity.vault_id)
     return path
+
+
+def existing_vault_cache_dir(vault_dir: Path) -> Path | None:
+    """Return an existing cache namespace without creating any state."""
+    identity = read_vault_identity(vault_dir)
+    if identity is None:
+        return None
+    return get_cache_dir(create=False) / "vaults" / identity.vault_id
+
+
+def existing_vault_db_path(vault_dir: Path | None = None) -> Path | None:
+    """Return an existing vault database path without creating a namespace."""
+    override = os.getenv("POWER_SEARCH_DB")
+    if override:
+        return Path(override)
+    if vault_dir is None:
+        raise ValueError("A vault path is required when POWER_SEARCH_DB is not set")
+    cache_dir = existing_vault_cache_dir(vault_dir)
+    return cache_dir / "search.db" if cache_dir is not None else None
 
 
 def vault_db_path(vault_dir: Path | None = None) -> Path:
@@ -144,7 +198,15 @@ class CacheNamespace:
 
 
 def _namespace_size(namespace: Path) -> int:
-    return sum(f.stat().st_size for f in namespace.rglob("*") if f.is_file())
+    total = 0
+    for filepath in namespace.rglob("*"):
+        if not filepath.is_file():
+            continue
+        try:
+            total += filepath.stat().st_size
+        except OSError:
+            continue
+    return total
 
 
 def classify_cache_namespaces() -> list[CacheNamespace]:
@@ -154,7 +216,7 @@ def classify_cache_namespaces() -> list[CacheNamespace]:
     different identity. ``unknown`` covers namespaces written before the
     back-reference existed — they are reported, never assumed dead.
     """
-    root = get_cache_dir() / "vaults"
+    root = get_cache_dir(create=False) / "vaults"
     if not root.is_dir():
         return []
 
@@ -171,16 +233,30 @@ def classify_cache_namespaces() -> list[CacheNamespace]:
             )
             continue
 
-        vault_path = Path(str(source.get("vault_path", "")))
+        if source["vault_id"] != entry.name:
+            namespaces.append(
+                CacheNamespace(
+                    entry.name,
+                    entry,
+                    _namespace_size(entry),
+                    "unknown",
+                    "source identity does not match namespace",
+                )
+            )
+            continue
+
+        vault_path = Path(source["vault_path"]).expanduser()
         if not vault_path.is_dir():
             verdict, detail = "stale", f"vault gone: {vault_path}"
         else:
             try:
-                current = ensure_vault_identity(vault_path).vault_id
+                identity = read_vault_identity(vault_path)
             except (OSError, ValueError, NotADirectoryError) as exc:
                 verdict, detail = "unknown", f"identity unreadable: {exc}"
             else:
-                if current == entry.name:
+                if identity is None:
+                    verdict, detail = "unknown", "vault identity missing"
+                elif identity.vault_id == entry.name:
                     verdict, detail = "live", str(vault_path)
                 else:
                     verdict, detail = "stale", f"vault re-identified: {vault_path}"

@@ -725,7 +725,9 @@ class TestCachePrune:
         from power_framework.core import vault_storage
         from power_framework.core.vault_storage import read_cache_source
 
-        monkeypatch.setattr(vault_storage, "get_cache_dir", lambda: tmp_path / "cache")
+        monkeypatch.setattr(
+            vault_storage, "get_cache_dir", lambda *, create=True: tmp_path / "cache"
+        )
         vault, namespace = self._make_vault(tmp_path, "v1")
         source = read_cache_source(namespace)
         assert source is not None
@@ -734,7 +736,9 @@ class TestCachePrune:
     def test_live_vault_is_never_pruned(self, tmp_path, monkeypatch):
         from power_framework.core import vault_storage
 
-        monkeypatch.setattr(vault_storage, "get_cache_dir", lambda: tmp_path / "cache")
+        monkeypatch.setattr(
+            vault_storage, "get_cache_dir", lambda *, create=True: tmp_path / "cache"
+        )
         _vault, namespace = self._make_vault(tmp_path, "live")
         report = vault_storage.prune_vault_caches(dry_run=False)
         assert namespace.is_dir()
@@ -745,7 +749,9 @@ class TestCachePrune:
 
         from power_framework.core import vault_storage
 
-        monkeypatch.setattr(vault_storage, "get_cache_dir", lambda: tmp_path / "cache")
+        monkeypatch.setattr(
+            vault_storage, "get_cache_dir", lambda *, create=True: tmp_path / "cache"
+        )
         vault, namespace = self._make_vault(tmp_path, "doomed")
         shutil.rmtree(vault)
         assert namespace.is_dir()
@@ -760,7 +766,9 @@ class TestCachePrune:
     def test_unattributable_namespace_is_kept_unless_asked(self, tmp_path, monkeypatch):
         from power_framework.core import vault_storage
 
-        monkeypatch.setattr(vault_storage, "get_cache_dir", lambda: tmp_path / "cache")
+        monkeypatch.setattr(
+            vault_storage, "get_cache_dir", lambda *, create=True: tmp_path / "cache"
+        )
         legacy = tmp_path / "cache" / "vaults" / "00000000-0000-4000-8000-000000000000"
         legacy.mkdir(parents=True)
         (legacy / "search.db").write_bytes(b"x")
@@ -770,3 +778,58 @@ class TestCachePrune:
 
         vault_storage.prune_vault_caches(dry_run=False, include_unknown=True)
         assert not legacy.exists()
+
+    def test_malformed_source_is_unknown_without_touching_vault(self, tmp_path, monkeypatch):
+        import json
+
+        from power_framework.core import vault_storage
+
+        monkeypatch.setattr(
+            vault_storage, "get_cache_dir", lambda *, create=False: tmp_path / "cache"
+        )
+        vault = tmp_path / "uninitialized"
+        vault.mkdir()
+        namespace = tmp_path / "cache" / "vaults" / "00000000-0000-4000-8000-000000000000"
+        namespace.mkdir(parents=True)
+        (namespace / "source.json").write_text(
+            json.dumps(
+                {
+                    "vault_id": namespace.name,
+                    "vault_path": "",
+                    "schema_version": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = vault_storage.classify_cache_namespaces()
+        assert result[0].verdict == "unknown"
+        assert not (vault / ".power").exists()
+
+    def test_missing_vault_identity_is_unknown_without_creating_one(self, tmp_path, monkeypatch):
+        import json
+
+        from power_framework.core import vault_storage
+
+        monkeypatch.setattr(
+            vault_storage, "get_cache_dir", lambda *, create=False: tmp_path / "cache"
+        )
+        vault = tmp_path / "missing-identity"
+        vault.mkdir()
+        namespace = tmp_path / "cache" / "vaults" / "00000000-0000-4000-8000-000000000000"
+        namespace.mkdir(parents=True)
+        (namespace / "source.json").write_text(
+            json.dumps(
+                {
+                    "vault_id": namespace.name,
+                    "vault_path": str(vault),
+                    "schema_version": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = vault_storage.classify_cache_namespaces()
+        assert result[0].verdict == "unknown"
+        assert result[0].detail == "vault identity missing"
+        assert not (vault / ".power").exists()
