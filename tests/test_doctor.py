@@ -8,7 +8,7 @@ from pathlib import Path
 
 from jsonschema import validate
 
-from power_framework.core import doctor
+from power_framework.core import capabilities, doctor
 
 
 def _safe_embedding() -> tuple[dict[str, object], list[dict[str, str]]]:
@@ -45,6 +45,22 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
     assert parsed["exit_code"] == 1
     assert parsed["vault"]["index_state"] == "missing"
     assert parsed["issues"][0]["code"] == "search_index_missing"
+    assert parsed["capabilities"] == capabilities.manifest()
+    assert len(parsed["capabilities"]["interfaces"]["cli_commands"]) == 19
+    assert len(parsed["capabilities"]["interfaces"]["mcp_tools"]) == 18
+    assert parsed["capabilities"]["search"]["default_mode"] == "semantic"
+
+
+def test_capability_manifest_is_read_only(tmp_path: Path, monkeypatch) -> None:
+    cache_home = tmp_path / "cache-home"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache_home))
+
+    report = capabilities.manifest()
+
+    assert report["read_only"] is True
+    assert report["network_access"] is False
+    assert report["storage"]["cache_root"] == str(cache_home / "power-framework")
+    assert not cache_home.exists()
 
 
 def test_vault_report_keeps_complete_exclusion_ledger(tmp_path: Path, monkeypatch) -> None:

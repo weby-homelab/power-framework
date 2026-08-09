@@ -10,6 +10,7 @@
     "status",
     "runtime",
     "configuration",
+    "capabilities",
     "embedding",
     "vault",
     "issues",
@@ -21,6 +22,34 @@
     "status": { "enum": ["ok", "degraded", "error"] },
     "runtime": { "type": "object" },
     "configuration": { "type": "object" },
+    "capabilities": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "source",
+        "version",
+        "interfaces",
+        "search",
+        "models",
+        "storage",
+        "environment",
+        "read_only",
+        "network_access"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "source": { "const": "power_framework.core.capabilities" },
+        "version": { "type": "string" },
+        "interfaces": { "type": "object" },
+        "search": { "type": "object" },
+        "models": { "type": "object" },
+        "storage": { "type": "object" },
+        "environment": { "type": "object" },
+        "read_only": { "const": true },
+        "network_access": { "const": false }
+      },
+      "additionalProperties": false
+    },
     "embedding": { "type": "object" },
     "vault": { "type": ["object", "null"] },
     "issues": {
