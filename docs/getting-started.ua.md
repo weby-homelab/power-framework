@@ -1,6 +1,6 @@
 # Початок роботи з чистою базою знань
 
-Це авторитетний clean-install шлях для P.O.W.E.R. `v3.3.2`. Він створює лише
+Це авторитетний clean-install шлях для P.O.W.E.R. `v3.4.0`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
@@ -29,7 +29,7 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.3.2/power_framework-3.3.2-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
 ```
 
 Release wheel фіксує версію вихідного коду P.O.W.E.R. Його залежності
@@ -45,7 +45,7 @@ Release wheel фіксує версію вихідного коду P.O.W.E.R. �
   'import power_framework.mcp, onnxruntime; print("imports: OK")'
 ```
 
-Обидві команди версії мають показати `3.3.2`, а остання команда —
+Обидві команди версії мають показати `3.4.0`, а остання команда —
 `imports: OK`.
 
 ### Альтернатива: встановлення із закріпленого tag
@@ -54,7 +54,7 @@ Release wheel фіксує версію вихідного коду P.O.W.E.R. �
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.3.2'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.4.0'
 ```
 
 Не використовуйте незакріплений `main`, якщо важлива відтворюваність.
@@ -196,7 +196,7 @@ Vault — це звичайні Markdown-файли, незалежні від P
 ## Acceptance checklist
 
 - Python має версію 3.11+, а interpreter належить окремому venv.
-- CLI та distribution metadata повертають `3.3.2`.
+- CLI та distribution metadata повертають `3.4.0`.
 - `power_framework.mcp` і `onnxruntime` імпортуються успішно.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з
   кодом `0`.

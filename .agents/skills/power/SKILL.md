@@ -1,6 +1,6 @@
 ---
 name: power
-version: 3.3.2
+version: 3.4.0
 description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
 ---
 
@@ -50,7 +50,7 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 18. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
 19. `power doctor [<path>] [--json]` — read-only діагностика runtime, фактичного ONNX provider, індексу та повного ledger виключених нотаток
 
-### MCP Tools (18) — FastMCP 3.x (v3.3.2)
+### MCP Tools (18) — FastMCP 3.x (v3.4.0)
 
 - Індекси й каталог: `generate_index`, `read_sub_index`, `ensure_sub_index`
 - Запис: `ingest_note`, `synthesize_session`
@@ -64,7 +64,7 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 оновлюють ієрархічний каталог, але база пошуку — окремий артефакт: доти
 `search_vault_tool` щойно збережену нотатку не поверне.
 
-### Конфігурація (v3.3.2)
+### Конфігурація (v3.4.0)
 
 - **Модель ембеддінгів** — канонічно `BAAI/bge-m3` (1024 dim) через direct ONNX Runtime. BGE-M3 natively підтримує **dense + sparse + ColBERT** в одній моделі, що дозволяє гібридний пошук (RRF) без окремого BM25. Провайдер змінюється через `POWER_EMBED_PROVIDER`; `fastembed`/MiniLM лишається полегшеним opt-in fallback.
 - **Реранкер за замовчуванням** — `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0, UA+EN). `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) лишається явним opt-in.

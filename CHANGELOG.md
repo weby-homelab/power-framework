@@ -5,7 +5,7 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.4.0] - 2026-08-09
 
 ### Added
 
@@ -19,6 +19,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   82.5% of queries). `DEFAULT_FTS_OPERATOR = "OR"` is unchanged — no code
   change is recommended by this evidence. See
   `docs/benchmarks/fts-or-vs-and.md`.
+- Added `power doctor`, a read-only, machine-readable diagnostic that reports
+  package/runtime state, active search generation, index coverage, model cache,
+  and the provider bound by a real ONNX Runtime session.
+- Added a fail-closed `power import --dry-run` migration planner that reports
+  foreign frontmatter, collisions, and quarantine changes before writing.
+- Added cache namespace provenance plus `power cache list` and
+  `power cache prune` for inspectable, scoped cache hygiene.
+
+### Changed
+
+- Made hierarchical catalogs recursive, explicitly linked, and bounded to
+  32 KiB UTF-8 pages with deterministic pagination.
+- Closed the MCP ingest-to-search loop so a successful agent write can be
+  synchronized and retrieved through the same governed surface.
+- Made dense-loss policy explicit across sync interfaces; an explicit device
+  request now fails closed when the requested provider cannot actually bind.
+- Refreshed both bundled agent skill copies and made their CLI/MCP/version
+  contract part of the documentation-drift gate.
+
+### Fixed
+
+- Isolated healer failures per note, quarantined foreign frontmatter, and
+  normalized failure paths on Windows so one malformed note cannot abort a
+  whole batch or leak machine-specific paths.
+- Made sync coverage an explicit invariant instead of allowing excluded notes
+  to disappear silently.
 
 ## [3.3.2] - 2026-08-05
 
