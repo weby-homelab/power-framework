@@ -63,6 +63,25 @@ def test_current_docs_match_executable_interfaces_and_safe_onboarding(
     assert gate["check_links"](documents, facts) == []
 
 
+def test_current_client_onboarding_matches_native_mcp_shapes() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+
+    assert gate["check_client_onboarding"](documents, facts) == []
+
+
+def test_client_onboarding_gate_rejects_legacy_wrapper() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    documents["Client onboarding"] += "\n/root/geminicli/.agents/mcp_servers/power_server.py\n"
+
+    errors = gate["check_client_onboarding"](documents, facts)
+
+    assert any("repository-specific MCP wrapper" in error for error in errors)
+
+
 def test_current_migration_guides_match_versioned_runtime_facts() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()

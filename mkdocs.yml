@@ -36,6 +36,8 @@ nav:
       - Чисте встановлення (UA): getting-started.ua.md
       - Windows 11 25H2 (EN): windows-11-installation.md
       - Windows 11 25H2 (UA): windows-11-installation.ua.md
+      - MCP Client Onboarding (EN): mcp-client-onboarding.md
+      - Підключення MCP-клієнтів (UA): mcp-client-onboarding.ua.md
       - Documentation Inventory (UA): documentation-inventory.ua.md
   - CLI Reference: cli.md
   - MCP Server: mcp-server.md

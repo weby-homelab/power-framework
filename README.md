@@ -245,6 +245,9 @@ power search ~/my-vault "experiment" --mode auto --domain research
 ## MCP Server Setup
 
 Connect P.O.W.E.R. to any MCP-compatible AI client (local stdio or Docker HTTP transport).
+The [MCP client onboarding guide](docs/mcp-client-onboarding.md) contains the
+canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
+OpenCode, plus the read-only golden task and approval workflow.
 
 ```bash
 pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
@@ -273,6 +276,9 @@ pip install https://github.com/weby-homelab/power-framework/releases/download/v3
   "power": {
     "type": "local",
     "command": ["python3", "-m", "power_framework.mcp"],
+    "environment": {
+      "POWER_VAULT_DIR": "/path/to/your/my-vault"
+    },
     "enabled": true
   }
 }

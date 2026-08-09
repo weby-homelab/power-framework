@@ -26,6 +26,7 @@ Checks:
       existing global OpenCode skill copy under ~/.opencode and
       ~/.config/opencode is audited unless POWER_GLOBAL_SKILL_PATH is set.
     onboarding — install/migration guides must use the current safe contract
+    clients    — all documented MCP client shapes must use the same stdio/vault contract
     links      — local Markdown targets in canonical docs must exist
 
 Exit code 0 = in sync, 1 = drift detected.
@@ -59,6 +60,8 @@ MIGRATION_UA = REPO_ROOT / "docs" / "migration-guide.ua.md"
 HIERARCHICAL = REPO_ROOT / "docs" / "hierarchical-index-migration.md"
 HIERARCHICAL_UA = REPO_ROOT / "docs" / "hierarchical-index-migration.ua.md"
 INVENTORY_UA = REPO_ROOT / "docs" / "documentation-inventory.ua.md"
+MCP_CLIENT_ONBOARDING = REPO_ROOT / "docs" / "mcp-client-onboarding.md"
+MCP_CLIENT_ONBOARDING_UA = REPO_ROOT / "docs" / "mcp-client-onboarding.ua.md"
 AGENT_INSTRUCTIONS = REPO_ROOT / ".agents" / "AGENTS.md"
 AGENT_SKILL = REPO_ROOT / "skills" / "power" / "SKILL.md"
 WORKSPACE_AGENT_SKILL = REPO_ROOT / ".agents" / "skills" / "power" / "SKILL.md"
@@ -83,6 +86,8 @@ CURRENT_DOCUMENTS = {
     "Hierarchical report": HIERARCHICAL,
     "Hierarchical report UA": HIERARCHICAL_UA,
     "Documentation inventory UA": INVENTORY_UA,
+    "Client onboarding": MCP_CLIENT_ONBOARDING,
+    "Client onboarding UA": MCP_CLIENT_ONBOARDING_UA,
     "Agent instructions": AGENT_INSTRUCTIONS,
     "Agent skill": AGENT_SKILL,
     "Workspace agent skill": WORKSPACE_AGENT_SKILL,
@@ -597,6 +602,45 @@ def check_onboarding(documents: dict[str, str], facts: dict[str, Any]) -> list[s
     return errors
 
 
+def check_client_onboarding(documents: dict[str, str], facts: dict[str, Any]) -> list[str]:
+    """Keep every client example on the same direct stdio/vault contract."""
+    errors: list[str] = []
+    labels = ("Client onboarding", "Client onboarding UA")
+    required_markers = (
+        "power-client-config:claude-desktop",
+        "power-client-config:gemini-cli",
+        "power-client-config:codex",
+        "power-client-config:opencode",
+        "POWER_VAULT_DIR",
+        "power_framework.mcp",
+        "get_memory_context",
+        "propose_memory_change",
+        "apply_memory_change",
+        "approved=true",
+    )
+    forbidden = {
+        r"POWER_VAULT_PATH": "legacy vault variable",
+        r"\.agents/mcp_servers/power_server\.py": "repository-specific MCP wrapper",
+        r"/root/geminicli": "foreign absolute workspace path",
+    }
+    for label in labels:
+        text = documents[label]
+        errors.extend(
+            f"{label} is missing client onboarding marker `{marker}`."
+            for marker in required_markers
+            if marker not in text
+        )
+        if f"{len(facts['interfaces']['mcp_tools'])} tools" not in text:
+            errors.append(
+                f"{label} does not declare the current MCP tool count "
+                f"({len(facts['interfaces']['mcp_tools'])})."
+            )
+        for pattern, description in forbidden.items():
+            if re.search(pattern, text, flags=re.IGNORECASE):
+                errors.append(f"{label} contains a forbidden {description}.")
+    return errors
+
+
 def check_migration_guide(documents: dict[str, str], facts: dict[str, Any]) -> list[str]:
     """Keep the migration guide's versioned safety claims executable and current."""
     errors: list[str] = []
@@ -689,6 +733,7 @@ CHECKS = {
     "retrieval": check_retrieval_registry,
     "interfaces": check_interfaces,
     "onboarding": check_onboarding,
+    "clients": check_client_onboarding,
     "links": check_links,
 }
 
@@ -697,7 +742,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="POWER doc-drift gate")
     parser.add_argument(
         "--check",
-        default="embedder,reranker,mode,version,retrieval,interfaces,onboarding,links",
+        default="embedder,reranker,mode,version,retrieval,interfaces,onboarding,clients,links",
         help="comma-separated checks to run (default: all)",
     )
     args = parser.parse_args()
@@ -713,7 +758,7 @@ def main() -> int:
         if fn is None:
             print(f"::warning:: unknown check '{name}' skipped", file=sys.stderr)
             continue
-        if name in {"retrieval", "interfaces", "onboarding", "links"}:
+        if name in {"retrieval", "interfaces", "onboarding", "clients", "links"}:
             all_errors.extend(fn(documents, facts))
         else:
             all_errors.extend(fn(readme, facts))

@@ -13,6 +13,8 @@ and an MCP interface for AI agents.
 - [Windows 11 25H2 validation after CRLF fix](tests/windows-11-25h2-v3.3.2-validation-fixed.md)
 - [Migration from an existing knowledge base](migration-guide.md)
 - [Міграція з наявної бази знань](migration-guide.ua.md)
+- [MCP client onboarding](mcp-client-onboarding.md)
+- [Підключення MCP-клієнтів](mcp-client-onboarding.ua.md)
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
 These guides pin the immutable `v3.4.0` release artifact, use an isolated virtual
