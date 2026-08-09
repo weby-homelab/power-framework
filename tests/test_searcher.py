@@ -41,7 +41,9 @@ from power_framework.core.searcher import (
 )
 
 
-def test_search_temporal_views_filter_one_shared_corpus(sample_vault: Path) -> None:
+def test_search_temporal_views_filter_one_shared_corpus(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     old = sample_vault / "03_Resources" / "old-fact.md"
     new = sample_vault / "03_Resources" / "new-fact.md"
     old.write_text(
@@ -93,6 +95,36 @@ temporal-token current fact
     assert {result.rel_path for result in historical} == {"03_Resources/old-fact.md"}
     assert current[0].temporal_status == "current"
     assert historical[0].temporal_status == "historical"
+
+
+def test_temporal_filter_uses_complete_indexed_metadata_projection(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    note = sample_vault / "03_Resources" / "indexed-temporal.md"
+    note.write_text(
+        "---\n"
+        "type: Resource\n"
+        'title: "Indexed temporal"\n'
+        'description: "indexed-temporal-token"\n'
+        "timestamp: 2026-07-10T00:00:00Z\n"
+        "memory:\n"
+        "  kind: semantic\n"
+        "  valid_from: 2026-01-01\n"
+        "---\n\nindexed-temporal-token\n",
+        encoding="utf-8",
+    )
+
+    first = search_vault(sample_vault, "indexed-temporal-token", mode="fts")
+    assert first
+
+    monkeypatch.setattr(
+        "power_framework.core.searcher.scan_temporal_records",
+        lambda _vault: pytest.fail("complete temporal projection should avoid disk scan"),
+    )
+    second = search_vault(sample_vault, "indexed-temporal-token", mode="fts")
+
+    assert second[0].rel_path == "03_Resources/indexed-temporal.md"
+    assert second[0].temporal_status == "current"
 
 
 class TestTokenize:
