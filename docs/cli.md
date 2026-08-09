@@ -6,7 +6,7 @@ This reference is aligned with the executable P.O.W.E.R. `v3.3.2` parser.
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,import,search,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,cache,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -314,3 +314,27 @@ CLI commands with an optional path resolve `POWER_VAULT_DIR` first. The legacy
 `POWER_VAULT_PATH` alias is accepted by the implementation, but new
 configurations should use `POWER_VAULT_DIR`, which is also the canonical MCP
 boundary.
+
+### `cache`
+
+Inspect or prune the per-vault cache namespaces under the user cache
+directory. They hold the search generations, not vault content.
+
+```text
+power cache list
+power cache prune [--no-dry-run] [--include-unknown]
+```
+
+| Flag | Description |
+| --- | --- |
+| `--no-dry-run` | Actually delete; the default is a preview only. |
+| `--include-unknown` | Also remove namespaces with no source record. |
+
+Each namespace records the vault it belongs to, so `prune` removes only those
+whose vault is provably gone or has been re-identified. A namespace written
+before that record existed is reported as `unknown` and kept, because absence
+of a record is not evidence that the vault is gone; `--include-unknown` opts
+into removing those as well.
+
+`cache list` prints every namespace with its verdict and size, which is the
+only way to see what a prune would target before running it.
