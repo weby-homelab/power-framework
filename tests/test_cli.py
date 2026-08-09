@@ -4,6 +4,7 @@ CLI tests for P.O.W.E.R. commands: init, lint, index, ingest, search.
 
 from __future__ import annotations
 
+import json
 import sys
 from typing import TYPE_CHECKING
 from unittest.mock import patch
@@ -59,6 +60,33 @@ def test_init_fails_on_nonempty(tmp_path: Path) -> None:
     with patch.object(sys, "argv", ["power", "init", str(vault)]), pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 1
+
+
+def test_doctor_json_uses_machine_contract(tmp_path: Path, capsys, monkeypatch) -> None:
+    from power_framework.core import cli
+
+    monkeypatch.setattr(
+        cli,
+        "run_doctor",
+        lambda _path: {
+            "schema_version": 1,
+            "command": "doctor",
+            "status": "ok",
+            "runtime": {},
+            "embedding": {},
+            "vault": None,
+            "issues": [],
+            "exit_code": 0,
+        },
+    )
+    with (
+        patch.object(sys, "argv", ["power", "doctor", "--json", str(tmp_path)]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 0
+    assert json.loads(capsys.readouterr().out)["schema_version"] == 1
 
 
 def test_lint_valid_vault(sample_vault: Path) -> None:

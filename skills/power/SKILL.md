@@ -28,7 +28,7 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 
 Скілл містить автоматизовані скрипти у каталозі `scripts/` та CLI:
 
-### CLI (power, 18 команд)
+### CLI (power, 19 команд)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
@@ -48,6 +48,7 @@ description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + O
 16. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
 17. `power synthesize <path>` — створення підсумкової нотатки сесії
 18. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
+19. `power doctor [<path>] [--json]` — read-only діагностика runtime, фактичного ONNX provider, індексу та повного ledger виключених нотаток
 
 ### MCP Tools (18) — FastMCP 3.x (v3.3.2)
 

@@ -6,7 +6,7 @@ This reference is aligned with the executable P.O.W.E.R. `v3.3.2` parser.
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,import,search,cache,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,cache,doctor,memory,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -338,3 +338,26 @@ into removing those as well.
 
 `cache list` prints every namespace with its verdict and size, which is the
 only way to see what a prune would target before running it.
+
+### `doctor`
+
+Run a read-only diagnostic pass for the runtime and, optionally, one vault.
+The command does not create a vault identity, cache namespace, search database,
+or model files. The embedding probe uses only an already-cached pinned model;
+otherwise the report says that binding is not verified and recommends running
+`power sync` separately.
+
+```text
+power doctor [PATH] [--json]
+```
+
+The report distinguishes compiled ONNX providers from the provider bound by a
+real embedding session. With `--json`, stdout contains the versioned report
+contract [`doctor-report-v1.json`](schemas/doctor-report-v1.json), including the
+complete `excluded_notes` ledger and stable issue codes for agents and CI.
+Human-readable output is a summary of the same report.
+
+Exit `0` means the requested diagnostics are healthy. Exit `1` means the
+runtime, binding, vault, index, or coverage state is unavailable or degraded;
+an uncached model and excluded notes are therefore visible failures, not silent
+successes. Use `power sync PATH --strict` as the repair gate.
