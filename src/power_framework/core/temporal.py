@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from .ignore import should_skip
 from .models import MemoryMetadata
 from .parser import read_file_content, validate_metadata
+from .timing import timing_span
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -93,9 +94,12 @@ def load_temporal_records(db_path: Path | None) -> dict[str, TemporalRecord] | N
     if db_path is None or not db_path.is_file():
         return None
     try:
-        with closing(
-            sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True, timeout=30)
-        ) as conn:
+        with (
+            closing(
+                sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True, timeout=30)
+            ) as conn,
+            timing_span("sqlite_read"),
+        ):
             table = conn.execute(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'temporal_records'"
             ).fetchone()

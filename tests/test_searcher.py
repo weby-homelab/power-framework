@@ -39,6 +39,7 @@ from power_framework.core.searcher import (
     search_vault,
     validate_dense_index,
 )
+from power_framework.core.timing import collect_timings
 
 
 def test_search_temporal_views_filter_one_shared_corpus(
@@ -125,6 +126,16 @@ def test_temporal_filter_uses_complete_indexed_metadata_projection(
 
     assert second[0].rel_path == "03_Resources/indexed-temporal.md"
     assert second[0].temporal_status == "current"
+
+
+def test_search_timing_collector_records_content_free_components(sample_vault: Path) -> None:
+    with collect_timings() as receipt:
+        assert search_vault(sample_vault, "test", mode="fts")
+
+    components = receipt.as_dict()["components_ms"]
+    assert {"generation_resolve", "sqlite_read", "temporal_metadata"} <= set(components)
+    assert "snippet" not in components
+    assert "query" not in components
 
 
 class TestTokenize:
