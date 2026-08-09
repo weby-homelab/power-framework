@@ -920,6 +920,38 @@ class TestVectorSearch:
         assert conn.execute("SELECT COUNT(*) FROM dense_index_manifest").fetchone()[0] == 0
         conn.close()
 
+    def test_generated_catalog_pages_never_enter_the_index(self, tmp_path: Path):
+        folder = tmp_path / "03_Resources"
+        folder.mkdir(parents=True)
+        catalog = (
+            "---\n"
+            "type: System Guide\n"
+            'title: "03 Resources Sub-Index"\n'
+            'description: "Detailed catalog of all notes in 03 Resources"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "x-generated-by: power\n"
+            "---\n\n# catalog\n"
+        )
+        # Page 1 was already excluded by name; the paginated pages were not.
+        for name in ("_index.md", "_index-2.md", "_index-17.md"):
+            (folder / name).write_text(catalog, encoding="utf-8")
+        (folder / "Real Note.md").write_text(
+            "---\n"
+            "type: Resource\n"
+            'title: "Real Note"\n'
+            'description: "Actual knowledge"\n'
+            "timestamp: 2026-07-21T00:00:00Z\n"
+            "---\n\nbody\n",
+            encoding="utf-8",
+        )
+
+        with closing(sqlite3.connect(tmp_path / "search.db")) as conn:
+            _init_db(conn)
+            _sync_vault_to_db(tmp_path, conn, sync_embeddings=False)
+            indexed = {row[0] for row in conn.execute("SELECT rel_path FROM file_metadata")}
+
+        assert indexed == {"03_Resources/Real Note.md"}
+
     def test_finds_relevant_note(self, sample_vault: Path):
         results = _vector_search(sample_vault, "project architecture")
         assert len(results) > 0

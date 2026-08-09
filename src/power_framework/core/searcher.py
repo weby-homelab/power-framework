@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .chunker import SemanticChunker
+from .constants import is_catalog_filename
 from .db import _init_db
 from .domains import DomainConfigError, resolve_search_policy
 from .embeddings import configured_embedding_identity, get_embedding_manager
@@ -357,7 +358,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
     results: list[SearchResult] = []
 
     for filepath in vault_dir.rglob("*.md"):
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
@@ -434,7 +435,12 @@ def _sync_vault_to_db(
 
     disk_files: dict[str, float] = {}
     for filepath in vault_dir.rglob("*.md"):
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+        # A generated catalog is navigation, not knowledge. The literal
+        # "_index.md" was excluded but the paginated "_index-N.md" pages were
+        # not, so every page past the first entered the index as if it were a
+        # note. `is_catalog_filename` is the check the indexer and linter
+        # already use for exactly this distinction.
+        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
