@@ -15,6 +15,7 @@ from power_framework.core.generation_index import (
     ActiveGenerationError,
     IndexGenerationError,
     _state_db_path,
+    invalidate_active_generation_cache,
     resolve_active_generation,
     resolve_active_generation_path,
     sync_vault_atomically,
@@ -241,6 +242,78 @@ def test_missing_active_generation_file_fails_closed(
 
     with pytest.raises(ActiveGenerationError, match="active generation file is missing"):
         search_vault(vault, "stable-token", mode="fts")
+
+
+def test_cached_generation_rechecks_file_identity_before_reuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cached identity must not hide an externally corrupted generation."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "corrupted-cache", "stable-token")
+    sync_vault_atomically(vault, sync_embeddings=False)
+    active = resolve_active_generation(vault)
+    assert active is not None
+
+    active.path.write_bytes(active.path.read_bytes() + b"corruption")
+
+    with pytest.raises(ActiveGenerationError, match="identity mismatch"):
+        resolve_active_generation(vault)
+
+
+def test_publication_invalidates_generation_identity_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A newly published generation is visible to the next read immediately."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "cache-invalidation", "first-token")
+    first = sync_vault_atomically(vault, sync_embeddings=False)
+    assert resolve_active_generation(vault) is not None
+
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("first-token", "second-token"),
+        encoding="utf-8",
+    )
+    second = sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert second.generation_id != first.generation_id
+    active = resolve_active_generation(vault)
+    assert active is not None
+    assert active.generation_id == second.generation_id
+
+    invalidate_active_generation_cache(vault)
+    rechecked = resolve_active_generation(vault)
+    assert rechecked is not None
+    assert rechecked.generation_id == second.generation_id
+
+
+def test_external_active_pointer_change_invalidates_cached_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The state WAL is part of the cache key for another publisher's update."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "external-pointer", "first-token")
+    first = sync_vault_atomically(vault, sync_embeddings=False)
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("first-token", "second-token"),
+        encoding="utf-8",
+    )
+    second = sync_vault_atomically(vault, sync_embeddings=False)
+    published = resolve_active_generation(vault)
+    assert published is not None
+    assert published.generation_id == second.generation_id
+
+    with closing(sqlite3.connect(_state_db_path(vault), timeout=30)) as conn:
+        conn.execute(
+            "UPDATE active_generation SET generation_id = ? WHERE id = 1",
+            (first.generation_id,),
+        )
+        conn.commit()
+
+    active = resolve_active_generation(vault)
+    assert active is not None
+    assert active.generation_id == first.generation_id
 
 
 def test_invalid_sources_are_explicitly_recorded(

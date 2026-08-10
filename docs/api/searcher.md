@@ -33,3 +33,12 @@ The executable registry is `SEARCH_MODE_REGISTRY` in `core/searcher.py` and
 the generated reference table is in [Architecture](../architecture.md). The
 deprecated `hybrid_reranked` input alias normalizes to `reranked`; it is not a
 canonical mode. The current default is `semantic`, not `reranked`.
+
+## Active-generation resolution
+
+When a vault has an immutable generation, POWER verifies the active state and
+database identity before serving retrieval. The verified identity may be
+reused by later requests only while the generation-state database (including
+its SQLite WAL/SHM files) and the immutable database fingerprint are unchanged.
+Publication explicitly invalidates this cache, and an identity or integrity
+mismatch fails closed instead of falling back to a stale generation.
