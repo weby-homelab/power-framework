@@ -81,6 +81,54 @@ jobs:
           $searchText
           uv run power status $vault
 
+  macos-runtime-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv==0.11.33
+          uv sync --locked
+          uv run python -m pip check
+
+      - name: Verify macOS CLI and FTS lifecycle without model download
+        env:
+          HF_HUB_OFFLINE: "1"
+          POWER_EMBED_DEVICE: cpu
+          POWER_RERANKER_DEVICE: cpu
+          XDG_CACHE_HOME: ${{ runner.temp }}/power-cache
+        run: |
+          set -euo pipefail
+          vault="${RUNNER_TEMP}/power-vault"
+
+          uv run power --version
+          uv run python -c "import power_framework.mcp, onnxruntime; print('imports: OK')"
+          uv run power init "$vault"
+          uv run power ingest "$vault" --type Resource --title "macOS smoke note" --description "macOS runtime smoke note"
+          uv run power index "$vault" --strict
+          uv run power lint "$vault"
+          uv run power markdown-check "$vault"
+          uv run power sync "$vault" --fts-only --strict
+          search_result="$(uv run power search "$vault" "macOS smoke" --mode fts)"
+          if ! grep -Fq "macOS smoke note" <<<"$search_result"; then
+            printf '%s\n' "$search_result"
+            echo "FTS acceptance check did not return macOS smoke note" >&2
+            exit 1
+          fi
+          if ! grep -Fq "Index coverage: 1/1" <<<"$search_result" || grep -Fq "pending:" <<<"$search_result"; then
+            printf '%s\n' "$search_result"
+            echo "FTS acceptance check reported stale index coverage" >&2
+            exit 1
+          fi
+          printf '%s\n' "$search_result"
+
   test:
     runs-on: ubuntu-latest
     strategy:
