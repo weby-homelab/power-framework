@@ -143,12 +143,16 @@ claude mcp add --transport stdio \
 має бути read-only до явного кроку створення proposal:
 
 1. Відкрийте MCP status view клієнта (`/mcp`, якщо підтримується) і перевірте,
-   що `power` підключений та має 19 інструментів.
+   що `power` підключений та має 20 інструментів.
 2. Попросіть агента перелічити tools, resources, resource templates і prompts.
-   POWER має показати 19 tools і не мати resources, templates або prompts.
-3. Попросіть агента викликати `get_memory_context` для короткого запиту. Це не
+   POWER має показати 20 tools і не мати resources, templates або prompts.
+3. Попросіть агента викликати `get_server_info` без аргументів. Перевірте
+   версію пакета, налаштований шлях vault і явний стан
+   `embedding.binding` перед довірою до retrieval. `probe_provider=true`
+   використовуйте лише коли потрібна фактична no-download перевірка binding.
+4. Попросіть агента викликати `get_memory_context` для короткого запиту. Це не
    має створити файл, namespace, index або запис history.
-4. Попросіть агента викликати `propose_memory_change` для нової нотатки, але не
+5. Попросіть агента викликати `propose_memory_change` для нової нотатки, але не
    схвалюйте її. Це створює лише durable content-addressed запис proposal;
    цільова нотатка, каталог і пошукова projection мають залишитися відсутніми.
 

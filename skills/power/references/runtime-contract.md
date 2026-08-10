@@ -6,7 +6,7 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.4.0` — runtime contract: **20 CLI commands** + **19 MCP tools** (FastMCP 3.x).
+`v3.4.0` — runtime contract: **20 CLI commands** + **20 MCP tools** (FastMCP 3.x).
 
 ## CLI (20 команд)
 
@@ -31,8 +31,11 @@ sync/doctor правила. Авторитетна правда — `power docto
 19. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
 20. `power doctor [<path>] [--json]` — read-only діагностика runtime, ONNX provider, індексу та ledger виключених нотаток
 
-## MCP Tools (19) — FastMCP 3.x
+## MCP Tools (20) — FastMCP 3.x
 
+- Discovery: `get_server_info` — versioned runtime, configured vault, coverage,
+  and embedding configuration; `probe_provider=true` is an explicit no-download
+  provider-binding probe.
 - Індекси й каталог: `generate_index`, `read_sub_index`, `ensure_sub_index`
 - Запис: `ingest_note`, `synthesize_session`
 - Пошук: `search_vault_tool`, `sync_vault`, `suggest_related_tool`
@@ -42,6 +45,12 @@ sync/doctor правила. Авторитетна правда — `power docto
   `apply_memory_change`, `validate_memory_state`, `read_memory_history`
 - Handoff: `handoff_work` — content-free Markdown packet, checkpoints,
   resume/cancel/input-required semantics та idempotency keys
+
+`get_server_info` is the MCP equivalent of the CLI doctor discovery contract.
+Its default call is lightweight and does not load ONNX Runtime, open a model
+session, create cache state, or access the network. A configured or listed
+provider is never treated as an active binding; use `probe_provider=true` when
+an actual no-download session binding receipt is required.
 
 **Канонічний запис замикає пошук.** `ingest_note`, `synthesize_session` та
 `apply_memory_change` в одному transaction workflow оновлюють note, index,
@@ -97,6 +106,9 @@ power sync PATH [--fts-only] [--force] [--strict | --allow-partial] [--accept-de
 - `power doctor [<path>] [--json]` — read-only діагностика. Report має
   `read_only=true` і `network_access=false`, включає повний ledger
   `excluded_notes` та стабільні issue codes для агентів і CI.
+- MCP `get_server_info` — той самий versioned doctor JSON для довгоживучого
+  агента; за замовчуванням discovery не пробує model/provider, а
+  `probe_provider=true` явно запитує no-download binding probe.
 
 ## Models / environment
 

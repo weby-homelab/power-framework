@@ -42,7 +42,7 @@ Verify against this checklist:
 - Are background threads constrained (`ThreadPoolExecutor` instead of raw threads)?
 - Is the image/codebase clean (no systemd artifacts, no empty directories)?
 - Does the vault pass `power lint` with exit code 0?
-- Are all 19 MCP tools functional via the FastMCP 3.x server?
+- Are all 20 MCP tools functional via the FastMCP 3.x server?
 - Is the `models.lock.json` SHA-pinned for both `canonical_embedding` and `canonical_reranker`?
 - Does the semantic GT (`--gt-mode semantic`) show `ndcg@5(reranked) > ndcg@5(fts)`?
 

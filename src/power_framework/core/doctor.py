@@ -228,6 +228,37 @@ def _probe_embedding_binding() -> tuple[dict[str, Any], list[dict[str, str]]]:
     return embedding, issues
 
 
+def _unprobed_embedding_status() -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Describe embedding configuration without loading runtimes or models.
+
+    MCP discovery is called by long-lived clients and must be cheap and
+    side-effect free by default.  A configured provider is not an active
+    provider, so this deliberately reports ``not_requested`` rather than
+    implying that the requested backend bound successfully.
+    """
+    from .embeddings import EMBED_PROVIDER, requested_device
+
+    embedding: dict[str, Any] = {
+        "provider": EMBED_PROVIDER,
+        "requested_device": requested_device("POWER_EMBED_DEVICE"),
+        "available_providers": [],
+        "model_cached": None,
+        "binding": "not_requested",
+        "bound_provider": None,
+        "probe_seconds": None,
+        "probe_requested": False,
+    }
+    issues = [
+        _issue(
+            "embedding_binding_not_requested",
+            "warning",
+            "The active embedding provider was not probed by this read-only discovery call.",
+            "Call the MCP discovery tool with probe_provider=true or run power doctor --json.",
+        )
+    ]
+    return embedding, issues
+
+
 def _probe_vault(vault_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Inspect a vault and its search state without creating cache or index files."""
     root = Path(vault_dir).expanduser().resolve()
@@ -392,8 +423,13 @@ def _probe_vault(vault_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]
     return vault, issues
 
 
-def run_doctor(vault_dir: Path | None = None) -> dict[str, Any]:
-    """Build the versioned, read-only doctor report."""
+def run_doctor(vault_dir: Path | None = None, *, probe_embedding: bool = True) -> dict[str, Any]:
+    """Build the versioned, read-only doctor report.
+
+    ``probe_embedding=False`` is the lightweight discovery path used by MCP.
+    It reports configuration and vault state without importing ONNX Runtime,
+    opening a model session, or checking model cache files.
+    """
     try:
         package_version = distribution_version("power-framework")
     except PackageNotFoundError:
@@ -422,7 +458,11 @@ def run_doctor(vault_dir: Path | None = None) -> dict[str, Any]:
         "embed_device": requested_device("POWER_EMBED_DEVICE"),
         "reranker_device": requested_device("POWER_RERANKER_DEVICE"),
     }
-    embedding, embedding_issues = _probe_embedding_binding()
+    if probe_embedding:
+        embedding, embedding_issues = _probe_embedding_binding()
+        embedding["probe_requested"] = True
+    else:
+        embedding, embedding_issues = _unprobed_embedding_status()
     report["embedding"] = embedding
     issues.extend(embedding_issues)
     if vault_dir is not None:

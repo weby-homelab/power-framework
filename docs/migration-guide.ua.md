@@ -35,7 +35,7 @@ rollback path.
 - P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, flat folders та
   hybrid trees підтримуються як **класифікації джерела**.
 - Destination використовує канонічні top-level folders P.O.W.E.R., щоб
-  hierarchical index і 19 MCP tools мали задокументовану поведінку.
+  hierarchical index і 20 MCP tools мали задокументовану поведінку.
 - Не-Markdown система має спочатку експортувати нотатки у Markdown, а
   attachments — у файли. Vendor database extraction не реалізовано в CLI.
 - Невідомі frontmatter fields можна зберегти, але required OKF fields мають
@@ -69,7 +69,7 @@ rollback path.
 executable capability manifest, щоб агент не успадковував старий migration
 recipe:
 
-- поточна surface — 20 top-level CLI commands і 19 MCP tools;
+- поточна surface — 20 top-level CLI commands і 20 MCP tools;
 - режим пошуку за замовчуванням — `semantic`; `reranked` є explicit opt-in;
 - database і cache paths належать runtime. Для active paths і state використовуйте
   `power doctor DESTINATION --json`; не hard-code-ьте vault-local database

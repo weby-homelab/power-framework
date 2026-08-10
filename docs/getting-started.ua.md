@@ -164,7 +164,7 @@ POWER_VAULT_DIR="$POWER_VAULT" "$POWER_PYTHON" -c \
 ```
 
 Після зміни конфігурації або Python environment перезапустіть long-lived
-MCP-клієнт. Повний контракт 19 інструментів і transport security boundary
+MCP-клієнт. Повний контракт 20 інструментів і transport security boundary
 описано в [MCP Server](mcp-server.md).
 
 ## 8. Щоденна послідовність
