@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -229,7 +230,8 @@ def _index_identity(vault: Path) -> dict[str, Any]:
         return {"kind": "legacy_db", "generation_id": None}
 
     try:
-        with sqlite3.connect(f"file:{active.path.as_posix()}?mode=ro", uri=True) as connection:
+        database_uri = f"{active.path.resolve().as_uri()}?mode=ro"
+        with closing(sqlite3.connect(database_uri, uri=True)) as connection:
             note_count = int(connection.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0])
             chunk_count = int(
                 connection.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
@@ -345,7 +347,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             ]
             mode_result["warm_process"] = _summary(warm)
         except Exception as exc:
-            receipt["errors"].append(f"{mode}/warm_process: {type(exc).__name__}: {exc}")
+            receipt["errors"].append(f"{mode}/warm_process: {type(exc).__name__}")
 
         try:
             cold = [
@@ -355,13 +357,13 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             ]
             mode_result["cold_process"] = _summary(cold)
         except Exception as exc:
-            receipt["errors"].append(f"{mode}/cold_process: {type(exc).__name__}: {exc}")
+            receipt["errors"].append(f"{mode}/cold_process: {type(exc).__name__}")
 
         try:
             mcp = await _mcp_samples(vault, queries, mode, args.rounds, args.max_results)
             mode_result["long_lived_mcp"] = _summary(mcp)
         except Exception as exc:
-            receipt["errors"].append(f"{mode}/long_lived_mcp: {type(exc).__name__}: {exc}")
+            receipt["errors"].append(f"{mode}/long_lived_mcp: {type(exc).__name__}")
 
         receipt["results"][mode] = mode_result
 

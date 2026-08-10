@@ -3,7 +3,7 @@
 `scripts/benchmark_retrieval_latency.py` produces a content-free latency
 receipt. It records query-set hash, verified index identity, execution-shape
 timings, sanitized provider binding, peak RSS, optional NVIDIA device memory,
-and error counts. It never writes query text, note content, snippets, paths, or
+and execution errors. It never writes query text, note content, snippets, paths, or
 the doctor report's vault path to the receipt.
 
 Peak RSS is recorded per execution shape. NVIDIA telemetry is sampled only at

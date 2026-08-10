@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import ctypes.wintypes as wintypes
 import os
 import shutil
 import subprocess
@@ -14,7 +15,6 @@ def _peak_rss_bytes() -> int | None:
     """Return the process peak resident set size when the host exposes it."""
     if os.name == "nt":
         try:
-            from ctypes import wintypes
 
             class _ProcessMemoryCounters(ctypes.Structure):
                 _fields_ = [
