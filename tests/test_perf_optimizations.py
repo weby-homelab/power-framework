@@ -96,6 +96,18 @@ class TestExplicitIndexing:
         assert total > 0
         assert indexed == total
 
+    def test_coverage_reads_published_generation(self, sample_vault, monkeypatch, tmp_path):
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "power-cache"))
+
+        from power_framework.core.generation_index import sync_vault_atomically
+
+        sync_vault_atomically(sample_vault, sync_embeddings=False)
+
+        indexed, total = get_index_coverage(sample_vault)
+        assert total == 5
+        assert indexed == total
+
     def test_coverage_excludes_paginated_catalog_pages(self, tmp_path):
         resources = tmp_path / "03_Resources"
         resources.mkdir()
