@@ -42,3 +42,11 @@ reused by later requests only while the generation-state database (including
 its SQLite WAL/SHM files) and the immutable database fingerprint are unchanged.
 Publication explicitly invalidates this cache, and an identity or integrity
 mismatch fails closed instead of falling back to a stale generation.
+
+For dense retrieval, the exact vector matrix is also cached in process memory
+after that identity verification. The cache key is the vault plus the verified
+generation ID and database SHA-256; it is bounded, contains no note content, and
+is never used for a legacy writable database. A new generation creates a new
+matrix and evicts the superseded entry for that vault. This is an exact-read
+optimization, not an ANN index or a new persistence layer; cache misses and
+hits use the same SQLite vector bytes and cosine oracle.

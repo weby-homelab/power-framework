@@ -18,10 +18,11 @@ import os
 import re
 import sqlite3
 import warnings
-from collections import Counter
+from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from threading import RLock
+from typing import TYPE_CHECKING, Any
 
 from .chunker import SemanticChunker
 from .constants import is_catalog_filename
@@ -64,6 +65,22 @@ logger = logging.getLogger(__name__)
 _reranker_singleton: RerankerProtocol | None = None
 
 
+@dataclass(frozen=True)
+class _DenseMatrixCacheEntry:
+    """Exact dense rows for one already-verified immutable generation."""
+
+    matrix: Any
+    rel_paths: tuple[str, ...]
+    chunk_ids: tuple[str, ...]
+    dimension: int
+
+
+_DENSE_MATRIX_CACHE_MAX_ENTRIES = 4
+_DenseMatrixCacheKey = tuple[Path, str, str]
+_dense_matrix_cache: OrderedDict[_DenseMatrixCacheKey, _DenseMatrixCacheEntry] = OrderedDict()
+_dense_matrix_cache_lock = RLock()
+
+
 def _get_reranker() -> RerankerProtocol:
     """Return the active reranker (cached).
 
@@ -99,6 +116,7 @@ class _ResolvedDb:
     is_generation: bool
     generation_id: str | None = None
     source_snapshot_hash: str | None = None
+    db_sha256: str | None = None
 
 
 def _resolve_request_db(vault_dir: Path) -> _ResolvedDb:
@@ -116,6 +134,7 @@ def _resolve_request_db(vault_dir: Path) -> _ResolvedDb:
                 True,
                 generation_id=active.generation_id,
                 source_snapshot_hash=active.source_snapshot_hash,
+                db_sha256=active.db_sha256,
             )
         return _ResolvedDb(existing_vault_db_path(vault_dir), False)
 
@@ -1212,6 +1231,103 @@ def _rrf_merge_many(
     return merged
 
 
+def _dense_matrix_cache_key(
+    vault_dir: Path, resolved_db: _ResolvedDb
+) -> _DenseMatrixCacheKey | None:
+    """Build a cache key only from a verified immutable-generation identity."""
+    if (
+        not resolved_db.is_generation
+        or resolved_db.generation_id is None
+        or resolved_db.db_sha256 is None
+    ):
+        return None
+    return (vault_dir.expanduser().resolve(), resolved_db.generation_id, resolved_db.db_sha256)
+
+
+def _get_or_build_dense_matrix(
+    vault_dir: Path,
+    db_path: Path,
+    index_dimension: int,
+    resolved_db: _ResolvedDb,
+) -> _DenseMatrixCacheEntry:
+    """Return exact dense rows, reusing only a verified immutable generation.
+
+    The cache is deliberately process-local and bounded. A legacy writable DB
+    has no immutable identity, so it bypasses the cache rather than guessing an
+    invalidation key. Publication and external replacement are handled by the
+    request's fail-closed ``resolve_active_generation`` readback before this
+    helper is called; a new generation gets a new key and evicts the old vault
+    entry when it is inserted.
+    """
+    import numpy as np
+
+    key = _dense_matrix_cache_key(vault_dir, resolved_db)
+    with timing_span("dense_matrix_cache"):
+        if key is not None:
+            with _dense_matrix_cache_lock:
+                cached = _dense_matrix_cache.get(key)
+                if cached is not None and cached.dimension == index_dimension:
+                    _dense_matrix_cache.move_to_end(key)
+                    return cached
+
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = _open_readonly_db(db_path)
+            cursor = conn.cursor()
+            # Chunk text is needed only for the few winners that become
+            # snippets. Keep the full-corpus read limited to vector identity
+            # and the exact bytes used by the cosine oracle.
+            with timing_span("sqlite_read"):
+                cursor.execute("SELECT chunk_id, rel_path, embedding FROM chunk_embeddings")
+                rows = cursor.fetchall()
+        except Exception as exc:
+            raise DenseIndexUnavailableError(
+                f"Dense search is unavailable (db error: {type(exc).__name__}). "
+                f"Run 'power sync {vault_dir}' and retry."
+            ) from exc
+        finally:
+            if conn is not None:
+                conn.close()
+
+        if not rows:
+            raise DenseIndexUnavailableError(
+                f"Dense search is unavailable (no dense vectors). "
+                f"Run 'power sync {vault_dir}' and retry."
+            )
+
+        expected_bytes = index_dimension * 4
+        usable = [row for row in rows if len(row[2]) == expected_bytes]
+        if not usable:
+            raise DenseIndexUnavailableError(
+                f"Dense search is unavailable (no dense vectors of width {index_dimension}). "
+                f"Run 'power sync {vault_dir}' and retry."
+            )
+
+        matrix = np.frombuffer(b"".join(row[2] for row in usable), dtype=np.float32).reshape(
+            len(usable), index_dimension
+        )
+        entry = _DenseMatrixCacheEntry(
+            matrix=matrix,
+            rel_paths=tuple(str(row[1]) for row in usable),
+            chunk_ids=tuple(str(row[0]) for row in usable),
+            dimension=index_dimension,
+        )
+
+        if key is not None:
+            with _dense_matrix_cache_lock:
+                # A publication creates a new immutable key. Drop superseded
+                # entries for this vault before retaining the new matrix.
+                for old_key in tuple(_dense_matrix_cache):
+                    if old_key[0] == key[0] and old_key != key:
+                        _dense_matrix_cache.pop(old_key, None)
+                _dense_matrix_cache[key] = entry
+                _dense_matrix_cache.move_to_end(key)
+                while len(_dense_matrix_cache) > _DENSE_MATRIX_CACHE_MAX_ENTRIES:
+                    _dense_matrix_cache.popitem(last=False)
+
+        return entry
+
+
 def _semantic_search(
     vault_dir: Path,
     query: str,
@@ -1226,8 +1342,23 @@ def _semantic_search(
     if not query or not query.strip():
         return []
 
+    if resolved_db is None:
+        # Keep direct/internal callers compatible with the legacy path hook
+        # used by library integrations and tests, while still attaching the
+        # verified identity whenever an immutable generation exists.
+        active = resolve_active_generation(vault_dir)
+        if active is not None:
+            resolved_db = _ResolvedDb(
+                active.path,
+                True,
+                generation_id=active.generation_id,
+                source_snapshot_hash=active.source_snapshot_hash,
+                db_sha256=active.db_sha256,
+            )
+        else:
+            resolved_db = _ResolvedDb(_read_db_path(vault_dir), False)
     index_dimension = validate_dense_index(vault_dir, resolved_db)
-    db_path = resolved_db.path if resolved_db is not None else _read_db_path(vault_dir)
+    db_path = resolved_db.path
     if db_path is None:  # pragma: no cover - validation above guarantees a path
         raise DenseIndexUnavailableError(
             f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
@@ -1251,25 +1382,6 @@ def _semantic_search(
             f"index dimension {index_dimension} does not match query dimension {len(query_vec)}"
         )
 
-    conn: sqlite3.Connection | None = None
-    try:
-        conn = _open_readonly_db(db_path)
-
-        cursor = conn.cursor()
-        # Chunk text is needed only for the few winners that become snippets.
-        # Avoid pulling the whole corpus body through SQLite on every query.
-        with timing_span("sqlite_read"):
-            cursor.execute("SELECT chunk_id, rel_path, embedding FROM chunk_embeddings")
-            rows = cursor.fetchall()
-    except Exception as exc:
-        _dense_failure(f"db error: {type(exc).__name__}")
-    finally:
-        if conn is not None:
-            conn.close()
-
-    if not rows:
-        _dense_failure("no dense vectors")
-
     import numpy as np
 
     with timing_span("scoring"):
@@ -1278,24 +1390,19 @@ def _semantic_search(
         if q_norm == 0:
             _dense_failure("zero query embedding")
 
-        # Score the complete corpus in one matrix multiplication. The former code
-        # vectorized only the inner dimension and still paid Python/NumPy dispatch
-        # once per chunk.
-        dim = int(q_arr.shape[0])
-        expected_bytes = dim * 4
-        usable = [row for row in rows if len(row[2]) == expected_bytes]
-        if not usable:
-            _dense_failure(f"no dense vectors of width {dim}")
-
-        matrix = np.frombuffer(b"".join(row[2] for row in usable), dtype=np.float32).reshape(
-            len(usable), dim
+        # Score the complete corpus in one matrix multiplication. The exact
+        # matrix is cached only for a verified immutable generation, so cache
+        # hits preserve the same oracle rows and ordering as a cold read.
+        matrix_entry = _get_or_build_dense_matrix(
+            vault_dir, db_path, int(q_arr.shape[0]), resolved_db
         )
+        matrix = matrix_entry.matrix
         norms = np.linalg.norm(matrix, axis=1)
-        similarities = np.zeros(len(usable), dtype=np.float32)
+        similarities = np.zeros(len(matrix_entry.rel_paths), dtype=np.float32)
         np.divide(matrix @ q_arr, norms * q_norm, out=similarities, where=norms > 0)
 
         chunk_scores: list[tuple[float, str, str]] = [
-            (float(similarities[i]), usable[i][1], usable[i][0])
+            (float(similarities[i]), matrix_entry.rel_paths[i], matrix_entry.chunk_ids[i])
             for i in np.nonzero(similarities > 0)[0]
         ]
 
