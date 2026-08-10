@@ -61,6 +61,17 @@ class GenerationReport:
     excluded_reason_counts: dict[str, int]
 
 
+@dataclass(frozen=True)
+class ActiveGeneration:
+    """The verified identity of the immutable generation used for reads."""
+
+    path: Path
+    generation_id: str
+    source_snapshot_hash: str
+    db_sha256: str
+    db_size: int
+
+
 def _excluded_reason_counts(excluded_sources: dict[str, str]) -> dict[str, int]:
     """Return deterministic counts for the reasons in an exclusion ledger."""
     return dict(sorted(Counter(excluded_sources.values()).items()))
@@ -356,8 +367,8 @@ def _verified_generation_path(
     return path
 
 
-def resolve_active_generation_path(vault_dir: Path) -> Path | None:
-    """Resolve the authoritative active generation or fail closed.
+def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
+    """Resolve and verify the authoritative active generation or fail closed.
 
     ``None`` means this vault still has no generation-state store and callers
     may use the pre-3.3 legacy DB path. Once a state store has an active row,
@@ -374,7 +385,7 @@ def resolve_active_generation_path(vault_dir: Path) -> Path | None:
         with closing(sqlite3.connect(f"file:{state_path}?mode=ro", uri=True, timeout=30)) as conn:
             row = conn.execute(
                 """
-                SELECT generation_id, state, db_sha256, db_size
+                SELECT generation_id, state, source_snapshot_hash, db_sha256, db_size
                 FROM index_generations
                 WHERE generation_id = (SELECT generation_id FROM active_generation WHERE id = 1)
                 """
@@ -383,10 +394,23 @@ def resolve_active_generation_path(vault_dir: Path) -> Path | None:
         raise ActiveGenerationError("generation state store is unreadable") from exc
     if row is None:
         return None
-    generation_id, state, db_sha256, db_size = row
-    if state != "ready" or not db_sha256 or db_size is None:
+    generation_id, state, source_snapshot_hash, db_sha256, db_size = row
+    if state != "ready" or not source_snapshot_hash or not db_sha256 or db_size is None:
         raise ActiveGenerationError(f"active generation is not ready: {generation_id}")
-    return _verified_generation_path(root, generation_id, str(db_sha256), int(db_size))
+    verified_path = _verified_generation_path(root, generation_id, str(db_sha256), int(db_size))
+    return ActiveGeneration(
+        path=verified_path,
+        generation_id=str(generation_id),
+        source_snapshot_hash=str(source_snapshot_hash),
+        db_sha256=str(db_sha256),
+        db_size=int(db_size),
+    )
+
+
+def resolve_active_generation_path(vault_dir: Path) -> Path | None:
+    """Resolve the authoritative active generation path or fail closed."""
+    active = resolve_active_generation(vault_dir)
+    return active.path if active is not None else None
 
 
 def active_dense_chunk_count(vault_dir: Path) -> int:

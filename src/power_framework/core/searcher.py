@@ -28,7 +28,11 @@ from .constants import is_catalog_filename
 from .db import _init_db
 from .domains import DomainConfigError, resolve_search_policy
 from .embeddings import configured_embedding_identity, get_embedding_manager
-from .generation_index import ActiveGenerationError, resolve_active_generation_path
+from .generation_index import (
+    ActiveGenerationError,
+    resolve_active_generation,
+    resolve_active_generation_path,
+)
 from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
 from .parser import FRONTMATTER_PATTERN, read_file_content, validate_metadata
@@ -93,6 +97,8 @@ class _ResolvedDb:
 
     path: Path | None
     is_generation: bool
+    generation_id: str | None = None
+    source_snapshot_hash: str | None = None
 
 
 def _resolve_request_db(vault_dir: Path) -> _ResolvedDb:
@@ -103,9 +109,14 @@ def _resolve_request_db(vault_dir: Path) -> _ResolvedDb:
     writable fallback behavior when no generation store exists.
     """
     with timing_span("generation_resolve"):
-        active = resolve_active_generation_path(vault_dir)
+        active = resolve_active_generation(vault_dir)
         if active is not None:
-            return _ResolvedDb(active, True)
+            return _ResolvedDb(
+                active.path,
+                True,
+                generation_id=active.generation_id,
+                source_snapshot_hash=active.source_snapshot_hash,
+            )
         return _ResolvedDb(existing_vault_db_path(vault_dir), False)
 
 
@@ -237,6 +248,9 @@ class SearchResult:
     retrieval_contract: str = "dense"
     temporal_status: str = TemporalStatus.CURRENT.value
     matched_text: str = ""
+    index_kind: str | None = None
+    index_generation_id: str | None = None
+    index_source_snapshot_hash: str | None = None
 
 
 def normalize_search_mode(mode: str) -> str:
@@ -1383,6 +1397,15 @@ def _apply_semantic_lexical_guard(
     return [lexical_result, *[result for result in results if result is not lexical_result]]
 
 
+def _attach_index_provenance(results: list[SearchResult], resolved_db: _ResolvedDb) -> None:
+    """Attach the request's verified index identity to returned evidence."""
+    index_kind = "immutable_generation" if resolved_db.is_generation else "legacy_db"
+    for result in results:
+        result.index_kind = index_kind
+        result.index_generation_id = resolved_db.generation_id
+        result.index_source_snapshot_hash = resolved_db.source_snapshot_hash
+
+
 def search_vault(
     vault_dir: Path,
     query: str,
@@ -1551,6 +1574,7 @@ def search_vault(
         )
         for result in results:
             result.retrieval_contract = retrieval_contract
+        _attach_index_provenance(results, resolved_db)
         return results
 
     # For non-hybrid modes, gather results, dedup by rel_path keeping max score, and sort
@@ -1598,6 +1622,7 @@ def search_vault(
         final_results = _apply_semantic_lexical_guard(vault_dir, query, final_results, resolved_db)
     for r in final_results:
         r.retrieval_contract = retrieval_contract
+    _attach_index_provenance(final_results, resolved_db)
     return final_results
 
 
@@ -1854,6 +1879,43 @@ def format_search_results(
     return "\n".join(lines)
 
 
+def _format_index_provenance(results: list[SearchResult]) -> dict[str, object]:
+    """Serialize only verified, request-scoped index provenance."""
+    observations = sorted(
+        {
+            (result.index_kind, result.index_generation_id, result.index_source_snapshot_hash)
+            for result in results
+            if result.index_kind is not None
+        },
+        key=lambda observation: tuple("" if value is None else str(value) for value in observation),
+    )
+    if len(observations) == 1:
+        kind, generation_id, source_snapshot_hash = observations[0]
+        provenance: dict[str, object] = {"kind": kind}
+        if generation_id is not None:
+            provenance["generation_id"] = generation_id
+        if source_snapshot_hash is not None:
+            provenance["source_snapshot_hash"] = source_snapshot_hash
+        return provenance
+    if len(observations) > 1:
+        return {
+            "kind": "mixed",
+            "entries": [
+                {
+                    "kind": kind,
+                    **({"generation_id": generation_id} if generation_id is not None else {}),
+                    **(
+                        {"source_snapshot_hash": source_snapshot_hash}
+                        if source_snapshot_hash is not None
+                        else {}
+                    ),
+                }
+                for kind, generation_id, source_snapshot_hash in observations
+            ],
+        }
+    return {"kind": "unavailable"}
+
+
 def format_untrusted_search_envelope(
     results: list[SearchResult],
     query: str,
@@ -1917,6 +1979,7 @@ def format_untrusted_search_envelope(
         "mode": mode,
         "temporal_view": temporal_view,
         "as_of": as_of,
+        "index_provenance": _format_index_provenance(results),
         "result_count": len(envelope_results),
         "results": envelope_results,
     }

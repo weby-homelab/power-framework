@@ -11,9 +11,11 @@ import pytest
 
 from power_framework.core.db import _init_db
 from power_framework.core.generation_index import (
+    ActiveGeneration,
     ActiveGenerationError,
     IndexGenerationError,
     _state_db_path,
+    resolve_active_generation,
     resolve_active_generation_path,
     sync_vault_atomically,
 )
@@ -81,6 +83,23 @@ def test_read_only_generation_probe_does_not_create_vault_state_or_cache(
     assert resolve_active_generation_path(vault) is None
     assert not (vault / ".power").exists()
     assert not cache_root.exists()
+
+
+def test_resolve_active_generation_returns_verified_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "identity", "identity-token")
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    active = resolve_active_generation(vault)
+
+    assert isinstance(active, ActiveGeneration)
+    assert active.path == _active_db(vault)
+    assert active.generation_id == report.generation_id
+    assert active.source_snapshot_hash == report.source_snapshot_hash
+    assert active.db_sha256
+    assert active.db_size == active.path.stat().st_size
 
 
 def test_failed_generation_keeps_the_previous_active_index(

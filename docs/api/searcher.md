@@ -23,6 +23,9 @@ Class representing a single search result with relevance details.
 | `match_count` | `int`       | Match count fallback                  |
 | `tags`        | `list[str]` | List of tags associated with the note |
 | `retrieval_contract` | `str` | Applied retrieval contract, including an explicit fallback when enabled |
+| `index_kind` | `str | None` | Verified request index: `immutable_generation` or `legacy_db` |
+| `index_generation_id` | `str | None` | Immutable generation identifier when `index_kind` is `immutable_generation` |
+| `index_source_snapshot_hash` | `str | None` | Content-free source snapshot hash for the verified immutable generation |
 
 ## Retrieval contract
 

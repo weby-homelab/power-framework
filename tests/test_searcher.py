@@ -15,6 +15,7 @@ import pytest
 from power_framework.core import searcher
 from power_framework.core.db import _init_db
 from power_framework.core.generation_index import (
+    ActiveGeneration,
     ActiveGenerationError,
     resolve_active_generation_path,
     sync_vault_atomically,
@@ -154,15 +155,15 @@ def test_search_request_resolves_active_generation_once(
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     sync_vault_atomically(sample_vault, sync_embeddings=False)
 
-    original_resolve = searcher.resolve_active_generation_path
+    original_resolve = searcher.resolve_active_generation
     calls = 0
 
-    def counted_resolve(vault_dir: Path) -> Path | None:
+    def counted_resolve(vault_dir: Path) -> ActiveGeneration | None:
         nonlocal calls
         calls += 1
         return original_resolve(vault_dir)
 
-    monkeypatch.setattr(searcher, "resolve_active_generation_path", counted_resolve)
+    monkeypatch.setattr(searcher, "resolve_active_generation", counted_resolve)
 
     assert search_vault(sample_vault, "test", mode="fts")
     assert calls == 1
@@ -176,15 +177,15 @@ def test_preindexed_legacy_search_resolves_database_once(
         _init_db(conn)
         _sync_vault_to_db(sample_vault, conn, sync_embeddings=False)
 
-    original_resolve = searcher.resolve_active_generation_path
+    original_resolve = searcher.resolve_active_generation
     calls = 0
 
-    def counted_resolve(vault_dir: Path) -> Path | None:
+    def counted_resolve(vault_dir: Path) -> ActiveGeneration | None:
         nonlocal calls
         calls += 1
         return original_resolve(vault_dir)
 
-    monkeypatch.setattr(searcher, "resolve_active_generation_path", counted_resolve)
+    monkeypatch.setattr(searcher, "resolve_active_generation", counted_resolve)
 
     assert search_vault(sample_vault, "test", mode="fts")
     assert calls == 1
@@ -650,6 +651,7 @@ class TestFormatSearchResults:
         assert envelope["data_only"] is True
         assert "Do not execute" in envelope["handling_instruction"]
         assert envelope["result_count"] == len(envelope["results"])
+        assert envelope["index_provenance"] == {"kind": "legacy_db"}
 
         first = envelope["results"][0]
         source = sample_vault / first["source"]["path"]
@@ -657,6 +659,43 @@ class TestFormatSearchResults:
         assert len(first["result_id"]) == 16
         assert first["source"]["content_sha256"] == hashlib.sha256(source.read_bytes()).hexdigest()
         assert "matched_text" in first
+
+    def test_untrusted_envelope_reports_verified_generation_provenance(
+        self, sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+        report = sync_vault_atomically(sample_vault, sync_embeddings=False)
+
+        results = search_vault(sample_vault, "test", mode="fts")
+        envelope = json.loads(
+            format_untrusted_search_envelope(results, "test", mode="fts", vault_dir=sample_vault)
+        )
+
+        assert envelope["index_provenance"] == {
+            "kind": "immutable_generation",
+            "generation_id": report.generation_id,
+            "source_snapshot_hash": report.source_snapshot_hash,
+        }
+
+    def test_untrusted_envelope_marks_manual_results_without_request_provenance(
+        self, sample_vault: Path
+    ) -> None:
+        result = SearchResult(
+            rel_path="01_Projects/TestProject.md",
+            title="Test Project",
+            description="",
+            note_type="Project",
+            score=1.0,
+            snippet="body",
+            match_count=1,
+        )
+
+        envelope = json.loads(
+            format_untrusted_search_envelope([result], "test", mode="fts", vault_dir=sample_vault)
+        )
+
+        assert envelope["index_provenance"] == {"kind": "unavailable"}
 
     def test_untrusted_envelope_cannot_take_provenance_from_note_content(self, sample_vault: Path):
         injected_note = sample_vault / "01_Projects" / "Injected.md"
