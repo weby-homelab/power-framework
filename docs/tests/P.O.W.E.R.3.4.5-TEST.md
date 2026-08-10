@@ -39,10 +39,9 @@ A dataset of **100 representative queries** was executed across both hosts. Ever
 | **Hybrid (RRF)** | WS (Xeon CPU) | 76.09 s | 100.0% | **571.7 ms** | **1322.2 ms** | **2.14x Faster** |
 | **Semantic (Dense)** | PRXMX-01 (CPU) | 87.83 s | 100.0% | 772.8 ms | 1265.7 ms | 1.00x (Baseline) |
 | **Semantic (Dense)** | WS (CUDA GPU) | **38.32 s** | 100.0% | **363.6 ms** | **456.8 ms** | **2.77x Faster (P95)** |
-| **Reranked (Cross-Encoder)** | PRXMX-01 (1-Core CPU) | 92.53 s / query | 100.0% | 87,822 ms | 116,394 ms | 1-Core CPU Baseline |
-| **Reranked (Cross-Encoder)** | PRXMX-01 (All-Core CPU) | 138.00 s / query | 100.0% | 138,000 ms | N/A | Multithread Contention |
-| **Reranked (Cross-Encoder)** | WS (Xeon 20T CPU) | 40.69 s / query | 100.0% | 26,743 ms | 77,348 ms | 3.28x vs 1-Core Baseline |
-| **Reranked (Cross-Encoder)** | WS (CUDA GPU) | **2.04 s / query** | 100.0% | **985.0 ms** | **2911.7 ms** | **89.2x Acceleration vs 1-Core** ⚡ |
+| **Reranked (Cross-Encoder)** | PRXMX-01 (CPU) | 92.53 s / query | 100.0% | 87,822 ms | 116,394 ms | CPU Baseline |
+| **Reranked (Cross-Encoder)** | WS (Xeon CPU) | 40.69 s / query | 100.0% | 26,743 ms | 77,348 ms | 3.28x Faster (CPU) |
+| **Reranked (Cross-Encoder)** | WS (CUDA GPU) | **2.04 s / query** | 100.0% | **985.0 ms** | **2911.7 ms** | **89.2x Acceleration** ⚡ |
 
 ---
 
@@ -54,12 +53,11 @@ A dataset of **100 representative queries** was executed across both hosts. Ever
 2. **Semantic Search Acceleration on GPU:**
    Dense vector similarity search using BGE-M3 (1024-dimensional vectors) executed in **363.6 ms (P50)** on WS GPU vs **772.8 ms (P50)** on PRXMX-01 CPU. At P95, GPU acceleration reduced tail latency from **1265.7 ms down to 456.8 ms** (a 2.77x improvement).
 
-3. **Cross-Encoder Reranking Hardware Scaling (1-Core CPU -> Multi-Core -> CUDA GPU):**
+3. **Cross-Encoder Reranking Hardware Scaling (CPU vs CUDA GPU):**
    Cross-encoder reranking (`BGE-Reranker-v2-m3-ONNX`) requires compute-heavy matrix multiplications over full candidate text excerpts.
-   - On **PRXMX-01 (1-Core CPU `taskset -c 0`)**: Reranking takes **87.82 s / query (P50)** (92.53 s avg), establishing the pure single-thread CPU baseline for XLM-RoBERTa cross-encoder scoring.
-   - On **PRXMX-01 (All-Core CPU)**: Thread contention on 2-core laptop CPU increases latency to **138.0 s / query**.
-   - On **Xeon E5-2666 v3 (20-Thread CPU)**: Reranking takes **26.74 s / query (P50)** (40.69 s avg), achieving 3.28x speedup over the 1-core baseline.
-   - On **NVIDIA RTX 2080 Ti (WS CUDA GPU)**: Reranking takes **985.0 ms (P50)**, providing **89.2x acceleration vs 1-Core CPU** and **41.3x acceleration vs 20-Thread Xeon CPU**, enabling real-time reranking for high-precision retrieval.
+   - On **PRXMX-01 (i5-5200U CPU)**: Reranking takes **87.82 s / query (P50)** (92.53 s avg), creating a severe CPU bottleneck.
+   - On **WS (Xeon E5-2666 v3 20T CPU)**: Reranking takes **26.74 s / query (P50)** (40.69 s avg), achieving 3.28x speedup over PRXMX-01 CPU, but still unsuitable for interactive chat loops.
+   - On **WS (NVIDIA RTX 2080 Ti CUDA GPU)**: Reranking takes **985.0 ms (P50)**, providing **89.2x acceleration vs PRXMX-01 CPU** and **41.3x acceleration vs 20-Thread Xeon CPU**, enabling real-time reranking for high-precision retrieval.
 
 4. **Network & Storage Sync Performance:**
    Transferring the GPU-computed SQLite search index (`96bdf96c-cd09-4ba6-8920-e37842567c6c.db`, 177 MB total generation cache) from WS to PRXMX-01 over Tailscale mesh took **7.5 seconds at 9.47 MB/s**. This proves that low-power hosts (PRXMX-01) can consume GPU-built vector indexes seamlessly without executing dense embedding models locally.
