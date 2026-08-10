@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.4.5] - 2026-08-10
 
 1. Всі фази POWER 3.4+ завершено (Milestone 3.4.5 — DONE):
+
     • 3.4.0 (Restore Truth): Signed v3.4.0 реліз, прибрано неправдиві конфігураційні заяви.
+    
     • 3.4.1 (One Truthful Contract): Єдиний power doctor --json, 20 MCP tools, risk annotations, двомовна документація.
+    
     • 3.4.2 (Closed Mutation Workflow): Атомарні транзакції запису з перевіркою пост-умов та схемою rollback.
+    
     • 3.4.3 (Durable Handoff): Work packets у Markdown, чекпоінти, захист від prompt injection.
+    
     • 3.4.4 (Fast and Useful Retrieval): Кешування поколінь, матричне множення векторів, exact dense matrix cache, synthetic quality oracle power31-quality-comparison-v1. Semantic Search (BGE-M3 1024d) закріплено як єдиний дефолт.
+    
     • 3.4.5 (Cross-Platform Release): [DONE] — повне покриття Linux, Windows 11 25H2 (Codex validation) та macOS (CI smoke). Двомовна Support Matrix інтегрована в CI/drift-гейти.
 
 ### Added
