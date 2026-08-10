@@ -214,6 +214,7 @@ class SearchResult:
     tags: list[str] = field(default_factory=list)
     retrieval_contract: str = "dense"
     temporal_status: str = TemporalStatus.CURRENT.value
+    matched_text: str = ""
 
 
 def normalize_search_mode(mode: str) -> str:
@@ -326,6 +327,44 @@ def _make_snippet(content: str, terms: list[str]) -> str:
     return snippet
 
 
+def _strip_synthetic_chunk_header(text: str) -> str:
+    """Remove the contextual-retrieval header from a stored chunk."""
+    candidate = text.lstrip()
+    if not candidate.startswith("[Document:"):
+        return candidate
+    first_line, separator, remainder = candidate.partition("\n")
+    if separator and "]" in first_line:
+        return remainder.lstrip()
+    return candidate
+
+
+def _body_centered_text(text: str) -> str:
+    """Return note/chunk body text without synthetic context or frontmatter."""
+    body = _strip_synthetic_chunk_header(text)
+    match = FRONTMATTER_PATTERN.match(body)
+    if match:
+        body = body[match.end() :]
+    return body.lstrip()
+
+
+def _matched_text(text: str, terms: list[str] | None = None) -> str:
+    """Return a bounded, body-only passage for agent-facing result context."""
+    body = _body_centered_text(text)
+    if not body:
+        return ""
+    if terms:
+        return _make_snippet(body, terms)
+    return body[:MAX_SNIPPET_LENGTH].replace("\n", " ").strip()
+
+
+def _read_matched_text(vault_dir: Path, rel_path: str, terms: list[str]) -> str:
+    """Read one bounded source note to produce a body-only passage."""
+    try:
+        return _matched_text(read_file_content(vault_dir / rel_path), terms)
+    except OSError:
+        return ""
+
+
 def _score_note(
     content: str,
     metadata: OKFMetadata,
@@ -397,6 +436,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
                     score=score,
                     snippet=snippet,
                     match_count=match_count,
+                    matched_text=_matched_text(content, terms),
                     tags=metadata.tags,
                 )
             )
@@ -912,6 +952,7 @@ def _fts_search(
             rows = cursor.fetchall()
 
         results: list[SearchResult] = []
+        matched_terms = _tokenize(query)
         with timing_span("result_materialization"):
             for row in rows:
                 rel_path, title, description, note_type, score, snippet, tags_str = row
@@ -926,6 +967,7 @@ def _fts_search(
                         score=float(score),
                         snippet=snippet,
                         match_count=match_count,
+                        matched_text=_read_matched_text(vault_dir, rel_path, matched_terms),
                         tags=tags,
                     )
                 )
@@ -1068,6 +1110,7 @@ def _vector_search(
                             score=similarity,
                             snippet=snippet,
                             match_count=len(query_tokens),
+                            matched_text=_matched_text(content, query_tokens),
                             tags=tags,
                         ),
                     )
@@ -1119,6 +1162,7 @@ def _rrf_merge_many(
                 score=score,
                 snippet=result.snippet,
                 match_count=result.match_count,
+                matched_text=result.matched_text,
                 tags=result.tags,
             )
         )
@@ -1263,6 +1307,7 @@ def _semantic_search(
                         score=similarity,
                         snippet=snippets.get(chunk_id, ""),
                         match_count=1,
+                        matched_text=_matched_text(snippets.get(chunk_id, "")),
                         tags=metadata.tags,
                     )
                 )
@@ -1668,6 +1713,7 @@ def _graph_assisted_search(
                 score=0.25 * boost,
                 snippet=content[:MAX_SNIPPET_LENGTH].replace("\n", " ").strip(),
                 match_count=0,
+                matched_text=_matched_text(content),
                 tags=metadata.tags,
                 retrieval_contract="graph_assisted",
             )
@@ -1724,8 +1770,9 @@ def format_search_results(
         lines.append(f"   Path: {r.rel_path}")
         lines.append(f"   Temporal status: {r.temporal_status}")
         lines.append(f"   {r.description}")
-        if r.snippet:
-            lines.append(f"   ...{r.snippet}...")
+        context = r.matched_text or r.snippet
+        if context:
+            lines.append(f"   ...{context}...")
         lines.append("")
 
     if vault_dir is not None:
@@ -1791,6 +1838,7 @@ def format_untrusted_search_envelope(
                 "score": result.score,
                 "match_count": result.match_count,
                 "snippet": result.snippet[:MAX_SNIPPET_LENGTH],
+                "matched_text": (result.matched_text or result.snippet)[:MAX_SNIPPET_LENGTH],
             }
         )
 

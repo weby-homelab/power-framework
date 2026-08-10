@@ -20,11 +20,13 @@ from power_framework.core.searcher import (
     SearchModeSpec,
     SearchResult,
     _apply_semantic_lexical_guard,
+    _body_centered_text,
     _compute_tf_vector,
     _cosine_similarity,
     _embedding_manifest_identity,
     _fts_search,
     _make_snippet,
+    _matched_text,
     _rrf_merge,
     _rrf_merge_many,
     _score_note,
@@ -523,6 +525,22 @@ class TestMakeSnippet:
         snippet = _make_snippet(long, ["hello"])
         assert len(snippet) <= 125
 
+    def test_matched_text_strips_context_and_frontmatter(self):
+        text = (
+            "[Document: Visible title | Description: metadata-only phrase] | Section: body\n"
+            "---\n"
+            "type: Project\n"
+            'description: "metadata-only phrase"\n'
+            "---\n\n"
+            "body-only passage\n"
+        )
+
+        assert _body_centered_text(text) == "body-only passage\n"
+        result = _matched_text(text, ["body-only"])
+        assert "body-only passage" in result
+        assert "metadata-only phrase" not in result
+        assert "[Document:" not in result
+
 
 class TestFormatSearchResults:
     """Tests for search results formatting."""
@@ -565,6 +583,7 @@ class TestFormatSearchResults:
         assert first["trust"] == "untrusted"
         assert len(first["result_id"]) == 16
         assert first["source"]["content_sha256"] == hashlib.sha256(source.read_bytes()).hexdigest()
+        assert "matched_text" in first
 
     def test_untrusted_envelope_cannot_take_provenance_from_note_content(self, sample_vault: Path):
         injected_note = sample_vault / "01_Projects" / "Injected.md"
@@ -675,6 +694,36 @@ class TestSearchVault:
         results = search_vault(sample_vault, "test project", mode="fts")
         assert len(results) > 0
         assert any("Test Project" in r.title for r in results)
+
+    def test_fts_matched_text_uses_body_not_metadata(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        vault = tmp_path / "vault"
+        note = vault / "01_Projects" / "Body.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            'title: "Body note"\n'
+            'description: "metadata-only phrase"\n'
+            "timestamp: 2026-01-01T00:00:00Z\n"
+            "---\n\n"
+            "body-only phrase is the useful passage.\n",
+            encoding="utf-8",
+        )
+        db_path = tmp_path / "search.db"
+        monkeypatch.setenv("POWER_SEARCH_DB", str(db_path))
+        conn = sqlite3.connect(str(db_path))
+        _init_db(conn)
+        _sync_vault_to_db(vault, conn, sync_embeddings=False)
+        conn.close()
+
+        results = _fts_search(vault, "body-only phrase", max_results=1)
+
+        assert len(results) == 1
+        assert "body-only phrase" in results[0].matched_text
+        assert "metadata-only phrase" not in results[0].matched_text
+        assert "description:" not in results[0].matched_text
 
     def test_auto_domain_policy_scopes_results(self, sample_vault: Path):
         (sample_vault / ".power").mkdir(exist_ok=True)
