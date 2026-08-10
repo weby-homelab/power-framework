@@ -11,6 +11,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import RLock
 
 from .constants import is_catalog_filename
 from .db import _init_db
@@ -70,6 +71,57 @@ class ActiveGeneration:
     source_snapshot_hash: str
     db_sha256: str
     db_size: int
+
+
+# A generation file is immutable after publication.  Cache only its verified
+# identity, and key the entry by filesystem fingerprints so an external
+# publisher, replacement, or corruption cannot silently reuse stale state.
+_FileFingerprint = tuple[int, int, int, int, int]
+_StateFingerprint = tuple[
+    _FileFingerprint | None,
+    _FileFingerprint | None,
+    _FileFingerprint | None,
+]
+_active_generation_cache: dict[
+    Path, tuple[_StateFingerprint, _FileFingerprint, ActiveGeneration]
+] = {}
+_active_generation_cache_lock = RLock()
+
+
+def _file_fingerprint(path: Path) -> _FileFingerprint | None:
+    """Return a read-only invalidation key for one existing file."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _state_fingerprint(path: Path) -> _StateFingerprint | None:
+    """Fingerprint the SQLite state database and its optional WAL/SHM files."""
+    database = _file_fingerprint(path)
+    if database is None:
+        return None
+    return (
+        database,
+        _file_fingerprint(path.with_name(path.name + "-wal")),
+        _file_fingerprint(path.with_name(path.name + "-shm")),
+    )
+
+
+def invalidate_active_generation_cache(vault_dir: Path | None = None) -> None:
+    """Invalidate cached active-generation identities after a publication.
+
+    The filesystem key remains the fail-closed backstop for publishers that
+    are outside this process.  A caller may invalidate one vault or all vaults
+    when it performs an operation whose state update is not visible through a
+    normal filesystem timestamp change.
+    """
+    with _active_generation_cache_lock:
+        if vault_dir is None:
+            _active_generation_cache.clear()
+            return
+        _active_generation_cache.pop(Path(vault_dir).expanduser().resolve(), None)
 
 
 def _excluded_reason_counts(excluded_sources: dict[str, str]) -> dict[str, int]:
@@ -379,8 +431,21 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
     if not root.is_dir():
         return None
     state_path = _existing_state_db_path(root)
-    if state_path is None or not state_path.exists():
+    state_fingerprint = _state_fingerprint(state_path) if state_path is not None else None
+    if state_path is None or state_fingerprint is None:
+        invalidate_active_generation_cache(root)
         return None
+
+    with _active_generation_cache_lock:
+        cached = _active_generation_cache.get(root)
+        if cached is not None:
+            cached_state, cached_generation, active = cached
+            if cached_state == state_fingerprint:
+                current_generation = _file_fingerprint(active.path)
+                if current_generation == cached_generation:
+                    return active
+            _active_generation_cache.pop(root, None)
+
     try:
         with closing(sqlite3.connect(f"file:{state_path}?mode=ro", uri=True, timeout=30)) as conn:
             row = conn.execute(
@@ -398,13 +463,19 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
     if state != "ready" or not source_snapshot_hash or not db_sha256 or db_size is None:
         raise ActiveGenerationError(f"active generation is not ready: {generation_id}")
     verified_path = _verified_generation_path(root, generation_id, str(db_sha256), int(db_size))
-    return ActiveGeneration(
+    active = ActiveGeneration(
         path=verified_path,
         generation_id=str(generation_id),
         source_snapshot_hash=str(source_snapshot_hash),
         db_sha256=str(db_sha256),
         db_size=int(db_size),
     )
+    generation_fingerprint = _file_fingerprint(verified_path)
+    if generation_fingerprint is None:  # pragma: no cover - verified path exists above
+        raise ActiveGenerationError(f"active generation file is missing: {generation_id}")
+    with _active_generation_cache_lock:
+        _active_generation_cache[root] = (state_fingerprint, generation_fingerprint, active)
+    return active
 
 
 def resolve_active_generation_path(vault_dir: Path) -> Path | None:
@@ -510,6 +581,7 @@ def _publish(
         except Exception:
             conn.rollback()
             raise
+    invalidate_active_generation_cache(vault_dir)
     resolved = resolve_active_generation_path(vault_dir)
     if resolved != generation_path:
         raise ActiveGenerationError(f"active generation readback failed: {generation_id}")
