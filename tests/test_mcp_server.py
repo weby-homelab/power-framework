@@ -140,6 +140,11 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
         "power.risk": {"local_only": True, "egress": "none", "approval": "caller"}
     }
 
+    for catalog_name in ("read_sub_index", "ensure_sub_index"):
+        catalog_parameters = by_name[catalog_name].parameters
+        assert catalog_parameters["properties"]["page"] == {"default": 1, "type": "integer"}
+        assert "page" not in catalog_parameters["required"]
+
 
 async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections() -> None:
     async with Client(power_server.mcp) as client:
@@ -228,6 +233,57 @@ async def test_read_sub_index_existing_category(sample_vault: Path) -> None:
     await ensure_sub_index(category="01_Projects", vault_path=str(sample_vault))
     result = await read_sub_index(category="01_Projects", vault_path=str(sample_vault))
     assert "Test Project" in result
+
+
+async def test_read_sub_index_can_select_declared_page(sample_vault: Path) -> None:
+    category_path = sample_vault / "01_Projects"
+    category_path.joinpath("_index.md").write_text(
+        "---\nx-index-pages: 2\n---\nPage 1 of 2\n", encoding="utf-8"
+    )
+    category_path.joinpath("_index-2.md").write_text(
+        "---\nx-index-page: 2\nx-index-pages: 2\n---\nPage 2 of 2\n",
+        encoding="utf-8",
+    )
+
+    result = await read_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
+
+    assert "Page 2 of 2" in result
+
+
+async def test_read_sub_index_rejects_invalid_or_stale_page(sample_vault: Path) -> None:
+    category_path = sample_vault / "01_Projects"
+    category_path.joinpath("_index.md").write_text(
+        "---\nx-index-pages: 2\n---\nPage 1 of 2\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ToolError, match="positive integer"):
+        await read_sub_index(category="01_Projects", page=0, vault_path=str(sample_vault))
+    with pytest.raises(ToolError, match="out of range"):
+        await read_sub_index(category="01_Projects", page=3, vault_path=str(sample_vault))
+    with pytest.raises(ToolError, match="missing"):
+        await read_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
+
+
+async def test_ensure_sub_index_can_return_requested_page(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_generate(vault_path: Path, category: str) -> str:
+        category_path = vault_path / category
+        category_path.joinpath("_index.md").write_text(
+            "---\nx-index-pages: 2\n---\nPage 1 of 2\n", encoding="utf-8"
+        )
+        category_path.joinpath("_index-2.md").write_text(
+            "---\nx-index-page: 2\nx-index-pages: 2\n---\nPage 2 of 2\n",
+            encoding="utf-8",
+        )
+        return "Generated test catalog"
+
+    monkeypatch.setattr(power_server, "run_generate_sub_index", fake_generate)
+
+    result = await ensure_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
+
+    assert result.startswith("Generated test catalog")
+    assert "Page 2 of 2" in result
 
 
 async def test_read_sub_index_invalid_category(sample_vault: Path) -> None:

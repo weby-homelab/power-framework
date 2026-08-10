@@ -163,21 +163,25 @@ losing semantic, hybrid, and reranked search until the next dense rebuild.
 Read an existing canonical P.A.R.A. `_index.md`; does not generate it.
 
 ```text
-read_sub_index(category: string, vault_path?: string) -> string
+read_sub_index(category: string, vault_path?: string, page?: integer) -> string
 ```
 
 `category` must be one of `00_Inbox`, `01_Projects`, `02_Areas`,
 `03_Resources`, `04_Archive`, or `06_Daily_Logs`.
+`page` is one-based and defaults to `1`; use it to read `_index-2.md` and later
+pages declared by the generated catalog's `x-index-pages` header. Requests for a
+missing or undeclared page fail closed instead of returning a partial catalog.
 
 ### 4. `ensure_sub_index`
 
 Generate and read one canonical P.A.R.A. sub-index if it has notes.
 
 ```text
-ensure_sub_index(category: string, vault_path?: string) -> string
+ensure_sub_index(category: string, vault_path?: string, page?: integer) -> string
 ```
 
 It has the same category boundary as `read_sub_index`.
+It regenerates the catalog when needed, then returns only the requested page.
 
 ### 5. `ingest_note`
 
