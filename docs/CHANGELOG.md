@@ -1,13 +1,13 @@
 # Changelog
 
-## 3.4.0
+## 3.4.5
 
 - Added fail-closed `power doctor` diagnostics, preflighted foreign-Markdown
   import, cache namespace provenance/list/prune, recursive bounded catalogs,
   MCP ingest/search closure, and explicit dense-loss/device contracts.
 - Isolated healer failures and made sync coverage visible and actionable.
 - Refreshed the bundled agent skill contract and documentation-drift checks.
-- See the [3.4.0 release notes](release-3.4.0.md) for scope and evidence limits.
+- See the [3.4.5 release notes](release-3.4.5.md) for scope and evidence limits.
 
 ## 3.3.2
 

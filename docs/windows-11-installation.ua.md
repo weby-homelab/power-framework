@@ -1,6 +1,6 @@
 # Встановлення P.O.W.E.R. на Windows 11 25H2
 
-Цей гід встановлює версіонований реліз P.O.W.E.R. `v3.4.0` в ізольоване
+Цей гід встановлює версіонований реліз P.O.W.E.R. `v3.4.5` в ізольоване
 віртуальне середовище, створює чистий vault, перевіряє CLI та налаштовує
 MCP-клієнт. Усі команди наведено для PowerShell.
 
@@ -10,12 +10,12 @@ MCP-клієнт. Усі команди наведено для PowerShell.
 - Windows 11 25H2 є офіційним релізом Windows 11 (сімейство OS build `26200`).
 - ONNX Runtime підтримує Windows 11, а його Windows-збірки потребують
   актуального Microsoft Visual C++ Runtime.
-- P.O.W.E.R. `v3.4.0` має автоматизований кросплатформний regression-тест
+- P.O.W.E.R. `v3.4.5` має автоматизований кросплатформний regression-тест
   поведінки rename-overwrite у Windows.
 - Фізичну перевірку Windows 11 25H2 завершено 2026-08-08 для follow-up revision
   `4e5b2b9`; див. [звіт перевірки](tests/windows-11-25h2-validation.md).
   Це підтверджує follow-up source/build і не переміщує та не перевидає
-  незмінні release-артефакти `v3.4.0`.
+  незмінні release-артефакти `v3.4.5`.
 
 Офіційні передумови:
 
@@ -95,7 +95,7 @@ Release wheel не потребує Git і фіксує версію вихід�
 Python-залежності все одно завантажуються з налаштованого Python package index.
 
 ```powershell
-$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl"
+$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl"
 & $VenvPython -m pip install $ReleaseWheel
 if ($LASTEXITCODE -ne 0) { throw "Помилка встановлення P.O.W.E.R." }
 ```
@@ -109,7 +109,7 @@ if ($LASTEXITCODE -ne 0) { throw "Помилка встановлення P.O.W.
 if ($LASTEXITCODE -ne 0) { throw "Помилка перевірки імпортів P.O.W.E.R." }
 ```
 
-Обидві перевірки версії мають показати `3.4.0`, а перевірка імпортів —
+Обидві перевірки версії мають показати `3.4.5`, а перевірка імпортів —
 `imports: OK`.
 
 ### Альтернатива: встановлення із закріпленого tag
@@ -117,7 +117,7 @@ if ($LASTEXITCODE -ne 0) { throw "Помилка перевірки імпорт
 Використовуйте лише коли Git уже встановлено:
 
 ```powershell
-& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.4.0"
+& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.4.5"
 ```
 
 Не встановлюйте незакріплений `main`, якщо важлива відтворюваність.
@@ -261,7 +261,7 @@ runtime. Зробіть backup перед видаленням будь-яког
 
 - Windows повідомляє version 25H2 / build family `26200`.
 - Обраний Python має версію 3.11+; venv-перевірка повертає `True`.
-- `power --version` і distribution metadata повертають `3.4.0`.
+- `power --version` і distribution metadata повертають `3.4.5`.
 - `power_framework.mcp` та `onnxruntime` імпортуються успішно.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з
   кодом `0`.

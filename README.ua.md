@@ -36,7 +36,7 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Windows-safe rename** — `power rename` використовує `os.replace()` для
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
-- **Технічний реліз 3.4.0** — machine-only M2–M5 gates, package та CI provenance перевірені; додано fail-closed doctor, migration, cache, catalog, healer та agent-contract safeguards. Сертифікація human-quality, доступ до sealed holdout і production claims залишаються закритими.
+- **Технічний реліз 3.4.5** — machine-only M2–M5 gates, package та CI provenance перевірені; додано fail-closed doctor, migration, cache, catalog, healer та agent-contract safeguards. Сертифікація human-quality, доступ до sealed holdout і production claims залишаються закритими.
 
 ## Для AI-агентів
 
@@ -66,7 +66,7 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 керуватиме POWER.
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -101,7 +101,7 @@ isolated venv, immutable release wheel, точний PowerShell syntax, clean-va
 acceptance checks, MCP configuration через venv interpreter, troubleshooting,
 rollback і uninstall.
 
-Прямий Windows runtime запуск не входив у Linux release pipeline `v3.4.0`;
+Прямий Windows runtime запуск не входив у Linux release pipeline `v3.4.5`;
 гід явно розділяє автоматизований cross-platform regression і checks, які
 мають пройти на цільовому Windows host.
 
@@ -131,7 +131,7 @@ rollback і uninstall.
 | **CI/CD**                        | Hermetic тести, CodeQL SAST і автоматизовані GitHub-релізи; release evidence перевіряється versioned harness `benchmarks/power31` та pinned model manifest.                                                                                                                                                                                                                                                                                                                          |
 | **Документація**                 | Повний [mkdocs-material сайт](https://weby-homelab.github.io/power-framework/) з API reference та гайдами                                                                                                                                                                                                                                                                                                                                                                            |
 
-> **Статус evidence для POWER 3.4.0:** реліз містить machine-only M2–M5
+> **Статус evidence для POWER 3.4.5:** реліз містить machine-only M2–M5
 > technical gates, package/CI provenance та Windows-safe виправлення
 > `power rename` з автоматичним regression покриттям. Historical figures
 > у feature-table, model comparisons, resource limits і benchmark
@@ -143,7 +143,7 @@ rollback і uninstall.
 
 Історичний v1.6.0 snapshot переходу від flat до hierarchical index. Його vault
 counts, token estimates, source paths, test counts і MCP inventory є
-historical evidence, а не поточним контрактом `v3.4.0`:
+historical evidence, а не поточним контрактом `v3.4.5`:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — детальний технічний звіт з метриками
@@ -251,7 +251,7 @@ power search ~/my-vault "experiment" --mode auto --domain research
 а також read-only golden task та workflow схвалення.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -521,7 +521,7 @@ mypy src/power_framework/
 
 Для актуальної відтворюваної інформації про реліз і evidence:
 
-- [Нотатки релізу P.O.W.E.R. 3.4.0](docs/release-3.4.0.md) — поточний технічний scope,
+- [Нотатки релізу P.O.W.E.R. 3.4.5](docs/release-3.4.5.md) — поточний технічний scope,
   межі валідації та інструкції оновлення.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) —
   canonical checksum-verified post-merge WS full-sync evidence; розширена
@@ -599,7 +599,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux, macOS, Windows
-softwareVersion: 3.4.0
+softwareVersion: 3.4.5
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

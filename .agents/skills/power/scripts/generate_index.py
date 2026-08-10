@@ -3,7 +3,7 @@
 P.O.W.E.R. Hierarchical Index Generator Script.
 
 Standalone CLI wrapper around power_core.indexer for generating the vault catalog.
-Generates a navigation map (index.md) plus per-folder _index.md files.
+Generates a navigation map (index.md) plus recursive, bounded catalog pages.
 
 Usage:
     python generate_index.py [vault_path]
@@ -13,15 +13,19 @@ from __future__ import annotations
 
 import os
 import sys
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(script_dir))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from pathlib import Path
 
 from power_framework.core import (
-    run_generate_hierarchical_index,
     generate_log_initial,
+    run_generate_hierarchical_index,
     scan_folder_notes,
 )
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def resolve_vault_dir() -> Path:

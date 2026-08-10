@@ -5,6 +5,19 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.5] - 2026-08-10
+
+### Added
+
+- Added Cross-Platform Supported Release baseline with verified Linux, macOS (`macos-latest` Python 3.13 CI smoke), hosted Windows Server, and physical Windows 11 25H2 GPU boundaries (`docs/support-matrix.md`).
+- Added synthetic quality oracle harness `benchmarks/power31/scripts/evaluation/run_quality_comparison.py` evaluating `semantic` vs `reranked` retrieval over dataset v1 (228 queries) with paired statistics and latency tracking.
+- Added CUDA ONNX Runtime binding verification on GPU host WS (`192.168.2.24`, RTX 2080 Ti).
+
+### Changed
+
+- Confirmed Semantic Search (BGE-M3 1024d) as sole canonical default retrieval engine. Reranker is rejected as default due to statistically significant degradation on English notes and latency/VRAM overhead.
+- Updated FastMCP package version readback in `get_server_info` tool and doctor report JSON.
+
 ## [3.4.0] - 2026-08-09
 
 ### Added

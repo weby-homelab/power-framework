@@ -13,11 +13,15 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
-
-from power_framework.core import run_lint_vault
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(script_dir))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from pathlib import Path
+
+from power_framework.core import run_lint_vault, run_rot_report
 
 
 def resolve_vault_dir() -> Path:
@@ -43,7 +47,7 @@ def resolve_vault_dir() -> Path:
 
 
 def main() -> None:
-    """Run lint and print health report."""
+    """Run lint + ROT audit and print health report."""
     vault_dir = resolve_vault_dir()
 
     if not vault_dir.exists():
@@ -52,6 +56,9 @@ def main() -> None:
 
     result = run_lint_vault(vault_dir)
     print(result.format_report(vault_dir))
+    print()
+    rot_report = run_rot_report(vault_dir)
+    print(rot_report)
     sys.exit(1 if result.has_blocking_issues else 0)
 
 

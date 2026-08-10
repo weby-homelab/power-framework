@@ -1,6 +1,6 @@
 # P.O.W.E.R. platform support matrix
 
-This matrix is the operational boundary for the current `v3.4.0` contract. It
+This matrix is the operational boundary for the current `v3.4.5` contract. It
 separates automated lifecycle coverage from model-backed, physical-host, GPU,
 and retrieval-quality evidence. A green CI job does not certify a different
 host, provider, corpus, or performance envelope.

@@ -1,6 +1,6 @@
 # Підключення MCP-клієнтів
 
-Це канонічне налаштування локального stdio для P.O.W.E.R. `v3.4.0` на Linux і
+Це канонічне налаштування локального stdio для P.O.W.E.R. `v3.4.5` на Linux і
 macOS. Воно дає Codex, OpenCode, Gemini CLI, Claude Desktop і Claude Code один
 і той самий процес сервера та однакову межу vault.
 
@@ -14,7 +14,7 @@ Windows virtual environment. POSIX-шляхи не можна переносит
 Спочатку встановіть release wheel і створіть або мігруйте vault:
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
 power init ~/my-vault
 python3 -c 'import sys; print(sys.executable)'
 ```

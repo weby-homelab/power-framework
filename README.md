@@ -36,7 +36,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Windows-safe rename** — `power rename` uses `os.replace()` for the physical
   move, so renaming onto an existing destination works on Windows instead of
   raising `FileExistsError`
-- **Technical 3.4.0 release** — the machine-only M2–M5 gates, package and CI
+- **Technical 3.4.5 release** — the machine-only M2–M5 gates, package and CI
   provenance are verified; the release adds fail-closed doctor, migration,
   cache, catalog, healer, and agent-contract safeguards. Human-quality
   certification, sealed-holdout access, and production claims remain closed.
@@ -69,7 +69,7 @@ assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -104,7 +104,7 @@ Visual C++ prerequisites, isolated venv setup, immutable release wheel,
 acceptance checks, MCP configuration, troubleshooting, rollback, and uninstall
 steps.
 
-Direct Windows runtime execution was not part of the `v3.4.0` Linux release
+Direct Windows runtime execution was not part of the `v3.4.5` Linux release
 pipeline; the guide explicitly separates automated cross-platform regression
 coverage from checks that must pass on the target Windows host.
 
@@ -134,7 +134,7 @@ coverage from checks that must pass on the target Windows host.
 | **CI/CD**                        | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest.                                                                                                                                                                                                                                                                                                                  |
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
 
-> **POWER 3.4.0 evidence status:** the release contains the machine-only M2–M5
+> **POWER 3.4.5 evidence status:** the release contains the machine-only M2–M5
 > technical gates, package/CI provenance, and the Windows-safe `power rename`
 > overwrite fix with automated regression coverage. Historical feature-table
 > figures, model comparisons, resource limits and benchmark recommendations are
@@ -145,7 +145,7 @@ coverage from checks that must pass on the target Windows host.
 
 Read the historical v1.6.0 snapshot of the transition from flat to hierarchical
 indexing. Its measured vault counts, token estimates, source paths, test counts,
-and MCP inventory are historical evidence, not the current `v3.4.0` contract:
+and MCP inventory are historical evidence, not the current `v3.4.5` contract:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
@@ -256,7 +256,7 @@ canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
 OpenCode, plus the read-only golden task and approval workflow.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.0/power_framework-3.4.0-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -526,7 +526,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.4.0 release notes](docs/release-3.4.0.md) — current technical release
+- [P.O.W.E.R. 3.4.5 release notes](docs/release-3.4.5.md) — current technical release
   scope, validation boundary, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is
@@ -604,7 +604,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux, macOS, Windows
-softwareVersion: 3.4.0
+softwareVersion: 3.4.5
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework
