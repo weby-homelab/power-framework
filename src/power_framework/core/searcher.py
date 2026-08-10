@@ -1472,6 +1472,7 @@ def search_vault(
         # the whole vault on every query (Performance Plan §1). Incremental
         # mtime checks inside _sync_vault_to_db keep repeat calls near-free.
         conn: sqlite3.Connection | None = None
+        synchronization_completed = False
         try:
             conn = sqlite3.connect(str(_db_path(vault_dir)), timeout=30)
             conn.execute("PRAGMA busy_timeout=30000")
@@ -1481,12 +1482,14 @@ def search_vault(
             cur.execute("SELECT COUNT(*) FROM file_metadata")
             if cur.fetchone()[0] == 0:
                 _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
+                synchronization_completed = True
         except Exception as e:
             logger.warning("Session-level FTS sync failed: %s", e)
         finally:
             if conn is not None:
                 conn.close()
-        resolved_db = _resolve_request_db(vault_dir)
+        if synchronization_completed:
+            resolved_db = _resolve_request_db(vault_dir)
 
     expander = QueryExpander()
     variants = expander.expand(query)

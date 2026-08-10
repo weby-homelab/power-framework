@@ -168,6 +168,28 @@ def test_search_request_resolves_active_generation_once(
     assert calls == 1
 
 
+def test_preindexed_legacy_search_resolves_database_once(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = Path(os.environ["POWER_SEARCH_DB"])
+    with closing(sqlite3.connect(db_path)) as conn:
+        _init_db(conn)
+        _sync_vault_to_db(sample_vault, conn, sync_embeddings=False)
+
+    original_resolve = searcher.resolve_active_generation_path
+    calls = 0
+
+    def counted_resolve(vault_dir: Path) -> Path | None:
+        nonlocal calls
+        calls += 1
+        return original_resolve(vault_dir)
+
+    monkeypatch.setattr(searcher, "resolve_active_generation_path", counted_resolve)
+
+    assert search_vault(sample_vault, "test", mode="fts")
+    assert calls == 1
+
+
 def test_search_request_fails_closed_on_corrupt_active_generation(
     sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
