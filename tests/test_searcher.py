@@ -148,6 +148,108 @@ def test_search_timing_collector_records_content_free_components(sample_vault: P
     assert "query" not in components
 
 
+def test_dense_matrix_cache_reuses_exact_rows_for_verified_generation(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class FakeDenseManager:
+        model_name = "matrix-cache-test"
+
+        def embed(self, text: str) -> list[float]:
+            del text
+            return [1.0, 0.0, 0.0]
+
+        def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+            del batch_size
+            return [[1.0, 0.0, 0.0] for _ in texts]
+
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setattr(searcher, "get_embedding_manager", lambda: FakeDenseManager())
+    monkeypatch.setattr(
+        searcher,
+        "configured_embedding_identity",
+        lambda: ("FakeDenseManager", "matrix-cache-test"),
+    )
+    sync_vault_atomically(sample_vault, sync_embeddings=True, force_rebuild=True)
+
+    original_open = searcher._open_readonly_db
+    matrix_reads = 0
+
+    def counted_open(path: Path) -> sqlite3.Connection:
+        nonlocal matrix_reads
+        conn = original_open(path)
+
+        def trace(statement: str) -> None:
+            nonlocal matrix_reads
+            if "SELECT chunk_id, rel_path, embedding FROM chunk_embeddings" in statement:
+                matrix_reads += 1
+
+        conn.set_trace_callback(trace)
+        return conn
+
+    monkeypatch.setattr(searcher, "_open_readonly_db", counted_open)
+
+    first = _semantic_search(sample_vault, "test", max_results=5)
+    with collect_timings() as receipt:
+        second = _semantic_search(sample_vault, "test", max_results=5)
+
+    assert first == second
+    assert matrix_reads == 1
+    assert receipt.as_dict()["span_counts"]["dense_matrix_cache"] == 1
+
+
+def test_dense_matrix_cache_rebuilds_after_generation_publication(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class FakeDenseManager:
+        model_name = "matrix-cache-publication-test"
+
+        def embed(self, text: str) -> list[float]:
+            del text
+            return [1.0, 0.0, 0.0]
+
+        def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+            del batch_size
+            return [[1.0, 0.0, 0.0] for _ in texts]
+
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setattr(searcher, "get_embedding_manager", lambda: FakeDenseManager())
+    monkeypatch.setattr(
+        searcher,
+        "configured_embedding_identity",
+        lambda: ("FakeDenseManager", "matrix-cache-publication-test"),
+    )
+    first_report = sync_vault_atomically(sample_vault, sync_embeddings=True, force_rebuild=True)
+
+    original_open = searcher._open_readonly_db
+    matrix_reads = 0
+
+    def counted_open(path: Path) -> sqlite3.Connection:
+        nonlocal matrix_reads
+        conn = original_open(path)
+
+        def trace(statement: str) -> None:
+            nonlocal matrix_reads
+            if "SELECT chunk_id, rel_path, embedding FROM chunk_embeddings" in statement:
+                matrix_reads += 1
+
+        conn.set_trace_callback(trace)
+        return conn
+
+    monkeypatch.setattr(searcher, "_open_readonly_db", counted_open)
+    _semantic_search(sample_vault, "test", max_results=5)
+    _semantic_search(sample_vault, "test", max_results=5)
+
+    note = sample_vault / "03_Resources" / "TestResource.md"
+    note.write_text(note.read_text(encoding="utf-8") + "\npublication change\n", encoding="utf-8")
+    second_report = sync_vault_atomically(sample_vault, sync_embeddings=True, force_rebuild=True)
+    _semantic_search(sample_vault, "publication", max_results=5)
+
+    assert first_report.generation_id != second_report.generation_id
+    assert matrix_reads == 2
+
+
 def test_search_request_resolves_active_generation_once(
     sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
