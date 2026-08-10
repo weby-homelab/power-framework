@@ -96,6 +96,17 @@ class TestExplicitIndexing:
         assert total > 0
         assert indexed == total
 
+    def test_coverage_excludes_paginated_catalog_pages(self, tmp_path):
+        resources = tmp_path / "03_Resources"
+        resources.mkdir()
+        (resources / "real-note.md").write_text("# Real note\n", encoding="utf-8")
+        (resources / "_index-2.md").write_text("# Generated catalog page\n", encoding="utf-8")
+
+        indexed, total = get_index_coverage(tmp_path)
+
+        assert indexed == 0
+        assert total == 1
+
 
 class TestSemanticNumpy:
     """Semantic search requires a compatible dense index before model loading."""
