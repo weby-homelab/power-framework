@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.4.5] - 2026-08-10
 
-### 🚀 Повне досягнення цілі! (Goal Completed)
-
-#### 🎯 Аудит та підсумковий статус розробки
-
 1. Всі фази POWER 3.4+ завершено (Milestone 3.4.5 — DONE):
     • 3.4.0 (Restore Truth): Signed v3.4.0 реліз, прибрано неправдиві конфігураційні заяви.
     • 3.4.1 (One Truthful Contract): Єдиний power doctor --json, 20 MCP tools, risk annotations, двомовна документація.
