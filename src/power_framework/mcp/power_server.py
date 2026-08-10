@@ -104,6 +104,100 @@ _LOOPBACK_HTTP_HOSTS = frozenset({"127.0.0.1", "::1"})
 _MAX_MCP_SEARCH_RESULTS = 20
 
 
+def _catalog_page_filename(page: int) -> str:
+    """Return the stable filename for a one-based catalog page."""
+    return "_index.md" if page == 1 else f"_index-{page}.md"
+
+
+def _validate_catalog_page(page: int) -> int:
+    """Validate the bounded page selector exposed by catalog tools."""
+    if isinstance(page, bool) or not isinstance(page, int) or page < 1:
+        raise ToolError("page must be a positive integer starting at 1")
+    return page
+
+
+def _read_catalog_prefix(index_path: Path) -> str:
+    """Read only enough catalog bytes to inspect generated frontmatter."""
+    try:
+        with index_path.open("r", encoding="utf-8") as handle:
+            return handle.read(4096)
+    except (OSError, UnicodeError) as exc:
+        raise ToolError("Unable to read the catalog landing page") from exc
+
+
+def _read_catalog_frontmatter(prefix: str) -> list[str] | None:
+    """Return only the first complete YAML frontmatter block, if present."""
+    lines = prefix.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    try:
+        closing = next(
+            index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"
+        )
+    except StopIteration as exc:
+        raise ToolError("Catalog frontmatter is unclosed; regenerate the index") from exc
+    return lines[1:closing]
+
+
+def _frontmatter_integer(lines: list[str], key: str) -> int | None:
+    """Read one unique integer frontmatter field without scanning the body."""
+    matches = [line for line in lines if line.startswith(f"{key}:")]
+    if len(matches) > 1:
+        raise ToolError(f"Catalog frontmatter contains duplicate {key}; regenerate the index")
+    if not matches:
+        return None
+    try:
+        return int(matches[0].split(":", 1)[1].strip())
+    except (IndexError, ValueError) as exc:
+        raise ToolError("Catalog page metadata is invalid; regenerate the index") from exc
+
+
+def _declared_catalog_page_count(prefix: str) -> int:
+    """Read the generated page count without trusting arbitrary body content."""
+    frontmatter = _read_catalog_frontmatter(prefix)
+    if frontmatter is None:
+        return 1
+    page_count = _frontmatter_integer(frontmatter, "x-index-pages")
+    if page_count is None:
+        return 1
+    if page_count < 1:
+        raise ToolError("Catalog page metadata is invalid; regenerate the index")
+    return page_count
+
+
+def _read_catalog_page(category_path: Path, page: int) -> str | None:
+    """Read one declared catalog page, failing closed on stale pagination."""
+    landing_path = category_path / _catalog_page_filename(1)
+    try:
+        landing_path.stat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise ToolError("Unable to read the catalog landing page") from exc
+
+    if page == 1:
+        try:
+            content = landing_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise ToolError("Unable to read the catalog landing page") from exc
+        _declared_catalog_page_count(content[:4096])
+        return content
+
+    page_count = _declared_catalog_page_count(_read_catalog_prefix(landing_path))
+    if page > page_count:
+        raise ToolError(f"Catalog page {page} is out of range; available pages: 1-{page_count}")
+
+    page_path = category_path / _catalog_page_filename(page)
+    try:
+        return page_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise ToolError(
+            f"Catalog page {page} is missing although the landing page declares {page_count}"
+        ) from exc
+    except (OSError, UnicodeError) as exc:
+        raise ToolError(f"Unable to read catalog page {page}") from exc
+
+
 def _get_vault_path(vault_path: str | None = None) -> Path:
     """Resolve a tool vault path without allowing configured-root substitution."""
     configured_root = os.getenv("POWER_VAULT_DIR") or os.getenv("POWER_VAULT_PATH")
@@ -311,9 +405,10 @@ async def sync_vault(
     },
     meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
 )
-async def read_sub_index(category: str, vault_path: str | None = None) -> str:
-    """Read the sub-index (_index.md) for a specific P.A.R.A. category. Use this after identifying the relevant category from the main index. Read-only — does not generate files."""
+async def read_sub_index(category: str, vault_path: str | None = None, page: int = 1) -> str:
+    """Read one bounded page of a P.A.R.A. sub-index without generating files."""
     path = _get_vault_path(vault_path)
+    page = _validate_catalog_page(page)
 
     if category not in PARA_FOLDERS:
         raise ToolError(f"Invalid category: {category}. Must be one of: {', '.join(PARA_FOLDERS)}")
@@ -322,9 +417,9 @@ async def read_sub_index(category: str, vault_path: str | None = None) -> str:
     if not category_path.is_dir():
         raise ToolError(f"Category folder not found: {category}")
 
-    sub_index_path = category_path / "_index.md"
-    if sub_index_path.exists():
-        return sub_index_path.read_text(encoding="utf-8")
+    content = _read_catalog_page(category_path, page)
+    if content is not None:
+        return content
 
     return f"No _index.md found for {category}. Use ensure_sub_index to generate it."
 
@@ -338,9 +433,10 @@ async def read_sub_index(category: str, vault_path: str | None = None) -> str:
     },
     meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
 )
-async def ensure_sub_index(category: str, vault_path: str | None = None) -> str:
-    """Generate and read a sub-index (_index.md) for a P.A.R.A. category. Use this when _index.md is missing and you need to generate it."""
+async def ensure_sub_index(category: str, vault_path: str | None = None, page: int = 1) -> str:
+    """Generate and read one bounded page of a P.A.R.A. sub-index."""
     path = _get_vault_path(vault_path)
+    page = _validate_catalog_page(page)
 
     if category not in PARA_FOLDERS:
         raise ToolError(f"Invalid category: {category}. Must be one of: {', '.join(PARA_FOLDERS)}")
@@ -357,8 +453,10 @@ async def ensure_sub_index(category: str, vault_path: str | None = None) -> str:
 
     def _gen_and_read() -> str:
         result = run_generate_sub_index(path, category)
-        sub_path = category_path / "_index.md"
-        return f"{result}\n\n{sub_path.read_text(encoding='utf-8')}"
+        content = _read_catalog_page(category_path, page)
+        if content is None:
+            raise ToolError(f"Generated catalog landing page is missing for {category}")
+        return f"{result}\n\n{content}"
 
     return await run_vault_mutation(path, _gen_and_read)
 
