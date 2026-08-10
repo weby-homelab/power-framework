@@ -15,6 +15,7 @@ from power_framework.core.coverage import get_index_coverage
 from power_framework.core.searcher import (
     RERANK_CANDIDATE_LIMIT,
     DenseIndexUnavailableError,
+    SearchResult,
     _hybrid_reranked_search,
     _init_db,
     _semantic_search,
@@ -151,6 +152,53 @@ class TestBoundedRerank:
         results = _hybrid_reranked_search(indexed_vault, "test project", max_results=5)
         assert isinstance(results, list)
         assert len(results) <= 5
+
+    def test_reranker_receives_body_centered_text(self, tmp_path, monkeypatch):
+        from power_framework.core import searcher
+
+        vault = tmp_path / "vault"
+        note = vault / "01_Projects" / "Body.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            'title: "Visible title"\n'
+            'description: "metadata-only phrase"\n'
+            "status: active\n"
+            "timestamp: 2026-01-01T00:00:00Z\n"
+            "---\n\n"
+            "body-only phrase\n",
+            encoding="utf-8",
+        )
+        candidate = SearchResult(
+            rel_path="01_Projects/Body.md",
+            title="Visible title",
+            description="metadata-only phrase",
+            note_type="Project",
+            score=1.0,
+            snippet="[Document: Visible title | Description: metadata-only phrase]",
+            match_count=1,
+        )
+        captured: list[str] = []
+
+        monkeypatch.setattr(searcher, "_fts_search", lambda *args, **kwargs: [candidate])
+        monkeypatch.setattr(searcher, "_vector_search", lambda *args, **kwargs: [])
+        monkeypatch.setattr(searcher, "_semantic_search", lambda *args, **kwargs: [])
+
+        class CaptureReranker:
+            def rerank(self, query: str, documents: list[str]) -> list[float]:
+                del query
+                captured.extend(documents)
+                return [1.0] * len(documents)
+
+        monkeypatch.setattr(searcher, "_get_reranker", lambda: CaptureReranker())
+
+        _hybrid_reranked_search(vault, "body-only phrase", max_results=1)
+
+        assert len(captured) == 1
+        assert captured[0].startswith("Visible title\n\nbody-only phrase")
+        assert "metadata-only phrase" not in captured[0]
+        assert "status: active" not in captured[0]
 
 
 class TestPragmaTuning:
