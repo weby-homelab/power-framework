@@ -40,22 +40,24 @@ A dataset of **100 representative queries** was executed across both hosts. Ever
 | **Semantic (Dense)** | PRXMX-01 (CPU) | 87.83 s | 100.0% | 772.8 ms | 1265.7 ms | 1.00x (Baseline) |
 | **Semantic (Dense)** | WS (CUDA GPU) | **38.32 s** | 100.0% | **363.6 ms** | **456.8 ms** | **2.77x Faster (P95)** |
 | **Reranked (Cross-Encoder)** | PRXMX-01 (CPU) | 138.00 s / query | 100.0% | 138,000 ms | N/A | CPU Bottleneck |
-| **Reranked (Cross-Encoder)** | WS (CUDA GPU) | **2.04 s / query** | 100.0% | **985.0 ms** | **2911.7 ms** | **67.6x Acceleration** ⚡ |
+| **Reranked (Cross-Encoder)** | WS (Xeon CPU) | 40.69 s / query | 100.0% | 26,743 ms | 77,348 ms | 3.39x Faster (CPU) |
+| **Reranked (Cross-Encoder)** | WS (CUDA GPU) | **2.04 s / query** | 100.0% | **985.0 ms** | **2911.7 ms** | **41.3x Acceleration vs Xeon** ⚡ |
 
 ---
 
 ## 🔍 3. Key Findings & Architectural Insights
 
 1. **Zero Search Degraded Paths (100% Hit Rate):**
-   Across all 600 search executions per host, P.O.W.E.R 3.4.5 achieved a **100.0% Hit Rate** (100/100 non-empty search responses), demonstrating the robustness of fallback ranking and FTS tokenization.
+   Across all search executions per host, P.O.W.E.R 3.4.5 achieved a **100.0% Hit Rate** (100/100 non-empty search responses), demonstrating the robustness of fallback ranking and FTS tokenization.
 
 2. **Semantic Search Acceleration on GPU:**
    Dense vector similarity search using BGE-M3 (1024-dimensional vectors) executed in **363.6 ms (P50)** on WS GPU vs **772.8 ms (P50)** on PRXMX-01 CPU. At P95, GPU acceleration reduced tail latency from **1265.7 ms down to 456.8 ms** (a 2.77x improvement).
 
-3. **Cross-Encoder Reranking Bottleneck:**
+3. **Cross-Encoder Reranking Hardware Scaling (CPU vs GPU):**
    Cross-encoder reranking (`BGE-Reranker-v2-m3-ONNX`) requires compute-heavy matrix multiplications over full candidate text excerpts.
-   - On **CPU-only (PRXMX-01)**, reranking takes ~138 seconds per query, making it unsuitable for interactive agentic chat sessions.
-   - On **GPU (WS CUDA)**, reranking takes **985.0 ms (P50)**, enabling real-time reranking for high-precision retrieval.
+   - On **i5-5200U (PRXMX-01 CPU)**: Reranking takes **138.0 s / query**, creating a severe CPU bottleneck.
+   - On **Xeon E5-2666 v3 (WS CPU)**: Reranking takes **40.69 s / query** (P50: 26.74 s), which is 3.39x faster than i5-5200U, but still unsuitable for interactive agentic chat loops.
+   - On **NVIDIA RTX 2080 Ti (WS CUDA GPU)**: Reranking takes **985.0 ms (P50)**, providing **41.3x acceleration vs 20-thread Xeon CPU** and enabling real-time reranking for high-precision retrieval.
 
 4. **Network & Storage Sync Performance:**
    Transferring the GPU-computed SQLite search index (`96bdf96c-cd09-4ba6-8920-e37842567c6c.db`, 177 MB total generation cache) from WS to PRXMX-01 over Tailscale mesh took **7.5 seconds at 9.47 MB/s**. This proves that low-power hosts (PRXMX-01) can consume GPU-built vector indexes seamlessly without executing dense embedding models locally.
