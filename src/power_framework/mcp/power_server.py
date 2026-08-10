@@ -93,7 +93,12 @@ from power_framework.core.synthesize import synthesize_session_ingest
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("power", version=__version__, mask_error_details=True)
+mcp = FastMCP(
+    "power",
+    version=__version__,
+    instructions=f"P.O.W.E.R. {__version__} — Hybrid Knowledge Management Framework",
+    mask_error_details=True,
+)
 mcp.add_middleware(
     ErrorHandlingMiddleware(
         include_traceback=False,

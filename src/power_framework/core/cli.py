@@ -832,13 +832,13 @@ def main() -> None:
     _configure_windows_utf8_streams()
     parser = argparse.ArgumentParser(
         prog="power",
-        description="AI-Native Toolkit for Second Brain — validate, index, and manage your knowledge base.",
+        description=f"P.O.W.E.R. {__version__} — Hybrid Knowledge Management Framework",
     )
     parser.add_argument(
         "-v",
         "--version",
         action="version",
-        version=f"power {__version__}",
+        version=f"P.O.W.E.R. {__version__} — Hybrid Knowledge Management Framework",
     )
     parser.add_argument(
         "--verbose",

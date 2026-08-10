@@ -1,7 +1,7 @@
 ---
 name: power
 version: 3.4.5
-description: Maintains and validates the P.O.W.E.R. knowledge base (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
+description: P.O.W.E.R. 3.4.5 — Hybrid Knowledge Management Framework (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
 ---
 
 # ⚡ P.O.W.E.R. Knowledge Management Skill
