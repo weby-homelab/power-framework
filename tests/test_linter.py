@@ -69,6 +69,26 @@ class TestRunLintVault:
         result = run_lint_vault(sample_vault)
         assert result.total_notes == 5
 
+    def test_generated_system_log_is_not_counted_or_linted(self, tmp_path: Path):
+        resources = tmp_path / "03_Resources"
+        resources.mkdir()
+        (resources / "log.md").write_text("# Generated log\n", encoding="utf-8")
+        (resources / "Note.md").write_text(
+            "---\n"
+            "type: Resource\n"
+            'title: "Note"\n'
+            'description: "A real note"\n'
+            "timestamp: 2026-01-01T00:00:00Z\n"
+            "---\n\n"
+            "# Note\n",
+            encoding="utf-8",
+        )
+
+        result = run_lint_vault(tmp_path)
+
+        assert result.total_notes == 1
+        assert not any(path == "03_Resources/log.md" for path, _ in result.untyped_files)
+
     def test_daily_logs_excluded_from_orphans(self, sample_vault: Path):
         result = run_lint_vault(sample_vault)
         orphan_paths = result.orphans

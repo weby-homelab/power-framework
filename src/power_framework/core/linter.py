@@ -332,6 +332,11 @@ def _resolve_internal_link(
     return basename_map.get(clean_note_name(Path(normalized).name), [])
 
 
+def _is_system_page(filename: str) -> bool:
+    """Return whether *filename* is a reserved or generated vault page."""
+    return filename in {"index.md", "log.md"} or is_catalog_filename(filename)
+
+
 def run_lint_vault(vault_dir: Path) -> LintResult:
     """
     Run full health lint on the vault.
@@ -357,12 +362,18 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
         all_files[rel_path] = filepath
         basename_map.setdefault(clean_note_name(filepath.name), []).append(rel_path)
 
-    result.total_notes = sum(not is_catalog_filename(Path(rel_path).name) for rel_path in all_files)
+    result.total_notes = sum(not _is_system_page(Path(rel_path).name) for rel_path in all_files)
 
     for rel_path, abs_path in all_files.items():
         try:
             content = read_file_content(abs_path)
         except Exception:  # noqa: S112
+            continue
+
+        if _is_system_page(Path(rel_path).name):
+            # Generated catalogs still contribute inbound links, but are not
+            # user notes and must not raise metadata findings themselves.
+            links[rel_path] = _extract_links(content)
             continue
 
         if not has_frontmatter(content):
