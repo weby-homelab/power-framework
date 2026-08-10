@@ -441,6 +441,38 @@ def test_legacy_search_database_is_imported_before_removal(
     assert search_vault(vault, "legacy-token", mode="fts")
 
 
+def test_stale_legacy_database_falls_back_to_source_rebuild(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A legacy snapshot missing current notes must not block recovery."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "stale-legacy", "legacy-token")
+    legacy_path = vault_db_path(vault)
+    with closing(sqlite3.connect(legacy_path)) as conn:
+        _init_db(conn)
+        _sync_vault_to_db(vault, conn, sync_embeddings=False)
+
+    added = vault / "01_Projects" / "Added.md"
+    added.write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Added\n"
+        "description: added after the legacy snapshot\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\nadded-token\n",
+        encoding="utf-8",
+    )
+
+    report = sync_vault_atomically(vault, sync_embeddings=False, allow_partial=False)
+
+    assert report.actual_files == 2
+    assert not legacy_path.exists()
+    archive = legacy_path.parent / "legacy" / f"search.db.{report.generation_id}.bak"
+    assert archive.is_file()
+    assert search_vault(vault, "legacy-token", mode="fts")
+    assert search_vault(vault, "added-token", mode="fts")
+
+
 def test_cleanup_failure_after_pointer_commit_keeps_new_generation_active(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

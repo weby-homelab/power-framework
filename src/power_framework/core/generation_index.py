@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import sqlite3
 import uuid
@@ -24,6 +25,8 @@ from .vault_storage import (
     vault_cache_dir,
     vault_db_path,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class IndexGenerationError(RuntimeError):
@@ -694,6 +697,12 @@ def _migrate_legacy_database(
         ):
             path.unlink(missing_ok=True)
         if isinstance(exc, IndexGenerationError):
+            if str(exc).startswith("source coverage mismatch:"):
+                logger.warning(
+                    "Legacy search database is stale for the current vault; "
+                    "rebuilding from source files"
+                )
+                return None
             raise
         raise IndexGenerationError(f"legacy generation {generation_id} failed: {exc}") from exc
 
@@ -794,6 +803,8 @@ def sync_vault_atomically(
             provider,
             model,
         )
+        if active_path is None and not os.getenv("POWER_SEARCH_DB"):
+            _archive_legacy_database(root, vault_db_path(root), generation_id)
     except Exception as exc:
         _record_failure(root, generation_id, str(exc))
         for path in (
