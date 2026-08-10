@@ -25,6 +25,8 @@
 | `docs/mcp-client-onboarding.ua.md` | Український golden onboarding | Семантично паритетний |
 | `docs/support-matrix.md` | Англійська матриця підтримки платформ | Tested / conditional / unsupported boundaries |
 | `docs/support-matrix.ua.md` | Українська матриця підтримки платформ | Семантично паритетна |
+| `docs/guides/hybrid-fleet-gpu-offloading-guide.md` | Англійський посібник гібридної GPU-архітектури | Універсальний асинхронний offloading |
+| `docs/guides/hybrid-fleet-gpu-offloading-guide.ua.md` | Український посібник гібридної GPU-архітектури | Семантично паритетний |
 
 ## Пов'язані документи
 
