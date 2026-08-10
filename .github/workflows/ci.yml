@@ -72,7 +72,7 @@ jobs:
           }
           $lintText
           uv run power markdown-check $vault
-          uv run power sync $vault --fts-only
+          uv run power sync $vault --fts-only --strict
           $searchResult = uv run power search $vault "Windows smoke" --mode fts
           $searchText = $searchResult -join [Environment]::NewLine
           if ($LASTEXITCODE -ne 0 -or $searchText -notmatch "First Note") {

@@ -33,7 +33,7 @@ def test_ci_has_windows_runtime_smoke_for_documented_lifecycle() -> None:
     assert "runs-on: windows-latest" in ci_text
     assert "uv sync --locked" in ci_text
     assert "uv run power index $vault --strict" in ci_text
-    assert "uv run power sync $vault --fts-only" in ci_text
+    assert "uv run power sync $vault --fts-only --strict" in ci_text
     assert 'uv run power search $vault "Windows smoke" --mode fts' in ci_text
 
 
