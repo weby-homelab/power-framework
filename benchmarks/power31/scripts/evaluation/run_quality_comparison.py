@@ -76,6 +76,17 @@ def _aggregate(metrics: list[dict[str, float]]) -> dict[str, float]:
     return {key: sum(item[key] for item in metrics) / len(metrics) for key in metrics[0]}
 
 
+def _peak_rss_mb() -> float | None:
+    """Return process peak RSS where the host exposes ``resource``."""
+    try:
+        import resource
+    except ImportError:
+        return None
+    raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    divisor = 1 if sys.platform == "darwin" or sys.platform.startswith("win") else 1024
+    return round(raw / divisor / 1024, 1)
+
+
 def _hash_dataset(manifest: dict[str, Any]) -> dict[str, Any]:
     """Validate immutable dataset counts and canonical JSONL hashes."""
     queries = _load_jsonl(QUERIES_FILE)
@@ -252,6 +263,7 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
             "python": sys.version,
             "platform": platform.platform(),
             "hardware": _hardware_profile(),
+            "peak_rss_mb": _peak_rss_mb(),
             "dependency_lock_sha256": _dependency_lock_hash(),
             "models_lock_sha256": _sha256_file(MODELS_LOCK) if MODELS_LOCK.exists() else None,
         },
@@ -262,6 +274,7 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
             "SYNTHETIC BENCHMARK — not human-annotated and not production evidence",
             "Raw per-query rankings are not retained; paired metric statistics are collected",
             "Latency is warm in-process only; it is not a cold/MCP/provider receipt",
+            "RSS is process-level only; GPU VRAM is not measured by this harness",
             "Provider binding must be proven by a separate session readback",
         ],
     }
