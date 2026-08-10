@@ -54,6 +54,24 @@ python benchmarks/power31/scripts/generate_benchmark.py
 python benchmarks/power31/scripts/evaluation/validate_dataset.py
 ```
 
+### Compare semantic and reranked retrieval
+
+The benchmark-only comparison harness runs the real search API against the
+frozen oracle and records MRR@10, Recall@10, nDCG@10, UA/EN strata,
+no-answer false positives, paired bootstrap/sign-test statistics, and warm
+in-process p50/p95 latency:
+
+```bash
+python benchmarks/power31/scripts/evaluation/run_quality_comparison.py \
+    --rounds 1 \
+    --output /tmp/power31-quality-comparison.json
+```
+
+It requires the pinned dense and reranker model assets and fails closed on a
+dirty source tree or dataset hash mismatch. The receipt is synthetic CI
+evidence only; it is not human-quality, production, cold-process, MCP, or
+provider-binding evidence.
+
 ### Run regression tests
 
 ```bash
