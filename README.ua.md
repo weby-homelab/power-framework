@@ -55,6 +55,9 @@ P.O.W.E.R. створений для роботи як людьми, так і A
   міграція з будь-якої Markdown source methodology у canonical POWER vault
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
+- **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — межі tested,
+  conditional та unsupported для Linux, macOS, hosted Windows і фізичного
+  Windows 11 25H2
 
 ## Швидкий старт (Linux/macOS)
 

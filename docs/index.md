@@ -15,6 +15,8 @@ and an MCP interface for AI agents.
 - [Міграція з наявної бази знань](migration-guide.ua.md)
 - [MCP client onboarding](mcp-client-onboarding.md)
 - [Підключення MCP-клієнтів](mcp-client-onboarding.ua.md)
+- [Platform support matrix](support-matrix.md)
+- [Матриця підтримки платформ](support-matrix.ua.md)
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
 These guides pin the immutable `v3.4.0` release artifact, use an isolated virtual

@@ -23,6 +23,8 @@
 | `docs/mcp-server.md` | Виконуваний MCP-контракт | 20 інструментів |
 | `docs/mcp-client-onboarding.md` | Golden onboarding для чотирьох клієнтів | stdio shape + proposal gate |
 | `docs/mcp-client-onboarding.ua.md` | Український golden onboarding | Семантично паритетний |
+| `docs/support-matrix.md` | Англійська матриця підтримки платформ | Tested / conditional / unsupported boundaries |
+| `docs/support-matrix.ua.md` | Українська матриця підтримки платформ | Семантично паритетна |
 
 ## Пов'язані документи
 
@@ -59,7 +61,9 @@
 Markdown-перевірку, FTS sync/search і status. Фізичну перевірку Windows 11 25H2
 виконано для follow-up revision `4e5b2b9`; результати наведено у [звіті
 перевірки](tests/windows-11-25h2-validation.md). `windows-latest` CI smoke
-перевіряє загальний Windows runtime, але не замінює доказ цільового хоста.
+перевіряє загальний Windows runtime із strict FTS coverage, але не замінює доказ
+цільового хоста. Платформні межі та заборонені inference claims зведені у
+[матриці підтримки](support-matrix.ua.md).
 
 Автоматичний gate `scripts/check_doc_drift.py` перевіряє поточні кількості CLI/MCP,
 пошуковий контракт, заборонені застарілі шаблони та всі локальні Markdown-посилання

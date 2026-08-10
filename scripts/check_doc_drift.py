@@ -60,6 +60,8 @@ MIGRATION_UA = REPO_ROOT / "docs" / "migration-guide.ua.md"
 HIERARCHICAL = REPO_ROOT / "docs" / "hierarchical-index-migration.md"
 HIERARCHICAL_UA = REPO_ROOT / "docs" / "hierarchical-index-migration.ua.md"
 INVENTORY_UA = REPO_ROOT / "docs" / "documentation-inventory.ua.md"
+SUPPORT_MATRIX = REPO_ROOT / "docs" / "support-matrix.md"
+SUPPORT_MATRIX_UA = REPO_ROOT / "docs" / "support-matrix.ua.md"
 MCP_CLIENT_ONBOARDING = REPO_ROOT / "docs" / "mcp-client-onboarding.md"
 MCP_CLIENT_ONBOARDING_UA = REPO_ROOT / "docs" / "mcp-client-onboarding.ua.md"
 AGENT_INSTRUCTIONS = REPO_ROOT / ".agents" / "AGENTS.md"
@@ -86,6 +88,8 @@ CURRENT_DOCUMENTS = {
     "Hierarchical report": HIERARCHICAL,
     "Hierarchical report UA": HIERARCHICAL_UA,
     "Documentation inventory UA": INVENTORY_UA,
+    "Support matrix": SUPPORT_MATRIX,
+    "Support matrix UA": SUPPORT_MATRIX_UA,
     "Client onboarding": MCP_CLIENT_ONBOARDING,
     "Client onboarding UA": MCP_CLIENT_ONBOARDING_UA,
     "Agent instructions": AGENT_INSTRUCTIONS,

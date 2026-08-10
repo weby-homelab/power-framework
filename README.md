@@ -58,6 +58,9 @@ the role-specific guides before touching a vault:
   migration from any Markdown source methodology into a canonical POWER vault
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
+- **[Platform support matrix](docs/support-matrix.md)** — tested, conditional,
+  and unsupported boundaries for Linux, macOS, hosted Windows, and physical
+  Windows 11 25H2
 
 ## Quick Start (Linux/macOS)
 
