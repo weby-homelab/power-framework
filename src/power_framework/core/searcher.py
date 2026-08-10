@@ -87,6 +87,28 @@ def _read_db_path(vault_dir: Path) -> Path | None:
         return resolve_active_generation_path(vault_dir) or existing_vault_db_path(vault_dir)
 
 
+@dataclass(frozen=True)
+class _ResolvedDb:
+    """A request-scoped database path with its generation/legacy contract."""
+
+    path: Path | None
+    is_generation: bool
+
+
+def _resolve_request_db(vault_dir: Path) -> _ResolvedDb:
+    """Verify the active generation once for one search request.
+
+    Immutable generations are safe to reuse after this verification.  The
+    legacy path remains explicitly marked so vector search keeps its historical
+    writable fallback behavior when no generation store exists.
+    """
+    with timing_span("generation_resolve"):
+        active = resolve_active_generation_path(vault_dir)
+        if active is not None:
+            return _ResolvedDb(active, True)
+        return _ResolvedDb(existing_vault_db_path(vault_dir), False)
+
+
 def _open_readonly_db(db_path: Path) -> sqlite3.Connection:
     """Open an existing index without mutating its immutable generation file."""
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30)
@@ -238,14 +260,14 @@ def get_search_mode_spec(mode: str) -> SearchModeSpec:
     return SEARCH_MODE_REGISTRY[normalize_search_mode(mode)]
 
 
-def validate_dense_index(vault_dir: Path) -> int:
+def validate_dense_index(vault_dir: Path, resolved_db: _ResolvedDb | None = None) -> int:
     """Validate dense-index presence before an embedding model is loaded.
 
     The check deliberately never creates or rebuilds an index. A caller that
     requested dense retrieval must run ``power sync`` first instead of silently
     receiving FTS results from a different retrieval contract.
     """
-    db_path = _read_db_path(vault_dir)
+    db_path = resolved_db.path if resolved_db is not None else _read_db_path(vault_dir)
     if db_path is None or not db_path.exists():
         raise DenseIndexUnavailableError(
             f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
@@ -890,6 +912,7 @@ def _fts_search(
     vault_dir: Path,
     query: str,
     max_results: int = 20,
+    resolved_db: _ResolvedDb | None = None,
 ) -> list[SearchResult]:
     """SQLite FTS5 full-text search with weighted BM25 scoring."""
     clean_query = re.sub(
@@ -919,7 +942,7 @@ def _fts_search(
     if not fts_query:
         return []
 
-    db_path = _read_db_path(vault_dir)
+    db_path = resolved_db.path if resolved_db is not None else _read_db_path(vault_dir)
 
     if db_path is None:
         fallback = _scan_and_search(vault_dir, [term.strip('"') for term in terms])
@@ -1031,6 +1054,7 @@ def _vector_search(
     vault_dir: Path,
     query: str,
     max_results: int = 20,
+    resolved_db: _ResolvedDb | None = None,
 ) -> list[SearchResult]:
     """
     Search vault notes using TF vector cosine similarity.
@@ -1043,8 +1067,12 @@ def _vector_search(
         return []
 
     query_vec = _compute_tf_vector(query_tokens)
-    active_generation_path = resolve_active_generation_path(vault_dir)
-    db_path = active_generation_path or _db_path(vault_dir)
+    if resolved_db is None:
+        active_generation_path = resolve_active_generation_path(vault_dir)
+        db_path = active_generation_path or _db_path(vault_dir)
+    else:
+        active_generation_path = resolved_db.path if resolved_db.is_generation else None
+        db_path = active_generation_path or _db_path(vault_dir)
 
     conn: sqlite3.Connection | None = None
     try:
@@ -1174,6 +1202,7 @@ def _semantic_search(
     vault_dir: Path,
     query: str,
     max_results: int = 20,
+    resolved_db: _ResolvedDb | None = None,
 ) -> list[SearchResult]:
     """Search vault notes using dense embedding cosine similarity over chunks.
 
@@ -1183,8 +1212,8 @@ def _semantic_search(
     if not query or not query.strip():
         return []
 
-    index_dimension = validate_dense_index(vault_dir)
-    db_path = _read_db_path(vault_dir)
+    index_dimension = validate_dense_index(vault_dir, resolved_db)
+    db_path = resolved_db.path if resolved_db is not None else _read_db_path(vault_dir)
     if db_path is None:  # pragma: no cover - validation above guarantees a path
         raise DenseIndexUnavailableError(
             f"Dense index is missing for {vault_dir}. Run 'power sync {vault_dir}' first."
@@ -1321,6 +1350,7 @@ def _apply_semantic_lexical_guard(
     vault_dir: Path,
     query: str,
     results: list[SearchResult],
+    resolved_db: _ResolvedDb | None = None,
 ) -> list[SearchResult]:
     """Use lexical evidence only to break an ambiguous dense top-1 tie.
 
@@ -1333,7 +1363,7 @@ def _apply_semantic_lexical_guard(
     if len(results) < 2 or results[0].score <= 0:
         return results
     try:
-        lexical = _fts_search(vault_dir, query, max_results=1)
+        lexical = _fts_search(vault_dir, query, max_results=1, resolved_db=resolved_db)
     except Exception:
         return results
     if not lexical:
@@ -1405,11 +1435,12 @@ def search_vault(
     boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
     retrieval_contract = "dense"
+    resolved_db = _resolve_request_db(vault_dir)
     if mode == "graph_assisted":
         retrieval_contract = "graph_assisted"
     if mode_spec.requires_dense_index:
         try:
-            validate_dense_index(vault_dir)
+            validate_dense_index(vault_dir, resolved_db)
         except DenseIndexUnavailableError:
             # WTF #3 remediation: a dense index is required for this mode. By
             # default we fail closed (re-raise). Only when POWER_ALLOW_DENSE_FALLBACK=1
@@ -1435,12 +1466,13 @@ def search_vault(
     # Dense-capable modes never create or refresh embeddings from a read request:
     # the caller must explicitly run ``power sync``. Sparse modes retain their
     # lightweight first-use FTS refresh.
-    if not mode_spec.requires_dense_index and resolve_active_generation_path(vault_dir) is None:
+    if not mode_spec.requires_dense_index and not resolved_db.is_generation:
         # Cheap synchronous FTS refresh ONLY when the index is empty/missing,
         # so non-semantic modes stay correct on first use without re-syncing
         # the whole vault on every query (Performance Plan §1). Incremental
         # mtime checks inside _sync_vault_to_db keep repeat calls near-free.
         conn: sqlite3.Connection | None = None
+        synchronization_completed = False
         try:
             conn = sqlite3.connect(str(_db_path(vault_dir)), timeout=30)
             conn.execute("PRAGMA busy_timeout=30000")
@@ -1450,11 +1482,14 @@ def search_vault(
             cur.execute("SELECT COUNT(*) FROM file_metadata")
             if cur.fetchone()[0] == 0:
                 _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
+                synchronization_completed = True
         except Exception as e:
             logger.warning("Session-level FTS sync failed: %s", e)
         finally:
             if conn is not None:
                 conn.close()
+        if synchronization_completed:
+            resolved_db = _resolve_request_db(vault_dir)
 
     expander = QueryExpander()
     variants = expander.expand(query)
@@ -1464,10 +1499,22 @@ def search_vault(
         vec_all: list[SearchResult] = []
         dense_all: list[SearchResult] = []
         for variant in variants:
-            fts_all.extend(_fts_search(vault_dir, variant, max_results=max_results * 2))
-            vec_all.extend(_vector_search(vault_dir, variant, max_results=max_results * 2))
+            fts_all.extend(
+                _fts_search(
+                    vault_dir, variant, max_results=max_results * 2, resolved_db=resolved_db
+                )
+            )
+            vec_all.extend(
+                _vector_search(
+                    vault_dir, variant, max_results=max_results * 2, resolved_db=resolved_db
+                )
+            )
             with contextlib.suppress(DenseIndexUnavailableError):
-                dense_all.extend(_semantic_search(vault_dir, variant, max_results=max_results * 2))
+                dense_all.extend(
+                    _semantic_search(
+                        vault_dir, variant, max_results=max_results * 2, resolved_db=resolved_db
+                    )
+                )
 
         # Deduplicate FTS by rel_path (keeping max score) and sort
         fts_map: dict[str, SearchResult] = {}
@@ -1500,7 +1547,7 @@ def search_vault(
         if domain_path:
             merged = _filter_domain_results(merged, domain_path)
         results = _filter_temporal_results(
-            vault_dir, merged, temporal_view, boundary, requested_max_results
+            vault_dir, merged, temporal_view, boundary, requested_max_results, resolved_db
         )
         for result in results:
             result.retrieval_contract = retrieval_contract
@@ -1510,20 +1557,30 @@ def search_vault(
     all_results: list[SearchResult] = []
     for variant in variants:
         if mode == "vector":
-            results = _vector_search(vault_dir, variant, max_results=max_results)
+            results = _vector_search(
+                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+            )
         elif mode == "semantic":
-            results = _semantic_search(vault_dir, variant, max_results=max_results)
+            results = _semantic_search(
+                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+            )
         elif mode == "graph_assisted":
-            results = _graph_assisted_search(vault_dir, variant, max_results=max_results)
+            results = _graph_assisted_search(
+                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+            )
         elif mode in ("reranked", "hybrid_reranked"):
-            results = _hybrid_reranked_search(vault_dir, variant, max_results=max_results)
+            results = _hybrid_reranked_search(
+                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+            )
             # ``_hybrid_reranked_search`` already fuses dense candidates before
             # assigning cross-encoder scores. Do not add a second dense fallback
             # here: dense cosine scores and cross-encoder scores are different
             # scales, and the later max-score deduplication would silently replace
             # the reranked order with the semantic order on small vaults.
         else:
-            results = _fts_search(vault_dir, variant, max_results=max_results)
+            results = _fts_search(
+                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+            )
         all_results.extend(results)
 
     res_map: dict[str, SearchResult] = {}
@@ -1535,10 +1592,10 @@ def search_vault(
     if domain_path:
         final_results = _filter_domain_results(final_results, domain_path)
     final_results = _filter_temporal_results(
-        vault_dir, final_results, temporal_view, boundary, requested_max_results
+        vault_dir, final_results, temporal_view, boundary, requested_max_results, resolved_db
     )
     if mode == "semantic":
-        final_results = _apply_semantic_lexical_guard(vault_dir, query, final_results)
+        final_results = _apply_semantic_lexical_guard(vault_dir, query, final_results, resolved_db)
     for r in final_results:
         r.retrieval_contract = retrieval_contract
     return final_results
@@ -1550,10 +1607,12 @@ def _filter_temporal_results(
     temporal_view: str,
     as_of: date,
     max_results: int,
+    resolved_db: _ResolvedDb | None = None,
 ) -> list[SearchResult]:
     """Attach resolved status and filter ranked results at the retrieval boundary."""
     with timing_span("temporal_metadata"):
-        indexed_records = load_temporal_records(_read_db_path(vault_dir))
+        db_path = resolved_db.path if resolved_db is not None else _read_db_path(vault_dir)
+        indexed_records = load_temporal_records(db_path)
         records = (
             indexed_records if indexed_records is not None else scan_temporal_records(vault_dir)
         )
@@ -1581,6 +1640,7 @@ def _hybrid_reranked_search(
     vault_dir: Path,
     query: str,
     max_results: int = 20,
+    resolved_db: _ResolvedDb | None = None,
 ) -> list[SearchResult]:
     """Canonical POWER 3.2 retrieval: FTS/BM25 + TF-vector + Dense -> top-20 -> rerank.
 
@@ -1590,14 +1650,16 @@ def _hybrid_reranked_search(
     fast. Includes dense candidates (POWER 3.2.1 fix) so the reranker sees
     documents the embedding model finds relevant (not just lexical matches).
     """
-    candidates = _fts_search(vault_dir, query, max_results=150)
-    vector_results = _vector_search(vault_dir, query, max_results=150)
+    candidates = _fts_search(vault_dir, query, max_results=150, resolved_db=resolved_db)
+    vector_results = _vector_search(vault_dir, query, max_results=150, resolved_db=resolved_db)
     candidates = _rrf_merge(candidates, vector_results)
 
     # 3.2.1: include dense/semantic candidates in the reranker pool.
     # Without this the reranker never sees documents the embedding model
     # considers relevant, which caused reranked quality < semantic quality.
-    dense_results = _semantic_search(vault_dir, query, max_results=max_results * 3)
+    dense_results = _semantic_search(
+        vault_dir, query, max_results=max_results * 3, resolved_db=resolved_db
+    )
     if dense_results:
         candidates = _rrf_merge(candidates, dense_results)
 
@@ -1648,6 +1710,7 @@ def _graph_assisted_search(
     vault_dir: Path,
     query: str,
     max_results: int = 20,
+    resolved_db: _ResolvedDb | None = None,
 ) -> list[SearchResult]:
     """Expand a sparse candidate pool through the accepted knowledge graph.
 
@@ -1661,8 +1724,8 @@ def _graph_assisted_search(
 
     candidate_limit = max(20, max_results * 4)
     candidates = _rrf_merge(
-        _fts_search(vault_dir, query, max_results=candidate_limit),
-        _vector_search(vault_dir, query, max_results=candidate_limit),
+        _fts_search(vault_dir, query, max_results=candidate_limit, resolved_db=resolved_db),
+        _vector_search(vault_dir, query, max_results=candidate_limit, resolved_db=resolved_db),
     )
     if not candidates:
         return []

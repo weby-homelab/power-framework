@@ -4,14 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from contextlib import closing
 from datetime import date, datetime
-from pathlib import Path  # noqa: TC003
+from pathlib import Path
 
 import pytest
 
+from power_framework.core import searcher
 from power_framework.core.db import _init_db
+from power_framework.core.generation_index import (
+    ActiveGenerationError,
+    resolve_active_generation_path,
+    sync_vault_atomically,
+)
 from power_framework.core.models import OKFMetadata
 from power_framework.core.searcher import (
     CANONICAL_SEARCH_MODES,
@@ -138,6 +145,72 @@ def test_search_timing_collector_records_content_free_components(sample_vault: P
     assert {"generation_resolve", "sqlite_read", "temporal_metadata"} <= set(components)
     assert "snippet" not in components
     assert "query" not in components
+
+
+def test_search_request_resolves_active_generation_once(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    sync_vault_atomically(sample_vault, sync_embeddings=False)
+
+    original_resolve = searcher.resolve_active_generation_path
+    calls = 0
+
+    def counted_resolve(vault_dir: Path) -> Path | None:
+        nonlocal calls
+        calls += 1
+        return original_resolve(vault_dir)
+
+    monkeypatch.setattr(searcher, "resolve_active_generation_path", counted_resolve)
+
+    assert search_vault(sample_vault, "test", mode="fts")
+    assert calls == 1
+
+
+def test_preindexed_legacy_search_resolves_database_once(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = Path(os.environ["POWER_SEARCH_DB"])
+    with closing(sqlite3.connect(db_path)) as conn:
+        _init_db(conn)
+        _sync_vault_to_db(sample_vault, conn, sync_embeddings=False)
+
+    original_resolve = searcher.resolve_active_generation_path
+    calls = 0
+
+    def counted_resolve(vault_dir: Path) -> Path | None:
+        nonlocal calls
+        calls += 1
+        return original_resolve(vault_dir)
+
+    monkeypatch.setattr(searcher, "resolve_active_generation_path", counted_resolve)
+
+    assert search_vault(sample_vault, "test", mode="fts")
+    assert calls == 1
+
+
+def test_search_request_fails_closed_on_corrupt_active_generation(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    sync_vault_atomically(sample_vault, sync_embeddings=False)
+    active = resolve_active_generation_path(sample_vault)
+    assert active is not None
+    active.unlink()
+
+    with pytest.raises(ActiveGenerationError, match="active generation file is missing"):
+        search_vault(sample_vault, "test", mode="fts")
+
+
+def test_legacy_request_context_keeps_vector_index_writable(sample_vault: Path) -> None:
+    results = search_vault(sample_vault, "test", mode="vector")
+
+    assert results
+    db_path = Path(os.environ["POWER_SEARCH_DB"])
+    with closing(sqlite3.connect(db_path)) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM tf_vectors").fetchone()[0] > 0
 
 
 class TestTokenize:
@@ -787,7 +860,7 @@ domains:
             snippet="",
             match_count=1,
         )
-        monkeypatch.setattr("power_framework.core.searcher.validate_dense_index", lambda _: 1)
+        monkeypatch.setattr("power_framework.core.searcher.validate_dense_index", lambda *_: 1)
         monkeypatch.setattr(
             "power_framework.core.searcher._hybrid_reranked_search",
             lambda *_args, **_kwargs: [reranked],
