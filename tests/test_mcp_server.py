@@ -20,6 +20,7 @@ import pytest
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
+from power_framework.core import __version__
 from power_framework.core.capabilities import manifest
 from power_framework.core.parser import validate_metadata
 from power_framework.mcp import power_server
@@ -27,6 +28,7 @@ from power_framework.mcp.power_server import (
     apply_memory_change,
     ensure_sub_index,
     generate_index,
+    get_server_info,
     handoff_work,
     ingest_note,
     lint_vault,
@@ -61,6 +63,8 @@ def _mcp_process_env(vault_path: Path, transport: str, port: int | None = None) 
 
 
 async def _assert_wire_contract(client: Client[object]) -> None:
+    assert client.initialize_result is not None
+    assert client.initialize_result.serverInfo.version == __version__
     tools = await client.list_tools()
     resources = await client.list_resources()
     resource_templates = await client.list_resource_templates()
@@ -112,7 +116,7 @@ async def _wait_for_http_health(process: asyncio.subprocess.Process, url: str) -
 async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
     tools = await power_server.mcp.list_tools()
 
-    assert len(tools) == 19
+    assert len(tools) == 20
     by_name = {tool.name: tool for tool in tools}
     assert set(by_name) == set(manifest()["interfaces"]["mcp_tools"])
 
@@ -145,6 +149,21 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
         assert catalog_parameters["properties"]["page"] == {"default": 1, "type": "integer"}
         assert "page" not in catalog_parameters["required"]
 
+    discovery = by_name["get_server_info"]
+    assert discovery.annotations is not None
+    assert discovery.annotations.readOnlyHint is True
+    assert discovery.annotations.destructiveHint is False
+    assert discovery.annotations.idempotentHint is True
+    assert discovery.annotations.openWorldHint is False
+    assert discovery.meta == {
+        "power.risk": {"local_only": True, "egress": "none", "approval": "none"}
+    }
+    assert discovery.parameters["properties"]["probe_provider"] == {
+        "default": False,
+        "type": "boolean",
+    }
+    assert "probe_provider" not in discovery.parameters.get("required", [])
+
 
 async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections() -> None:
     async with Client(power_server.mcp) as client:
@@ -166,6 +185,63 @@ async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections(
     assert all(tool.meta and tool.meta.get("power.risk") for tool in tools)
 
 
+async def test_mcp_server_advertises_truthful_package_version() -> None:
+    from power_framework.core import __version__
+
+    async with Client(power_server.mcp) as client:
+        assert client.initialize_result is not None
+        assert client.initialize_result.serverInfo.version == __version__
+
+
+async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
+    sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache_home = tmp_path / "empty-cache"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache_home))
+
+    result = json.loads(await get_server_info(vault_path=str(sample_vault)))
+
+    assert result["schema_version"] == 1
+    assert result["command"] == "doctor"
+    assert result["runtime"]["power_framework"]
+    assert result["vault"]["path"] == str(sample_vault.resolve())
+    assert result["embedding"]["binding"] == "not_requested"
+    assert result["embedding"]["probe_requested"] is False
+    assert any(issue["code"] == "embedding_binding_not_requested" for issue in result["issues"])
+    assert not cache_home.exists()
+    assert not (sample_vault / ".power").exists()
+
+
+async def test_get_server_info_can_request_the_no_download_provider_probe(
+    sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from power_framework.core import doctor
+
+    monkeypatch.setattr(
+        doctor,
+        "_probe_embedding_binding",
+        lambda: (
+            {
+                "provider": "bge-m3",
+                "requested_device": "auto",
+                "available_providers": ["CPUExecutionProvider"],
+                "model_cached": True,
+                "binding": "verified",
+                "bound_provider": "CPUExecutionProvider",
+                "probe_seconds": 0.001,
+                "runtime": {"available": True, "version": "test"},
+            },
+            [],
+        ),
+    )
+
+    result = json.loads(await get_server_info(vault_path=str(sample_vault), probe_provider=True))
+
+    assert result["embedding"]["binding"] == "verified"
+    assert result["embedding"]["probe_requested"] is True
+    assert not any(issue["code"] == "embedding_binding_not_requested" for issue in result["issues"])
+
+
 async def test_mcp_stdio_process_preserves_wire_contract(sample_vault: Path) -> None:
     config = {
         "mcpServers": {
@@ -179,6 +255,13 @@ async def test_mcp_stdio_process_preserves_wire_contract(sample_vault: Path) -> 
 
     async with Client(config) as client:
         await _assert_wire_contract(client)
+        info_result = await client.call_tool("get_server_info")
+        assert info_result.content
+        info = json.loads(info_result.content[0].text)
+        assert info["command"] == "doctor"
+        assert info["runtime"]["power_framework"] == __version__
+        assert info["vault"]["path"] == str(sample_vault.resolve())
+        assert info["embedding"]["binding"] == "not_requested"
 
 
 async def test_mcp_http_process_reports_health_and_preserves_wire_contract(

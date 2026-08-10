@@ -4,6 +4,7 @@ P.O.W.E.R. MCP Server (FastMCP 3.x).
 
 Exposes MCP tools for AI agent interaction with the knowledge vault:
 - lint_vault: Health check for metadata, links, and orphans
+- get_server_info: Read-only runtime, provider, vault, and coverage discovery
 - generate_index: Compile hierarchical catalog (index.md + _index.md files)
 - sync_vault: Publish an atomic FTS/dense search-index generation
 - read_sub_index: Read a specific category sub-index on-demand (read-only)
@@ -49,6 +50,7 @@ from power_framework.core import (
     OKFMetadata,
     RateLimiter,
     WritePolicy,
+    __version__,
     advance_work_packet,
     apply_change,
     archive_stale_notes,
@@ -83,6 +85,7 @@ from power_framework.core import (
     check_all as check_markdown,
 )
 from power_framework.core.constants import SKIP_FILES
+from power_framework.core.doctor import report_as_json, run_doctor
 from power_framework.core.domains import DomainConfigError
 from power_framework.core.ignore import should_skip
 from power_framework.core.relations import suggest_related_semantic
@@ -90,7 +93,7 @@ from power_framework.core.synthesize import synthesize_session_ingest
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("power", mask_error_details=True)
+mcp = FastMCP("power", version=__version__, mask_error_details=True)
 mcp.add_middleware(
     ErrorHandlingMiddleware(
         include_traceback=False,
@@ -265,6 +268,32 @@ async def health_check(_request: Request) -> Response:
     except RuntimeError as exc:
         return JSONResponse({"status": "error", "detail": str(exc)}, status_code=503)
     return JSONResponse({"status": "ok"})
+
+
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+    meta={"power.risk": {"local_only": True, "egress": "none", "approval": "none"}},
+)
+async def get_server_info(
+    vault_path: str | None = None,
+    probe_provider: bool = False,
+) -> str:
+    """Return the versioned read-only runtime and vault discovery report.
+
+    The default path does not load ONNX Runtime, open a model session, create
+    cache state, or access the network. Set ``probe_provider=True`` to perform
+    the full no-download binding probe; even then a missing model fails closed
+    instead of downloading it.
+    """
+    path = _get_vault_path(vault_path)
+    return await run_blocking(
+        lambda: report_as_json(run_doctor(path, probe_embedding=probe_provider))
+    )
 
 
 @mcp.tool(

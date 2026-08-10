@@ -141,12 +141,17 @@ After changing a client configuration, restart or reload that client. The
 first task is read-only until the explicit proposal step:
 
 1. Open the client's MCP status view (`/mcp` where supported) and confirm that
-   `power` is connected and exposes 19 tools.
+   `power` is connected and exposes 20 tools.
 2. Ask the agent to list tools, resources, resource templates, and prompts.
-   POWER should expose 19 tools and no resources, templates, or prompts.
-3. Ask the agent to call `get_memory_context` for a short query. This must not
+   POWER should expose 20 tools and no resources, templates, or prompts.
+3. Ask the agent to call `get_server_info` with its default arguments. Confirm
+   the reported package version, configured vault path, and explicit
+   `embedding.binding` state before trusting retrieval. Use
+   `probe_provider=true` only when an actual no-download provider binding check
+   is needed.
+4. Ask the agent to call `get_memory_context` for a short query. This must not
    create a file, namespace, index, or history entry.
-4. Ask the agent to call `propose_memory_change` for a new note, but do not
+5. Ask the agent to call `propose_memory_change` for a new note, but do not
    approve it. This creates only a durable content-addressed proposal ledger
    entry; the target note, catalog, and search projection must remain absent.
 

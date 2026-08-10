@@ -47,7 +47,7 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
     assert parsed["issues"][0]["code"] == "search_index_missing"
     assert parsed["capabilities"] == capabilities.manifest()
     assert len(parsed["capabilities"]["interfaces"]["cli_commands"]) == 20
-    assert len(parsed["capabilities"]["interfaces"]["mcp_tools"]) == 19
+    assert len(parsed["capabilities"]["interfaces"]["mcp_tools"]) == 20
     contracts = parsed["capabilities"]["interfaces"]["mcp_tool_contracts"]
     assert [contract["name"] for contract in contracts] == parsed["capabilities"]["interfaces"][
         "mcp_tools"
@@ -71,6 +71,25 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
     assert archive_contract["annotations"]["destructiveHint"] is True
     assert archive_contract["risk"]["approval"] == "explicit"
     assert parsed["capabilities"]["search"]["default_mode"] == "semantic"
+
+
+def test_lightweight_discovery_skips_embedding_probe_and_cache_state(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cache_home = tmp_path / "cache-home"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache_home))
+
+    def fail_if_called() -> tuple[dict[str, object], list[dict[str, str]]]:
+        raise AssertionError("lightweight discovery must not probe the embedding session")
+
+    monkeypatch.setattr(doctor, "_probe_embedding_binding", fail_if_called)
+
+    report = doctor.run_doctor(tmp_path, probe_embedding=False)
+
+    assert report["embedding"]["binding"] == "not_requested"
+    assert report["embedding"]["probe_requested"] is False
+    assert report["issues"][0]["code"] == "embedding_binding_not_requested"
+    assert not cache_home.exists()
 
 
 def test_capability_manifest_is_read_only(tmp_path: Path, monkeypatch) -> None:
