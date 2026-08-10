@@ -19,6 +19,7 @@ Class representing a single search result with relevance details.
 | `note_type`   | `str`       | Note OKF type                         |
 | `score`       | `float`     | Weighted relevance score              |
 | `snippet`     | `str`       | Context window around match           |
+| `matched_text` | `str`      | Bounded body-only passage for agent context; excludes YAML frontmatter and synthetic chunk headers |
 | `match_count` | `int`       | Match count fallback                  |
 | `tags`        | `list[str]` | List of tags associated with the note |
 | `retrieval_contract` | `str` | Applied retrieval contract, including an explicit fallback when enabled |

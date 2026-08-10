@@ -252,6 +252,7 @@ async def test_search_vault_finds_notes(sample_vault: Path) -> None:
     assert envelope["temporal_view"] == "current"
     assert envelope["as_of"]
     assert envelope["results"][0]["source"]["content_sha256"]
+    assert "matched_text" in envelope["results"][0]
 
 
 async def test_transactional_memory_tools_share_approval_and_history(sample_vault: Path) -> None:
