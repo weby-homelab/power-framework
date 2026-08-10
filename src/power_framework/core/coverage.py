@@ -7,6 +7,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+from .constants import is_catalog_filename
 from .ignore import should_skip
 from .vault_storage import existing_vault_db_path
 
@@ -24,7 +25,7 @@ def get_index_coverage(vault_dir: Path) -> tuple[int, int]:
     total = 0
     try:
         for filepath in root.rglob("*.md"):
-            if filepath.name in ("index.md", "log.md", "_index.md"):
+            if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
                 continue
             if should_skip(root, filepath.relative_to(root).as_posix()):
                 continue
