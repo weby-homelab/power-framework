@@ -31,7 +31,7 @@ from .embeddings import configured_embedding_identity, get_embedding_manager
 from .generation_index import ActiveGenerationError, resolve_active_generation_path
 from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
-from .parser import read_file_content, validate_metadata
+from .parser import FRONTMATTER_PATTERN, read_file_content, validate_metadata
 from .query_expansion import QueryExpander
 from .temporal import (
     TemporalStatus,
@@ -163,6 +163,17 @@ CANONICAL_SEARCH_MODES = frozenset(
     {"fts", "vector", "hybrid", "semantic", "reranked", "graph_assisted"}
 )
 SEARCH_MODE_ALIASES = {"hybrid_reranked": "reranked"}
+
+
+def _reranker_document_text(text: str, title: str = "") -> str:
+    """Return title plus note body, excluding YAML frontmatter from reranking."""
+    match = FRONTMATTER_PATTERN.match(text)
+    body = text[match.end() :] if match else text
+    body = body.lstrip()
+    title = title.strip()
+    if not title:
+        return body
+    return f"{title}\n\n{body}" if body else title
 
 
 @dataclass(frozen=True)
@@ -1550,22 +1561,27 @@ def _hybrid_reranked_search(
 
     # Performance Plan §4: bound the reranker to the top-K RRF candidates
     # (default 20) instead of reranking all 150 full-document texts, AND rerank
-    # only the leading excerpt (truncated to RERANK_TEXT_CHARS) of each doc.
-    # Cross-encoders on CPU are dominated by token count, so truncating slashes
-    # latency ~10x with negligible nDCG loss (MAR@5 preserved).
+    # only a title plus body-centered excerpt (truncated to RERANK_TEXT_CHARS).
+    # YAML frontmatter is governance metadata, not note meaning; feeding it as
+    # the leading excerpt can make the cross-encoder score fields instead of the
+    # user's body content.
     rerank_pool = candidates[: min(len(candidates), RERANK_CANDIDATE_LIMIT)]
 
     documents: list[str] = []
     for result in rerank_pool:
-        if result.snippet:
-            documents.append(result.snippet[:RERANK_TEXT_CHARS])
-            continue
         filepath = vault_dir / result.rel_path
         try:
+            # Search snippets may be synthetic, frontmatter-heavy, or chunk
+            # headers rather than the note's meaning.  Read the source note so
+            # the reranker always sees the same body-centered representation.
             text = read_file_content(filepath)
-            documents.append(text[:RERANK_TEXT_CHARS])
+            documents.append(_reranker_document_text(text, result.title)[:RERANK_TEXT_CHARS])
         except Exception:
-            documents.append("")
+            # Preserve a bounded degraded path for an unreadable source file;
+            # the snippet is still better than dropping the candidate.
+            documents.append(
+                _reranker_document_text(result.snippet, result.title)[:RERANK_TEXT_CHARS]
+            )
 
     with timing_span("reranker_session_startup"):
         reranker = _get_reranker()
