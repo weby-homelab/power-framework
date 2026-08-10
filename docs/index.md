@@ -63,6 +63,7 @@ are explicitly preserved as v1.6 historical snapshots.
 - [POWER 3.4.0 release notes](release-3.4.0.md)
 - [Windows 11 25H2 validation receipt](tests/windows-11-25h2-v3.3.2-validation-fixed.md)
 - [M2 human-evaluation contract](m2-human-evaluation.md)
+- [Real-vault retrieval receipt](benchmarks/real-vault-retrieval.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](contributing.md)
 

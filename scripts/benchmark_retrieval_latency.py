@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Produce a content-free retrieval latency attribution receipt.
+"""Produce a content-free retrieval latency and resource receipt.
 
-The benchmark deliberately reports timings and counts only. It never writes
-queries, note paths, snippets, or note content to the receipt.
+The benchmark deliberately reports verified metadata, timings, resource
+summaries, and counts only. It never writes queries, note paths, snippets, or
+note content to the receipt.
 
 Examples:
     python scripts/benchmark_retrieval_latency.py --vault /path/to/vault
@@ -18,6 +19,7 @@ import hashlib
 import json
 import math
 import os
+import sqlite3
 import statistics
 import subprocess
 import sys
@@ -26,6 +28,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+from power_framework.core.benchmark_resources import resource_snapshot
+from power_framework.core.doctor import run_doctor
+from power_framework.core.generation_index import resolve_active_generation
 from power_framework.core.metrics.udcg_real import _load_semantic_gt
 from power_framework.core.searcher import search_vault
 from power_framework.core.timing import collect_timings
@@ -50,6 +55,35 @@ def _summary(samples: list[dict[str, Any]]) -> dict[str, Any]:
         for name, value in sample.get("timings_ms", {}).items():
             components.setdefault(name, []).append(float(value))
 
+    resource_values: dict[str, list[int]] = {
+        "peak_rss_bytes": [],
+        "gpu_memory_used_bytes": [],
+    }
+    resource_scopes: set[str] = set()
+    resource_sources: set[str] = set()
+    for sample in samples:
+        resources = sample.get("resources", {})
+        if not isinstance(resources, dict):
+            continue
+        for name in resource_values:
+            value = resources.get(name)
+            if isinstance(value, int) and value >= 0:
+                resource_values[name].append(value)
+        scope = resources.get("gpu_memory_scope")
+        source = resources.get("gpu_memory_source")
+        if isinstance(scope, str):
+            resource_scopes.add(scope)
+        if isinstance(source, str):
+            resource_sources.add(source)
+
+    def resource_summary(values: list[int]) -> dict[str, int | float | None]:
+        return {
+            "samples": len(values),
+            "p50": _percentile([float(value) for value in values], 0.50),
+            "p95": _percentile([float(value) for value in values], 0.95),
+            "max": max(values) if values else None,
+        }
+
     return {
         "samples": len(samples),
         "wall_ms": {
@@ -65,6 +99,12 @@ def _summary(samples: list[dict[str, Any]]) -> dict[str, Any]:
                 "mean": round(statistics.mean(values), 3),
             }
             for name, values in sorted(components.items())
+        },
+        "resources": {
+            "peak_rss_bytes": resource_summary(resource_values["peak_rss_bytes"]),
+            "gpu_memory_used_bytes": resource_summary(resource_values["gpu_memory_used_bytes"]),
+            "gpu_memory_scope": sorted(resource_scopes) or None,
+            "gpu_memory_source": sorted(resource_sources) or None,
         },
     }
 
@@ -84,6 +124,7 @@ def _local_sample(vault: Path, query: str, mode: str, max_results: int) -> dict[
         "wall_ms": (time.perf_counter() - started) * 1000,
         "timings_ms": receipt.as_dict()["components_ms"],
         "result_count": len(results),
+        "resources": resource_snapshot(include_gpu=False),
     }
 
 
@@ -172,19 +213,106 @@ async def _mcp_samples(
                         {
                             "wall_ms": elapsed,
                             "timings_ms": receipt["components_ms"],
+                            "resources": receipt.get("resources", {}),
                         }
                     )
         return samples
+
+
+def _index_identity(vault: Path) -> dict[str, Any]:
+    """Read verified generation identity and dense manifest without user data."""
+    try:
+        active = resolve_active_generation(vault)
+    except Exception as exc:
+        return {"kind": "unreadable", "error_type": type(exc).__name__}
+    if active is None:
+        return {"kind": "legacy_db", "generation_id": None}
+
+    try:
+        with sqlite3.connect(f"file:{active.path.as_posix()}?mode=ro", uri=True) as connection:
+            note_count = int(connection.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0])
+            chunk_count = int(
+                connection.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+            )
+            manifest = dict(
+                connection.execute(
+                    "SELECT manifest_key, manifest_value FROM dense_index_manifest"
+                ).fetchall()
+            )
+    except (OSError, sqlite3.Error, TypeError, ValueError) as exc:
+        return {
+            "kind": "unreadable",
+            "generation_id": active.generation_id,
+            "error_type": type(exc).__name__,
+        }
+
+    return {
+        "kind": "immutable_generation",
+        "generation_id": active.generation_id,
+        "source_snapshot_hash": active.source_snapshot_hash,
+        "database_sha256": active.db_sha256,
+        "database_size_bytes": active.db_size,
+        "indexed_notes": note_count,
+        "indexed_chunks": chunk_count,
+        "dense_manifest": {
+            key: manifest[key]
+            for key in ("embedding_provider", "embedding_model", "chunk_count")
+            if key in manifest
+        },
+    }
+
+
+def _provider_receipt(vault: Path, *, probe: bool) -> dict[str, Any]:
+    """Return sanitized actual-provider state; never include doctor paths."""
+    if not probe:
+        return {"probe_requested": False, "binding": "not_requested"}
+    try:
+        report = run_doctor(vault, probe_embedding=True)
+    except Exception as exc:
+        return {
+            "probe_requested": True,
+            "binding": "failed",
+            "error_type": type(exc).__name__,
+        }
+    embedding = report.get("embedding", {})
+    if not isinstance(embedding, dict):
+        return {
+            "probe_requested": True,
+            "binding": "failed",
+            "error_type": "invalid_report",
+        }
+    issues = report.get("issues", [])
+    issue_codes = [
+        {"code": issue.get("code"), "severity": issue.get("severity")}
+        for issue in issues
+        if isinstance(issue, dict)
+    ]
+    available = embedding.get("available_providers", [])
+    runtime = embedding.get("runtime")
+    return {
+        "probe_requested": True,
+        "binding": embedding.get("binding"),
+        "bound_provider": embedding.get("bound_provider"),
+        "configured_provider": embedding.get("provider"),
+        "requested_device": embedding.get("requested_device"),
+        "available_providers": sorted(str(value) for value in available),
+        "runtime_version": runtime.get("version") if isinstance(runtime, dict) else None,
+        "probe_seconds": embedding.get("probe_seconds"),
+        "issues": issue_codes,
+    }
 
 
 async def _run(args: argparse.Namespace) -> dict[str, Any]:
     vault = args.vault.expanduser().resolve()
     queries = _load_queries(args.fixture, args.query_limit)
     query_set_hash = hashlib.sha256("\0".join(queries).encode("utf-8")).hexdigest()
+    resource_start = resource_snapshot()
     receipt: dict[str, Any] = {
-        "schema_version": "power.retrieval-latency.v1",
+        "schema_version": "power.retrieval-latency.v2",
         "content_free": True,
         "query_set_sha256": query_set_hash,
+        "index": _index_identity(vault),
+        "provider": _provider_receipt(vault, probe=args.probe_provider),
         "controls": {
             "query_count": len(queries),
             "rounds": args.rounds,
@@ -194,6 +322,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         "results": {},
         "errors": [],
     }
+
+    if args.require_immutable_generation and receipt["index"].get("kind") != "immutable_generation":
+        receipt["errors"].append(
+            "index/immutable_generation: verified immutable generation required"
+        )
+    if args.require_provider_binding:
+        provider = receipt["provider"]
+        if provider.get("binding") != "verified" or not provider.get("bound_provider"):
+            receipt["errors"].append("provider/binding: verified active provider required")
 
     for mode in args.modes:
         mode_result: dict[str, Any] = {}
@@ -228,6 +365,11 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
 
         receipt["results"][mode] = mode_result
 
+    receipt["resources"] = {
+        "run_start": resource_start,
+        "run_end": resource_snapshot(),
+        "gpu_memory_note": "device-wide snapshots; may include unrelated processes",
+    }
     if receipt["errors"] and not receipt["results"]:
         raise RuntimeError("all retrieval latency modes failed")
     return receipt
@@ -247,6 +389,7 @@ def _worker(args: argparse.Namespace) -> int:
             "wall_ms": (time.perf_counter() - started) * 1000,
             "timings_ms": receipt.as_dict()["components_ms"],
             "result_count": len(results),
+            "resources": resource_snapshot(include_gpu=False),
         },
         sys.stdout,
         sort_keys=True,
@@ -265,6 +408,21 @@ def main() -> int:
     parser.add_argument("--query-limit", type=int, default=4)
     parser.add_argument("--max-results", type=int, default=20)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--probe-provider",
+        action="store_true",
+        help="Probe the actual embedding session and include sanitized provider state",
+    )
+    parser.add_argument(
+        "--require-provider-binding",
+        action="store_true",
+        help="Fail unless the provider probe creates a session with an active provider",
+    )
+    parser.add_argument(
+        "--require-immutable-generation",
+        action="store_true",
+        help="Fail unless the vault resolves to a verified immutable generation",
+    )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--query", help=argparse.SUPPRESS)
     parser.add_argument("--mode", choices=DEFAULT_MODES, help=argparse.SUPPRESS)
@@ -274,6 +432,8 @@ def main() -> int:
         if not args.query or not args.mode:
             parser.error("--worker requires --query and --mode")
         return _worker(args)
+    if args.require_provider_binding:
+        args.probe_provider = True
     if args.rounds < 1 or args.cold_rounds < 1 or args.query_limit < 1:
         parser.error("rounds and query-limit must be positive")
 

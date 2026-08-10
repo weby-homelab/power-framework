@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from time import perf_counter
 
+from power_framework.core.benchmark_resources import resource_snapshot
 from power_framework.core.timing import collect_timings
 from power_framework.mcp import power_server
 
@@ -34,6 +35,7 @@ def _format_with_receipt(*args: object, **kwargs: object) -> str:
     payload = json.loads(serialized)
     timing_payload = _last_receipt.as_dict()
     payload["timings_ms"] = timing_payload["components_ms"]
+    timing_payload["resources"] = resource_snapshot(include_gpu=False)
     Path(os.environ["POWER_BENCHMARK_RECEIPT"]).write_text(
         json.dumps(timing_payload, sort_keys=True), encoding="utf-8"
     )
