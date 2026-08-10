@@ -77,6 +77,13 @@ def atomic_write(filepath: Path, content: str, encoding: str = "utf-8") -> None:
     Write content to file atomically using temp file + rename.
 
     Prevents corruption from interrupted writes (0-byte files).
+
+    ``newline=""`` disables newline translation so the file on disk is exactly
+    ``content.encode(encoding)`` on every platform. Without it, text mode maps
+    each "\\n" to ``os.linesep``, and on Windows a caller that bounded its
+    content by byte length -- such as the INDEX_MAX_BYTES catalog contract --
+    writes an artifact larger than the bound it just enforced, by one byte per
+    line.
     """
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -87,7 +94,7 @@ def atomic_write(filepath: Path, content: str, encoding: str = "utf-8") -> None:
         suffix=".tmp",
     )
     try:
-        file_obj = os.fdopen(fd, "w", encoding=encoding)
+        file_obj = os.fdopen(fd, "w", encoding=encoding, newline="")
         fd = -1
         with file_obj as f:
             f.write(content)
