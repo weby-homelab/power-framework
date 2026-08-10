@@ -116,23 +116,50 @@ def _validate_catalog_page(page: int) -> int:
     return page
 
 
-def _declared_catalog_page_count(index_path: Path) -> int:
-    """Read the generated page count without trusting arbitrary note content."""
+def _read_catalog_prefix(index_path: Path) -> str:
+    """Read only enough catalog bytes to inspect generated frontmatter."""
     try:
-        prefix = index_path.read_text(encoding="utf-8")[:4096]
-    except OSError as exc:
+        with index_path.open("r", encoding="utf-8") as handle:
+            return handle.read(4096)
+    except (OSError, UnicodeError) as exc:
         raise ToolError("Unable to read the catalog landing page") from exc
 
-    page_line = next(
-        (line for line in prefix.splitlines() if line.startswith("x-index-pages:")),
-        "",
-    )
-    if not page_line:
-        return 1
+
+def _read_catalog_frontmatter(prefix: str) -> list[str] | None:
+    """Return only the first complete YAML frontmatter block, if present."""
+    lines = prefix.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
     try:
-        page_count = int(page_line.split(":", 1)[1].strip())
+        closing = next(
+            index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"
+        )
+    except StopIteration as exc:
+        raise ToolError("Catalog frontmatter is unclosed; regenerate the index") from exc
+    return lines[1:closing]
+
+
+def _frontmatter_integer(lines: list[str], key: str) -> int | None:
+    """Read one unique integer frontmatter field without scanning the body."""
+    matches = [line for line in lines if line.startswith(f"{key}:")]
+    if len(matches) > 1:
+        raise ToolError(f"Catalog frontmatter contains duplicate {key}; regenerate the index")
+    if not matches:
+        return None
+    try:
+        return int(matches[0].split(":", 1)[1].strip())
     except (IndexError, ValueError) as exc:
         raise ToolError("Catalog page metadata is invalid; regenerate the index") from exc
+
+
+def _declared_catalog_page_count(prefix: str) -> int:
+    """Read the generated page count without trusting arbitrary body content."""
+    frontmatter = _read_catalog_frontmatter(prefix)
+    if frontmatter is None:
+        return 1
+    page_count = _frontmatter_integer(frontmatter, "x-index-pages")
+    if page_count is None:
+        return 1
     if page_count < 1:
         raise ToolError("Catalog page metadata is invalid; regenerate the index")
     return page_count
@@ -142,13 +169,21 @@ def _read_catalog_page(category_path: Path, page: int) -> str | None:
     """Read one declared catalog page, failing closed on stale pagination."""
     landing_path = category_path / _catalog_page_filename(1)
     try:
-        landing_path.read_text(encoding="utf-8")
+        landing_path.stat()
     except FileNotFoundError:
         return None
     except OSError as exc:
         raise ToolError("Unable to read the catalog landing page") from exc
 
-    page_count = _declared_catalog_page_count(landing_path)
+    if page == 1:
+        try:
+            content = landing_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise ToolError("Unable to read the catalog landing page") from exc
+        _declared_catalog_page_count(content[:4096])
+        return content
+
+    page_count = _declared_catalog_page_count(_read_catalog_prefix(landing_path))
     if page > page_count:
         raise ToolError(f"Catalog page {page} is out of range; available pages: 1-{page_count}")
 
@@ -159,7 +194,7 @@ def _read_catalog_page(category_path: Path, page: int) -> str | None:
         raise ToolError(
             f"Catalog page {page} is missing although the landing page declares {page_count}"
         ) from exc
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise ToolError(f"Unable to read catalog page {page}") from exc
 
 

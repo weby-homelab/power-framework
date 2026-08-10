@@ -264,6 +264,40 @@ async def test_read_sub_index_rejects_invalid_or_stale_page(sample_vault: Path) 
         await read_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
 
 
+async def test_read_sub_index_ignores_body_metadata_and_rejects_malformed_frontmatter(
+    sample_vault: Path,
+) -> None:
+    category_path = sample_vault / "01_Projects"
+    landing_path = category_path / "_index.md"
+    landing_path.write_text(
+        "---\ntype: System Guide\n---\nbody x-index-pages: 2\n", encoding="utf-8"
+    )
+    with pytest.raises(ToolError, match="out of range"):
+        await read_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
+
+    landing_path.write_text("---\nx-index-pages: 2\nx-index-pages: 2\n---\n", encoding="utf-8")
+    with pytest.raises(ToolError, match="duplicate"):
+        await read_sub_index(category="01_Projects", vault_path=str(sample_vault))
+
+    landing_path.write_text("---\nx-index-pages: 2\n", encoding="utf-8")
+    with pytest.raises(ToolError, match="unclosed"):
+        await read_sub_index(category="01_Projects", vault_path=str(sample_vault))
+
+
+async def test_read_sub_index_wraps_invalid_utf8_in_tool_error(sample_vault: Path) -> None:
+    category_path = sample_vault / "01_Projects"
+    category_path.joinpath("_index.md").write_bytes(b"\xff\xfe")
+    with pytest.raises(ToolError, match="Unable to read"):
+        await read_sub_index(category="01_Projects", vault_path=str(sample_vault))
+
+    category_path.joinpath("_index.md").write_text(
+        "---\nx-index-pages: 2\n---\nPage 1 of 2\n", encoding="utf-8"
+    )
+    category_path.joinpath("_index-2.md").write_bytes(b"\xff\xfe")
+    with pytest.raises(ToolError, match="Unable to read catalog page"):
+        await read_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
+
+
 async def test_ensure_sub_index_can_return_requested_page(
     sample_vault: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
