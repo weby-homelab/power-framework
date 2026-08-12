@@ -16,6 +16,7 @@ SCRIPT = REPO_ROOT / "scripts" / "generate_release_baseline.py"
 VERIFY = REPO_ROOT / "scripts" / "verify_release_contract.py"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from generate_release_baseline import _default_template, build_baseline  # noqa: E402
+from release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS  # noqa: E402
 
 
 def test_default_template_skips_candidate_baseline() -> None:
@@ -66,6 +67,26 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
 
     output = tmp_path / "release-baseline.json"
     validation_report = _write_validation_report(tmp_path / "validation.json")
+    sbom = tmp_path / "sbom.spdx.json"
+    sbom.write_text('{"spdxVersion": "SPDX-2.3"}\n', encoding="utf-8")
+    upgrade_matrix = tmp_path / "upgrade-matrix-aggregate.json"
+    upgrade_matrix.write_text(
+        json.dumps(
+            {
+                "schema_version": "power.upgrade-matrix.aggregate.v1",
+                "content_free": True,
+                "raw_content_in_report": False,
+                "release_gate": {
+                    "all_platforms_executed": True,
+                    "local_invariants": True,
+                },
+                "supported_platforms": list(SUPPORTED_RELEASE_PLATFORMS),
+                "deferred_platforms": list(DEFERRED_RELEASE_PLATFORMS),
+                "platforms": dict.fromkeys(SUPPORTED_RELEASE_PLATFORMS, "executed"),
+            }
+        ),
+        encoding="utf-8",
+    )
     result = subprocess.run(  # noqa: S603 -- invokes repository-local scripts.
         [
             sys.executable,
@@ -74,6 +95,10 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
             tag_name,
             "--validation-report",
             str(validation_report),
+            "--sbom",
+            str(sbom),
+            "--upgrade-matrix-aggregate",
+            str(upgrade_matrix),
             "--output",
             str(output),
         ],
