@@ -97,6 +97,11 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "needs: validate" in release_text
     assert "needs: [validate, upgrade-matrix-aggregate]" in release_text
     assert "--require-signed-tag" in release_text
+    assert "Install the pinned maintainer release signing key" in release_text
+    assert "gh api users/weby-homelab/gpg_keys" in release_text
+    assert 'select(.key_id == "2D49E810C7F2527E")' in release_text
+    assert "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E" in release_text
+    assert 'gpg --batch --import "$key_file"' in release_text
 
 
 def test_release_materializes_phase8_evidence_through_protected_environment() -> None:

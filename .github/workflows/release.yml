@@ -274,6 +274,21 @@ jobs:
           format: spdx-json
           output-file: dist/power-framework.spdx.json
 
+      - name: Install the pinned maintainer release signing key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          key_file="$RUNNER_TEMP/power-release-signing-key.asc"
+          gh api users/weby-homelab/gpg_keys \
+            --jq '.[] | select(.key_id == "2D49E810C7F2527E") | .raw_key' \
+            > "$key_file"
+          test -s "$key_file"
+          gpg --batch --with-colons --show-keys "$key_file" \
+            | awk -F: '$1 == "fpr" {print $10; exit}' \
+            | grep -Fxq '7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E'
+          gpg --batch --import "$key_file"
+
       - name: Generate and verify tag-bound release baseline
         run: |
           phase8_dir="$RUNNER_TEMP/power35-phase8"
