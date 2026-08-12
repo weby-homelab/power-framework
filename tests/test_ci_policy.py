@@ -103,6 +103,11 @@ def test_release_materializes_phase8_evidence_through_protected_environment() ->
     assert "name: power35-stable-release" in release_text
     assert "POWER35_REAL_VAULT_RECEIPT_JSON" in release_text
     assert "POWER35_HUMAN_MANIFEST_JSON" in release_text
+    assert (
+        "POWER35_REAL_VAULT_RECEIPT_JSON: ${{ secrets.POWER35_REAL_VAULT_RECEIPT_JSON }}"
+        in release_text
+    )
+    assert "POWER35_HUMAN_MANIFEST_JSON: ${{ secrets.POWER35_HUMAN_MANIFEST_JSON }}" in release_text
     assert "umask 077" in release_text
     assert "printf '%s' \"$POWER35_REAL_VAULT_RECEIPT_JSON\"" in release_text
     assert "printf '%s' \"$POWER35_HUMAN_MANIFEST_JSON\"" in release_text
