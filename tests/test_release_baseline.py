@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -37,6 +38,8 @@ def _write_validation_report(path: Path) -> Path:
                 "skipped_optional_gates": ["physical platforms"],
                 "mandatory_skipped": 0,
                 "mandatory_failed": 0,
+                "test_failures": 0,
+                "test_errors": 0,
                 "warnings_as_errors": True,
                 "junit_sha256": "a" * 64,
                 "coverage_sha256": "b" * 64,
@@ -65,6 +68,7 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
     if tag.returncode != 0:
         pytest.skip(f"{tag_name} is created only for the release tag gate")
 
+    expected_commit = tag.stdout.strip()
     output = tmp_path / "release-baseline.json"
     validation_report = _write_validation_report(tmp_path / "validation.json")
     sbom = tmp_path / "sbom.spdx.json"
@@ -87,6 +91,191 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+    (tmp_path / "corpus.jsonl").write_text('{"doc_id": "d1"}\n', encoding="utf-8")
+    (tmp_path / "queries.jsonl").write_text(
+        '{"query_id": "q1", "journey": "current_fact"}\n'
+        '{"query_id": "q2", "journey": "historical_fact"}\n'
+        '{"query_id": "q3", "journey": "provenance_trace"}\n'
+        '{"query_id": "q4", "journey": "abstention"}\n'
+        '{"query_id": "q5", "journey": "candidate_boundary"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "raw-judgments.jsonl").write_text('{"relevance": 2}\n', encoding="utf-8")
+    (tmp_path / "adjudicated-qrels.jsonl").write_text(
+        '{"query_id": "q1", "document_id": "d1", "final": {"relevance": 2, "acceptable_citation": true, "temporal_status": "current"}}\n'
+        '{"query_id": "q2", "document_id": "d2", "final": {"relevance": 2, "acceptable_citation": true, "temporal_status": "historical"}}\n'
+        '{"query_id": "q3", "document_id": "d3", "final": {"relevance": 2, "acceptable_citation": true, "temporal_status": "not_applicable"}}\n'
+        '{"query_id": "q4", "document_id": "d4", "final": {"relevance": 0, "acceptable_citation": false, "temporal_status": "not_applicable"}}\n'
+        '{"query_id": "q5", "document_id": "d5", "final": {"relevance": 2, "acceptable_citation": true, "temporal_status": "not_applicable"}}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "annotation_protocol_v2.md").write_text("protocol\n", encoding="utf-8")
+    (tmp_path / "calibration-agreement.v2.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "power.m2.human-agreement.v2",
+                "annotation_protocol_version": "2.0",
+                "status": "calibration_passed",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    raw_sha = hashlib.sha256((tmp_path / "raw-judgments.jsonl").read_bytes()).hexdigest()
+    (tmp_path / "adjudication-agreement.v2.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "power.m2.human-agreement.v2",
+                "annotation_protocol_version": "2.0",
+                "status": "calibration_passed",
+                "raw_judgments_sha256": raw_sha,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    human_manifest_dict = {
+        "schema_version": "2.0",
+        "status": "adjudicated",
+        "split": "sealed_holdout",
+        "language": "uk",
+        "threshold_profile": "m2-v2.1",
+        "annotator_count": 2,
+        "journeys": [
+            "current_fact",
+            "historical_fact",
+            "provenance_trace",
+            "abstention",
+            "candidate_boundary",
+        ],
+        "thresholds": {
+            "recall_at_10": 0.75,
+            "ndcg_at_10": 0.70,
+            "mrr_at_10": 0.70,
+            "citation_provenance_accuracy": 0.95,
+            "stale_answer_rate_max": 0.02,
+            "abstention_quality": 0.90,
+            "p95_latency_ms": 1500,
+        },
+        "artifacts": {
+            "corpus": "corpus.jsonl",
+            "queries": "queries.jsonl",
+            "raw_judgments": "raw-judgments.jsonl",
+            "adjudicated_qrels": "adjudicated-qrels.jsonl",
+        },
+        "annotation_protocol": "annotation_protocol_v2.md",
+        "calibration": {
+            "status": "passed",
+            "agreement_receipt": "calibration-agreement.v2.json",
+            "agreement_receipt_sha256": hashlib.sha256(
+                (tmp_path / "calibration-agreement.v2.json").read_bytes()
+            ).hexdigest(),
+        },
+        "agreement": {
+            "receipt": "adjudication-agreement.v2.json",
+            "receipt_sha256": hashlib.sha256(
+                (tmp_path / "adjudication-agreement.v2.json").read_bytes()
+            ).hexdigest(),
+        },
+        "corpus_sha256": hashlib.sha256((tmp_path / "corpus.jsonl").read_bytes()).hexdigest(),
+        "queries_sha256": hashlib.sha256((tmp_path / "queries.jsonl").read_bytes()).hexdigest(),
+        "raw_judgments_sha256": raw_sha,
+        "adjudicated_qrels_sha256": hashlib.sha256(
+            (tmp_path / "adjudicated-qrels.jsonl").read_bytes()
+        ).hexdigest(),
+    }
+    human_manifest_bytes = json.dumps(human_manifest_dict, indent=2).encode("utf-8")
+    human_manifest_path = tmp_path / "human-manifest.json"
+    human_manifest_path.write_bytes(human_manifest_bytes)
+
+    real_vault_dict = {
+        "schema_version": "power.phase8.real-vault-receipt.v1",
+        "release": version,
+        "status": "passed",
+        "content_free": True,
+        "raw_content_present": False,
+        "source": {"revision": expected_commit, "clean": True},
+        "vault": {"opaque_id": "v1", "snapshot_sha256": "a" * 64, "note_count": 10},
+        "runtime": {
+            "executable": "power",
+            "provider": "cpu",
+            "generation": "g1",
+            "config_sha256": "b" * 64,
+        },
+        "experiments": [
+            {"id": "build", "status": "passed", "receipt_sha256": "c" * 64},
+            {
+                "id": "transfer",
+                "status": "passed",
+                "receipt_sha256": "d" * 64,
+                "bytes": {"full": 100, "wire": 50, "delta": 10, "compression": "zstd"},
+            },
+            {"id": "import", "status": "passed", "receipt_sha256": "e" * 64},
+            {"id": "query", "status": "passed", "receipt_sha256": "f" * 64},
+        ],
+        "quality": {
+            "sealed_dataset": True,
+            "real_vault": True,
+            "blind_scoring": True,
+            "no_answer_scoring": True,
+            "outcome_gate": "pass",
+            "power_beats_no_power": True,
+            "comparators": ["fts", "auto"],
+            "metrics": {
+                "recall_at_10": 0.8,
+                "ndcg_at_10": 0.8,
+                "mrr_at_10": 0.8,
+                "evidence_use": 0.9,
+                "no_answer_score": 0.9,
+                "stale_answer_rate": 0.01,
+                "latency_p95_ms": 100.0,
+            },
+            "fresh_agent_completion_percent": 100.0,
+            "safety_invariants_percent": 100.0,
+            "median_human_reminders": 0,
+        },
+        "human_evidence": {
+            "status": "passed",
+            "sealed_holdout": True,
+            "manifest_sha256": hashlib.sha256(human_manifest_bytes).hexdigest(),
+        },
+    }
+    real_vault_path = tmp_path / "real-vault-receipt.json"
+    real_vault_path.write_text(json.dumps(real_vault_dict), encoding="utf-8")
+
+    outcome_path = tmp_path / "outcome-receipt.json"
+    outcome_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "power.phase8.outcome-receipt.v1",
+                "release": version,
+                "status": "passed",
+                "source": {"revision": expected_commit, "clean": True},
+                "metrics": {"recall_at_10": 0.8},
+                "fresh_agent_completion_percent": 100.0,
+                "safety_invariants_percent": 100.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    continuity_path = tmp_path / "continuity-receipt.json"
+    continuity_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "power.phase8.continuity-receipt.v1",
+                "release": version,
+                "status": "passed",
+                "source": {"revision": expected_commit, "clean": True},
+                "soak_hours": 24,
+                "retention_integrity_percent": 100.0,
+                "readback_pass_rate_percent": 100.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
     result = subprocess.run(  # noqa: S603 -- invokes repository-local scripts.
         [
             sys.executable,
@@ -99,6 +288,14 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
             str(sbom),
             "--upgrade-matrix-aggregate",
             str(upgrade_matrix),
+            "--phase8-real-vault-receipt",
+            str(real_vault_path),
+            "--phase8-human-manifest",
+            str(human_manifest_path),
+            "--phase8-outcome-receipt",
+            str(outcome_path),
+            "--phase8-continuity-receipt",
+            str(continuity_path),
             "--output",
             str(output),
         ],
