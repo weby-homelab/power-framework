@@ -225,6 +225,8 @@ jobs:
   release:
     needs: [validate, upgrade-matrix-aggregate]
     runs-on: ubuntu-latest
+    environment:
+      name: power35-stable-release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -251,6 +253,30 @@ jobs:
         with:
           name: power35-release-upgrade-aggregate
           path: ${{ runner.temp }}/power35-upgrade
+
+      - name: Materialize approved Phase 8 stable evidence
+        env:
+          POWER35_REAL_VAULT_RECEIPT_JSON: ${{ secrets.POWER35_REAL_VAULT_RECEIPT_JSON }}
+          POWER35_HUMAN_MANIFEST_JSON: ${{ secrets.POWER35_HUMAN_MANIFEST_JSON }}
+        run: |
+          set -euo pipefail
+          phase8_dir="$RUNNER_TEMP/power35-phase8"
+          test -n "$POWER35_REAL_VAULT_RECEIPT_JSON" || {
+            echo "power35-stable-release requires POWER35_REAL_VAULT_RECEIPT_JSON" >&2
+            exit 1
+          }
+          test -n "$POWER35_HUMAN_MANIFEST_JSON" || {
+            echo "power35-stable-release requires POWER35_HUMAN_MANIFEST_JSON" >&2
+            exit 1
+          }
+          umask 077
+          mkdir -p "$phase8_dir"
+          printf '%s' "$POWER35_REAL_VAULT_RECEIPT_JSON" \
+            > "$phase8_dir/real-vault-receipt.json"
+          printf '%s' "$POWER35_HUMAN_MANIFEST_JSON" \
+            > "$phase8_dir/human-manifest.json"
+          python -m json.tool "$phase8_dir/real-vault-receipt.json" >/dev/null
+          python -m json.tool "$phase8_dir/human-manifest.json" >/dev/null
 
       - name: Build package before binding final evidence
         run: python -m build

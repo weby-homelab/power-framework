@@ -55,7 +55,8 @@ physical Windows/macOS migration, signed tag, package indexes, and remote
 release readback remain separate mandatory release evidence. The final release
 workflow fails closed unless the maintainer provisions the two content-free
 Phase 8 receipts described in `release/evidence/README.md`.
-They are not inferred from a passing unit suite.
+The workflow receives them through the protected `power35-stable-release`
+environment; they are not inferred from a passing unit suite.
 
 ## Validation commands
 

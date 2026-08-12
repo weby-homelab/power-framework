@@ -97,6 +97,19 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "--require-signed-tag" in release_text
 
 
+def test_release_materializes_phase8_evidence_through_protected_environment() -> None:
+    release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
+
+    assert "name: power35-stable-release" in release_text
+    assert "POWER35_REAL_VAULT_RECEIPT_JSON" in release_text
+    assert "POWER35_HUMAN_MANIFEST_JSON" in release_text
+    assert "umask 077" in release_text
+    assert "printf '%s' \"$POWER35_REAL_VAULT_RECEIPT_JSON\"" in release_text
+    assert "printf '%s' \"$POWER35_HUMAN_MANIFEST_JSON\"" in release_text
+    assert '> "$phase8_dir/real-vault-receipt.json"' in release_text
+    assert '> "$phase8_dir/human-manifest.json"' in release_text
+
+
 def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
     docs_text = (WORKFLOWS_DIR / "docs.yml").read_text(encoding="utf-8")
