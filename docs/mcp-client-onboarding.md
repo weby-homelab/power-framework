@@ -1,8 +1,13 @@
 # MCP client onboarding
 
-This is the canonical local-stdio setup for P.O.W.E.R. `v3.4.5` on Linux and
+This is the canonical local-stdio setup for P.O.W.E.R. `v3.5.0` on Linux and
 macOS. It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
 the same server process and the same vault boundary.
+
+> **Candidate boundary:** `v3.5.0` is not published from the current worktree.
+> The release-wheel command below is valid only after the signed tag, artifact,
+> and remote readback gates pass. For local candidate work, install from the
+> locked checkout environment described in the repository's `CONTRIBUTING.md`.
 
 For Windows, use the [Windows 11 25H2 guide](windows-11-installation.md), which
 uses the exact interpreter inside the Windows virtual environment. Do not copy
@@ -13,7 +18,8 @@ POSIX shell paths into a Windows client configuration.
 Install the release wheel and create or migrate a vault first:
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
+python3 -m pip install \
+  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
 power init ~/my-vault
 python3 -c 'import sys; print(sys.executable)'
 ```

@@ -23,8 +23,9 @@ environment, commands, and raw artifacts.
    views. A view is disposable and must never become the only copy of a fact.
 2. Retrieval contracts are explicit. The executable
    `SEARCH_MODE_REGISTRY` in `power_framework.core.searcher` is canonical for
-   the supported modes. `semantic` is the current default; `reranked` is an
-   explicit opt-in until comparative quality evidence supports another default.
+   the supported modes. `auto` is the current default profile and returns
+   verified dense when ready or labelled FTS otherwise; `semantic` and
+   `reranked` are explicit opt-ins.
 3. Every public capability or performance claim has exactly one state:
    - `source-verified`: implementation and focused tests confirm the code path;
    - `measured`: a complete, valid benchmark manifest and retained artifacts

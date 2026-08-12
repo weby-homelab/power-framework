@@ -154,7 +154,7 @@ def load_domain_registry(vault_dir: Path) -> DomainRegistry:
         if not isinstance(raw_rules, list):
             raise DomainConfigError(f"domain {name} rules must be a list")
         rules = tuple(_parse_rule(rule) for rule in raw_rules)
-        priorities = entry.get("search_priority", ["semantic", "fts"])
+        priorities = entry.get("search_priority", ["fts", "semantic"])
         if not isinstance(priorities, list) or not priorities:
             raise DomainConfigError(f"domain {name} search_priority must be a non-empty list")
         normalized_priorities: list[str] = []
@@ -221,7 +221,12 @@ def route_domain(
 def resolve_search_policy(
     vault_dir: Path, query: str, requested_mode: str, domain_name: str | None = None
 ) -> tuple[str, DomainSpec | None]:
-    """Resolve ``auto`` search to a domain priority without changing legacy defaults."""
+    """Resolve domain policy while leaving no-domain ``auto`` for the runtime.
+
+    A configured domain may explicitly select its first priority. Without a
+    domain, the searcher decides whether a verified dense profile is ready and
+    otherwise uses FTS; policy resolution itself remains read-only.
+    """
     registry = load_domain_registry(vault_dir)
     domain = registry.get(domain_name) if domain_name else None
     if domain_name and domain is None:
@@ -230,7 +235,7 @@ def resolve_search_policy(
         domain = route_domain(registry, title=query, description=query, content=query)
     if requested_mode.casefold() != "auto":
         return requested_mode, domain
-    return (domain.search_priority[0] if domain else "semantic"), domain
+    return (domain.search_priority[0] if domain else "auto"), domain
 
 
 def render_domain_template(template: str, values: dict[str, str]) -> str:

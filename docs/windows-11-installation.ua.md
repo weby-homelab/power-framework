@@ -1,8 +1,13 @@
-# Встановлення P.O.W.E.R. на Windows 11 25H2
+# Встановлення P.O.W.E.R. 3.5.0 на Windows 11 25H2
 
-Цей гід встановлює версіонований реліз P.O.W.E.R. `v3.4.5` в ізольоване
-віртуальне середовище, створює чистий vault, перевіряє CLI та налаштовує
-MCP-клієнт. Усі команди наведено для PowerShell.
+Цей гід встановлює P.O.W.E.R. `v3.5.0` в ізольоване віртуальне середовище,
+створює чистий vault, перевіряє CLI та налаштовує MCP-клієнт. Усі команди
+наведено для PowerShell.
+
+> **Межа candidate:** підписаний release і tag `v3.5.0` ще не опубліковані з
+> поточного worktree. Команди з wheel і pinned tag нижче є контрактом після
+> публікації; не запускайте їх до проходження release workflow та remote
+> readback gates. Фізичні Windows-докази залишаються окремим target-host gate.
 
 ## Межа підтримки та доказів
 
@@ -10,12 +15,12 @@ MCP-клієнт. Усі команди наведено для PowerShell.
 - Windows 11 25H2 є офіційним релізом Windows 11 (сімейство OS build `26200`).
 - ONNX Runtime підтримує Windows 11, а його Windows-збірки потребують
   актуального Microsoft Visual C++ Runtime.
-- P.O.W.E.R. `v3.4.5` має автоматизований кросплатформний regression-тест
+- P.O.W.E.R. `v3.5.0` має автоматизований кросплатформний regression-тест
   поведінки rename-overwrite у Windows.
 - Фізичну перевірку Windows 11 25H2 завершено 2026-08-08 для follow-up revision
   `4e5b2b9`; див. [звіт перевірки](tests/windows-11-25h2-validation.md).
   Це підтверджує follow-up source/build і не переміщує та не перевидає
-  незмінні release-артефакти `v3.4.5`.
+  незмінні release-артефакти `v3.5.0`.
 
 Офіційні передумови:
 
@@ -95,29 +100,30 @@ Release wheel не потребує Git і фіксує версію вихід�
 Python-залежності все одно завантажуються з налаштованого Python package index.
 
 ```powershell
-$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl"
+$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
 & $VenvPython -m pip install $ReleaseWheel
 if ($LASTEXITCODE -ne 0) { throw "Помилка встановлення P.O.W.E.R." }
 ```
 
-Перевірте executable, distribution metadata, імпорти та ONNX Runtime:
+Перевірте executable, distribution metadata та lean FTS import:
 
 ```powershell
 & $PowerExe --version
 & $VenvPython -c "from importlib.metadata import version; print(version('power-framework'))"
-& $VenvPython -c "import power_framework, power_framework.mcp, onnxruntime; print('imports: OK'); print(onnxruntime.__version__)"
+& $VenvPython -c "import power_framework; print('lean FTS import: OK')"
 if ($LASTEXITCODE -ne 0) { throw "Помилка перевірки імпортів P.O.W.E.R." }
 ```
 
-Обидві перевірки версії мають показати `3.4.5`, а перевірка імпортів —
-`imports: OK`.
+Обидві перевірки версії мають показати `3.5.0`, а import check —
+`lean FTS import: OK`. Перед MCP встановіть явний extra `[remote]`, а
+`[semantic]` — лише для свідомо увімкненого dense search.
 
 ### Альтернатива: встановлення із закріпленого tag
 
 Використовуйте лише коли Git уже встановлено:
 
 ```powershell
-& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.4.5"
+& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.5.0"
 ```
 
 Не встановлюйте незакріплений `main`, якщо важлива відтворюваність.
@@ -172,7 +178,7 @@ assets. Перша повна синхронізація може потребу
 & $PowerExe sync $Vault
 if ($LASTEXITCODE -ne 0) { throw "Dense-синхронізація не пройшла" }
 
-& $PowerExe search $Vault "clean installation" --mode semantic
+& $PowerExe search $Vault "clean installation"
 if ($LASTEXITCODE -ne 0) { throw "Semantic-пошук не пройшов" }
 ```
 
@@ -261,8 +267,10 @@ runtime. Зробіть backup перед видаленням будь-яког
 
 - Windows повідомляє version 25H2 / build family `26200`.
 - Обраний Python має версію 3.11+; venv-перевірка повертає `True`.
-- `power --version` і distribution metadata повертають `3.4.5`.
-- `power_framework.mcp` та `onnxruntime` імпортуються успішно.
+- `power --version` і distribution metadata повертають `3.5.0`.
+- `power_framework` імпортується без neural/MCP extras.
+- Якщо налаштовано MCP, встановіть явний extra `[remote]` і запустіть preflight
+  тим самим interpreter.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з
   кодом `0`.
 - FTS sync завершується з кодом `0`, а пошук повертає acceptance note.

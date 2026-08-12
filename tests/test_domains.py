@@ -62,6 +62,31 @@ domains:
     assert resolve_search_policy(vault, "anything", "auto", "projects")[0] == "reranked"
 
 
+def test_auto_without_domain_is_deferred_to_runtime_readiness(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    assert resolve_search_policy(vault, "anything", "auto")[0] == "auto"
+
+
+def test_registry_default_priority_is_fts_first(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _write_registry(
+        vault,
+        """
+version: 1
+domains:
+  - name: notes
+    path: 03_Resources/notes
+    template: 05_Templates/default.md
+    rules: [{keywords: [note]}]
+""",
+    )
+
+    assert resolve_search_policy(vault, "note", "auto")[0] == "fts"
+
+
 def test_registry_rejects_unsafe_paths_and_unknown_modes(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()

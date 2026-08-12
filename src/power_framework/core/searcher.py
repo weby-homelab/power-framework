@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sqlite3
+import time
 import warnings
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
@@ -28,7 +29,6 @@ from .chunker import SemanticChunker
 from .constants import is_catalog_filename
 from .db import _init_db
 from .domains import DomainConfigError, resolve_search_policy
-from .embeddings import configured_embedding_identity, get_embedding_manager
 from .generation_index import (
     ActiveGenerationError,
     resolve_active_generation,
@@ -37,7 +37,6 @@ from .generation_index import (
 from .ignore import should_skip
 from .models import OKFMetadata  # noqa: TC001
 from .parser import FRONTMATTER_PATTERN, read_file_content, validate_metadata
-from .query_expansion import QueryExpander
 from .temporal import (
     TemporalStatus,
     includes_temporal_status,
@@ -53,9 +52,33 @@ from .vault_storage import existing_vault_db_path, vault_db_path
 if TYPE_CHECKING:
     from datetime import date
 
-    from .reranker import RerankerProtocol
+    from power_framework.experimental.reranker import RerankerProtocol
 
 logger = logging.getLogger(__name__)
+
+
+def get_embedding_manager() -> Any:
+    """Load the optional embedding manager only when a dense path needs it."""
+    from power_framework.experimental.embeddings import get_embedding_manager as load_manager
+
+    return load_manager()
+
+
+def dense_embedding_ready() -> tuple[bool, str]:
+    """Resolve optional dense readiness lazily for compatibility callers."""
+    from power_framework.experimental.embeddings import dense_embedding_ready as check_ready
+
+    return check_ready()
+
+
+def configured_embedding_identity() -> tuple[str, str]:
+    """Resolve optional embedding identity lazily for manifest validation."""
+    from power_framework.experimental.embeddings import (
+        configured_embedding_identity as read_identity,
+    )
+
+    return read_identity()
+
 
 # Module-level cross-encoder reranker singleton. The fastembed/qwen3 cross-encoder
 # model is expensive to load (~seconds); constructing a fresh RerankerManager per
@@ -91,7 +114,7 @@ def _get_reranker() -> RerankerProtocol:
     """
     global _reranker_singleton
     if _reranker_singleton is None:
-        from .reranker import get_reranker
+        from power_framework.experimental.reranker import get_reranker
 
         _reranker_singleton = get_reranker()
     return _reranker_singleton
@@ -210,7 +233,7 @@ FTS_STOPWORDS = frozenset(
         "чи",
     }
 )
-DEFAULT_SEARCH_MODE = "semantic"
+DEFAULT_SEARCH_MODE = "auto"
 CANONICAL_SEARCH_MODES = frozenset(
     {"fts", "vector", "hybrid", "semantic", "reranked", "graph_assisted"}
 )
@@ -264,12 +287,47 @@ class SearchResult:
     snippet: str
     match_count: int
     tags: list[str] = field(default_factory=list)
-    retrieval_contract: str = "dense"
+    retrieval_contract: str = "fts"
+    actual_mode: str | None = None
+    fallback_reason: str | None = None
+    index_age_seconds: float | None = None
     temporal_status: str = TemporalStatus.CURRENT.value
     matched_text: str = ""
     index_kind: str | None = None
     index_generation_id: str | None = None
     index_source_snapshot_hash: str | None = None
+
+
+class SearchResults(list[SearchResult]):
+    """Search hits plus request-level runtime metadata for empty result sets."""
+
+    actual_mode: str
+    fallback_reason: str | None
+
+    def __init__(
+        self,
+        values: list[SearchResult],
+        *,
+        actual_mode: str,
+        fallback_reason: str | None,
+    ) -> None:
+        super().__init__(values)
+        self.actual_mode = actual_mode
+        self.fallback_reason = fallback_reason
+
+
+def _with_runtime_metadata(
+    results: list[SearchResult],
+    *,
+    actual_mode: str,
+    fallback_reason: str | None,
+) -> SearchResults:
+    """Keep auto/fallback metadata available when retrieval returns no hits."""
+    return SearchResults(
+        results,
+        actual_mode=actual_mode,
+        fallback_reason=fallback_reason,
+    )
 
 
 def normalize_search_mode(mode: str) -> str:
@@ -1513,6 +1571,28 @@ def _attach_index_provenance(results: list[SearchResult], resolved_db: _Resolved
         result.index_source_snapshot_hash = resolved_db.source_snapshot_hash
 
 
+def _attach_runtime_contract(
+    results: list[SearchResult],
+    *,
+    actual_mode: str,
+    fallback_reason: str | None,
+    resolved_db: _ResolvedDb,
+) -> None:
+    """Attach the actual profile and bounded index freshness to every hit."""
+    index_age_seconds: float | None = None
+    if resolved_db.path is not None:
+        try:
+            index_age_seconds = max(0.0, time.time() - resolved_db.path.stat().st_mtime)
+        except OSError:
+            index_age_seconds = None
+    retrieval_contract = "fts_fallback" if fallback_reason else actual_mode
+    for result in results:
+        result.retrieval_contract = retrieval_contract
+        result.actual_mode = actual_mode
+        result.fallback_reason = fallback_reason
+        result.index_age_seconds = index_age_seconds
+
+
 def search_vault(
     vault_dir: Path,
     query: str,
@@ -1529,15 +1609,16 @@ def search_vault(
         vault_dir: Path to the vault root directory.
         query: Search query string.
         max_results: Maximum number of results to return.
-        mode: Search mode. POWER 3.1 canonical mode is "semantic" (default),
-              backed by the pinned BGE-M3 ONNX revision and a compatible dense
-              index. Other explicit modes are "fts" (BM25), "vector" (TF
+        mode: Search mode. ``auto`` is the default profile: it uses the pinned
+              BGE-M3 ONNX revision only with a verified dense generation and
+              local runtime/model assets, otherwise it uses labelled FTS. Other
+              explicit modes are "fts" (BM25), "vector" (TF
               cosine), "hybrid" (RRF of FTS + TF vector), "reranked", and
               "graph_assisted" (sparse RRF expanded through accepted OKF
               relations). ``hybrid_reranked`` is a deprecated alias of
               ``reranked``. ``auto`` uses the selected domain's first
-              ``search_priority`` entry; without a domain registry it retains
-              the semantic default.
+              ``search_priority`` entry; without a domain registry it resolves
+              dense readiness before choosing the FTS fallback.
         temporal_view: ``current`` (default), ``historical``, or ``all``.
         as_of: Inclusive ISO-8601 date boundary for temporal evaluation.
         domain: Optional domain slug. When present, results are scoped to the
@@ -1555,7 +1636,21 @@ def search_vault(
         mode, resolved_domain = resolve_search_policy(vault_dir, query, mode, domain)
     except DomainConfigError:
         raise
-    mode = normalize_search_mode(mode)
+    fallback_reason: str | None = None
+    resolved_db = _resolve_request_db(vault_dir)
+    if mode.casefold() == "auto":
+        dense_reason = "dense_index_unavailable"
+        try:
+            validate_dense_index(vault_dir, resolved_db)
+            dense_ready, dense_reason = dense_embedding_ready()
+            if not dense_ready:
+                raise DenseIndexUnavailableError(dense_reason)
+            mode = "semantic"
+        except DenseIndexUnavailableError:
+            mode = "fts"
+            fallback_reason = dense_reason
+    else:
+        mode = normalize_search_mode(mode)
     domain_path = resolved_domain.path if resolved_domain else None
     if resolved_domain:
         # Scope after candidate generation, but over-fetch so a domain does not
@@ -1564,10 +1659,6 @@ def search_vault(
     temporal_view = normalize_temporal_view(temporal_view).value
     boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
-    retrieval_contract = "dense"
-    resolved_db = _resolve_request_db(vault_dir)
-    if mode == "graph_assisted":
-        retrieval_contract = "graph_assisted"
     if mode_spec.requires_dense_index:
         try:
             validate_dense_index(vault_dir, resolved_db)
@@ -1589,7 +1680,7 @@ def search_vault(
                 )
                 mode = "fts"
                 mode_spec = get_search_mode_spec(mode)
-                retrieval_contract = "fts_fallback"
+                fallback_reason = "explicit_dense_fallback"
             else:
                 raise
 
@@ -1620,6 +1711,8 @@ def search_vault(
                 conn.close()
         if synchronization_completed:
             resolved_db = _resolve_request_db(vault_dir)
+
+    from power_framework.experimental.query_expansion import QueryExpander
 
     expander = QueryExpander()
     variants = expander.expand(query)
@@ -1679,10 +1772,18 @@ def search_vault(
         results = _filter_temporal_results(
             vault_dir, merged, temporal_view, boundary, requested_max_results, resolved_db
         )
-        for result in results:
-            result.retrieval_contract = retrieval_contract
+        _attach_runtime_contract(
+            results,
+            actual_mode=mode,
+            fallback_reason=fallback_reason,
+            resolved_db=resolved_db,
+        )
         _attach_index_provenance(results, resolved_db)
-        return results
+        return _with_runtime_metadata(
+            results,
+            actual_mode=mode,
+            fallback_reason=fallback_reason,
+        )
 
     # For non-hybrid modes, gather results, dedup by rel_path keeping max score, and sort
     all_results: list[SearchResult] = []
@@ -1727,10 +1828,18 @@ def search_vault(
     )
     if mode == "semantic":
         final_results = _apply_semantic_lexical_guard(vault_dir, query, final_results, resolved_db)
-    for r in final_results:
-        r.retrieval_contract = retrieval_contract
+    _attach_runtime_contract(
+        final_results,
+        actual_mode=mode,
+        fallback_reason=fallback_reason,
+        resolved_db=resolved_db,
+    )
     _attach_index_provenance(final_results, resolved_db)
-    return final_results
+    return _with_runtime_metadata(
+        final_results,
+        actual_mode=mode,
+        fallback_reason=fallback_reason,
+    )
 
 
 def _filter_temporal_results(
@@ -1852,7 +1961,7 @@ def _graph_assisted_search(
     relation targets are ignored by the graph builder. A graph hop is a
     ranking signal, never a replacement for the source note.
     """
-    from .relations import WeightedKnowledgeGraph, suggest_related_v2
+    from power_framework.experimental.relations import WeightedKnowledgeGraph, suggest_related_v2
 
     candidate_limit = max(20, max_results * 4)
     candidates = _rrf_merge(
@@ -2039,6 +2148,21 @@ def format_untrusted_search_envelope(
     """
     root = vault_dir.resolve()
     envelope_results: list[dict[str, object]] = []
+    actual_modes = sorted({result.actual_mode or mode for result in results})
+    fallback_reasons = sorted(
+        {result.fallback_reason for result in results if result.fallback_reason}
+    )
+    index_ages = [
+        result.index_age_seconds for result in results if result.index_age_seconds is not None
+    ]
+    actual_mode: str = (
+        actual_modes[0] if actual_modes else getattr(results, "actual_mode", "unknown")
+    )
+    fallback_reason: str | None = (
+        fallback_reasons[0]
+        if len(fallback_reasons) == 1
+        else getattr(results, "fallback_reason", None)
+    )
 
     for result in results:
         content_hash: str | None = None
@@ -2065,6 +2189,9 @@ def format_untrusted_search_envelope(
                     "note_type": result.note_type,
                     "tags": result.tags,
                     "retrieval_contract": result.retrieval_contract,
+                    "actual_mode": result.actual_mode,
+                    "fallback_reason": result.fallback_reason,
+                    "index_age_seconds": result.index_age_seconds,
                     "temporal_status": result.temporal_status,
                 },
                 "score": result.score,
@@ -2084,6 +2211,9 @@ def format_untrusted_search_envelope(
         ),
         "query": query,
         "mode": mode,
+        "actual_mode": actual_mode,
+        "fallback_reason": fallback_reason,
+        "index_age_seconds": max(index_ages) if index_ages else None,
         "temporal_view": temporal_view,
         "as_of": as_of,
         "index_provenance": _format_index_provenance(results),

@@ -6,6 +6,26 @@ repo_url: "https://github.com/weby-homelab/power-framework"
 repo_name: weby-homelab/power-framework
 edit_uri: "edit/main/docs/"
 
+# Historical receipts and working papers remain buildable, but are intentionally
+# outside the curated navigation. This keeps the public navigation focused on
+# the current contract without deleting evidence.
+not_in_nav:
+  |
+  release-3.2.md
+  release-3.2.2.md
+  release-3.2.3.md
+  release-3.2.4.md
+  release-3.2.5.md
+  release-3.2.6.md
+  release-3.2.7.md
+  release-3.3.0.md
+  release-3.3.1.md
+  release-3.4.5.md
+  benchmarks/
+  guides/
+  plans/
+  tests/
+
 theme:
   name: material
   palette:
@@ -66,15 +86,20 @@ nav:
   - Architecture Decisions:
       - POWER 3.1 Trust-Release Baseline: adr/0001-power-3.1-trust-release-baseline.md
       - POWER Memory OS Principles: adr/0002-memory-os-principles.md
+      - POWER 3.5 Core Boundary: adr/0003-power-3.5-core-boundary.md
   - POWER 3.1 Release Evidence: release-3.1.md
   - POWER 3.4.0 Release Notes: release-3.4.0.md
   - POWER 3.3.2 Release Notes: release-3.3.2.md
+  - POWER 3.5.0 Release Candidate: release-3.5.0.md
+  - Platform Support:
+      - Platform Support Matrix (EN): support-matrix.md
+      - Матриця підтримки платформ (UA): support-matrix.ua.md
   - Release Governance:
       - M2 Human Evaluation: m2-human-evaluation.md
       - Issue 187 Historical Checklist: plans/issue-187-production-validation-checklist.md
       - Windows 11 25H2 Validation: tests/windows-11-25h2-validation.md
       - Windows 11 25H2 Validation after CRLF fix: tests/windows-11-25h2-v3.3.2-validation-fixed.md
-  - Changelog: CHANGELOG.md
+  - Changelog: https://github.com/weby-homelab/power-framework/blob/main/CHANGELOG.md
   - Contributing: contributing.md
 
 extra:

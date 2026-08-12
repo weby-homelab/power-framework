@@ -34,6 +34,24 @@ def test_current_docs_match_the_executable_retrieval_contract() -> None:
     assert gate["check_retrieval_registry"](documents, facts) == []
 
 
+def test_global_skill_discovery_includes_agent_and_opencode_roots(
+    monkeypatch, tmp_path: Path
+) -> None:
+    gate = _load_gate()
+    monkeypatch.delenv("POWER_GLOBAL_SKILL_PATH", raising=False)
+    monkeypatch.setattr(Path, "home", classmethod(lambda _cls: tmp_path))
+
+    expected = (
+        tmp_path / ".agents" / "skills" / "power",
+        tmp_path / ".opencode" / "skills" / "power",
+        tmp_path / ".config" / "opencode" / "skills" / "power",
+    )
+    for root in expected:
+        root.mkdir(parents=True)
+
+    assert gate["_discover_global_skill_roots"]() == list(expected)
+
+
 def test_retrieval_gate_rejects_a_missing_canonical_row() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()
@@ -47,6 +65,17 @@ def test_retrieval_gate_rejects_a_missing_canonical_row() -> None:
     assert any("semantic" in error and "does not match" in error for error in errors)
 
 
+def test_retrieval_gate_rejects_unscoped_historical_token_claim() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+    documents["README"] += "\nThe index provides ~75% token savings.\n"
+
+    errors = gate["check_retrieval_registry"](documents, facts)
+
+    assert any("unscoped historical token-saving claim" in error for error in errors)
+
+
 def test_current_docs_match_executable_interfaces_and_safe_onboarding(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -56,7 +85,7 @@ def test_current_docs_match_executable_interfaces_and_safe_onboarding(
     documents = gate["_read_current_documents"]()
 
     assert facts["source"] == "power_framework.core.capabilities"
-    assert len(facts["interfaces"]["cli_commands"]) == 20
+    assert len(facts["interfaces"]["cli_commands"]) == 24
     assert len(facts["interfaces"]["mcp_tools"]) == 20
     assert gate["check_interfaces"](documents, facts) == []
     assert gate["check_onboarding"](documents, facts) == []
@@ -95,29 +124,29 @@ def test_migration_gate_rejects_stale_runtime_claims() -> None:
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
     documents["Migration"] = documents["Migration"].replace(
-        "default search mode is `semantic`", "default search mode is `reranked`", 1
+        "default search mode is `auto`", "default search mode is `reranked`", 1
     )
     documents["Migration UA"] = documents["Migration UA"].replace(
-        "режим пошуку за замовчуванням — `semantic`",
+        "режим пошуку за замовчуванням — `auto`",
         "режим пошуку за замовчуванням — `reranked`",
         1,
     )
 
     errors = gate["check_migration_guide"](documents, facts)
 
-    assert any("Migration" in error and "semantic" in error for error in errors)
-    assert any("Migration UA" in error and "semantic" in error for error in errors)
+    assert any("Migration" in error and "auto" in error for error in errors)
+    assert any("Migration UA" in error and "auto" in error for error in errors)
 
 
 def test_interface_gate_rejects_stale_architecture_count() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
-    documents["Architecture"] = documents["Architecture"].replace("20 commands", "15 commands", 1)
+    documents["Architecture"] = documents["Architecture"].replace("24 commands", "15 commands", 1)
 
     errors = gate["check_interfaces"](documents, facts)
 
-    assert any("Architecture" in error and "20 CLI commands" in error for error in errors)
+    assert any("Architecture" in error and "24 CLI commands" in error for error in errors)
 
 
 def test_interface_gate_rejects_stale_readme_mcp_count() -> None:
@@ -240,6 +269,17 @@ def test_skill_body_gate_rejects_missing_workflow_markers() -> None:
         "progressive-disclosure reference `references/runtime-contract.md`" in error
         for error in errors
     )
+
+
+def test_skill_body_gate_rejects_incomplete_okf_required_fields() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    body = (REPO_SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    body = body.replace("`description`, `timestamp`", "`description`", 1)
+
+    errors = gate["_check_skill_body"]("Incomplete OKF skill", body, facts)
+
+    assert any("executable OKF required fields" in error for error in errors)
 
 
 def test_skill_gate_rejects_stale_reference_facts(tmp_path: Path) -> None:

@@ -1,8 +1,14 @@
 # Початок роботи з чистою базою знань
 
-Це авторитетний clean-install шлях для P.O.W.E.R. `v3.4.5`. Він створює лише
+Це авторитетний clean-install шлях для P.O.W.E.R. `v3.5.0`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
+
+> **Межа candidate:** `v3.5.0` ще не є опублікованим GitHub Release або tag у
+> поточному worktree. Immutable wheel і pinned-tag команди нижче є контрактом
+> після публікації та не повинні запускатися до проходження signed release і
+> remote readback gates. Для поточного candidate використовуйте locked
+> development environment з root-файлу `CONTRIBUTING.md` репозиторію.
 
 Користувачам Windows 11 25H2 потрібно виконати повний
 [Windows-гід](windows-11-installation.ua.md) з точними PowerShell-шляхами та
@@ -18,7 +24,7 @@ MCP acceptance checks.
 Використовуйте ізольований virtual environment. Для звичайного встановлення не
 змінюйте системний Python і не покладайтеся на `--break-system-packages`.
 
-## 2. Встановіть версіонований реліз
+## 2. Встановіть версіонований реліз (після публікації)
 
 На Linux або macOS:
 
@@ -29,24 +35,33 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
 ```
 
-Release wheel фіксує версію вихідного коду P.O.W.E.R. Його залежності
-вирішуються через налаштований Python package index.
+Базовий release wheel є FTS-only: він не встановлює ONNX Runtime, model
+tokenizers, numerical packages або optional MCP transport. Перед MCP додайте
+явний extra `remote`, а `semantic` використовуйте лише для локальних dense
+експериментів.
 
-Перевірте executable, package metadata та MCP import:
+Перевірте executable, package metadata та lean import:
 
 ```bash
 "$POWER_CLI" --version
 "$POWER_PYTHON" -c \
   'from importlib.metadata import version; print(version("power-framework"))'
 "$POWER_PYTHON" -c \
-  'import power_framework.mcp, onnxruntime; print("imports: OK")'
+  'import power_framework; print("lean FTS import: OK")'
 ```
 
-Обидві команди версії мають показати `3.4.5`, а остання команда —
-`imports: OK`.
+Обидві команди версії мають показати `3.5.0`, а остання команда —
+`lean FTS import: OK`.
+
+Для локального MCP встановіть optional transport з того самого wheel:
+
+```bash
+"$POWER_PYTHON" -m pip install \
+  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
+```
 
 ### Альтернатива: встановлення із закріпленого tag
 
@@ -54,7 +69,7 @@ Release wheel фіксує версію вихідного коду P.O.W.E.R. �
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.4.5'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.5.0'
 ```
 
 Не використовуйте незакріплений `main`, якщо важлива відтворюваність.
@@ -130,7 +145,7 @@ power-vault/
 
 ```bash
 "$POWER_CLI" sync "$POWER_VAULT"
-"$POWER_CLI" search "$POWER_VAULT" "clean installation" --mode semantic
+"$POWER_CLI" search "$POWER_VAULT" "clean installation"
 ```
 
 Не заявляйте готовність semantic або reranked mode, доки full sync і пошук у
@@ -196,8 +211,10 @@ Vault — це звичайні Markdown-файли, незалежні від P
 ## Acceptance checklist
 
 - Python має версію 3.11+, а interpreter належить окремому venv.
-- CLI та distribution metadata повертають `3.4.5`.
-- `power_framework.mcp` і `onnxruntime` імпортуються успішно.
+- CLI та distribution metadata повертають `3.5.0`.
+- `power_framework` імпортується без neural/MCP extras.
+- Якщо налаштовано MCP, встановлено явний extra `remote`, а preflight успішно
+  імпортує `power_framework.mcp`.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з
   кодом `0`.
 - FTS sync завершується з кодом `0`, а FTS search повертає першу нотатку.

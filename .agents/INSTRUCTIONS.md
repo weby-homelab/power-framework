@@ -1,6 +1,6 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+, hatchling, Pydantic v2, FastMCP 3.x, ONNX Runtime, BGE-M3.
+Python 3.11+, hatchling, Pydantic v2, local FTS by default, and optional FastMCP/neural extras.
 
 ## Commands
 
@@ -33,8 +33,9 @@ mypy src/power_framework/  # type check
 
 ```
 src/power_framework/
-├── core/          # CLI, models, parser, indexer, linter, searcher, embeddings, reranker
-├── mcp/           # FastMCP 3.x server — 18 async tools
+├── core/          # CLI, models, parser, indexer, linter, searcher, application service
+├── experimental/  # opt-in dense, graph, reranker, query-expansion and ROT adapters
+├── mcp/           # FastMCP 3.x local server — 20 async tools
 tests/             # pytest, asyncio_mode=auto, coverage >= 70%
 scripts/           # utility scripts (excluded from ruff T20/S310)
 ```
@@ -43,6 +44,13 @@ Rules:
 - `core/` must NOT import from `mcp/`. Data flows one direction: CLI/MCP → core.
 - Never add I/O in hot paths (search, lint, index). Batch reads.
 - Keep MCP tools stateless — vault state lives in the filesystem, not in memory.
+- `auto` is the default search profile: verified dense when ready, otherwise
+  labelled FTS with an explicit fallback reason. Explicit semantic/reranked
+  modes fail closed when their optional assets are unavailable.
+- Base installation must remain free of neural runtime dependencies; use the
+  `semantic`, `rerank`, `gpu`, `remote`, and other declared extras explicitly.
+- `power_framework.core` must not eagerly import optional implementations;
+  compatibility module paths are lazy shims to `power_framework.experimental`.
 
 ## Testing
 

@@ -1,8 +1,14 @@
-# Install P.O.W.E.R. on Windows 11 25H2
+# Install P.O.W.E.R. 3.5.0 on Windows 11 25H2
 
-This guide installs the signed P.O.W.E.R. `v3.4.5` release in an isolated
-virtual environment, creates a clean vault, verifies the CLI, and configures an
-MCP client. It uses PowerShell syntax throughout.
+This guide installs P.O.W.E.R. `v3.5.0` in an isolated virtual environment,
+creates a clean vault, verifies the CLI, and configures an MCP client. It uses
+PowerShell syntax throughout.
+
+> **Candidate boundary:** the signed `v3.5.0` release and tag are not published
+> from the current worktree. The wheel and pinned-tag commands below are the
+> post-publication contract; do not run them until the release workflow and
+> remote readback gates pass. Physical Windows evidence remains a separate
+> target-host gate.
 
 ## Support and evidence boundary
 
@@ -10,12 +16,12 @@ MCP client. It uses PowerShell syntax throughout.
 - Windows 11 25H2 is an official Windows 11 release (OS build family `26200`).
 - ONNX Runtime supports Windows 11, and its Windows builds require the current
   Microsoft Visual C++ runtime.
-- P.O.W.E.R. `v3.4.5` includes an automated cross-platform regression for the
+- P.O.W.E.R. `v3.5.0` includes an automated cross-platform regression for the
   Windows rename-overwrite behavior.
 - Physical Windows 11 25H2 validation was completed on 2026-08-08 for follow-up
   revision `4e5b2b9`; see the [validation report](tests/windows-11-25h2-validation.md).
   This validates the follow-up source/build and does not move or reissue the
-  immutable `v3.4.5` release artifacts.
+  immutable `v3.5.0` release artifacts.
 
 Official prerequisites:
 
@@ -95,29 +101,30 @@ The release wheel avoids Git and pins the P.O.W.E.R. source version. Its Python
 dependencies are still resolved from the configured Python package index.
 
 ```powershell
-$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl"
+$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
 & $VenvPython -m pip install $ReleaseWheel
 if ($LASTEXITCODE -ne 0) { throw "P.O.W.E.R. installation failed" }
 ```
 
-Verify the executable, distribution metadata, imports, and ONNX Runtime:
+Verify the executable, distribution metadata, and lean FTS import:
 
 ```powershell
 & $PowerExe --version
 & $VenvPython -c "from importlib.metadata import version; print(version('power-framework'))"
-& $VenvPython -c "import power_framework, power_framework.mcp, onnxruntime; print('imports: OK'); print(onnxruntime.__version__)"
+& $VenvPython -c "import power_framework; print('lean FTS import: OK')"
 if ($LASTEXITCODE -ne 0) { throw "P.O.W.E.R. import verification failed" }
 ```
 
-Both version checks must report `3.4.5`, and the import check must print
-`imports: OK`.
+Both version checks must report `3.5.0`, and the import check must print
+`lean FTS import: OK`. Install the explicit `[remote]` extra before configuring
+MCP, and `[semantic]` only when dense search is intentionally enabled.
 
 ### Alternative: install from the pinned tag
 
 Use this only when Git is installed:
 
 ```powershell
-& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.4.5"
+& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.5.0"
 ```
 
 Do not install unpinned `main` when reproducibility matters.
@@ -171,7 +178,7 @@ disk space, and memory:
 & $PowerExe sync $Vault
 if ($LASTEXITCODE -ne 0) { throw "Dense synchronization failed" }
 
-& $PowerExe search $Vault "clean installation" --mode semantic
+& $PowerExe search $Vault "clean installation"
 if ($LASTEXITCODE -ne 0) { throw "Semantic search failed" }
 ```
 
@@ -263,8 +270,10 @@ runtime. Back it up before deleting either directory.
 
 - Windows reports version 25H2 / build family `26200`.
 - The selected Python is 3.11 or newer and the venv check prints `True`.
-- `power --version` and distribution metadata both report `3.4.5`.
-- `power_framework.mcp` and `onnxruntime` import successfully.
+- `power --version` and distribution metadata both report `3.5.0`.
+- `power_framework` imports successfully without neural or MCP extras.
+- If MCP is configured, install the explicit `[remote]` extra and run its
+  preflight with the same interpreter.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.
 - FTS sync exits `0` and search returns the acceptance note.
 - MCP preflight prints `MCP preflight: OK` using the exact configured Python.

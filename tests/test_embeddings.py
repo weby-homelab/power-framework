@@ -17,6 +17,33 @@ if TYPE_CHECKING:
 
 
 class TestEmbeddingManager:
+    def test_dense_readiness_is_read_only_and_reports_missing_snapshot(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "cache"))
+
+        ready, reason = embeddings.dense_embedding_ready()
+
+        assert ready is False
+        assert reason in {"model_snapshot_missing", "optional_dependency_missing"}
+        assert not (tmp_path / "cache").exists()
+
+    def test_dense_readiness_accepts_complete_local_snapshot(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        snapshot = (
+            tmp_path / "models--aapot--bge-m3-onnx" / "snapshots" / embeddings.BGE_M3_ONNX_REVISION
+        )
+        snapshot.mkdir(parents=True)
+        for filename in ("model.onnx", "model.onnx.data", "tokenizer.json"):
+            (snapshot / filename).write_bytes(b"cached")
+        monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path))
+
+        ready, reason = embeddings.dense_embedding_ready()
+
+        assert ready is True
+        assert reason == "ready"
+
     def test_auto_device_prefers_cuda_and_keeps_cpu_fallback(self, monkeypatch: pytest.MonkeyPatch):
         class FakeOrt:
             @staticmethod

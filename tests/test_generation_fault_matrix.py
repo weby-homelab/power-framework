@@ -11,13 +11,16 @@ import subprocess
 import sys
 import time
 from contextlib import closing
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
 from power_framework.core import generation_index, searcher
 from power_framework.core.generation_index import (
     IndexGenerationError,
+    _publish,
     _state_db_path,
     resolve_active_generation_path,
     sync_vault_atomically,
@@ -82,6 +85,84 @@ def _assert_previous_generation_is_unchanged(vault: Path, before_checksum: str) 
         ).fetchone()[0]
     assert active_state == "ready"
     assert half_ready == 0
+
+
+def _plant_building_artifacts(vault: Path, created_at: str) -> tuple[str, tuple[Path, ...]]:
+    """Plant synthetic UUID-owned build artifacts and a matching state row."""
+    generation_id = str(uuid4())
+    paths = generation_index._build_artifact_paths(vault, generation_id)
+    for path in paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"synthetic orphan artifact")
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
+        generation_index._init_state_db(conn)
+        conn.execute(
+            """
+            INSERT INTO index_generations (
+                generation_id, state, source_snapshot_hash, expected_files,
+                chunker_identity, created_at
+            ) VALUES (?, 'building', ?, ?, ?, ?)
+            """,
+            (generation_id, "synthetic-snapshot", 1, "SemanticChunker/v1", created_at),
+        )
+        conn.commit()
+    return generation_id, paths
+
+
+def test_stale_build_reaper_removes_crash_artifacts_but_preserves_live_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Crash cleanup is lease-gated and never treats a young build as stale."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("POWER_GENERATION_BUILD_TTL_SECONDS", "3600")
+    vault = _vault(tmp_path)
+    sync_vault_atomically(vault, sync_embeddings=False)
+
+    stale_id, stale_paths = _plant_building_artifacts(
+        vault, (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+    )
+    fresh_id, fresh_paths = _plant_building_artifacts(vault, datetime.now(UTC).isoformat())
+
+    sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert all(not path.exists() for path in stale_paths)
+    assert all(path.exists() for path in fresh_paths)
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
+        states = dict(
+            conn.execute(
+                "SELECT generation_id, state FROM index_generations WHERE generation_id IN (?, ?)",
+                (stale_id, fresh_id),
+            ).fetchall()
+        )
+    assert states == {stale_id: "failed", fresh_id: "building"}
+
+
+def test_publisher_rejects_a_reaped_build_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reaper claim fences a late writer before it can move the pointer."""
+    vault, before_checksum = _prepare_active_vault(tmp_path, monkeypatch)
+    generation_id, paths = _plant_building_artifacts(
+        vault, (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+    )
+    staging_path = paths[0]
+    for path in paths[3:]:
+        path.unlink(missing_ok=True)
+    with closing(sqlite3.connect(_state_db_path(vault))) as conn:
+        conn.execute(
+            "UPDATE index_generations SET state = 'failed', error = ? WHERE generation_id = ?",
+            ("reaped stale building row after crash", generation_id),
+        )
+        conn.commit()
+
+    with pytest.raises(IndexGenerationError, match="lease was revoked"):
+        _publish(vault, generation_id, staging_path, 0, 0, None, None)
+
+    active = resolve_active_generation_path(vault)
+    assert active is not None
+    assert hashlib.sha256(active.read_bytes()).hexdigest() == before_checksum
+    assert not paths[3].exists()
 
 
 @pytest.mark.parametrize("batch_position", ["first", "middle", "last"])

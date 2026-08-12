@@ -145,6 +145,50 @@ class TestHealVault:
         content = note.read_text()
         assert "type: Project" in content
 
+    def test_noop_transform_does_not_create_backup_or_count_as_healed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        note = vault / "note.md"
+        note.write_text("original", encoding="utf-8")
+
+        def fake_heal(content: str, _filepath: Path, _vault: Path) -> tuple[str, list[str]]:
+            return content, ["reported change without byte change"]
+
+        monkeypatch.setattr(healer_module, "heal_frontmatter", fake_heal)
+
+        for _ in range(100):
+            report = heal_vault_report(vault, dry_run=False)
+            assert report.healed == 0
+            assert report.changes_log == []
+        assert not (vault / ".backups").exists()
+
+    def test_one_hundred_real_noop_heals_create_no_backups(self, tmp_path: Path):
+        """Issue #311 guard: unchanged notes never accumulate byte-identical backups."""
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        note = vault / "note.md"
+        note.write_text(
+            "---\n"
+            "type: Resource\n"
+            'title: "Stable note"\n'
+            'description: "Already valid"\n'
+            "timestamp: 2026-01-01T00:00:00+00:00\n"
+            "---\n\n"
+            "No mutation is required.\n",
+            encoding="utf-8",
+        )
+        before = note.read_bytes()
+
+        for _ in range(100):
+            report = heal_vault_report(vault, dry_run=False)
+            assert report.healed == 0
+            assert report.failures == []
+
+        assert note.read_bytes() == before
+        assert not (vault / ".backups").exists()
+
 
 @pytest.mark.parametrize(
     ("field", "value"),

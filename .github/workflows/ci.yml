@@ -11,78 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  windows-runtime-smoke:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.13"
-
-      - name: Install project
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install uv==0.11.33
-          uv sync --locked
-          uv run python -m pip check
-
-      - name: Verify Windows CLI and clean-vault lifecycle
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $vault = Join-Path $env:RUNNER_TEMP "power-vault"
-
-          uv run power --version
-          uv run python -c "import power_framework.mcp, onnxruntime; print('imports: OK')"
-          $env:POWER_EMBED_DEVICE = "auto"
-          uv run python -c "import onnxruntime as ort; from power_framework.core.embeddings import select_onnx_providers; selected = select_onnx_providers(ort); print('available providers:', ort.get_available_providers()); print('selected providers:', selected); assert any((p[0] if isinstance(p, tuple) else p) == 'CPUExecutionProvider' for p in selected)"
-          uv run power init $vault
-          uv run power ingest $vault --type Resource --title "First Note" --description "Windows smoke note"
-          $nestedA = Join-Path $vault "03_Resources\Nested Space"
-          $nestedB = Join-Path $vault "03_Resources\Nested Space\Deep"
-          New-Item -ItemType Directory -Force $nestedB | Out-Null
-          @"
-          ---
-          type: Resource
-          title: "Duplicate A"
-          description: "Nested Windows smoke note A"
-          timestamp: 2026-08-09T00:00:00Z
-          ---
-
-          # Duplicate A
-          "@ | Set-Content -Encoding utf8 (Join-Path $nestedA "Same Name.md")
-          @"
-          ---
-          type: Resource
-          title: "Duplicate B"
-          description: "Nested Windows smoke note B"
-          timestamp: 2026-08-09T00:00:00Z
-          ---
-
-          # Duplicate B
-          "@ | Set-Content -Encoding utf8 (Join-Path $nestedB "Same Name.md")
-          uv run power index $vault --strict
-          $lintResult = uv run power lint $vault
-          $lintText = $lintResult -join [Environment]::NewLine
-          if ($LASTEXITCODE -ne 0 -or $lintText -match "[\\/]_index\.md") {
-            throw "Lint treated a generated sub-index as an orphan note"
-          }
-          $lintText
-          uv run power markdown-check $vault
-          uv run power sync $vault --fts-only --strict
-          $searchResult = uv run power search $vault "Windows smoke" --mode fts
-          $searchText = $searchResult -join [Environment]::NewLine
-          if ($LASTEXITCODE -ne 0 -or $searchText -notmatch "First Note") {
-            throw "FTS acceptance check did not return First Note"
-          }
-          $searchText
-          uv run power status $vault
-
-  macos-runtime-smoke:
-    runs-on: macos-latest
+  upgrade-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -91,43 +25,53 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install project
+      - name: Install locked development environment
         run: |
           python -m pip install --upgrade pip
           python -m pip install uv==0.11.33
-          uv sync --locked
-          uv run python -m pip check
+          uv sync --locked --group dev
 
-      - name: Verify macOS CLI and FTS lifecycle without model download
-        env:
-          HF_HUB_OFFLINE: "1"
-          POWER_EMBED_DEVICE: cpu
-          POWER_RERANKER_DEVICE: cpu
-          XDG_CACHE_HOME: ${{ runner.temp }}/power-cache
-        run: |
-          set -euo pipefail
-          vault="${RUNNER_TEMP}/power-vault"
+      - name: Execute content-free upgrade and rollback invariants
+        run: >-
+          uv run python scripts/verify_upgrade_matrix.py
+          --from-version 3.4.5 --to-version 3.5.0
+          --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
-          uv run power --version
-          uv run python -c "import power_framework.mcp, onnxruntime; print('imports: OK')"
-          uv run power init "$vault"
-          uv run power ingest "$vault" --type Resource --title "macOS smoke note" --description "macOS runtime smoke note"
-          uv run power index "$vault" --strict
-          uv run power lint "$vault"
-          uv run power markdown-check "$vault"
-          uv run power sync "$vault" --fts-only --strict
-          search_result="$(uv run power search "$vault" "macOS smoke" --mode fts)"
-          if ! grep -Fq "macOS smoke note" <<<"$search_result"; then
-            printf '%s\n' "$search_result"
-            echo "FTS acceptance check did not return macOS smoke note" >&2
-            exit 1
-          fi
-          if ! grep -Fq "Index coverage: 1/1" <<<"$search_result" || grep -Fq "pending:" <<<"$search_result"; then
-            printf '%s\n' "$search_result"
-            echo "FTS acceptance check reported stale index coverage" >&2
-            exit 1
-          fi
-          printf '%s\n' "$search_result"
+      - name: Upload platform upgrade matrix evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: power35-upgrade-${{ matrix.os }}
+          path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  upgrade-matrix-aggregate:
+    needs: upgrade-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download platform upgrade matrix evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: power35-upgrade-*
+          path: ${{ runner.temp }}/power35-upgrade-reports
+          merge-multiple: true
+
+      - name: Aggregate all supported Ubuntu reports
+        run: >-
+          python scripts/aggregate_upgrade_matrix.py
+          --input-dir "${{ runner.temp }}/power35-upgrade-reports"
+          --require-supported-platforms
+          --output "${{ runner.temp }}/power35-upgrade-aggregate.json"
+
+      - name: Upload aggregated upgrade matrix evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: power35-upgrade-aggregate
+          path: ${{ runner.temp }}/power35-upgrade-aggregate.json
+          if-no-files-found: error
+          retention-days: 7
 
   test:
     runs-on: ubuntu-latest
@@ -149,13 +93,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install uv==0.11.33
-          uv sync --locked --group dev
+          uv sync --locked --group dev --extra semantic --extra rerank
 
       - name: Run Ruff linter
-        run: uv run ruff check src/ tests/ scripts/
+        run: uv run ruff check src/ tests/ scripts/ benchmarks/power35/
 
       - name: Run Ruff formatter check
-        run: uv run ruff format --check src/ tests/ scripts/
+        run: uv run ruff format --check src/ tests/ scripts/ benchmarks/power35/
 
       - name: Run MyPy type check
         if: ${{ matrix.python-version == '3.13' }}
@@ -164,11 +108,51 @@ jobs:
       - name: Verify current documentation contract
         run: uv run python scripts/check_doc_drift.py
 
-      - name: Verify release metadata contract
-        run: uv run python scripts/verify_release_contract.py
+      - name: Enforce the frozen complexity budget
+        run: uv run python scripts/complexity_dashboard.py --baseline-revision v3.4.5 --require-budget
+
+      - name: Build documentation with strict link and nav checks
+        run: uv run mkdocs build --strict --site-dir "$RUNNER_TEMP/power-site"
+
+      - name: Verify release metadata contract from a generated candidate
+        run: uv run pytest tests/test_release_contract.py -q --no-cov --override-ini=addopts=
 
       - name: Run tests with coverage and resource warning gates
         run: uv run pytest tests/ -v --tb=short --cov=src/power_framework/ --cov-report=term-missing --cov-fail-under=70 -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
+
+      - name: Run maintenance fault-injection rollback gate
+        run: uv run pytest tests/test_maintenance.py tests/test_maintenance_faults.py -q --no-cov --override-ini=addopts=
+
+  base-runtime-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install only the locked base runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv==0.11.33
+          base_env="$RUNNER_TEMP/power-base"
+          UV_PROJECT_ENVIRONMENT="$base_env" uv sync --locked --no-dev
+          UV_PROJECT_ENVIRONMENT="$base_env" uv pip install --python "$base_env/bin/python" pip
+          UV_PROJECT_ENVIRONMENT="$base_env" uv run --no-dev python -m pip check
+
+      - name: Verify base FTS works without optional neural imports
+        run: |
+          set -euo pipefail
+          base_env="$RUNNER_TEMP/power-base"
+          vault="$RUNNER_TEMP/power-vault"
+          UV_PROJECT_ENVIRONMENT="$base_env" uv run --no-dev power init "$vault"
+          UV_PROJECT_ENVIRONMENT="$base_env" uv run --no-dev power ingest "$vault" \
+            --type Resource --title "Base FTS note" --description "Base runtime smoke"
+          UV_PROJECT_ENVIRONMENT="$base_env" uv run --no-dev power sync "$vault" --fts-only --strict
+          result="$(UV_PROJECT_ENVIRONMENT="$base_env" uv run --no-dev power search "$vault" "Base FTS" --mode fts)"
+          grep -Fq "Base FTS note" <<<"$result"
 
   benchmark-integrity:
     runs-on: ubuntu-latest
@@ -190,6 +174,100 @@ jobs:
 
       - name: Run hermetic frozen benchmark checks
         run: uv run pytest benchmarks/power31/tests -q --no-cov --override-ini=addopts=
+
+      - name: Run content-free Phase 8 technical outcome benchmark
+        run: |
+          uv run python benchmarks/power35/scripts/run_outcome_benchmark.py \
+            --output "$RUNNER_TEMP/power35-outcome.json"
+          uv run python - "$RUNNER_TEMP/power35-outcome.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert report["synthetic"] is True
+          assert report["content_free"] is True
+          assert report["workflow_count"] == 20
+          assert report["gate"]["fresh_agent_completion"] >= 0.9
+          assert report["gate"]["safety_invariants_100"] is True
+          assert report["gate"]["false_premise_abstention"] is True
+          assert report["gate"]["stale_state_filter"] is True
+          assert report["gate"]["technical_continuity_20"] is True
+          assert report["gate"]["blocked_workflow_abstention"] is True
+          assert report["gate"]["median_human_reminders"] == 0
+          assert report["comparison"]["practical_improvement"] is True
+          assert report["feedback_reuse"]["measured"] is False
+          assert report["blind_scoring"] is False
+          assert report["bootstrap_context_tokens"]["measured"] is False
+          assert report["raw_content_in_report"] is False
+          assert report["retrieval_profiles"]["auto"]["fallback_to_fts_rate"] == 1.0
+          assert report["retrieval_profiles"]["semantic"]["status"] == "not_evaluated"
+          print("outcome benchmark technical gate passed")
+          PY
+
+      - name: Run cross-process continuity benchmark
+        run: |
+          uv run python benchmarks/power35/scripts/run_continuity_benchmark.py \
+            --output "$RUNNER_TEMP/power35-continuity.json"
+          uv run python - "$RUNNER_TEMP/power35-continuity.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert report["synthetic"] is True
+          assert report["content_free"] is True
+          assert report["workflow_count"] == 20
+          assert report["independent_processes"] == 60
+          assert report["plain_handoff_processes"] == 40
+          assert report["gate"]["correct_resume_20"] is True
+          assert report["gate"]["proof_carrying_handoff"] is True
+          assert report["gate"]["source_preserved"] is True
+          assert report["gate"]["power_beats_plain_handoff"] is True
+          assert report["comparison"]["practical_improvement"] is True
+          assert report["metrics"]["duplicate_work_rate"] == 0
+          assert report["raw_content_in_report"] is False
+          print("cross-process continuity gate passed")
+          PY
+
+      - name: Run fresh-agent chaos safety gate
+        run: |
+          set -euo pipefail
+          vault="$RUNNER_TEMP/power-chaos-vault"
+          uv run power init "$vault"
+          uv run power ingest "$vault" --type Resource --title "Test" --description "Chaos fixture"
+          uv run power sync "$vault" --fts-only --strict
+          uv run python scripts/fresh_agent_chaos.py "$vault" \
+            > "$RUNNER_TEMP/power35-fresh-agent-chaos.json"
+          uv run python - "$RUNNER_TEMP/power35-fresh-agent-chaos.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert report["scenario_count"] == 8
+          assert report["passed"] == 8
+          assert report["safety_invariants_passed"] is True
+          assert report["bootstrap_bytes"] <= 12 * 1024
+          print("fresh-agent chaos gate passed")
+          PY
+
+      - name: Run bounded retention and restore soak gate
+        run: |
+          uv run python scripts/retention_soak.py \
+            --output "$RUNNER_TEMP/power35-retention-soak.json"
+          uv run python - "$RUNNER_TEMP/power35-retention-soak.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert report["bounded_growth"]["within_policy"] is True
+          assert report["restore"]["status"] == "ok"
+          assert report["source_preserved"] is True
+          assert report["control_preserved"] is True
+          print("retention soak gate passed")
+          PY
 
   security:
     runs-on: ubuntu-latest

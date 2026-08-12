@@ -49,25 +49,30 @@ P.O.W.E.R. створений для роботи як людьми, так і A
   vault, executable acceptance gate, FTS і MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.ua.md)** — повне
   PowerShell-встановлення, Visual C++ prerequisite, точні interpreter paths і checks
-- **[CLI reference](docs/cli.md)** — усі 20 команд, flags і реальна exit behavior
+- **[CLI reference](docs/cli.md)** — усі 24 команди, flags і реальна exit behavior
 - **[MCP server](docs/mcp-server.md)** — усі 20 governed tools, rate limits,
   configured-vault boundary і untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.ua.md)** — 6-фазна manifest/hash-driven
   міграція з будь-якої Markdown source methodology у canonical POWER vault
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
-- **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — межі tested,
-  conditional та unsupported для Linux, macOS, hosted Windows і фізичного
-  Windows 11 25H2
+- **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — Ubuntu/Linux є
+  release-платформою `v3.5.0`; macOS і Windows явно відкладені
 
-## Швидкий старт (Linux/macOS)
+## Швидкий старт (Ubuntu/Linux)
 
-Наведені нижче команди — найкоротший підтримуваний шлях для Linux і macOS.
+Наведені нижче команди — найкоротший підтримуваний шлях для Ubuntu/Linux.
 Потрібен Python 3.11+ і terminal shell; `~/my-vault` — каталог vault, яким
 керуватиме POWER.
 
+> **Межа candidate 3.5.0:** підписаний GitHub Release і tag `v3.5.0` ще не
+> опубліковані з цього worktree. URL immutable wheel нижче стане виконуваним
+> лише після проходження tag, artifact і remote readback gates. Для поточного
+> candidate використовуйте locked development installation з
+> [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -76,9 +81,9 @@ power heal ~/my-vault      # Автовиправлення відсутньог
 power markdown-check ~/my-vault  # Перевірка якості Markdown
 ```
 
-## Розробницька установка (Linux/macOS)
+## Розробницька установка (Ubuntu/Linux)
 
-Учасникам на Linux або macOS слід clone у durable development directory,
+Учасникам на Ubuntu/Linux слід clone у durable development directory,
 створити venv і виконати [CONTRIBUTING.md](CONTRIBUTING.md). Перед pull
 перевіряйте local changes; документація не пропонує updater, який reset робоче
 дерево.
@@ -93,30 +98,26 @@ uv sync --locked --group dev
 power --version
 ```
 
-## Встановлення на Windows 11 25H2
+## Встановлення на Windows 11 25H2 (відкладено)
 
-Користувачам Windows слід використовувати окремий детальний
-[гід Windows 11 25H2](docs/windows-11-installation.ua.md), а не наведені вище
-Linux/macOS shell-команди. Гід описує Python/Visual C++ prerequisites,
-isolated venv, immutable release wheel, точний PowerShell syntax, clean-vault
-acceptance checks, MCP configuration через venv interpreter, troubleshooting,
-rollback і uninstall.
+Windows 11 25H2 відкладено за межі release `v3.5.0`. Окремий детальний
+[гід Windows 11 25H2](docs/windows-11-installation.ua.md) залишається майбутньою
+документацією і не є Stable release certification.
 
-Прямий Windows runtime запуск не входив у Linux release pipeline `v3.4.5`;
-гід явно розділяє автоматизований cross-platform regression і checks, які
-мають пройти на цільовому Windows host.
+Для `v3.5.0` немає Windows CI, upgrade-matrix, compatibility, performance або
+GPU claim.
 
 ## Що всередині
 
 | Функція                          | Що робить                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **CLI**                          | 20 команд, включно з `power doctor` для read-only діагностики runtime/index, `power cache` для гігієни namespace, `power import` для preflighted Markdown migration, `power memory` для явного proposal/approval та `power handoff` для durable cross-agent work packets                                                                                                                                                                                                                                                                                           |
+| **CLI**                          | 24 команди, включно з `power doctor` для read-only діагностики runtime/index, `power connect` для conflict-safe local MCP setup, `power cache` для гігієни namespace, `power import` для preflighted Markdown migration, `power memory` для явного proposal/approval та `power handoff` для durable cross-agent work packets                                                                                                                                                                                                                                                                                           |
 | **MCP Server**                   | 20 інструментів, включно з керованими операціями memory context, proposal, apply, validation, history та `handoff_work`                                                                                                                                                                                                                                                                                                                                                                              |
 | **OKF Validation**               | Pydantic v2 схеми забезпечують строгі OKF-метадані на кожній нотатці з governance-полями (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                               |
 | **Knowledge Graph (Graph RAG)**  | Поле `related` в OKF frontmatter з підтримкою `TypedRelation` (path, relation, confidence), BFS обходом та експортом підграфів у Mermaid-діаграми (`to_mermaid`)                                                                                                                                                                                                                                                                                                                     |
 | **Freshness Monitoring**         | Лінтер виявляє застарілі нотатки за полем `expiry`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **Agent Auto-Ingest**            | `synthesize_session` — агенти автономно створюють нотатки з governance + graph links + перебудовою індексу                                                                                                                                                                                                                                                                                                                                                                           |
-| **Режими retrieval**             | Доступні FTS5 (BM25), local TF vector, Hybrid (RRF), Semantic та **Reranked** режими. Default POWER 3.2 потребує сумісний dense index і завершується fail-closed з remediation `power sync`, якщо assets відсутні або несумісні. Semantic ranking застосовує 5% confidence-bound lexical tie-break без додавання кандидатів; явно дозволений FTS downgrade позначається в result contract. Якісні та ресурсні показники потребують versioned evidence перед будь-яким release claim. |
+| **Режими retrieval**             | Доступні `auto` (verified dense, якщо готовий, інакше labelled FTS), FTS5 (BM25), local TF vector, Hybrid (RRF), explicit Semantic та **Reranked** режими. Explicit dense modes завершуються fail-closed з remediation `power sync`, якщо assets відсутні або несумісні; auto повертає actual mode і fallback reason. Якісні та ресурсні показники потребують versioned evidence перед будь-яким release claim. |
 | **Cross-Encoder реранкер**       | Канонічний BGE-реранкер — Apache-2.0 ONNX snapshot із SHA-256-перевірками. Локальний `jinaai/jina-reranker-v2-base-multilingual` має CC-BY-NC-4.0 і потребує `POWER_RERANKER=jina` та `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` для дозволеного non-commercial використання.                                                                                                                                                                                                              |
 | **Graph RAG v2**                 | Фаза 3 suggester зв'язків: явні OKF `related` посилання дають сильний куратований сигнал, злитий з перетином ключових слів/тегів у **зважений двонаправлений граф подібності** зі зваженим BFS та центральністю за ступенем/вагою (`power suggest-related --v2`). Лише впевнені передбачення, без вигаданих зв'язків.                                                                                                                                                                |
 | **ColBERT Opt-In реранкер**      | Фаза 3 `POWER_RERANKER=colbert` вмикає late-interaction ColBERT реранкинг (потрібно ≥16 GB RAM, інакше пропускається); **вимкнено за замовчуванням**. Канонічний fallback — ліцензійно чистий BGE ONNX реранкер; Jina доступна лише через явний non-commercial opt-in.                                                                                                                                                                                                               |
@@ -144,7 +145,7 @@ rollback і uninstall.
 
 Історичний v1.6.0 snapshot переходу від flat до hierarchical index. Його vault
 counts, token estimates, source paths, test counts і MCP inventory є
-historical evidence, а не поточним контрактом `v3.4.5`:
+historical evidence, а не поточним контрактом `v3.5.0`:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — детальний технічний звіт з метриками
@@ -188,7 +189,7 @@ domains:
           - keywords: [paper, experiment]
             weight: 2
           - tags: [science]
-      search_priority: [semantic, fts]
+      search_priority: [fts, semantic]
 ```
 
 Domain path має залишатися під cataloged canonical folder, як у прикладі.
@@ -197,7 +198,8 @@ Domain path має залишатися під cataloged canonical folder, як 
 `power search ... --mode auto --domain research` дотримується пріоритету домену
 й обмежує кандидатів його шляхом. Реєстр приймає лише реалізовані режими POWER;
 непідтримувані провайдери на кшталт Qdrant відхиляються, а не рекламуються як
-доступні. Без реєстру залишаються старе розміщення P.A.R.A. та default semantic.
+доступні. Без реєстру залишається старе розміщення P.A.R.A.; default `auto`
+використовує verified dense лише коли runtime готовий, інакше повертає labelled FTS.
 
 ## Для кого це
 
@@ -211,19 +213,26 @@ Domain path має залишатися під cataloged canonical folder, як 
 power init <path>              Створити новий vault зі структурою P.A.R.A.
 power lint <path>              Сканування на биті посилання, відсутні метадані, сиріт
 power index <path>             Згенерувати ієрархічний індекс (index.md + _index.md)
+power cache list|prune <path>  Переглянути або явно очистити rebuildable cache namespace
+power doctor [path]            Read-only діагностика runtime та індексу
+power connect [path]           План/застосування conflict-safe local MCP setup
 power search <path> <query>    Повнотекстовий пошук з релевантним ранжуванням
 power ingest <path> [опції]    Створити нову нотатку з валідованими OKF метаданими
 power import <dir> --into FOLDER [опції]
                                 Перевірити/імпортувати наявне Markdown-дерево
 power memory <операція>        Керований memory context, proposal, apply, validation та history
+power handoff <операція>       Durable cross-agent work packets і proof-carrying resume
 power sync <path>              Побудувати FTS і dense-індекси пошуку
 power rot <path>               ROT Audit — виявити дублікати, застарілі, тривіальні
 power status [path]            Показати інформаційну панель стану vault (статистика та здоров'я)
+power control-plane <path>     Preview/materialize content-free control cockpit
+power maintenance <path>      Preview або explicit apply hash-bound maintenance
+power migrate-state <path>    Переглянути source/control/runtime/evidence state без запису
 power heal <path>              Автоматично виправити відсутній/невалідний frontmatter
 power markdown-check <path>    Перевірити якість Markdown
 power archive <path>           Автоматично архівувати застарілі нотатки в 04_Archive/
 power suggest-related <path>   Запропонувати Graph RAG зв'язки між нотатками
-power cron <path>              Автоматичне обслуговування (lint + index + rot)
+power cron <path>              Read-only maintenance плюс rebuildable index projection
 power synthesize <path>        Автоматично додати нотатку з підсумком сесії
 power rename <path> --old OLD --new NEW   Перейменувати нотатку й оновити пов'язані шляхи
 ```
@@ -251,8 +260,11 @@ power search ~/my-vault "experiment" --mode auto --domain research
 канонічні конфігурації для Claude Desktop/Code, Gemini CLI, Codex і OpenCode,
 а також read-only golden task та workflow схвалення.
 
+URL wheel нижче є контрактом після публікації; він не стверджує, що candidate
+вже опублікований.
+
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -317,7 +329,9 @@ AI-агенти читають vault ефективно за цим алгори
 1. **Прочитати `index.md`** — визначити релевантну категорію за кількістю нотаток
 2. **Викликати MCP `read_sub_index`** — отримати детальні записи для категорії
 3. **Читати конкретні нотатки** — тільки коли під-індекс вказує на релевантність
-4. **НІКОЛИ не glob усі `.md` файли** — використовуйте під-індекси як карту (~75% економії токенів)
+4. **НІКОЛИ не glob усі `.md` файли** — використовуйте під-індекси як карту;
+   історичний звіт v1.6 містить сценарні вимірювання, а не поточну гарантію
+   релізу
 
 Кожна нотатка починається з валідованого YAML frontmatter. Обов'язкові поля + опціональні governance та графові зв'язки:
 
@@ -346,7 +360,7 @@ related:
 Фреймворк поєднує чотири комплементарні методології:
 
 - **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — організовує файли за рівнем їх активності на Projects (Проєкти), Areas (Сфери відповідальності), Resources (Ресурси) та Archives (Архіви). P.O.W.E.R. використовує цю структуру каталогів для визначення життєвого циклу нотаток. Інформація природним чином перетікає від швидких записів в Inbox до активних проєктів, довгострокових довідників та, зрештою, архівів.
-- **W** — **LLM-Wiki** (філософія A. Karpathy) — перетворює базу знань на ієрархічний каталог, зрозумілий для штучного інтелекту. Завдяки генерації загального навігаційного файлу `index.md` та локальних підкаталогів `_index.md` у кожній папці, система забезпечує токен-ефективну навігацію, яка скорочує використання контексту ШІ-агентами на 75-94%.
+- **W** — **LLM-Wiki** (філософія A. Karpathy) — перетворює базу знань на ієрархічний каталог, зрозумілий для штучного інтелекту. Завдяки генерації загального навігаційного файлу `index.md` та локальних підкаталогів `_index.md` у кожній папці, система забезпечує токен-ефективну навігацію. Історичні вимірювання v1.6 збережено у звіті міграції; вони не є поточною release-quality гарантією.
 - **E.R.** — **Execution Rules** (Правила Виконання) — впроваджує операційні інструкції та правила безпечної поведінки, розроблені спеціально для ШІ-агентів (наприклад, `RULES.md`, `PROMPTS.md` та системні гайди), що встановлюють безпечні межі для автономного редагування. GPG-підписані коміти, PR-only workflow, cron-based sync, очищення гілок.
 
 ### 🧠 Взаємозв'язок та співпраця: Другий мозок vs P.O.W.E.R. Framework
@@ -481,18 +495,18 @@ flowchart TD
 | `core/indexer.py`                         | Сканування vault та генерація ієрархічного індексу                                                                                                                                                                                                     |
 | `core/linter.py`                          | Перевірки: биті посилання, відсутні метадані, сироти, застарілі нотатки                                                                                                                                                                                |
 | `core/searcher.py`                        | Повнотекстовий пошук (FTS5/Vector/Hybrid/Reranked); WAL mode + `busy_timeout` для паралельного доступу                                                                                                                                                 |
-| `core/embeddings.py`                      | Підключний менеджер dense-ембеддінгів: **BGE-M3 (за замовчуванням, 1024d, прямий ONNX Runtime — `BGEM3OnnxManager`)** / Qwen3-0.6B / MiniLM-L12-v2 (light) через `POWER_EMBED_PROVIDER`, lazy init, приборкана BFCArena, adaptive batch halving на OOM |
-| `core/reranker.py`                        | Cross-Encoder реранкер: **`onnx-community/bge-reranker-v2-m3-ONNX`** (за замовчуванням) / Jina v2 (явний non-commercial opt-in) / `Qwen3-Reranker-0.6B-ONNX` (provider=qwen3)                                                                          |
+| `experimental/embeddings.py`              | Опційний менеджер dense-ембеддінгів: **BGE-M3 (за замовчуванням, 1024d, прямий ONNX Runtime — `BGEM3OnnxManager`)** / Qwen3-0.6B / MiniLM-L12-v2 (light) через `POWER_EMBED_PROVIDER`, завантажується лише для dense-шляху |
+| `experimental/reranker.py`                 | Опційний Cross-Encoder реранкер: **`onnx-community/bge-reranker-v2-m3-ONNX`** (за замовчуванням) / Jina v2 (явний non-commercial opt-in) / `Qwen3-Reranker-0.6B-ONNX` (provider=qwen3) |
 | `core/metrics/discounted_lexical_gain.py` | Legacy normalised discounted lexical proxy; `udcg.py` — deprecated compatibility alias, не EACL-2026 UDCG                                                                                                                                              |
-| `core/query_expansion.py`                 | Словник синонімів (EN/UK) та розширення запитів Multi-Query через OpenRouter                                                                                                                                                                           |
+| `experimental/query_expansion.py`         | Опційний словник синонімів (EN/UK) та розширення запитів Multi-Query через OpenRouter                                                                                                                                                |
 | `core/chunker.py`                         | Семантичне та контекстне розбиття нотаток на чанки (патерн Contextual Retrieval)                                                                                                                                                                       |
 | `core/healer.py`                          | Автовиправлення відсутніх/невалідних полів frontmatter                                                                                                                                                                                                 |
-| `core/relations.py`                       | Побудова KnowledgeGraph, BFS обхід зв'язків та експорт у Mermaid                                                                                                                                                                                       |
-| `core/rot_scoring.py`                     | A2 scoring: семантична дедублікація, freshness, лінт суперечностей                                                                                                                                                                                     |
+| `experimental/relations.py`               | Опційна побудова KnowledgeGraph, BFS обхід зв'язків та експорт у Mermaid                                                                                                                                                |
+| `experimental/rot_scoring.py`             | Опційний A2 scoring: семантична дедублікація, freshness, лінт суперечностей                                                                                                                                          |
 | `core/markdown_checks.py`                 | Перевірки якості Markdown: trailing whitespace, списки, заголовки                                                                                                                                                                                      |
 | `core/constants.py`                       | Централізовані списки виключень та системні константи                                                                                                                                                                                                  |
 | `core/utils.py`                           | Захист від path traversal, атомарний запис, бекапи, rate limiter                                                                                                                                                                                       |
-| `core/cli.py`                             | Командний рядок із 20 командами, включно з read-only doctor diagnostics, cache hygiene, preflighted import, transactional memory і durable handoff workflows                                                                                                                               |
+| `core/cli.py`                             | Командний рядок із 24 командами, включно з read-only doctor diagnostics, conflict-safe MCP connection plans, cache hygiene, preflighted import, transactional memory і durable handoff workflows                                                                                                                               |
 | `mcp/power_server.py`                     | FastMCP 3.x сервер із 20 async tools, loopback HTTP transport та `/health`                                                                                                                                                                             |
 
 Всі компоненти використовують `power_framework.core` як єдине джерело правди.
@@ -522,7 +536,7 @@ mypy src/power_framework/
 
 Для актуальної відтворюваної інформації про реліз і evidence:
 
-- [Нотатки релізу P.O.W.E.R. 3.4.5](docs/release-3.4.5.md) — поточний технічний scope,
+- [Нотатки релізу P.O.W.E.R. 3.5.0](docs/release-3.5.0.md) — candidate scope,
   межі валідації та інструкції оновлення.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) —
   canonical checksum-verified post-merge WS full-sync evidence; розширена
@@ -567,7 +581,7 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux, macOS, Windows",
+  "operatingSystem": "Linux (v3.5.0 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
   "softwareVersion": "latest",
@@ -599,8 +613,8 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux, macOS, Windows
-softwareVersion: 3.4.5
+operatingSystem: Linux (v3.5.0 release boundary)
+softwareVersion: 3.5.0
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

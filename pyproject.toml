@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "3.4.5"
+version = "3.5.0"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -26,20 +26,6 @@ classifiers = [
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
 dependencies = [
-    # POWER 3.0 canonical embedding stack: BGE-M3 (1024d) via DIRECT
-    # onnxruntime + tokenizers. This deliberately does NOT go through fastembed,
-    # whose custom-model registry (0.6.x-0.8.x) cannot resolve BGE-M3's ONNX
-    # external-data files ("External data path does not exist") and repeatedly
-    # broke the embedder across 15 releases. onnxruntime loads the co-located
-    # model.onnx + model.onnx.data cleanly with a tamed BFCArena.
-    "onnxruntime>=1.17.0",
-    "tokenizers>=0.15.0",
-    "huggingface-hub>=0.20.0",
-    # fastembed retained ONLY for the cross-encoder reranker and the light
-    # opt-in fallback path; it is no longer the canonical dense backend.
-    "fastembed>=0.5.0,<1.0.0",
-    "fastmcp>=3.2,<4.0",
-    "numpy>=1.24.0",
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
     "pathspec>=0.12.0",
@@ -61,6 +47,9 @@ dev = [
     "types-PyYAML>=6.0.0",
     "pre-commit>=4.0.0",
     "pip-audit>=2.7.0",
+    "fastmcp>=3.2,<4.0",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.7.0",
 ]
 
 [project.optional-dependencies]
@@ -75,9 +64,39 @@ dev = [
     "types-PyYAML>=6.0.0",
     "pre-commit>=4.0.0",
     "pip-audit>=2.7.0",
+    "fastmcp>=3.2,<4.0",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.7.0",
 ]
-# Qwen3 ONNX backend (1024d, no PyTorch). Optional so minimal installs and
-# CI on small runners keep the light fastembed/MiniLM path available.
+# Optional profiles are explicit so the base install remains FTS-only and does
+# not pull a model runtime, tokenizer, numerical stack, or MCP transport.
+semantic = [
+    "onnxruntime>=1.17.0",
+    "tokenizers>=0.15.0",
+    "huggingface-hub>=0.20.0",
+    "numpy>=1.24.0",
+]
+rerank = [
+    "onnxruntime>=1.17.0",
+    "tokenizers>=0.15.0",
+    "huggingface-hub>=0.20.0",
+    "numpy>=1.24.0",
+    "fastembed>=0.5.0,<1.0.0",
+]
+gpu = [
+    "onnxruntime-gpu>=1.17.0",
+    "tokenizers>=0.15.0",
+    "huggingface-hub>=0.20.0",
+    "numpy>=1.24.0",
+]
+fleet = []
+bench = []
+remote = [
+    "fastmcp>=3.2,<4.0",
+]
+experimental = [
+    "qwen3-embed>=1.12.0",
+]
 qwen3 = [
     "qwen3-embed>=1.12.0",
 ]
@@ -143,7 +162,7 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = [
     "power_framework.core.markdown_checks",
-    "power_framework.core.rot_scoring",
+    "power_framework.experimental.rot_scoring",
     "power_framework.core.healer",
     "power_framework.core.indexer",
     "power_framework.core.parser",
@@ -152,9 +171,9 @@ disable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]
 module = [
-    "power_framework.core.embeddings",
+    "power_framework.experimental.embeddings",
     "power_framework.core.searcher",
-    "power_framework.core.reranker",
+    "power_framework.experimental.reranker",
 ]
 disable_error_code = [
     "import-not-found",

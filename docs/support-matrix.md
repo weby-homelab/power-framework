@@ -1,6 +1,6 @@
 # P.O.W.E.R. platform support matrix
 
-This matrix is the operational boundary for the current `v3.4.5` contract. It
+This matrix is the operational boundary for the current `v3.5.0` candidate contract. It
 separates automated lifecycle coverage from model-backed, physical-host, GPU,
 and retrieval-quality evidence. A green CI job does not certify a different
 host, provider, corpus, or performance envelope.
@@ -10,9 +10,9 @@ host, provider, corpus, or performance envelope.
 | Platform / environment | Tested now | Conditional | Not certified by this matrix |
 | --- | --- | --- | --- |
 | Linux, Python 3.11–3.14 | Ubuntu CI runs the full test suite, Ruff, MyPy, documentation and release-contract gates; package smoke runs wheel/sdist outside the checkout. | Dense, reranked, and provider-backed workflows require a local model cache and an actually bound provider. | Real-vault dense latency, GPU benefit, ANN recall, and reranker quality. |
-| macOS, Python 3.13 | `macos-latest` smoke covers import, init, ingest, strict index, lint, markdown-check, strict FTS sync, and FTS search with offline model settings. | Model-backed dense search requires a locally available model and a verified runtime provider. | Physical Mac hardware performance, GPU acceleration, dense real-vault evidence, and reranker quality. |
-| Hosted Windows CI, Python 3.13 | `windows-latest` smoke covers import, init, ingest, strict index, lint, markdown-check, strict FTS sync, FTS search, and CPU provider selection. | The Windows 11 guide must be followed for a physical installation; provider choice is accepted only after session readback. | Physical Windows 11 25H2 GPU performance, CUDA DLL availability on a user's machine, dense real-vault evidence, and quality claims. |
-| Physical Windows 11 25H2 | The dedicated [Windows installation guide](windows-11-installation.md) and its validation receipts define the supported installation procedure and host-specific checks. | Exact Python, release artifact, OS build, model cache, ONNX provider, and hardware must be recorded in the receipt. | Hosted CI is not a physical Windows 11 certification; no GPU or latency claim is inferred without a fresh host receipt. |
+| macOS, Python 3.13 | Deferred for `v3.5.0`; no macOS CI or release upgrade evidence is claimed. | Revisit in a later release with a named runner and fresh receipts. | All macOS compatibility, performance, GPU, dense real-vault, and reranker claims. |
+| Hosted Windows CI, Python 3.13 | Deferred for `v3.5.0`; no Windows CI or release upgrade evidence is claimed. | Revisit in a later release with a named runner and fresh receipts. | All hosted Windows lifecycle, provider, performance, GPU, dense real-vault, and quality claims. |
+| Physical Windows 11 25H2 | Deferred for `v3.5.0`; the installation guide is not a release certification. | Revisit in a later release with exact host and artifact receipts. | Physical Windows compatibility, GPU performance, CUDA availability, and latency claims. |
 
 ## Evidence rules for agents
 
@@ -29,8 +29,8 @@ host, provider, corpus, or performance envelope.
 
 ## Source of truth
 
-The executable checks live in [CI](../.github/workflows/ci.yml), the release
-workflow is [release.yml](../.github/workflows/release.yml), and the physical
-Windows procedure is [windows-11-installation.md](windows-11-installation.md).
+The executable checks live in [CI](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/ci.yml), the release
+workflow is [release.yml](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/release.yml). Windows procedures are deferred from
+`v3.5.0` and remain future documentation only.
 The roadmap records evidence boundaries and pending gates in
 [`ROADMAP_POWER.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md).

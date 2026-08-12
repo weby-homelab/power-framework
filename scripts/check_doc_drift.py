@@ -23,7 +23,7 @@ Checks:
       carry the workflow markers and relative links, while the referenced
       files (references/agent-workflow.md, references/runtime-contract.md) carry
       the versioned facts checked against the capability manifest. Every
-      existing global OpenCode skill copy under ~/.opencode and
+      existing global agent skill copy under ~/.agents, ~/.opencode and
       ~/.config/opencode is audited unless POWER_GLOBAL_SKILL_PATH is set.
     onboarding — install/migration guides must use the current safe contract
     clients    — all documented MCP client shapes must use the same stdio/vault contract
@@ -253,6 +253,17 @@ def check_retrieval_registry(documents: dict[str, str], facts: dict[str, Any]) -
             for claim in claims
             if claim in documents[label]
         )
+
+    historical_token_claims = {
+        "README": ("~75% token savings", "75% to 94%"),
+        "README.ua": ("~75% економії токенів", "на 75-94%"),
+    }
+    for label, claims in historical_token_claims.items():
+        errors.extend(
+            f"{label} contains an unscoped historical token-saving claim: {claim!r}."
+            for claim in claims
+            if claim in documents[label]
+        )
     return errors
 
 
@@ -441,11 +452,12 @@ _FORBIDDEN_SKILL_PATTERNS: dict[str, str] = {
 
 
 def _discover_global_skill_roots() -> list[Path]:
-    """Locate global OpenCode skill copies to audit.
+    """Locate global agent skill copies to audit.
 
     When `POWER_GLOBAL_SKILL_PATH` is explicitly set it is the only audited
-    location. Otherwise every existing OpenCode global skills directory is
-    checked: `~/.opencode/skills/power` and `~/.config/opencode/skills/power`.
+    location. Otherwise every existing global skills directory is checked:
+    `~/.agents/skills/power`, `~/.opencode/skills/power` and
+    `~/.config/opencode/skills/power`.
     """
     explicit = os.getenv("POWER_GLOBAL_SKILL_PATH")
     if explicit:
@@ -460,6 +472,7 @@ def _discover_global_skill_roots() -> list[Path]:
     return [
         root
         for root in (
+            home / ".agents" / "skills" / "power",
             home / ".opencode" / "skills" / "power",
             home / ".config" / "opencode" / "skills" / "power",
         )
@@ -484,6 +497,13 @@ def _check_skill_body(label: str, body: str, facts: dict[str, Any]) -> list[str]
     for pattern, description in _FORBIDDEN_SKILL_PATTERNS.items():
         if re.search(pattern, body):
             errors.append(f"{prefix} contains a forbidden {description}.")
+    required_fields = ("type", "title", "description", "timestamp")
+    if not all(f"`{field}`" in body for field in required_fields):
+        errors.append(
+            f"{prefix} does not declare the executable OKF required fields: "
+            + ", ".join(required_fields)
+            + "."
+        )
     return errors
 
 

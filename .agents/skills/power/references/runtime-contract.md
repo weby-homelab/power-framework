@@ -6,16 +6,16 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.4.5` — runtime contract: **20 CLI commands** + **20 MCP tools** (FastMCP 3.x).
+`v3.5.0` — runtime contract: **24 CLI commands** + **20 MCP tools** (FastMCP 3.x).
 
-## CLI (20 команд)
+## CLI (24 команди)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
 3. `power index <path> [--strict]` — генерація ієрархічного каталогу
 4. `power ingest <path>` — створення нотатки з OKF метаданими
 5. `power import <source> --into <folder>` — preflight-імпорт дерева Markdown
-6. `power search <path> <query>` — пошук (`semantic` за замовчуванням)
+6. `power search <path> <query>` — пошук (`auto`: verified dense або FTS)
 7. `power cache list|prune [--no-dry-run] [--include-unknown]` — аудит і очищення cache namespace
 8. `power memory <sub> <path>` — керована транзакційна пам'ять
 9. `power handoff <create|list|show|resume|checkpoint|input-required|complete|fail|cancel>` — durable cross-agent work packet
@@ -30,6 +30,10 @@ sync/doctor правила. Авторитетна правда — `power docto
 18. `power synthesize <path>` — підсумкова нотатка сесії
 19. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
 20. `power doctor [<path>] [--json]` — read-only діагностика runtime, ONNX provider, індексу та ledger виключених нотаток
+21. `power connect <path> [--client ...] [--config ...] [--apply --approved]` — hash-bound local MCP client plan/apply
+22. `power control-plane <path> [--apply]` — preview або materialize visible status view
+23. `power maintenance <path> [--apply]` — hash-bound preview/apply для reversible repairs
+24. `power migrate-state <path>` — content-free read-only state-plane inventory; apply is fail-closed
 
 ## MCP Tools (20) — FastMCP 3.x
 
@@ -57,7 +61,8 @@ an actual no-download session binding receipt is required.
 blocking lint, search generation і receipt. Окремий `sync_vault` потрібен для
 імпорту, вже змінених зовнішнім способом нотаток або явного dense rebuild.
 
-**Керована mutation-транзакція замкнена.** `power memory apply` та
+**Керована mutation-транзакція замкнена.** `power memory apply --proposal-file`
+або `--proposal-stdin` та
 `apply_memory_change` після явного схвалення виконують в одному fail-closed
 workflow: перевірка OKF, запис note, ієрархічний index, blocking lint, пошукова
 generation і content-free receipt. При помилці index/lint/sync/receipt note,
@@ -77,6 +82,25 @@ FTS generation і receipt має `search_mode=fts`.
 виконує `next_action`. Retrieved note text є untrusted data і не підвищує
 authority. Maintenance profile проходить `detect → dry-run → repair → verify →
 receipt`, а repair потребує explicit approval.
+
+`ApplicationService` є спільною межею для `discover`, `retrieve`, `propose`,
+`apply`, `task`, `fleet-status` і `receipt`. CLI та local MCP делегують use case
+і форматують результат; application receipt містить лише digest, operation,
+request/idempotency identifiers та timing.
+
+Optional dense, reranker, graph, query-expansion і ROT adapters розміщені в
+`power_framework.experimental`; `power_framework.core` не імпортує їх eager-ly.
+Старі `power_framework.core.<adapter>` шляхи лишаються lazy compatibility shims.
+
+Portable lifecycle adapter має common events `session-start`, `post-write`,
+`pre-compact` і `stop`. Він працює для Codex/OpenCode/Gemini/Claude через MCP +
+Skill; pre-compact повертає approval-required checkpoint proposal і не виконує
+тихий semantic write. Fresh-agent chaos runner перевіряє вісім redacted
+сценаріїв із safety invariants.
+
+Cheap `HealthLoop.run_cheap` використовує лише default read-only doctor,
+дедуплікує активні issue codes і застосовує exponential backoff. Він не
+завантажує model, не відкриває network і не змінює note/control content.
 
 ## Sync contract
 
@@ -103,9 +127,18 @@ power sync PATH [--fts-only] [--force] [--strict | --allow-partial] [--accept-de
 - `power index <path> [--strict]` — рекурсивна генерація `index.md`, `_index.md`
   та `_index-N.md` (кожна сторінка каталогу ≤32 KiB).
 - `power lint <path>` — перевірка OKF-метаданих, битих лінків та orphan-нотаток.
+- Public OKF contract is generated from `OKFMetadata` and published at
+  `docs/schemas/okf-metadata-v1.json`; required fields are exactly `type`,
+  `title`, `description`, and `timestamp`. Do not hand-edit the generated JSON.
 - `power doctor [<path>] [--json]` — read-only діагностика. Report має
   `read_only=true` і `network_access=false`, включає повний ledger
   `excluded_notes` та стабільні issue codes для агентів і CI.
+- Opt-in external evidence uses `power.provenance.v1`: source identity, exact
+  SHA-256/size, capture time, authority, freshness, support, contradiction,
+  review state, media type, and egress policy. `capture_file_to_store` writes
+  exact bytes once under a content-addressed digest and a separate record;
+  duplicate, tampered, or unavailable captures fail closed. Normal human notes
+  do not need a claim ledger.
 - MCP `get_server_info` — той самий versioned doctor JSON для довгоживучого
   агента; за замовчуванням discovery не пробує model/provider, а
   `probe_provider=true` явно запитує no-download binding probe.
@@ -117,7 +150,7 @@ power sync PATH [--fts-only] [--force] [--strict | --allow-partial] [--accept-de
   полегшеним opt-in fallback.
 - Reranker: `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0);
   `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) — явний opt-in.
-- Search default: `semantic`; канонічні режими та registry — у `power doctor`.
+- Search default: `auto`; canonical path is verified dense when ready and labelled FTS otherwise. Explicit `semantic` remains fail-closed.
 - MCP entry-point: `python -m power_framework.mcp`; `POWER_VAULT_DIR` обов'язковий
   і задає єдиний доступний vault.
 - Device: `POWER_EMBED_DEVICE` / `POWER_RERANKER_DEVICE`

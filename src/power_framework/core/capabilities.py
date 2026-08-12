@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import copy
+from functools import lru_cache
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
 from pathlib import Path
@@ -19,6 +21,7 @@ def _read_source(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+@lru_cache(maxsize=1)
 def _cli_commands() -> list[str]:
     """Read top-level argparse registrations without importing the CLI."""
     source = ast.parse(_read_source(_package_root() / "core" / "cli.py"))
@@ -52,6 +55,7 @@ def _literal_dict(node: ast.AST) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+@lru_cache(maxsize=1)
 def _mcp_tool_contracts() -> list[dict[str, Any]]:
     """Read FastMCP tool contracts without importing FastMCP or the server."""
     source = ast.parse(_read_source(_package_root() / "mcp" / "power_server.py"))
@@ -99,6 +103,7 @@ def _mcp_tools() -> list[str]:
     return [contract["name"] for contract in _mcp_tool_contracts()]
 
 
+@lru_cache(maxsize=1)
 def _environment_variables() -> list[str]:
     """Collect environment names read by the package's executable code."""
     package_root = _package_root()
@@ -142,12 +147,18 @@ def manifest() -> dict[str, Any]:
     The function intentionally performs no model loading, network access,
     vault identity creation, cache directory creation, or database access.
     """
-    from .embeddings import BGE_M3_ONNX_REPO, BGE_M3_ONNX_REVISION, EMBED_PROVIDER
-    from .reranker import (
+    from power_framework.experimental.embeddings import (
+        BGE_M3_ONNX_REPO,
+        BGE_M3_ONNX_REVISION,
+        EMBED_PROVIDER,
+    )
+    from power_framework.experimental.reranker import (
         BGE_RERANKER_ONNX_REPO,
         BGE_RERANKER_ONNX_REVISION,
         DEFAULT_RERANKER_MODEL,
     )
+
+    from .models import OKFMetadata
     from .searcher import (
         CANONICAL_SEARCH_MODES,
         DEFAULT_SEARCH_MODE,
@@ -174,13 +185,18 @@ def manifest() -> dict[str, Any]:
         "interfaces": {
             "cli_commands": _cli_commands(),
             "mcp_tools": _mcp_tools(),
-            "mcp_tool_contracts": _mcp_tool_contracts(),
+            "mcp_tool_contracts": copy.deepcopy(_mcp_tool_contracts()),
         },
         "search": {
             "default_mode": DEFAULT_SEARCH_MODE,
             "canonical_modes": sorted(CANONICAL_SEARCH_MODES),
             "aliases": dict(sorted(SEARCH_MODE_ALIASES.items())),
             "registry": registry,
+        },
+        "okf": {
+            "schema_version": "power.okf-metadata.v1",
+            "artifact": "docs/schemas/okf-metadata-v1.json",
+            "required_fields": list(OKFMetadata.model_json_schema()["required"]),
         },
         "models": {
             "embedder": EMBED_PROVIDER,
