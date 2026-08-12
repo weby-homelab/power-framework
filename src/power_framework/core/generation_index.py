@@ -18,6 +18,7 @@ from threading import RLock
 from .constants import is_catalog_filename
 from .db import _init_db
 from .ignore import should_skip
+from .index_sync import _sync_vault_to_db
 from .parser import read_file_content, validate_metadata
 from .vault_storage import (
     ensure_vault_identity,
@@ -882,8 +883,6 @@ def sync_vault_atomically(
     active_path = resolve_active_generation_path(root)
 
     try:
-        from .searcher import _sync_vault_to_db
-
         with closing(sqlite3.connect(staging_path, timeout=30)) as conn:
             if active_path is not None:
                 # Preserve the previous immutable index as the starting point

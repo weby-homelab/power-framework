@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from power_framework.core import searcher
+from power_framework.core import index_sync, searcher
 from power_framework.core.db import _init_db
 from power_framework.core.generation_index import (
     ActiveGeneration,
@@ -20,6 +20,7 @@ from power_framework.core.generation_index import (
     resolve_active_generation_path,
     sync_vault_atomically,
 )
+from power_framework.core.index_sync import _embedding_manifest_identity
 from power_framework.core.models import OKFMetadata
 from power_framework.core.searcher import (
     CANONICAL_SEARCH_MODES,
@@ -31,7 +32,6 @@ from power_framework.core.searcher import (
     _body_centered_text,
     _compute_tf_vector,
     _cosine_similarity,
-    _embedding_manifest_identity,
     _fts_search,
     _make_snippet,
     _matched_text,
@@ -164,6 +164,7 @@ def test_dense_matrix_cache_reuses_exact_rows_for_verified_generation(
 
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: FakeDenseManager())
     monkeypatch.setattr(searcher, "get_embedding_manager", lambda: FakeDenseManager())
     monkeypatch.setattr(
         searcher,
@@ -214,6 +215,7 @@ def test_dense_matrix_cache_rebuilds_after_generation_publication(
 
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: FakeDenseManager())
     monkeypatch.setattr(searcher, "get_embedding_manager", lambda: FakeDenseManager())
     monkeypatch.setattr(
         searcher,

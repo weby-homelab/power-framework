@@ -12,15 +12,15 @@ from __future__ import annotations
 import sqlite3
 from typing import TYPE_CHECKING
 
-from power_framework.core import searcher
+from power_framework.core import index_sync, searcher
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-# searcher imports get_embedding_manager directly, so patch it there.
+# The atomic sync implementation owns the lazy embedding-loader seam.
 def _patch_manager(monkeypatch, fake):
-    monkeypatch.setattr(searcher, "get_embedding_manager", lambda *a, **k: fake)
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda *a, **k: fake)
 
 
 def _make_vault(vault: Path, n: int = 12) -> None:

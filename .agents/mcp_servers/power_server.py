@@ -7,7 +7,6 @@ Version: 3.4.0
 Updated: 2026-08-05
 """
 
-import sys
 import os
 
 # Load .env from geminicli workspace
@@ -23,7 +22,7 @@ if os.path.isfile(_env_path):
                     os.environ[_k] = _v
 
 # Run the power_framework MCP server
-from power_framework.mcp import run  # type: ignore
+from power_framework.mcp import run  # type: ignore  # noqa: E402
 
 if __name__ == "__main__":
     run()

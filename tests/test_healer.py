@@ -6,17 +6,28 @@ from pathlib import Path, PureWindowsPath
 
 import pytest
 
-import power_framework.core.healer as healer_module
-from power_framework.core.cli import _cmd_heal
-from power_framework.core.healer import (
-    _extract_first_paragraph,
-    _infer_title_from_filename,
-    _report_path,
+from power_framework.core import (
     heal_frontmatter,
     heal_vault,
     heal_vault_report,
 )
+from power_framework.core import (
+    healer as healer_module,
+)
+from power_framework.core.cli import _cmd_heal
 from power_framework.core.parser import parse_frontmatter, validate_metadata
+
+
+def _extract_first_paragraph(content: str) -> str:
+    return healer_module._extract_first_paragraph(content)
+
+
+def _infer_title_from_filename(filename: Path) -> str:
+    return healer_module._infer_title_from_filename(filename)
+
+
+def _report_path(path: PureWindowsPath) -> str:
+    return healer_module._report_path(path)
 
 
 class TestInferTitleFromFilename:

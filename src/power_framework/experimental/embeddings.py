@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, cast
 from power_framework.core.egress import EgressOperation, is_remote_endpoint, require_remote_egress
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable
 
     from fastembed import TextEmbedding
 
@@ -298,7 +298,7 @@ def _get_embedding_dim(model_name: str) -> int:
 
             result = ollama.show(OLLAMA_EMBED_MODEL)
             mi = cast(
-                "Mapping[str, Any]",
+                "dict[str, Any]",
                 result.modelinfo if hasattr(result, "modelinfo") else result.get("model_info", {}),
             )
             if "general.embedding_dim" in mi:
@@ -352,7 +352,7 @@ class OllamaEmbeddingManager:
             try:
                 result = ollama.show(self.model_name)
                 mi = cast(
-                    "Mapping[str, Any]",
+                    "dict[str, Any]",
                     result.modelinfo
                     if hasattr(result, "modelinfo")
                     else result.get("model_info", {}),

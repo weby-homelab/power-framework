@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 from .application import ApplicationEnvelope, ApplicationService, AuditReceipt, RequestContext
 from .chunker import SemanticChunker
@@ -156,6 +157,30 @@ from .utils import (
     validate_vault_path,
 )
 from .write_queue import enqueue_write
+
+if TYPE_CHECKING:
+    from power_framework.experimental.embeddings import (  # noqa: N812
+        get_embedding_manager as EmbeddingManager,
+    )
+    from power_framework.experimental.query_expansion import QueryExpander
+    from power_framework.experimental.relations import (
+        KnowledgeGraph,
+        RelationSuggestion,
+        format_relation_suggestions,
+        suggest_related,
+        suggest_related_semantic,
+    )
+    from power_framework.experimental.reranker import RerankerManager
+    from power_framework.experimental.rot_scoring import (
+        TYPE_HALF_LIFE_DAYS,
+        ContentDedupDetector,
+        ContradictionDetector,
+        FreshnessScorer,
+        LinkRotChecker,
+        UsageTracker,
+    )
+
+    from .cli import main as cli_main
 
 _OPTIONAL_EXPORTS = {
     "cli_main": ("power_framework.core.cli", "main"),

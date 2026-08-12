@@ -12,7 +12,7 @@ import sqlite3
 from contextlib import closing
 from typing import TYPE_CHECKING
 
-from power_framework.core import cli, searcher
+from power_framework.core import cli, generation_index
 from power_framework.core.generation_index import resolve_active_generation_path
 
 if TYPE_CHECKING:
@@ -66,7 +66,7 @@ class TestVaultMutationBoundary:
         vault = _create_test_vault(tmp_path)
         _configure_sync_environment(monkeypatch, tmp_path)
         assert cli._cmd_sync(_sync_args(vault)) == 0
-        original_sync = searcher._sync_vault_to_db
+        original_sync = generation_index._sync_vault_to_db
         observed_read = False
 
         def sync_with_concurrent_reader(*args, **kwargs):
@@ -81,7 +81,7 @@ class TestVaultMutationBoundary:
             observed_read = True
             return original_sync(*args, **kwargs)
 
-        monkeypatch.setattr(searcher, "_sync_vault_to_db", sync_with_concurrent_reader)
+        monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_with_concurrent_reader)
 
         assert cli._cmd_sync(_sync_args(vault)) == 0
         assert observed_read

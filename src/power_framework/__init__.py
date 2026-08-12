@@ -9,6 +9,7 @@ Modules:
 from __future__ import annotations
 
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 from .core import ApplicationService, RequestContext
 from .core.healer import HealFailure, HealReport, heal_frontmatter, heal_vault, heal_vault_report
@@ -40,6 +41,10 @@ from .core.utils import (
     resolve_vault_path,
     validate_path_in_vault,
 )
+
+if TYPE_CHECKING:
+    from .core.cli import main as cli_main
+    from .experimental.relations import format_relation_suggestions, suggest_related
 
 __all__ = [
     "MAX_DESCRIPTION_LENGTH",

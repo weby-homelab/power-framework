@@ -78,6 +78,15 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
     ).stdout.strip()
     if head != expected_commit:
         pytest.skip(f"{tag_name} is not checked out; final baseline is tag-gate only")
+    worktree = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local refs.
+        [git_executable, "status", "--porcelain"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if worktree.stdout.strip():
+        pytest.skip(f"{tag_name} baseline requires a clean checkout; local worktree is dirty")
     output = tmp_path / "release-baseline.json"
     validation_report = _write_validation_report(tmp_path / "validation.json")
     sbom = tmp_path / "sbom.spdx.json"
