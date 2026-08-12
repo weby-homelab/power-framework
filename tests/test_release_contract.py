@@ -143,7 +143,19 @@ def test_release_notes_keep_governance_claims_within_evidence_boundary() -> None
     notes = RELEASE_NOTES.read_text(encoding="utf-8")
 
     assert "Zero open repository issues" not in notes
-    assert "not a published" in notes
+    assert "published `v3.5.0` release" in notes
+
+
+def test_windows_rollback_points_to_the_previous_stable_release() -> None:
+    for relative_path in (
+        "docs/windows-11-installation.md",
+        "docs/windows-11-installation.ua.md",
+    ):
+        guide = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+
+        assert "v3.4.5" in guide
+        assert ("releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl") in guide
+        assert "--force-reinstall $ReleaseWheel" not in guide
 
 
 def test_model_lock_version_must_match_project_version(tmp_path: Path) -> None:

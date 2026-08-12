@@ -4,11 +4,10 @@ This is the authoritative clean-install path for P.O.W.E.R. `v3.5.0`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
 
-> **Candidate boundary:** `v3.5.0` is not a published GitHub Release or tag in
-> the current worktree. The immutable wheel and pinned-tag commands below are
-> the post-publication contract and must not be run until the signed release
-> and remote readback gates pass. For the current candidate, use the checkout's
-> locked development environment from the repository's `CONTRIBUTING.md`.
+> **Published release:** `v3.5.0` is available as a signed tag and immutable
+> wheel on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> This guide uses that artifact. Check the [platform support matrix](support-matrix.md)
+> before applying the procedure to a non-Linux host.
 
 Windows 11 25H2 users should follow the complete
 [Windows installation guide](windows-11-installation.md), which uses exact
@@ -24,7 +23,7 @@ PowerShell paths and includes MCP acceptance checks.
 Use an isolated virtual environment. Avoid modifying an operating-system Python
 or relying on `--break-system-packages` for a normal installation.
 
-## 2. Install the versioned release (after publication)
+## 2. Install the versioned release
 
 On Linux or macOS:
 
@@ -144,12 +143,13 @@ can require substantial time, network traffic, disk space, and memory:
 
 ```bash
 "$POWER_CLI" sync "$POWER_VAULT"
-"$POWER_CLI" search "$POWER_VAULT" "clean installation"
+"$POWER_CLI" search "$POWER_VAULT" "clean installation" --mode semantic
 ```
 
 Do not claim semantic or reranked readiness unless both full sync and a search
-in the selected mode succeed on the target host. FTS remains available if the
-dense model gate fails.
+in the selected mode succeed on the target host. The explicit mode is important:
+the default `auto` profile may report a labelled FTS fallback. FTS remains
+available if the dense model gate fails.
 
 ## 7. Configure MCP for an AI agent
 

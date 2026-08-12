@@ -37,10 +37,11 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Windows-safe rename** — `power rename` uses `os.replace()` for the physical
   move, so renaming onto an existing destination works on Windows instead of
   raising `FileExistsError`
-- **Technical 3.4.5 release** — the machine-only M2–M5 gates, package and CI
-  provenance are verified; the release adds fail-closed doctor, migration,
-  cache, catalog, healer, and agent-contract safeguards. Human-quality
-  certification, sealed-holdout access, and production claims remain closed.
+- **P.O.W.E.R. 3.5.0 release** — the published wheel, source archive, SBOM,
+  upgrade matrix, and release receipts are verified. The release adds
+  fail-closed doctor, migration, cache, catalog, healer, and agent-contract
+  safeguards. Platform support remains bounded by the
+  [support matrix](docs/support-matrix.md).
 
 ## For AI Agents
 
@@ -68,11 +69,12 @@ The commands below are the shortest supported path for Ubuntu/Linux. They
 assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
-> **3.5.0 candidate boundary:** the signed `v3.5.0` GitHub Release and tag are
-> not published from this worktree yet. The immutable wheel URL below becomes
-> executable only after the release workflow's tag, artifact, and remote
-> readback gates pass. To run the current candidate locally, use the locked
-> development install in [CONTRIBUTING.md](CONTRIBUTING.md).
+> **Published `v3.5.0` release:** the signed tag, wheel, source archive, SBOM,
+> and release receipt are available from the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> Use the immutable wheel below for a reproducible installation. The release
+> receipt covers the declared Linux release boundary; check the
+> [support matrix](docs/support-matrix.md) before making platform or model
+> claims about another host.
 
 ```bash
 python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
@@ -103,9 +105,10 @@ power --version
 
 ## Windows 11 25H2 installation (deferred)
 
-Windows 11 25H2 is deferred from the `v3.5.0` release boundary. The dedicated
-[Windows 11 25H2 guide](docs/windows-11-installation.md) remains future
-documentation and is not a Stable release certification.
+Windows 11 25H2 remains outside the `v3.5.0` supported-platform boundary. The
+dedicated [Windows 11 25H2 guide](docs/windows-11-installation.md) describes a
+separate installation and host-validation path; it is not a Stable release
+platform certification.
 
 No Windows CI, upgrade-matrix, compatibility, performance, or GPU claim is
 made for `v3.5.0`.
@@ -126,7 +129,7 @@ made for `v3.5.0`.
 | **Markdown Checks**              | Detects trailing whitespace, inconsistent list markers, header jumps, missing code language — `power markdown-check <path>`                                                                                                                                                                                                                                                                                                                                                         |
 | **Relation Suggestions**         | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>`                                                                                                                                                                                                                                                                                                                                                                                            |
 | **Cron Maintenance**             | Runs lint + index + rot audit in one command — `power cron <path>`                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Retrieval modes**              | `auto` (verified dense when ready, otherwise labelled FTS), FTS5 (BM25), local TF vector, Hybrid (RRF), explicit Semantic and **Reranked** modes. Explicit dense modes fail closed with a `power sync` remediation message when assets are missing or incompatible; auto exposes the actual mode and fallback reason. Quality and resource figures require versioned evidence before any release claim. |
+| **Retrieval modes**              | `auto` (verified dense when ready, otherwise labelled FTS), FTS5 (BM25), local TF vector, Hybrid (RRF), explicit Semantic and **Reranked** modes. Explicit dense modes fail closed with a `power sync` remediation message when assets are missing or incompatible; auto exposes the actual mode and fallback reason. Quality and resource figures require versioned evidence before any host-independent claim. |
 | **Cross-Encoder Reranker**       | The default BGE reranker is an Apache-2.0 ONNX snapshot with SHA-256 checks. Local `jinaai/jina-reranker-v2-base-multilingual` is CC-BY-NC-4.0 and requires `POWER_RERANKER=jina` plus `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` for permitted non-commercial use.                                                                                                                                                                                                                       |
 | **Hierarchical Index**           | `index.md` (navigation map) + recursive per-folder catalogs for token-efficient AI reading. Each generated page uses explicit links, carries a POWER ownership marker, and stays within a 32 KiB UTF-8 budget via `_index-N.md` pagination.                                                                                                                                                                                                                 |
 | **Graph RAG v2**                 | Phase 3 relation suggester: explicit OKF `related` links contribute a strong curated signal, fused with keyword/tag overlap into a **weighted, bidirectional similarity graph** with weighted BFS and degree/weight centrality (`power suggest-related --v2`). Confident predictions only, no fabricated links.                                                                                                                                                                     |
@@ -136,12 +139,12 @@ made for `v3.5.0`.
 | **CI/CD**                        | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest.                                                                                                                                                                                                                                                                                                                  |
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
 
-> **POWER 3.4.5 evidence status:** the release contains the machine-only M2–M5
-> technical gates, package/CI provenance, and the Windows-safe `power rename`
-> overwrite fix with automated regression coverage. Historical feature-table
-> figures, model comparisons, resource limits and benchmark recommendations are
-> not current release evidence. Human-quality certification, sealed-holdout
-> access, and production-quality claims remain outside this release.
+> **POWER 3.5.0 evidence status:** the published release contains the machine
+> validation gates, package/CI provenance, SBOM, Ubuntu upgrade matrix, and
+> Phase 8 technical and human-evaluation receipts. These receipts apply to the
+> declared release scope. Historical feature-table figures, model comparisons,
+> resource limits, and benchmark recommendations do not become guarantees for
+> an arbitrary host or vault.
 
 ## Migration Report
 
@@ -265,8 +268,9 @@ The [MCP client onboarding guide](docs/mcp-client-onboarding.md) contains the
 canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
 OpenCode, plus the read-only golden task and approval workflow.
 
-The wheel URL below is the post-publication install contract; it is not a
-claim that the candidate has already been published.
+The wheel URL below is the published `v3.5.0` install artifact. Use the
+[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0)
+for the signed tag, source archive, SBOM, and release receipts.
 
 ```bash
 pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
@@ -541,7 +545,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.5.0 release notes](docs/release-3.5.0.md) — candidate contract and release gate
+- [P.O.W.E.R. 3.5.0 release notes](docs/release-3.5.0.md) — published release scope, evidence, and upgrade guidance
   scope, validation boundary, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is

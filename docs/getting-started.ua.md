@@ -4,11 +4,10 @@
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
-> **Межа candidate:** `v3.5.0` ще не є опублікованим GitHub Release або tag у
-> поточному worktree. Immutable wheel і pinned-tag команди нижче є контрактом
-> після публікації та не повинні запускатися до проходження signed release і
-> remote readback gates. Для поточного candidate використовуйте locked
-> development environment з root-файлу `CONTRIBUTING.md` репозиторію.
+> **Опублікований реліз:** `v3.5.0` доступний як signed tag та immutable wheel
+> на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> Цей гід використовує саме цей artifact. Перед установкою на не-Linux host
+> перевірте [матрицю підтримки платформ](support-matrix.ua.md).
 
 Користувачам Windows 11 25H2 потрібно виконати повний
 [Windows-гід](windows-11-installation.ua.md) з точними PowerShell-шляхами та
@@ -24,7 +23,7 @@ MCP acceptance checks.
 Використовуйте ізольований virtual environment. Для звичайного встановлення не
 змінюйте системний Python і не покладайтеся на `--break-system-packages`.
 
-## 2. Встановіть версіонований реліз (після публікації)
+## 2. Встановіть версіонований реліз
 
 На Linux або macOS:
 
@@ -145,11 +144,12 @@ power-vault/
 
 ```bash
 "$POWER_CLI" sync "$POWER_VAULT"
-"$POWER_CLI" search "$POWER_VAULT" "clean installation"
+"$POWER_CLI" search "$POWER_VAULT" "clean installation" --mode semantic
 ```
 
 Не заявляйте готовність semantic або reranked mode, доки full sync і пошук у
-вибраному mode не пройдуть на цільовому хості. FTS залишається доступним, якщо
+вибраному mode не пройдуть на цільовому хості. Явний mode важливий: профіль
+`auto` може повернути labelled FTS fallback. FTS залишається доступним, якщо
 dense model gate працює fail-closed.
 
 ## 7. Налаштуйте MCP для AI-агента

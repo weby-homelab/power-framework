@@ -1,6 +1,6 @@
 # Матриця підтримки платформ P.O.W.E.R.
 
-Ця матриця визначає операційні межі поточного candidate-контракту `v3.5.0`. Вона
+Ця матриця визначає операційні межі контракту опублікованого релізу `v3.5.0`. Вона
 відділяє автоматизоване покриття життєвого циклу від доказів для model-backed
 режимів, фізичних хостів, GPU та якості пошуку. Зелений CI не сертифікує інший
 хост, провайдер, корпус або envelope продуктивності.
@@ -9,7 +9,7 @@
 
 | Платформа / середовище | Перевірено зараз | Умовно підтримується | Ця матриця не сертифікує |
 | --- | --- | --- | --- |
-| Linux, Python 3.11–3.14 | Ubuntu CI запускає повний suite, Ruff, MyPy, documentation і release-contract gates; package smoke перевіряє wheel/sdist поза checkout. | Dense, reranked і provider-backed workflows потребують локального model cache та реально прив'язаного provider. | Latency на real vault, GPU benefit, ANN recall і якість reranker. |
+| Linux, Python 3.11–3.14 | Ubuntu CI запускає повний suite, Ruff, MyPy, documentation і release-contract gates; package smoke перевіряє wheel/sdist поза checkout. | Dense, reranked і provider-backed workflows потребують локального model cache та реально прив'язаного provider. | Host-independent latency, GPU benefit, ANN recall і якість reranker поза опублікованими release receipts. |
 | macOS, Python 3.13 | Відкладено для `v3.5.0`; macOS CI та release upgrade evidence не заявляються. | Повернутися в наступному release з названим runner і свіжими receipts. | Усі claims сумісності, продуктивності, GPU, dense real-vault і reranker для macOS. |
 | Hosted Windows CI, Python 3.13 | Відкладено для `v3.5.0`; Windows CI та release upgrade evidence не заявляються. | Повернутися в наступному release з названим runner і свіжими receipts. | Усі claims lifecycle, provider, performance, GPU, dense real-vault і quality для Windows. |
 | Фізичний Windows 11 25H2 | Відкладено для `v3.5.0`; installation guide не є release certification. | Повернутися в наступному release з точними host/artifact receipts. | Фізична сумісність Windows, GPU performance, CUDA availability і latency claims. |

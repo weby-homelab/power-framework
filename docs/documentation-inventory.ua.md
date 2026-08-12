@@ -1,6 +1,6 @@
 # Інвентаризація документації встановлення та міграції
 
-**Стан на:** 2026-08-09
+**Стан на:** 2026-08-12
 
 **Версія коду:** 3.5.0
 
@@ -33,25 +33,25 @@
 | Документ або посилання | Класифікація | Результат аудиту |
 | --- | --- | --- |
 | `CONTRIBUTING.md` | Поточний development workflow | Існує; не є інструкцією кінцевого користувача |
-| `docs/release-3.5.0.md` | Поточні release notes | Candidate contract; publish gate окремий |
+| `docs/release-3.5.0.md` | Поточні release notes | Опублікований release contract; receipt і remote readback перевірені |
 | `docs/hierarchical-index-migration*.md` | Звіт v1.6 | Позначено історичним; прибрано загальні `O(log n)` і руйнівну Git-пораду |
 | `docs/tests/P.O.W.E.R.3.2.1-TEST-2.md` | Історичний тестовий артефакт | Залишено з явною версією у назві |
 | `docs/tests/P.O.W.E.R.3.0.0-TEST.md` | Історичний search-quality звіт | Залишено з явною версією у назві |
 | Документаційний сайт | Опублікований рендер | URL відповідав під час аудиту |
-| Release wheel `v3.5.0` | Майбутній immutable install artifact | URL чинний лише після signed tag/readback |
+| Release wheel `v3.5.0` | Immutable install artifact | Опублікований wheel; signed tag/readback доступні на GitHub Release |
 | Python, Git, Microsoft, ONNX Runtime | Зовнішні prerequisites | Посилання ведуть на офіційні джерела |
 
 ## Усунений дрейф
 
 - Старий MCP-інвентар замінено на фактичні `20` інструментів; CLI
   задокументовано як `24` top-level команд.
-  топ-рівневих команд.
 - `reranked` більше не називається стандартним режимом: код використовує `semantic`,
   а reranking вмикається явно.
 - Видалено небезпечне оновлення через destructive reset, непереносний `/tmp`,
   `%USERPROFILE%` у PowerShell і запуск MCP через глобальний `py` замість точного
   інтерпретатора venv.
-- Встановлення прив'язано до release wheel `v3.5.0`, а не до рухомої гілки; публікація ще gated.
+- Встановлення прив'язано до опублікованого release wheel `v3.5.0`, а не до
+  рухомої гілки; tag, assets і release receipts перевірені через GitHub Release.
 - Міграція більше не обіцяє автоматичне розпізнавання довільних папок, переписування
   всіх посилань або відновлення тексту через LLM. Додано manifest/hash reconciliation,
   вкладення, неоднозначні посилання, rollback і заборону автоматичного cutover.

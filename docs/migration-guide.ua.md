@@ -3,7 +3,7 @@ type: Resource
 title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.5.0"
 description: "Fail-closed manifest-driven протокол міграції наявної Markdown-бази знань у перевірений P.O.W.E.R. vault без зміни джерела."
 tags: [power, migration, guide, ai-agents, safety, verification]
-timestamp: 2026-08-08T12:00:00+03:00
+timestamp: 2026-08-12T18:00:00+03:00
 ---
 
 # Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.5.0
@@ -16,6 +16,11 @@ rollback path.
 Для нового порожнього vault використовуйте
 [«Початок роботи»](getting-started.ua.md). Для runtime setup на Windows 11 25H2
 спочатку виконайте [Windows-гід](windows-11-installation.ua.md).
+
+Цей гід стосується опублікованого релізу `v3.5.0`. Обирайте гід чистої
+установки, коли destination порожній. Обирайте цей гід, коли потрібно зберегти
+будь-яку наявну нотатку, attachment або configuration. Ніколи не запускайте
+`power init` усередині наявної бази знань.
 
 ## Індекс інструкцій репозиторію
 
@@ -55,6 +60,9 @@ rollback path.
 - CLI `power ingest` створює нову нотатку, але не імпортує body наявної. Для
   bounded batch import використовуйте `power import`: це єдина команда, яка
   приймає source directory і формує preflight report.
+- `power import` сканує лише Markdown-файли. Він не копіює attachments,
+  configuration files або vendor databases; інвентаризуйте й копіюйте їх у
+  Фазі 2 та Фазі 4 з окремими hash-перевірками.
 - `power heal` виправляє missing/invalid frontmatter fields, але не класифікує
   довільні top-level folders, не ремонтує wikilinks і не викликає LLM.
 - `power rename` за замовчуванням працює як dry run і оновлює paths у metadata
@@ -65,7 +73,7 @@ rollback path.
 
 ## Версійовані executable facts
 
-Цей гід перевірено проти pinned candidate `v3.5.0`. CI звіряє ці факти з
+Цей гід перевірено проти contract опублікованого релізу `v3.5.0`. CI звіряє ці факти з
 executable capability manifest, щоб агент не успадковував старий migration
 recipe:
 
@@ -110,6 +118,11 @@ power search /absolute/path/to/vault "known phrase" --mode fts
 
 `--allow-partial` використовуйте лише коли названі exclusions прийнятні.
 Source залишається незмінним; destination collision ніколи не перезаписується.
+
+Цей fast path не є повною міграцією методології. Він зберігає source-relative
+Markdown tree під однією обраною canonical folder. Якщо нотаткам потрібні
+classification, filename mapping, link rewrites, обробка attachments або
+rollback record, використовуйте шестифазний протокол.
 
 ## Шестифазний протокол
 
@@ -260,19 +273,22 @@ manifest checksum і нуль unaccounted authorized files.
 
 ### 3.1 Встановіть і перевірте P.O.W.E.R.
 
-Використовуйте pinned `v3.5.0` environment із clean-install гіда:
+Використовуйте published `v3.5.0` environment із clean-install гіда:
 
 ```bash
-power --version
-python -c 'import power_framework; print("lean FTS import: OK")'
+POWER_PYTHON=/absolute/path/to/venv/bin/python
+POWER_CLI=/absolute/path/to/venv/bin/power
+"$POWER_CLI" --version
+"$POWER_PYTHON" -c 'import power_framework; print("lean FTS import: OK")'
 ```
 
-`python` має бути тим interpreter, якому належить executable `power`.
+`POWER_PYTHON` має бути тим interpreter, якому належить executable
+`POWER_CLI`. Використовуйте ці змінні в усіх наступних командах.
 
 ### 3.2 Ініціалізуйте порожній destination
 
 ```bash
-power init /absolute/path/to/destination
+"$POWER_CLI" init /absolute/path/to/destination
 ```
 
 Команда має завершитися з кодом `0`. Не копіюйте source files до цього кроку й
@@ -368,10 +384,10 @@ rewritten, ambiguous/blocked і remaining broken-link count.
 ### 5.1 Markdown і OKF gates
 
 ```bash
-power index /absolute/path/to/destination --strict
-power lint /absolute/path/to/destination
-power markdown-check /absolute/path/to/destination
-power status /absolute/path/to/destination
+"$POWER_CLI" index /absolute/path/to/destination --strict
+"$POWER_CLI" lint /absolute/path/to/destination
+"$POWER_CLI" markdown-check /absolute/path/to/destination
+"$POWER_CLI" status /absolute/path/to/destination
 ```
 
 Required result:
@@ -387,17 +403,17 @@ Required result:
 Спочатку доведіть FTS без model downloads:
 
 ```bash
-power sync /absolute/path/to/destination --fts-only
-power search /absolute/path/to/destination "known phrase" --mode fts
+"$POWER_CLI" sync /absolute/path/to/destination --fts-only
+"$POWER_CLI" search /absolute/path/to/destination "known phrase" --mode fts
 ```
 
 Використайте кілька known phrases із різних source categories і запишіть
 expected target paths. Лише за наявності ресурсів перевіряйте dense search:
 
 ```bash
-power sync /absolute/path/to/destination
-power search /absolute/path/to/destination "known concept" --mode semantic
-power search /absolute/path/to/destination "known concept" --mode reranked
+"$POWER_CLI" sync /absolute/path/to/destination
+"$POWER_CLI" search /absolute/path/to/destination "known concept" --mode semantic
+"$POWER_CLI" search /absolute/path/to/destination "known concept" --mode reranked
 ```
 
 Semantic/reranked readiness залишається pending, якщо model download,
@@ -467,9 +483,9 @@ Local vault не потребує remote repository. Якщо Git publication а
 Після structural changes:
 
 ```bash
-power index /absolute/path/to/destination --strict
-power lint /absolute/path/to/destination
-power markdown-check /absolute/path/to/destination
+"$POWER_CLI" index /absolute/path/to/destination --strict
+"$POWER_CLI" lint /absolute/path/to/destination
+"$POWER_CLI" markdown-check /absolute/path/to/destination
 ```
 
 Запускайте `power sync`, коли retrieval indexes треба оновити. Читайте

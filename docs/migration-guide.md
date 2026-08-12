@@ -3,7 +3,7 @@ type: Resource
 title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.5.0"
 description: "Fail-closed, manifest-driven protocol for migrating an existing Markdown knowledge base to a verified P.O.W.E.R. vault without modifying the source."
 tags: [power, migration, guide, ai-agents, safety, verification]
-timestamp: 2026-08-08T12:00:00+03:00
+timestamp: 2026-08-12T18:00:00+03:00
 ---
 
 # AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.5.0
@@ -16,6 +16,11 @@ and a rollback path.
 For a new empty vault, stop here and use [Getting Started](getting-started.md).
 For Windows 11 25H2 runtime setup, first use the
 [Windows installation guide](windows-11-installation.md).
+
+This guide targets the published `v3.5.0` release. Select the clean-install
+guide when the destination is empty. Select this guide when any existing note,
+attachment, or configuration must be preserved. Never run `power init` inside
+an existing knowledge base.
 
 ## Repository instruction index
 
@@ -55,6 +60,9 @@ An agent must read the relevant documents before changing data:
 - CLI `power ingest` creates a new note but does not import an existing note
   body. For a bounded batch import, use `power import`; it is the only command
   that accepts an explicit source directory and produces a preflight report.
+- `power import` scans Markdown files only. It does not copy attachments,
+  configuration files, or vendor databases; inventory and copy those items in
+  Phase 2 and Phase 4 with separate hashes.
 - `power heal` repairs missing/invalid frontmatter fields; it does not classify
   arbitrary top-level folders, repair wikilinks, or call an LLM.
 - `power rename` is dry-run by default and updates `related` metadata paths. It
@@ -65,7 +73,7 @@ manifest instead of pretending that one command performs a lossless migration.
 
 ## Version-stamped executable facts
 
-This guide is verified against the pinned `v3.5.0` candidate contract. CI checks these
+This guide is verified against the published `v3.5.0` release contract. CI checks these
 facts against the executable capability manifest so an agent does not inherit
 an older migration recipe:
 
@@ -111,6 +119,11 @@ power search /absolute/path/to/vault "known phrase" --mode fts
 
 Use `--allow-partial` only when the named exclusions are acceptable. The
 source remains unchanged; a conflicting destination is never overwritten.
+
+This fast path is not a complete methodology migration. It preserves the
+source-relative Markdown tree below one chosen canonical folder. Use the
+six-phase protocol when notes need classification, filename mapping, link
+rewrites, attachment handling, or a rollback record.
 
 ## Six-phase protocol
 
@@ -262,19 +275,22 @@ manifest checksum, and zero unaccounted authorized source files.
 
 ### 3.1 Install and preflight P.O.W.E.R.
 
-Use the pinned `v3.5.0` environment from Getting Started and verify:
+Use the published `v3.5.0` environment from Getting Started and verify:
 
 ```bash
-power --version
-python -c 'import power_framework; print("lean FTS import: OK")'
+POWER_PYTHON=/absolute/path/to/venv/bin/python
+POWER_CLI=/absolute/path/to/venv/bin/power
+"$POWER_CLI" --version
+"$POWER_PYTHON" -c 'import power_framework; print("lean FTS import: OK")'
 ```
 
-Use the interpreter that actually owns the `power` executable.
+`POWER_PYTHON` must be the interpreter that owns `POWER_CLI`. Use these
+variables in all following commands.
 
 ### 3.2 Initialize the empty destination
 
 ```bash
-power init /absolute/path/to/destination
+"$POWER_CLI" init /absolute/path/to/destination
 ```
 
 The command must exit `0`. Do not copy source files into the destination before
@@ -371,10 +387,10 @@ links rewritten, ambiguous links blocked, and remaining broken-link count.
 ### 5.1 Markdown and OKF gates
 
 ```bash
-power index /absolute/path/to/destination --strict
-power lint /absolute/path/to/destination
-power markdown-check /absolute/path/to/destination
-power status /absolute/path/to/destination
+"$POWER_CLI" index /absolute/path/to/destination --strict
+"$POWER_CLI" lint /absolute/path/to/destination
+"$POWER_CLI" markdown-check /absolute/path/to/destination
+"$POWER_CLI" status /absolute/path/to/destination
 ```
 
 Required result:
@@ -390,17 +406,17 @@ Required result:
 First prove FTS without model downloads:
 
 ```bash
-power sync /absolute/path/to/destination --fts-only
-power search /absolute/path/to/destination "known phrase" --mode fts
+"$POWER_CLI" sync /absolute/path/to/destination --fts-only
+"$POWER_CLI" search /absolute/path/to/destination "known phrase" --mode fts
 ```
 
 Use several known phrases from different source categories and record expected
 target paths. Then, only when resources permit, prove dense search:
 
 ```bash
-power sync /absolute/path/to/destination
-power search /absolute/path/to/destination "known concept" --mode semantic
-power search /absolute/path/to/destination "known concept" --mode reranked
+"$POWER_CLI" sync /absolute/path/to/destination
+"$POWER_CLI" search /absolute/path/to/destination "known concept" --mode semantic
+"$POWER_CLI" search /absolute/path/to/destination "known concept" --mode reranked
 ```
 
 Semantic/reranked readiness remains pending if model download, validation, or
@@ -472,9 +488,9 @@ destruction require a separate explicit decision.
 After structural changes:
 
 ```bash
-power index /absolute/path/to/destination --strict
-power lint /absolute/path/to/destination
-power markdown-check /absolute/path/to/destination
+"$POWER_CLI" index /absolute/path/to/destination --strict
+"$POWER_CLI" lint /absolute/path/to/destination
+"$POWER_CLI" markdown-check /absolute/path/to/destination
 ```
 
 Run `power sync` when retrieval indexes need refreshing. Read `index.md`, then
