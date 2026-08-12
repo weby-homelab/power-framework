@@ -280,6 +280,84 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
+    outcome_path = tmp_path / "outcome-receipt.json"
+    outcome_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "power.phase8-outcome.v1",
+                "synthetic": True,
+                "content_free": True,
+                "workflow_count": 20,
+                "gate": {
+                    "fresh_agent_completion": 1.0,
+                    "safety_invariants_100": True,
+                    "false_premise_abstention": True,
+                    "stale_state_filter": True,
+                    "technical_continuity_20": True,
+                    "blocked_workflow_abstention": True,
+                    "median_human_reminders": 0,
+                },
+                "comparison": {
+                    "practical_improvement": True,
+                    "power_mean_score": 0.95,
+                    "no_power_mean_score": 0.35,
+                    "evidence_recall": {"power": 0.75, "no_power": 0.0},
+                },
+                "feedback_reuse": {
+                    "measured": False,
+                    "reason": "no human labels",
+                },
+                "retrieval_profiles": {
+                    "fts": {"status": "executed"},
+                    "auto": {"status": "executed"},
+                    "semantic": {
+                        "status": "not_evaluated",
+                        "reason": "no sealed provider",
+                    },
+                },
+                "blind_scoring": False,
+                "bootstrap_context_tokens": {"measured": False},
+                "raw_content_in_report": False,
+                "human_quality_certification": False,
+                "real_vault": False,
+                "sealed_holdout": "not_opened",
+            }
+        ),
+        encoding="utf-8",
+    )
+    continuity_path = tmp_path / "continuity-receipt.json"
+    continuity_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "power.phase8-continuity.v1",
+                "synthetic": True,
+                "content_free": True,
+                "workflow_count": 20,
+                "independent_processes": 60,
+                "plain_handoff_processes": 40,
+                "metrics": {"duplicate_work_rate": 0.0},
+                "gate": {
+                    "correct_resume_20": True,
+                    "proof_carrying_handoff": True,
+                    "source_preserved": True,
+                    "unsafe_actions_100_percent_safe": True,
+                    "human_reminders_median_zero": True,
+                    "power_beats_plain_handoff": True,
+                },
+                "comparison": {
+                    "practical_improvement": True,
+                    "power_continuity_rate": 1.0,
+                    "plain_handoff_continuity_rate": 0.0,
+                },
+                "raw_content_in_report": False,
+                "human_quality_certification": False,
+                "real_vault": False,
+                "sealed_holdout": "not_opened",
+            }
+        ),
+        encoding="utf-8",
+    )
+
     result = subprocess.run(  # noqa: S603 -- invokes repository-local scripts.
         [
             sys.executable,
@@ -296,6 +374,10 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
             str(real_vault_path),
             "--phase8-human-manifest",
             str(human_manifest_path),
+            "--phase8-outcome-receipt",
+            str(outcome_path),
+            "--phase8-continuity-receipt",
+            str(continuity_path),
             "--output",
             str(output),
         ],
