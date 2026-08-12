@@ -239,11 +239,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install build tools
+      - name: Install build tools and framework dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build
-
+          pip install build .
+ 
       - name: Download Phase 8 technical receipts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -269,7 +269,7 @@ jobs:
         run: python -m build
 
       - name: Generate SPDX SBOM before binding final evidence
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: actions/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: .
           format: spdx-json
@@ -303,9 +303,6 @@ jobs:
             --sbom dist/power-framework.spdx.json \
             --upgrade-matrix-aggregate "$RUNNER_TEMP/power35-upgrade/power35-release-upgrade-aggregate.json" \
             --baseline dist/power-framework.release-baseline.json
-
-      - name: Install runtime dependencies for artifact smoke
-        run: pip install .
 
       - name: Smoke-test wheel and sdist outside checkout
         run: |
