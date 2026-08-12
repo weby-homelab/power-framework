@@ -260,23 +260,8 @@ jobs:
           POWER35_HUMAN_MANIFEST_JSON: ${{ secrets.POWER35_HUMAN_MANIFEST_JSON }}
         run: |
           set -euo pipefail
-          phase8_dir="$RUNNER_TEMP/power35-phase8"
-          test -n "$POWER35_REAL_VAULT_RECEIPT_JSON" || {
-            echo "power35-stable-release requires POWER35_REAL_VAULT_RECEIPT_JSON" >&2
-            exit 1
-          }
-          test -n "$POWER35_HUMAN_MANIFEST_JSON" || {
-            echo "power35-stable-release requires POWER35_HUMAN_MANIFEST_JSON" >&2
-            exit 1
-          }
-          umask 077
-          mkdir -p "$phase8_dir"
-          printf '%s' "$POWER35_REAL_VAULT_RECEIPT_JSON" \
-            > "$phase8_dir/real-vault-receipt.json"
-          printf '%s' "$POWER35_HUMAN_MANIFEST_JSON" \
-            > "$phase8_dir/human-manifest.json"
-          python -m json.tool "$phase8_dir/real-vault-receipt.json" >/dev/null
-          python -m json.tool "$phase8_dir/human-manifest.json" >/dev/null
+          python scripts/materialize_phase8_evidence.py \
+            --output-dir "$RUNNER_TEMP/power35-phase8"
 
       - name: Build package before binding final evidence
         run: python -m build

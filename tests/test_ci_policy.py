@@ -108,11 +108,8 @@ def test_release_materializes_phase8_evidence_through_protected_environment() ->
         in release_text
     )
     assert "POWER35_HUMAN_MANIFEST_JSON: ${{ secrets.POWER35_HUMAN_MANIFEST_JSON }}" in release_text
-    assert "umask 077" in release_text
-    assert "printf '%s' \"$POWER35_REAL_VAULT_RECEIPT_JSON\"" in release_text
-    assert "printf '%s' \"$POWER35_HUMAN_MANIFEST_JSON\"" in release_text
-    assert '> "$phase8_dir/real-vault-receipt.json"' in release_text
-    assert '> "$phase8_dir/human-manifest.json"' in release_text
+    assert "scripts/materialize_phase8_evidence.py" in release_text
+    assert '--output-dir "$RUNNER_TEMP/power35-phase8"' in release_text
 
 
 def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:

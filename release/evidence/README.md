@@ -71,8 +71,9 @@ maintainer must provision two content-free files in the release runner's
   `sealed_holdout` manifest validated by
   `benchmarks/human_retrieval/scripts/validate_human_evidence.py`.
 
-The GitHub release workflow materializes these files from the protected
-`power35-stable-release` environment. Configure required reviewers for that
+The GitHub release workflow calls
+`scripts/materialize_phase8_evidence.py` to materialize these files from the
+protected `power35-stable-release` environment. Configure required reviewers for that
 environment and store only the two content-free JSON documents as
 `POWER35_REAL_VAULT_RECEIPT_JSON` and `POWER35_HUMAN_MANIFEST_JSON` secrets.
 The workflow refuses to continue when either secret is absent, writes the
