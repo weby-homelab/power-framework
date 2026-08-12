@@ -197,7 +197,11 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
         "content_free": True,
         "raw_content_present": False,
         "source": {"revision": expected_commit, "clean": True},
-        "vault": {"opaque_id": "v1", "snapshot_sha256": "a" * 64, "note_count": 10},
+        "vault": {
+            "opaque_id": "real-vault-prxmx01-prod-202608",
+            "snapshot_sha256": "a" * 64,
+            "note_count": 10,
+        },
         "runtime": {
             "executable": "power",
             "provider": "cpu",
@@ -222,7 +226,7 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
             "no_answer_scoring": True,
             "outcome_gate": "pass",
             "power_beats_no_power": True,
-            "comparators": ["fts", "auto"],
+            "comparators": ["fts", "auto", "semantic", "no_power"],
             "metrics": {
                 "recall_at_10": 0.8,
                 "ndcg_at_10": 0.8,
