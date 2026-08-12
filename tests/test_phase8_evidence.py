@@ -270,3 +270,22 @@ def test_phase8_validation_accepts_formatted_human_manifest_hash(tmp_path: Path)
 
     candidates = phase8._candidate_manifest_hashes(human, manifest_obj)
     assert pretty_hash in candidates
+
+
+def test_phase8_validation_accepts_standard_python_dumps_hash(tmp_path: Path) -> None:
+    """Standard json.dumps (with spaces after : and ,) must also be a candidate hash."""
+    human = tmp_path / "human.json"
+    _write_human_manifest(human, status="adjudicated")
+    manifest_obj = json.loads(human.read_text(encoding="utf-8"))
+    # Standard json.dumps produces {"key": "val"} with spaces — not covered by compact separators
+    for trailing in (b"\n", b""):
+        for sort in (False, True):
+            std_bytes = (
+                json.dumps(manifest_obj, ensure_ascii=False, sort_keys=sort).encode("utf-8")
+                + trailing
+            )
+            std_hash = hashlib.sha256(std_bytes).hexdigest()
+            candidates = phase8._candidate_manifest_hashes(human, manifest_obj)
+            assert std_hash in candidates, (
+                f"Standard json.dumps hash missing (sort={sort}, trailing={bool(trailing)})"
+            )
