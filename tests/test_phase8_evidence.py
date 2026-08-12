@@ -259,3 +259,15 @@ def test_phase8_validation_fails_closed_when_receipts_are_missing(tmp_path: Path
 
     assert len(errors) == 2
     assert all("missing or invalid JSON" in error for error in errors)
+
+
+def test_phase8_validation_accepts_formatted_human_manifest_hash(tmp_path: Path) -> None:
+    human = tmp_path / "human.json"
+    _write_human_manifest(human, status="adjudicated")
+    manifest_obj = json.loads(human.read_text(encoding="utf-8"))
+    pretty_bytes = json.dumps(manifest_obj, indent=2).encode("utf-8") + b"\n"
+    pretty_hash = hashlib.sha256(pretty_bytes).hexdigest()
+
+    candidates = phase8._candidate_manifest_hashes(human, manifest_obj)
+    assert pretty_hash in candidates
+

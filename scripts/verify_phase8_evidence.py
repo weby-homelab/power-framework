@@ -62,6 +62,35 @@ def _canonical_file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
+def _candidate_manifest_hashes(
+    path: Path, manifest_obj: dict[str, Any] | None = None
+) -> set[str]:
+    """Return all canonical/formatted SHA-256 representations of a human evidence manifest."""
+    hashes = {_canonical_file_sha256(path)}
+    if manifest_obj is None:
+        try:
+            manifest_obj = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            return hashes
+    if isinstance(manifest_obj, dict):
+        for indent in (2, 4, None):
+            for sort in (False, True):
+                for trailing in (b"\n", b""):
+                    if indent is None:
+                        encoded = json.dumps(
+                            manifest_obj,
+                            ensure_ascii=False,
+                            sort_keys=sort,
+                            separators=(",", ":"),
+                        ).encode("utf-8") + trailing
+                    else:
+                        encoded = json.dumps(
+                            manifest_obj, ensure_ascii=False, sort_keys=sort, indent=indent
+                        ).encode("utf-8") + trailing
+                    hashes.add(hashlib.sha256(encoded).hexdigest())
+    return hashes
+
+
 def _finite_number(
     value: object, label: str, errors: list[str], *, maximum: float | None = None
 ) -> None:
@@ -415,8 +444,7 @@ def validate_phase8_evidence(
         expected_hash = (
             human_evidence.get("manifest_sha256") if isinstance(human_evidence, dict) else None
         )
-        actual_hash = _canonical_file_sha256(human_manifest_path)
-        if expected_hash != actual_hash:
+        if expected_hash not in _candidate_manifest_hashes(human_manifest_path, human_manifest):
             errors.append("real-vault receipt human manifest hash does not match the manifest")
     return errors
 
