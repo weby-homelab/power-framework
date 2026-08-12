@@ -62,9 +62,7 @@ def _canonical_file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
-def _candidate_manifest_hashes(
-    path: Path, manifest_obj: dict[str, Any] | None = None
-) -> set[str]:
+def _candidate_manifest_hashes(path: Path, manifest_obj: dict[str, Any] | None = None) -> set[str]:
     """Return all canonical/formatted SHA-256 representations of a human evidence manifest."""
     hashes = {_canonical_file_sha256(path)}
     if manifest_obj is None:
@@ -77,16 +75,22 @@ def _candidate_manifest_hashes(
             for sort in (False, True):
                 for trailing in (b"\n", b""):
                     if indent is None:
-                        encoded = json.dumps(
-                            manifest_obj,
-                            ensure_ascii=False,
-                            sort_keys=sort,
-                            separators=(",", ":"),
-                        ).encode("utf-8") + trailing
+                        encoded = (
+                            json.dumps(
+                                manifest_obj,
+                                ensure_ascii=False,
+                                sort_keys=sort,
+                                separators=(",", ":"),
+                            ).encode("utf-8")
+                            + trailing
+                        )
                     else:
-                        encoded = json.dumps(
-                            manifest_obj, ensure_ascii=False, sort_keys=sort, indent=indent
-                        ).encode("utf-8") + trailing
+                        encoded = (
+                            json.dumps(
+                                manifest_obj, ensure_ascii=False, sort_keys=sort, indent=indent
+                            ).encode("utf-8")
+                            + trailing
+                        )
                     hashes.add(hashlib.sha256(encoded).hexdigest())
     return hashes
 
