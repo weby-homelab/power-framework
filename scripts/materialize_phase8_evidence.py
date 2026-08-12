@@ -69,6 +69,20 @@ def materialize_phase8_evidence(
     human_manifest_path = output_dir / "human-manifest.json"
     _atomic_private_write(real_vault_path, real_vault)
     _atomic_private_write(human_manifest_path, human_manifest)
+
+    try:
+        manifest_obj = json.loads(human_manifest.decode("utf-8"))
+        if isinstance(manifest_obj, dict) and isinstance(
+            manifest_obj.get("embedded_artifacts"), dict
+        ):
+            for rel_name, content in manifest_obj["embedded_artifacts"].items():
+                if isinstance(rel_name, str) and isinstance(content, str):
+                    target_file = output_dir / rel_name
+                    if target_file.resolve().parent == output_dir.resolve():
+                        _atomic_private_write(target_file, content.encode("utf-8"))
+    except Exception:
+        pass
+
     return real_vault_path, human_manifest_path
 
 
