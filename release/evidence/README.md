@@ -82,6 +82,12 @@ JSON syntax before binding their hashes into the release baseline. The secrets
 are never committed, printed, uploaded as an input artifact, or used as a
 substitute for the verifier's exact source/runtime and sealed-holdout checks.
 
+If the human manifest carries an `embedded_artifacts` object, the materializer
+also writes only its referenced protocol, receipt, corpus, query, judgment and
+qrels files into the same private runner directory. Every referenced artifact
+must be present, UTF-8 text, and confined to that directory; malformed or
+incomplete embedded artifacts fail closed before evidence is written.
+
 The public repository intentionally contains neither raw vault material nor
 private qrels. If these files are absent, the release workflow fails closed;
 the candidate baseline remains non-production evidence.
