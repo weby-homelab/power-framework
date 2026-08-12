@@ -67,3 +67,79 @@ def test_materializer_fails_closed_when_a_secret_is_missing(tmp_path: Path, miss
         materialize_phase8_evidence(tmp_path / "phase8", environ=environment)
 
     assert not (tmp_path / "phase8").exists()
+
+
+def _embedded_environment() -> dict[str, str]:
+    manifest = {
+        "artifacts": {
+            "corpus": "corpus.jsonl",
+            "queries": "queries.jsonl",
+            "raw_judgments": "raw-judgments.jsonl",
+            "adjudicated_qrels": "adjudicated-qrels.jsonl",
+        },
+        "annotation_protocol": "annotation_protocol_v2.md",
+        "calibration": {"agreement_receipt": "calibration-agreement.v2.json"},
+        "agreement": {"receipt": "adjudication-agreement.v2.json"},
+        "embedded_artifacts": {
+            "corpus.jsonl": "corpus\n",
+            "queries.jsonl": "queries\n",
+            "raw-judgments.jsonl": "judgments\n",
+            "adjudicated-qrels.jsonl": "qrels\n",
+            "annotation_protocol_v2.md": "protocol\n",
+            "calibration-agreement.v2.json": "{}\n",
+            "adjudication-agreement.v2.json": "{}\n",
+        },
+    }
+    environment = _environment()
+    environment[HUMAN_MANIFEST_ENV] = json.dumps(manifest)
+    return environment
+
+
+def test_materializer_writes_referenced_embedded_artifacts_privately(tmp_path: Path) -> None:
+    output_dir = tmp_path / "phase8"
+
+    materialize_phase8_evidence(output_dir, environ=_embedded_environment())
+
+    assert (output_dir / "corpus.jsonl").read_text(encoding="utf-8") == "corpus\n"
+    assert (output_dir / "annotation_protocol_v2.md").read_text(encoding="utf-8") == "protocol\n"
+    if os.name != "nt":
+        assert S_IMODE((output_dir / "corpus.jsonl").stat().st_mode) == 0o600
+
+
+def test_materializer_rejects_missing_embedded_artifact_before_writing(tmp_path: Path) -> None:
+    environment = _embedded_environment()
+    manifest = json.loads(environment[HUMAN_MANIFEST_ENV])
+    del manifest["embedded_artifacts"]["queries.jsonl"]
+    environment[HUMAN_MANIFEST_ENV] = json.dumps(manifest)
+
+    with pytest.raises(ValueError, match="missing a referenced artifact"):
+        materialize_phase8_evidence(tmp_path / "phase8", environ=environment)
+
+    assert not (tmp_path / "phase8").exists()
+
+
+def test_materializer_rejects_embedded_path_escape(tmp_path: Path) -> None:
+    environment = _embedded_environment()
+    manifest = json.loads(environment[HUMAN_MANIFEST_ENV])
+    content = manifest["embedded_artifacts"].pop("corpus.jsonl")
+    manifest["artifacts"]["corpus"] = "../corpus.jsonl"
+    manifest["embedded_artifacts"]["../corpus.jsonl"] = content
+    environment[HUMAN_MANIFEST_ENV] = json.dumps(manifest)
+
+    with pytest.raises(ValueError, match="escapes the output directory"):
+        materialize_phase8_evidence(tmp_path / "phase8", environ=environment)
+
+    assert not (tmp_path / "phase8").exists()
+
+
+def test_materializer_rejects_embedded_artifact_sha256_mismatch(tmp_path: Path) -> None:
+    environment = _embedded_environment()
+    manifest = json.loads(environment[HUMAN_MANIFEST_ENV])
+    manifest["corpus_sha256"] = "a" * 64
+    environment[HUMAN_MANIFEST_ENV] = json.dumps(manifest)
+
+    with pytest.raises(ValueError, match="SHA-256 does not match its manifest declaration"):
+        materialize_phase8_evidence(tmp_path / "phase8", environ=environment)
+
+    assert not (tmp_path / "phase8").exists()
+
