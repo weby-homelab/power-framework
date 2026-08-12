@@ -142,4 +142,3 @@ def test_materializer_rejects_embedded_artifact_sha256_mismatch(tmp_path: Path) 
         materialize_phase8_evidence(tmp_path / "phase8", environ=environment)
 
     assert not (tmp_path / "phase8").exists()
-
