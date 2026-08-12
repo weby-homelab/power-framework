@@ -18,6 +18,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+try:
+    from release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
+    from scripts.release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PYPROJECT = REPO_ROOT / "pyproject.toml"
 DEFAULT_MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
@@ -393,6 +398,20 @@ def validate_release_contract(
                 errors.append("final release requires the referenced aggregate upgrade artifact")
             elif _sha256(upgrade_matrix_path) != upgrade["sha256"]:
                 errors.append("baseline upgrade evidence SHA-256 does not match the artifact")
+            if upgrade_matrix_path is not None and upgrade_matrix_path.is_file():
+                upgrade_matrix = _load_json(upgrade_matrix_path)
+                if upgrade_matrix.get("supported_platforms") != list(SUPPORTED_RELEASE_PLATFORMS):
+                    errors.append(
+                        "final upgrade evidence has an unexpected supported-platform boundary"
+                    )
+                if upgrade_matrix.get("deferred_platforms") != list(DEFERRED_RELEASE_PLATFORMS):
+                    errors.append(
+                        "final upgrade evidence has an unexpected deferred-platform boundary"
+                    )
+                if upgrade_matrix.get("platforms") != dict.fromkeys(
+                    SUPPORTED_RELEASE_PLATFORMS, "executed"
+                ):
+                    errors.append("final upgrade evidence must execute every supported platform")
 
     return errors
 

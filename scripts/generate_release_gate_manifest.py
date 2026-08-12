@@ -25,7 +25,7 @@ MANDATORY_GATES = (
 )
 OPTIONAL_GATES = {
     "real-vault-quality": "real-vault neural/quality evaluation",
-    "physical-windows-macos": "target-host Windows and macOS physical upgrade matrix",
+    "deferred-macos-windows": "macOS and Windows support deferred for the 3.5.0 release",
     "remote-release-readback": "remote release readback",
 }
 

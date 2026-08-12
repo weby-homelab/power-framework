@@ -26,18 +26,15 @@ def test_ci_keeps_blocking_test_and_security_jobs() -> None:
     assert "  security:" in ci_text
 
 
-def test_ci_has_windows_runtime_smoke_for_documented_lifecycle() -> None:
+def test_ci_defers_non_linux_runtime_smoke_for_3_5_0() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
 
-    assert "  windows-runtime-smoke:" in ci_text
-    assert "runs-on: windows-latest" in ci_text
-    assert "uv sync --locked" in ci_text
-    assert "uv run power index $vault --strict" in ci_text
-    assert "uv run power sync $vault --fts-only --strict" in ci_text
-    assert 'uv run power search $vault "Windows smoke" --mode fts' in ci_text
+    assert "windows-latest" not in ci_text
+    assert "macos-latest" not in ci_text
+    assert "runs-on: ubuntu-latest" in ci_text
 
 
-def test_ci_aggregates_all_platform_upgrade_reports() -> None:
+def test_ci_aggregates_all_supported_ubuntu_reports() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
 
     assert "  upgrade-matrix-aggregate:" in ci_text
@@ -45,6 +42,8 @@ def test_ci_aggregates_all_platform_upgrade_reports() -> None:
     assert "actions/download-artifact@" in ci_text
     assert "merge-multiple: true" in ci_text
     assert "scripts/aggregate_upgrade_matrix.py" in ci_text
+    assert "os: [ubuntu-latest]" in ci_text
+    assert "--require-supported-platforms" in ci_text
     assert "name: power35-upgrade-aggregate" in ci_text
     assert "power35-upgrade-aggregate.json" in ci_text
 
@@ -90,7 +89,10 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "uv run mkdocs build --strict" in release_text
     assert "complexity_dashboard.py --baseline-revision v3.4.5 --require-budget" in release_text
     assert "  upgrade-matrix:" in release_text
-    assert "--require-all-platforms" in release_text
+    assert "os: [ubuntu-latest]" in release_text
+    assert "--require-supported-platforms" in release_text
+    assert "macos-latest" not in release_text
+    assert "windows-latest" not in release_text
     assert "  upgrade-matrix-aggregate:" in release_text
     assert "needs: validate" in release_text
     assert "needs: [validate, upgrade-matrix-aggregate]" in release_text

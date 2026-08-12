@@ -2,8 +2,8 @@
 """Run the local, content-free 3.4.5 -> 3.5.0 upgrade safety matrix.
 
 The script proves invariants available on the current runner and records
-platforms that were not physically executed.  It never treats an unexecuted
-platform or unavailable dense provider as a pass.
+the declared release platform boundary. Deferred platforms are never treated
+as supported or passed by this report.
 """
 
 from __future__ import annotations
@@ -37,6 +37,10 @@ from power_framework.core.searcher import search_vault
 from power_framework.core.state_migration import build_state_migration_plan
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+try:
+    from release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
+    from scripts.release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
 
 _INTERRUPTED_UPGRADE_WORKER = r"""
 import os
@@ -134,8 +138,10 @@ def build_matrix(*, from_version: str = "3.4.5", to_version: str = "3.5.0") -> d
             },
         }
 
-    platforms = {"linux": "not-executed", "macos": "not-executed", "windows": "not-executed"}
-    platforms[current] = "executed"
+    platforms = {
+        platform_name: "executed" if platform_name == current else "not-executed"
+        for platform_name in SUPPORTED_RELEASE_PLATFORMS
+    }
     interrupted = build_interrupted_upgrade_matrix(
         from_version=from_version,
         to_version=to_version,
@@ -147,6 +153,8 @@ def build_matrix(*, from_version: str = "3.4.5", to_version: str = "3.5.0") -> d
         "source_content": "not captured",
         "current_runner": current_result,
         "interrupted_upgrade": interrupted,
+        "supported_platforms": list(SUPPORTED_RELEASE_PLATFORMS),
+        "deferred_platforms": list(DEFERRED_RELEASE_PLATFORMS),
         "platforms": platforms,
         "dense_profile": {
             "status": "not evaluated",
@@ -157,7 +165,7 @@ def build_matrix(*, from_version: str = "3.4.5", to_version: str = "3.5.0") -> d
             and interrupted["gate"]["all_checkpoints_pass"],
             "all_platforms_executed": all(value == "executed" for value in platforms.values()),
             "publish_ready": False,
-            "reason": "tag-bound clean source and remote readback are release steps",
+            "reason": "macOS and Windows are deferred for 3.5.0; tag-bound clean source and remote readback are release steps",
         },
     }
 

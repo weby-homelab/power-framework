@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
     from verify_phase8_evidence import validate_phase8_evidence, validate_technical_receipts
     from verify_release_contract import (
         DEFAULT_DATASET_MANIFEST,
@@ -24,6 +25,7 @@ try:
         _sha256,
     )
 except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
+    from scripts.release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
     from scripts.verify_phase8_evidence import validate_phase8_evidence, validate_technical_receipts
     from scripts.verify_release_contract import (
         DEFAULT_DATASET_MANIFEST,
@@ -146,6 +148,12 @@ def build_baseline(
         raise ValueError("upgrade matrix aggregate must cover all supported platforms")
     if upgrade_gate.get("local_invariants") is not True:
         raise ValueError("upgrade matrix aggregate local invariants must pass")
+    if upgrade_matrix.get("supported_platforms") != list(SUPPORTED_RELEASE_PLATFORMS):
+        raise ValueError("upgrade matrix aggregate has an unexpected supported-platform boundary")
+    if upgrade_matrix.get("deferred_platforms") != list(DEFERRED_RELEASE_PLATFORMS):
+        raise ValueError("upgrade matrix aggregate has an unexpected deferred-platform boundary")
+    if upgrade_matrix.get("platforms") != dict.fromkeys(SUPPORTED_RELEASE_PLATFORMS, "executed"):
+        raise ValueError("upgrade matrix aggregate must execute every supported platform")
 
     package_version = _load_package_version(repo / "pyproject.toml")
     expected_tag = f"v{package_version}"

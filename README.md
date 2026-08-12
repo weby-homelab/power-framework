@@ -59,13 +59,12 @@ the role-specific guides before touching a vault:
   migration from any Markdown source methodology into a canonical POWER vault
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
-- **[Platform support matrix](docs/support-matrix.md)** — tested, conditional,
-  and unsupported boundaries for Linux, macOS, hosted Windows, and physical
-  Windows 11 25H2
+- **[Platform support matrix](docs/support-matrix.md)** — Ubuntu/Linux is the
+  `v3.5.0` release platform; macOS and Windows are explicitly deferred
 
-## Quick Start (Linux/macOS)
+## Quick Start (Ubuntu/Linux)
 
-The commands below are the shortest supported path for Linux and macOS. They
+The commands below are the shortest supported path for Ubuntu/Linux. They
 assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
@@ -85,9 +84,9 @@ power heal ~/my-vault          # Auto-fix missing/invalid frontmatter
 power markdown-check ~/my-vault  # Check markdown quality issues
 ```
 
-## Development install (Linux/macOS)
+## Development install (Ubuntu/Linux)
 
-Contributors on Linux or macOS should clone into a durable development
+Contributors on Ubuntu/Linux should clone into a durable development
 directory, create a venv, and follow [CONTRIBUTING.md](CONTRIBUTING.md). Inspect
 local changes before pulling; documentation does not provide an updater that
 resets a working tree.
@@ -102,18 +101,14 @@ uv sync --locked --group dev
 power --version
 ```
 
-## Windows 11 25H2 installation
+## Windows 11 25H2 installation (deferred)
 
-Windows users should use the dedicated [Windows 11 25H2
-guide](docs/windows-11-installation.md) instead of the Linux/macOS shell
-commands above. It contains the complete PowerShell installation, Python and
-Visual C++ prerequisites, isolated venv setup, immutable release wheel,
-acceptance checks, MCP configuration, troubleshooting, rollback, and uninstall
-steps.
+Windows 11 25H2 is deferred from the `v3.5.0` release boundary. The dedicated
+[Windows 11 25H2 guide](docs/windows-11-installation.md) remains future
+documentation and is not a Stable release certification.
 
-Direct Windows runtime execution is not part of the Linux release
-pipeline; the guide explicitly separates automated cross-platform regression
-coverage from checks that must pass on the target Windows host.
+No Windows CI, upgrade-matrix, compatibility, performance, or GPU claim is
+made for `v3.5.0`.
 
 ## What's Inside
 
@@ -591,7 +586,7 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux, macOS, Windows",
+  "operatingSystem": "Linux (v3.5.0 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
   "softwareVersion": "latest",
@@ -623,7 +618,7 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux, macOS, Windows
+operatingSystem: Linux (v3.5.0 release boundary)
 softwareVersion: 3.5.0
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)

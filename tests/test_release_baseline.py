@@ -165,6 +165,9 @@ def test_final_baseline_clears_candidate_publication_scope(tmp_path: Path) -> No
                 "schema_version": "power.upgrade-matrix.aggregate.v1",
                 "content_free": True,
                 "raw_content_in_report": False,
+                "supported_platforms": ["linux"],
+                "deferred_platforms": ["macos", "windows"],
+                "platforms": {"linux": "executed"},
                 "release_gate": {
                     "all_platforms_executed": True,
                     "local_invariants": True,

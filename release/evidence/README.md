@@ -54,8 +54,8 @@ and coverage JSON artifacts. This prevents a final baseline from inheriting
 historical candidate counts from a template; the receipt must report passed
 tests, skipped tests, coverage, warning policy, zero skipped mandatory gates,
 and hashes of its JUnit, coverage, and executed-gate manifest inputs. The final
-baseline additionally binds the generated SPDX SBOM and the aggregate
-cross-platform upgrade receipt.
+baseline additionally binds the generated SPDX SBOM and the aggregate Ubuntu
+upgrade receipt.
 
 ## Phase 8 stable-release evidence
 
@@ -88,6 +88,9 @@ the candidate baseline remains non-production evidence.
 
 The release workflow also archives the synthetic outcome and continuity
 receipts from `benchmarks/power35` and binds their SHA-256 values into the
-tag-bound baseline. Those receipts prove only technical safety/continuity;
+tag-bound baseline. For `v3.5.0`, the Ubuntu upgrade aggregate covers the only
+supported release platform;
+macOS and Windows are explicitly deferred and do not appear as supported
+platforms in the release artifact. The synthetic receipts prove only technical safety/continuity;
 their explicit `real_vault=false` and `human_quality_certification=false`
 fields are required and cannot open the stable gate.

@@ -46,7 +46,9 @@ def test_local_upgrade_matrix_proves_safe_boundaries() -> None:
 def test_unexecuted_platforms_are_not_silently_green() -> None:
     report = build_matrix()
 
-    assert report["release_gate"]["all_platforms_executed"] is False
+    assert report["release_gate"]["all_platforms_executed"] is True
+    assert report["supported_platforms"] == ["linux"]
+    assert report["deferred_platforms"] == ["macos", "windows"]
     assert "tag-bound" in report["release_gate"]["reason"]
 
 
@@ -74,24 +76,20 @@ def _synthetic_platform_report(platform: str) -> dict[str, object]:
     }
 
 
-def test_upgrade_matrix_aggregation_requires_all_platforms() -> None:
-    report = aggregate_reports(
-        [_synthetic_platform_report(platform) for platform in ("linux", "macos", "windows")]
-    )
+def test_upgrade_matrix_aggregation_requires_supported_platforms() -> None:
+    report = aggregate_reports([_synthetic_platform_report("linux")])
 
     assert report["schema_version"] == "power.upgrade-matrix.aggregate.v1"
-    assert report["platforms"] == {
-        "linux": "executed",
-        "macos": "executed",
-        "windows": "executed",
-    }
+    assert report["supported_platforms"] == ["linux"]
+    assert report["deferred_platforms"] == ["macos", "windows"]
+    assert report["platforms"] == {"linux": "executed"}
     assert report["release_gate"]["all_platforms_executed"] is True
     assert report["release_gate"]["physical_3_4_5_runtime"] is False
     assert report["raw_content_in_report"] is False
 
 
 def test_upgrade_matrix_aggregation_rejects_duplicate_platform() -> None:
-    reports = [_synthetic_platform_report(platform) for platform in ("linux", "macos", "linux")]
+    reports = [_synthetic_platform_report(platform) for platform in ("linux", "linux")]
 
     with pytest.raises(ValueError, match="duplicate"):
-        aggregate_reports(reports)
+        aggregate_reports(reports, expected_platforms=("linux", "macos"))

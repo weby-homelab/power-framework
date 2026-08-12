@@ -56,13 +56,12 @@ P.O.W.E.R. створений для роботи як людьми, так і A
   міграція з будь-якої Markdown source methodology у canonical POWER vault
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
-- **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — межі tested,
-  conditional та unsupported для Linux, macOS, hosted Windows і фізичного
-  Windows 11 25H2
+- **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — Ubuntu/Linux є
+  release-платформою `v3.5.0`; macOS і Windows явно відкладені
 
-## Швидкий старт (Linux/macOS)
+## Швидкий старт (Ubuntu/Linux)
 
-Наведені нижче команди — найкоротший підтримуваний шлях для Linux і macOS.
+Наведені нижче команди — найкоротший підтримуваний шлях для Ubuntu/Linux.
 Потрібен Python 3.11+ і terminal shell; `~/my-vault` — каталог vault, яким
 керуватиме POWER.
 
@@ -82,9 +81,9 @@ power heal ~/my-vault      # Автовиправлення відсутньог
 power markdown-check ~/my-vault  # Перевірка якості Markdown
 ```
 
-## Розробницька установка (Linux/macOS)
+## Розробницька установка (Ubuntu/Linux)
 
-Учасникам на Linux або macOS слід clone у durable development directory,
+Учасникам на Ubuntu/Linux слід clone у durable development directory,
 створити venv і виконати [CONTRIBUTING.md](CONTRIBUTING.md). Перед pull
 перевіряйте local changes; документація не пропонує updater, який reset робоче
 дерево.
@@ -99,18 +98,14 @@ uv sync --locked --group dev
 power --version
 ```
 
-## Встановлення на Windows 11 25H2
+## Встановлення на Windows 11 25H2 (відкладено)
 
-Користувачам Windows слід використовувати окремий детальний
-[гід Windows 11 25H2](docs/windows-11-installation.ua.md), а не наведені вище
-Linux/macOS shell-команди. Гід описує Python/Visual C++ prerequisites,
-isolated venv, immutable release wheel, точний PowerShell syntax, clean-vault
-acceptance checks, MCP configuration через venv interpreter, troubleshooting,
-rollback і uninstall.
+Windows 11 25H2 відкладено за межі release `v3.5.0`. Окремий детальний
+[гід Windows 11 25H2](docs/windows-11-installation.ua.md) залишається майбутньою
+документацією і не є Stable release certification.
 
-Прямий Windows runtime запуск не входить у Linux release pipeline;
-гід явно розділяє автоматизований cross-platform regression і checks, які
-мають пройти на цільовому Windows host.
+Для `v3.5.0` немає Windows CI, upgrade-matrix, compatibility, performance або
+GPU claim.
 
 ## Що всередині
 
@@ -586,7 +581,7 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux, macOS, Windows",
+  "operatingSystem": "Linux (v3.5.0 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
   "softwareVersion": "latest",
@@ -618,7 +613,7 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux, macOS, Windows
+operatingSystem: Linux (v3.5.0 release boundary)
 softwareVersion: 3.5.0
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)

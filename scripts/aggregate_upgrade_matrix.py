@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate content-free upgrade matrix reports from all supported runners."""
+"""Aggregate content-free upgrade reports for the declared release platforms."""
 
 from __future__ import annotations
 
@@ -8,7 +8,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-EXPECTED_PLATFORMS = ("linux", "macos", "windows")
+try:
+    from release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
+    from scripts.release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+
+SUPPORTED_PLATFORMS = SUPPORTED_RELEASE_PLATFORMS
+DEFERRED_PLATFORMS = DEFERRED_RELEASE_PLATFORMS
 REPORT_SCHEMA = "power.upgrade-matrix.v1"
 AGGREGATE_SCHEMA = "power.upgrade-matrix.aggregate.v1"
 INTERRUPTED_GATE_KEYS = (
@@ -20,11 +26,15 @@ INTERRUPTED_GATE_KEYS = (
 )
 
 
-def aggregate_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
-    """Validate and aggregate exactly one successful report per supported OS."""
-    if len(reports) != len(EXPECTED_PLATFORMS):
+def aggregate_reports(
+    reports: list[dict[str, Any]],
+    *,
+    expected_platforms: tuple[str, ...] = SUPPORTED_PLATFORMS,
+) -> dict[str, Any]:
+    """Validate one successful report for every declared release platform."""
+    if len(reports) != len(expected_platforms):
         raise ValueError(
-            f"expected {len(EXPECTED_PLATFORMS)} platform reports, received {len(reports)}"
+            f"expected {len(expected_platforms)} platform reports, received {len(reports)}"
         )
 
     by_platform: dict[str, dict[str, Any]] = {}
@@ -40,7 +50,7 @@ def aggregate_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
         if report.get("interrupted_upgrade", {}).get("physical_3_4_5_runtime") is not False:
             raise ValueError("physical 3.4.5 runtime must not be inferred from synthetic evidence")
         platform = report.get("current_runner", {}).get("platform")
-        if platform not in EXPECTED_PLATFORMS:
+        if platform not in expected_platforms:
             raise ValueError(f"unsupported or missing runner platform: {platform!r}")
         if platform in by_platform:
             raise ValueError(f"duplicate upgrade matrix report for {platform}")
@@ -61,7 +71,7 @@ def aggregate_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
             raise ValueError("upgrade matrix reports use different version bounds")
         by_platform[platform] = report
 
-    missing = sorted(set(EXPECTED_PLATFORMS) - set(by_platform))
+    missing = sorted(set(expected_platforms) - set(by_platform))
     if missing:
         raise ValueError(f"missing upgrade matrix platforms: {', '.join(missing)}")
 
@@ -71,7 +81,9 @@ def aggregate_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
         "to_version": to_version,
         "content_free": True,
         "raw_content_in_report": False,
-        "platforms": dict.fromkeys(EXPECTED_PLATFORMS, "executed"),
+        "supported_platforms": list(expected_platforms),
+        "deferred_platforms": list(DEFERRED_PLATFORMS),
+        "platforms": dict.fromkeys(expected_platforms, "executed"),
         "reports": [
             {
                 "platform": platform,
@@ -80,7 +92,7 @@ def aggregate_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
                 "interrupted_upgrade": dict.fromkeys(INTERRUPTED_GATE_KEYS, True),
                 "physical_3_4_5_runtime": False,
             }
-            for platform in EXPECTED_PLATFORMS
+            for platform in expected_platforms
         ],
         "release_gate": {
             "local_invariants": True,
@@ -88,7 +100,7 @@ def aggregate_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
             "interrupted_upgrade": True,
             "physical_3_4_5_runtime": False,
             "publish_ready": False,
-            "reason": "clean tag, physical 3.4.5 compatibility, and remote readback remain separate release gates",
+            "reason": "macOS and Windows are deferred for 3.5.0; clean tag, physical 3.4.5 compatibility, and remote readback remain separate release gates",
         },
     }
 
@@ -105,10 +117,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
-        "--require-all-platforms",
+        "--require-supported-platforms",
         action="store_true",
         required=True,
-        help="require exactly one passing Linux, macOS, and Windows report",
+        help="require exactly one passing report for every platform supported by this release",
     )
     args = parser.parse_args(argv)
     try:
@@ -117,7 +129,9 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(exc))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Aggregated {len(EXPECTED_PLATFORMS)} upgrade matrix reports into {args.output}")
+    print(
+        f"Aggregated {len(SUPPORTED_PLATFORMS)} supported-platform upgrade report into {args.output}"
+    )
     return 0
 
 
