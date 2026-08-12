@@ -75,7 +75,8 @@ def _candidate_manifest_hashes(path: Path, manifest_obj: dict[str, Any] | None =
             for sort in (False, True):
                 for trailing in (b"\n", b""):
                     if indent is None:
-                        encoded = (
+                        # Compact encoding with no spaces (separators=(",", ":"))
+                        encoded_compact = (
                             json.dumps(
                                 manifest_obj,
                                 ensure_ascii=False,
@@ -84,6 +85,17 @@ def _candidate_manifest_hashes(path: Path, manifest_obj: dict[str, Any] | None =
                             ).encode("utf-8")
                             + trailing
                         )
+                        hashes.add(hashlib.sha256(encoded_compact).hexdigest())
+                        # Standard Python encoding with spaces (default separators ", " and ": ")
+                        encoded_standard = (
+                            json.dumps(
+                                manifest_obj,
+                                ensure_ascii=False,
+                                sort_keys=sort,
+                            ).encode("utf-8")
+                            + trailing
+                        )
+                        hashes.add(hashlib.sha256(encoded_standard).hexdigest())
                     else:
                         encoded = (
                             json.dumps(
@@ -91,7 +103,7 @@ def _candidate_manifest_hashes(path: Path, manifest_obj: dict[str, Any] | None =
                             ).encode("utf-8")
                             + trailing
                         )
-                    hashes.add(hashlib.sha256(encoded).hexdigest())
+                        hashes.add(hashlib.sha256(encoded).hexdigest())
     return hashes
 
 
