@@ -133,6 +133,7 @@ def _validate_git_source(
     git_repo: Path,
     require_tag: bool,
     require_signed_tag: bool,
+    candidate: bool = False,
     errors: list[str],
 ) -> None:
     """Prove that the baseline names the released Git objects and ref."""
@@ -167,6 +168,10 @@ def _validate_git_source(
     tag = source.get("tag", f"v{release}")
     if not isinstance(tag, str) or not GIT_TAG_RE.fullmatch(tag):
         errors.append(f"baseline source.tag must be a release tag like v{release!s}")
+        return
+    if candidate:
+        # A candidate may be ahead of an existing release tag; final baselines
+        # still bind the tag to the exact source commit below.
         return
     status, tag_commit, stderr = _git(
         git_repo,
@@ -289,6 +294,7 @@ def validate_release_contract(
             git_repo=git_repo,
             require_tag=require_tag,
             require_signed_tag=require_signed_tag,
+            candidate=candidate,
             errors=errors,
         )
 

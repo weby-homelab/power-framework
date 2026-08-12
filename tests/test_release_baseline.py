@@ -69,6 +69,15 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
         pytest.skip(f"{tag_name} is created only for the release tag gate")
 
     expected_commit = tag.stdout.strip()
+    head = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local refs.
+        [git_executable, "rev-parse", "--verify", "HEAD"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if head != expected_commit:
+        pytest.skip(f"{tag_name} is not checked out; final baseline is tag-gate only")
     output = tmp_path / "release-baseline.json"
     validation_report = _write_validation_report(tmp_path / "validation.json")
     sbom = tmp_path / "sbom.spdx.json"
