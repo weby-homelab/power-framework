@@ -10,6 +10,8 @@ import math
 from pathlib import Path
 from typing import Any
 
+from power_framework.phase8_contract import HUMAN_EVIDENCE_THRESHOLD_PROFILE
+
 REQUIRED_JOURNEYS = {
     "current_fact",
     "historical_fact",
@@ -48,7 +50,7 @@ V21_THRESHOLDS = {**LEGACY_V2_THRESHOLDS, "recall_at_10": 0.75}
 REQUIRED_THRESHOLDS = LEGACY_V2_THRESHOLDS
 THRESHOLD_PROFILES = {
     "m2-v2": LEGACY_V2_THRESHOLDS,
-    "m2-v2.1": V21_THRESHOLDS,
+    HUMAN_EVIDENCE_THRESHOLD_PROFILE: V21_THRESHOLDS,
 }
 logger = logging.getLogger(__name__)
 

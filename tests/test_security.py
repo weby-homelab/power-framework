@@ -15,8 +15,10 @@ from power_framework.core.utils import (
     create_backup,
     is_excluded_dir,
     is_excluded_orphan,
+    prune_backups,
     resolve_path_in_vault,
     resolve_vault_path,
+    restore_backup,
     validate_vault_path,
 )
 
@@ -274,6 +276,39 @@ class TestCreateBackup:
         backup = create_backup(filepath, backup_dir=backup_dir)
         assert backup is not None
         assert str(backup).startswith(str(backup_dir))
+
+    def test_prune_is_dry_run_by_default_and_ignores_unmanaged_files(self, tmp_path: Path):
+        filepath = tmp_path / "test.md"
+        filepath.write_text("content")
+        backup_dir = tmp_path / "backups"
+        backups = [create_backup(filepath, backup_dir=backup_dir) for _ in range(3)]
+        unmanaged = backup_dir / "keep-me.txt"
+        unmanaged.write_text("keep")
+
+        selected = prune_backups(backup_dir, max_count=1, max_age_days=None, max_bytes=None)
+
+        assert len(selected) == 2
+        assert all(path is not None and path.exists() for path in backups)
+        assert unmanaged.exists()
+
+    def test_prune_and_restore_are_explicit_and_atomic(self, tmp_path: Path):
+        filepath = tmp_path / "test.md"
+        filepath.write_text("original")
+        backup_dir = tmp_path / "backups"
+        backup = create_backup(filepath, backup_dir=backup_dir)
+        assert backup is not None
+
+        destination = tmp_path / "restored.md"
+        restore_backup(backup, destination)
+        assert destination.read_text() == "original"
+        with pytest.raises(FileExistsError):
+            restore_backup(backup, destination)
+
+        removed = prune_backups(
+            backup_dir, max_count=0, max_age_days=None, max_bytes=None, dry_run=False
+        )
+        assert removed == [backup]
+        assert not backup.exists()
 
 
 class TestCleanNoteName:

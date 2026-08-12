@@ -250,6 +250,7 @@ def heal_frontmatter(
     content: str,
     filepath: Path,
     vault_dir: Path | None = None,
+    now: datetime | None = None,
 ) -> tuple[str, list[str]]:
     """
     Heal missing or invalid OKF frontmatter fields.
@@ -333,10 +334,10 @@ def heal_frontmatter(
                 timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                 changes.append("Parsed string timestamp to datetime")
             except ValueError:
-                timestamp = datetime.now(UTC)
+                timestamp = now or datetime.now(UTC)
                 changes.append("Replaced invalid string timestamp with current time")
     else:
-        timestamp = datetime.now(UTC)
+        timestamp = now or datetime.now(UTC)
         changes.append("Added missing timestamp")
 
     # 5. Tags list healing (convert non-strings like integers 2026 to strings)
@@ -414,7 +415,7 @@ def heal_vault_report(
                 HealFailure(_report_path(rel), "transform", type(exc).__name__, str(exc))
             )
             continue
-        if not changes:
+        if not changes or healed == content:
             continue
 
         if limit is not None and report.healed >= limit:

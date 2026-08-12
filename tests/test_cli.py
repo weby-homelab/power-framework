@@ -62,13 +62,46 @@ def test_init_fails_on_nonempty(tmp_path: Path) -> None:
     assert exc.value.code == 1
 
 
+def test_control_plane_can_materialize_and_remove_optional_base(
+    sample_vault: Path,
+) -> None:
+    user_note = sample_vault / "01_Projects" / "human-note.md"
+    user_note.write_text("# human-owned\n", encoding="utf-8")
+
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["power", "control-plane", str(sample_vault), "--apply", "--obsidian-base"],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 0
+    assert (sample_vault / "POWER_STATUS.md").exists()
+    assert (sample_vault / "POWER Control.base").exists()
+
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["power", "control-plane", str(sample_vault), "--remove-obsidian-base"],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+    assert exc.value.code == 0
+    assert not (sample_vault / "POWER Control.base").exists()
+    assert user_note.read_text(encoding="utf-8") == "# human-owned\n"
+
+
 def test_doctor_json_uses_machine_contract(tmp_path: Path, capsys, monkeypatch) -> None:
     from power_framework.core import cli
 
     monkeypatch.setattr(
         cli,
         "run_doctor",
-        lambda _path: {
+        lambda _path, *, probe_embedding: {
             "schema_version": 1,
             "command": "doctor",
             "status": "ok",
@@ -525,10 +558,79 @@ def test_search_returns_results(sample_vault: Path) -> None:
     assert exc.value.code == 0
 
 
+def test_memory_propose_rejects_content_in_argv(sample_vault: Path) -> None:
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "memory",
+                "propose",
+                str(sample_vault),
+                "01_Projects/secret.md",
+                "secret-content",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 1
+
+
+def test_memory_propose_reads_content_from_file(sample_vault: Path, tmp_path: Path) -> None:
+    content_file = tmp_path / "proposal.md"
+    content_file.write_text(
+        '---\ntype: Project\ntitle: "File proposal"\n'
+        'description: "stdin/file boundary"\ntimestamp: 2026-08-11T00:00:00Z\n---\n',
+        encoding="utf-8",
+    )
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "memory",
+                "propose",
+                str(sample_vault),
+                "01_Projects/file-proposal.md",
+                "--content-file",
+                str(content_file),
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 0
+
+
+def test_memory_apply_rejects_proposal_json_in_argv(sample_vault: Path) -> None:
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "memory",
+                "apply",
+                str(sample_vault),
+                '{"proposal_id":"argv-secret"}',
+                "--approved",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 1
+
+
 def test_search_uses_canonical_default_mode(sample_vault: Path) -> None:
     with (
-        patch("power_framework.core.cli.format_search_results", return_value="No results"),
-        patch("power_framework.core.cli.search_vault", return_value=[]) as search,
+        patch("power_framework.core.application.search_vault", return_value=[]) as search,
         patch.object(sys, "argv", ["power", "search", str(sample_vault), "Test"]),
         pytest.raises(SystemExit) as exc,
     ):
@@ -540,8 +642,7 @@ def test_search_uses_canonical_default_mode(sample_vault: Path) -> None:
 
 def test_search_passes_shared_temporal_contract(sample_vault: Path) -> None:
     with (
-        patch("power_framework.core.cli.format_search_results", return_value="No results"),
-        patch("power_framework.core.cli.search_vault", return_value=[]) as search,
+        patch("power_framework.core.application.search_vault", return_value=[]) as search,
         patch.object(
             sys,
             "argv",
@@ -597,7 +698,7 @@ def test_version_flag(capsys: pytest.CaptureFixture) -> None:
         main()
     assert exc.value.code == 0
     captured = capsys.readouterr()
-    assert "3.4.5" in captured.out
+    assert "3.5.0" in captured.out
 
 
 def test_no_command_shows_help(capsys: pytest.CaptureFixture) -> None:
@@ -677,6 +778,8 @@ def test_memory_apply_cli_publishes_search_projection(sample_vault, capsys) -> N
         + marker
         + "\n",
     )
+    proposal_file = sample_vault / "proposal.json"
+    proposal_file.write_text(json.dumps(proposal), encoding="utf-8")
 
     with (
         patch(
@@ -686,7 +789,8 @@ def test_memory_apply_cli_publishes_search_projection(sample_vault, capsys) -> N
                 "memory",
                 "apply",
                 str(sample_vault),
-                json.dumps(proposal),
+                "--proposal-file",
+                str(proposal_file),
                 "--approved",
             ],
         ),

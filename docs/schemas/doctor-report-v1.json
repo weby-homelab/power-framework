@@ -30,6 +30,7 @@
         "version",
         "interfaces",
         "search",
+        "okf",
         "models",
         "storage",
         "environment",
@@ -87,6 +88,19 @@
           "additionalProperties": false
         },
         "search": { "type": "object" },
+        "okf": {
+          "type": "object",
+          "required": ["schema_version", "artifact", "required_fields"],
+          "properties": {
+            "schema_version": { "const": "power.okf-metadata.v1" },
+            "artifact": { "const": "docs/schemas/okf-metadata-v1.json" },
+            "required_fields": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
+        },
         "models": { "type": "object" },
         "storage": { "type": "object" },
         "environment": { "type": "object" },

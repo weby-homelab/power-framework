@@ -52,7 +52,7 @@ the role-specific guides before touching a vault:
   executable acceptance gate, FTS, and MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.md)** — complete PowerShell
   installation, Visual C++ prerequisite, exact interpreter paths, and checks
-- **[CLI reference](docs/cli.md)** — all 20 commands, flags, and actual exit behavior
+- **[CLI reference](docs/cli.md)** — all 24 commands, flags, and actual exit behavior
 - **[MCP server](docs/mcp-server.md)** — all 20 governed tools, rate limits,
   configured-vault boundary, and untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.md)** — 6-phase, manifest/hash-driven
@@ -69,8 +69,14 @@ The commands below are the shortest supported path for Linux and macOS. They
 assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
+> **3.5.0 candidate boundary:** the signed `v3.5.0` GitHub Release and tag are
+> not published from this worktree yet. The immutable wheel URL below becomes
+> executable only after the release workflow's tag, artifact, and remote
+> readback gates pass. To run the current candidate locally, use the locked
+> development install in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -105,7 +111,7 @@ Visual C++ prerequisites, isolated venv setup, immutable release wheel,
 acceptance checks, MCP configuration, troubleshooting, rollback, and uninstall
 steps.
 
-Direct Windows runtime execution was not part of the `v3.4.5` Linux release
+Direct Windows runtime execution is not part of the Linux release
 pipeline; the guide explicitly separates automated cross-platform regression
 coverage from checks that must pass on the target Windows host.
 
@@ -113,7 +119,7 @@ coverage from checks that must pass on the target Windows host.
 
 | Feature                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI**                          | 20 commands, including `power doctor` for read-only runtime/index diagnosis, `power cache` for namespace hygiene, `power import` for preflighted Markdown migration, `power memory` for explicit proposal/approval, and `power handoff` for durable cross-agent work packets                                                                                                                                                                                                                                                                                                                            |
+| **CLI**                          | 24 commands, including `power doctor` for read-only runtime/index diagnosis, `power connect` for conflict-safe local MCP setup, `power cache` for namespace hygiene, `power import` for preflighted Markdown migration, `power memory` for explicit proposal/approval, and `power handoff` for durable cross-agent work packets                                                                                                                                                                                                                                                                                                                            |
 | **MCP Server**                   | 20 tools, including governed memory context, proposal, apply, validation, history, `handoff_work`, and search-index synchronization operations                                                                                                                                                                                                                                                                                                                                                    |
 | **OKF Validation**               | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                             |
 | **Knowledge Graph (Graph RAG)**  | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                                                                             |
@@ -125,7 +131,7 @@ coverage from checks that must pass on the target Windows host.
 | **Markdown Checks**              | Detects trailing whitespace, inconsistent list markers, header jumps, missing code language — `power markdown-check <path>`                                                                                                                                                                                                                                                                                                                                                         |
 | **Relation Suggestions**         | Keyword & tag overlap analysis for Graph RAG enrichment — `power suggest-related <path>`                                                                                                                                                                                                                                                                                                                                                                                            |
 | **Cron Maintenance**             | Runs lint + index + rot audit in one command — `power cron <path>`                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Retrieval modes**              | FTS5 (BM25), local TF vector, Hybrid (RRF), Semantic and **Reranked** modes. The POWER 3.2 default requires a compatible dense index and fails with a `power sync` remediation message when assets are missing or incompatible. Semantic ranking applies a 5% confidence-bound lexical tie-break without adding candidates; an explicitly allowed FTS downgrade is marked in the result contract. Quality and resource figures require versioned evidence before any release claim. |
+| **Retrieval modes**              | `auto` (verified dense when ready, otherwise labelled FTS), FTS5 (BM25), local TF vector, Hybrid (RRF), explicit Semantic and **Reranked** modes. Explicit dense modes fail closed with a `power sync` remediation message when assets are missing or incompatible; auto exposes the actual mode and fallback reason. Quality and resource figures require versioned evidence before any release claim. |
 | **Cross-Encoder Reranker**       | The default BGE reranker is an Apache-2.0 ONNX snapshot with SHA-256 checks. Local `jinaai/jina-reranker-v2-base-multilingual` is CC-BY-NC-4.0 and requires `POWER_RERANKER=jina` plus `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` for permitted non-commercial use.                                                                                                                                                                                                                       |
 | **Hierarchical Index**           | `index.md` (navigation map) + recursive per-folder catalogs for token-efficient AI reading. Each generated page uses explicit links, carries a POWER ownership marker, and stays within a 32 KiB UTF-8 budget via `_index-N.md` pagination.                                                                                                                                                                                                                 |
 | **Graph RAG v2**                 | Phase 3 relation suggester: explicit OKF `related` links contribute a strong curated signal, fused with keyword/tag overlap into a **weighted, bidirectional similarity graph** with weighted BFS and degree/weight centrality (`power suggest-related --v2`). Confident predictions only, no fabricated links.                                                                                                                                                                     |
@@ -146,7 +152,7 @@ coverage from checks that must pass on the target Windows host.
 
 Read the historical v1.6.0 snapshot of the transition from flat to hierarchical
 indexing. Its measured vault counts, token estimates, source paths, test counts,
-and MCP inventory are historical evidence, not the current `v3.4.5` contract:
+and MCP inventory are historical evidence, not the current `v3.5.0` contract:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
@@ -193,7 +199,7 @@ domains:
           - keywords: [paper, experiment]
             weight: 2
           - tags: [science]
-      search_priority: [semantic, fts]
+      search_priority: [fts, semantic]
 ```
 
 Keep domain paths under a cataloged canonical folder, as in the example.
@@ -202,7 +208,8 @@ the selected template. `power search ... --mode auto --domain research` follows
 the domain priority and scopes candidates to the domain path. Only retrieval
 modes implemented by POWER are accepted; unsupported providers such as Qdrant
 are rejected instead of being advertised as available. Without a registry,
-legacy P.A.R.A. placement and the semantic search default are unchanged.
+legacy P.A.R.A. placement is unchanged; the default `auto` profile uses verified
+dense only when ready and otherwise returns labelled FTS.
 
 ## Who Is This For
 
@@ -216,19 +223,26 @@ legacy P.A.R.A. placement and the semantic search default are unchanged.
 power init <path>              Create a new vault with P.A.R.A. folder structure
 power lint <path>              Scan for broken links, missing metadata, orphans
 power index <path>             Generate hierarchical index (index.md + _index.md files)
+power cache list|prune <path>  Inspect or explicitly prune rebuildable cache namespaces
+power doctor [path]            Read-only runtime and index diagnosis
+power connect [path]           Plan/apply conflict-safe local MCP client setup
 power search <path> <query>    Full-text search with relevance scoring
 power ingest <path> [options]  Create a new note with validated OKF metadata
 power import <dir> --into FOLDER [options]
                                 Preflight/import an existing Markdown tree
 power memory <operation>       Governed memory context, proposal, apply, validation, and history
+power handoff <operation>      Durable cross-agent work packets and proof-carrying resume
 power sync <path>              Build FTS and dense search indexes
 power rot <path>               ROT Audit — detect redundant, outdated, trivial notes
 power status [path]            Show vault status dashboard (statistics & health metrics)
+power control-plane <path>     Preview/materialize the content-free control cockpit
+power maintenance <path>      Preview or explicitly apply hash-bound maintenance
+power migrate-state <path>    Inspect source/control/runtime/evidence state without writes
 power heal <path>              Auto-heal missing/invalid frontmatter
 power markdown-check <path>    Check markdown quality issues
 power archive <path>           Auto-archive stale notes to 04_Archive/
+power cron <path>              Run read-only maintenance plus rebuildable index projection
 power suggest-related <path>   Suggest cross-note relations for Graph RAG
-power cron <path>              Run automated maintenance (lint + index + rot)
 power synthesize <path>        Auto-ingest a session synthesis note
 power rename <path> --old OLD --new NEW   Rename a note and update related paths
 ```
@@ -256,8 +270,11 @@ The [MCP client onboarding guide](docs/mcp-client-onboarding.md) contains the
 canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
 OpenCode, plus the read-only golden task and approval workflow.
 
+The wheel URL below is the post-publication install contract; it is not a
+claim that the candidate has already been published.
+
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -322,7 +339,9 @@ AI agents read the vault efficiently by following this pattern:
 1. **Read `index.md`** — identify the relevant category by note counts
 2. **Call `read_sub_index` MCP tool** — get detailed entries for that category
 3. **Read specific notes** — only when the sub-index indicates relevance
-4. **NEVER glob all `.md` files** — use sub-indexes as a map (~75% token savings)
+4. **NEVER glob all `.md` files** — use sub-indexes as a map; the historical
+   v1.6 migration report records scenario-specific measurements, not a current
+   release guarantee
 
 Every note starts with validated YAML frontmatter. Core fields + optional governance and graph links:
 
@@ -351,7 +370,7 @@ related:
 The framework combines four complementary methodologies:
 
 - **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — Organizes files based on actionability into Projects, Areas, Resources, and Archives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
-- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation that slashes AI agent context usage by 75% to 94%.
+- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation. Historical v1.6 measurements are preserved in the migration report and are not a current release-quality claim.
 - **E.R.** — **Execution Rules** — Integrates operational rules and guidelines specifically formatted for AI agents (like `RULES.md`, `PROMPTS.md`, and system-level guidelines), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system. GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup.
 
 ### 🧠 Second Brain vs P.O.W.E.R. Framework Relationship & Collaboration
@@ -486,18 +505,18 @@ flowchart TD
 | `core/indexer.py`                         | Vault scanning and hierarchical index generation                                                                                                                                                                                   |
 | `core/linter.py`                          | Health checks: broken links, missing metadata, orphans, stale/expired notes                                                                                                                                                        |
 | `core/searcher.py`                        | Full-text search with relevance scoring (FTS5/Vector/Hybrid/Reranked); WAL mode + `busy_timeout` for parallel access                                                                                                               |
-| `core/embeddings.py`                      | Pluggable dense embedding manager: **BGE-M3 (default, 1024d, direct ONNX Runtime — `BGEM3OnnxManager`)** / Qwen3-0.6B / MiniLM-L12-v2 (light) via `POWER_EMBED_PROVIDER`, lazy init, tamed BFCArena, adaptive batch halving on OOM |
-| `core/reranker.py`                        | Cross-Encoder reranker: **`onnx-community/bge-reranker-v2-m3-ONNX`** (default) / Jina v2 (explicit non-commercial opt-in) / `Qwen3-Reranker-0.6B-ONNX` (provider=qwen3)                                                            |
+| `experimental/embeddings.py`              | Optional dense embedding manager: **BGE-M3 (default, 1024d, direct ONNX Runtime — `BGEM3OnnxManager`)** / Qwen3-0.6B / MiniLM-L12-v2 (light) via `POWER_EMBED_PROVIDER`, loaded only on dense paths |
+| `experimental/reranker.py`                 | Optional Cross-Encoder reranker: **`onnx-community/bge-reranker-v2-m3-ONNX`** (default) / Jina v2 (explicit non-commercial opt-in) / `Qwen3-Reranker-0.6B-ONNX` (provider=qwen3) |
 | `core/metrics/discounted_lexical_gain.py` | Legacy normalized discounted lexical proxy; `udcg.py` is a deprecated compatibility alias, not EACL-2026 UDCG                                                                                                                      |
-| `core/query_expansion.py`                 | Synonym map (EN/UK) & OpenRouter Multi-Query expansion                                                                                                                                                                             |
+| `experimental/query_expansion.py`         | Optional synonym map (EN/UK) & OpenRouter Multi-Query expansion                                                                                                                                                                    |
 | `core/chunker.py`                         | Semantic & contextual note splitter (Anthropic Contextual Retrieval)                                                                                                                                                               |
 | `core/healer.py`                          | Auto-fix missing/invalid frontmatter fields                                                                                                                                                                                        |
-| `core/relations.py`                       | Knowledge graph construction, BFS traversal, and Mermaid export                                                                                                                                                                    |
-| `core/rot_scoring.py`                     | A2 scoring: semantic content dedup, freshness, contradiction checks                                                                                                                                                                |
+| `experimental/relations.py`               | Optional knowledge graph construction, BFS traversal, and Mermaid export                                                                                                                                            |
+| `experimental/rot_scoring.py`             | Optional A2 scoring: semantic content dedup, freshness, contradiction checks                                                                                                                                          |
 | `core/markdown_checks.py`                 | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                                                                           |
 | `core/constants.py`                       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
 | `core/utils.py`                           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                                                                                    |
-| `core/cli.py`                             | Command-line interface with 20 commands, including read-only doctor diagnostics, preflighted import, transactional memory, and durable handoff workflows                                                                                                                           |
+| `core/cli.py`                             | Command-line interface with 24 commands, including read-only doctor diagnostics, conflict-safe MCP connection plans, preflighted import, transactional memory, and durable handoff workflows                                                                                                                           |
 | `mcp/power_server.py`                     | FastMCP 3.x server with 20 async tools, loopback HTTP transport, and `/health`                                                                                                                                                     |
 
 All components share `power_framework.core` as the single source of truth.
@@ -527,7 +546,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.4.5 release notes](docs/release-3.4.5.md) — current technical release
+- [P.O.W.E.R. 3.5.0 release notes](docs/release-3.5.0.md) — candidate contract and release gate
   scope, validation boundary, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is
@@ -605,7 +624,7 @@ description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF 
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
 operatingSystem: Linux, macOS, Windows
-softwareVersion: 3.4.5
+softwareVersion: 3.5.0
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

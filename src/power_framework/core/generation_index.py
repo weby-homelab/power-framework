@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import os
 import sqlite3
 import uuid
@@ -35,6 +36,8 @@ class IndexGenerationError(RuntimeError):
 
 GENERATION_STORE_SCHEMA_VERSION = 1
 RETAIN_READY_GENERATIONS = 2
+STALE_BUILD_TTL_SECONDS = 3600.0
+STALE_BUILD_TTL_ENV = "POWER_GENERATION_BUILD_TTL_SECONDS"
 
 
 class ActiveGenerationError(IndexGenerationError):
@@ -505,6 +508,101 @@ def active_dense_chunk_count(vault_dir: Path) -> int:
     return int(row[0])
 
 
+def _stale_build_ttl_seconds() -> float:
+    """Return the conservative crash-recovery lease duration."""
+    raw_value = os.getenv(STALE_BUILD_TTL_ENV)
+    if raw_value is None:
+        return STALE_BUILD_TTL_SECONDS
+    try:
+        value = float(raw_value)
+    except ValueError:
+        return STALE_BUILD_TTL_SECONDS
+    if not math.isfinite(value) or value < 0:
+        return STALE_BUILD_TTL_SECONDS
+    return value
+
+
+def _build_artifact_paths(vault_dir: Path, generation_id: str) -> tuple[Path, ...]:
+    """Return only the two UUID-owned artifact namespaces for one generation."""
+    try:
+        uuid.UUID(generation_id)
+    except ValueError:
+        return ()
+    staging = vault_cache_dir(vault_dir) / "staging" / f"{generation_id}.db"
+    generation = _generation_path(vault_dir, generation_id)
+    return tuple(
+        path
+        for database in (staging, generation)
+        for path in (
+            database,
+            database.with_name(database.name + "-wal"),
+            database.with_name(database.name + "-shm"),
+        )
+    )
+
+
+def _reap_stale_build_artifacts(vault_dir: Path) -> None:
+    """Reap only lease-expired, unpublished build artifacts after a crash.
+
+    A live writer may legitimately have a ``building`` row while it is still
+    building or between the generation move and pointer commit. The TTL is a
+    conservative lease: young rows are retained, while old UUID-owned files
+    are claimed failed before cleanup begins. This helper is best-effort so
+    a locked or read-only state store never blocks a new sync attempt.
+    """
+    now = datetime.now(UTC)
+    ttl_seconds = _stale_build_ttl_seconds()
+    state_path = _existing_state_db_path(vault_dir)
+    if state_path is None or not state_path.is_file():
+        return
+    try:
+        with closing(sqlite3.connect(state_path, timeout=30)) as conn:
+            active_row = conn.execute(
+                "SELECT generation_id FROM active_generation WHERE id = 1"
+            ).fetchone()
+            active_id = str(active_row[0]) if active_row else None
+            rows = conn.execute(
+                "SELECT generation_id, created_at FROM index_generations WHERE state = 'building'"
+            ).fetchall()
+            for generation_id, created_at in rows:
+                generation_id = str(generation_id)
+                if generation_id == active_id:
+                    continue
+                try:
+                    created = datetime.fromisoformat(str(created_at))
+                except ValueError:
+                    continue
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=UTC)
+                if (now - created).total_seconds() < ttl_seconds:
+                    continue
+                artifact_paths = _build_artifact_paths(vault_dir, generation_id)
+                claimed = conn.execute(
+                    """
+                    UPDATE index_generations
+                    SET state = 'failed', error = ?, completed_at = ?
+                    WHERE generation_id = ? AND state = 'building'
+                    """,
+                    ("reaped stale building row after crash", now.isoformat(), generation_id),
+                )
+                if claimed.rowcount != 1:
+                    # A concurrent publisher won the state transition; never
+                    # delete artifacts for a generation that may be active.
+                    continue
+                try:
+                    for path in artifact_paths:
+                        path.unlink(missing_ok=True)
+                except OSError:
+                    # A platform-specific handle may still hold one artifact.
+                    # Leave the failed row and artifact for manual inspection;
+                    # the active pointer remains untouched and publication is
+                    # fenced by the failed state below.
+                    continue
+            conn.commit()
+    except (OSError, sqlite3.Error) as exc:
+        logger.warning("Could not reap stale generation artifacts: %s", exc)
+
+
 def _cleanup_generations(vault_dir: Path) -> None:
     """Best-effort retention, called only after an active-generation readback."""
     with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
@@ -547,43 +645,56 @@ def _publish(
     os.replace(staging_path, generation_path)
     _fsync_directory(generation_path.parent)
     db_sha256, db_size = _file_identity(generation_path)
-    with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
-        _init_state_db(conn)
+    try:
+        with closing(sqlite3.connect(_state_db_path(vault_dir), timeout=30)) as conn:
+            _init_state_db(conn)
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                updated = conn.execute(
+                    """
+                    UPDATE index_generations
+                    SET state = 'ready', actual_files = ?, actual_chunks = ?,
+                        embedding_provider = ?, embedding_model = ?, db_sha256 = ?,
+                        db_size = ?, db_schema_version = ?, completed_at = ?
+                    WHERE generation_id = ? AND state = 'building'
+                    """,
+                    (
+                        actual_files,
+                        actual_chunks,
+                        embedding_provider,
+                        embedding_model,
+                        db_sha256,
+                        db_size,
+                        GENERATION_STORE_SCHEMA_VERSION,
+                        datetime.now(UTC).isoformat(),
+                        generation_id,
+                    ),
+                )
+                if updated.rowcount != 1:
+                    raise IndexGenerationError(
+                        f"generation build lease was revoked before publication: {generation_id}"
+                    )
+                conn.execute(
+                    """
+                    INSERT INTO active_generation (id, generation_id, activated_at)
+                    VALUES (1, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET generation_id = excluded.generation_id,
+                        activated_at = excluded.activated_at
+                    """,
+                    (generation_id, datetime.now(UTC).isoformat()),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+    except IndexGenerationError:
+        # The move precedes the state CAS. A revoked or otherwise failed
+        # unpublished generation must not remain in the immutable namespace.
         try:
-            conn.execute("BEGIN IMMEDIATE")
-            conn.execute(
-                """
-                UPDATE index_generations
-                SET state = 'ready', actual_files = ?, actual_chunks = ?,
-                    embedding_provider = ?, embedding_model = ?, db_sha256 = ?,
-                    db_size = ?, db_schema_version = ?, completed_at = ?
-                WHERE generation_id = ?
-                """,
-                (
-                    actual_files,
-                    actual_chunks,
-                    embedding_provider,
-                    embedding_model,
-                    db_sha256,
-                    db_size,
-                    GENERATION_STORE_SCHEMA_VERSION,
-                    datetime.now(UTC).isoformat(),
-                    generation_id,
-                ),
-            )
-            conn.execute(
-                """
-                INSERT INTO active_generation (id, generation_id, activated_at)
-                VALUES (1, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET generation_id = excluded.generation_id,
-                    activated_at = excluded.activated_at
-                """,
-                (generation_id, datetime.now(UTC).isoformat()),
-            )
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
+            generation_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Could not remove unpublished generation: %s", generation_id)
+        raise
     invalidate_active_generation_cache(vault_dir)
     resolved = resolve_active_generation_path(vault_dir)
     if resolved != generation_path:
@@ -738,6 +849,7 @@ def sync_vault_atomically(
     """
     root = Path(vault_dir).expanduser().resolve()
     ensure_vault_identity(root)
+    _reap_stale_build_artifacts(root)
     if not sync_embeddings and not accept_dense_loss:
         existing_chunks = active_dense_chunk_count(root)
         if existing_chunks:

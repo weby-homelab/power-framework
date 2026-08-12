@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.4.5"
+title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.5.0"
 description: "Fail-closed, manifest-driven protocol for migrating an existing Markdown knowledge base to a verified P.O.W.E.R. vault without modifying the source."
 tags: [power, migration, guide, ai-agents, safety, verification]
 timestamp: 2026-08-08T12:00:00+03:00
 ---
 
-# AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.4.5
+# AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.5.0
 
 This guide is written as an execution contract for any AI agent with filesystem
 access. It migrates a Markdown or Obsidian knowledge base into the canonical
@@ -65,12 +65,13 @@ manifest instead of pretending that one command performs a lossless migration.
 
 ## Version-stamped executable facts
 
-This guide is verified against the pinned `v3.4.5` release. CI checks these
+This guide is verified against the pinned `v3.5.0` candidate contract. CI checks these
 facts against the executable capability manifest so an agent does not inherit
 an older migration recipe:
 
-- the current surface is 20 top-level CLI commands and 20 MCP tools;
-- the default search mode is `semantic`; `reranked` is explicit opt-in;
+- the current surface is 24 top-level CLI commands and 20 MCP tools;
+- the default search mode is `auto`; it uses verified dense when ready and
+  otherwise labelled FTS; `semantic` and `reranked` are explicit opt-ins;
 - database and cache paths are runtime-owned. Use `power doctor DESTINATION
   --json` to read the active paths and state; never hard-code a vault-local
   database filename;
@@ -261,11 +262,11 @@ manifest checksum, and zero unaccounted authorized source files.
 
 ### 3.1 Install and preflight P.O.W.E.R.
 
-Use the pinned `v3.4.5` environment from Getting Started and verify:
+Use the pinned `v3.5.0` environment from Getting Started and verify:
 
 ```bash
 power --version
-python -c 'import power_framework.mcp, onnxruntime; print("imports: OK")'
+python -c 'import power_framework; print("lean FTS import: OK")'
 ```
 
 Use the interpreter that actually owns the `power` executable.

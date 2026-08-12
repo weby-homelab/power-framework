@@ -14,9 +14,18 @@ Usage:
 
 from __future__ import annotations
 
+from importlib import import_module
+
+from .application import ApplicationEnvelope, ApplicationService, AuditReceipt, RequestContext
 from .chunker import SemanticChunker
-from .cli import main as cli_main
-from .embeddings import get_embedding_manager
+from .connect import ConnectPlan, apply_connect_plan, build_connect_plan
+from .control_plane import (
+    build_control_plane,
+    build_obsidian_base,
+    remove_obsidian_base,
+    write_control_plane,
+    write_obsidian_base,
+)
 from .handoff import (
     WorkPacket,
     WorkPacketState,
@@ -26,6 +35,7 @@ from .handoff import (
     read_work_packet,
 )
 from .healer import HealFailure, HealReport, heal_frontmatter, heal_vault, heal_vault_report
+from .health_loop import HealthCycle, HealthLoop, HealthNotification
 from .indexer import (
     generate_index_content,
     generate_log_initial,
@@ -37,6 +47,7 @@ from .indexer import (
     scan_folder_notes,
     scan_vault_notes,
 )
+from .lifecycle import LifecycleAdapter, LifecycleCapability, LifecycleEnvelope, capability_matrix
 from .linter import (
     LintResult,
     ROTResult,
@@ -46,6 +57,13 @@ from .linter import (
     run_rot_audit,
     run_rot_report,
     run_status_report,
+)
+from .maintenance import (
+    MaintenanceAction,
+    MaintenancePlan,
+    MaintenanceReceipt,
+    apply_maintenance_plan,
+    build_maintenance_plan,
 )
 from .markdown_checks import (
     check_all,
@@ -91,22 +109,18 @@ from .parser import (
     read_file_content,
     validate_metadata,
 )
-from .query_expansion import QueryExpander
-from .relations import (
-    KnowledgeGraph,
-    RelationSuggestion,
-    format_relation_suggestions,
-    suggest_related,
-    suggest_related_semantic,
-)
-from .reranker import RerankerManager
-from .rot_scoring import (
-    TYPE_HALF_LIFE_DAYS,
-    ContentDedupDetector,
-    ContradictionDetector,
-    FreshnessScorer,
-    LinkRotChecker,
-    UsageTracker,
+from .provenance import (
+    PROVENANCE_SCHEMA_VERSION,
+    EvidenceCapture,
+    ProvenanceError,
+    ProvenanceRecord,
+    capture_bytes,
+    capture_file,
+    capture_file_to_store,
+    is_stale,
+    read_captured_evidence,
+    same_content,
+    verify_bytes,
 )
 from .searcher import (
     CANONICAL_SEARCH_MODES,
@@ -118,6 +132,13 @@ from .searcher import (
     normalize_search_mode,
     search_vault,
 )
+from .state_migration import (
+    STATE_MIGRATION_SCHEMA,
+    StateEntry,
+    StateMigrationPlan,
+    apply_state_migration_plan,
+    build_state_migration_plan,
+)
 from .temporal import TemporalStatus, TemporalView, normalize_as_of, normalize_temporal_view
 from .utils import (
     RateLimiter,
@@ -127,14 +148,56 @@ from .utils import (
     clean_note_name,
     create_backup,
     get_cache_dir,
+    prune_backups,
     resolve_path_in_vault,
     resolve_vault_path,
+    restore_backup,
     validate_path_in_vault,
     validate_vault_path,
 )
 from .write_queue import enqueue_write
 
-EmbeddingManager = get_embedding_manager  # backward compat alias
+_OPTIONAL_EXPORTS = {
+    "cli_main": ("power_framework.core.cli", "main"),
+    "EmbeddingManager": ("power_framework.experimental.embeddings", "get_embedding_manager"),
+    "QueryExpander": ("power_framework.experimental.query_expansion", "QueryExpander"),
+    "KnowledgeGraph": ("power_framework.experimental.relations", "KnowledgeGraph"),
+    "RelationSuggestion": ("power_framework.experimental.relations", "RelationSuggestion"),
+    "format_relation_suggestions": (
+        "power_framework.experimental.relations",
+        "format_relation_suggestions",
+    ),
+    "suggest_related": ("power_framework.experimental.relations", "suggest_related"),
+    "suggest_related_semantic": (
+        "power_framework.experimental.relations",
+        "suggest_related_semantic",
+    ),
+    "RerankerManager": ("power_framework.experimental.reranker", "RerankerManager"),
+    "TYPE_HALF_LIFE_DAYS": ("power_framework.experimental.rot_scoring", "TYPE_HALF_LIFE_DAYS"),
+    "ContentDedupDetector": (
+        "power_framework.experimental.rot_scoring",
+        "ContentDedupDetector",
+    ),
+    "ContradictionDetector": (
+        "power_framework.experimental.rot_scoring",
+        "ContradictionDetector",
+    ),
+    "FreshnessScorer": ("power_framework.experimental.rot_scoring", "FreshnessScorer"),
+    "LinkRotChecker": ("power_framework.experimental.rot_scoring", "LinkRotChecker"),
+    "UsageTracker": ("power_framework.experimental.rot_scoring", "UsageTracker"),
+}
+
+
+def __getattr__(name: str) -> object:
+    """Load experimental and CLI compatibility exports only when requested."""
+    target = _OPTIONAL_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute_name = target
+    value = getattr(import_module(module_name), attribute_name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "CANONICAL_SEARCH_MODES",
@@ -143,32 +206,53 @@ __all__ = [
     "MAX_TITLE_LENGTH",
     "NOTE_TYPE_ORDER",
     "PARA_FOLDERS",
+    "PROVENANCE_SCHEMA_VERSION",
     "SEARCH_MODE_ALIASES",
+    "STATE_MIGRATION_SCHEMA",
     "TYPE_HALF_LIFE_DAYS",
     "VAULT_STRUCTURE",
+    "ApplicationEnvelope",
+    "ApplicationService",
+    "AuditReceipt",
+    "ConnectPlan",
     "ContentDedupDetector",
     "ContradictionDetector",
     "EmbeddingManager",
+    "EvidenceCapture",
     "FreshnessScorer",
     "HealFailure",
     "HealReport",
+    "HealthCycle",
+    "HealthLoop",
+    "HealthNotification",
     "KnowledgeGraph",
+    "LifecycleAdapter",
+    "LifecycleCapability",
+    "LifecycleEnvelope",
     "LinkRotChecker",
     "LintResult",
+    "MaintenanceAction",
+    "MaintenancePlan",
+    "MaintenanceReceipt",
     "MemoryKind",
     "MemoryMetadata",
     "NoteFile",
     "NoteStatus",
     "NoteType",
     "OKFMetadata",
+    "ProvenanceError",
+    "ProvenanceRecord",
     "QueryExpander",
     "ROTResult",
     "RateLimiter",
     "RelationSuggestion",
+    "RequestContext",
     "RerankerManager",
     "SearchResult",
     "SemanticChunker",
     "Sensitivity",
+    "StateEntry",
+    "StateMigrationPlan",
     "TemporalStatus",
     "TemporalView",
     "TypedRelation",
@@ -179,10 +263,22 @@ __all__ = [
     "__version__",
     "advance_work_packet",
     "apply_change",
+    "apply_connect_plan",
+    "apply_maintenance_plan",
+    "apply_state_migration_plan",
     "archive_stale_notes",
     "atomic_write",
     "atomic_write_in_vault",
+    "build_connect_plan",
+    "build_control_plane",
     "build_frontmatter",
+    "build_maintenance_plan",
+    "build_obsidian_base",
+    "build_state_migration_plan",
+    "capability_matrix",
+    "capture_bytes",
+    "capture_file",
+    "capture_file_to_store",
     "check_all",
     "check_code_block_language",
     "check_header_jumps",
@@ -212,17 +308,22 @@ __all__ = [
     "heal_frontmatter",
     "heal_vault",
     "heal_vault_report",
+    "is_stale",
     "list_work_packets",
     "normalize_as_of",
     "normalize_search_mode",
     "normalize_temporal_view",
     "parse_frontmatter",
     "propose_change",
+    "prune_backups",
+    "read_captured_evidence",
     "read_file_content",
     "read_history",
     "read_work_packet",
+    "remove_obsidian_base",
     "resolve_path_in_vault",
     "resolve_vault_path",
+    "restore_backup",
     "run_blocking",
     "run_generate_hierarchical_index",
     "run_generate_index",
@@ -233,6 +334,7 @@ __all__ = [
     "run_rot_report",
     "run_status_report",
     "run_vault_mutation",
+    "same_content",
     "scan_folder_notes",
     "scan_vault_notes",
     "search_vault",
@@ -242,4 +344,7 @@ __all__ = [
     "validate_path_in_vault",
     "validate_state",
     "validate_vault_path",
+    "verify_bytes",
+    "write_control_plane",
+    "write_obsidian_base",
 ]

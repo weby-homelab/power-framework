@@ -103,7 +103,7 @@ def synthesize_session_ingest(
     # Graph extraction is deliberately an optional projection.  A failure here
     # must not invalidate the already verified Markdown/search transaction.
     try:
-        from .graph_extraction import store_note_triplets
+        from power_framework.experimental.graph_extraction import store_note_triplets
 
         store_note_triplets(vault, name, content)
     except Exception as exc:

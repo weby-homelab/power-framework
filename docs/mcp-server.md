@@ -1,6 +1,6 @@
 # MCP Server (FastMCP 3.x)
 
-P.O.W.E.R. `v3.4.5` exposes 20 governed tools through the
+P.O.W.E.R. `v3.5.0` exposes 20 governed tools through the
 [Model Context Protocol](https://modelcontextprotocol.io), powered by
 [FastMCP 3.x](https://gofastmcp.com). MCP-compatible agents can validate,
 index, retrieve, and perform bounded writes in one configured vault.
@@ -316,7 +316,7 @@ Search and return a provenance-bearing untrusted retrieval envelope.
 search_vault_tool(
   query: string,
   max_results: integer = 20,
-  search_mode: string = "semantic",
+  search_mode: string = "auto",
   temporal_view: string = "current",
   as_of?: string,
   domain?: string,
@@ -325,9 +325,9 @@ search_vault_tool(
 ```
 
 - `max_results` must be 1–20;
-- canonical modes: `semantic` (default), `fts`, `vector`, `hybrid`,
-  `reranked`, and `graph_assisted`;
-- `auto` follows a configured domain priority;
+- canonical modes: `auto` (default; verified dense or labelled FTS), `fts`,
+  `vector`, `hybrid`, `semantic`, `reranked`, and `graph_assisted`;
+- `auto` follows configured domain priority when a domain is selected;
 - deprecated `hybrid_reranked` maps to `reranked`;
 - `temporal_view`: `current`, `historical`, or `all`;
 - `as_of`: inclusive ISO date lifecycle boundary;

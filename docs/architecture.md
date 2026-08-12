@@ -7,8 +7,8 @@ src/power_framework/
 ├── __init__.py         # Public API exports
 ├── py.typed            # PEP 561 marker
 ├── core/
-│   ├── __init__.py     # Re-exports all core modules
-│   ├── cli.py          # CLI entry point (argparse) — 20 commands
+│   ├── __init__.py     # Stable core exports; optional exports are lazy
+│   ├── cli.py          # CLI entry point (argparse) — 24 commands
 │   ├── constants.py    # Centralized constants (exclusion lists, skip files, system dirs)
 │   ├── healer.py       # Frontmatter Healer
 │   ├── markdown_checks.py  # Markdown quality checks
@@ -16,15 +16,22 @@ src/power_framework/
 │   ├── parser.py       # YAML frontmatter parsing (PyYAML)
 │   ├── linter.py       # Vault health + ROT audit + archive
 │   ├── indexer.py      # Hierarchical index generation
-│   ├── relations.py    # Entity extraction + relation suggestions (Graph RAG)
-│   ├── rot_scoring.py  # A2 scoring: dedup, freshness, link rot, usage
 │   ├── searcher.py     # Full-text search (FTS5/Vector/Hybrid/Reranked)
-│   ├── embeddings.py   # Dense embedding managers (BGEM3OnnxManager canonical; fastembed/qwen3/ollama opt-in)
-│   ├── reranker.py     # Cross-Encoder reranker (BGE ONNX default; Jina opt-in)
-│   ├── query_expansion.py # Synonym map (EN/UK) + OpenRouter Multi-Query expansion
 │   ├── chunker.py      # Semantic & contextual chunker (Anthropic Contextual Retrieval)
 │   ├── metrics/        # Retrieval metrics (legacy discounted lexical gain; true UDCG deferred)
+│   ├── application.py  # Stable typed use-case boundary for all transports
+│   ├── control_plane.py # Content-free Markdown cockpit and optional Bases asset
+│   ├── lifecycle.py    # Portable read-only session lifecycle adapters
+│   ├── health_loop.py  # Cheap deduplicated health observations/backoff
+│   ├── provenance.py   # Opt-in exact-byte evidence capture and verification
 │   └── utils.py        # Path safety, atomic writes, version, rate limiter
+├── experimental/       # Optional adapters, never imported by core startup
+│   ├── embeddings.py    # Dense embedding managers
+│   ├── reranker.py      # Cross-encoder and opt-in rerankers
+│   ├── query_expansion.py # Synonym/LLM query expansion
+│   ├── relations.py     # Graph relation suggestions
+│   ├── rot_scoring.py   # Semantic ROT scoring
+│   └── graph_extraction.py # Untrusted graph candidates
 └── mcp/
     ├── __init__.py     # Package marker
     ├── __main__.py     # python -m entry point
@@ -66,9 +73,23 @@ tests/
 
 ## API boundaries
 
-- **Core library** — All business logic lives in `power_framework.core`. Importable from `power_framework.core` or top-level `power_framework`.
+- **Core library** — Stable FTS, parsing, mutation, handoff and application logic lives in `power_framework.core`. Optional dense, graph and ROT adapters live in `power_framework.experimental` and are loaded only when requested.
 - **CLI** — Thin argparser wrapper delegating to core functions. Entry: `power_framework.core.cli:main`.
-- **MCP server** — Thin orchestration layer delegating to core. Uses `asyncio.to_thread()` for all filesystem I/O. Async tools with `ToolError` for structured errors.
+- **MCP server** — Thin orchestration layer delegating to the application
+  boundary for stable use cases. Uses `asyncio.to_thread()` for filesystem I/O;
+  legacy tools retain compatibility wrappers while new workflows use typed
+  envelopes and content-free receipts.
+- **Lifecycle and health** — Native hooks are optional; every supported client
+  has the portable MCP + Skill contract. Cheap health checks call lightweight
+  doctor only, never load a model, use network, or mutate vault content.
+- **Optional boundary** — `core.__init__` does not eagerly import embeddings,
+  rerankers, graph/relation, query-expansion or ROT implementations. Compatibility
+  module paths remain lazy shims while canonical implementations are under
+  `power_framework.experimental`.
+- **Human cockpit fallback** — `power control-plane` always supports the
+  conflict-safe `POWER_STATUS.md` view. `--obsidian-base` adds a marker-owned
+  `POWER Control.base` with four optional tables; removing it is scoped to that
+  generated file and cannot remove user notes.
 - **No circular dependencies** — Core never imports from `mcp`. MCP imports only from core.
 
 ## Canonical retrieval registry
@@ -86,10 +107,11 @@ because they are compatibility input, not canonical modes.
 | `reranked` | `fts + tf_vector + dense` | `rrf` | yes | yes |
 | `graph_assisted` | `fts + tf_vector + graph` | `rrf_graph` | no | no |
 
-The current default is `semantic`; `reranked` is an explicit opt-in until the
-frozen quality and latency comparison in Issue #187 supports another default.
-An unavailable dense index fails closed unless the caller explicitly enables
-the documented fallback, which is labelled in the result contract.
+The current default is `auto`, not `reranked`: it uses a verified dense
+generation only when the canonical runtime and local model snapshot are ready;
+otherwise it uses FTS and labels the actual mode and fallback reason. Explicit
+`semantic` remains fail-closed when its dense contract is unavailable unless the
+caller enables the documented, labelled fallback.
 
 ## Canonical model contract
 

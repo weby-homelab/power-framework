@@ -1,8 +1,14 @@
-# 🚀 Hybrid Fleet Architecture: Asynchronous GPU Vector Offloading for Intermittent Workstations
+# ⚠️ Hybrid Fleet GPU Offloading: Quarantined 3.5++ Design Note
 
 > **Pattern Category:** Infrastructure & Deployment Guides  
 > **Target Audience:** System Architects, DevOps Engineers, Homelab Administrators, AI Coding Agent Operators  
-> **Applies to:** P.O.W.E.R. Framework 3.4.0+
+> **Applies to:** Optional 3.5++ research only; not part of the lean 3.5.0 release path.
+
+> **Safety status:** Fleet transfer is quarantined. POWER 3.5.0 keeps Markdown as
+> source of truth and local FTS as the canonical retrieval path. Do not copy a
+> remote SQLite/cache tree into a live vault; a signed artifact manifest,
+> quarantine import, exact source snapshot check, and atomic activation are still
+> required before this design can be enabled.
 
 ---
 
@@ -17,7 +23,10 @@ Deploying hybrid search and Retrieval-Augmented Generation (RAG) across heteroge
    - **Strengths:** Fast GPU tensor cores (sub-second Cross-Encoder reranking, high-throughput vector embedding).
    - **Weaknesses:** High idle power draw (300–600W); frequently powered off overnight, during off-hours, or when traveling.
 
-This guide details the **Asynchronous GPU Offloading with Resilient Pull Sync** pattern. This architecture enables a low-power, 24/7 server to consume GPU-computed SQLite search indexes built by an intermittent workstation **without requiring the workstation to remain powered on 24/7**.
+This note records the deferred **Asynchronous GPU Offloading** idea. It is not an
+installation recipe and makes no transfer, latency, power, or corruption-safety
+promise. The supported workflow is to build a local index with `power sync`; an
+intermittent GPU host may be evaluated later through the quarantined fleet track.
 
 ---
 
@@ -25,21 +34,10 @@ This guide details the **Asynchronous GPU Offloading with Resilient Pull Sync** 
 
 ```mermaid
 flowchart TD
-    subgraph WS ["High-Performance Workstation (Intermittent / Scheduled)"]
-        A[NVIDIA CUDA GPU] -->|CUDAExecutionProvider| B[BGE-M3 Dense Embedder]
-        B -->|power sync --force| C[SQLite Vector Database generation.db]
-    end
-
-    subgraph NET ["Private Mesh Network (Tailscale / WireGuard / SSH)"]
-        C ==>|rsync over SSH| D{Resilience Ping Probe}
-    end
-
-    subgraph CORE ["Low-Power 24/7 Core Server (Always On)"]
-        D -->|WS Online| E[Pull Latest SQLite Database]
-        D -->|WS Offline / Overnight| F[Retain Existing Local SQLite Database Cache]
-        E --> G[P.O.W.E.R. Local Search Engine]
-        F --> G[P.O.W.E.R. Local Search Engine]
-    end
+    S[Markdown source of truth] --> F[Local FTS generation]
+    F --> C[P.O.W.E.R. 3.5.0 canonical search]
+    G[Optional GPU dense generation] --> Q[Quarantine only]
+    Q -.->|not activated in 3.5.0| C
 ```
 
 ---
@@ -84,70 +82,35 @@ On the GPU Workstation, configure P.O.W.E.R. to bind ONNX Runtime to `CUDAExecut
 
 ---
 
-### Step 2: Resilient Pull Automation on the 24/7 Core Server
+### Step 2: Fleet transfer is quarantined
 
-Because the GPU Workstation turns off periodically, traditional cron jobs running on the workstation will fail during off-hours. 
-
-Instead, the **Always-On Core Server** triggers an automated pull script that first probes workstation reachability over SSH/Tailscale.
-
-Create `/usr/local/bin/sync_vector_db_resilient.sh` on the 24/7 Core Server:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-# ------------------------------------------------------------------------------
-# Universal Resilient Vector DB Pull Script
-# Host: 24/7 Always-On Server
-# ------------------------------------------------------------------------------
-
-# Configuration (Customize for your fleet)
-REMOTE_HOST="100.68.179.109"                  # Remote Workstation IP or Hostname
-REMOTE_USER="root"                             # SSH Username
-VAULT_UUID="9fbead1a-5b14-413f-814a-4f37af5656bc" # P.O.W.E.R Vault UUID
-SSH_TIMEOUT=3                                  # Timeout in seconds
-
-LOCAL_CACHE_DIR="/root/.cache/power-framework/vaults/${VAULT_UUID}"
-REMOTE_CACHE_DIR="/root/.cache/power-framework/vaults/${VAULT_UUID}"
-
-echo "🔍 Probing reachability of GPU Workstation (${REMOTE_HOST})..."
-
-if ssh -o "ConnectTimeout=${SSH_TIMEOUT}" -o "BatchMode=yes" "${REMOTE_USER}@${REMOTE_HOST}" "echo online" >/dev/null 2>&1; then
-    echo "⚡ Workstation is ONLINE! Syncing GPU-built vector database..."
-    mkdir -p "${LOCAL_CACHE_DIR}"
-    rsync -avz --update "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_CACHE_DIR}/" "${LOCAL_CACHE_DIR}/"
-    echo "✅ Vector database sync completed successfully!"
-else
-    echo "ℹ️ Workstation is OFFLINE (turned off or sleeping). Retaining local vector database cache."
-fi
-```
-
-Make the script executable:
-```bash
-chmod +x /usr/local/bin/sync_vector_db_resilient.sh
-```
+The legacy helper `scripts/sync_brain_db_from_ws.sh` is intentionally a no-op.
+It performs no SSH probe, cache creation, or database transfer. Do not recreate
+the old whole-cache pull pattern under another name. A future implementation
+must first define the artifact manifest, vault/source identity, exact snapshot
+hash, schema/model compatibility, free-space policy, `.partial` handling,
+atomic activation, and rollback/readback receipts.
 
 ---
 
-## 📊 4. Benchmark & Efficiency Gains
+## 📊 4. Evidence boundary
 
-Empirical benchmarks conducted across a 727-note knowledge vault (5,623 dense 1024d vectors) demonstrate the dramatic performance and power efficiency of this hybrid architecture:
-
-| Operation | 24/7 Low-Power Node (CPU) | Workstation (NVIDIA CUDA GPU) | Architectural Benefit |
-| :--- | :--- | :--- | :--- |
-| **Dense Vector Embedding Sync** | ~15–20 minutes (CPU) | **< 35 seconds (GPU)** | 30x faster index generation |
-| **Semantic Search (P95 Latency)** | 1265.7 ms | **456.8 ms** | 2.77x latency reduction |
-| **Cross-Encoder Reranking (P50)** | 87,822 ms | **985.0 ms** | **89.2x acceleration** |
-| **Index Network Transfer (rsync)** | N/A | **7.5 seconds (177 MB)** | Instant database hydration |
-| **24/7 Power Consumption** | **~15 W (Low Power)** | **0 W (Powered Off)** | **Zero idle GPU energy waste** |
+No fleet latency, transfer-size, power, or cross-host corruption claim is part of
+the 3.5.0 evidence set. Any future comparison must publish the host, model lock,
+source snapshot, generation identity, warm/cold state, failure cases, and
+readback receipt; synthetic numbers must not be presented as production facts.
 
 ---
 
 ## 🔒 5. Best Practices & Operational Rules
 
-1. **Deterministic Vault UUIDs:** P.O.W.E.R. computes vault UUIDs deterministically based on vault structure, ensuring the `.db` generation files generated on the GPU workstation match the local cache schema on the core server.
-2. **Read-Only Lock Safety:** SQLite WAL mode ensures that running `rsync` while P.O.W.E.R. search queries are executing on the 24/7 core server does not cause database corruption.
-3. **Automated Scheduling:** On the 24/7 core server, run the pull script via a systemd timer or cron job every 30 minutes. When the workstation is off, the script exits cleanly in under 3 seconds without generating alerts.
+1. **Source identity:** Never infer compatibility from a path, UUID, filename, or
+   WAL mode. Verify the exact current source snapshot and signed artifact manifest.
+2. **Quarantine first:** Receive artifacts as `.partial`/quarantined data, verify
+   integrity and compatibility, and keep the last-good local generation and FTS
+   available until an atomic activation and readback succeed.
+3. **Non-blocking release path:** Fleet/GPU offloading is optional 3.5++ work;
+   absence or degradation must leave local FTS search fully usable.
 
 ---
 *Documentation maintained by the P.O.W.E.R. Framework Core Development Team.*

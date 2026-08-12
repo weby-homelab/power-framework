@@ -71,7 +71,10 @@ def verify(evidence_path: Path, contract_path: Path = CONTRACT_DEFAULT) -> list[
         errors.append("unsupported evidence schema")
     if contract.get("scope") != "machine_only" or evidence.get("scope") != "machine_only":
         errors.append("scope must be machine_only")
-    if contract.get("human_evidence_used") is not False or evidence.get("human_evidence_used") is not False:
+    if (
+        contract.get("human_evidence_used") is not False
+        or evidence.get("human_evidence_used") is not False
+    ):
         errors.append("human evidence is forbidden")
     if contract.get("sealed_accessed") is not False or evidence.get("sealed_accessed") is not False:
         errors.append("sealed access is forbidden")
@@ -122,7 +125,9 @@ def verify(evidence_path: Path, contract_path: Path = CONTRACT_DEFAULT) -> list[
         paired_entry = paired.get(key, {})
         baseline_value = baseline.get(key)
         delta = paired_entry.get("delta")
-        if not all(isinstance(value, (int, float)) for value in (candidate_value, baseline_value, delta)):
+        if not all(
+            isinstance(value, (int, float)) for value in (candidate_value, baseline_value, delta)
+        ):
             errors.append(f"missing numeric metric: {key}")
             continue
         if candidate_value < float(minimum):
@@ -139,10 +144,7 @@ def verify(evidence_path: Path, contract_path: Path = CONTRACT_DEFAULT) -> list[
         errors.append("quality_gate is not PASS")
 
     forbidden = [
-        marker
-        for text in _walk_strings(evidence)
-        for marker in FORBIDDEN_MARKERS
-        if marker in text
+        marker for text in _walk_strings(evidence) for marker in FORBIDDEN_MARKERS if marker in text
     ]
     if forbidden:
         errors.append(f"forbidden private/sealed marker in evidence: {sorted(set(forbidden))}")

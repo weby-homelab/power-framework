@@ -64,7 +64,7 @@ INDEX_FOLDERS: tuple[str, ...] = (*PARA_FOLDERS_, "PROTOCOLS")
 # useful to agents even when a vault contains thousands of notes.
 INDEX_MAX_BYTES = 32 * 1024
 
-SKIP_FILES: frozenset[str] = frozenset({"index.md", "log.md", "_index.md"})
+SKIP_FILES: frozenset[str] = frozenset({"index.md", "log.md", "_index.md", "POWER_STATUS.md"})
 
 SYSTEM_SKIP_PARTS: tuple[str, ...] = (".git", "05_Templates", ".system_generated")
 

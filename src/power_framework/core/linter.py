@@ -524,7 +524,7 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
 
     # Extended A2 scoring
     if extended:
-        from .rot_scoring import (
+        from power_framework.experimental.rot_scoring import (
             ContentDedupDetector,
             ContradictionDetector,
             FreshnessScorer,
@@ -669,10 +669,11 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
 def run_status_report(vault_dir: Path) -> str:
     """Generate a high-density, visual status report of the vault's structure, health, and knowledge graph RAG connectivity."""
 
+    from power_framework.experimental.relations import KnowledgeGraph
+
     from .ignore import should_skip
     from .models import NoteFile
     from .parser import validate_metadata
-    from .relations import KnowledgeGraph
 
     today = datetime.now(UTC).date()
 

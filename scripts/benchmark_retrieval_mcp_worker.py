@@ -9,12 +9,13 @@ import sys
 from pathlib import Path
 from time import perf_counter
 
+from power_framework.core import application
 from power_framework.core.benchmark_resources import resource_snapshot
 from power_framework.core.timing import collect_timings
 from power_framework.mcp import power_server
 
 _original_search = power_server.search_vault
-_original_format = power_server.format_untrusted_search_envelope
+_original_format = application.format_untrusted_search_envelope
 _last_receipt = None
 
 
@@ -43,7 +44,7 @@ def _format_with_receipt(*args: object, **kwargs: object) -> str:
 
 
 power_server.search_vault = _timed_search
-power_server.format_untrusted_search_envelope = _format_with_receipt
+application.format_untrusted_search_envelope = _format_with_receipt
 
 
 if __name__ == "__main__":

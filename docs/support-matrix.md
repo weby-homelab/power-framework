@@ -1,6 +1,6 @@
 # P.O.W.E.R. platform support matrix
 
-This matrix is the operational boundary for the current `v3.4.5` contract. It
+This matrix is the operational boundary for the current `v3.5.0` candidate contract. It
 separates automated lifecycle coverage from model-backed, physical-host, GPU,
 and retrieval-quality evidence. A green CI job does not certify a different
 host, provider, corpus, or performance envelope.
@@ -29,8 +29,8 @@ host, provider, corpus, or performance envelope.
 
 ## Source of truth
 
-The executable checks live in [CI](../.github/workflows/ci.yml), the release
-workflow is [release.yml](../.github/workflows/release.yml), and the physical
+The executable checks live in [CI](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/ci.yml), the release
+workflow is [release.yml](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/release.yml), and the physical
 Windows procedure is [windows-11-installation.md](windows-11-installation.md).
 The roadmap records evidence boundaries and pending gates in
 [`ROADMAP_POWER.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md).

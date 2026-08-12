@@ -1,0 +1,296 @@
+{
+  "$defs": {
+    "MemoryKind": {
+      "description": "Functional role of a governed memory record.",
+      "enum": [
+        "semantic",
+        "episodic",
+        "procedural",
+        "intent"
+      ],
+      "title": "MemoryKind",
+      "type": "string"
+    },
+    "MemoryMetadata": {
+      "additionalProperties": true,
+      "description": "Optional OKF v0.2 lifecycle and provenance metadata for one note.",
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/MemoryKind"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity",
+          "default": "internal"
+        },
+        "sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "supersedes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supersedes",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_until": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid Until"
+        },
+        "write_policy": {
+          "$ref": "#/$defs/WritePolicy",
+          "default": "human"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "MemoryMetadata",
+      "type": "object"
+    },
+    "NoteStatus": {
+      "description": "Lifecycle status for governance tracking.",
+      "enum": [
+        "active",
+        "review",
+        "archived"
+      ],
+      "title": "NoteStatus",
+      "type": "string"
+    },
+    "NoteType": {
+      "description": "Allowed OKF note types according to P.A.R.A. + LLM-Wiki schema.",
+      "enum": [
+        "Project",
+        "Area",
+        "Resource",
+        "Daily Log",
+        "Archive",
+        "System Guide"
+      ],
+      "title": "NoteType",
+      "type": "string"
+    },
+    "Sensitivity": {
+      "description": "Local handling class for memory content.",
+      "enum": [
+        "public",
+        "internal",
+        "sensitive"
+      ],
+      "title": "Sensitivity",
+      "type": "string"
+    },
+    "TypedRelation": {
+      "additionalProperties": true,
+      "description": "A typed relation between two notes in the knowledge graph.\n\nFields:\n  path: Relative path to the related note\n  relation: Semantic relation type (e.g. 'related_to', 'depends_on', 'references')\n  confidence: Confidence score for the relation (0.0 - 1.0)",
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "description": "Confidence score (0.0 - 1.0)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "path": {
+          "description": "Relative path to the related note",
+          "title": "Path",
+          "type": "string"
+        },
+        "relation": {
+          "default": "related_to",
+          "description": "Semantic relation type",
+          "title": "Relation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "TypedRelation",
+      "type": "object"
+    },
+    "WritePolicy": {
+      "description": "How a memory record was allowed to enter the vault.",
+      "enum": [
+        "human",
+        "agent-proposed",
+        "agent-approved"
+      ],
+      "title": "WritePolicy",
+      "type": "string"
+    }
+  },
+  "$id": "https://weby-homelab.github.io/power-framework/schemas/okf-metadata-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Strict Pydantic model for OKF YAML frontmatter validation.\n\nFields:\n  type, title, description, resource, tags, timestamp — core OKF\n  owner, status, expiry — governance\n  related — knowledge graph links (Graph RAG)",
+  "properties": {
+    "description": {
+      "description": "Single-line summary for the catalog index",
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "expiry": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Date after which the note should be reviewed",
+      "title": "Expiry"
+    },
+    "memory": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MemoryMetadata"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional lifecycle, provenance, and sensitivity metadata"
+    },
+    "okf_version": {
+      "anyOf": [
+        {
+          "const": "0.2",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional additive OKF Memory Contract version",
+      "title": "Okf Version"
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Responsible person/team for governance tracking",
+      "title": "Owner"
+    },
+    "related": {
+      "description": "Typed knowledge graph links to related notes",
+      "items": {
+        "$ref": "#/$defs/TypedRelation"
+      },
+      "title": "Related",
+      "type": "array"
+    },
+    "resource": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "External source URL",
+      "title": "Resource"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NoteStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Lifecycle status: active, review, or archived"
+    },
+    "tags": {
+      "description": "Markdown tags",
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "timestamp": {
+      "description": "Last modified ISO-8601 timestamp",
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "title": {
+      "description": "Human-friendly title",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/NoteType",
+      "description": "OKF note category"
+    }
+  },
+  "required": [
+    "type",
+    "title",
+    "description",
+    "timestamp"
+  ],
+  "title": "OKFMetadata",
+  "type": "object",
+  "x-power-schema-version": "power.okf-metadata.v1"
+}

@@ -1,13 +1,13 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 20 top-level
-commands) + MCP server (20 tools).
+Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 24 top-level
+commands) + local MCP server (20 tools).
 
 ## Project Structure
 
 ```
 src/power_framework/       # Core library
-  core/                    #   models, parser, indexer, linter, searcher, embedder
+  core/                    #   models, parser, indexer, linter, searcher, application service
   mcp/                     #   FastMCP-3.x server (20 async tools)
 tests/                     # Pytest suite; CI enforces coverage >=70%
 scripts/                   # Dev/CI utilities
@@ -42,9 +42,9 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 | `core/parser.py`      | Safe YAML frontmatter parsing                          |
 | `core/indexer.py`     | Recursive bounded catalog generation (index.md + _index*.md) |
 | `core/linter.py`      | Health checks: links, metadata, orphans, stale/expired |
-| `core/searcher.py`    | FTS5/dense/hybrid/reranked search (`semantic` default) |
-| `core/embeddings.py`  | BGE-M3 ONNX (1024d) + MiniLM fallback                  |
-| `mcp/power_server.py` | FastMCP 3.x, 20 async tools, HTTP transport + /health  |
+| `core/searcher.py`    | FTS5/dense/hybrid/reranked search (`auto` default; labelled FTS fallback) |
+| `experimental/embeddings.py` | Optional BGE-M3 ONNX (1024d) + MiniLM fallback       |
+| `mcp/power_server.py` | FastMCP 3.x, 20 async tools, stdio/loopback HTTP + /health  |
 
 ## Workflow
 
@@ -57,12 +57,10 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 
 ## Key Dependencies
 
-- `fastmcp>=3.2` — MCP server framework
-- `pydantic>=2.0` — Schema validation
-- `onnxruntime>=1.17` + `tokenizers>=0.15` — BGE-M3 embeddings
-- `fastembed>=0.5` — Cross-encoder reranker
-- `pyyaml>=6.0` — Frontmatter parsing
-- `pathspec>=0.12` — .gitignore-style exclusion
+- Base: `pydantic>=2.0`, `pyyaml>=6.0`, `pathspec>=0.12`, `defusedxml>=0.7.1` — offline FTS/core path
+- `semantic` extra: `onnxruntime`, `tokenizers`, `huggingface-hub`, and `numpy`
+- `rerank` extra: `fastembed` and its explicit neural runtime dependencies
+- `remote`/development: `fastmcp>=3.2` — local MCP server framework
 
 ## Skills (on-demand)
 
@@ -70,4 +68,7 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 - `cleanup-branches` — Remove merged git branches
 - `power` — Vault maintenance workflow (lint, index, heal, search, archive)
 
-Detailed dev guide: `CONTRIBUTING.md` | Full docs: `docs/` | CI: `.github/workflows/`
+The canonical search default is `auto`: verified dense only when the local
+generation/provider is ready, otherwise an explicit FTS result with fallback
+metadata. Detailed dev guide: `CONTRIBUTING.md` | Full docs: `docs/` | CI:
+`.github/workflows/`

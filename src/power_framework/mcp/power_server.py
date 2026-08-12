@@ -44,28 +44,25 @@ if TYPE_CHECKING:
 from power_framework.core import (
     DEFAULT_SEARCH_MODE,
     PARA_FOLDERS,
+    ApplicationService,
     MemoryKind,
     MemoryMetadata,
     NoteType,
     OKFMetadata,
     RateLimiter,
+    RequestContext,
     WritePolicy,
     __version__,
     advance_work_packet,
-    apply_change,
     archive_stale_notes,
     build_frontmatter,
     commit_note_change,
     create_work_packet,
-    format_relation_suggestions,
-    format_untrusted_search_envelope,
     get_context,
     heal_vault,
     list_work_packets,
     normalize_search_mode,
-    propose_change,
     read_file_content,
-    read_history,
     read_work_packet,
     resolve_path_in_vault,
     resolve_vault_path,
@@ -77,7 +74,6 @@ from power_framework.core import (
     run_vault_mutation,
     scan_folder_notes,
     search_vault,
-    suggest_related,
     validate_state,
     validate_vault_path,
 )
@@ -88,8 +84,12 @@ from power_framework.core.constants import SKIP_FILES
 from power_framework.core.doctor import report_as_json, run_doctor
 from power_framework.core.domains import DomainConfigError
 from power_framework.core.ignore import should_skip
-from power_framework.core.relations import suggest_related_semantic
 from power_framework.core.synthesize import synthesize_session_ingest
+from power_framework.experimental.relations import (
+    format_relation_suggestions,
+    suggest_related,
+    suggest_related_semantic,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -610,9 +610,14 @@ async def get_memory_context(query: str, vault_path: str | None = None) -> str:
 async def propose_memory_change(path: str, content: str, vault_path: str | None = None) -> str:
     """Persist a reviewable, content-addressed memory proposal without applying it."""
     root = _get_vault_path(vault_path)
-    return json.dumps(
-        await run_blocking(lambda: propose_change(root, path, content)), sort_keys=True
+    envelope = await run_blocking(
+        lambda: ApplicationService(root).propose(
+            path,
+            content,
+            context=RequestContext(actor="mcp", authority="propose"),
+        )
     )
+    return json.dumps(envelope.data, sort_keys=True)
 
 
 @mcp.tool(
@@ -630,10 +635,16 @@ async def apply_memory_change(
     """Apply only an explicitly approved memory proposal."""
     root = _get_vault_path(vault_path)
     try:
-        receipt = await run_blocking(lambda: apply_change(root, proposal, approved))
+        receipt = await run_blocking(
+            lambda: ApplicationService(root).apply(
+                proposal,
+                approved=approved,
+                context=RequestContext(actor="mcp", authority="apply"),
+            )
+        )
     except (PermissionError, RuntimeError, ValueError, OSError) as exc:
         raise ToolError(str(exc)) from exc
-    return json.dumps(receipt, sort_keys=True)
+    return json.dumps(receipt.data, sort_keys=True)
 
 
 @mcp.tool(
@@ -663,7 +674,8 @@ async def validate_memory_state(vault_path: str | None = None) -> bool:
 async def read_memory_history(vault_path: str | None = None) -> str:
     """Read append-only transaction receipts without note content."""
     root = _get_vault_path(vault_path)
-    return json.dumps(await run_blocking(lambda: read_history(root)), sort_keys=True)
+    envelope = await run_blocking(lambda: ApplicationService(root).receipt())
+    return json.dumps(envelope.data["receipts"], sort_keys=True)
 
 
 @mcp.tool(
@@ -809,14 +821,14 @@ async def search_vault_tool(
 
     def _do_search() -> str:
         try:
-            results = search_vault(
-                path,
+            envelope = ApplicationService(path, search_fn=search_vault).retrieve(
                 query,
                 max_results=max_results,
                 mode=search_mode,
                 temporal_view=temporal_view,
                 as_of=normalized_as_of,
                 domain=domain,
+                context=RequestContext(actor="mcp"),
             )
         except RuntimeError as exc:
             from power_framework.core.generation_index import ActiveGenerationError
@@ -825,14 +837,7 @@ async def search_vault_tool(
             if not isinstance(exc, (ActiveGenerationError, DenseIndexUnavailableError)):
                 raise
             raise ToolError(str(exc)) from exc
-        return format_untrusted_search_envelope(
-            results,
-            query,
-            mode=search_mode,
-            vault_dir=path,
-            temporal_view=temporal_view,
-            as_of=normalized_as_of,
-        )
+        return json.dumps(envelope.data, ensure_ascii=False, sort_keys=True)
 
     return await run_blocking(_do_search)
 

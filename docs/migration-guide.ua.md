@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.4.5"
+title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.5.0"
 description: "Fail-closed manifest-driven протокол міграції наявної Markdown-бази знань у перевірений P.O.W.E.R. vault без зміни джерела."
 tags: [power, migration, guide, ai-agents, safety, verification]
 timestamp: 2026-08-08T12:00:00+03:00
 ---
 
-# Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.4.5
+# Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.5.0
 
 Цей гід є execution contract для будь-якого AI-агента з доступом до файлової
 системи. Він переносить Markdown або Obsidian knowledge base у канонічну
@@ -65,12 +65,14 @@ rollback path.
 
 ## Версійовані executable facts
 
-Цей гід перевірено проти pinned release `v3.4.5`. CI звіряє ці факти з
+Цей гід перевірено проти pinned candidate `v3.5.0`. CI звіряє ці факти з
 executable capability manifest, щоб агент не успадковував старий migration
 recipe:
 
-- поточна surface — 20 top-level CLI commands і 20 MCP tools;
-- режим пошуку за замовчуванням — `semantic`; `reranked` є explicit opt-in;
+- поточна surface — 24 top-level CLI commands і 20 MCP tools;
+- режим пошуку за замовчуванням — `auto`; він використовує verified dense лише
+  коли runtime готовий, інакше повертає labelled FTS; `semantic` та `reranked` є
+  explicit opt-in;
 - database і cache paths належать runtime. Для active paths і state використовуйте
   `power doctor DESTINATION --json`; не hard-code-ьте vault-local database
   filename;
@@ -258,11 +260,11 @@ manifest checksum і нуль unaccounted authorized files.
 
 ### 3.1 Встановіть і перевірте P.O.W.E.R.
 
-Використовуйте pinned `v3.4.5` environment із clean-install гіда:
+Використовуйте pinned `v3.5.0` environment із clean-install гіда:
 
 ```bash
 power --version
-python -c 'import power_framework.mcp, onnxruntime; print("imports: OK")'
+python -c 'import power_framework; print("lean FTS import: OK")'
 ```
 
 `python` має бути тим interpreter, якому належить executable `power`.

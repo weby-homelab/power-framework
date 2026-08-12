@@ -188,7 +188,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"M2-AUTO execution failed: {exc}", file=sys.stderr)
         return 1
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"M2-AUTO {evidence['quality_gate']}: {evidence['runtime_seconds']}s")
     return 0 if evidence["quality_gate"] == "PASS" else 1
 

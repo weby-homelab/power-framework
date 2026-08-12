@@ -1,12 +1,12 @@
 # CLI Reference
 
-This reference is aligned with the executable P.O.W.E.R. `v3.4.5` parser.
+This reference is aligned with the executable P.O.W.E.R. `v3.5.0` parser.
 
 ## Synopsis
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,import,search,cache,doctor,memory,handoff,sync,rot,archive,status,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,cache,doctor,connect,memory,handoff,sync,rot,archive,status,control-plane,maintenance,migrate-state,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -142,7 +142,7 @@ power search PATH QUERY [--max-results N] [--mode MODE]
 | Flag | Description |
 | --- | --- |
 | `--max-results` | Maximum results; default `20`. |
-| `--mode` | `semantic` (default), `fts`, `vector`, `hybrid`, `reranked`, `graph_assisted`, or `auto`; deprecated alias `hybrid_reranked` maps to `reranked`. |
+| `--mode` | `auto` (default; verified dense or labelled FTS), `fts`, `vector`, `hybrid`, `semantic`, `reranked`, or `graph_assisted`; deprecated alias `hybrid_reranked` maps to `reranked`. |
 | `--temporal-view` | `current` (default), `historical`, or `all`. |
 | `--as-of` | Inclusive ISO date lifecycle boundary. |
 | `--domain` | Optional configured domain slug for scoped retrieval. |
@@ -162,8 +162,8 @@ Human-governed transactional memory workflow.
 
 ```text
 power memory context PATH QUERY
-power memory propose PATH NOTE_PATH CONTENT
-power memory apply PATH PROPOSAL_JSON [--approved]
+power memory propose PATH NOTE_PATH (--content-file FILE | --content-stdin)
+power memory apply PATH (--proposal-file FILE | --proposal-stdin) [--approved]
 power memory validate PATH
 power memory history PATH
 ```
@@ -180,6 +180,9 @@ reports `search_mode=fts` in the receipt. History never returns note content.
 The proposal and receipt also carry an `idempotency_key`; replaying the same
 approved proposal returns the original receipt without duplicating the note or
 history entry.
+Proposal content is read from a file or stdin; positional content and proposal
+JSON are rejected so sensitive data cannot appear in shell history or the
+process list.
 
 ### `handoff`
 
@@ -388,6 +391,37 @@ only way to see what a prune would target before running it.
 ### `doctor`
 
 Run a read-only diagnostic pass for the runtime and, optionally, one vault.
+
+### `control-plane`
+
+Preview the human-visible `POWER_STATUS.md` control view. Add `--apply` to
+materialize it; the default is read-only and manual files are never overwritten.
+Add `--obsidian-base` to preview the optional `POWER Control.base` asset, or
+combine it with `--apply` to materialize both views. The generated Base has
+Active Work, Needs Human Decision, Stale Evidence, and Recent Changes tables;
+the Markdown view remains the fallback outside Obsidian. Uninstalling the Base
+is limited to the marked generated file and never removes notes.
+
+```text
+power control-plane PATH --obsidian-base
+power control-plane PATH --apply --obsidian-base
+```
+
+### `migrate-state`
+
+Print a content-free, read-only inventory of the source, control, runtime, and
+evidence planes. The plan includes exact file hashes, a disk budget, and a
+rollback boundary. Applying a state move is intentionally disabled until the
+cross-platform upgrade matrix is accepted.
+
+```text
+power migrate-state PATH
+```
+
+### `maintenance`
+
+Print a deterministic, hash-bound maintenance plan. Add `--apply` to apply only
+reversible `safe_auto` actions; retention and archive candidates remain plan-only.
 The command does not create a vault identity, cache namespace, search database,
 or model files. The embedding probe uses only an already-cached pinned model;
 otherwise the report says that binding is not verified and recommends running
@@ -407,3 +441,22 @@ Exit `0` means the requested diagnostics are healthy. Exit `1` means the
 runtime, binding, vault, index, or coverage state is unavailable or degraded;
 an uncached model and excluded notes are therefore visible failures, not silent
 successes. Use `power sync PATH --strict` as the repair gate.
+
+### `connect`
+
+Plan or apply a local stdio MCP connection for Codex, OpenCode, Gemini, or
+Claude. Planning is read-only and emits only hashes, paths, and status. Apply
+requires both a previously inspected plan and explicit approval.
+
+```text
+power connect PATH [--client auto|codex|opencode|gemini|claude]
+                    [--config CONFIG] [--executable PYTHON]
+                    [--remove] [--apply --approved]
+                    [--plan-file PLAN.json] [--plan-output PLAN.json]
+```
+
+The transaction refuses symlinked, malformed, commented JSONC, or foreign
+`power` entries for manual review. An approved update is bound to the exact
+pre-image hash, writes atomically, and creates a `.power-backups` copy before
+changing an existing config. A stale plan must be regenerated; the command
+never starts a client or contacts a network service.

@@ -1,6 +1,6 @@
 # Матриця підтримки платформ P.O.W.E.R.
 
-Ця матриця визначає операційні межі поточного контракту `v3.4.5`. Вона
+Ця матриця визначає операційні межі поточного candidate-контракту `v3.5.0`. Вона
 відділяє автоматизоване покриття життєвого циклу від доказів для model-backed
 режимів, фізичних хостів, GPU та якості пошуку. Зелений CI не сертифікує інший
 хост, провайдер, корпус або envelope продуктивності.
@@ -28,8 +28,8 @@
 
 ## Джерело правди
 
-Виконувані перевірки живуть у [CI](../.github/workflows/ci.yml), release
-workflow — у [release.yml](../.github/workflows/release.yml), а фізична
+Виконувані перевірки живуть у [CI](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/ci.yml), release
+workflow — у [release.yml](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/release.yml), а фізична
 процедура Windows — у [windows-11-installation.ua.md](windows-11-installation.ua.md).
 Roadmap фіксує межі доказів і pending gates у
 [`ROADMAP_POWER.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md).

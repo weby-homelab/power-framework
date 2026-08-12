@@ -3,3 +3,5 @@
 !benchmark-manifest.schema.json
 !baselines/
 !baselines/*.json
+# The 3.5.0 candidate is generated outside the checkout and is not release evidence.
+baselines/v3.5.0.json

@@ -1,8 +1,13 @@
-# 🚀 Гібридна Архітектура Флоту: Асинхронний GPU-Оффлоадинг Векторів для Робочих Станцій з Періодичним Графіком Роботи
+# ⚠️ Гібридний GPU-оффлоадинг: quarantine design note для 3.5++
 
 > **Категорія паттерна:** Архітектура та Інфраструктурні Сценарії  
 > **Цільова аудиторія:** Системні Архітектори, DevOps Інженери, Адміністратори Homelab, Оператори ШІ-Агентів  
-> **Застосовність:** P.O.W.E.R. Framework 3.4.0+
+> **Застосовність:** лише optional 3.5++; не є шляхом релізу lean 3.5.0.
+
+> **Статус безпеки:** fleet transfer перебуває в quarantine. У POWER 3.5.0
+> Markdown є source of truth, а локальний FTS — canonical retrieval path. Не
+> копіюйте віддалене SQLite/cache-дерево у live vault: спершу потрібні підписаний
+> manifest, quarantine import, exact source snapshot check та atomic activation.
 
 ---
 
@@ -17,7 +22,10 @@
    - **Сильні сторони:** Швидкі тензорні ядра GPU (субсекундний Cross-Encoder Reranking, висока швидкість генерації векторів).
    - **Слабкі сторони:** Високе енергоспоживання у режимі простою (300–600 Вт); періодичне вимкнення на ніч, у неробочі години або під час поїздок.
 
-Цей посібник описує паттерн **«Асинхронний GPU-Оффлоадинг з Відмовостійкою Pull-Синхронізацією»**. Впровадження цієї архітектури дозволяє 24/7 серверу використовувати згенеровані на GPU векторні бази даних SQLite без потреби тримати потужну робочу станцію увімкненою цілодобово.
+Ця нотатка фіксує відкладену ідею **асинхронного GPU-оффлоадингу**. Це не
+інструкція встановлення і не обіцянка latency, power, transfer або safety. Підтриманий
+workflow — локальний `power sync`; intermittent GPU host можна буде оцінити лише
+через quarantine fleet track.
 
 ---
 
@@ -25,21 +33,10 @@
 
 ```mermaid
 flowchart TD
-    subgraph WS ["Високопродуктивна Робоча Станція (Періодична / Графік)"]
-        A[NVIDIA CUDA GPU] -->|CUDAExecutionProvider| B[BGE-M3 Dense Embedder]
-        B -->|power sync --force| C[SQLite Vector Database generation.db]
-    end
-
-    subgraph NET ["Приватна Mesh Мережа (Tailscale / WireGuard / SSH)"]
-        C ==>|rsync over SSH| D{Пінгування Доступності}
-    end
-
-    subgraph CORE ["Низькоспоживаючий 24/7 Сервер (Always On)"]
-        D -->|WS Увімкнено| E[Завантаження Свіжої Бази SQLite]
-        D -->|WS Вимкнено / Ніч| F[Збереження Існуючого Локального Кєшу SQLite]
-        E --> G[P.O.W.E.R. Локальний Пошуковий Рушій]
-        F --> G[P.O.W.E.R. Локальний Пошуковий Рушій]
-    end
+    S[Markdown source of truth] --> F[Local FTS generation]
+    F --> C[P.O.W.E.R. 3.5.0 canonical search]
+    G[Optional GPU dense generation] --> Q[Quarantine only]
+    Q -.->|не активується у 3.5.0| C
 ```
 
 ---
@@ -84,70 +81,35 @@ flowchart TD
 
 ---
 
-### Крок 2: Відмовостійкий Скрипт Синхронізації на 24/7 Сервері
+### Крок 2: Fleet transfer перебуває в quarantine
 
-Оскільки робоча станція періодично вимикається, звичайний cron на робочій станції буде збіватись у неробочий час.
-
-Замість цього **24/7 Сервер** запускає інтелектуальний скрипт, який спочатку перевіряє мережеву доступність робочої станції через SSH/Tailscale.
-
-Створіть файл `/usr/local/bin/sync_vector_db_resilient.sh` на 24/7 Сервері:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-# ------------------------------------------------------------------------------
-# Універсальний Відмовостійкий Скрипт Синхронізації Векторної Бази
-# Хост: 24/7 Сервер (Always-On)
-# ------------------------------------------------------------------------------
-
-# Конфігурація (Налаштуйте під ваш флот)
-REMOTE_HOST="100.68.179.109"                  # IP або Hostname робочої станції
-REMOTE_USER="root"                             # Користувач SSH
-VAULT_UUID="9fbead1a-5b14-413f-814a-4f37af5656bc" # UUID ваулту P.O.W.E.R
-SSH_TIMEOUT=3                                  # Таймаут пінгування у секундах
-
-LOCAL_CACHE_DIR="/root/.cache/power-framework/vaults/${VAULT_UUID}"
-REMOTE_CACHE_DIR="/root/.cache/power-framework/vaults/${VAULT_UUID}"
-
-echo "🔍 Перевірка доступності GPU Робочої Станції (${REMOTE_HOST})..."
-
-if ssh -o "ConnectTimeout=${SSH_TIMEOUT}" -o "BatchMode=yes" "${REMOTE_USER}@${REMOTE_HOST}" "echo online" >/dev/null 2>&1; then
-    echo "⚡ Робоча станція УВІМКНЕНА! Синхронізація GPU-згенерованої бази даних..."
-    mkdir -p "${LOCAL_CACHE_DIR}"
-    rsync -avz --update "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_CACHE_DIR}/" "${LOCAL_CACHE_DIR}/"
-    echo "✅ Синхронізація векторної бази даних успішно завершена!"
-else
-    echo "ℹ️ Робоча станція ВИМКНЕНА (на ніч або у стані сну). Безпечне збереження локального кєшу."
-fi
-```
-
-Зробіть скрипт виконуваним:
-```bash
-chmod +x /usr/local/bin/sync_vector_db_resilient.sh
-```
+Legacy helper `scripts/sync_brain_db_from_ws.sh` навмисно є no-op. Він не робить
+SSH probe, не створює cache і не переносить database. Не відновлюйте старий
+whole-cache pattern під іншою назвою. Майбутня реалізація спершу має визначити
+artifact manifest, vault/source identity, exact snapshot hash, schema/model
+compatibility, free-space policy, `.partial`, atomic activation та
+rollback/readback receipts.
 
 ---
 
-## 📊 4. Порівняння Ефективності та Метрики
+## 📊 4. Межа evidence
 
-Емпіричні бенчмарки на вольті з 727 нотаток (5,623 вектори BGE-M3 1024d) демонструють високу ефективність цієї гібридної схеми:
-
-| Операція | 24/7 Низькоспоживаючий Сервер (CPU) | Робоча Станція (NVIDIA CUDA GPU) | Архітектурний Ефект |
-| :--- | :--- | :--- | :--- |
-| **Генерація Векторних Ембедингів** | ~15–20 хвилин (CPU) | **< 35 секунд (GPU)** | 30x прискорення індексації |
-| **Семантичний Пошук (P95 Latency)** | 1265.7 ms | **456.8 ms** | 2.77x скорочення латентності |
-| **Cross-Encoder Reranking (P50)** | 87,822 ms | **985.0 ms** | **89.2x прискорення** ⚡ |
-| **Передача Індексу Мережею (rsync)** | N/A | **7.5 секунд (177 MB)** | Миттєва гідрація бази |
-| **Енергоспоживання 24/7** | **~15 Вт (Низьке)** | **0 Вт (Вимкнено на ніч)** | **0 Вт витрат GPU у простої** |
+Fleet latency, transfer-size, power та cross-host corruption claims не входять
+до evidence 3.5.0. Майбутнє порівняння має публікувати host, model lock, source
+snapshot, generation identity, warm/cold state, failure cases та readback receipt;
+synthetic numbers не можна видавати за production facts.
 
 ---
 
 ## 🔒 5. Кращі Практики та Операційні Правила
 
-1. **Детерміновані UUID Ваултів:** P.O.W.E.R. розраховує UUID ваулту детерміновано, що гарантує 100% сумісність `.db` файлів генерації між різними хостами.
-2. **Безпека WAL у SQLite:** Режим SQLite WAL гарантує, що виконання `rsync` під час активних запитів пошуку на 24/7 сервері не призводить до пошкодження бази даних.
-3. **Автоматичний Таймер:** На 24/7 сервері додайте виклик скрипта у systemd timer або cron кожні 30 хвилин. Якщо робоча станція вимкнена, скрипт завершується за < 3 секунди без створення помилок у логах.
+1. **Source identity:** Не виводьте compatibility з path, UUID, filename або WAL.
+   Перевіряйте exact current source snapshot і signed artifact manifest.
+2. **Quarantine first:** Приймайте artifact як `.partial`/quarantined data,
+   перевіряйте integrity та compatibility, а last-good generation і FTS
+   зберігайте до atomic activation/readback.
+3. **Non-blocking release path:** Fleet/GPU offloading — optional 3.5++; його
+   відсутність або degradation не може ламати local FTS search.
 
 ---
 *Документація підтримується командою розробки P.O.W.E.R. Framework.*

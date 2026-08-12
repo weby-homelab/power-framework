@@ -77,18 +77,16 @@ def test_contract_is_machine_only_and_bounded() -> None:
 
 
 def test_verifier_accepts_valid_machine_only_evidence() -> None:
-    assert verify_m2_auto.verify(
-        _write_fixture(_valid_evidence()), run_m2_auto.CONTRACT_DEFAULT
-    ) == []
+    assert (
+        verify_m2_auto.verify(_write_fixture(_valid_evidence()), run_m2_auto.CONTRACT_DEFAULT) == []
+    )
 
 
 def test_verifier_rejects_human_or_sealed_markers() -> None:
     evidence = _valid_evidence()
     evidence["human_evidence_used"] = True
     evidence["limitations"] = ["sealed_holdout/evaluation-v2 was read"]
-    errors = verify_m2_auto.verify(
-        _write_fixture(evidence), run_m2_auto.CONTRACT_DEFAULT
-    )
+    errors = verify_m2_auto.verify(_write_fixture(evidence), run_m2_auto.CONTRACT_DEFAULT)
     assert any("human evidence" in error for error in errors)
     assert any("forbidden" in error for error in errors)
 

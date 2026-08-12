@@ -24,7 +24,22 @@ try:  # resource is POSIX-only; Windows uses the no-limit path.
 except ImportError:  # pragma: no cover - exercised on Windows
     resource = None  # type: ignore[assignment]
 
+from power_framework.experimental.relations import (
+    format_relation_suggestions,
+    suggest_related,
+    suggest_related_v2,
+)
+
+from .application import ApplicationService, RequestContext
+from .connect import apply_connect_plan, build_connect_plan
 from .constants import SKIP_FILES
+from .control_plane import (
+    build_control_plane,
+    build_obsidian_base,
+    remove_obsidian_base,
+    write_control_plane,
+    write_obsidian_base,
+)
 from .doctor import render_doctor, report_as_json, run_doctor
 from .domains import (
     DomainConfigError,
@@ -55,30 +70,22 @@ from .linter import (
     run_rot_report,
     run_status_report,
 )
+from .maintenance import apply_maintenance_plan, build_maintenance_plan
 from .markdown_checks import check_all as check_markdown_issues
 from .memory_api import (
-    apply_change,
     commit_note_change,
     get_context,
-    propose_change,
-    read_history,
     validate_state,
 )
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .mutation import execute_vault_mutation
 from .parser import build_frontmatter, read_file_content
-from .relations import (
-    format_relation_suggestions,
-    suggest_related,
-    suggest_related_v2,
-)
 from .searcher import (
     CANONICAL_SEARCH_MODES,
     DEFAULT_SEARCH_MODE,
     SEARCH_MODE_ALIASES,
-    format_search_results,
-    search_vault,
 )
+from .state_migration import build_state_migration_plan
 from .synthesize import synthesize_session_ingest
 from .utils import __version__, atomic_write
 
@@ -387,7 +394,7 @@ def _cmd_import(args: argparse.Namespace) -> int:
 
 
 def _cmd_search(args: argparse.Namespace) -> int:
-    """Search vault notes with configurable mode (fts/vector/hybrid)."""
+    """Search through the shared application boundary."""
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
         logger.error("Vault not found: %s", vault_dir)
@@ -397,18 +404,58 @@ def _cmd_search(args: argparse.Namespace) -> int:
     max_results = args.max_results
     mode = args.mode
 
-    results = search_vault(
-        vault_dir,
+    if args.json and args.envelope:
+        logger.error("Choose only one of --json and --envelope")
+        return 1
+    envelope = ApplicationService(vault_dir).retrieve(
         query,
         max_results=max_results,
         mode=mode,
         temporal_view=args.temporal_view,
         as_of=args.as_of,
         domain=args.domain,
+        context=RequestContext(actor="cli"),
     )
-    report = format_search_results(results, query, mode=mode, vault_dir=vault_dir)
-    print(report)
+    if args.envelope:
+        print(json.dumps(envelope.as_dict(), ensure_ascii=False, sort_keys=True))
+    elif args.json:
+        print(json.dumps(envelope.data, ensure_ascii=False, sort_keys=True))
+    else:
+        print(_format_retrieval_data(envelope.data), end="")
     return 0
+
+
+def _format_retrieval_data(data: dict[str, object]) -> str:
+    """Render application retrieval data without reopening storage."""
+    query = str(data.get("query", ""))
+    results = data.get("results", [])
+    if not isinstance(results, list) or not results:
+        return f"No results found for '{query}'.\n"
+    actual_mode = str(data.get("actual_mode") or data.get("mode") or "unknown")
+    lines = [
+        f"=== Search Results for '{query}' ===",
+        f"Mode: {actual_mode.upper()}  |  Found {len(results)} matching note(s):",
+        "",
+    ]
+    for index, result in enumerate(results, 1):
+        if not isinstance(result, dict):
+            continue
+        metadata = result.get("metadata", {})
+        metadata = metadata if isinstance(metadata, dict) else {}
+        source = result.get("source", {})
+        source = source if isinstance(source, dict) else {}
+        lines.append(
+            f"{index}. [{metadata.get('note_type', 'Note')}] "
+            f"{metadata.get('title', 'Untitled')}  (score: {float(result.get('score', 0)):.4f})"
+        )
+        lines.append(f"   Path: {source.get('path', 'unavailable')}")
+        lines.append(f"   Temporal status: {metadata.get('temporal_status', 'unknown')}")
+        lines.append(f"   {metadata.get('description', '')}")
+        context = result.get("matched_text") or result.get("snippet") or ""
+        if context:
+            lines.append(f"   ...{context}...")
+        lines.append("")
+    return "\n".join(lines)
 
 
 def _cmd_sync(args: argparse.Namespace) -> int:
@@ -503,6 +550,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
 
 def _cmd_rot(args: argparse.Namespace) -> int:
     """Run ROT (Redundant, Outdated, Trivial) audit."""
+    logger.warning("Deprecated compatibility command: use 'power maintenance PATH' for the plan.")
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
         logger.error("Vault not found: %s", vault_dir)
@@ -514,6 +562,9 @@ def _cmd_rot(args: argparse.Namespace) -> int:
 
 def _cmd_archive(args: argparse.Namespace) -> int:
     """Move stale/expired notes to 04_Archive."""
+    logger.warning(
+        "Deprecated compatibility command: use 'power maintenance PATH' for the plan/apply gate."
+    )
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
         logger.error("Vault not found: %s", vault_dir)
@@ -530,12 +581,61 @@ def _cmd_archive(args: argparse.Namespace) -> int:
 
 def _cmd_status(args: argparse.Namespace) -> int:
     """Show vault status dashboard."""
+    logger.warning(
+        "Deprecated compatibility command: use 'power doctor PATH' or 'power control-plane PATH'."
+    )
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
         logger.error("Vault not found: %s", vault_dir)
         return 1
     report = run_status_report(vault_dir)
     print(report)
+    return 0
+
+
+def _cmd_control_plane(args: argparse.Namespace) -> int:
+    """Preview or explicitly materialize the human-visible control plane."""
+    vault_dir = _resolve_path(args.path)
+    if not vault_dir.exists():
+        logger.error("Vault not found: %s", vault_dir)
+        return 1
+    if args.remove_obsidian_base:
+        logger.info("Obsidian Base removed: %s", remove_obsidian_base(vault_dir))
+        return 0
+    if args.apply:
+        logger.info("Control plane written to %s", write_control_plane(vault_dir))
+        if args.obsidian_base:
+            logger.info("Obsidian Base written to %s", write_obsidian_base(vault_dir))
+    elif args.obsidian_base:
+        print(build_obsidian_base(), end="")
+    else:
+        print(build_control_plane(vault_dir), end="")
+    return 0
+
+
+def _cmd_maintenance(args: argparse.Namespace) -> int:
+    """Preview policy-driven maintenance and apply only reversible actions."""
+    vault_dir = _resolve_path(args.path)
+    if not vault_dir.exists():
+        logger.error("Vault not found: %s", vault_dir)
+        return 1
+    plan = build_maintenance_plan(vault_dir)
+    if args.apply:
+        receipt = apply_maintenance_plan(vault_dir, plan, approved=True)
+        print(json.dumps(receipt.as_dict(), sort_keys=True))
+    else:
+        print(json.dumps(plan.as_dict(), ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def _cmd_migrate_state(args: argparse.Namespace) -> int:
+    """Print the read-only source/control/runtime/evidence inventory."""
+    try:
+        plan = build_state_migration_plan(_resolve_path(args.path))
+    except (OSError, ValueError) as exc:
+        logger.error("State migration plan failed: %s", exc)
+        return 1
+    print(json.dumps(plan.as_dict(), ensure_ascii=False, sort_keys=True))
     return 0
 
 
@@ -571,6 +671,9 @@ def _cmd_cron(args: argparse.Namespace) -> int:
 
 def _cmd_heal(args: argparse.Namespace) -> int:
     """Heal missing/invalid frontmatter in vault notes."""
+    logger.warning(
+        "Deprecated compatibility command: use 'power maintenance PATH' for the plan/apply gate."
+    )
     vault_dir = _resolve_path(args.path)
     if not vault_dir.exists():
         logger.error("Vault not found: %s", vault_dir)
@@ -744,12 +847,45 @@ def _cmd_cache(args: argparse.Namespace) -> int:
 def _cmd_doctor(args: argparse.Namespace) -> int:
     """Run read-only runtime and vault diagnostics for humans or agents."""
     vault_dir = _resolve_path(args.path) if getattr(args, "path", None) else None
-    report = run_doctor(vault_dir)
+    report = run_doctor(vault_dir, probe_embedding=getattr(args, "probe_provider", False))
     if getattr(args, "json", False):
         print(report_as_json(report), end="")
     else:
         logger.info(render_doctor(report))
     return int(report["exit_code"])
+
+
+def _cmd_connect(args: argparse.Namespace) -> int:
+    """Plan or apply a conflict-safe local MCP client connection."""
+    vault_dir = _resolve_path(args.path)
+    try:
+        if args.plan_file:
+            plan = json.loads(Path(args.plan_file).read_text(encoding="utf-8"))
+            if not isinstance(plan, dict):
+                raise ValueError("connect plan must be a JSON object")
+        else:
+            plan = build_connect_plan(
+                args.client,
+                vault_dir,
+                config_path=Path(args.config).expanduser() if args.config else None,
+                executable=args.executable,
+                action="remove" if args.remove else "install",
+            ).as_dict()
+
+        if args.plan_output:
+            atomic_write(
+                Path(args.plan_output).expanduser(),
+                json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            )
+        if args.apply:
+            receipt = apply_connect_plan(plan, approved=args.approved)
+            print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        else:
+            print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
+    except (KeyError, PermissionError, RuntimeError, ValueError, OSError) as exc:
+        logger.error("Connect transaction failed: %s", exc)
+        return 1
+    return 0
 
 
 def _cmd_memory(args: argparse.Namespace) -> int:
@@ -758,16 +894,67 @@ def _cmd_memory(args: argparse.Namespace) -> int:
         if args.memory_command == "context":
             print(json.dumps([item.rel_path for item in get_context(vault_dir, args.query)]))
         elif args.memory_command == "propose":
+            if args.content is not None:
+                raise ValueError(
+                    "memory content is not accepted in argv; use --content-file or --content-stdin"
+                )
+            if args.content_file and args.content_stdin:
+                raise ValueError("choose only one of --content-file and --content-stdin")
+            if args.content_file:
+                content = Path(args.content_file).read_text(encoding="utf-8")
+            elif args.content_stdin:
+                content = sys.stdin.read()
+            else:
+                raise ValueError("provide memory content through --content-file or --content-stdin")
             print(
-                json.dumps(propose_change(vault_dir, args.note_path, args.content), sort_keys=True)
+                json.dumps(
+                    ApplicationService(vault_dir)
+                    .propose(
+                        args.note_path,
+                        content,
+                        context=RequestContext(actor="cli", authority="propose"),
+                    )
+                    .data,
+                    sort_keys=True,
+                )
             )
         elif args.memory_command == "apply":
-            proposal = json.loads(args.proposal)
-            print(json.dumps(apply_change(vault_dir, proposal, args.approved), sort_keys=True))
+            if args.proposal is not None:
+                raise ValueError(
+                    "memory proposal is not accepted in argv; use --proposal-file or --proposal-stdin"
+                )
+            if args.proposal_file and args.proposal_stdin:
+                raise ValueError("choose only one of --proposal-file and --proposal-stdin")
+            if args.proposal_file:
+                proposal_text = Path(args.proposal_file).read_text(encoding="utf-8")
+            elif args.proposal_stdin:
+                proposal_text = sys.stdin.read()
+            else:
+                raise ValueError(
+                    "provide the durable memory proposal through --proposal-file or --proposal-stdin"
+                )
+            proposal = json.loads(proposal_text)
+            print(
+                json.dumps(
+                    ApplicationService(vault_dir)
+                    .apply(
+                        proposal,
+                        approved=args.approved,
+                        context=RequestContext(actor="cli", authority="apply"),
+                    )
+                    .data,
+                    sort_keys=True,
+                )
+            )
         elif args.memory_command == "validate":
             print(json.dumps({"valid": validate_state(vault_dir)}))
         else:
-            print(json.dumps(read_history(vault_dir), sort_keys=True))
+            print(
+                json.dumps(
+                    ApplicationService(vault_dir).receipt().data["receipts"],
+                    sort_keys=True,
+                )
+            )
     except (PermissionError, RuntimeError, ValueError, OSError) as exc:
         logger.error("Memory transaction failed: %s", exc)
         return 1
@@ -952,14 +1139,20 @@ def main() -> None:
         choices=sorted(CANONICAL_SEARCH_MODES | set(SEARCH_MODE_ALIASES) | {"auto"}),
         default=DEFAULT_SEARCH_MODE,
         help=(
-            'Search mode: "semantic" (canonical default, pinned BGE-M3), "fts" (BM25), '
+            'Search mode: "auto" (default; verified dense or FTS), "fts" (BM25), '
             '"vector" (TF cosine), "hybrid" (RRF merged), or "semantic" '
-            '(dense embedding); "reranked" is an explicit opt-in. '
-            '"reranked" is an explicit opt-in, "auto" follows domain priority, '
-            'and "hybrid_reranked" is a deprecated alias.'
+            '(explicit dense embedding); "reranked" is an explicit opt-in. '
+            '"auto" falls back to FTS when dense is not ready, and '
+            '"hybrid_reranked" is a deprecated alias.'
         ),
     )
     p_search.add_argument("--domain", default=None, help="Optional domain slug to scope the search")
+    p_search.add_argument(
+        "--json", action="store_true", help="Emit retrieval data as versioned JSON"
+    )
+    p_search.add_argument(
+        "--envelope", action="store_true", help="Emit the full application envelope as JSON"
+    )
     p_search.set_defaults(func=_cmd_search)
 
     p_cache = subparsers.add_parser(
@@ -1006,7 +1199,48 @@ def main() -> None:
         default=False,
         help="Emit the versioned machine-readable report to stdout",
     )
+    p_doctor.add_argument(
+        "--probe-provider",
+        action="store_true",
+        default=False,
+        help="Explicitly probe the configured provider without downloading a model",
+    )
     p_doctor.set_defaults(func=_cmd_doctor)
+
+    p_connect = subparsers.add_parser(
+        "connect", help="Plan or apply a conflict-safe local MCP client connection"
+    )
+    p_connect.add_argument("path", help="Path to the POWER vault")
+    p_connect.add_argument(
+        "--client",
+        choices=["auto", "codex", "opencode", "gemini", "claude"],
+        default="auto",
+        help="Client to configure (default: detect an existing supported client config)",
+    )
+    p_connect.add_argument(
+        "--config",
+        default=None,
+        help="Explicit client config path; required when the config does not exist yet",
+    )
+    p_connect.add_argument(
+        "--executable",
+        default=sys.executable,
+        help="Python executable used by the local MCP server command",
+    )
+    p_connect.add_argument(
+        "--remove", action="store_true", help="Plan removal of the POWER-owned entry"
+    )
+    p_connect.add_argument("--apply", action="store_true", help="Apply the plan after --approved")
+    p_connect.add_argument(
+        "--approved", action="store_true", help="Explicitly approve the requested config write"
+    )
+    p_connect.add_argument(
+        "--plan-file", default=None, help="Read an exact previously generated plan from JSON"
+    )
+    p_connect.add_argument(
+        "--plan-output", default=None, help="Write the content-free plan to this JSON path"
+    )
+    p_connect.set_defaults(func=_cmd_connect)
 
     p_memory = subparsers.add_parser("memory", help="Human-governed transactional memory workflow")
     memory_sub = p_memory.add_subparsers(dest="memory_command", required=True)
@@ -1016,10 +1250,26 @@ def main() -> None:
     p_propose = memory_sub.add_parser("propose")
     p_propose.add_argument("path")
     p_propose.add_argument("note_path")
-    p_propose.add_argument("content")
+    p_propose.add_argument(
+        "content",
+        nargs="?",
+        help="Deprecated positional content is rejected to keep secrets out of argv",
+    )
+    p_propose.add_argument("--content-file", help="Read proposal content from a local file")
+    p_propose.add_argument(
+        "--content-stdin", action="store_true", help="Read proposal content from stdin"
+    )
     p_apply = memory_sub.add_parser("apply")
     p_apply.add_argument("path")
-    p_apply.add_argument("proposal")
+    p_apply.add_argument(
+        "proposal",
+        nargs="?",
+        help="Deprecated positional proposal JSON is rejected to keep secrets out of argv",
+    )
+    p_apply.add_argument("--proposal-file", help="Read durable proposal JSON from a local file")
+    p_apply.add_argument(
+        "--proposal-stdin", action="store_true", help="Read durable proposal JSON from stdin"
+    )
     p_apply.add_argument("--approved", action="store_true")
     p_validate = memory_sub.add_parser("validate")
     p_validate.add_argument("path")
@@ -1149,6 +1399,40 @@ def main() -> None:
         "path", nargs="?", default=None, help="Path to the vault directory (optional)"
     )
     p_status.set_defaults(func=_cmd_status)
+
+    p_control = subparsers.add_parser(
+        "control-plane", help="Preview or materialize the human-visible POWER status"
+    )
+    p_control.add_argument("path", help="Path to the vault directory")
+    p_control.add_argument(
+        "--apply", action="store_true", help="Write POWER_STATUS.md (default is read-only preview)"
+    )
+    p_control.add_argument(
+        "--obsidian-base",
+        action="store_true",
+        help="Preview or also write the optional POWER Control.base asset",
+    )
+    p_control.add_argument(
+        "--remove-obsidian-base",
+        action="store_true",
+        help="Remove only the generated POWER Control.base asset",
+    )
+    p_control.set_defaults(func=_cmd_control_plane)
+
+    p_maintenance = subparsers.add_parser(
+        "maintenance", help="Preview or apply hash-bound reversible maintenance"
+    )
+    p_maintenance.add_argument("path", help="Path to the vault directory")
+    p_maintenance.add_argument(
+        "--apply", action="store_true", help="Apply safe_auto actions with explicit approval"
+    )
+    p_maintenance.set_defaults(func=_cmd_maintenance)
+
+    p_migrate_state = subparsers.add_parser(
+        "migrate-state", help="Preview the read-only vault state-plane migration inventory"
+    )
+    p_migrate_state.add_argument("path", help="Path to the vault directory")
+    p_migrate_state.set_defaults(func=_cmd_migrate_state)
 
     p_cron = subparsers.add_parser(
         "cron",

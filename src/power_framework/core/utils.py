@@ -14,12 +14,14 @@ import tempfile
 import time
 from collections import defaultdict
 from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PureWindowsPath
 from typing import Any
 from urllib.parse import unquote
 
 from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES, is_catalog_filename
+
+_BACKUP_NAME_RE = re.compile(r"^.+\.\d{8}_\d{6}(?:_\d+)?\.[^.]+$")
 
 
 def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Path:
@@ -236,12 +238,111 @@ def create_backup(filepath: Path, backup_dir: Path | None = None) -> Path | None
 
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-    backup_name = f"{filepath.stem}.{timestamp}{filepath.suffix}"
-    backup_path = backup_dir / backup_name
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
+    backup_path = backup_dir / f"{filepath.stem}.{timestamp}{filepath.suffix}"
+    counter = 1
+    while backup_path.exists():
+        backup_path = backup_dir / f"{filepath.stem}.{timestamp}_{counter}{filepath.suffix}"
+        counter += 1
 
     shutil.copy2(filepath, backup_path)
     return backup_path
+
+
+def _backup_files(backup_dir: Path) -> list[Path]:
+    """Return only files using POWER's timestamped backup naming contract."""
+    if not backup_dir.is_dir():
+        return []
+    return sorted(
+        (
+            path
+            for path in backup_dir.iterdir()
+            if path.is_file() and not path.is_symlink() and _BACKUP_NAME_RE.match(path.name)
+        ),
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+        reverse=True,
+    )
+
+
+def prune_backups(
+    backup_dir: Path,
+    *,
+    max_count: int | None = 50,
+    max_age_days: float | None = 30,
+    max_bytes: int | None = 500 * 1024 * 1024,
+    dry_run: bool = True,
+) -> list[Path]:
+    """Preview or remove timestamped backups outside explicit retention limits.
+
+    The default is a dry run. Only files created by :func:`create_backup` are
+    eligible; unrelated files and symlinks are never removed.
+    """
+    for name, value in (
+        ("max_count", max_count),
+        ("max_age_days", max_age_days),
+        ("max_bytes", max_bytes),
+    ):
+        if value is not None and value < 0:
+            raise ValueError(f"{name} must be non-negative or None")
+
+    candidates = _backup_files(Path(backup_dir))
+    remove: set[Path] = set()
+    if max_count is not None:
+        remove.update(candidates[max_count:])
+
+    if max_age_days is not None:
+        cutoff = datetime.now(UTC).timestamp() - timedelta(days=max_age_days).total_seconds()
+        remove.update(path for path in candidates if path.stat().st_mtime < cutoff)
+
+    if max_bytes is not None:
+        retained_bytes = 0
+        for path in candidates:
+            size = path.stat().st_size
+            if path in remove:
+                continue
+            if retained_bytes + size > max_bytes:
+                remove.add(path)
+            else:
+                retained_bytes += size
+
+    selected = [path for path in candidates if path in remove]
+    if not dry_run:
+        for path in selected:
+            path.unlink()
+    return selected
+
+
+def restore_backup(backup_path: Path, destination: Path, *, overwrite: bool = False) -> Path:
+    """Atomically restore one backup, requiring explicit overwrite permission."""
+    source = Path(backup_path)
+    target = Path(destination)
+    if not source.is_file() or source.is_symlink():
+        raise FileNotFoundError(f"Backup is not a regular file: {source}")
+    if source.resolve() == target.resolve():
+        raise ValueError("Backup and destination must be different paths")
+    if target.exists() and not overwrite:
+        raise FileExistsError(f"Destination already exists: {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink():
+        raise ValueError("Symlink destinations are not allowed")
+
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=target.parent,
+            prefix=f".{target.name}.",
+            suffix=".restore.tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+        shutil.copy2(source, temporary_path)
+        os.replace(temporary_path, target)
+    except Exception:
+        if temporary_path is not None:
+            with suppress(FileNotFoundError):
+                temporary_path.unlink()
+        raise
+    return target
 
 
 def clean_note_name(filename: str) -> str:
@@ -348,7 +449,7 @@ try:
 
     __version__ = _get_version("power-framework")
 except Exception:
-    __version__ = "3.4.0"
+    __version__ = "3.5.0"
 
 
 def run_opencode_cli(prompt: str) -> str:

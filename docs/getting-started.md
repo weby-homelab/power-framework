@@ -1,8 +1,14 @@
 # Getting Started from a Clean Knowledge Base
 
-This is the authoritative clean-install path for P.O.W.E.R. `v3.4.5`. It
+This is the authoritative clean-install path for P.O.W.E.R. `v3.5.0`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
+
+> **Candidate boundary:** `v3.5.0` is not a published GitHub Release or tag in
+> the current worktree. The immutable wheel and pinned-tag commands below are
+> the post-publication contract and must not be run until the signed release
+> and remote readback gates pass. For the current candidate, use the checkout's
+> locked development environment from the repository's `CONTRIBUTING.md`.
 
 Windows 11 25H2 users should follow the complete
 [Windows installation guide](windows-11-installation.md), which uses exact
@@ -18,7 +24,7 @@ PowerShell paths and includes MCP acceptance checks.
 Use an isolated virtual environment. Avoid modifying an operating-system Python
 or relying on `--break-system-packages` for a normal installation.
 
-## 2. Install the versioned release
+## 2. Install the versioned release (after publication)
 
 On Linux or macOS:
 
@@ -29,24 +35,33 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
 ```
 
-The release wheel pins the P.O.W.E.R. source version. Its dependencies are
-resolved from the configured Python package index.
+The base release wheel is FTS-only: it does not install ONNX Runtime, model
+tokenizers, numerical packages, or the optional MCP transport. Add the explicit
+`remote` extra before configuring MCP, and add `semantic` only for local dense
+experiments.
 
-Verify the executable, package metadata, and MCP import:
+Verify the executable, package metadata, and lean import:
 
 ```bash
 "$POWER_CLI" --version
 "$POWER_PYTHON" -c \
   'from importlib.metadata import version; print(version("power-framework"))'
 "$POWER_PYTHON" -c \
-  'import power_framework.mcp, onnxruntime; print("imports: OK")'
+  'import power_framework; print("lean FTS import: OK")'
 ```
 
-Both version commands must report `3.4.5`; the final command must print
-`imports: OK`.
+Both version commands must report `3.5.0`; the final command must print
+`lean FTS import: OK`.
+
+For local MCP, install the optional remote transport from the same wheel:
+
+```bash
+"$POWER_PYTHON" -m pip install \
+  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
+```
 
 ### Alternative: install from the pinned tag
 
@@ -54,7 +69,7 @@ This path requires Git:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.4.5'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.5.0'
 ```
 
 Do not use an unpinned `main` install when reproducibility matters.
@@ -129,7 +144,7 @@ can require substantial time, network traffic, disk space, and memory:
 
 ```bash
 "$POWER_CLI" sync "$POWER_VAULT"
-"$POWER_CLI" search "$POWER_VAULT" "clean installation" --mode semantic
+"$POWER_CLI" search "$POWER_VAULT" "clean installation"
 ```
 
 Do not claim semantic or reranked readiness unless both full sync and a search
@@ -195,8 +210,10 @@ it up before removing either location.
 ## Acceptance checklist
 
 - Python is 3.11+ and the selected interpreter is inside the dedicated venv.
-- CLI and distribution metadata both report `3.4.5`.
-- `power_framework.mcp` and `onnxruntime` import successfully.
+- CLI and distribution metadata both report `3.5.0`.
+- `power_framework` imports successfully without neural or MCP extras.
+- If MCP is configured, the explicit `remote` extra is installed and MCP
+  preflight imports `power_framework.mcp` successfully.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.
 - FTS sync exits `0` and FTS search returns the first note.
 - MCP preflight uses the same interpreter and prints `MCP preflight: OK`.

@@ -11,7 +11,219 @@ permissions:
   attestations: write
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install the locked release-gate environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev --extra semantic --extra rerank
+
+      - name: Run release-gate static and documentation checks
+        run: |
+          uv run ruff check src/ tests/ scripts/ benchmarks/power35/
+          uv run ruff format --check src/ tests/ scripts/ benchmarks/power35/
+          uv run mypy src/power_framework/
+          uv run python scripts/check_doc_drift.py
+          uv run python scripts/complexity_dashboard.py --baseline-revision v3.4.5 --require-budget
+          uv run mkdocs build --strict --site-dir "$RUNNER_TEMP/power-release-site"
+
+      - name: Run the full release-gate test suite
+        run: >-
+          uv run pytest tests/ -v --tb=short
+          --junitxml="$RUNNER_TEMP/power35-junit.xml"
+          --cov=src/power_framework/ --cov-report=term-missing
+          --cov-report=json:"$RUNNER_TEMP/power35-coverage.json" --cov-fail-under=70
+          -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
+
+      - name: Verify upgrade and fault-injection invariants
+        run: |
+          uv run python scripts/retention_soak.py \
+            --output "$RUNNER_TEMP/power35-retention.json"
+          uv run pytest tests/test_maintenance.py tests/test_maintenance_faults.py \
+            -q --no-cov --override-ini=addopts=
+
+      - name: Generate content-free Phase 8 technical receipts
+        run: |
+          uv run python benchmarks/power35/scripts/run_outcome_benchmark.py \
+            --output "$RUNNER_TEMP/power35-outcome.json"
+          uv run python benchmarks/power35/scripts/run_continuity_benchmark.py \
+            --output "$RUNNER_TEMP/power35-continuity.json"
+          uv run python - "$RUNNER_TEMP/power35-outcome.json" "$RUNNER_TEMP/power35-continuity.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          from power_framework.phase8_contract import (
+              CONTINUITY_INDEPENDENT_PROCESSES,
+              PHASE8_CONTINUITY_SCHEMA_VERSION,
+              PHASE8_OUTCOME_SCHEMA_VERSION,
+              SYNTHETIC_WORKFLOW_COUNT,
+          )
+
+          outcome = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          continuity = json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert outcome["schema_version"] == PHASE8_OUTCOME_SCHEMA_VERSION
+          assert outcome["synthetic"] is True
+          assert outcome["content_free"] is True
+          assert outcome["workflow_count"] == SYNTHETIC_WORKFLOW_COUNT
+          assert outcome["gate"]["fresh_agent_completion"] >= 0.9
+          assert outcome["gate"]["safety_invariants_100"] is True
+          assert outcome["gate"]["false_premise_abstention"] is True
+          assert outcome["gate"]["stale_state_filter"] is True
+          assert outcome["gate"]["technical_continuity_20"] is True
+          assert outcome["gate"]["blocked_workflow_abstention"] is True
+          assert outcome["gate"]["median_human_reminders"] == 0
+          assert outcome["comparison"]["practical_improvement"] is True
+          assert outcome["feedback_reuse"]["measured"] is False
+          assert outcome["blind_scoring"] is False
+          assert outcome["bootstrap_context_tokens"]["measured"] is False
+          assert outcome["raw_content_in_report"] is False
+          assert outcome["human_quality_certification"] is False
+          assert outcome["real_vault"] is False
+          assert continuity["schema_version"] == PHASE8_CONTINUITY_SCHEMA_VERSION
+          assert continuity["synthetic"] is True
+          assert continuity["content_free"] is True
+          assert continuity["workflow_count"] == SYNTHETIC_WORKFLOW_COUNT
+          assert continuity["independent_processes"] == CONTINUITY_INDEPENDENT_PROCESSES
+          assert continuity["gate"]["correct_resume_20"] is True
+          assert continuity["gate"]["proof_carrying_handoff"] is True
+          assert continuity["gate"]["source_preserved"] is True
+          assert continuity["gate"]["power_beats_plain_handoff"] is True
+          assert continuity["comparison"]["practical_improvement"] is True
+          assert continuity["raw_content_in_report"] is False
+          assert continuity["human_quality_certification"] is False
+          assert continuity["real_vault"] is False
+          print("Phase 8 technical receipts verified; external quality evidence remains closed")
+          PY
+
+      - name: Record executed release gates
+        run: >-
+          uv run python scripts/generate_release_gate_manifest.py
+          --output "$RUNNER_TEMP/power35-gates.json"
+          --passed-mandatory locked-dependencies
+          --passed-mandatory ruff-check
+          --passed-mandatory ruff-format
+          --passed-mandatory mypy
+          --passed-mandatory doc-drift
+          --passed-mandatory complexity-budget
+          --passed-mandatory mkdocs-strict
+          --passed-mandatory full-pytest
+          --passed-mandatory warnings-as-errors
+          --passed-mandatory maintenance-faults
+          --passed-mandatory phase8-technical
+          --passed-mandatory retention-soak
+          --skipped-optional real-vault-quality
+          --skipped-optional physical-windows-macos
+          --skipped-optional remote-release-readback
+
+      - name: Generate content-free validation receipt
+        run: >-
+          uv run python scripts/generate_release_validation.py
+          --junit-xml "$RUNNER_TEMP/power35-junit.xml"
+          --coverage-json "$RUNNER_TEMP/power35-coverage.json"
+          --gate-manifest "$RUNNER_TEMP/power35-gates.json"
+          --output "$RUNNER_TEMP/power35-validation.json"
+
+      - name: Upload content-free Phase 8 technical receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: power35-phase8-technical-receipts
+          path: |
+            ${{ runner.temp }}/power35-outcome.json
+            ${{ runner.temp }}/power35-continuity.json
+            ${{ runner.temp }}/power35-gates.json
+            ${{ runner.temp }}/power35-validation.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Verify the tag-bound candidate contract before publication
+        run: |
+          uv run python scripts/generate_release_candidate.py \
+            --output "$RUNNER_TEMP/power35-candidate.json" \
+            --validation-report "$RUNNER_TEMP/power35-validation.json" \
+            --phase8-outcome-receipt "$RUNNER_TEMP/power35-outcome.json" \
+            --phase8-continuity-receipt "$RUNNER_TEMP/power35-continuity.json"
+          uv run python scripts/verify_release_contract.py \
+            --candidate \
+            --baseline "$RUNNER_TEMP/power35-candidate.json" \
+            --require-worktree-hash
+
+  upgrade-matrix:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install the locked upgrade environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev
+
+      - name: Execute the complete platform upgrade matrix
+        run: >-
+          uv run python scripts/verify_upgrade_matrix.py
+          --from-version 3.4.5 --to-version 3.5.0
+          --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
+
+      - name: Upload platform upgrade evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: power35-release-upgrade-${{ matrix.os }}
+          path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  upgrade-matrix-aggregate:
+    needs: upgrade-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download platform upgrade evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: power35-release-upgrade-*
+          path: ${{ runner.temp }}/power35-release-upgrade
+          merge-multiple: true
+
+      - name: Aggregate and block on every supported platform
+        run: >-
+          python scripts/aggregate_upgrade_matrix.py
+          --input-dir "${{ runner.temp }}/power35-release-upgrade"
+          --require-all-platforms
+          --output "${{ runner.temp }}/power35-release-upgrade-aggregate.json"
+
+      - name: Upload aggregated upgrade evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: power35-release-upgrade-aggregate
+          path: ${{ runner.temp }}/power35-release-upgrade-aggregate.json
+          if-no-files-found: error
+          retention-days: 7
+
   release:
+    needs: [validate, upgrade-matrix-aggregate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -28,18 +240,56 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
+      - name: Download Phase 8 technical receipts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: power35-phase8-technical-receipts
+          path: ${{ runner.temp }}/power35-phase8-technical
+
+      - name: Download aggregate upgrade evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: power35-release-upgrade-aggregate
+          path: ${{ runner.temp }}/power35-upgrade
+
+      - name: Build package before binding final evidence
+        run: python -m build
+
+      - name: Generate SPDX SBOM before binding final evidence
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: spdx-json
+          output-file: dist/power-framework.spdx.json
+
       - name: Generate and verify tag-bound release baseline
         run: |
+          phase8_dir="$RUNNER_TEMP/power35-phase8"
+          test -f "$phase8_dir/real-vault-receipt.json" || {
+            echo "stable 3.5.0 requires maintainer-provisioned Phase 8 evidence at $phase8_dir" >&2
+            exit 1
+          }
+          test -f "$phase8_dir/human-manifest.json" || {
+            echo "stable 3.5.0 requires the hash-bound sealed human manifest at $phase8_dir" >&2
+            exit 1
+          }
           mkdir -p dist
           python scripts/generate_release_baseline.py \
             --tag "$GITHUB_REF_NAME" \
+            --validation-report "$RUNNER_TEMP/power35-phase8-technical/power35-validation.json" \
+            --sbom dist/power-framework.spdx.json \
+            --upgrade-matrix-aggregate "$RUNNER_TEMP/power35-upgrade/power35-release-upgrade-aggregate.json" \
+            --phase8-outcome-receipt "$RUNNER_TEMP/power35-phase8-technical/power35-outcome.json" \
+            --phase8-continuity-receipt "$RUNNER_TEMP/power35-phase8-technical/power35-continuity.json" \
+            --phase8-real-vault-receipt "$phase8_dir/real-vault-receipt.json" \
+            --phase8-human-manifest "$phase8_dir/human-manifest.json" \
             --output dist/power-framework.release-baseline.json
           python scripts/verify_release_contract.py \
             --require-tag \
+            --require-signed-tag \
+            --sbom dist/power-framework.spdx.json \
+            --upgrade-matrix-aggregate "$RUNNER_TEMP/power35-upgrade/power35-release-upgrade-aggregate.json" \
             --baseline dist/power-framework.release-baseline.json
-
-      - name: Build package
-        run: python -m build
 
       - name: Install runtime dependencies for artifact smoke
         run: pip install .
@@ -50,12 +300,10 @@ jobs:
             --wheel dist/power_framework-*.whl \
             --sdist dist/power_framework-*.tar.gz
 
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          path: .
-          format: spdx-json
-          output-file: dist/power-framework.spdx.json
+      - name: Select tag-matched release notes
+        id: release_notes
+        shell: bash
+        run: echo "path=docs/release-${GITHUB_REF_NAME#v}.md" >> "$GITHUB_OUTPUT"
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -65,7 +313,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
-          body_path: docs/release-3.4.0.md
+          body_path: ${{ steps.release_notes.outputs.path }}
           generate_release_notes: false
           files: |
             dist/power-framework.release-baseline.json
@@ -85,3 +333,34 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: dist/power-framework.release-receipt.json
+
+      - name: Read back GitHub release metadata and assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$GITHUB_REF_NAME" --json tagName,body,assets \
+            > dist/power-framework.github-readback.json
+          python - "$GITHUB_REF_NAME" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          expected_tag = sys.argv[1]
+          readback = json.loads(
+              pathlib.Path("dist/power-framework.github-readback.json").read_text()
+          )
+          notes_path = pathlib.Path(f"docs/release-{expected_tag.removeprefix('v')}.md")
+          assert readback["tagName"] == expected_tag
+          assert readback["body"] == notes_path.read_text()
+          asset_names = {asset["name"] for asset in readback["assets"]}
+          required = {
+              "power-framework.release-baseline.json",
+              "power-framework.release-receipt.json",
+          }
+          assert required <= asset_names
+          assert any(name.endswith(".whl") for name in asset_names)
+          assert any(name.endswith(".tar.gz") for name in asset_names)
+          assert any(name.endswith(".spdx.json") for name in asset_names)
+          print("GitHub release readback verified")
+          PY

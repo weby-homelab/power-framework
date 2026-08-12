@@ -1,15 +1,21 @@
 # POWER 3.4.5 release notes
 
-POWER 3.4.5 consolidates the cross-platform supported release baseline across Linux, Windows 11 25H2, and macOS. It incorporates the canonical synthetic quality oracle harness (`benchmarks/power31`), validated CUDA execution on ONNX Runtime GPU, verified BGE-M3 1024d semantic search default, and complete platform matrix coverage.
+POWER 3.4.5 records the prior cross-platform technical baseline across Linux,
+Windows 11 25H2, and macOS. Its historical retrieval contract was semantic;
+the development line now targets the FTS-first `auto` profile for 3.5.0.
 
 ## What changed
 
 - **Cross-Platform Support Matrix**: Documented and verified platform boundaries for Linux, macOS (`macos-latest` Python 3.13 CI smoke), hosted Windows Server, and physical Windows 11 25H2 GPU environments (`docs/support-matrix.md`).
 - **Synthetic Quality Oracle Harness**: Added `benchmarks/power31/scripts/evaluation/run_quality_comparison.py` evaluating `semantic` vs `reranked` retrieval on dataset v1 (228 queries, 100 corpus docs, 416 qrels) with paired statistics (MRR@10, NDCG@10, Recall@10, per-stratum UA↔EN breakdown, and warm latency).
-- **Verified Retrieval Default**: Confirmed Semantic Search (BGE-M3 1024d) as the canonical, fast, high-precision default retrieval engine. Reranker is rejected as default due to statistically significant degradation on English notes and latency/VRAM overhead.
+- **Historical Retrieval Evidence**: The 3.4.5 semantic measurements remain
+  version-stamped historical evidence; they do not define the 3.5.0 default.
+  The 3.5.0 `auto` profile exposes actual mode and fallback reason.
 - **Truthful MCP Discovery & Server Info**: `get_server_info` tool exposes FastMCP package version, configured vault path, coverage stats, and explicit provider binding state without side effects or model preloading.
 - **Windows Runtime Safety**: `power rename` uses `os.replace()` for atomic physical moves. Windows runtime smoke enforces strict index coverage policy (`power sync --fts-only --strict`).
-- **Clean Governance**: Zero open repository issues; all field report defects and measurements validated by regression suites.
+- **Governance boundary**: This is a technical release baseline. Issue status,
+  human-quality certification, and production claims require separately retained
+  tracker/readback evidence and are not inferred from the regression suite.
 
 ## Validation and evidence boundary
 
