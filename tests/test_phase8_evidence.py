@@ -270,4 +270,3 @@ def test_phase8_validation_accepts_formatted_human_manifest_hash(tmp_path: Path)
 
     candidates = phase8._candidate_manifest_hashes(human, manifest_obj)
     assert pretty_hash in candidates
-
