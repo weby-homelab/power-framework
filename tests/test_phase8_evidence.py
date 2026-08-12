@@ -289,3 +289,16 @@ def test_phase8_validation_accepts_standard_python_dumps_hash(tmp_path: Path) ->
             assert std_hash in candidates, (
                 f"Standard json.dumps hash missing (sort={sort}, trailing={bool(trailing)})"
             )
+
+
+def test_phase8_validation_accepts_ascii_escaped_unicode_hash(tmp_path: Path) -> None:
+    """Default JSON escaping must be accepted for manifests containing Ukrainian text."""
+    human = tmp_path / "human.json"
+    _write_human_manifest(human, status="adjudicated")
+    manifest_obj = json.loads(human.read_text(encoding="utf-8"))
+    manifest_obj["annotation_protocol"] = "протокол_ua.md"
+
+    escaped_bytes = json.dumps(manifest_obj, indent=2, ensure_ascii=True).encode("utf-8") + b"\n"
+    escaped_hash = hashlib.sha256(escaped_bytes).hexdigest()
+
+    assert escaped_hash in phase8._candidate_manifest_hashes(human, manifest_obj)
