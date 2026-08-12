@@ -37,7 +37,10 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Windows-safe rename** — `power rename` використовує `os.replace()` для
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
-- **Технічний реліз 3.4.5** — machine-only M2–M5 gates, package та CI provenance перевірені; додано fail-closed doctor, migration, cache, catalog, healer та agent-contract safeguards. Сертифікація human-quality, доступ до sealed holdout і production claims залишаються закритими.
+- **Реліз P.O.W.E.R. 3.5.0** — опубліковані wheel, source archive, SBOM,
+  upgrade matrix і release receipts перевірені. Додано fail-closed doctor,
+  migration, cache, catalog, healer та agent-contract safeguards. Межі
+  підтримки визначає [матриця платформ](docs/support-matrix.ua.md).
 
 ## Для AI-агентів
 
@@ -65,11 +68,11 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 Потрібен Python 3.11+ і terminal shell; `~/my-vault` — каталог vault, яким
 керуватиме POWER.
 
-> **Межа candidate 3.5.0:** підписаний GitHub Release і tag `v3.5.0` ще не
-> опубліковані з цього worktree. URL immutable wheel нижче стане виконуваним
-> лише після проходження tag, artifact і remote readback gates. Для поточного
-> candidate використовуйте locked development installation з
-> [CONTRIBUTING.md](CONTRIBUTING.md).
+> **Опублікований реліз `v3.5.0`:** підписаний tag, wheel, source archive, SBOM
+> і release receipt доступні на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> Для відтворюваної установки використовуйте immutable wheel нижче. Release
+> receipt стосується заявленої Linux-межі; перед claims для іншого хоста
+> перевірте [матрицю платформ](docs/support-matrix.ua.md).
 
 ```bash
 python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
@@ -100,9 +103,10 @@ power --version
 
 ## Встановлення на Windows 11 25H2 (відкладено)
 
-Windows 11 25H2 відкладено за межі release `v3.5.0`. Окремий детальний
-[гід Windows 11 25H2](docs/windows-11-installation.ua.md) залишається майбутньою
-документацією і не є Stable release certification.
+Windows 11 25H2 залишається поза межами підтримуваної платформи release
+`v3.5.0`. Окремий [гід Windows 11 25H2](docs/windows-11-installation.ua.md)
+описує установку та host validation, але не є сертифікацією Stable release для
+цієї платформи.
 
 Для `v3.5.0` немає Windows CI, upgrade-matrix, compatibility, performance або
 GPU claim.
@@ -117,7 +121,7 @@ GPU claim.
 | **Knowledge Graph (Graph RAG)**  | Поле `related` в OKF frontmatter з підтримкою `TypedRelation` (path, relation, confidence), BFS обходом та експортом підграфів у Mermaid-діаграми (`to_mermaid`)                                                                                                                                                                                                                                                                                                                     |
 | **Freshness Monitoring**         | Лінтер виявляє застарілі нотатки за полем `expiry`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **Agent Auto-Ingest**            | `synthesize_session` — агенти автономно створюють нотатки з governance + graph links + перебудовою індексу                                                                                                                                                                                                                                                                                                                                                                           |
-| **Режими retrieval**             | Доступні `auto` (verified dense, якщо готовий, інакше labelled FTS), FTS5 (BM25), local TF vector, Hybrid (RRF), explicit Semantic та **Reranked** режими. Explicit dense modes завершуються fail-closed з remediation `power sync`, якщо assets відсутні або несумісні; auto повертає actual mode і fallback reason. Якісні та ресурсні показники потребують versioned evidence перед будь-яким release claim. |
+| **Режими retrieval**             | Доступні `auto` (verified dense, якщо готовий, інакше labelled FTS), FTS5 (BM25), local TF vector, Hybrid (RRF), explicit Semantic та **Reranked** режими. Explicit dense modes завершуються fail-closed з remediation `power sync`, якщо assets відсутні або несумісні; auto повертає actual mode і fallback reason. Якісні та ресурсні показники потребують versioned evidence перед claims, незалежними від конкретного хоста. |
 | **Cross-Encoder реранкер**       | Канонічний BGE-реранкер — Apache-2.0 ONNX snapshot із SHA-256-перевірками. Локальний `jinaai/jina-reranker-v2-base-multilingual` має CC-BY-NC-4.0 і потребує `POWER_RERANKER=jina` та `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` для дозволеного non-commercial використання.                                                                                                                                                                                                              |
 | **Graph RAG v2**                 | Фаза 3 suggester зв'язків: явні OKF `related` посилання дають сильний куратований сигнал, злитий з перетином ключових слів/тегів у **зважений двонаправлений граф подібності** зі зваженим BFS та центральністю за ступенем/вагою (`power suggest-related --v2`). Лише впевнені передбачення, без вигаданих зв'язків.                                                                                                                                                                |
 | **ColBERT Opt-In реранкер**      | Фаза 3 `POWER_RERANKER=colbert` вмикає late-interaction ColBERT реранкинг (потрібно ≥16 GB RAM, інакше пропускається); **вимкнено за замовчуванням**. Канонічний fallback — ліцензійно чистий BGE ONNX реранкер; Jina доступна лише через явний non-commercial opt-in.                                                                                                                                                                                                               |
@@ -133,13 +137,12 @@ GPU claim.
 | **CI/CD**                        | Hermetic тести, CodeQL SAST і автоматизовані GitHub-релізи; release evidence перевіряється versioned harness `benchmarks/power31` та pinned model manifest.                                                                                                                                                                                                                                                                                                                          |
 | **Документація**                 | Повний [mkdocs-material сайт](https://weby-homelab.github.io/power-framework/) з API reference та гайдами                                                                                                                                                                                                                                                                                                                                                                            |
 
-> **Статус evidence для POWER 3.4.5:** реліз містить machine-only M2–M5
-> technical gates, package/CI provenance та Windows-safe виправлення
-> `power rename` з автоматичним regression покриттям. Historical figures
-> у feature-table, model comparisons, resource limits і benchmark
-> recommendations не є поточним release evidence. Сертифікація human-quality,
-> доступ до sealed holdout та production-quality claims залишаються поза
-> межами цього релізу.
+> **Статус evidence для POWER 3.5.0:** опублікований реліз містить machine
+> validation gates, package/CI provenance, SBOM, Ubuntu upgrade matrix і Phase 8
+> technical та human-evaluation receipts. Ці receipts діють у межах заявленого
+> release scope. Historical figures у feature-table, model comparisons, resource
+> limits і benchmark recommendations не є гарантіями для довільного хоста або
+> vault.
 
 ## Звіт міграції
 
@@ -260,8 +263,9 @@ power search ~/my-vault "experiment" --mode auto --domain research
 канонічні конфігурації для Claude Desktop/Code, Gemini CLI, Codex і OpenCode,
 а також read-only golden task та workflow схвалення.
 
-URL wheel нижче є контрактом після публікації; він не стверджує, що candidate
-вже опублікований.
+URL wheel нижче веде до опублікованого install artifact `v3.5.0`. На
+[сторінці релізу](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0)
+доступні signed tag, source archive, SBOM і release receipts.
 
 ```bash
 pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
@@ -536,8 +540,8 @@ mypy src/power_framework/
 
 Для актуальної відтворюваної інформації про реліз і evidence:
 
-- [Нотатки релізу P.O.W.E.R. 3.5.0](docs/release-3.5.0.md) — candidate scope,
-  межі валідації та інструкції оновлення.
+- [Нотатки релізу P.O.W.E.R. 3.5.0](docs/release-3.5.0.md) — scope опублікованого
+  релізу, evidence та інструкції оновлення.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) —
   canonical checksum-verified post-merge WS full-sync evidence; розширена
   валідація явно ведеться в issue #187.

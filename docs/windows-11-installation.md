@@ -4,11 +4,10 @@ This guide installs P.O.W.E.R. `v3.5.0` in an isolated virtual environment,
 creates a clean vault, verifies the CLI, and configures an MCP client. It uses
 PowerShell syntax throughout.
 
-> **Candidate boundary:** the signed `v3.5.0` release and tag are not published
-> from the current worktree. The wheel and pinned-tag commands below are the
-> post-publication contract; do not run them until the release workflow and
-> remote readback gates pass. Physical Windows evidence remains a separate
-> target-host gate.
+> **Published release:** the signed `v3.5.0` tag and immutable wheel are
+> available on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> Physical Windows evidence remains a separate target-host gate; see the
+> [platform support matrix](support-matrix.md).
 
 ## Support and evidence boundary
 
@@ -117,7 +116,12 @@ if ($LASTEXITCODE -ne 0) { throw "P.O.W.E.R. import verification failed" }
 
 Both version checks must report `3.5.0`, and the import check must print
 `lean FTS import: OK`. Install the explicit `[remote]` extra before configuring
-MCP, and `[semantic]` only when dense search is intentionally enabled.
+MCP, and `[semantic]` only when dense search is intentionally enabled:
+
+```powershell
+$RemoteRequirement = "power-framework[remote] @ $ReleaseWheel"
+& $VenvPython -m pip install $RemoteRequirement
+```
 
 ### Alternative: install from the pinned tag
 
@@ -178,7 +182,7 @@ disk space, and memory:
 & $PowerExe sync $Vault
 if ($LASTEXITCODE -ne 0) { throw "Dense synchronization failed" }
 
-& $PowerExe search $Vault "clean installation"
+& $PowerExe search $Vault "clean installation" --mode semantic
 if ($LASTEXITCODE -ne 0) { throw "Semantic search failed" }
 ```
 
@@ -236,10 +240,11 @@ Upgrade to a specific release by replacing the version in the wheel URL and
 running the same install command with `--upgrade`. Verify `power --version`
 afterward.
 
-Rollback to `v3.3.2`:
+Rollback to the previous stable release, `v3.4.5`:
 
 ```powershell
-& $VenvPython -m pip install --force-reinstall $ReleaseWheel
+$RollbackWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl"
+& $VenvPython -m pip install --force-reinstall $RollbackWheel
 & $PowerExe --version
 ```
 

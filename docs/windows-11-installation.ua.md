@@ -4,10 +4,10 @@
 створює чистий vault, перевіряє CLI та налаштовує MCP-клієнт. Усі команди
 наведено для PowerShell.
 
-> **Межа candidate:** підписаний release і tag `v3.5.0` ще не опубліковані з
-> поточного worktree. Команди з wheel і pinned tag нижче є контрактом після
-> публікації; не запускайте їх до проходження release workflow та remote
-> readback gates. Фізичні Windows-докази залишаються окремим target-host gate.
+> **Опублікований реліз:** підписаний tag `v3.5.0` та immutable wheel доступні
+> на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> Фізичні Windows-докази залишаються окремим target-host gate; дивіться
+> [матрицю підтримки платформ](support-matrix.ua.md).
 
 ## Межа підтримки та доказів
 
@@ -116,7 +116,12 @@ if ($LASTEXITCODE -ne 0) { throw "Помилка перевірки імпорт
 
 Обидві перевірки версії мають показати `3.5.0`, а import check —
 `lean FTS import: OK`. Перед MCP встановіть явний extra `[remote]`, а
-`[semantic]` — лише для свідомо увімкненого dense search.
+`[semantic]` — лише для свідомо увімкненого dense search:
+
+```powershell
+$RemoteRequirement = "power-framework[remote] @ $ReleaseWheel"
+& $VenvPython -m pip install $RemoteRequirement
+```
 
 ### Альтернатива: встановлення із закріпленого tag
 
@@ -178,9 +183,14 @@ assets. Перша повна синхронізація може потребу
 & $PowerExe sync $Vault
 if ($LASTEXITCODE -ne 0) { throw "Dense-синхронізація не пройшла" }
 
-& $PowerExe search $Vault "clean installation"
+& $PowerExe search $Vault "clean installation" --mode semantic
 if ($LASTEXITCODE -ne 0) { throw "Semantic-пошук не пройшов" }
 ```
+
+Не заявляйте готовність semantic або reranked mode, доки full sync і пошук у
+вибраному mode не пройдуть на цільовому хості. Явний mode важливий: профіль
+`auto` може повернути labelled FTS fallback. FTS залишається доступним, якщо
+dense model gate працює fail-closed.
 
 Моделі зберігаються в Hugging Face cache, а не всередині virtual environment.
 P.O.W.E.R. перевіряє закріплений model contract і працює fail-closed, якщо
@@ -233,10 +243,11 @@ $env:POWER_VAULT_DIR = $Vault
 Для оновлення до конкретного релізу замініть версію в URL wheel і повторіть
 install із `--upgrade`. Після цього перевірте `power --version`.
 
-Rollback на `v3.3.2`:
+Rollback на попередній стабільний реліз `v3.4.5`:
 
 ```powershell
-& $VenvPython -m pip install --force-reinstall $ReleaseWheel
+$RollbackWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.4.5/power_framework-3.4.5-py3-none-any.whl"
+& $VenvPython -m pip install --force-reinstall $RollbackWheel
 & $PowerExe --version
 ```
 

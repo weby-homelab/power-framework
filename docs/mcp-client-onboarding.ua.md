@@ -4,10 +4,9 @@
 macOS. Воно дає Codex, OpenCode, Gemini CLI, Claude Desktop і Claude Code один
 і той самий процес сервера та однакову межу vault.
 
-> **Межа candidate:** `v3.5.0` ще не опублікований із поточного worktree. Команда
-> з release wheel нижче чинна лише після проходження signed tag, artifact і
-> remote readback gates. Для локального candidate встановлюйте з locked
-> checkout environment, описаного в root-файлі `CONTRIBUTING.md` репозиторію.
+> **Опублікований реліз:** `v3.5.0` доступний на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> Використовуйте immutable wheel і точний interpreter із
+> [гіда чистої установки](getting-started.ua.md).
 
 Для Windows використовуйте [посібник Windows 11
 25H2](windows-11-installation.ua.md), який працює з точним інтерпретатором у
@@ -16,19 +15,29 @@ Windows virtual environment. POSIX-шляхи не можна переносит
 
 ## Одноразова підготовка
 
-Спочатку встановіть release wheel і створіть або мігруйте vault:
+Спочатку встановіть release wheel в ізольоване середовище. Для нового vault
+створіть його через `init`; для наявного спочатку виконайте
+[гід міграції](migration-guide.ua.md) і не запускайте `init` поверх нього:
 
 ```bash
-python3 -m pip install \
+POWER_HOME="$HOME/.local/share/power-framework"
+POWER_VENV="$POWER_HOME/venv"
+POWER_PYTHON="$POWER_VENV/bin/python"
+POWER_CLI="$POWER_VENV/bin/power"
+POWER_VAULT="$HOME/Documents/power-vault"
+
+python3 -m venv "$POWER_VENV"
+"$POWER_PYTHON" -m pip install \
   "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
-power init ~/my-vault
-python3 -c 'import sys; print(sys.executable)'
+# Лише для нового або порожнього vault:
+"$POWER_CLI" init "$POWER_VAULT"
+"$POWER_PYTHON" -c 'import sys; print(sys.executable)'
 ```
 
-Використайте надрукований абсолютний шлях до Python і абсолютний шлях до
-`~/my-vault` у конфігурації нижче. MCP-процес повинен отримати
-`POWER_VAULT_DIR` — це налаштована межа vault. Сервер працює через локальний
-stdio, тому його stdout зарезервований для MCP-протоколу.
+Використайте абсолютні шляхи `POWER_PYTHON` і `POWER_VAULT` у конфігурації
+нижче. MCP-процес повинен отримати `POWER_VAULT_DIR` — це налаштована межа
+vault. Сервер працює через локальний stdio, тому його stdout зарезервований для
+MCP-протоколу.
 
 Не підключайте клієнт до repository wrapper, shell-скрипту, який завантажує
 секрети, або іншої установки Python. Не додавайте до клієнтської конфігурації

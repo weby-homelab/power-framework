@@ -1,6 +1,6 @@
 # P.O.W.E.R. platform support matrix
 
-This matrix is the operational boundary for the current `v3.5.0` candidate contract. It
+This matrix is the operational boundary for the published `v3.5.0` release contract. It
 separates automated lifecycle coverage from model-backed, physical-host, GPU,
 and retrieval-quality evidence. A green CI job does not certify a different
 host, provider, corpus, or performance envelope.
@@ -9,7 +9,7 @@ host, provider, corpus, or performance envelope.
 
 | Platform / environment | Tested now | Conditional | Not certified by this matrix |
 | --- | --- | --- | --- |
-| Linux, Python 3.11–3.14 | Ubuntu CI runs the full test suite, Ruff, MyPy, documentation and release-contract gates; package smoke runs wheel/sdist outside the checkout. | Dense, reranked, and provider-backed workflows require a local model cache and an actually bound provider. | Real-vault dense latency, GPU benefit, ANN recall, and reranker quality. |
+| Linux, Python 3.11–3.14 | Ubuntu CI runs the full test suite, Ruff, MyPy, documentation and release-contract gates; package smoke runs wheel/sdist outside the checkout. | Dense, reranked, and provider-backed workflows require a local model cache and an actually bound provider. | Host-independent latency, GPU benefit, ANN recall, and reranker quality beyond the published release receipts. |
 | macOS, Python 3.13 | Deferred for `v3.5.0`; no macOS CI or release upgrade evidence is claimed. | Revisit in a later release with a named runner and fresh receipts. | All macOS compatibility, performance, GPU, dense real-vault, and reranker claims. |
 | Hosted Windows CI, Python 3.13 | Deferred for `v3.5.0`; no Windows CI or release upgrade evidence is claimed. | Revisit in a later release with a named runner and fresh receipts. | All hosted Windows lifecycle, provider, performance, GPU, dense real-vault, and quality claims. |
 | Physical Windows 11 25H2 | Deferred for `v3.5.0`; the installation guide is not a release certification. | Revisit in a later release with exact host and artifact receipts. | Physical Windows compatibility, GPU performance, CUDA availability, and latency claims. |
@@ -30,7 +30,7 @@ host, provider, corpus, or performance envelope.
 ## Source of truth
 
 The executable checks live in [CI](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/ci.yml), the release
-workflow is [release.yml](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/release.yml). Windows procedures are deferred from
-`v3.5.0` and remain future documentation only.
+workflow is [release.yml](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/release.yml). Windows procedures remain
+outside the supported-platform boundary for `v3.5.0`.
 The roadmap records evidence boundaries and pending gates in
 [`ROADMAP_POWER.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md).

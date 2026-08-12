@@ -20,9 +20,8 @@ and an MCP interface for AI agents.
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
 These guides define the immutable `v3.5.0` release artifact contract, use an
-isolated virtual environment, and include acceptance checks. The signed tag and
-artifact are not published from the current worktree; release-wheel commands
-become executable only after the release and remote readback gates pass. The
+isolated virtual environment, and include acceptance checks. The signed tag,
+wheel, source archive, SBOM, and release receipts are published on GitHub. The
 migration guides keep the source immutable, reconcile every file by manifest
 and hash, and make cutover reversible.
 
@@ -38,7 +37,7 @@ and hash, and make cutover reversible.
 - The canonical dense backend is `BAAI/bge-m3`; model-backed checks download large artifacts.
   FTS5 works without model downloads.
 
-## Minimal quick start (after `v3.5.0` publication)
+## Minimal quick start
 
 ```bash
 python -m venv .venv

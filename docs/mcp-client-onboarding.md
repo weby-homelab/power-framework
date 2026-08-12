@@ -4,10 +4,9 @@ This is the canonical local-stdio setup for P.O.W.E.R. `v3.5.0` on Linux and
 macOS. It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
 the same server process and the same vault boundary.
 
-> **Candidate boundary:** `v3.5.0` is not published from the current worktree.
-> The release-wheel command below is valid only after the signed tag, artifact,
-> and remote readback gates pass. For local candidate work, install from the
-> locked checkout environment described in the repository's `CONTRIBUTING.md`.
+> **Published release:** `v3.5.0` is available from the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> Use the immutable wheel and the exact interpreter created by the
+> [clean-install guide](getting-started.md).
 
 For Windows, use the [Windows 11 25H2 guide](windows-11-installation.md), which
 uses the exact interpreter inside the Windows virtual environment. Do not copy
@@ -15,18 +14,28 @@ POSIX shell paths into a Windows client configuration.
 
 ## One-time preparation
 
-Install the release wheel and create or migrate a vault first:
+Install the release wheel in an isolated environment. For a new vault, create
+it with `init`; for an existing vault, complete the
+[migration guide](migration-guide.md) first and do not run `init` in place:
 
 ```bash
-python3 -m pip install \
+POWER_HOME="$HOME/.local/share/power-framework"
+POWER_VENV="$POWER_HOME/venv"
+POWER_PYTHON="$POWER_VENV/bin/python"
+POWER_CLI="$POWER_VENV/bin/power"
+POWER_VAULT="$HOME/Documents/power-vault"
+
+python3 -m venv "$POWER_VENV"
+"$POWER_PYTHON" -m pip install \
   "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
-power init ~/my-vault
-python3 -c 'import sys; print(sys.executable)'
+# Only for a new or empty vault:
+"$POWER_CLI" init "$POWER_VAULT"
+"$POWER_PYTHON" -c 'import sys; print(sys.executable)'
 ```
 
-Use the printed absolute Python path and the absolute path to `~/my-vault` in
-the configuration below. The MCP process must receive `POWER_VAULT_DIR`; it is
-the configured vault boundary. The server is local stdio, so its stdout is
+Use the absolute `POWER_PYTHON` path and `POWER_VAULT` path in the
+configuration below. The MCP process must receive `POWER_VAULT_DIR`; it is the
+configured vault boundary. The server is local stdio, so its stdout is
 reserved for MCP protocol traffic.
 
 Do not point a client at a repository wrapper, a shell script that loads
