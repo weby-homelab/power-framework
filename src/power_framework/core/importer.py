@@ -169,11 +169,6 @@ def normalize_foreign_fields(
     return data, changes
 
 
-# Kept as a private alias for callers that used the pre-release helper while the
-# importer API is still settling.  New code should use the explicit public name.
-_normalize_foreign_fields = normalize_foreign_fields
-
-
 def _validation_reason(data: Mapping[str, object], error: ValidationError) -> str:
     """Create a stable, non-sensitive exclusion reason from Pydantic errors."""
     if "type" not in data:

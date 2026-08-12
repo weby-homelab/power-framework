@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from power_framework.core import generation_index
 from power_framework.core.db import _init_db
 from power_framework.core.generation_index import (
     ActiveGeneration,
@@ -20,7 +21,8 @@ from power_framework.core.generation_index import (
     resolve_active_generation_path,
     sync_vault_atomically,
 )
-from power_framework.core.searcher import _stable_chunk_id, _sync_vault_to_db, search_vault
+from power_framework.core.index_sync import _stable_chunk_id
+from power_framework.core.searcher import _sync_vault_to_db, search_vault
 from power_framework.core.vault_storage import ensure_vault_identity, vault_db_path
 
 if TYPE_CHECKING:
@@ -112,12 +114,10 @@ def test_failed_generation_keeps_the_previous_active_index(
     active_db = _active_db(vault)
     before = active_db.read_bytes()
 
-    from power_framework.core import searcher
-
     def fail_staged_sync(*args: object, **kwargs: object) -> None:
         raise RuntimeError("simulated disk-full")
 
-    monkeypatch.setattr(searcher, "_sync_vault_to_db", fail_staged_sync)
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", fail_staged_sync)
     with pytest.raises(IndexGenerationError, match="simulated disk-full"):
         sync_vault_atomically(vault, sync_embeddings=False)
 
@@ -146,9 +146,7 @@ def test_source_change_during_sync_keeps_previous_active_index(
     active_db = _active_db(vault)
     before = active_db.read_bytes()
 
-    from power_framework.core import searcher
-
-    original_sync = searcher._sync_vault_to_db
+    original_sync = generation_index._sync_vault_to_db
 
     def sync_then_change_source(*args: object, **kwargs: object) -> None:
         original_sync(*args, **kwargs)
@@ -158,7 +156,7 @@ def test_source_change_during_sync_keeps_previous_active_index(
             encoding="utf-8",
         )
 
-    monkeypatch.setattr(searcher, "_sync_vault_to_db", sync_then_change_source)
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_then_change_source)
     with pytest.raises(IndexGenerationError, match=r"snapshot changed during sync.*Test.md"):
         sync_vault_atomically(vault, sync_embeddings=False)
 
@@ -214,9 +212,7 @@ def test_new_generation_starts_from_active_db_for_incremental_reuse(
         encoding="utf-8",
     )
 
-    from power_framework.core import searcher
-
-    original_sync = searcher._sync_vault_to_db
+    original_sync = generation_index._sync_vault_to_db
     observed: dict[str, int] = {}
 
     def capture_existing_rows(*args: object, **kwargs: object) -> None:
@@ -225,7 +221,7 @@ def test_new_generation_starts_from_active_db_for_incremental_reuse(
         observed["before_sync"] = conn.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0]
         original_sync(*args, **kwargs)
 
-    monkeypatch.setattr(searcher, "_sync_vault_to_db", capture_existing_rows)
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", capture_existing_rows)
     sync_vault_atomically(vault, sync_embeddings=False)
 
     assert observed["before_sync"] == 1
@@ -397,9 +393,7 @@ def test_excluded_source_change_during_sync_keeps_previous_active_index(
     active_db = _active_db(vault)
     before = active_db.read_bytes()
 
-    from power_framework.core import searcher
-
-    original_sync = searcher._sync_vault_to_db
+    original_sync = generation_index._sync_vault_to_db
 
     def sync_then_repair_excluded(*args: object, **kwargs: object) -> None:
         original_sync(*args, **kwargs)
@@ -413,7 +407,7 @@ def test_excluded_source_change_during_sync_keeps_previous_active_index(
             encoding="utf-8",
         )
 
-    monkeypatch.setattr(searcher, "_sync_vault_to_db", sync_then_repair_excluded)
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_then_repair_excluded)
     with pytest.raises(IndexGenerationError, match=r"snapshot changed during sync.*Invalid.md"):
         sync_vault_atomically(vault, sync_embeddings=False)
 

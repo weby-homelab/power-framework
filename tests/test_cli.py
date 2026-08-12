@@ -763,7 +763,6 @@ def test_ingest_duplicate_returns_1(tmp_path: Path) -> None:
 
 
 def test_memory_apply_cli_publishes_search_projection(sample_vault, capsys) -> None:
-    import json
     from unittest.mock import patch
 
     from power_framework.core.cli import main
@@ -999,8 +998,6 @@ class TestCachePrune:
         assert not legacy.exists()
 
     def test_malformed_source_is_unknown_without_touching_vault(self, tmp_path, monkeypatch):
-        import json
-
         from power_framework.core import vault_storage
 
         monkeypatch.setattr(
@@ -1026,8 +1023,6 @@ class TestCachePrune:
         assert not (vault / ".power").exists()
 
     def test_missing_vault_identity_is_unknown_without_creating_one(self, tmp_path, monkeypatch):
-        import json
-
         from power_framework.core import vault_storage
 
         monkeypatch.setattr(

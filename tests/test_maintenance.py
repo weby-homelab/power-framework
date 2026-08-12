@@ -6,8 +6,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-import power_framework.core.maintenance as maintenance_module
-from power_framework.core.maintenance import apply_maintenance_plan, build_maintenance_plan
+from power_framework.core import (
+    apply_maintenance_plan,
+    build_maintenance_plan,
+)
+from power_framework.core import (
+    maintenance as maintenance_module,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path

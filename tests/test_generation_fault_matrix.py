@@ -175,7 +175,7 @@ def test_permanent_oom_at_any_batch_keeps_previous_generation(
     def permanent_oom(*args: object, **kwargs: object) -> None:
         raise MemoryError(f"simulated permanent OOM at {batch_position} batch")
 
-    monkeypatch.setattr(searcher, "_sync_vault_to_db", permanent_oom)
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", permanent_oom)
     with pytest.raises(IndexGenerationError, match=f"OOM at {batch_position} batch"):
         sync_vault_atomically(vault, sync_embeddings=False)
 
@@ -267,7 +267,7 @@ def test_source_add_or_delete_during_sync_keeps_previous_generation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
 ) -> None:
     vault, before_checksum = _prepare_active_vault(tmp_path, monkeypatch)
-    original_sync = searcher._sync_vault_to_db
+    original_sync = generation_index._sync_vault_to_db
 
     def sync_then_change_source(*args: object, **kwargs: object) -> None:
         original_sync(*args, **kwargs)
@@ -281,7 +281,7 @@ def test_source_add_or_delete_during_sync_keeps_previous_generation(
         else:
             (vault / "01_Projects" / "Test.md").unlink()
 
-    monkeypatch.setattr(searcher, "_sync_vault_to_db", sync_then_change_source)
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_then_change_source)
     with pytest.raises(IndexGenerationError, match="source snapshot changed during sync"):
         sync_vault_atomically(vault, sync_embeddings=False)
 

@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 QUERY_LANGUAGE_RE = re.compile(r"[а-яєіїґ]", re.IGNORECASE)
-_HYPHEN_RE = re.compile(r"-")
 _PHRASE_RE = re.compile(r'"([^"]+)"|(\S+)')
 
 TERM_AND_RULE_NAME = "all(query_terms in document)"

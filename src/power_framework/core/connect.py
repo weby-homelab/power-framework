@@ -17,7 +17,6 @@ from .utils import atomic_write, create_backup, restore_backup
 ConnectClient = Literal["auto", "codex", "opencode", "gemini", "claude"]
 ConnectAction = Literal["install", "remove"]
 CONNECT_SCHEMA_VERSION = "power.connect-plan.v1"
-_JSON_CLIENTS = {"opencode", "gemini", "claude"}
 _JSON_ROOTS = {"opencode": "mcp", "gemini": "mcpServers", "claude": "mcpServers"}
 
 
