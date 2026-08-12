@@ -127,6 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         report = aggregate_reports(_load_reports(args.input_dir))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
+        return 2
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(

@@ -273,6 +273,7 @@ def _build_interrupted_upgrade_case(
 
         previous_ttl = os.environ.get(STALE_BUILD_TTL_ENV)
         os.environ[STALE_BUILD_TTL_ENV] = "0"
+        data_loss = True
         try:
             sync_vault_atomically(vault, sync_embeddings=False, allow_partial=False)
         finally:
