@@ -5,6 +5,46 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-08-13
+
+### Changed
+
+- Extracted atomic index synchronization from `core.searcher` into the dedicated
+  `core.index_sync` module while preserving compatibility exports and the
+  generation, crash-recovery, maintenance, and low-memory contracts.
+- Audited installation, migration, MCP onboarding, support-matrix, and launcher
+  metadata against the executable package contract.
+- Scoped release evidence to the `3.5.0 -> 3.6.0` Ubuntu/Linux upgrade path.
+  macOS and Windows are deferred without a scheduled target and are not part of
+  this release's CI, upgrade, compatibility, performance, or quality claims.
+
+### Fixed
+
+- Cleared CodeQL Python quality findings without changing the public inventory
+  of 24 CLI commands and 20 MCP tools.
+- Prevented historical source-bound 3.5.0 evidence from being reused as 3.6.0
+  evidence by assigning the release workflow a fresh `power36-*` namespace.
+- Upgraded synthetic Phase 8 receipts to v2 with exact release, commit, tree,
+  clean-state, and worktree-hash binding; candidate and final generators now
+  reject stale receipts from another checkout.
+
+## [3.5.0] - 2026-08-12
+
+### Added
+
+- Added the bounded read-only doctor/bootstrap contract, transactional memory
+  and maintenance receipts, durable handoff, visible control-plane views,
+  FTS-first packaging, retention controls, and Phase 8 technical evidence.
+- Added tag-bound package, SBOM, upgrade-matrix, provenance, and GitHub release
+  readback gates.
+
+### Changed
+
+- Reduced the supported release boundary to Ubuntu/Linux. macOS and Windows
+  were explicitly deferred and were not certified by the 3.5.0 release.
+- Isolated neural, graph, reranking, expansion, and ROT implementations behind
+  optional or experimental boundaries so the base path remains offline FTS.
+
 ## [3.4.5] - 2026-08-10
 
 All POWER 3.4+ phases completed (Milestone 3.4.5 — DONE):

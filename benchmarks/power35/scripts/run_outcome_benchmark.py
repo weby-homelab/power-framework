@@ -30,6 +30,11 @@ from power_framework.phase8_contract import (
     SYNTHETIC_WORKFLOW_COUNT,
 )
 
+try:
+    from .evidence_identity import technical_evidence_identity
+except ImportError:  # pragma: no cover - direct script execution in release workflow.
+    from evidence_identity import technical_evidence_identity
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
@@ -463,6 +468,7 @@ def run_benchmark() -> dict[str, object]:
     auto_fallbacks = sum(int(row["power"]["auto_fallback"]) for row in rows)
     rendered = json.dumps(rows, ensure_ascii=False, sort_keys=True)
     return {
+        **technical_evidence_identity(),
         "schema_version": PHASE8_OUTCOME_SCHEMA_VERSION,
         "synthetic": True,
         "content_free": True,

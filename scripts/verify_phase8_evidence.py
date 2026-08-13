@@ -258,7 +258,48 @@ def validate_real_vault_receipt(receipt: dict[str, Any], *, release: str) -> lis
     return errors
 
 
-def validate_technical_receipts(*, outcome_path: Path, continuity_path: Path) -> list[str]:
+def _validate_technical_identity(
+    receipt: dict[str, Any],
+    *,
+    label: str,
+    release: str,
+    source_commit: str,
+    source_tree: str,
+    worktree_sha256: str | None,
+    require_clean: bool,
+    errors: list[str],
+) -> None:
+    """Require a technical receipt to describe the exact release checkout."""
+    if receipt.get("release") != release:
+        errors.append(f"{label} receipt release must be {release}")
+    source = _object(receipt.get("source"), f"{label} source", errors)
+    if source is None:
+        return
+    if source.get("commit") != source_commit:
+        errors.append(f"{label} source.commit must match the release source commit")
+    if source.get("tree") != source_tree:
+        errors.append(f"{label} source.tree must match the release source tree")
+    if not isinstance(source.get("clean"), bool):
+        errors.append(f"{label} source.clean must be boolean")
+    elif require_clean and source["clean"] is not True:
+        errors.append(f"{label} technical receipt must come from a clean checkout")
+    receipt_worktree = source.get("worktree_sha256")
+    if not _sha256(receipt_worktree):
+        errors.append(f"{label} source.worktree_sha256 must be a SHA-256")
+    elif worktree_sha256 is not None and receipt_worktree != worktree_sha256:
+        errors.append(f"{label} source.worktree_sha256 must match the release worktree")
+
+
+def validate_technical_receipts(
+    *,
+    outcome_path: Path,
+    continuity_path: Path,
+    release: str,
+    source_commit: str,
+    source_tree: str,
+    worktree_sha256: str | None = None,
+    require_clean: bool = False,
+) -> list[str]:
     """Validate public synthetic Phase 8 receipts without promoting them."""
     errors: list[str] = []
     outcome = _load_json(outcome_path)
@@ -266,6 +307,16 @@ def validate_technical_receipts(*, outcome_path: Path, continuity_path: Path) ->
     if outcome is None:
         errors.append(f"outcome receipt is missing or invalid JSON: {outcome_path}")
     else:
+        _validate_technical_identity(
+            outcome,
+            label="outcome",
+            release=release,
+            source_commit=source_commit,
+            source_tree=source_tree,
+            worktree_sha256=worktree_sha256,
+            require_clean=require_clean,
+            errors=errors,
+        )
         if outcome.get("schema_version") != PHASE8_OUTCOME_SCHEMA_VERSION:
             errors.append("outcome receipt has an unsupported schema")
         if outcome.get("synthetic") is not True or outcome.get("content_free") is not True:
@@ -351,6 +402,16 @@ def validate_technical_receipts(*, outcome_path: Path, continuity_path: Path) ->
     if continuity is None:
         errors.append(f"continuity receipt is missing or invalid JSON: {continuity_path}")
     else:
+        _validate_technical_identity(
+            continuity,
+            label="continuity",
+            release=release,
+            source_commit=source_commit,
+            source_tree=source_tree,
+            worktree_sha256=worktree_sha256,
+            require_clean=require_clean,
+            errors=errors,
+        )
         if continuity.get("schema_version") != PHASE8_CONTINUITY_SCHEMA_VERSION:
             errors.append("continuity receipt has an unsupported schema")
         if continuity.get("synthetic") is not True or continuity.get("content_free") is not True:
@@ -421,6 +482,11 @@ def validate_technical_receipts(*, outcome_path: Path, continuity_path: Path) ->
             errors.append("continuity receipt must not claim real-vault evidence")
         if continuity.get("sealed_holdout") != "not_opened":
             errors.append("continuity receipt must not open the sealed holdout")
+    if outcome is not None and continuity is not None:
+        if outcome.get("release") != continuity.get("release"):
+            errors.append("technical receipts must name the same release")
+        if outcome.get("source") != continuity.get("source"):
+            errors.append("technical receipts must carry identical source identity")
     return errors
 
 

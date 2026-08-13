@@ -69,6 +69,13 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
         pytest.skip(f"{tag_name} is created only for the release tag gate")
 
     expected_commit = tag.stdout.strip()
+    expected_tree = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local object.
+        [git_executable, "show", "-s", "--format=%T", expected_commit],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     head = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local refs.
         [git_executable, "rev-parse", "--verify", "HEAD"],
         cwd=REPO_ROOT,
@@ -302,7 +309,14 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
     outcome_path.write_text(
         json.dumps(
             {
-                "schema_version": "power.phase8-outcome.v1",
+                "schema_version": "power.phase8-outcome.v2",
+                "release": version,
+                "source": {
+                    "commit": expected_commit,
+                    "tree": expected_tree,
+                    "clean": True,
+                    "worktree_sha256": "0" * 64,
+                },
                 "synthetic": True,
                 "content_free": True,
                 "workflow_count": 20,
@@ -347,7 +361,14 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
     continuity_path.write_text(
         json.dumps(
             {
-                "schema_version": "power.phase8-continuity.v1",
+                "schema_version": "power.phase8-continuity.v2",
+                "release": version,
+                "source": {
+                    "commit": expected_commit,
+                    "tree": expected_tree,
+                    "clean": True,
+                    "worktree_sha256": "0" * 64,
+                },
                 "synthetic": True,
                 "content_free": True,
                 "workflow_count": 20,
@@ -409,13 +430,6 @@ def test_generated_baseline_binds_current_release_tag(tmp_path: Path) -> None:
     baseline = json.loads(output.read_text(encoding="utf-8"))
     assert baseline["release"] == version
     expected_commit = tag.stdout.strip()
-    expected_tree = subprocess.run(  # noqa: S603 -- fixed Git executable and repository-local object.
-        [git_executable, "show", "-s", "--format=%T", expected_commit],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
     assert baseline["source"]["commit"] == expected_commit
     assert baseline["source"]["tree"] == expected_tree
 

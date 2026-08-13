@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit the content-free gate inventory used by the 3.5.0 release receipt."""
+"""Emit the content-free gate inventory used by the 3.6.0 release receipt."""
 
 from __future__ import annotations
 
@@ -25,7 +25,9 @@ MANDATORY_GATES = (
 )
 OPTIONAL_GATES = {
     "real-vault-quality": "real-vault neural/quality evaluation",
-    "deferred-macos-windows": "macOS and Windows support deferred for the 3.5.0 release",
+    "deferred-macos-windows": (
+        "macOS and Windows support deferred without a scheduled release target for 3.6.0"
+    ),
     "remote-release-readback": "remote release readback",
 }
 

@@ -10,7 +10,11 @@ from benchmarks.power35.scripts.run_continuity_benchmark import run_continuity_b
 def test_continuity_benchmark_uses_independent_processes() -> None:
     report = run_continuity_benchmark()
 
-    assert report["schema_version"] == "power.phase8-continuity.v1"
+    assert report["schema_version"] == "power.phase8-continuity.v2"
+    assert report["release"] == "3.6.0"
+    assert len(report["source"]["commit"]) == 40
+    assert len(report["source"]["tree"]) == 40
+    assert len(report["source"]["worktree_sha256"]) == 64
     assert report["synthetic"] is True
     assert report["content_free"] is True
     assert report["workflow_count"] == 20

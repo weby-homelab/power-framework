@@ -63,6 +63,7 @@ def build_candidate(
     version = _load_package_version(repo / "pyproject.toml")
     commit = _git(repo, "rev-parse", "--verify", "HEAD").strip()
     tree = _git(repo, "show", "-s", "--format=%T", commit).strip()
+    worktree_sha256 = _worktree_hash(repo, exclude=output_path)
     baseline = copy.deepcopy(_load_json(template))
     baseline["release"] = version
     baseline["candidate"] = True
@@ -71,7 +72,7 @@ def build_candidate(
         "tree": tree,
         "tag": f"v{version}",
         "clean": False,
-        "worktree_sha256": _worktree_hash(repo, exclude=output_path),
+        "worktree_sha256": worktree_sha256,
     }
     baseline["models_lock_sha256"] = _sha256(models_lock)
     if (phase8_outcome_receipt_path is None) != (phase8_continuity_receipt_path is None):
@@ -81,6 +82,10 @@ def build_candidate(
         errors = validate_technical_receipts(
             outcome_path=phase8_outcome_receipt_path,
             continuity_path=phase8_continuity_receipt_path,
+            release=version,
+            source_commit=commit,
+            source_tree=tree,
+            worktree_sha256=worktree_sha256,
         )
         if errors:
             raise ValueError("Phase 8 technical receipt validation failed: " + "; ".join(errors))

@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-REAL_VAULT_RECEIPT_ENV = "POWER35_REAL_VAULT_RECEIPT_JSON"
-HUMAN_MANIFEST_ENV = "POWER35_HUMAN_MANIFEST_JSON"
+REAL_VAULT_RECEIPT_ENV = "POWER36_REAL_VAULT_RECEIPT_JSON"
+HUMAN_MANIFEST_ENV = "POWER36_HUMAN_MANIFEST_JSON"
 
 
 def _read_json_object(environ: Mapping[str, str], variable: str) -> bytes:

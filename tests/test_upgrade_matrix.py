@@ -12,8 +12,8 @@ def test_local_upgrade_matrix_proves_safe_boundaries() -> None:
     report = build_matrix()
 
     assert report["schema_version"] == "power.upgrade-matrix.v1"
-    assert report["from_version"] == "3.4.5"
-    assert report["to_version"] == "3.5.0"
+    assert report["from_version"] == "3.5.0"
+    assert report["to_version"] == "3.6.0"
     assert report["current_runner"]["status"] == "pass"
     assert report["current_runner"]["checks"]["free_space_sufficient"] is True
     assert report["current_runner"]["preflight"]["migration_preview"] == "pass"
@@ -23,7 +23,7 @@ def test_local_upgrade_matrix_proves_safe_boundaries() -> None:
     assert report["source_content"] == "not captured"
     interrupted = report["interrupted_upgrade"]
     assert interrupted["schema_version"] == "power.upgrade-interrupted-matrix.v1"
-    assert interrupted["physical_3_4_5_runtime"] is False
+    assert interrupted["physical_previous_runtime"] is False
     assert interrupted["gate"] == {
         "all_checkpoints_pass": True,
         "source_preserved": True,
@@ -49,6 +49,7 @@ def test_unexecuted_platforms_are_not_silently_green() -> None:
     assert report["release_gate"]["all_platforms_executed"] is True
     assert report["supported_platforms"] == ["linux"]
     assert report["deferred_platforms"] == ["macos", "windows"]
+    assert "unscheduled" in report["release_gate"]["reason"]
     assert "tag-bound" in report["release_gate"]["reason"]
 
 
@@ -63,14 +64,14 @@ def _synthetic_platform_report(platform: str) -> dict[str, object]:
     }
     return {
         "schema_version": "power.upgrade-matrix.v1",
-        "from_version": "3.4.5",
-        "to_version": "3.5.0",
+        "from_version": "3.5.0",
+        "to_version": "3.6.0",
         "source_content": "not captured",
         "current_runner": {"platform": platform, "status": "pass"},
         "interrupted_upgrade": {
             "gate": gate,
             "raw_content_in_report": False,
-            "physical_3_4_5_runtime": False,
+            "physical_previous_runtime": False,
         },
         "release_gate": {"local_invariants": True},
     }
@@ -84,7 +85,8 @@ def test_upgrade_matrix_aggregation_requires_supported_platforms() -> None:
     assert report["deferred_platforms"] == ["macos", "windows"]
     assert report["platforms"] == {"linux": "executed"}
     assert report["release_gate"]["all_platforms_executed"] is True
-    assert report["release_gate"]["physical_3_4_5_runtime"] is False
+    assert report["release_gate"]["physical_previous_runtime"] is False
+    assert "unscheduled" in report["release_gate"]["reason"]
     assert report["raw_content_in_report"] is False
 
 

@@ -698,7 +698,7 @@ def test_version_flag(capsys: pytest.CaptureFixture) -> None:
         main()
     assert exc.value.code == 0
     captured = capsys.readouterr()
-    assert "3.5.0" in captured.out
+    assert "3.6.0" in captured.out
 
 
 def test_no_command_shows_help(capsys: pytest.CaptureFixture) -> None:

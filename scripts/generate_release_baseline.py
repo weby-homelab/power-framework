@@ -200,6 +200,10 @@ def build_baseline(
         errors = validate_technical_receipts(
             outcome_path=phase8_outcome_receipt_path,
             continuity_path=phase8_continuity_receipt_path,
+            release=package_version,
+            source_commit=commit,
+            source_tree=tree,
+            require_clean=True,
         )
         if errors:
             raise ValueError("Phase 8 technical receipt validation failed: " + "; ".join(errors))

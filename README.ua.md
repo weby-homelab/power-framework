@@ -37,9 +37,10 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Windows-safe rename** — `power rename` використовує `os.replace()` для
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
-- **Реліз P.O.W.E.R. 3.5.0** — опубліковані wheel, source archive, SBOM,
-  upgrade matrix і release receipts перевірені. Додано fail-closed doctor,
-  migration, cache, catalog, healer та agent-contract safeguards. Межі
+- **Реліз P.O.W.E.R. 3.6.0** — публікація вимагає перевірені
+  wheel, source archive, SBOM, Ubuntu upgrade matrix і fresh release receipts.
+  Версія 3.6.0 консолідує fail-closed doctor, migration, cache, catalog, healer та
+  agent-contract safeguards. Межі
   підтримки визначає [матриця платформ](docs/support-matrix.ua.md).
 
 ## Для AI-агентів
@@ -60,7 +61,7 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
 - **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — Ubuntu/Linux є
-  release-платформою `v3.5.0`; macOS і Windows явно відкладені
+  release-платформою `v3.6.0`; macOS і Windows відкладені на невизначений строк
 
 ## Швидкий старт (Ubuntu/Linux)
 
@@ -68,14 +69,16 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 Потрібен Python 3.11+ і terminal shell; `~/my-vault` — каталог vault, яким
 керуватиме POWER.
 
-> **Опублікований реліз `v3.5.0`:** підписаний tag, wheel, source archive, SBOM
-> і release receipt доступні на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
-> Для відтворюваної установки використовуйте immutable wheel нижче. Release
+> **Контракт релізу `v3.6.0`:** використовуйте signed tag, wheel, source
+> archive, SBOM і release receipt лише після їх появи на
+> [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.0).
+> URL нижче є tag-bound install target, а не доказом уже завершеної публікації.
+> Release
 > receipt стосується заявленої Linux-межі; перед claims для іншого хоста
 > перевірте [матрицю платформ](docs/support-matrix.ua.md).
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -104,12 +107,12 @@ power --version
 ## Встановлення на Windows 11 25H2 (відкладено)
 
 Windows 11 25H2 залишається поза межами підтримуваної платформи release
-`v3.5.0`. Окремий [гід Windows 11 25H2](docs/windows-11-installation.ua.md)
+`v3.6.0`. Окремий [гід Windows 11 25H2](docs/windows-11-installation.ua.md)
 описує установку та host validation, але не є сертифікацією Stable release для
 цієї платформи.
 
-Для `v3.5.0` немає Windows CI, upgrade-matrix, compatibility, performance або
-GPU claim.
+Для `v3.6.0` немає Windows CI, upgrade-matrix, compatibility, performance або
+GPU claim. Windows і macOS не мають запланованого release target.
 
 ## Що всередині
 
@@ -137,9 +140,9 @@ GPU claim.
 | **CI/CD**                        | Hermetic тести, CodeQL SAST і автоматизовані GitHub-релізи; release evidence перевіряється versioned harness `benchmarks/power31` та pinned model manifest.                                                                                                                                                                                                                                                                                                                          |
 | **Документація**                 | Повний [mkdocs-material сайт](https://weby-homelab.github.io/power-framework/) з API reference та гайдами                                                                                                                                                                                                                                                                                                                                                                            |
 
-> **Статус evidence для POWER 3.5.0:** опублікований реліз містить machine
-> validation gates, package/CI provenance, SBOM, Ubuntu upgrade matrix і Phase 8
-> technical та human-evaluation receipts. Ці receipts діють у межах заявленого
+> **Контракт evidence для POWER 3.6.0:** публікація вимагає machine validation
+> gates, package/CI provenance, SBOM, Ubuntu upgrade matrix і fresh Phase 8
+> technical та human-evaluation receipts. Після публікації ці receipts діють у межах заявленого
 > release scope. Historical figures у feature-table, model comparisons, resource
 > limits і benchmark recommendations не є гарантіями для довільного хоста або
 > vault.
@@ -148,7 +151,7 @@ GPU claim.
 
 Історичний v1.6.0 snapshot переходу від flat до hierarchical index. Його vault
 counts, token estimates, source paths, test counts і MCP inventory є
-historical evidence, а не поточним контрактом `v3.5.0`:
+historical evidence, а не поточним контрактом `v3.6.0`:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — детальний технічний звіт з метриками
@@ -263,12 +266,13 @@ power search ~/my-vault "experiment" --mode auto --domain research
 канонічні конфігурації для Claude Desktop/Code, Gemini CLI, Codex і OpenCode,
 а також read-only golden task та workflow схвалення.
 
-URL wheel нижче веде до опублікованого install artifact `v3.5.0`. На
-[сторінці релізу](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0)
-доступні signed tag, source archive, SBOM і release receipts.
+URL wheel нижче є tag-bound install target `v3.6.0`. Запускайте його лише
+після появи signed tag та assets на
+[сторінці релізу](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.0)
+разом із source archive, SBOM і release receipts.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -540,8 +544,8 @@ mypy src/power_framework/
 
 Для актуальної відтворюваної інформації про реліз і evidence:
 
-- [Нотатки релізу P.O.W.E.R. 3.5.0](docs/release-3.5.0.md) — scope опублікованого
-  релізу, evidence та інструкції оновлення.
+- [Нотатки релізу P.O.W.E.R. 3.6.0](docs/release-3.6.0.md) — Linux-first scope,
+  evidence та інструкції оновлення.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) —
   canonical checksum-verified post-merge WS full-sync evidence; розширена
   валідація явно ведеться в issue #187.
@@ -585,7 +589,7 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux (v3.5.0 release boundary)",
+  "operatingSystem": "Linux (v3.6.0 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
   "softwareVersion": "latest",
@@ -617,8 +621,8 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux (v3.5.0 release boundary)
-softwareVersion: 3.5.0
+operatingSystem: Linux (v3.6.0 release boundary)
+softwareVersion: 3.6.0
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework
