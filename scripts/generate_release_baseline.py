@@ -185,7 +185,10 @@ def build_baseline(
         raise ValueError("baseline scope must be an object")
     scope["technical_release"] = True
     scope["candidate_only"] = False
-    scope["phase8_evidence"] = {"status": "pending"}
+    scope["phase8_evidence"] = {"status": "optional"}
+    scope["human_quality_certification"] = False
+    scope["production_quality_claim"] = False
+    scope["sealed_holdout"] = "not_opened"
     validation_report = _load_validation_report(validation_report_path)
     validation = baseline["validation"] = copy.deepcopy(validation_report)
     validation["sbom_sha256"] = _sha256(sbom_path)

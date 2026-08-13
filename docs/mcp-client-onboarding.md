@@ -1,7 +1,7 @@
 # MCP client onboarding
 
-This is the canonical local-stdio setup for P.O.W.E.R. `v3.6.0` on
-Ubuntu/Linux. It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
+This is the canonical local-stdio setup for P.O.W.E.R. `v3.6.0` on Linux.
+It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
 the same server process and the same vault boundary.
 
 > **Release contract:** use `v3.6.0` only after its signed tag and immutable

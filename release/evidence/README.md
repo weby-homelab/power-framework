@@ -54,15 +54,15 @@ and coverage JSON artifacts. This prevents a final baseline from inheriting
 historical candidate counts from a template; the receipt must report passed
 tests, skipped tests, coverage, warning policy, zero skipped mandatory gates,
 and hashes of its JUnit, coverage, and executed-gate manifest inputs. The final
-baseline additionally binds the generated SPDX SBOM and the aggregate Ubuntu
-upgrade receipt.
+baseline additionally binds the generated SPDX SBOM and the aggregate Linux
+upgrade receipt produced on the Ubuntu CI runner.
 
-## Phase 8 stable-release evidence
+## Optional Phase 8 quality evidence
 
 The synthetic `benchmarks/power35` receipts are technical CI evidence only.
-They cannot open the stable-release gate. Before a stable 3.6.0 tag, a
-maintainer must provision two content-free files in the release runner's
-`$RUNNER_TEMP/power36-phase8/` directory:
+Real-vault and sealed-human evidence are optional quality evaluations and are
+not required to publish a stable 3.6.0 tag. If a maintainer wants to make those
+additional quality claims, two content-free files can be validated separately:
 
 - `real-vault-receipt.json`, validated by `scripts/verify_phase8_evidence.py`
   for exact source/runtime identity, build/transfer/import/query separation,
@@ -71,16 +71,10 @@ maintainer must provision two content-free files in the release runner's
   `sealed_holdout` manifest validated by
   `benchmarks/human_retrieval/scripts/validate_human_evidence.py`.
 
-The GitHub release workflow calls
-`scripts/materialize_phase8_evidence.py` to materialize these files from the
-protected `power36-stable-release` environment. Configure required reviewers for that
-environment and store only the two content-free JSON documents as
-`POWER36_REAL_VAULT_RECEIPT_JSON` and `POWER36_HUMAN_MANIFEST_JSON` secrets.
-The workflow refuses to continue when either secret is absent, writes the
-files with mode `0600` into the ephemeral runner directory, and validates their
-JSON syntax before binding their hashes into the release baseline. The secrets
-are never committed, printed, uploaded as an input artifact, or used as a
-substitute for the verifier's exact source/runtime and sealed-holdout checks.
+`scripts/materialize_phase8_evidence.py` remains an optional local utility for
+turning explicitly supplied JSON environment values into mode-`0600` files.
+The GitHub release workflow does not call it and does not require private
+evidence secrets.
 
 If the human manifest carries an `embedded_artifacts` object, the materializer
 also writes only its referenced protocol, receipt, corpus, query, judgment and
@@ -89,18 +83,17 @@ must be present, UTF-8 text, and confined to that directory; malformed or
 incomplete embedded artifacts fail closed before evidence is written.
 
 The public repository intentionally contains neither raw vault material nor
-private qrels. If these files are absent, the release workflow fails closed;
-the candidate baseline remains non-production evidence.
+private qrels. Their absence limits quality claims but does not block the
+technical Linux release.
 
 The release workflow also archives the synthetic outcome and continuity
 receipts from the stable `benchmarks/power35` harness and binds their SHA-256
 values into the tag-bound baseline. Their v2 schemas also carry release,
 commit, tree, clean-state, and worktree-hash identity; candidate and final
 baseline generation rejects stale receipts from another checkout. For
-`v3.6.0`, the Ubuntu upgrade aggregate
-covers the only supported release platform;
+`v3.6.0`, the Linux upgrade aggregate is executed on the Ubuntu runner;
 macOS and Windows are explicitly deferred and do not appear as supported
 platforms in the release artifact. Their deferral has no scheduled release
 target. The synthetic receipts prove only technical safety/continuity;
 their explicit `real_vault=false` and `human_quality_certification=false`
-fields are required and cannot open the stable gate.
+fields are required and cannot be promoted into quality claims.

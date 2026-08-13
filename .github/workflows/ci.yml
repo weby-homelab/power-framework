@@ -58,7 +58,7 @@ jobs:
           path: ${{ runner.temp }}/power36-upgrade-reports
           merge-multiple: true
 
-      - name: Aggregate all supported Ubuntu reports
+      - name: Aggregate supported Linux reports from Ubuntu CI
         run: >-
           python scripts/aggregate_upgrade_matrix.py
           --input-dir "${{ runner.temp }}/power36-upgrade-reports"

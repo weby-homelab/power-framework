@@ -26,7 +26,7 @@ macOS відкладені на невизначений строк і не є �
 
 ## 2. Встановіть версіонований реліз
 
-На Ubuntu/Linux:
+На Linux:
 
 ```bash
 python3 -m venv "$HOME/.local/share/power-framework/venv"

@@ -38,7 +38,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
   move, so renaming onto an existing destination works on Windows instead of
   raising `FileExistsError`
 - **P.O.W.E.R. 3.6.0 release** — publication requires a verified
-  wheel, source archive, SBOM, Ubuntu upgrade matrix, and fresh release
+  wheel, source archive, SBOM, Linux upgrade matrix, and fresh release
   receipts. Version 3.6.0 consolidates fail-closed doctor, migration, cache,
   catalog, healer, and agent-contract safeguards. Platform support remains bounded by the
   [support matrix](docs/support-matrix.md).
@@ -60,12 +60,13 @@ the role-specific guides before touching a vault:
   migration from any Markdown source methodology into a canonical POWER vault
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
-- **[Platform support matrix](docs/support-matrix.md)** — Ubuntu/Linux is the
-  `v3.6.0` release platform; macOS and Windows are deferred indefinitely
+- **[Platform support matrix](docs/support-matrix.md)** — Linux is the
+  `v3.6.0` release platform; CI currently validates it on Ubuntu, while macOS
+  and Windows are deferred indefinitely
 
-## Quick Start (Ubuntu/Linux)
+## Quick Start (Linux)
 
-The commands below are the shortest supported path for Ubuntu/Linux. They
+The commands below are the shortest supported path for Linux. They
 assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
@@ -88,9 +89,9 @@ power heal ~/my-vault          # Auto-fix missing/invalid frontmatter
 power markdown-check ~/my-vault  # Check markdown quality issues
 ```
 
-## Development install (Ubuntu/Linux)
+## Development install (Linux)
 
-Contributors on Ubuntu/Linux should clone into a durable development
+Contributors on Linux should clone into a durable development
 directory, create a venv, and follow [CONTRIBUTING.md](CONTRIBUTING.md). Inspect
 local changes before pulling; documentation does not provide an updater that
 resets a working tree.
@@ -142,8 +143,10 @@ made for `v3.6.0`. Windows and macOS have no scheduled release target.
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
 
 > **POWER 3.6.0 evidence contract:** publication requires machine validation
-> gates, package/CI provenance, an SBOM, an Ubuntu upgrade matrix, and fresh
-> Phase 8 technical and human-evaluation receipts. Once published, these
+> gates, package/CI provenance, an SBOM, a Linux upgrade matrix executed on the
+> Ubuntu CI runner, and source-bound technical receipts. Real-vault and human
+> evaluation are optional benchmarks, not release secrets or publication
+> blockers. Once published, these
 > receipts apply to the
 > declared release scope. Historical feature-table figures, model comparisons,
 > resource limits, and benchmark recommendations do not become guarantees for

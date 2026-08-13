@@ -26,9 +26,10 @@ public inventory remains 24 CLI commands and 20 MCP tools.
 
 ## Platform boundary
 
-Ubuntu/Linux is the only supported release platform for `v3.6.0`. Every CI,
-documentation, CodeQL, package, upgrade, and publication job runs on
-`ubuntu-latest`.
+Linux is the supported release platform for `v3.6.0`. The automated CI,
+documentation, CodeQL, package, upgrade, and publication jobs currently run on
+an Ubuntu runner; Ubuntu is the validation environment, not the product name or
+the full platform boundary.
 
 macOS and Windows are deferred with an **unscheduled** policy. This release
 does not run macOS or Windows CI, does not publish upgrade receipts for those
@@ -38,7 +39,8 @@ supported-platform certification.
 
 ## Upgrade and rollback
 
-The executable Ubuntu matrix covers `3.5.0 -> 3.6.0`, including interrupted
+The executable Linux matrix runs on Ubuntu and covers `3.5.0 -> 3.6.0`,
+including interrupted
 index publication at `before_move`, `after_move`, and `after_pointer`. It must
 prove source preservation, restart recovery, stale-build cleanup, active-pointer
 consistency, and no data loss before publication.
@@ -66,13 +68,14 @@ uv run python scripts/verify_upgrade_matrix.py \
 
 The tag workflow additionally requires a clean signed `v3.6.0` tag, wheel and
 source-distribution smoke tests outside the checkout, an SPDX SBOM, provenance
-attestation, fresh source-bound Phase 8 evidence, a complete Ubuntu upgrade
-aggregate, and GitHub release body/asset readback.
+attestation, source-bound technical Phase 8 receipts, a complete Linux upgrade
+aggregate from the Ubuntu runner, and GitHub release body/asset readback.
 
 ## Evidence boundary
 
-Synthetic technical receipts do not substitute for real-vault or sealed-human
-evidence. The stable workflow fails closed unless the protected
-`power36-stable-release` environment supplies fresh content-free evidence bound
-to `v3.6.0`. Historical `v3.5.0` release assets remain immutable historical
+Synthetic technical receipts prove release mechanics and continuity, not
+host-independent retrieval quality. Real-vault and sealed-human evaluation are
+optional benchmarks: they are not GitHub Secrets and do not block normal Linux
+publication. When supplied, they may support separate quality claims after
+their own validation. Historical `v3.5.0` assets remain immutable historical
 evidence and are not relabelled as 3.6.0 results.

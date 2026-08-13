@@ -104,19 +104,15 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert 'gpg --batch --import "$key_file"' in release_text
 
 
-def test_release_materializes_phase8_evidence_through_protected_environment() -> None:
+def test_release_does_not_require_private_phase8_secrets() -> None:
     release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
 
-    assert "name: power36-stable-release" in release_text
-    assert "POWER36_REAL_VAULT_RECEIPT_JSON" in release_text
-    assert "POWER36_HUMAN_MANIFEST_JSON" in release_text
-    assert (
-        "POWER36_REAL_VAULT_RECEIPT_JSON: ${{ secrets.POWER36_REAL_VAULT_RECEIPT_JSON }}"
-        in release_text
-    )
-    assert "POWER36_HUMAN_MANIFEST_JSON: ${{ secrets.POWER36_HUMAN_MANIFEST_JSON }}" in release_text
-    assert "scripts/materialize_phase8_evidence.py" in release_text
-    assert '--output-dir "$RUNNER_TEMP/power36-phase8"' in release_text
+    assert "name: power36-stable-release" not in release_text
+    assert "POWER36_REAL_VAULT_RECEIPT_JSON" not in release_text
+    assert "POWER36_HUMAN_MANIFEST_JSON" not in release_text
+    assert "scripts/materialize_phase8_evidence.py" not in release_text
+    assert "--phase8-real-vault-receipt" not in release_text
+    assert "--phase8-human-manifest" not in release_text
 
 
 def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
@@ -136,9 +132,7 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "scripts/smoke_package.py" in ci_text
     assert "scripts/smoke_package.py" in release_text
     assert "scripts/generate_release_receipt.py" in release_text
-    assert "maintainer-provisioned Phase 8 evidence" in release_text
-    assert "--phase8-real-vault-receipt" in release_text
-    assert "--phase8-human-manifest" in release_text
+    assert "--skipped-optional real-vault-quality" in release_text
     assert "run_outcome_benchmark.py" in release_text
     assert "run_continuity_benchmark.py" in release_text
     assert "scripts/generate_release_validation.py" in release_text

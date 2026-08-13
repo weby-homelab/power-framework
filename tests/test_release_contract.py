@@ -153,7 +153,8 @@ def test_release_notes_keep_governance_claims_within_evidence_boundary() -> None
 
     assert "Zero open repository issues" not in notes
     assert "published `v3.6.0` release" not in notes
-    assert "fresh source-bound Phase 8 evidence" in notes
+    assert "Real-vault and sealed-human evaluation" in notes
+    assert "not GitHub Secrets and do not block normal Linux" in notes
     assert "macOS and Windows are deferred with an **unscheduled** policy" in notes
 
 
@@ -300,7 +301,7 @@ def test_final_gate_rejects_candidate_publication_scope(tmp_path: Path) -> None:
     assert "technical_release must be true" in result.stderr
 
 
-def test_final_gate_rejects_unproven_phase8_quality_scope(tmp_path: Path) -> None:
+def test_final_gate_rejects_ambiguous_phase8_quality_scope(tmp_path: Path) -> None:
     baseline = json.loads(_build_candidate(tmp_path).read_text(encoding="utf-8"))
     baseline["candidate"] = False
     baseline["source"]["clean"] = True
@@ -315,8 +316,7 @@ def test_final_gate_rejects_unproven_phase8_quality_scope(tmp_path: Path) -> Non
     result = _run_validator("--baseline", str(altered_baseline))
 
     assert result.returncode == 1
-    assert "requires passed Phase 8" in result.stderr
-    assert "human_quality_certification=true" in result.stderr
+    assert "Phase 8 evidence status must be optional or passed" in result.stderr
 
 
 def test_candidate_generator_accepts_output_outside_checkout(tmp_path: Path) -> None:
