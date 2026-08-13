@@ -1,7 +1,7 @@
 # Підключення MCP-клієнтів
 
-Це канонічне налаштування локального stdio для P.O.W.E.R. `v3.6.0` на
-Ubuntu/Linux. Воно дає Codex, OpenCode, Gemini CLI, Claude Desktop і Claude Code один
+Це канонічне налаштування локального stdio для P.O.W.E.R. `v3.6.0` на Linux.
+Воно дає Codex, OpenCode, Gemini CLI, Claude Desktop і Claude Code один
 і той самий процес сервера та однакову межу vault.
 
 > **Контракт релізу:** використовуйте `v3.6.0` лише після появи signed tag та

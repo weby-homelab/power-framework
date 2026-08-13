@@ -245,20 +245,36 @@ def validate_release_contract(
             if scope.get("technical_release") is not True:
                 errors.append("final release baseline scope.technical_release must be true")
             phase8_evidence = scope.get("phase8_evidence")
-            if not isinstance(phase8_evidence, dict) or phase8_evidence.get("status") != "passed":
-                errors.append("final release requires passed Phase 8 real-vault and human evidence")
-            elif not all(
-                isinstance(phase8_evidence.get(field), str)
-                and re.fullmatch(r"[0-9a-f]{64}", phase8_evidence[field])
-                for field in ("real_vault_receipt_sha256", "human_manifest_sha256")
-            ):
-                errors.append("final Phase 8 evidence must include both receipt SHA-256 bindings")
-            if scope.get("human_quality_certification") is not True:
-                errors.append("final release requires human_quality_certification=true")
-            if scope.get("production_quality_claim") is not True:
-                errors.append("final release requires production_quality_claim=true")
-            if scope.get("sealed_holdout") != "passed":
-                errors.append("final release requires sealed_holdout=passed")
+            if not isinstance(phase8_evidence, dict):
+                errors.append("final release baseline scope.phase8_evidence must be an object")
+            elif phase8_evidence.get("status") == "passed":
+                if not all(
+                    isinstance(phase8_evidence.get(field), str)
+                    and re.fullmatch(r"[0-9a-f]{64}", phase8_evidence[field])
+                    for field in ("real_vault_receipt_sha256", "human_manifest_sha256")
+                ):
+                    errors.append("passed Phase 8 evidence must include both SHA-256 bindings")
+                if scope.get("human_quality_certification") is not True:
+                    errors.append(
+                        "passed Phase 8 evidence requires human_quality_certification=true"
+                    )
+                if scope.get("production_quality_claim") is not True:
+                    errors.append("passed Phase 8 evidence requires production_quality_claim=true")
+                if scope.get("sealed_holdout") != "passed":
+                    errors.append("passed Phase 8 evidence requires sealed_holdout=passed")
+            elif phase8_evidence.get("status") == "optional":
+                if scope.get("human_quality_certification") is not False:
+                    errors.append(
+                        "optional Phase 8 evidence requires human_quality_certification=false"
+                    )
+                if scope.get("production_quality_claim") is not False:
+                    errors.append(
+                        "optional Phase 8 evidence requires production_quality_claim=false"
+                    )
+                if scope.get("sealed_holdout") != "not_opened":
+                    errors.append("optional Phase 8 evidence requires sealed_holdout=not_opened")
+            else:
+                errors.append("final release Phase 8 evidence status must be optional or passed")
 
     source = baseline.get("source")
     if not isinstance(source, dict):

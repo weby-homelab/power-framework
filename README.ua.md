@@ -38,7 +38,7 @@ P.O.W.E.R. — це гібридна система, створена для п�
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
 - **Реліз P.O.W.E.R. 3.6.0** — публікація вимагає перевірені
-  wheel, source archive, SBOM, Ubuntu upgrade matrix і fresh release receipts.
+  wheel, source archive, SBOM, Linux upgrade matrix і fresh release receipts.
   Версія 3.6.0 консолідує fail-closed doctor, migration, cache, catalog, healer та
   agent-contract safeguards. Межі
   підтримки визначає [матриця платформ](docs/support-matrix.ua.md).
@@ -60,12 +60,13 @@ P.O.W.E.R. створений для роботи як людьми, так і A
   міграція з будь-якої Markdown source methodology у canonical POWER vault
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
-- **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — Ubuntu/Linux є
-  release-платформою `v3.6.0`; macOS і Windows відкладені на невизначений строк
+- **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — Linux є
+  release-платформою `v3.6.0`; CI зараз перевіряє її на Ubuntu, а macOS і
+  Windows відкладені на невизначений строк
 
-## Швидкий старт (Ubuntu/Linux)
+## Швидкий старт (Linux)
 
-Наведені нижче команди — найкоротший підтримуваний шлях для Ubuntu/Linux.
+Наведені нижче команди — найкоротший підтримуваний шлях для Linux.
 Потрібен Python 3.11+ і terminal shell; `~/my-vault` — каталог vault, яким
 керуватиме POWER.
 
@@ -87,9 +88,9 @@ power heal ~/my-vault      # Автовиправлення відсутньог
 power markdown-check ~/my-vault  # Перевірка якості Markdown
 ```
 
-## Розробницька установка (Ubuntu/Linux)
+## Розробницька установка (Linux)
 
-Учасникам на Ubuntu/Linux слід clone у durable development directory,
+Учасникам на Linux слід clone у durable development directory,
 створити venv і виконати [CONTRIBUTING.md](CONTRIBUTING.md). Перед pull
 перевіряйте local changes; документація не пропонує updater, який reset робоче
 дерево.
@@ -141,8 +142,10 @@ GPU claim. Windows і macOS не мають запланованого release t
 | **Документація**                 | Повний [mkdocs-material сайт](https://weby-homelab.github.io/power-framework/) з API reference та гайдами                                                                                                                                                                                                                                                                                                                                                                            |
 
 > **Контракт evidence для POWER 3.6.0:** публікація вимагає machine validation
-> gates, package/CI provenance, SBOM, Ubuntu upgrade matrix і fresh Phase 8
-> technical та human-evaluation receipts. Після публікації ці receipts діють у межах заявленого
+> gates, package/CI provenance, SBOM, Linux upgrade matrix, виконану на Ubuntu
+> CI runner, і source-bound technical receipts. Real-vault та human evaluation
+> є опціональними benchmark, а не release secrets чи блокерами публікації.
+> Після публікації ці receipts діють у межах заявленого
 > release scope. Historical figures у feature-table, model comparisons, resource
 > limits і benchmark recommendations не є гарантіями для довільного хоста або
 > vault.

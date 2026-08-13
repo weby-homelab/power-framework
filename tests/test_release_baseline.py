@@ -541,6 +541,10 @@ def test_final_baseline_clears_candidate_publication_scope(tmp_path: Path) -> No
     assert baseline["candidate"] is False
     assert baseline["scope"]["technical_release"] is True
     assert baseline["scope"]["candidate_only"] is False
+    assert baseline["scope"]["phase8_evidence"] == {"status": "optional"}
+    assert baseline["scope"]["human_quality_certification"] is False
+    assert baseline["scope"]["production_quality_claim"] is False
+    assert baseline["scope"]["sealed_holdout"] == "not_opened"
     assert baseline["validation"]["passed"] == 1014
     assert baseline["validation"]["skipped"] == 11
     assert baseline["validation"]["coverage_percent"] == 81.66

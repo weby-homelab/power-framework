@@ -26,7 +26,7 @@ or relying on `--break-system-packages` for a normal installation.
 
 ## 2. Install the versioned release
 
-On Ubuntu/Linux:
+On Linux:
 
 ```bash
 python3 -m venv "$HOME/.local/share/power-framework/venv"

@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generation, crash-recovery, maintenance, and low-memory contracts.
 - Audited installation, migration, MCP onboarding, support-matrix, and launcher
   metadata against the executable package contract.
-- Scoped release evidence to the `3.5.0 -> 3.6.0` Ubuntu/Linux upgrade path.
+- Scoped release evidence to the `3.5.0 -> 3.6.0` Linux upgrade path, executed
+  on the Ubuntu CI runner.
   macOS and Windows are deferred without a scheduled target and are not part of
   this release's CI, upgrade, compatibility, performance, or quality claims.
 
@@ -27,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded synthetic Phase 8 receipts to v2 with exact release, commit, tree,
   clean-state, and worktree-hash binding; candidate and final generators now
   reject stale receipts from another checkout.
+- Removed the private real-vault/sealed-human GitHub Secrets gate from normal
+  publication. Those evaluations remain optional and do not block the Linux
+  release.
 
 ## [3.5.0] - 2026-08-12
 
