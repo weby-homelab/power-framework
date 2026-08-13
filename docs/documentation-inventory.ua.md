@@ -1,8 +1,8 @@
 # Інвентаризація документації встановлення та міграції
 
-**Стан на:** 2026-08-12
+**Стан на:** 2026-08-13
 
-**Версія коду:** 3.5.0
+**Версія коду:** 3.6.0
 
 **Обсяг:** публічні стартові описи, усі безпосередньо пов'язані з ними операційні
 документи та виконуваний контракт CLI/MCP.
@@ -11,7 +11,7 @@
 
 | Документ | Призначення | Перевірений стан |
 | --- | --- | --- |
-| `README.md` | Англійський огляд і маршрути для агента | Вирівняно з 3.5.0 |
+| `README.md` | Англійський огляд і маршрути для агента | Вирівняно з 3.6.0 |
 | `README.ua.md` | Український огляд і маршрути для агента | Вирівняно з англійським описом |
 | `docs/getting-started.md` | Чисте встановлення на POSIX | Повний acceptance gate |
 | `docs/getting-started.ua.md` | Українська чиста установка | Семантично паритетна |
@@ -33,12 +33,13 @@
 | Документ або посилання | Класифікація | Результат аудиту |
 | --- | --- | --- |
 | `CONTRIBUTING.md` | Поточний development workflow | Існує; не є інструкцією кінцевого користувача |
-| `docs/release-3.5.0.md` | Поточні release notes | Опублікований release contract; receipt і remote readback перевірені |
+| `docs/release-3.6.0.md` | Поточні release notes | Linux-first architecture, evidence та upgrade contract |
+| `docs/release-3.5.0.md` | Історичні release notes | Опублікований release contract; receipt і remote readback перевірені |
 | `docs/hierarchical-index-migration*.md` | Звіт v1.6 | Позначено історичним; прибрано загальні `O(log n)` і руйнівну Git-пораду |
 | `docs/tests/P.O.W.E.R.3.2.1-TEST-2.md` | Історичний тестовий артефакт | Залишено з явною версією у назві |
 | `docs/tests/P.O.W.E.R.3.0.0-TEST.md` | Історичний search-quality звіт | Залишено з явною версією у назві |
 | Документаційний сайт | Опублікований рендер | URL відповідав під час аудиту |
-| Release wheel `v3.5.0` | Immutable install artifact | Опублікований wheel; signed tag/readback доступні на GitHub Release |
+| Release wheel `v3.6.0` | Immutable install artifact | Tag-bound wheel; signed tag/readback перевіряє GitHub Release workflow |
 | Python, Git, Microsoft, ONNX Runtime | Зовнішні prerequisites | Посилання ведуть на офіційні джерела |
 
 ## Усунений дрейф
@@ -50,7 +51,7 @@
 - Видалено небезпечне оновлення через destructive reset, непереносний `/tmp`,
   `%USERPROFILE%` у PowerShell і запуск MCP через глобальний `py` замість точного
   інтерпретатора venv.
-- Встановлення прив'язано до опублікованого release wheel `v3.5.0`, а не до
+- Встановлення прив'язано до release wheel `v3.6.0`, а не до
   рухомої гілки; tag, assets і release receipts перевірені через GitHub Release.
 - Міграція більше не обіцяє автоматичне розпізнавання довільних папок, переписування
   всіх посилань або відновлення тексту через LLM. Додано manifest/hash reconciliation,
@@ -60,12 +61,12 @@
 ## Межі перевірки
 
 Локальний smoke test підтверджує створення чистої бази, ingest, strict index, lint,
-Markdown-перевірку, FTS sync/search і status. Фізичну перевірку Windows 11 25H2
-виконано для follow-up revision `4e5b2b9`; результати наведено у [звіті
-перевірки](tests/windows-11-25h2-validation.md). `windows-latest` CI smoke
-перевіряє загальний Windows runtime із strict FTS coverage, але не замінює доказ
-цільового хоста. Платформні межі та заборонені inference claims зведені у
-[матриці підтримки](support-matrix.ua.md).
+Markdown-перевірку, FTS sync/search і status. Фізична перевірка Windows 11 25H2
+для follow-up revision `4e5b2b9` є історичною; результати наведено у [звіті
+перевірки](tests/windows-11-25h2-validation.md). `v3.6.0` не запускає
+`windows-latest` або `macos-latest`: обидві платформи відкладені на невизначений
+строк і не мають release certification. Межі та заборонені inference claims
+зведені у [матриці підтримки](support-matrix.ua.md).
 
 Автоматичний gate `scripts/check_doc_drift.py` перевіряє поточні кількості CLI/MCP,
 пошуковий контракт, заборонені застарілі шаблони та всі локальні Markdown-посилання

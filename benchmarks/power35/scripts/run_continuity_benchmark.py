@@ -19,6 +19,11 @@ from power_framework.phase8_contract import (
     SYNTHETIC_WORKFLOW_COUNT,
 )
 
+try:
+    from .evidence_identity import technical_evidence_identity
+except ImportError:  # pragma: no cover - direct script execution in release workflow.
+    from evidence_identity import technical_evidence_identity
+
 ScenarioKind = Literal["code", "ops", "research", "note_mutation", "blocked"]
 
 _WORKER = r"""
@@ -220,6 +225,7 @@ def run_continuity_benchmark() -> dict[str, Any]:
         int(row["plain_handoff"]["durable_state_resumed"]) for row in rows
     ) / len(rows)
     return {
+        **technical_evidence_identity(),
         "schema_version": PHASE8_CONTINUITY_SCHEMA_VERSION,
         "synthetic": True,
         "content_free": True,

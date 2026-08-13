@@ -10,7 +10,11 @@ from benchmarks.power35.scripts.run_outcome_benchmark import run_benchmark
 def test_outcome_benchmark_compares_twenty_workflows_without_raw_content() -> None:
     report = run_benchmark()
 
-    assert report["schema_version"] == "power.phase8-outcome.v1"
+    assert report["schema_version"] == "power.phase8-outcome.v2"
+    assert report["release"] == "3.6.0"
+    assert len(report["source"]["commit"]) == 40
+    assert len(report["source"]["tree"]) == 40
+    assert len(report["source"]["worktree_sha256"]) == 64
     assert report["synthetic"] is True
     assert report["content_free"] is True
     assert report["workflow_count"] == 20

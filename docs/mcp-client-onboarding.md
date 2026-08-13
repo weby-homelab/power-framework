@@ -1,16 +1,17 @@
 # MCP client onboarding
 
-This is the canonical local-stdio setup for P.O.W.E.R. `v3.5.0` on Linux and
-macOS. It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
+This is the canonical local-stdio setup for P.O.W.E.R. `v3.6.0` on
+Ubuntu/Linux. It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
 the same server process and the same vault boundary.
 
-> **Published release:** `v3.5.0` is available from the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
-> Use the immutable wheel and the exact interpreter created by the
+> **Release contract:** use `v3.6.0` only after its signed tag and immutable
+> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.0).
+> Then use that wheel and the exact interpreter created by the
 > [clean-install guide](getting-started.md).
 
-For Windows, use the [Windows 11 25H2 guide](windows-11-installation.md), which
-uses the exact interpreter inside the Windows virtual environment. Do not copy
-POSIX shell paths into a Windows client configuration.
+The [Windows 11 25H2 guide](windows-11-installation.md) is informational only.
+Windows and macOS are deferred indefinitely and are not supported MCP onboarding
+platforms for `v3.6.0`.
 
 ## One-time preparation
 
@@ -27,7 +28,7 @@ POWER_VAULT="$HOME/Documents/power-vault"
 
 python3 -m venv "$POWER_VENV"
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
+  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl"
 # Only for a new or empty vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'

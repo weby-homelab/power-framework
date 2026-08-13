@@ -109,12 +109,24 @@ def test_real_receipt_requires_all_four_experiments() -> None:
 
 
 def test_technical_receipts_are_content_free_and_complete(tmp_path: Path) -> None:
+    release = "3.6.0"
+    source_commit = "a" * 40
+    source_tree = "b" * 40
+    worktree_sha256 = "c" * 64
+    source = {
+        "commit": source_commit,
+        "tree": source_tree,
+        "clean": False,
+        "worktree_sha256": worktree_sha256,
+    }
     outcome = tmp_path / "outcome.json"
     continuity = tmp_path / "continuity.json"
     outcome.write_text(
         json.dumps(
             {
-                "schema_version": "power.phase8-outcome.v1",
+                "schema_version": "power.phase8-outcome.v2",
+                "release": release,
+                "source": source,
                 "synthetic": True,
                 "content_free": True,
                 "workflow_count": 20,
@@ -158,7 +170,9 @@ def test_technical_receipts_are_content_free_and_complete(tmp_path: Path) -> Non
     continuity.write_text(
         json.dumps(
             {
-                "schema_version": "power.phase8-continuity.v1",
+                "schema_version": "power.phase8-continuity.v2",
+                "release": release,
+                "source": source,
                 "synthetic": True,
                 "content_free": True,
                 "workflow_count": 20,
@@ -191,9 +205,45 @@ def test_technical_receipts_are_content_free_and_complete(tmp_path: Path) -> Non
         phase8.validate_technical_receipts(
             outcome_path=outcome,
             continuity_path=continuity,
+            release=release,
+            source_commit=source_commit,
+            source_tree=source_tree,
+            worktree_sha256=worktree_sha256,
         )
         == []
     )
+
+
+def test_technical_receipts_reject_stale_release_or_source(tmp_path: Path) -> None:
+    outcome = tmp_path / "outcome.json"
+    continuity = tmp_path / "continuity.json"
+    source = {
+        "commit": "a" * 40,
+        "tree": "b" * 40,
+        "clean": True,
+        "worktree_sha256": "c" * 64,
+    }
+    for path, schema in (
+        (outcome, "power.phase8-outcome.v2"),
+        (continuity, "power.phase8-continuity.v2"),
+    ):
+        path.write_text(
+            json.dumps({"schema_version": schema, "release": "3.5.0", "source": source}),
+            encoding="utf-8",
+        )
+
+    errors = phase8.validate_technical_receipts(
+        outcome_path=outcome,
+        continuity_path=continuity,
+        release="3.6.0",
+        source_commit="d" * 40,
+        source_tree="e" * 40,
+        require_clean=True,
+    )
+
+    assert any("release must be 3.6.0" in error for error in errors)
+    assert any("source.commit" in error for error in errors)
+    assert any("source.tree" in error for error in errors)
 
 
 def test_phase8_json_hash_is_stable_for_crlf_manifest(tmp_path: Path) -> None:

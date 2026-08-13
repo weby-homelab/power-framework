@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the local, content-free 3.4.5 -> 3.5.0 upgrade safety matrix.
+"""Run the local, content-free 3.5.0 -> 3.6.0 upgrade safety matrix.
 
 The script proves invariants available on the current runner and records
 the declared release platform boundary. Deferred platforms are never treated
@@ -38,9 +38,17 @@ from power_framework.core.state_migration import build_state_migration_plan
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 try:
-    from release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+    from release_platforms import (
+        DEFERRED_RELEASE_PLATFORMS,
+        DEFERRED_RELEASE_POLICY,
+        SUPPORTED_RELEASE_PLATFORMS,
+    )
 except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
-    from scripts.release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+    from scripts.release_platforms import (
+        DEFERRED_RELEASE_PLATFORMS,
+        DEFERRED_RELEASE_POLICY,
+        SUPPORTED_RELEASE_PLATFORMS,
+    )
 
 _INTERRUPTED_UPGRADE_WORKER = r"""
 import os
@@ -89,7 +97,7 @@ generation_index.sync_vault_atomically(vault, sync_embeddings=False)
 _UPGRADE_CHECKPOINTS = ("before_move", "after_move", "after_pointer")
 
 
-def build_matrix(*, from_version: str = "3.4.5", to_version: str = "3.5.0") -> dict[str, Any]:
+def build_matrix(*, from_version: str = "3.5.0", to_version: str = "3.6.0") -> dict[str, Any]:
     """Return local matrix evidence without exposing vault content."""
     current = _platform_name()
     with tempfile.TemporaryDirectory(prefix="power-upgrade-") as temporary:
@@ -165,7 +173,10 @@ def build_matrix(*, from_version: str = "3.4.5", to_version: str = "3.5.0") -> d
             and interrupted["gate"]["all_checkpoints_pass"],
             "all_platforms_executed": all(value == "executed" for value in platforms.values()),
             "publish_ready": False,
-            "reason": "macOS and Windows are deferred for 3.5.0; tag-bound clean source and remote readback are release steps",
+            "reason": (
+                f"macOS and Windows are deferred with {DEFERRED_RELEASE_POLICY} policy for "
+                f"{to_version}; tag-bound clean source and remote readback are release steps"
+            ),
         },
     }
 
@@ -242,7 +253,7 @@ def _build_interrupted_upgrade_case(
     with _temporary_xdg_cache_home(cache_home):
         vault = case_root / "vault"
         vault.mkdir(parents=True)
-        note = _write_upgrade_fixture(vault, "legacy345marker")
+        note = _write_upgrade_fixture(vault, "previous-release-marker")
         sync_vault_atomically(vault, sync_embeddings=False, allow_partial=False)
         active_before = resolve_active_generation_path(vault)
         if active_before is None:
@@ -250,7 +261,9 @@ def _build_interrupted_upgrade_case(
         active_before_sha = hashlib.sha256(active_before.read_bytes()).hexdigest()
 
         note.write_text(
-            note.read_text(encoding="utf-8").replace("legacy345marker", "upgrade350marker"),
+            note.read_text(encoding="utf-8").replace(
+                "previous-release-marker", "current-release-marker"
+            ),
             encoding="utf-8",
         )
         source_after_change = note.read_bytes()
@@ -262,8 +275,8 @@ def _build_interrupted_upgrade_case(
             raise RuntimeError(f"active generation disappeared at {checkpoint}")
         active_after_sha = hashlib.sha256(active_after_interrupt.read_bytes()).hexdigest()
         expected_new_visible = checkpoint == "after_pointer"
-        legacy_visible = bool(search_vault(vault, "legacy345marker", mode="fts"))
-        upgraded_visible = bool(search_vault(vault, "upgrade350marker", mode="fts"))
+        legacy_visible = bool(search_vault(vault, "previous-release-marker", mode="fts"))
+        upgraded_visible = bool(search_vault(vault, "current-release-marker", mode="fts"))
         expected_pre_restart = upgraded_visible if expected_new_visible else legacy_visible
         if not expected_pre_restart:
             raise RuntimeError(
@@ -282,8 +295,8 @@ def _build_interrupted_upgrade_case(
             else:
                 os.environ[STALE_BUILD_TTL_ENV] = previous_ttl
         recovered_note = note.read_bytes()
-        recovered_new = bool(search_vault(vault, "upgrade350marker", mode="fts"))
-        recovered_legacy = bool(search_vault(vault, "legacy345marker", mode="fts"))
+        recovered_new = bool(search_vault(vault, "current-release-marker", mode="fts"))
+        recovered_legacy = bool(search_vault(vault, "previous-release-marker", mode="fts"))
         restart_recovered = recovered_new and not recovered_legacy
         with closing(sqlite3.connect(_state_db_path(vault))) as conn:
             stale_build_rows_cleared = (
@@ -319,7 +332,7 @@ def _build_interrupted_upgrade_case(
 
 
 def build_interrupted_upgrade_matrix(
-    *, from_version: str = "3.4.5", to_version: str = "3.5.0"
+    *, from_version: str = "3.5.0", to_version: str = "3.6.0"
 ) -> dict[str, Any]:
     """Prove interrupted publication recovery without exposing fixture content."""
     with tempfile.TemporaryDirectory(prefix="power-upgrade-interrupted-") as temporary:
@@ -346,15 +359,15 @@ def build_interrupted_upgrade_matrix(
             ),
             "no_data_loss": all(not row["data_loss"] for row in checkpoint_rows),
         },
-        "physical_3_4_5_runtime": False,
+        "physical_previous_runtime": False,
         "raw_content_in_report": False,
     }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--from-version", default="3.4.5")
-    parser.add_argument("--to-version", default="3.5.0")
+    parser.add_argument("--from-version", default="3.5.0")
+    parser.add_argument("--to-version", default="3.6.0")
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 

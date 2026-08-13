@@ -1,12 +1,12 @@
-"""Shared, versioned contract constants for POWER 3.5 Phase 8 evidence."""
+"""Shared, versioned contract constants for POWER 3.6 Phase 8 evidence."""
 
 from __future__ import annotations
 
 from typing import Final
 
 PHASE8_CONTRACT_SCHEMA_VERSION: Final = "power.phase8-contract.v1"
-PHASE8_OUTCOME_SCHEMA_VERSION: Final = "power.phase8-outcome.v1"
-PHASE8_CONTINUITY_SCHEMA_VERSION: Final = "power.phase8-continuity.v1"
+PHASE8_OUTCOME_SCHEMA_VERSION: Final = "power.phase8-outcome.v2"
+PHASE8_CONTINUITY_SCHEMA_VERSION: Final = "power.phase8-continuity.v2"
 
 SYNTHETIC_WORKFLOW_COUNT: Final = 20
 CONTINUITY_INDEPENDENT_PROCESSES: Final = 60

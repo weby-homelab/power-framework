@@ -6,7 +6,7 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.5.0` — runtime contract: **24 CLI commands** + **20 MCP tools** (FastMCP 3.x).
+`v3.6.0` — runtime contract: **24 CLI commands** + **20 MCP tools** (FastMCP 3.x).
 
 ## CLI (24 команди)
 

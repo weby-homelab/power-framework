@@ -9,9 +9,17 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+    from release_platforms import (
+        DEFERRED_RELEASE_PLATFORMS,
+        DEFERRED_RELEASE_POLICY,
+        SUPPORTED_RELEASE_PLATFORMS,
+    )
 except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
-    from scripts.release_platforms import DEFERRED_RELEASE_PLATFORMS, SUPPORTED_RELEASE_PLATFORMS
+    from scripts.release_platforms import (
+        DEFERRED_RELEASE_PLATFORMS,
+        DEFERRED_RELEASE_POLICY,
+        SUPPORTED_RELEASE_PLATFORMS,
+    )
 
 SUPPORTED_PLATFORMS = SUPPORTED_RELEASE_PLATFORMS
 DEFERRED_PLATFORMS = DEFERRED_RELEASE_PLATFORMS
@@ -47,8 +55,10 @@ def aggregate_reports(
             raise ValueError("upgrade matrix report must not capture source content")
         if report.get("interrupted_upgrade", {}).get("raw_content_in_report") is not False:
             raise ValueError("interrupted upgrade report must remain content-free")
-        if report.get("interrupted_upgrade", {}).get("physical_3_4_5_runtime") is not False:
-            raise ValueError("physical 3.4.5 runtime must not be inferred from synthetic evidence")
+        if report.get("interrupted_upgrade", {}).get("physical_previous_runtime") is not False:
+            raise ValueError(
+                "physical previous runtime must not be inferred from synthetic evidence"
+            )
         platform = report.get("current_runner", {}).get("platform")
         if platform not in expected_platforms:
             raise ValueError(f"unsupported or missing runner platform: {platform!r}")
@@ -90,7 +100,7 @@ def aggregate_reports(
                 "status": "pass",
                 "local_invariants": True,
                 "interrupted_upgrade": dict.fromkeys(INTERRUPTED_GATE_KEYS, True),
-                "physical_3_4_5_runtime": False,
+                "physical_previous_runtime": False,
             }
             for platform in expected_platforms
         ],
@@ -98,9 +108,13 @@ def aggregate_reports(
             "local_invariants": True,
             "all_platforms_executed": True,
             "interrupted_upgrade": True,
-            "physical_3_4_5_runtime": False,
+            "physical_previous_runtime": False,
             "publish_ready": False,
-            "reason": "macOS and Windows are deferred for 3.5.0; clean tag, physical 3.4.5 compatibility, and remote readback remain separate release gates",
+            "reason": (
+                f"macOS and Windows are deferred with {DEFERRED_RELEASE_POLICY} policy; "
+                "clean tag, physical previous-release compatibility, and remote readback "
+                "remain separate release gates"
+            ),
         },
     }
 

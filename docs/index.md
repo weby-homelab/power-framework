@@ -1,4 +1,4 @@
-# P.O.W.E.R. Framework 3.5.0
+# P.O.W.E.R. Framework 3.6.0
 
 P.O.W.E.R. is a local-first, Git-native toolkit for structured knowledge bases. It combines
 P.A.R.A., validated OKF frontmatter, hierarchical indexes, full-text and semantic retrieval,
@@ -19,9 +19,10 @@ and an MCP interface for AI agents.
 - [Матриця підтримки платформ](support-matrix.ua.md)
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
-These guides define the immutable `v3.5.0` release artifact contract, use an
-isolated virtual environment, and include acceptance checks. The signed tag,
-wheel, source archive, SBOM, and release receipts are published on GitHub. The
+These guides define the immutable `v3.6.0` release artifact contract, use an
+isolated virtual environment, and include acceptance checks. Publication is
+complete only when the signed tag, wheel, source archive, SBOM, and release
+receipts can be read back from GitHub. The
 migration guides keep the source immutable, reconcile every file by manifest
 and hash, and make cutover reversible.
 
@@ -44,7 +45,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install \
-  "https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
+  "https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl"
 
 power init ./my-vault
 power index ./my-vault --strict
@@ -65,7 +66,7 @@ are explicitly preserved as v1.6 historical snapshots.
 
 - [Architecture](architecture.md)
 - [Security threat model](threat-model.md)
-- [POWER 3.5.0 release notes](release-3.5.0.md)
+- [POWER 3.6.0 release notes](release-3.6.0.md)
 - [Windows 11 25H2 validation receipt](tests/windows-11-25h2-v3.3.2-validation-fixed.md)
 - [M2 human-evaluation contract](m2-human-evaluation.md)
 - [Real-vault retrieval receipt](benchmarks/real-vault-retrieval.md)
