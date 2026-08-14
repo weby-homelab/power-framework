@@ -274,6 +274,40 @@ SEARCH_MODE_REGISTRY = {
     "graph_assisted": SearchModeSpec(("fts", "tf_vector", "graph"), "rrf_graph", False, False),
 }
 
+_TECH_GLOSSARY_SYNONYMS: dict[str, list[str]] = {
+    "докер": ["docker"],
+    "docker": ["докер"],
+    "проксмокс": ["proxmox"],
+    "proxmox": ["проксмокс"],
+    "тейлскейл": ["tailscale"],
+    "tailscale": ["тейлскейл"],
+    "кубернетіс": ["kubernetes", "k8s"],
+    "кубер": ["kubernetes", "k8s"],
+    "kubernetes": ["кубернетіс", "k8s"],
+    "k8s": ["kubernetes", "кубернетіс"],
+    "повер": ["power"],
+    "павер": ["power"],
+    "power": ["повер", "павер"],
+    "пітон": ["python"],
+    "пайтон": ["python"],
+    "python": ["пітон", "пайтон"],
+    "гіт": ["git"],
+    "git": ["гіт"],
+    "бекап": ["backup"],
+    "бекапи": ["backup", "backups"],
+    "backup": ["бекап"],
+    "лог": ["log"],
+    "логи": ["logs", "log"],
+    "log": ["лог"],
+    "граф": ["graph"],
+    "graph": ["граф"],
+    "безпека": ["security"],
+    "security": ["безпека"],
+    "контейнер": ["container"],
+    "контейнери": ["containers", "container"],
+    "container": ["контейнер"],
+}
+
 
 class DenseIndexUnavailableError(RuntimeError):
     """Raised when a request explicitly requires a usable dense index."""
@@ -486,26 +520,30 @@ def _score_note(
 
     for term in terms:
         term_lower = term.lower()
+        active_variants = [term_lower] + [
+            s.lower() for s in _TECH_GLOSSARY_SYNONYMS.get(term_lower, [])
+        ]
 
-        title_count = title_lower.count(term_lower)
-        if title_count:
-            total_score += title_count * TITLE_WEIGHT
-            total_matches += title_count
+        for v in active_variants:
+            title_count = title_lower.count(v)
+            if title_count:
+                total_score += title_count * TITLE_WEIGHT
+                total_matches += title_count
 
-        tag_count = sum(1 for t in tags_lower if term_lower in t)
-        if tag_count:
-            total_score += tag_count * TAG_WEIGHT
-            total_matches += tag_count
+            tag_count = sum(1 for t in tags_lower if v in t)
+            if tag_count:
+                total_score += tag_count * TAG_WEIGHT
+                total_matches += tag_count
 
-        desc_count = desc_lower.count(term_lower)
-        if desc_count:
-            total_score += desc_count * DESCRIPTION_WEIGHT
-            total_matches += desc_count
+            desc_count = desc_lower.count(v)
+            if desc_count:
+                total_score += desc_count * DESCRIPTION_WEIGHT
+                total_matches += desc_count
 
-        body_count = content_lower.count(term_lower)
-        if body_count:
-            total_score += body_count * CONTENT_WEIGHT
-            total_matches += body_count
+            body_count = content_lower.count(v)
+            if body_count:
+                total_score += body_count * CONTENT_WEIGHT
+                total_matches += body_count
 
     snippet = _make_snippet(content, terms) if total_matches > 0 else ""
     return total_score, total_matches, snippet
@@ -575,8 +613,15 @@ def _fts_search(
             # FTS5 treats punctuation such as a hyphen as a query operator or
             # a token separator. Quoting it preserves the user's identifier
             # and prevents ``first-token`` from matching ``second-token``.
-            if "-" in token or token.casefold() not in FTS_STOPWORDS:
-                terms.append(f'"{token}"' if "-" in token else f"{token}*")
+            if "-" in token:
+                terms.append(f'"{token}"')
+            elif token.casefold() not in FTS_STOPWORDS:
+                syns = _TECH_GLOSSARY_SYNONYMS.get(token.casefold(), [])
+                if syns:
+                    all_variants = [f"{token}*"] + [f"{s}*" for s in syns]
+                    terms.append("(" + " OR ".join(all_variants) + ")")
+                else:
+                    terms.append(f"{token}*")
 
     operator = os.getenv("POWER_FTS_OPERATOR", DEFAULT_FTS_OPERATOR).upper()
     if operator not in {"AND", "OR"}:
