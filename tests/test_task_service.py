@@ -132,3 +132,27 @@ def test_v1_work_packet_migration(temp_vault: Path) -> None:
     assert task.state == "working"
     assert task.objective == "Legacy task objective"
     assert task.authority == "propose"
+
+
+def test_direct_backlog_to_working_transition(temp_vault: Path) -> None:
+    """Test direct transition from backlog to working state."""
+    service = TaskService(temp_vault)
+    service.create_task(
+        task_id="task_direct_working",
+        title="Direct Work Task",
+        state="backlog",
+    )
+
+    t_working = service.transition_task("task_direct_working", "working", expected_revision=1)
+    assert t_working.state == "working"
+    assert t_working.revision == 2
+
+    # Verify transition back to ready or backlog
+    t_ready = service.transition_task("task_direct_working", "ready", expected_revision=2)
+    assert t_ready.state == "ready"
+    assert t_ready.revision == 3
+
+    t_backlog = service.transition_task("task_direct_working", "backlog", expected_revision=3)
+    assert t_backlog.state == "backlog"
+    assert t_backlog.revision == 4
+
