@@ -55,6 +55,70 @@ def resolve_safe_vault_path(vault_dir: Path, rel_path: str) -> Path:
     return target
 
 
+def resolve_note_file(vault_dir: Path, rel_path: str) -> tuple[Path, str]:
+    """Resolve note path or wikilink stem to an actual note file inside vault_dir."""
+    normalized = normalize_rel_path(rel_path)
+    if not normalized:
+        raise ValueError("Relative path cannot be empty")
+    root = vault_dir.expanduser().resolve()
+    target = (root / normalized).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise PermissionError(f"Path escapes vault boundary: {rel_path}") from exc
+
+    # 1. Exact file match
+    if target.is_file():
+        return target, target.relative_to(root).as_posix()
+
+    # 2. Match with .md suffix
+    if not normalized.endswith(".md"):
+        with_md = target.with_suffix(".md")
+        if with_md.is_file():
+            return with_md, with_md.relative_to(root).as_posix()
+
+    # 3. Directory index or same-named note inside directory
+    if target.is_dir():
+        same_named = target / f"{target.name}.md"
+        if same_named.is_file():
+            return same_named, same_named.relative_to(root).as_posix()
+        idx = target / "index.md"
+        if idx.is_file():
+            return idx, idx.relative_to(root).as_posix()
+        und_idx = target / "_index.md"
+        if und_idx.is_file():
+            return und_idx, und_idx.relative_to(root).as_posix()
+
+    # 4. Vault-wide stem matching (Obsidian wikilink target resolution)
+    clean_target = normalized.split("/")[-1]
+    if clean_target.endswith(".md"):
+        clean_target = clean_target[:-3]
+    clean_target_lower = clean_target.lower()
+
+    candidates: list[tuple[int, int, Path]] = []
+    for file_path in root.rglob("*.md"):
+        rel = file_path.relative_to(root).as_posix()
+        if should_skip(root, rel):
+            continue
+        is_archive = rel.startswith("04_Archive/")
+        stem = file_path.stem
+        stem_lower = stem.lower()
+
+        if stem == clean_target:
+            priority = 3 if is_archive else 1
+            candidates.append((priority, len(file_path.parts), file_path))
+        elif stem_lower == clean_target_lower:
+            priority = 4 if is_archive else 2
+            candidates.append((priority, len(file_path.parts), file_path))
+
+    if candidates:
+        candidates.sort(key=lambda x: (x[0], x[1]))
+        best = candidates[0][2]
+        return best, best.relative_to(root).as_posix()
+
+    raise FileNotFoundError(f"Source note not found: {rel_path}")
+
+
 def list_sources(vault_dir: Path, request: SourceListRequest | None = None) -> SourceListResponse:
     """List notes in the vault with bounded pagination and filtering."""
     req = request or SourceListRequest()
@@ -138,9 +202,7 @@ def list_sources(vault_dir: Path, request: SourceListRequest | None = None) -> S
 
 def read_source(vault_dir: Path, request: SourceReadRequest) -> SourceReadResponse:
     """Read a specific note from the vault with ETag and strict containment."""
-    target_file = resolve_safe_vault_path(vault_dir, request.rel_path)
-    if not target_file.is_file():
-        raise FileNotFoundError(f"Source note not found: {request.rel_path}")
+    target_file, rel_norm = resolve_note_file(vault_dir, request.rel_path)
 
     stat = target_file.stat()
     if stat.st_size > request.max_bytes:
@@ -157,7 +219,6 @@ def read_source(vault_dir: Path, request: SourceReadRequest) -> SourceReadRespon
     sha256_digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
     etag = f'"{sha256_digest[:16]}-{int(stat.st_mtime)}"'
     mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
-    rel_norm = normalize_rel_path(request.rel_path)
 
     return SourceReadResponse(
         rel_path=rel_norm,
