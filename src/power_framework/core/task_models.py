@@ -34,10 +34,11 @@ TERMINAL_STATES: set[TaskState] = {"completed", "failed", "canceled", "rejected"
 
 # Allowed transitions mapping: from_state -> set of allowed to_states
 VALID_TRANSITIONS: dict[TaskState, set[TaskState]] = {
-    "backlog": {"ready", "submitted", "canceled"},
-    "ready": {"working", "input-required", "auth-required", "blocked", "canceled", "rejected"},
-    "submitted": {"working", "input-required", "auth-required", "blocked", "canceled", "rejected"},
+    "backlog": {"ready", "submitted", "working", "canceled"},
+    "ready": {"backlog", "working", "input-required", "auth-required", "blocked", "canceled", "rejected"},
+    "submitted": {"backlog", "ready", "working", "input-required", "auth-required", "blocked", "canceled", "rejected"},
     "working": {
+        "ready",
         "completed",
         "failed",
         "blocked",
