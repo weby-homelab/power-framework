@@ -17,6 +17,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from .application_models import (
+    SourceListRequest,
+    SourceReadRequest,
+)
 from .capabilities import manifest
 from .handoff import (
     advance_work_packet,
@@ -30,6 +34,13 @@ from .searcher import (
     format_untrusted_search_envelope,
     search_vault,
 )
+from .source_service import (
+    get_graph_projection,
+    get_source_stats,
+    list_sources,
+    read_source,
+)
+from .task_service import TaskService
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -113,10 +124,12 @@ class ApplicationService:
         *,
         audit_hook: Callable[[AuditReceipt], None] | None = None,
         search_fn: Callable[..., list[Any]] | None = None,
+        task_service: TaskService | None = None,
     ) -> None:
         self.vault_dir = Path(vault_dir).expanduser().resolve()
         self._audit_hook = audit_hook
         self._search_fn = search_fn or search_vault
+        self.task_service = task_service or TaskService(self.vault_dir)
 
     def discover(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
         """Return bounded capability metadata without probing optional runtimes."""
@@ -293,6 +306,181 @@ class ApplicationService:
             "receipt",
             context,
             lambda: {"receipts": read_history(self.vault_dir)[-limit:]},
+        )
+
+    def source_list(
+        self,
+        request: SourceListRequest | None = None,
+        *,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """List notes in vault with bounded pagination and filtering."""
+        return self._run(
+            "source.list",
+            context,
+            lambda: list_sources(self.vault_dir, request).model_dump(),
+        )
+
+    def source_read(
+        self,
+        rel_path: str,
+        *,
+        max_bytes: int = 2_000_000,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Read a note securely with path containment and ETag."""
+        req = SourceReadRequest(rel_path=rel_path, max_bytes=max_bytes)
+        return self._run(
+            "source.read",
+            context,
+            lambda: read_source(self.vault_dir, req).model_dump(),
+        )
+
+    def source_stats(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
+        """Return precomputed aggregate statistics for the vault."""
+        return self._run(
+            "source.stats",
+            context,
+            lambda: get_source_stats(self.vault_dir).model_dump(),
+        )
+
+    def source_graph(
+        self,
+        *,
+        max_nodes: int = 500,
+        focus_path: str | None = None,
+        max_depth: int = 2,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Return bounded graph slice for knowledge graph visualization."""
+        return self._run(
+            "source.graph",
+            context,
+            lambda: get_graph_projection(
+                self.vault_dir,
+                max_nodes=max_nodes,
+                focus_path=focus_path,
+                max_depth=max_depth,
+            ).model_dump(),
+        )
+
+    def task_create(
+        self,
+        task_id: str,
+        title: str,
+        *,
+        objective: str = "",
+        owner: str = "local",
+        assignee: str | None = None,
+        state: str = "backlog",
+        priority: str = "normal",
+        authority: str = "read-only",
+        context: RequestContext | None = None,
+        **kwargs: Any,
+    ) -> ApplicationEnvelope:
+        """Create a durable Task v2."""
+        request = context or RequestContext(authority="propose")
+        if request.authority not in {"propose", "apply"}:
+            raise PermissionError("task creation requires propose authority")
+        return self._run(
+            "task.create",
+            request,
+            lambda: self.task_service.create_task(
+                task_id=task_id,
+                title=title,
+                objective=objective,
+                owner=owner,
+                assignee=assignee,
+                state=state,  # type: ignore[arg-type]
+                priority=priority,  # type: ignore[arg-type]
+                authority=authority,  # type: ignore[arg-type]
+                actor=request.actor,
+                **kwargs,
+            ).model_dump(),
+        )
+
+    def task_transition(
+        self,
+        task_id: str,
+        new_state: str,
+        *,
+        expected_revision: int | None = None,
+        receipt_id: str | None = None,
+        next_action: str | None = None,
+        context: RequestContext | None = None,
+        **kwargs: Any,
+    ) -> ApplicationEnvelope:
+        """Advance a Task v2 state."""
+        request = context or RequestContext(authority="apply")
+        if request.authority != "apply":
+            raise PermissionError("task transition requires apply authority")
+        return self._run(
+            "task.transition",
+            request,
+            lambda: self.task_service.transition_task(
+                task_id,
+                new_state=new_state,  # type: ignore[arg-type]
+                actor=request.actor,
+                expected_revision=expected_revision,
+                receipt_id=receipt_id,
+                next_action=next_action,
+                **kwargs,
+            ).model_dump(),
+        )
+
+    def task_list(
+        self,
+        *,
+        state: str | None = None,
+        owner: str | None = None,
+        assignee: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """List Task v2 items."""
+        return self._run(
+            "task.list",
+            context,
+            lambda: [
+                t.model_dump()
+                for t in self.task_service.list_tasks(
+                    state=state, owner=owner, assignee=assignee, limit=limit, offset=offset
+                )
+            ],
+        )
+
+    def task_read(
+        self,
+        task_id: str,
+        *,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Read a single Task v2 item."""
+
+        def execute() -> dict[str, object]:
+            t = self.task_service.get_task(task_id)
+            if not t:
+                raise FileNotFoundError(f"Task {task_id} not found")
+            return t.model_dump()
+
+        return self._run("task.read", context, execute)
+
+    def task_events(
+        self,
+        task_id: str,
+        *,
+        since_sequence: int = 0,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Read event stream for a Task v2."""
+        return self._run(
+            "task.events",
+            context,
+            lambda: [
+                e.model_dump()
+                for e in self.task_service.get_events(task_id, since_sequence=since_sequence)
+            ],
         )
 
     def _run(
