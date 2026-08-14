@@ -103,7 +103,7 @@ def test_source_list_and_pagination(temp_vault: Path) -> None:
 
 
 def test_source_read_and_etag(temp_vault: Path) -> None:
-    """Test reading source content with ETag and hash verification."""
+    """Test reading source content with ETag, hash verification, and stem resolution."""
     service = ApplicationService(temp_vault)
     env = service.source_read("01_Projects/Project_Alpha.md")
     assert env.status == "ok"
@@ -112,6 +112,15 @@ def test_source_read_and_etag(temp_vault: Path) -> None:
     assert env.data["etag"]
     assert env.data["sha256"]
     assert env.data["metadata"]["type"] == "Project"
+
+    # Wikilink / stem resolution without folder and without .md
+    env_stem = service.source_read("Project_Alpha")
+    assert env_stem.status == "ok"
+    assert env_stem.data["rel_path"] == "01_Projects/Project_Alpha.md"
+
+    env_stem2 = service.source_read("Resource_Beta")
+    assert env_stem2.status == "ok"
+    assert env_stem2.data["rel_path"] == "03_Resources/Resource_Beta.md"
 
     # Non-existent file
     with pytest.raises(FileNotFoundError):
