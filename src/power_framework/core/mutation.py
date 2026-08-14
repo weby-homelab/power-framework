@@ -84,7 +84,7 @@ def vault_mutation(vault_dir: Path) -> Iterator[Path]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     process_lock = _get_vault_lock(root)
     with process_lock:
-        descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o666)
         try:
             _lock_descriptor(descriptor)
             yield root
