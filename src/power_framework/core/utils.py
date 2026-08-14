@@ -459,9 +459,11 @@ def run_opencode_cli(prompt: str) -> str:
 
     local_logger = logging.getLogger(__name__)
 
-    # Locate opencode binary
-    binary = "/root/.opencode/bin/opencode"
-    if not os.path.exists(binary):
+    # Locate opencode binary dynamically across systems
+    user_opencode = Path.home() / ".opencode" / "bin" / "opencode"
+    if user_opencode.exists():
+        binary = str(user_opencode)
+    else:
         binary = shutil.which("opencode") or "opencode"
 
     try:
