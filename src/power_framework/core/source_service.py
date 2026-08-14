@@ -12,7 +12,7 @@ import hashlib
 import posixpath
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .application_models import (
     GraphEdgeDTO,
@@ -28,6 +28,9 @@ from .application_models import (
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 from .vault_storage import ensure_vault_identity
+
+if TYPE_CHECKING:
+    from .models import OKFMetadata
 
 
 def normalize_rel_path(path: str) -> str:
@@ -282,21 +285,25 @@ def get_source_stats(vault_dir: Path) -> SourceStatsResponse:
 
 def get_graph_projection(
     vault_dir: Path,
-    max_nodes: int = 500,
+    max_nodes: int = 1000,
     focus_path: str | None = None,
     max_depth: int = 2,
 ) -> GraphProjectionResponse:
     """Extract a safe, bounded graph projection for visualization."""
+    import re
+
     root = vault_dir.expanduser().resolve()
     nodes_map: dict[str, GraphNodeDTO] = {}
-    edges: list[GraphEdgeDTO] = []
+    stem_to_paths: dict[str, list[str]] = {}
+    node_metas: dict[str, OKFMetadata | None] = {}
+    edges_set: set[tuple[str, str, str]] = set()
 
     # First collect nodes
     for file_path in root.rglob("*.md"):
         rel_posix = file_path.relative_to(root).as_posix()
         if should_skip(root, rel_posix):
             continue
-        if file_path.name in {"index.md", "log.md", "_index.md"}:
+        if file_path.name in {"index.md", "log.md", "_index.md"} or file_path.name.startswith("."):
             continue
 
         parts = rel_posix.split("/")
@@ -312,51 +319,93 @@ def get_graph_projection(
                 degree=0,
                 metadata={"tags": meta.tags if meta else []},
             )
+            node_metas[rel_posix] = meta
+            stem_to_paths.setdefault(file_path.stem.lower(), []).append(rel_posix)
         except Exception:  # noqa: S112
             continue
 
         if len(nodes_map) >= max_nodes:
             break
 
-    # Next collect links (wikilinks format [[Target Note]] or [[Target|Alias]])
-    import re
+    # Link patterns:
+    # 1. Wikilinks format [[Target Note]], [[Target.md]], [[path/target|Alias]], [[target#section]]
+    wikilink_pattern = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]")
+    # 2. Markdown links format [Title](relative/path.md)
+    mdlink_pattern = re.compile(r"\[([^\]]*)\]\(([^)#]+\.md)(?:#[^)]+)?\)")
 
-    link_pattern = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]")
+    def _resolve_target(source_path: str, raw_target: str) -> str | None:
+        target_clean = raw_target.strip()
+        if not target_clean:
+            return None
+        # 1. Exact match
+        if target_clean in nodes_map and target_clean != source_path:
+            return target_clean
+        # 2. Match with .md appended
+        if not target_clean.endswith(".md") and f"{target_clean}.md" in nodes_map:
+            candidate = f"{target_clean}.md"
+            if candidate != source_path:
+                return candidate
+        # 3. Relative path resolution from source file directory
+        source_parent = Path(source_path).parent
+        resolved_candidate = (source_parent / target_clean).as_posix()
+        with contextlib.suppress(Exception):
+            norm = Path(resolved_candidate).as_posix()
+            if norm in nodes_map and norm != source_path:
+                return norm
+            candidate_md = f"{norm}.md"
+            if not norm.endswith(".md") and candidate_md in nodes_map and candidate_md != source_path:
+                return candidate_md
+        # 4. Match by filename stem (case-insensitive)
+        target_stem = Path(target_clean).stem.lower()
+        if target_stem in stem_to_paths:
+            for matched in stem_to_paths[target_stem]:
+                if matched != source_path:
+                    return matched
+        return None
 
-    for source_path, node in list(nodes_map.items()):
+    for source_path, _node in list(nodes_map.items()):
         source_file = root / source_path
         if not source_file.is_file():
             continue
         try:
             content = read_file_content(source_file)
-            matches = link_pattern.findall(content)
-            for target_raw in matches:
-                target_clean = target_raw.strip()
-                # Find matching target in nodes_map (by path or by stem/title)
-                matched_target: str | None = None
-                for candidate_path, cand_node in nodes_map.items():
-                    if (
-                        candidate_path == target_clean
-                        or Path(candidate_path).stem.lower() == target_clean.lower()
-                        or cand_node.label.lower() == target_clean.lower()
-                    ):
-                        matched_target = candidate_path
-                        break
+            # A. Extract Wikilinks
+            for target_raw in wikilink_pattern.findall(content):
+                target_matched = _resolve_target(source_path, target_raw)
+                if target_matched:
+                    edges_set.add((source_path, target_matched, "wikilink"))
 
-                if matched_target and matched_target != source_path:
-                    edges.append(
-                        GraphEdgeDTO(
-                            source=source_path,
-                            target=matched_target,
-                            relation_type="wikilink",
-                            is_candidate=False,
-                            weight=1.0,
-                        )
-                    )
-                    node.degree += 1
-                    nodes_map[matched_target].degree += 1
+            # B. Extract Markdown links
+            for _, target_raw in mdlink_pattern.findall(content):
+                target_matched = _resolve_target(source_path, target_raw)
+                if target_matched:
+                    edges_set.add((source_path, target_matched, "markdown_link"))
+
+            # C. Extract OKF Frontmatter related relations
+            meta = node_metas.get(source_path)
+            if meta and getattr(meta, "related", None):
+                for rel_item in meta.related:
+                    rel_target_str = getattr(rel_item, "path", None) or str(rel_item)
+                    target_matched = _resolve_target(source_path, rel_target_str)
+                    if target_matched:
+                        rel_type = getattr(rel_item, "relation", "related_to")
+                        edges_set.add((source_path, target_matched, rel_type))
         except Exception:  # noqa: S112
             continue
+
+    edges: list[GraphEdgeDTO] = []
+    for s_path, t_path, r_type in edges_set:
+        edges.append(
+            GraphEdgeDTO(
+                source=s_path,
+                target=t_path,
+                relation_type=r_type,
+                is_candidate=False,
+                weight=1.0,
+            )
+        )
+        nodes_map[s_path].degree += 1
+        nodes_map[t_path].degree += 1
 
     return GraphProjectionResponse(
         nodes=list(nodes_map.values()),
