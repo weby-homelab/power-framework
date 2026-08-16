@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .task_models import PowerTask, TaskAuthority, TaskEvent, TaskKind, TaskPriority, TaskState
 from .task_store import TaskStore
@@ -205,7 +205,7 @@ class TaskService:
                 v1_state = data.get("state", "submitted")
                 mapped_state: TaskState = "ready"
                 if v1_state in {"working", "input-required", "completed", "failed", "canceled"}:
-                    mapped_state = v1_state  # type: ignore[assignment]
+                    mapped_state = cast("TaskState", v1_state)
 
                 task = PowerTask(
                     task_id=task_id,

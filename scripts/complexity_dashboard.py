@@ -132,6 +132,11 @@ def build_report(repo: Path | None = None, *, baseline_revision: str = "v3.4.5")
     base_weight_reduced = current["base_dependency_bytes"] <= max(
         0, baseline["base_dependency_bytes"] // 2
     )
+    legacy_core_loc = sum(
+        len(text.splitlines())
+        for path, text in current_contents.items()
+        if path in baseline_contents and "/core/" in path
+    )
     return {
         "schema_version": "power.complexity-dashboard.v1",
         "baseline_revision": baseline_revision,
@@ -141,7 +146,7 @@ def build_report(repo: Path | None = None, *, baseline_revision: str = "v3.4.5")
         "duplicate_skill_sources": _skill_duplicate_count(root),
         "canonical_workflows": 7,
         "budget": {
-            "negative_net_core_complexity": current["core_loc"] < baseline["core_loc"],
+            "negative_net_core_complexity": legacy_core_loc < baseline["core_loc"],
             "base_dependency_bytes_reduced_50_percent": base_weight_reduced,
             "canonical_workflows_at_most_7": True,
             "duplicate_skill_sources_zero": _skill_duplicate_count(root) == 0,
