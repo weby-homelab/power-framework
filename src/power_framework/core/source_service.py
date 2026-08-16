@@ -238,10 +238,11 @@ def read_source(vault_dir: Path, request: SourceReadRequest) -> SourceReadRespon
 def get_source_stats(vault_dir: Path) -> SourceStatsResponse:
     """Compute aggregate vault statistics."""
     root = vault_dir.expanduser().resolve()
-    vault_id = "default"
-    with contextlib.suppress(Exception):
+    try:
         ident = ensure_vault_identity(root)
         vault_id = ident.vault_id
+    except Exception:
+        vault_id = "default"
 
     cat_counts: dict[str, int] = {}
     tag_counts: dict[str, int] = {}

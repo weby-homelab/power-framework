@@ -11,6 +11,7 @@ from power_framework.core.application_models import (
     SourceListRequest,
 )
 from power_framework.core.source_service import (
+    get_source_stats,
     normalize_rel_path,
     resolve_safe_vault_path,
 )
@@ -135,6 +136,19 @@ def test_source_stats(temp_vault: Path) -> None:
     assert env.data["total_notes"] == 2
     assert env.data["category_counts"]["01_Projects"] == 1
     assert env.data["category_counts"]["03_Resources"] == 1
+
+
+def test_source_stats_fallback_vault_id(monkeypatch: pytest.MonkeyPatch, temp_vault: Path) -> None:
+    """Test that get_source_stats falls back to 'default' if identity resolution fails."""
+    import power_framework.core.source_service as src_mod
+
+    def fail_identity(_root: Path) -> None:
+        raise OSError("Permission denied")
+
+    monkeypatch.setattr(src_mod, "ensure_vault_identity", fail_identity)
+    stats = get_source_stats(temp_vault)
+    assert stats.vault_id == "default"
+    assert stats.total_notes == 2
 
 
 def test_graph_projection(temp_vault: Path) -> None:
