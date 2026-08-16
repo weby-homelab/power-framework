@@ -26,7 +26,9 @@ class SourceItemDTO(BaseDTO):
     size_bytes: int = Field(default=0, ge=0)
     modified_at: str = Field(default="", description="ISO 8601 UTC timestamp")
     tags: list[str] = Field(default_factory=list)
-    trust_label: str = Field(default="local", description="Trust level: local, federated, untrusted")
+    trust_label: str = Field(
+        default="local", description="Trust level: local, federated, untrusted"
+    )
     sha256: str = Field(default="", description="Content hash digest")
 
 

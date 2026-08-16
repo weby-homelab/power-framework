@@ -238,10 +238,11 @@ def read_source(vault_dir: Path, request: SourceReadRequest) -> SourceReadRespon
 def get_source_stats(vault_dir: Path) -> SourceStatsResponse:
     """Compute aggregate vault statistics."""
     root = vault_dir.expanduser().resolve()
-    vault_id = "default"
-    with contextlib.suppress(Exception):
+    try:
         ident = ensure_vault_identity(root)
         vault_id = ident.vault_id
+    except Exception:
+        vault_id = "default"
 
     cat_counts: dict[str, int] = {}
     tag_counts: dict[str, int] = {}
@@ -353,7 +354,11 @@ def get_graph_projection(
             if norm in nodes_map and norm != source_path:
                 return norm
             candidate_md = f"{norm}.md"
-            if not norm.endswith(".md") and candidate_md in nodes_map and candidate_md != source_path:
+            if (
+                not norm.endswith(".md")
+                and candidate_md in nodes_map
+                and candidate_md != source_path
+            ):
                 return candidate_md
         # 4. Match by filename stem (case-insensitive)
         target_stem = Path(target_clean).stem.lower()

@@ -35,8 +35,25 @@ TERMINAL_STATES: set[TaskState] = {"completed", "failed", "canceled", "rejected"
 # Allowed transitions mapping: from_state -> set of allowed to_states
 VALID_TRANSITIONS: dict[TaskState, set[TaskState]] = {
     "backlog": {"ready", "submitted", "working", "canceled"},
-    "ready": {"backlog", "working", "input-required", "auth-required", "blocked", "canceled", "rejected"},
-    "submitted": {"backlog", "ready", "working", "input-required", "auth-required", "blocked", "canceled", "rejected"},
+    "ready": {
+        "backlog",
+        "working",
+        "input-required",
+        "auth-required",
+        "blocked",
+        "canceled",
+        "rejected",
+    },
+    "submitted": {
+        "backlog",
+        "ready",
+        "working",
+        "input-required",
+        "auth-required",
+        "blocked",
+        "canceled",
+        "rejected",
+    },
     "working": {
         "ready",
         "completed",
@@ -151,7 +168,7 @@ class TaskEvent(BaseModel):
         payload: dict[str, Any],
         prev_event_digest: str = "",
     ) -> TaskEvent:
-        event_id = f"evt_{task_id}_{sequence}_{int(datetime.now(UTC).timestamp()*1000)}"
+        event_id = f"evt_{task_id}_{sequence}_{int(datetime.now(UTC).timestamp() * 1000)}"
         payload_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
         payload_digest = hashlib.sha256(payload_bytes).hexdigest()
         return cls(

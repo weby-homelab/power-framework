@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import subprocess
 import sys
 import threading
@@ -87,6 +88,16 @@ def test_lock_is_released_after_failure(tmp_path: Path) -> None:
 
     with vault_mutation(vault):
         assert (vault / ".power" / "mutation.lock").exists()
+
+
+def test_mutation_lock_has_strict_permissions(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    with vault_mutation(vault):
+        lock_file = vault / ".power" / "mutation.lock"
+        assert lock_file.exists()
+        assert stat.S_IMODE(lock_file.stat().st_mode) == 0o600
 
 
 def test_os_lock_serializes_another_process(tmp_path: Path) -> None:

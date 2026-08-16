@@ -6,13 +6,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from power_framework.core import source_service
 from power_framework.core.application import ApplicationService
 from power_framework.core.application_models import (
     SourceListRequest,
-)
-from power_framework.core.source_service import (
-    normalize_rel_path,
-    resolve_safe_vault_path,
 )
 
 if TYPE_CHECKING:
@@ -67,18 +64,18 @@ Reference content.
 
 def test_path_normalization_and_containment(temp_vault: Path) -> None:
     """Ensure path normalization and traversal prevention work fail-closed."""
-    assert normalize_rel_path("01_Projects/Note.md") == "01_Projects/Note.md"
-    assert normalize_rel_path("/01_Projects/Note.md") == "01_Projects/Note.md"
-    assert normalize_rel_path("01_Projects\\Note.md") == "01_Projects/Note.md"
+    assert source_service.normalize_rel_path("01_Projects/Note.md") == "01_Projects/Note.md"
+    assert source_service.normalize_rel_path("/01_Projects/Note.md") == "01_Projects/Note.md"
+    assert source_service.normalize_rel_path("01_Projects\\Note.md") == "01_Projects/Note.md"
 
     with pytest.raises(PermissionError, match="Path traversal"):
-        normalize_rel_path("../secrets.env")
+        source_service.normalize_rel_path("../secrets.env")
 
     with pytest.raises(PermissionError, match="Path traversal"):
-        normalize_rel_path("01_Projects/../../etc/passwd")
+        source_service.normalize_rel_path("01_Projects/../../etc/passwd")
 
     with pytest.raises(PermissionError, match="Path traversal detected"):
-        resolve_safe_vault_path(temp_vault, "../outside.md")
+        source_service.resolve_safe_vault_path(temp_vault, "../outside.md")
 
 
 def test_source_list_and_pagination(temp_vault: Path) -> None:
@@ -135,6 +132,18 @@ def test_source_stats(temp_vault: Path) -> None:
     assert env.data["total_notes"] == 2
     assert env.data["category_counts"]["01_Projects"] == 1
     assert env.data["category_counts"]["03_Resources"] == 1
+
+
+def test_source_stats_fallback_vault_id(monkeypatch: pytest.MonkeyPatch, temp_vault: Path) -> None:
+    """Test that get_source_stats falls back to 'default' if identity resolution fails."""
+
+    def fail_identity(_root: Path) -> None:
+        raise OSError("Permission denied")
+
+    monkeypatch.setattr(source_service, "ensure_vault_identity", fail_identity)
+    stats = source_service.get_source_stats(temp_vault)
+    assert stats.vault_id == "default"
+    assert stats.total_notes == 2
 
 
 def test_graph_projection(temp_vault: Path) -> None:
