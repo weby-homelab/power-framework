@@ -155,4 +155,3 @@ def test_direct_backlog_to_working_transition(temp_vault: Path) -> None:
     t_backlog = service.transition_task("task_direct_working", "backlog", expected_revision=3)
     assert t_backlog.state == "backlog"
     assert t_backlog.revision == 4
-

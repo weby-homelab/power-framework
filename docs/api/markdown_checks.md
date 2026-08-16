@@ -19,7 +19,7 @@ Each check returns a list of issue dicts:
 
 ```python
 {
-    "line": 42,       # 1-indexed line number
+    "line": 42,  # 1-indexed line number
     "type": "trailing-whitespace",  # issue category
     "context": "...",  # truncated context snippet
 }

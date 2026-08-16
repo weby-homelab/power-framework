@@ -354,7 +354,11 @@ def get_graph_projection(
             if norm in nodes_map and norm != source_path:
                 return norm
             candidate_md = f"{norm}.md"
-            if not norm.endswith(".md") and candidate_md in nodes_map and candidate_md != source_path:
+            if (
+                not norm.endswith(".md")
+                and candidate_md in nodes_map
+                and candidate_md != source_path
+            ):
                 return candidate_md
         # 4. Match by filename stem (case-insensitive)
         target_stem = Path(target_clean).stem.lower()

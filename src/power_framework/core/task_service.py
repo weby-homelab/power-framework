@@ -221,7 +221,9 @@ class TaskService:
                     scope=data.get("scope", []),
                     authority=data.get("authority", "read-only"),
                     next_action=data.get("next_action", "inspect"),
-                    receipt_ids=[data.get("last_receipt_id")] if data.get("last_receipt_id") else [],
+                    receipt_ids=[data.get("last_receipt_id")]
+                    if data.get("last_receipt_id")
+                    else [],
                     revision=len(data.get("checkpoints", [])) + 1,
                     created_at=data.get("created_at", datetime.now(UTC).isoformat()),
                     updated_at=data.get("updated_at", datetime.now(UTC).isoformat()),
