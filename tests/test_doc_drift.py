@@ -85,7 +85,7 @@ def test_current_docs_match_executable_interfaces_and_safe_onboarding(
     documents = gate["_read_current_documents"]()
 
     assert facts["source"] == "power_framework.core.capabilities"
-    assert len(facts["interfaces"]["cli_commands"]) == 24
+    assert len(facts["interfaces"]["cli_commands"]) == 25
     assert len(facts["interfaces"]["mcp_tools"]) == 20
     assert gate["check_interfaces"](documents, facts) == []
     assert gate["check_onboarding"](documents, facts) == []
@@ -142,11 +142,11 @@ def test_interface_gate_rejects_stale_architecture_count() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
-    documents["Architecture"] = documents["Architecture"].replace("24 commands", "15 commands", 1)
+    documents["Architecture"] = documents["Architecture"].replace("25 commands", "15 commands", 1)
 
     errors = gate["check_interfaces"](documents, facts)
 
-    assert any("Architecture" in error and "24 CLI commands" in error for error in errors)
+    assert any("Architecture" in error and "25 CLI commands" in error for error in errors)
 
 
 def test_interface_gate_rejects_stale_readme_mcp_count() -> None:

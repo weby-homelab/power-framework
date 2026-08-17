@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 from power_framework.core.application import ApplicationService, RequestContext
 from power_framework.core.doctor import BOOTSTRAP_MAX_BYTES, run_doctor
 from power_framework.core.egress import EgressDeniedError, EgressOperation, require_remote_egress
-from power_framework.core.handoff import create_work_packet
 from power_framework.core.lifecycle import LifecycleAdapter
 
 if TYPE_CHECKING:
@@ -88,9 +87,10 @@ def run_fresh_agent_chaos(vault_dir: Path) -> ChaosReport:
             result = service.discover()
             capabilities = bootstrap.get("capabilities", {})
             version = capabilities.get("version") if isinstance(capabilities, dict) else None
+            discovered = result.data.get("capabilities", {})
+            discovered_version = discovered.get("version") if isinstance(discovered, dict) else None
             return (
-                result.data["capabilities"]["version"] == version
-                and bootstrap_size <= BOOTSTRAP_MAX_BYTES,
+                discovered_version == version and bootstrap_size <= BOOTSTRAP_MAX_BYTES,
                 True,
                 "bounded_discovery",
             )
@@ -157,12 +157,15 @@ def run_fresh_agent_chaos(vault_dir: Path) -> ChaosReport:
             )
 
         def handoff() -> tuple[bool, bool, str]:
-            create_work_packet(
-                work,
+            service.task(
+                action="create",
                 task_id="chaos-handoff",
-                objective="Continue bounded workflow",
-                owner="chaos",
-                actor="agent-a",
+                values={
+                    "objective": "Continue bounded workflow",
+                    "owner": "chaos",
+                    "state": "submitted",
+                },
+                context=RequestContext(actor="agent-a", authority="propose"),
             )
             result = LifecycleAdapter(service, client="claude").handle(
                 "stop", task_id="chaos-handoff"

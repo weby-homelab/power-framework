@@ -83,4 +83,9 @@ def compute_semantic_udcg(
     gt_path: Path | None = None,
 ) -> dict[str, float]:
     qrels = _load_semantic_gt(gt_path)
-    return compute_ndcg(qrels, run, k=k)
+    metrics = compute_ndcg(qrels, run, k=k)
+    ndcg_key = f"ndcg@{k}"
+    return {
+        ndcg_key: metrics[ndcg_key],
+        f"udcg@{k}": metrics[ndcg_key],
+    }

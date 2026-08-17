@@ -475,6 +475,7 @@ async def test_handoff_work_is_cross_agent_and_does_not_execute_next_action(
             task_id="mcp-handoff",
             actor="agent-b",
             idempotency_key="mcp-resume-1",
+            expected_revision=1,
             vault_path=str(sample_vault),
         )
     )
@@ -484,11 +485,45 @@ async def test_handoff_work_is_cross_agent_and_does_not_execute_next_action(
             task_id="mcp-handoff",
             actor="agent-b",
             idempotency_key="mcp-resume-1",
+            expected_revision=1,
             vault_path=str(sample_vault),
         )
     )
     assert resumed == replay
     assert resumed["state"] == "working"
+    completed = json.loads(
+        await handoff_work(
+            action="complete",
+            task_id="mcp-handoff",
+            actor="agent-b",
+            idempotency_key="mcp-complete-1",
+            expected_revision=2,
+            completion_postcondition="The project note exists and is readable.",
+            changed_artifacts=["01_Projects/TestProject.md"],
+            vault_path=str(sample_vault),
+        )
+    )
+    completion_replay = json.loads(
+        await handoff_work(
+            action="complete",
+            task_id="mcp-handoff",
+            actor="agent-b",
+            idempotency_key="mcp-complete-1",
+            expected_revision=2,
+            completion_postcondition="The project note exists and is readable.",
+            changed_artifacts=["01_Projects/TestProject.md"],
+            vault_path=str(sample_vault),
+        )
+    )
+    assert completed == completion_replay
+    assert completed["state"] == "completed"
+    assert completed["receipt_ids"][0].startswith("tcr_")
+    receipt_path = (
+        sample_vault / ".power" / "tasks" / "receipts" / f"{completed['receipt_ids'][0]}.json"
+    )
+    assert receipt_path.is_file()
+    assert (sample_vault / ".power" / "tasks" / "mcp-handoff.json").is_file()
+    assert not (sample_vault / ".power" / "work-packets").exists()
     assert not (sample_vault.parent / "outside-power-packet.md").exists()
 
 

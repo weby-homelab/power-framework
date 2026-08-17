@@ -8,7 +8,7 @@ src/power_framework/
 ├── py.typed            # PEP 561 marker
 ├── core/
 │   ├── __init__.py     # Stable core exports; optional exports are lazy
-│   ├── cli.py          # CLI entry point (argparse) — 24 commands
+│   ├── cli.py          # CLI entry point (argparse) — 25 commands
 │   ├── constants.py    # Centralized constants (exclusion lists, skip files, system dirs)
 │   ├── healer.py       # Frontmatter Healer
 │   ├── markdown_checks.py  # Markdown quality checks

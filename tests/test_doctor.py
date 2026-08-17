@@ -47,7 +47,7 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
     assert parsed["vault"]["index_state"] == "missing"
     assert parsed["issues"][0]["code"] == "search_index_missing"
     assert parsed["capabilities"] == capabilities.manifest()
-    assert len(parsed["capabilities"]["interfaces"]["cli_commands"]) == 24
+    assert len(parsed["capabilities"]["interfaces"]["cli_commands"]) == 25
     assert len(parsed["capabilities"]["interfaces"]["mcp_tools"]) == 20
     contracts = parsed["capabilities"]["interfaces"]["mcp_tool_contracts"]
     assert [contract["name"] for contract in contracts] == parsed["capabilities"]["interfaces"][

@@ -463,6 +463,7 @@ def evaluate(
 
     metrics = compute_semantic_udcg(run_ranked, k=5)
     nd = metrics["ndcg@5"]
+    udcg5 = metrics["udcg@5"]
 
     # Compute ranx metrics for secondary info (recall, mrr)
     ranx = _ensure_ranx()
@@ -487,18 +488,20 @@ def evaluate(
     rc = float(ranx_metrics["recall@5"])
     mr = float(ranx_metrics["mrr@5"])
 
-    passed = nd >= udcg_gate
+    passed = nd >= gate and udcg5 >= udcg_gate
 
     print(f"vault   : {vault}")
     print("gt_mode : semantic (curated, bilingual)")
     print(f"mode    : {mode}")
     print(f"queries : {len(eval_queries)} (with GT relevance)")
-    print(f"ndcg@5  : {nd:.4f}   (PRIMARY gate >= {udcg_gate:.2f})")
+    print(f"ndcg@5  : {nd:.4f}   (secondary gate >= {gate:.2f})")
+    print(f"udcg@5  : {udcg5:.4f}   (PRIMARY gate >= {udcg_gate:.2f})")
     print(f"recall@5: {rc:.4f}   (secondary)")
     print(f"mrr@5   : {mr:.4f}   (secondary)")
     print(f"gate    : -> {'PASS' if passed else 'FAIL'}")
     return {
         "ndcg@5": nd,
+        "udcg@5": udcg5,
         "recall@5": rc,
         "mrr@5": mr,
         "passed": passed,

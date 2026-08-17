@@ -6,9 +6,9 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.6.1` — runtime contract: **24 CLI commands** + **20 MCP tools** (FastMCP 3.x).
+`v3.6.2` — runtime contract: **25 CLI commands** + **20 MCP tools** (FastMCP 3.x).
 
-## CLI (24 команди)
+## CLI (25 команд)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
@@ -18,22 +18,23 @@ sync/doctor правила. Авторитетна правда — `power docto
 6. `power search <path> <query>` — пошук (`auto`: verified dense або FTS)
 7. `power cache list|prune [--no-dry-run] [--include-unknown]` — аудит і очищення cache namespace
 8. `power memory <sub> <path>` — керована транзакційна пам'ять
-9. `power handoff <create|list|show|resume|checkpoint|input-required|complete|fail|cancel>` — durable cross-agent work packet
-10. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
-11. `power rot <path> [--extended]` — ROT аудит (дублікати, застарілі, тривіальні)
-12. `power archive <path> [--dry-run|--no-dry-run]` — архівування застарілих нотаток
-13. `power status [<path>]` — панель стану vault
-14. `power cron <path>` — автоматичне обслуговування (lint + index + rot)
-15. `power heal <path>` — автовиправлення frontmatter
-16. `power markdown-check <path>` — перевірка якості Markdown
-17. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
-18. `power synthesize <path>` — підсумкова нотатка сесії
-19. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
-20. `power doctor [<path>] [--json]` — read-only діагностика runtime, ONNX provider, індексу та ledger виключених нотаток
-21. `power connect <path> [--client ...] [--config ...] [--apply --approved]` — hash-bound local MCP client plan/apply
-22. `power control-plane <path> [--apply]` — preview або materialize visible status view
-23. `power maintenance <path> [--apply]` — hash-bound preview/apply для reversible repairs
-24. `power migrate-state <path>` — content-free read-only state-plane inventory; apply is fail-closed
+9. `power handoff <create|list|show|resume|checkpoint|input-required|complete|fail|cancel>` — compatibility adapter для Task v2
+10. `power task <list|read|create|transition|events>` — canonical Task v2 lifecycle, filters, optimistic revision та event cursor
+11. `power sync <path> [--fts-only] [--accept-dense-loss] [--strict|--allow-partial]` — побудова індексу пошуку
+12. `power rot <path> [--extended]` — ROT аудит (дублікати, застарілі, тривіальні)
+13. `power archive <path> [--dry-run|--no-dry-run]` — архівування застарілих нотаток
+14. `power status [<path>]` — панель стану vault
+15. `power cron <path>` — автоматичне обслуговування (lint + index + rot)
+16. `power heal <path>` — автовиправлення frontmatter
+17. `power markdown-check <path>` — перевірка якості Markdown
+18. `power suggest-related <path>` — пропозиції зв'язків Graph RAG
+19. `power synthesize <path>` — підсумкова нотатка сесії
+20. `power rename <path> --old <old> --new <new>` — перейменування з оновленням зв'язків
+21. `power doctor [<path>] [--json]` — read-only діагностика runtime, ONNX provider, індексу та ledger виключених нотаток
+22. `power connect <path> [--client ...] [--config ...] [--apply --approved]` — hash-bound local MCP client plan/apply
+23. `power control-plane <path> [--apply]` — preview або materialize visible status view
+24. `power maintenance <path> [--apply]` — hash-bound preview/apply для reversible repairs
+25. `power migrate-state <path>` — content-free read-only state-plane inventory; apply is fail-closed
 
 ## MCP Tools (20) — FastMCP 3.x
 

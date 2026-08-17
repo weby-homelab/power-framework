@@ -39,10 +39,11 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
   move, so renaming onto an existing destination works on Windows instead of
   raising `FileExistsError`
 - **Strict 50% CPU Throttling Mandate** — hard concurrency bounds (`max_workers <= max(1, os.cpu_count() // 2)`) and automatic environment throttling (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) ensure P.O.W.E.R. never starves host resources
-- **P.O.W.E.R. 3.6.1 release** — publication requires a verified
+- **P.O.W.E.R. 3.6.2 release** — publication requires a verified
   wheel, source archive, SBOM, Linux upgrade matrix, and fresh release
-  receipts. Version 3.6.1 consolidates the strict 50% CPU throttling mandate, fail-closed doctor, migration, cache,
-  catalog, healer, and agent-contract safeguards. Platform support remains bounded by the
+  receipts. Version 3.6.2 adds canonical Task v2 and typed decision workflows,
+  fail-closed task persistence, Application envelope v2, and consensus-aware
+  reranked search. Platform support remains bounded by the
   [support matrix](docs/support-matrix.md).
 
 ## For AI Agents
@@ -55,7 +56,7 @@ the role-specific guides before touching a vault:
   executable acceptance gate, FTS, and MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.md)** — complete PowerShell
   installation, Visual C++ prerequisite, exact interpreter paths, and checks
-- **[CLI reference](docs/cli.md)** — all 24 commands, flags, and actual exit behavior
+- **[CLI reference](docs/cli.md)** — all 25 commands, flags, and actual exit behavior
 - **[MCP server](docs/mcp-server.md)** — all 20 governed tools, rate limits,
   configured-vault boundary, and untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.md)** — 6-phase, manifest/hash-driven
@@ -63,7 +64,7 @@ the role-specific guides before touching a vault:
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
 - **[Platform support matrix](docs/support-matrix.md)** — Linux is the
-  `v3.6.1` release platform; CI currently validates it on Ubuntu, while macOS
+  `v3.6.2` release platform; CI currently validates it on Ubuntu, while macOS
   and Windows are deferred indefinitely
 
 ## Quick Start (Linux)
@@ -72,9 +73,9 @@ The commands below are the shortest supported path for Linux. They
 assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
-> **`v3.6.1` release contract:** use the signed tag, wheel, source archive,
+> **`v3.6.2` release contract:** use the signed tag, wheel, source archive,
 > SBOM, and release receipt only after they appear on the
-> [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.1).
+> [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.2).
 > The URL below is the tag-bound install target, not evidence that publication
 > has already completed. The release
 > receipt covers the declared Linux release boundary; check the
@@ -82,7 +83,7 @@ you want POWER to manage.
 > claims about another host.
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.1/power_framework-3.6.1-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.2/power_framework-3.6.2-py3-none-any.whl
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -110,19 +111,19 @@ power --version
 
 ## Windows 11 25H2 installation (deferred)
 
-Windows 11 25H2 remains outside the `v3.6.0` supported-platform boundary. The
+Windows 11 25H2 remains outside the `v3.6.2` supported-platform boundary. The
 dedicated [Windows 11 25H2 guide](docs/windows-11-installation.md) describes a
 separate installation and host-validation path; it is not a Stable release
 platform certification.
 
 No Windows CI, upgrade-matrix, compatibility, performance, or GPU claim is
-made for `v3.6.0`. Windows and macOS have no scheduled release target.
+made for `v3.6.2`. Windows and macOS have no scheduled release target.
 
 ## What's Inside
 
 | Feature                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI**                          | 24 commands, including `power doctor` for read-only runtime/index diagnosis, `power connect` for conflict-safe local MCP setup, `power cache` for namespace hygiene, `power import` for preflighted Markdown migration, `power memory` for explicit proposal/approval, and `power handoff` for durable cross-agent work packets                                                                                                                                                                                                                                                                                                                            |
+| **CLI**                          | 25 commands, including `power doctor` for read-only runtime/index diagnosis, `power connect` for conflict-safe local MCP setup, `power cache` for namespace hygiene, `power import` for preflighted Markdown migration, `power memory` for explicit proposal/approval, `power handoff` for compatibility workflows, and `power task` for canonical Task v2 lifecycle management                                                                                                                                                                                                                                  |
 | **MCP Server**                   | 20 tools, including governed memory context, proposal, apply, validation, history, `handoff_work`, and search-index synchronization operations                                                                                                                                                                                                                                                                                                                                                    |
 | **OKF Validation**               | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                             |
 | **Knowledge Graph (Graph RAG)**  | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                                                                             |
@@ -144,7 +145,7 @@ made for `v3.6.0`. Windows and macOS have no scheduled release target.
 | **CI/CD**                        | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest.                                                                                                                                                                                                                                                                                                                  |
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
 
-> **POWER 3.6.0 evidence contract:** publication requires machine validation
+> **POWER 3.6.2 evidence contract:** publication requires machine validation
 > gates, package/CI provenance, an SBOM, a Linux upgrade matrix executed on the
 > Ubuntu CI runner, and source-bound technical receipts. Real-vault and human
 > evaluation are optional benchmarks, not release secrets or publication
@@ -158,7 +159,7 @@ made for `v3.6.0`. Windows and macOS have no scheduled release target.
 
 Read the historical v1.6.0 snapshot of the transition from flat to hierarchical
 indexing. Its measured vault counts, token estimates, source paths, test counts,
-and MCP inventory are historical evidence, not the current `v3.6.0` contract:
+and MCP inventory are historical evidence, not the current `v3.6.2` contract:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
@@ -276,13 +277,13 @@ The [MCP client onboarding guide](docs/mcp-client-onboarding.md) contains the
 canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
 OpenCode, plus the read-only golden task and approval workflow.
 
-The wheel URL below is the tag-bound `v3.6.1` install target. Run it only after
+The wheel URL below is the tag-bound `v3.6.2` install target. Run it only after
 the signed tag and assets exist on the
-[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.1)
+[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.2)
 with the source archive, SBOM, and release receipts.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.1/power_framework-3.6.1-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.2/power_framework-3.6.2-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -524,7 +525,7 @@ flowchart TD
 | `core/markdown_checks.py`                 | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                                                                           |
 | `core/constants.py`                       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
 | `core/utils.py`                           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                                                                                    |
-| `core/cli.py`                             | Command-line interface with 24 commands, including read-only doctor diagnostics, conflict-safe MCP connection plans, preflighted import, transactional memory, and durable handoff workflows                                                                                                                           |
+| `core/cli.py`                             | Command-line interface with 25 commands, including read-only doctor diagnostics, conflict-safe MCP connection plans, preflighted import, transactional memory, compatibility handoff workflows, and canonical Task v2 lifecycle management                                                                              |
 | `mcp/power_server.py`                     | FastMCP 3.x server with 20 async tools, loopback HTTP transport, and `/health`                                                                                                                                                     |
 
 All components share `power_framework.core` as the single source of truth.
@@ -554,6 +555,7 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
+- [P.O.W.E.R. 3.6.2 release notes](docs/release-3.6.2.md) — Canonical Task v2, typed decisions, fail-closed persistence, reranked search, and evidence boundaries.
 - [P.O.W.E.R. 3.6.1 release notes](docs/release-3.6.1.md) — Strict 50% CPU throttling mandate, Linux-first architecture, evidence, and upgrade guidance.
 - [P.O.W.E.R. 3.6.0 release notes](docs/release-3.6.0.md) — Linux-first architecture, evidence, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
@@ -599,10 +601,10 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux (v3.6.1 release boundary)",
+  "operatingSystem": "Linux (v3.6.2 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
-  "softwareVersion": "3.6.1",
+  "softwareVersion": "3.6.2",
   "license": "https://www.gnu.org/licenses/gpl-3.0",
   "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
   "author": {
@@ -631,8 +633,8 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux (v3.6.1 release boundary)
-softwareVersion: 3.6.1
+operatingSystem: Linux (v3.6.2 release boundary)
+softwareVersion: 3.6.2
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

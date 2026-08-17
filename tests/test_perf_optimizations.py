@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 from power_framework.core.coverage import get_index_coverage
 from power_framework.core.searcher import (
     RERANK_CANDIDATE_LIMIT,
+    RERANK_PRIOR_WEIGHT,
     DenseIndexUnavailableError,
     SearchResult,
     _hybrid_reranked_search,
@@ -138,6 +139,7 @@ class TestBoundedRerank:
 
     def test_rerank_limit_constant(self):
         assert RERANK_CANDIDATE_LIMIT == 20
+        assert RERANK_PRIOR_WEIGHT == 3
 
     def test_hybrid_reranked_uses_hermetic_reranker(self, indexed_vault, monkeypatch):
         from power_framework.core import searcher
@@ -199,6 +201,52 @@ class TestBoundedRerank:
         assert captured[0].startswith("Visible title\n\nbody-only phrase")
         assert "metadata-only phrase" not in captured[0]
         assert "status: active" not in captured[0]
+
+    def test_reranker_cannot_erase_three_source_candidate_consensus(self, tmp_path, monkeypatch):
+        from power_framework.core import searcher
+
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        for name in ("strong.md", "weak.md"):
+            (vault / name).write_text(f"# {name}\n\nbody\n", encoding="utf-8")
+
+        def result(path: str, score: float) -> SearchResult:
+            return SearchResult(
+                rel_path=path,
+                title=path,
+                description="",
+                note_type="Resource",
+                score=score,
+                snippet="body",
+                match_count=1,
+            )
+
+        monkeypatch.setattr(
+            searcher,
+            "_fts_search",
+            lambda *args, **kwargs: [result("strong.md", 1.0), result("weak.md", 0.5)],
+        )
+        monkeypatch.setattr(
+            searcher,
+            "_vector_search",
+            lambda *args, **kwargs: [result("strong.md", 1.0), result("weak.md", 0.5)],
+        )
+        monkeypatch.setattr(
+            searcher,
+            "_semantic_search",
+            lambda *args, **kwargs: [result("strong.md", 1.0), result("weak.md", 0.5)],
+        )
+
+        class ReversingReranker:
+            def rerank(self, query: str, documents: list[str]) -> list[float]:
+                del query, documents
+                return [0.0, 1.0]
+
+        monkeypatch.setattr(searcher, "_get_reranker", lambda: ReversingReranker())
+
+        results = _hybrid_reranked_search(vault, "query", max_results=2)
+
+        assert [item.rel_path for item in results] == ["strong.md", "weak.md"]
 
 
 class TestPragmaTuning:

@@ -186,7 +186,8 @@ class DecisionDTO(BaseDTO):
     """Approval or structured input gate linked to task/proposal."""
 
     decision_id: str
-    task_id: str | None = None
+    task_id: str
+    task_revision: int = Field(ge=1)
     proposal_id: str | None = None
     proposal_sha256: str | None = None
     title: str
@@ -195,11 +196,16 @@ class DecisionDTO(BaseDTO):
     status: Literal["pending", "approved", "rejected", "expired"] = "pending"
     requested_by: str = "agent"
     required_authority: Literal["propose", "apply"] = "apply"
+    allowed_actors: list[str] = Field(default_factory=lambda: ["*"])
+    response_schema: dict[str, Literal["string", "boolean", "number"]] = Field(default_factory=dict)
     created_at: str = ""
     expires_at: str | None = None
     resolved_at: str | None = None
     resolved_by: str | None = None
+    resolution_action: Literal["approve", "reject", "provide_input"] | None = None
     resolution_comment: str | None = None
+    resolution_input: dict[str, str | bool | int | float] | None = None
+    receipt_id: str | None = None
 
 
 class DecisionResolveRequest(BaseDTO):
@@ -208,6 +214,8 @@ class DecisionResolveRequest(BaseDTO):
     decision_id: str
     action: Literal["approve", "reject", "provide_input"]
     actor: str = "human"
+    authority: Literal["propose", "apply"] = "apply"
+    proposal_sha256: str | None = None
     comment: str | None = None
     input_data: dict[str, Any] | None = None
 

@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from power_framework.core.application import ApplicationService
-from power_framework.core.handoff import create_work_packet
+from power_framework.core.application import ApplicationService, RequestContext
 from power_framework.core.lifecycle import LifecycleAdapter, capability_matrix
 
 if TYPE_CHECKING:
@@ -54,21 +53,24 @@ def test_lifecycle_events_are_read_only_and_bounded(sample_vault: Path, event: s
 
 
 def test_pre_compact_proposal_requires_separate_approval(sample_vault: Path) -> None:
-    create_work_packet(
-        sample_vault,
+    service = ApplicationService(sample_vault)
+    service.task(
+        action="create",
         task_id="pending-task",
-        objective="Keep the current bounded task",
-        owner="test",
-        actor="test",
+        values={
+            "objective": "Keep the current bounded task",
+            "owner": "test",
+            "state": "working",
+        },
+        context=RequestContext(actor="test", authority="propose"),
     )
-    result = LifecycleAdapter(ApplicationService(sample_vault)).handle(
-        "pre-compact", task_id="pending-task"
-    )
+    result = LifecycleAdapter(service).handle("pre-compact", task_id="pending-task")
 
     proposal = result.data["checkpoint_proposal"]
     assert isinstance(proposal, dict)
     assert proposal["approval_required"] is True
     assert proposal["action"] == "checkpoint"
+    assert proposal["expected_revision"] == 1
 
 
 def test_unknown_client_is_explicitly_rejected(sample_vault: Path) -> None:
