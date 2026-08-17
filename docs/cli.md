@@ -1,12 +1,12 @@
 # CLI Reference
 
-This reference is aligned with the executable P.O.W.E.R. `v3.6.0` parser.
+This reference is aligned with the executable P.O.W.E.R. `v3.6.2` parser.
 
 ## Synopsis
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,import,search,cache,doctor,connect,memory,handoff,sync,rot,archive,status,control-plane,maintenance,migrate-state,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,cache,doctor,connect,memory,handoff,task,sync,rot,archive,status,control-plane,maintenance,migrate-state,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -186,10 +186,9 @@ process list.
 
 ### `handoff`
 
-Persist and advance one durable, content-free work packet for another agent.
-The packet is Markdown under `.power/work-packets/`, with immutable checkpoint
-copies. POWER records state and approval requirements but never executes the
-packet's `next_action`.
+Compatibility adapter for one durable, content-free Task v2 record. New clients
+should use `power task`; POWER records state and approval requirements but never
+executes the packet's `next_action`.
 
 ```text
 power handoff create PATH --task-id ID --objective TEXT --owner OWNER --actor ACTOR
@@ -213,6 +212,30 @@ The `maintenance` profile enforces `detect → dry-run → repair → verify →
 receipt`, and `repair` requires explicit approval. Packet fields contain
 metadata, paths, gate names, and receipt IDs only; retrieved note text remains
 untrusted data and is never an instruction channel.
+
+### `task`
+
+Manage the canonical Task v2 record and its append-only event stream. Mutation
+commands require an actor and idempotency key; transitions also require the
+current expected revision. Task fields are bounded command-line values; no
+arbitrary JSON payload is accepted through argv.
+
+```text
+power task list PATH [--state STATE] [--owner OWNER] [--assignee ASSIGNEE]
+                    [--limit N] [--offset N]
+power task read PATH --task-id ID
+power task create PATH --task-id ID --title TITLE --actor ACTOR
+                       --idempotency-key KEY [options]
+power task transition PATH --task-id ID --state STATE
+                           --expected-revision N --actor ACTOR
+                           --idempotency-key KEY [options]
+power task events PATH --task-id ID [--since-sequence N]
+```
+
+`list` returns a stable, updated-time-ordered page under the `items` field.
+`events` returns events after the supplied sequence, allowing cursor-style
+resume. Completing a task requires either an existing receipt ID or a verified
+postcondition plus one or more vault-relative artifact paths.
 
 ### `sync`
 

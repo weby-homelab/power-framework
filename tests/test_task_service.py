@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from power_framework.core.task_models import TaskEvent
 from power_framework.core.task_service import TaskService
+from power_framework.core.task_store import TaskStore
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,6 +44,84 @@ def test_task_creation_and_events(temp_vault: Path) -> None:
     assert events[0].payload_digest
 
 
+@pytest.mark.parametrize(
+    "task_id",
+    ["../escape", "nested/task", "nested\\task", ".hidden", "task id"],
+)
+def test_task_ids_reject_filesystem_metacharacters(temp_vault: Path, task_id: str) -> None:
+    """Task identifiers must never escape or introduce nested store paths."""
+    service = TaskService(temp_vault)
+
+    with pytest.raises(ValueError, match="task_id must be a safe token"):
+        service.create_task(task_id=task_id, title="Unsafe task")
+
+    assert not (temp_vault / ".power" / "escape.json").exists()
+
+
+def test_task_store_revalidates_ids_at_filesystem_boundary(temp_vault: Path) -> None:
+    """Direct store callers cannot bypass the domain model's task ID validation."""
+    store = TaskStore(temp_vault)
+
+    with pytest.raises(ValueError, match="task_id must be a safe token"):
+        store.get_task("../../outside")
+
+
+def test_malformed_task_event_journal_fails_closed(temp_vault: Path) -> None:
+    """Corrupt event records are errors, never silently discarded history."""
+    service = TaskService(temp_vault)
+    service.create_task(task_id="task_corrupt", title="Corrupt journal")
+    event_file = temp_vault / ".power" / "tasks" / "events" / "task_corrupt.jsonl"
+    event_file.write_text(event_file.read_text(encoding="utf-8") + "{not-json}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Malformed task event journal"):
+        service.get_events("task_corrupt")
+
+
+def test_malformed_task_snapshot_fails_closed(temp_vault: Path) -> None:
+    """A corrupt snapshot is not reported as an absent task."""
+    service = TaskService(temp_vault)
+    service.create_task(task_id="task_snapshot", title="Corrupt snapshot")
+    snapshot_file = temp_vault / ".power" / "tasks" / "task_snapshot.json"
+    snapshot_file.write_text("{not-json}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Malformed task snapshot"):
+        service.get_task("task_snapshot")
+
+
+def test_task_snapshot_rolls_back_when_event_append_fails(temp_vault: Path) -> None:
+    """Snapshot and journal remain unchanged when the second write fails."""
+    service = TaskService(temp_vault)
+    task = service.create_task(task_id="task_atomic", title="Atomic task")
+    snapshot_file = temp_vault / ".power" / "tasks" / "task_atomic.json"
+    event_file = temp_vault / ".power" / "tasks" / "events" / "task_atomic.jsonl"
+    before_snapshot = snapshot_file.read_bytes()
+    before_events = event_file.read_bytes()
+
+    store = service.store
+    original_append = store._append_event_unlocked
+
+    def fail_append(event: TaskEvent) -> None:
+        raise OSError("injected event append failure")
+
+    store._append_event_unlocked = fail_append  # type: ignore[method-assign]
+    try:
+        updated = task.model_copy(update={"revision": 2})
+        event = TaskEvent.create(
+            task_id="task_atomic",
+            sequence=2,
+            actor="test",
+            event_type="state_transition",
+            payload={"to_state": "ready"},
+        )
+        with pytest.raises(OSError, match="injected event append failure"):
+            store.save_task(updated, event=event)
+    finally:
+        store._append_event_unlocked = original_append  # type: ignore[method-assign]
+
+    assert snapshot_file.read_bytes() == before_snapshot
+    assert event_file.read_bytes() == before_events
+
+
 def test_task_state_transitions(temp_vault: Path) -> None:
     """Test standard progression: backlog -> ready -> working -> completed."""
     service = TaskService(temp_vault)
@@ -62,19 +142,54 @@ def test_task_state_transitions(temp_vault: Path) -> None:
     assert t_working.revision == 3
 
     # Transition to completed requires receipt_id
-    with pytest.raises(ValueError, match="requires a terminal receipt"):
+    with pytest.raises(ValueError, match="requires a verified postcondition"):
         service.transition_task("task_002", "completed", expected_revision=3)
 
+    artifact = temp_vault / "01_Projects" / "completion.md"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("verified result", encoding="utf-8")
     t_completed = service.transition_task(
-        "task_002", "completed", expected_revision=3, receipt_id="rec_12345"
+        "task_002",
+        "completed",
+        expected_revision=3,
+        completion_postcondition="The completion artifact exists and is readable.",
+        completion_artifact_refs=["01_Projects/completion.md"],
     )
     assert t_completed.state == "completed"
     assert t_completed.revision == 4
-    assert "rec_12345" in t_completed.receipt_ids
+    assert len(t_completed.receipt_ids) == 1
+    receipt = service.store.get_completion_receipt(t_completed.receipt_ids[0])
+    assert receipt is not None
+    assert receipt.task_id == "task_002"
+    assert receipt.task_revision == 4
+    assert receipt.artifact_digests["01_Projects/completion.md"]
 
     # Terminal state cannot be transitioned
     with pytest.raises(ValueError, match="Cannot transition terminal task"):
         service.transition_task("task_002", "working")
+
+
+def test_completion_rejects_fabricated_or_missing_artifacts(temp_vault: Path) -> None:
+    """A caller-provided token cannot stand in for durable completion evidence."""
+    service = TaskService(temp_vault)
+    service.create_task(task_id="task_receipt", title="Receipt binding", state="working")
+
+    with pytest.raises(ValueError, match="Completion receipt does not exist"):
+        service.transition_task(
+            "task_receipt",
+            "completed",
+            expected_revision=1,
+            receipt_id="tcr_" + "a" * 64,
+        )
+
+    with pytest.raises(FileNotFoundError):
+        service.transition_task(
+            "task_receipt",
+            "completed",
+            expected_revision=1,
+            completion_postcondition="Missing artifact should fail.",
+            completion_artifact_refs=["01_Projects/missing.md"],
+        )
 
 
 def test_optimistic_concurrency_conflict(temp_vault: Path) -> None:
@@ -88,6 +203,36 @@ def test_optimistic_concurrency_conflict(temp_vault: Path) -> None:
     # Attempt transition with stale expected_revision=1
     with pytest.raises(ValueError, match="Revision conflict"):
         service.transition_task("task_concurrency", "working", expected_revision=1)
+
+
+def test_task_transition_idempotency_replays_exact_result(temp_vault: Path) -> None:
+    """Duplicate transport delivery returns the original result without a new event."""
+    service = TaskService(temp_vault)
+    service.create_task(task_id="task_idempotent", title="Idempotent transition")
+
+    first = service.transition_task(
+        "task_idempotent",
+        "ready",
+        expected_revision=1,
+        idempotency_key="transition-ready-1",
+    )
+    replay = service.transition_task(
+        "task_idempotent",
+        "ready",
+        expected_revision=1,
+        idempotency_key="transition-ready-1",
+    )
+
+    assert replay == first
+    assert len(service.get_events("task_idempotent")) == 2
+
+    with pytest.raises(ValueError, match="reused for a different task command"):
+        service.transition_task(
+            "task_idempotent",
+            "working",
+            expected_revision=2,
+            idempotency_key="transition-ready-1",
+        )
 
 
 def test_event_hash_chaining(temp_vault: Path) -> None:

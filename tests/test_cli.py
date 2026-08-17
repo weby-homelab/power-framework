@@ -831,8 +831,28 @@ def test_handoff_cli_persists_and_resumes_packet(sample_vault, capsys) -> None:
             "cli-handoff",
             "--idempotency-key",
             "cli-resume-1",
+            "--expected-revision",
+            "1",
             "--actor",
             "agent-b",
+        ],
+        [
+            "power",
+            "handoff",
+            "complete",
+            str(sample_vault),
+            "--task-id",
+            "cli-handoff",
+            "--idempotency-key",
+            "cli-complete-1",
+            "--expected-revision",
+            "2",
+            "--actor",
+            "agent-b",
+            "--completion-postcondition",
+            "The project note exists and is readable.",
+            "--changed-artifacts",
+            "01_Projects/TestProject.md",
         ],
     ]
     for argv in commands:
@@ -841,9 +861,260 @@ def test_handoff_cli_persists_and_resumes_packet(sample_vault, capsys) -> None:
         assert exc.value.code == 0
 
     result = json.loads(capsys.readouterr().out.splitlines()[-1])
-    assert result["state"] == "working"
-    assert result["checkpoint"] == 1
-    assert (sample_vault / ".power" / "work-packets" / "cli-handoff.md").exists()
+    assert result["state"] == "completed"
+    assert result["revision"] == 3
+    assert result["receipt_ids"][0].startswith("tcr_")
+    assert (sample_vault / ".power" / "tasks" / "cli-handoff.json").exists()
+    receipt_path = (
+        sample_vault / ".power" / "tasks" / "receipts" / f"{result['receipt_ids'][0]}.json"
+    )
+    assert receipt_path.is_file()
+    assert not (sample_vault / ".power" / "work-packets").exists()
+
+
+def test_task_cli_create_list_read_transition_and_events(sample_vault, capsys) -> None:
+    def run_json(argv: list[str]) -> object:
+        with patch.object(sys, "argv", argv), pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code == 0
+        return json.loads(capsys.readouterr().out)
+
+    create_a = [
+        "power",
+        "task",
+        "create",
+        str(sample_vault),
+        "--task-id",
+        "cli-task-a",
+        "--title",
+        "First CLI task",
+        "--objective",
+        "Exercise the canonical task surface",
+        "--owner",
+        "cli-owner",
+        "--assignee",
+        "cli-agent",
+        "--kind",
+        "agent",
+        "--scope",
+        "src",
+        "tests",
+        "--actor",
+        "cli-agent",
+        "--idempotency-key",
+        "create-cli-task-a",
+    ]
+    created = run_json(create_a)
+    replayed = run_json(create_a)
+    assert isinstance(created, dict)
+    assert replayed == created
+    assert created["revision"] == 1
+
+    created_b = run_json(
+        [
+            "power",
+            "task",
+            "create",
+            str(sample_vault),
+            "--task-id",
+            "cli-task-b",
+            "--title",
+            "Second CLI task",
+            "--owner",
+            "cli-owner",
+            "--actor",
+            "cli-agent",
+            "--idempotency-key",
+            "create-cli-task-b",
+        ]
+    )
+    assert isinstance(created_b, dict)
+
+    first_page = run_json(
+        [
+            "power",
+            "task",
+            "list",
+            str(sample_vault),
+            "--state",
+            "backlog",
+            "--owner",
+            "cli-owner",
+            "--limit",
+            "1",
+        ]
+    )
+    second_page = run_json(
+        [
+            "power",
+            "task",
+            "list",
+            str(sample_vault),
+            "--state",
+            "backlog",
+            "--owner",
+            "cli-owner",
+            "--limit",
+            "1",
+            "--offset",
+            "1",
+        ]
+    )
+    assert isinstance(first_page, dict)
+    assert isinstance(second_page, dict)
+    page_ids = {
+        first_page["items"][0]["task_id"],
+        second_page["items"][0]["task_id"],
+    }
+    assert page_ids == {"cli-task-a", "cli-task-b"}
+
+    read = run_json(
+        [
+            "power",
+            "task",
+            "read",
+            str(sample_vault),
+            "--task-id",
+            "cli-task-a",
+        ]
+    )
+    assert isinstance(read, dict)
+    assert read["assignee"] == "cli-agent"
+    assert read["scope"] == ["src", "tests"]
+
+    transition = [
+        "power",
+        "task",
+        "transition",
+        str(sample_vault),
+        "--task-id",
+        "cli-task-a",
+        "--state",
+        "working",
+        "--expected-revision",
+        "1",
+        "--actor",
+        "cli-agent",
+        "--idempotency-key",
+        "start-cli-task-a",
+    ]
+    working = run_json(transition)
+    replayed_transition = run_json(transition)
+    assert replayed_transition == working
+    assert isinstance(working, dict)
+    assert working["state"] == "working"
+    assert working["revision"] == 2
+
+    events = run_json(
+        [
+            "power",
+            "task",
+            "events",
+            str(sample_vault),
+            "--task-id",
+            "cli-task-a",
+            "--since-sequence",
+            "1",
+        ]
+    )
+    assert isinstance(events, dict)
+    assert [event["sequence"] for event in events["items"]] == [2]
+
+    completed = run_json(
+        [
+            "power",
+            "task",
+            "transition",
+            str(sample_vault),
+            "--task-id",
+            "cli-task-a",
+            "--state",
+            "completed",
+            "--expected-revision",
+            "2",
+            "--actor",
+            "cli-agent",
+            "--idempotency-key",
+            "complete-cli-task-a",
+            "--completion-postcondition",
+            "The sample project note is present and readable.",
+            "--completion-artifacts",
+            "01_Projects/TestProject.md",
+        ]
+    )
+    assert isinstance(completed, dict)
+    assert completed["state"] == "completed"
+    assert completed["revision"] == 3
+    assert completed["receipt_ids"][0].startswith("tcr_")
+
+
+def test_task_cli_rejects_missing_guards_and_stale_inputs(sample_vault, capsys) -> None:
+    def run(argv: list[str]) -> int:
+        with patch.object(sys, "argv", argv), pytest.raises(SystemExit) as exc:
+            main()
+        capsys.readouterr()
+        return int(exc.value.code)
+
+    create_prefix = [
+        "power",
+        "task",
+        "create",
+        str(sample_vault),
+        "--task-id",
+        "guard-task",
+        "--title",
+        "Guard task",
+        "--actor",
+        "cli-agent",
+    ]
+    assert run(create_prefix) == 2
+    assert run([*create_prefix, "--idempotency-key", "create-guard-task"]) == 0
+
+    transition_prefix = [
+        "power",
+        "task",
+        "transition",
+        str(sample_vault),
+        "--task-id",
+        "guard-task",
+        "--state",
+        "working",
+        "--actor",
+        "cli-agent",
+        "--idempotency-key",
+        "start-guard-task",
+    ]
+    assert run(transition_prefix) == 2
+    assert run([*transition_prefix, "--expected-revision", "9"]) == 1
+    assert run(["power", "task", "list", str(sample_vault), "--limit", "0"]) == 2
+    assert (
+        run(
+            [
+                "power",
+                "task",
+                "events",
+                str(sample_vault),
+                "--task-id",
+                "guard-task",
+                "--since-sequence",
+                "-1",
+            ]
+        )
+        == 2
+    )
+    assert (
+        run(
+            [
+                "power",
+                "task",
+                "read",
+                str(sample_vault),
+                "--task-id",
+                "missing-task",
+            ]
+        )
+        == 1
+    )
 
 
 class TestFtsOnlyDenseGuard:

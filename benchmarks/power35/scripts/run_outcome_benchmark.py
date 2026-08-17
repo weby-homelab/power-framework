@@ -228,7 +228,7 @@ def _run_power(vault: Path, scenario: Scenario) -> Outcome:
     service.task(
         action="advance",
         task_id=task_id,
-        values={"action": "resume", "next_action": "retrieve"},
+        values={"action": "resume", "next_action": "retrieve", "expected_revision": 1},
         context=RequestContext(
             actor="synthetic-agent-b",
             authority="apply",
@@ -238,6 +238,7 @@ def _run_power(vault: Path, scenario: Scenario) -> Outcome:
     is_abstention_case = scenario.kind == "blocked" or scenario.premise == "false"
     advance_values: dict[str, object] = {
         "action": "input-required" if is_abstention_case else "complete",
+        "expected_revision": 2,
         "next_action": (
             "human-decision"
             if scenario.kind == "blocked"
@@ -258,7 +259,12 @@ def _run_power(vault: Path, scenario: Scenario) -> Outcome:
             }
         )
     else:
-        advance_values["receipt_id"] = f"{scenario.workflow_id}-receipt"
+        advance_values.update(
+            {
+                "completion_postcondition": "The expected evidence artifact remains readable.",
+                "completion_artifact_refs": [scenario.expected_path],
+            }
+        )
     advanced = service.task(
         action="advance",
         task_id=task_id,

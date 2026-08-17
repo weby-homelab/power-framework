@@ -53,18 +53,14 @@ from power_framework.core import (
     RequestContext,
     WritePolicy,
     __version__,
-    advance_work_packet,
     archive_stale_notes,
     build_frontmatter,
     commit_note_change,
-    create_work_packet,
     enforce_cpu_throttling_env,
     get_context,
     heal_vault,
-    list_work_packets,
     normalize_search_mode,
     read_file_content,
-    read_work_packet,
     resolve_path_in_vault,
     resolve_vault_path,
     run_blocking,
@@ -711,60 +707,88 @@ async def handoff_work(
     profile: Literal["standard", "maintenance"] = "standard",
     required_approval: str | None = None,
     idempotency_key: str | None = None,
+    expected_revision: int | None = None,
     approved: bool = False,
     blocker: str | None = None,
     receipt_id: str | None = None,
+    completion_postcondition: str | None = None,
     changed_artifacts: list[str] | None = None,
     open_gates: list[str] | None = None,
     phase: Literal["detect", "dry-run", "repair", "verify", "receipt"] | None = None,
     vault_path: str | None = None,
 ) -> str:
-    """Create/read/advance a content-free work packet; never execute its next action."""
+    """Create/read/advance a canonical Task v2; never execute its next action."""
     root = _get_vault_path(vault_path)
+    service = ApplicationService(root)
     try:
         if action == "create":
             if not task_id or objective is None or owner is None:
                 raise ToolError("create requires task_id, objective, and owner")
             result = await run_blocking(
-                lambda: create_work_packet(
-                    root,
-                    task_id=task_id,
-                    objective=objective,
-                    owner=owner,
-                    actor=actor,
-                    scope=scope,
-                    authority=authority,
-                    source_revision=source_revision,
-                    next_action=next_action or "inspect",
-                    profile=profile,
-                    required_approval=required_approval,
-                    idempotency_key=idempotency_key,
+                lambda: (
+                    service.task(
+                        action="create",
+                        task_id=task_id,
+                        values={
+                            "title": objective[:256],
+                            "objective": objective,
+                            "owner": owner,
+                            "scope": scope or [],
+                            "authority": authority,
+                            "source_revision": source_revision,
+                            "next_action": next_action or "inspect",
+                            "profile": profile,
+                            "state": "submitted",
+                            "required_input": (
+                                {"required_approval": required_approval}
+                                if required_approval
+                                else None
+                            ),
+                        },
+                        context=RequestContext(
+                            actor=actor,
+                            authority="propose",
+                            idempotency_key=idempotency_key,
+                        ),
+                    ).data
                 )
             )
         elif action == "list":
-            result = await run_blocking(lambda: {"packets": list_work_packets(root)})
+            result = await run_blocking(lambda: {"packets": service.task(action="list").data})
         elif action == "show":
             if not task_id:
                 raise ToolError("show requires task_id")
-            result = await run_blocking(lambda: read_work_packet(root, task_id))
+            result = await run_blocking(lambda: service.task(action="read", task_id=task_id).data)
         else:
-            if not task_id or not idempotency_key:
-                raise ToolError(f"{action} requires task_id and idempotency_key")
+            if not task_id or not idempotency_key or expected_revision is None:
+                raise ToolError(
+                    f"{action} requires task_id, idempotency_key, and expected_revision"
+                )
             result = await run_blocking(
-                lambda: advance_work_packet(
-                    root,
-                    task_id,
-                    action=action,
-                    idempotency_key=idempotency_key,
-                    actor=actor,
-                    approved=approved,
-                    next_action=next_action,
-                    blocker=blocker,
-                    required_approval=required_approval,
-                    receipt_id=receipt_id,
-                    changed_artifacts=changed_artifacts,
-                    open_gates=open_gates,
-                    phase=phase,
+                lambda: (
+                    service.task(
+                        action="advance",
+                        task_id=task_id,
+                        values={
+                            "action": action,
+                            "expected_revision": expected_revision,
+                            "approved": approved,
+                            "next_action": next_action,
+                            "blocker": blocker,
+                            "required_approval": required_approval,
+                            "receipt_id": receipt_id,
+                            "changed_artifacts": changed_artifacts,
+                            "open_gates": open_gates,
+                            "phase": phase,
+                            "completion_postcondition": completion_postcondition,
+                            "completion_artifact_refs": changed_artifacts,
+                        },
+                        context=RequestContext(
+                            actor=actor,
+                            authority="apply",
+                            idempotency_key=idempotency_key,
+                        ),
+                    ).data
                 )
             )
     except ToolError:

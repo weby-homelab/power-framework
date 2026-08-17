@@ -22,12 +22,7 @@ from .application_models import (
     SourceReadRequest,
 )
 from .capabilities import manifest
-from .handoff import (
-    advance_work_packet,
-    create_work_packet,
-    list_work_packets,
-    read_work_packet,
-)
+from .decision_service import DecisionService
 from .memory_api import apply_change, propose_change, read_history
 from .searcher import (
     DEFAULT_SEARCH_MODE,
@@ -100,7 +95,9 @@ class ApplicationEnvelope:
     status: Literal["ok", "unavailable"]
     data: dict[str, object]
     receipt: AuditReceipt
-    schema_version: str = "power.application.v1"
+    actual_capability: str
+    source_revision: str | None = None
+    schema_version: str = "power.application.v2"
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -109,6 +106,9 @@ class ApplicationEnvelope:
             "status": self.status,
             "data": self.data,
             "receipt": self.receipt.as_dict(),
+            "request_id": self.receipt.request_id,
+            "actual_capability": self.actual_capability,
+            "source_revision": self.source_revision,
         }
 
 
@@ -130,6 +130,7 @@ class ApplicationService:
         self._audit_hook = audit_hook
         self._search_fn = search_fn or search_vault
         self.task_service = task_service or TaskService(self.vault_dir)
+        self.decision_service = DecisionService(self.vault_dir, task_service=self.task_service)
 
     def discover(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
         """Return bounded capability metadata without probing optional runtimes."""
@@ -234,48 +235,120 @@ class ApplicationService:
         values: Mapping[str, Any] | None = None,
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
-        """Read or advance durable work packets without executing next_action."""
+        """Compatibility facade over the canonical TaskService v2 lifecycle."""
         request = context or RequestContext()
         values = dict(values or {})
 
         def execute() -> dict[str, object] | list[dict[str, object]]:
             if action == "list":
-                return list_work_packets(self.vault_dir)
+                return [task.model_dump() for task in self.task_service.list_tasks()]
             if not task_id:
                 raise ValueError("task_id is required for task read/create/advance")
             if action == "read":
-                return read_work_packet(self.vault_dir, task_id)
+                task = self.task_service.get_task(task_id)
+                if task is None:
+                    raise FileNotFoundError(f"Task {task_id} not found")
+                return task.model_dump()
             if action == "create":
                 if request.authority not in {"propose", "apply"}:
                     raise PermissionError("task creation requires propose authority")
-                packet_authority = str(values.get("authority", request.authority))
-                packet_profile = str(values.get("profile", "standard"))
-                if packet_authority not in {"read-only", "propose", "apply"}:
+                task_authority = str(values.get("authority", request.authority))
+                if task_authority not in {"read-only", "propose", "apply"}:
                     raise ValueError("unsupported task authority")
-                if packet_profile not in {"standard", "maintenance"}:
-                    raise ValueError("unsupported task profile")
-                return create_work_packet(
-                    self.vault_dir,
+                objective = str(values.get("objective", ""))
+                return self.task_service.create_task(
                     task_id=task_id,
-                    objective=str(values.get("objective", "")),
+                    title=str(values.get("title", objective or task_id))[:256],
+                    objective=objective,
                     owner=str(values.get("owner", request.actor)),
                     actor=request.actor,
                     scope=list(values.get("scope", [])),
-                    authority=cast("Literal['read-only', 'propose', 'apply']", packet_authority),
+                    authority=cast("Literal['read-only', 'propose', 'apply']", task_authority),
+                    state=cast("Any", values.get("state", "backlog")),
+                    source_revision=str(values.get("source_revision", "")),
                     next_action=str(values.get("next_action", "inspect")),
-                    profile=cast("Literal['standard', 'maintenance']", packet_profile),
+                    kind="maintenance" if values.get("profile") == "maintenance" else "human",
+                    required_input=cast("dict[str, Any] | None", values.get("required_input")),
                     idempotency_key=request.idempotency_key,
-                )
+                ).model_dump()
             if action == "advance":
                 if request.authority != "apply":
                     raise PermissionError("task advance requires apply authority")
-                return advance_work_packet(
-                    self.vault_dir,
+                legacy_action = values.pop("action", None)
+                legacy_state_map = {
+                    "resume": "working",
+                    "checkpoint": "working",
+                    "input-required": "input-required",
+                    "complete": "completed",
+                    "fail": "failed",
+                    "cancel": "canceled",
+                }
+                new_state = str(values.pop("new_state", legacy_state_map.get(legacy_action, "")))
+                if not new_state:
+                    raise ValueError("task advance requires new_state or a supported legacy action")
+                expected_revision = values.pop("expected_revision", None)
+                if expected_revision is None:
+                    raise ValueError("task advance requires expected_revision")
+
+                current = self.task_service.get_task(task_id)
+                if current is None:
+                    raise FileNotFoundError(f"Task {task_id} not found")
+                approved = bool(values.pop("approved", False))
+                blocker = values.pop("blocker", None)
+                required_approval = values.pop("required_approval", None)
+                changed_artifacts = values.pop("changed_artifacts", None)
+                phase = values.pop("phase", None)
+
+                if legacy_action == "resume" and current.state == "input-required" and not approved:
+                    raise PermissionError(
+                        "resume requires explicit approval for the requested input"
+                    )
+                if legacy_action == "checkpoint" and current.state != "working":
+                    raise RuntimeError("checkpoint requires a working task")
+                if legacy_action in {"input-required", "fail"} and (
+                    not isinstance(blocker, str) or not blocker.strip()
+                ):
+                    raise ValueError(f"{legacy_action} requires a blocker")
+                if legacy_action == "cancel" and not approved:
+                    raise PermissionError("cancel requires explicit approved=True")
+
+                if legacy_action == "input-required":
+                    values["required_input"] = {
+                        "blocker": blocker.strip(),
+                        "required_approval": required_approval or "caller",
+                    }
+                elif legacy_action == "fail":
+                    values["error_ref"] = blocker.strip()
+
+                model_updates: dict[str, Any] = {}
+                if changed_artifacts is not None:
+                    merged_artifacts = list(current.artifact_refs)
+                    for artifact in changed_artifacts:
+                        if artifact not in merged_artifacts:
+                            merged_artifacts.append(artifact)
+                    model_updates["artifact_refs"] = merged_artifacts
+                if phase is not None:
+                    external_refs = dict(current.external_refs)
+                    external_refs["maintenance_phase"] = str(phase)
+                    model_updates["external_refs"] = external_refs
+                if model_updates:
+                    values["values"] = model_updates
+                return self.task_service.transition_task(
                     task_id,
+                    new_state=cast("Any", new_state),
                     actor=request.actor,
-                    idempotency_key=request.idempotency_key or task_id,
+                    expected_revision=cast("int", expected_revision),
+                    receipt_id=cast("str | None", values.pop("receipt_id", None)),
+                    completion_postcondition=cast(
+                        "str | None", values.pop("completion_postcondition", None)
+                    ),
+                    completion_artifact_refs=cast(
+                        "list[str] | None",
+                        values.pop("completion_artifact_refs", changed_artifacts),
+                    ),
+                    idempotency_key=request.idempotency_key,
                     **values,
-                )
+                ).model_dump()
             raise ValueError(f"unsupported task action: {action}")
 
         return self._run("task", request, execute)
@@ -364,6 +437,114 @@ class ApplicationService:
             ).model_dump(),
         )
 
+    def decision_create(
+        self,
+        *,
+        decision_id: str,
+        task_id: str,
+        title: str,
+        requested_by: str | None = None,
+        task_revision: int | None = None,
+        proposal_id: str | None = None,
+        proposal_sha256: str | None = None,
+        description: str = "",
+        risk_level: str = "medium",
+        required_authority: str = "apply",
+        allowed_actors: list[str] | None = None,
+        response_schema: dict[str, str] | None = None,
+        expires_at: str | None = None,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Create a typed decision gate bound to one Task v2 revision."""
+        request = context or RequestContext(authority="propose")
+        if request.authority not in {"propose", "apply"}:
+            raise PermissionError("decision creation requires propose authority")
+        return self._run(
+            "decision.create",
+            request,
+            lambda: self.decision_service.create_decision(
+                decision_id=decision_id,
+                task_id=task_id,
+                title=title,
+                requested_by=requested_by or request.actor,
+                task_revision=task_revision,
+                proposal_id=proposal_id,
+                proposal_sha256=proposal_sha256,
+                description=description,
+                risk_level=risk_level,
+                required_authority=cast("Any", required_authority),
+                allowed_actors=allowed_actors,
+                response_schema=cast("Any", response_schema),
+                expires_at=expires_at,
+            ).model_dump(),
+        )
+
+    def decision_list(
+        self,
+        *,
+        status: str | None = None,
+        task_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """List bounded decision gates."""
+        return self._run(
+            "decision.list",
+            context,
+            lambda: [
+                decision.model_dump()
+                for decision in self.decision_service.list_decisions(
+                    status=status, task_id=task_id, limit=limit, offset=offset
+                )
+            ],
+        )
+
+    def decision_read(
+        self,
+        decision_id: str,
+        *,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Read one durable decision gate."""
+
+        def execute() -> dict[str, object]:
+            decision = self.decision_service.get_decision(decision_id)
+            if decision is None:
+                raise FileNotFoundError(f"Decision {decision_id} not found")
+            return decision.model_dump()
+
+        return self._run("decision.read", context, execute)
+
+    def decision_resolve(
+        self,
+        decision_id: str,
+        *,
+        action: str,
+        proposal_sha256: str | None = None,
+        input_data: dict[str, Any] | None = None,
+        comment: str | None = None,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Resolve a decision with actor/authority and binding checks."""
+        request = context or RequestContext(authority="apply")
+        if request.authority not in {"propose", "apply"}:
+            raise PermissionError("decision resolution requires proposal authority")
+
+        def execute() -> dict[str, object]:
+            decision, receipt = self.decision_service.resolve_decision(
+                decision_id,
+                action=cast("Any", action),
+                actor=request.actor,
+                authority=request.authority,
+                proposal_sha256=proposal_sha256,
+                input_data=input_data,
+                comment=comment,
+            )
+            return {"decision": decision.model_dump(), "receipt": receipt.model_dump()}
+
+        return self._run("decision.resolve", request, execute)
+
     def task_create(
         self,
         task_id: str,
@@ -395,6 +576,7 @@ class ApplicationService:
                 priority=priority,  # type: ignore[arg-type]
                 authority=authority,  # type: ignore[arg-type]
                 actor=request.actor,
+                idempotency_key=request.idempotency_key,
                 **kwargs,
             ).model_dump(),
         )
@@ -424,6 +606,7 @@ class ApplicationService:
                 expected_revision=expected_revision,
                 receipt_id=receipt_id,
                 next_action=next_action,
+                idempotency_key=request.idempotency_key,
                 **kwargs,
             ).model_dump(),
         )
@@ -518,8 +701,16 @@ class ApplicationService:
         )
         if self._audit_hook is not None:
             self._audit_hook(receipt)
+        actual_capability = str(serializable.get("actual_mode", operation))
+        raw_source_revision = serializable.get("source_revision")
+        source_revision = str(raw_source_revision) if raw_source_revision is not None else None
         return ApplicationEnvelope(
-            operation=operation, status=status, data=serializable, receipt=receipt
+            operation=operation,
+            status=status,
+            data=serializable,
+            receipt=receipt,
+            actual_capability=actual_capability,
+            source_revision=source_revision,
         )
 
 

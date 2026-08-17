@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from .task_models import PowerTask, TaskAuthority, TaskEvent, TaskKind, TaskPriority, TaskState
+from .task_models import (
+    PowerTask,
+    TaskAuthority,
+    TaskCompletionReceipt,
+    TaskEvent,
+    TaskKind,
+    TaskPriority,
+    TaskState,
+)
 from .task_store import TaskStore
 
 logger = logging.getLogger(__name__)
@@ -34,6 +44,7 @@ class TaskService:
         scope: list[str] | None = None,
         authority: TaskAuthority = "read-only",
         dependencies: list[str] | None = None,
+        source_revision: str = "",
         next_action: str = "inspect",
         open_gates: list[str] | None = None,
         required_input: dict[str, Any] | None = None,
@@ -42,11 +53,39 @@ class TaskService:
         external_refs: dict[str, str] | None = None,
         due_at: str | None = None,
         actor: str = "local",
+        idempotency_key: str | None = None,
     ) -> PowerTask:
         """Create a new durable PowerTask v2 with initial event."""
+        command_sha256 = _command_fingerprint(
+            "create",
+            {
+                "task_id": task_id,
+                "title": title,
+                "objective": objective,
+                "owner": owner,
+                "assignee": assignee,
+                "state": state,
+                "priority": priority,
+                "kind": kind,
+                "scope": scope or [],
+                "authority": authority,
+                "dependencies": dependencies or [],
+                "source_revision": source_revision,
+                "next_action": next_action,
+                "open_gates": open_gates or [],
+                "required_input": required_input,
+                "artifact_refs": artifact_refs or [],
+                "receipt_ids": receipt_ids or [],
+                "external_refs": external_refs or {},
+                "due_at": due_at,
+            },
+        )
         with self.store.lock():
             existing = self.store.get_task(task_id)
             if existing:
+                replay = self._find_idempotent_result(task_id, idempotency_key, command_sha256)
+                if replay is not None:
+                    return replay
                 raise ValueError(f"Task with ID {task_id} already exists")
 
             now_iso = datetime.now(UTC).isoformat()
@@ -64,6 +103,7 @@ class TaskService:
                 scope=scope or [],
                 authority=authority,
                 dependencies=dependencies or [],
+                source_revision=source_revision,
                 next_action=next_action,
                 open_gates=open_gates or [],
                 required_input=required_input,
@@ -81,7 +121,14 @@ class TaskService:
                 sequence=1,
                 actor=actor,
                 event_type="task_created",
-                payload={"initial_state": state, "title": title, "owner": owner},
+                payload={
+                    "initial_state": state,
+                    "title": title,
+                    "owner": owner,
+                    "idempotency_key": idempotency_key,
+                    "command_sha256": command_sha256,
+                    "result": task.model_dump(),
+                },
                 prev_event_digest="",
             )
 
@@ -96,6 +143,9 @@ class TaskService:
         actor: str = "local",
         expected_revision: int | None = None,
         receipt_id: str | None = None,
+        completion_postcondition: str | None = None,
+        completion_artifact_refs: list[str] | None = None,
+        idempotency_key: str | None = None,
         next_action: str | None = None,
         assignee: str | None = None,
         required_input: dict[str, Any] | None = None,
@@ -104,17 +154,59 @@ class TaskService:
         values: dict[str, Any] | None = None,
     ) -> PowerTask:
         """Advance task state machine with optimistic concurrency and invariant validation."""
+        command_sha256 = _command_fingerprint(
+            "transition",
+            {
+                "task_id": task_id,
+                "new_state": new_state,
+                "expected_revision": expected_revision,
+                "receipt_id": receipt_id,
+                "completion_postcondition": completion_postcondition,
+                "completion_artifact_refs": completion_artifact_refs,
+                "next_action": next_action,
+                "assignee": assignee,
+                "required_input": required_input,
+                "open_gates": open_gates,
+                "error_ref": error_ref,
+                "values": values,
+            },
+        )
         with self.store.lock():
             task = self.store.get_task(task_id)
             if not task:
                 raise FileNotFoundError(f"Task {task_id} not found")
+
+            replay = self._find_idempotent_result(task_id, idempotency_key, command_sha256)
+            if replay is not None:
+                return replay
 
             if expected_revision is not None and task.revision != expected_revision:
                 raise ValueError(
                     f"Revision conflict for task {task_id}: expected {expected_revision}, found {task.revision}"
                 )
 
-            # Validate state transition rules
+            completion_receipt = None
+            if new_state == "completed":
+                if expected_revision is None:
+                    raise ValueError("Completion requires expected_revision")
+                if receipt_id is not None:
+                    completion_receipt = self.store.get_completion_receipt(receipt_id)
+                    if completion_receipt is None:
+                        raise ValueError("Completion receipt does not exist")
+                    if (
+                        completion_receipt.task_id != task_id
+                        or completion_receipt.task_revision != task.revision + 1
+                    ):
+                        raise ValueError("Completion receipt is not bound to this task revision")
+                else:
+                    completion_receipt = self._build_completion_receipt(
+                        task,
+                        actor=actor,
+                        postcondition=completion_postcondition,
+                        artifact_refs=completion_artifact_refs,
+                    )
+                    receipt_id = completion_receipt.receipt_id
+
             task.validate_transition(new_state, receipt_id=receipt_id, actor=actor)
 
             prev_state = task.state
@@ -153,12 +245,90 @@ class TaskService:
                     "to_state": new_state,
                     "receipt_id": receipt_id,
                     "next_action": task.next_action,
+                    "idempotency_key": idempotency_key,
+                    "command_sha256": command_sha256,
+                    "result": task.model_dump(),
                 },
                 prev_event_digest=last_digest,
             )
 
-            self.store.save_task(task, event=event)
+            self.store.save_task(task, event=event, completion_receipt=completion_receipt)
             return task
+
+    def _find_idempotent_result(
+        self,
+        task_id: str,
+        idempotency_key: str | None,
+        command_sha256: str,
+    ) -> PowerTask | None:
+        if idempotency_key is None:
+            return None
+        for event in self.store.get_task_events(task_id):
+            if event.payload.get("idempotency_key") != idempotency_key:
+                continue
+            if event.payload.get("command_sha256") != command_sha256:
+                raise ValueError("Idempotency key was reused for a different task command")
+            result = event.payload.get("result")
+            if not isinstance(result, dict):
+                raise ValueError("Idempotent task event is missing its result snapshot")
+            return PowerTask.model_validate(result)
+        return None
+
+    def _build_completion_receipt(
+        self,
+        task: PowerTask,
+        *,
+        actor: str,
+        postcondition: str | None,
+        artifact_refs: list[str] | None,
+    ) -> TaskCompletionReceipt:
+        if not isinstance(postcondition, str) or not postcondition.strip():
+            raise ValueError("Completion requires a verified postcondition")
+        refs = artifact_refs if artifact_refs is not None else task.artifact_refs
+        if not refs:
+            raise ValueError("Completion requires at least one verifiable artifact")
+
+        artifact_digests: dict[str, str] = {}
+        for rel_path in refs:
+            if not isinstance(rel_path, str) or not rel_path.strip():
+                raise ValueError("Completion artifact references must be non-empty paths")
+            raw_path = Path(rel_path)
+            if (
+                raw_path.is_absolute()
+                or "\\" in rel_path
+                or any(part in {"", ".", ".."} for part in raw_path.parts)
+            ):
+                raise ValueError("Completion artifact path is invalid")
+            candidate = (self.vault_dir / raw_path).resolve(strict=True)
+            try:
+                canonical_rel = candidate.relative_to(self.vault_dir).as_posix()
+            except ValueError as exc:
+                raise ValueError("Completion artifact escapes the vault") from exc
+            if not candidate.is_file():
+                raise ValueError("Completion artifact must be an existing file")
+            artifact_digests[canonical_rel] = hashlib.sha256(candidate.read_bytes()).hexdigest()
+
+        postcondition_sha256 = hashlib.sha256(postcondition.strip().encode("utf-8")).hexdigest()
+        receipt_payload: dict[str, object] = {
+            "task_id": task.task_id,
+            "task_revision": task.revision + 1,
+            "completion_policy": task.completion_policy,
+            "postcondition_sha256": postcondition_sha256,
+            "artifact_digests": artifact_digests,
+            "actor": actor,
+        }
+        digest = hashlib.sha256(
+            json.dumps(receipt_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        return TaskCompletionReceipt(
+            receipt_id=f"tcr_{digest}",
+            task_id=task.task_id,
+            task_revision=task.revision + 1,
+            completion_policy=task.completion_policy,
+            postcondition_sha256=postcondition_sha256,
+            artifact_digests=artifact_digests,
+            actor=actor,
+        )
 
     def get_task(self, task_id: str) -> PowerTask | None:
         """Get a task by ID."""
@@ -246,3 +416,13 @@ class TaskService:
 
 
 __all__ = ["TaskService"]
+
+
+def _command_fingerprint(operation: str, payload: dict[str, Any]) -> str:
+    serialized = json.dumps(
+        {"operation": operation, "payload": payload},
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(serialized).hexdigest()

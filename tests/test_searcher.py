@@ -1089,6 +1089,44 @@ domains:
         assert len(results) == 1
         assert results[0].score == 0.2
 
+    def test_reranked_mode_scores_only_the_original_query(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from power_framework.core import searcher
+        from power_framework.core.query_expansion import QueryExpander
+
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        seen_queries: list[str] = []
+        result = SearchResult(
+            rel_path="result.md",
+            title="Result",
+            description="",
+            note_type="Resource",
+            score=1.0,
+            snippet="",
+            match_count=1,
+        )
+
+        monkeypatch.setattr(searcher, "validate_dense_index", lambda *_args: 1)
+        monkeypatch.setattr(
+            QueryExpander,
+            "expand",
+            lambda self, query: [query, "expanded synonym"],
+        )
+
+        def reranked_search(*args, **kwargs):
+            del kwargs
+            seen_queries.append(args[1])
+            return [result]
+
+        monkeypatch.setattr(searcher, "_hybrid_reranked_search", reranked_search)
+
+        results = search_vault(vault, "original query", mode="reranked")
+
+        assert seen_queries == ["original query"]
+        assert results == [result]
+
     def test_max_results(self, sample_vault: Path):
         results = search_vault(sample_vault, "test", max_results=1, mode="fts")
         assert len(results) <= 1

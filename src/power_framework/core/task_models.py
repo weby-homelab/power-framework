@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 TaskState = Literal[
     "backlog",
@@ -31,6 +32,16 @@ ExecutionState = Literal[
 ]
 
 TERMINAL_STATES: set[TaskState] = {"completed", "failed", "canceled", "rejected"}
+TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+TASK_COMPLETION_RECEIPT_PATTERN = re.compile(r"^tcr_[0-9a-f]{64}$")
+
+
+def ensure_valid_task_id(task_id: str) -> str:
+    """Reject task identifiers that cannot be used as a single safe filename stem."""
+    if not TASK_ID_PATTERN.fullmatch(task_id):
+        raise ValueError("task_id must be a safe token using letters, digits, '.', '_' or '-'")
+    return task_id
+
 
 # Allowed transitions mapping: from_state -> set of allowed to_states
 VALID_TRANSITIONS: dict[TaskState, set[TaskState]] = {
@@ -113,6 +124,11 @@ class PowerTask(BaseModel):
     due_at: str | None = None
     completion_policy: str = Field(default="standard", max_length=64)
 
+    @field_validator("task_id")
+    @classmethod
+    def validate_task_id(cls, value: str) -> str:
+        return ensure_valid_task_id(value)
+
     def is_terminal(self) -> bool:
         """Check if task is in a terminal state."""
         return self.state in TERMINAL_STATES
@@ -158,6 +174,11 @@ class TaskEvent(BaseModel):
     prev_event_digest: str = ""
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    @field_validator("task_id")
+    @classmethod
+    def validate_task_id(cls, value: str) -> str:
+        return ensure_valid_task_id(value)
+
     @classmethod
     def create(
         cls,
@@ -183,14 +204,54 @@ class TaskEvent(BaseModel):
         )
 
 
+class TaskCompletionReceipt(BaseModel):
+    """Content-free evidence binding a verified postcondition to one task revision."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    receipt_schema: Literal["power.task-completion.v1"] = "power.task-completion.v1"
+    receipt_id: str
+    task_id: str
+    task_revision: int = Field(ge=1)
+    completion_policy: str = Field(min_length=1, max_length=64)
+    postcondition_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    artifact_digests: dict[str, str] = Field(min_length=1, max_length=64)
+    actor: str = Field(min_length=1, max_length=200)
+    status: Literal["verified"] = "verified"
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    @field_validator("task_id")
+    @classmethod
+    def validate_task_id(cls, value: str) -> str:
+        return ensure_valid_task_id(value)
+
+    @field_validator("receipt_id")
+    @classmethod
+    def validate_receipt_id(cls, value: str) -> str:
+        if not TASK_COMPLETION_RECEIPT_PATTERN.fullmatch(value):
+            raise ValueError("receipt_id must be a canonical task completion receipt token")
+        return value
+
+    @field_validator("artifact_digests")
+    @classmethod
+    def validate_artifact_digests(cls, value: dict[str, str]) -> dict[str, str]:
+        if any(not re.fullmatch(r"[0-9a-f]{64}", digest) for digest in value.values()):
+            raise ValueError("artifact digests must be SHA-256 hex values")
+        return value
+
+
 __all__ = [
+    "TASK_COMPLETION_RECEIPT_PATTERN",
+    "TASK_ID_PATTERN",
     "TERMINAL_STATES",
     "VALID_TRANSITIONS",
     "ExecutionState",
     "PowerTask",
     "TaskAuthority",
+    "TaskCompletionReceipt",
     "TaskEvent",
     "TaskKind",
     "TaskPriority",
     "TaskState",
+    "ensure_valid_task_id",
 ]

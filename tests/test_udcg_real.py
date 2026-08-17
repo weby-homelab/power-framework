@@ -142,3 +142,4 @@ class TestComputeSemanticUdcg:
         result = compute_semantic_udcg(run, k=5)
         assert result["ndcg@5"] > 0.0
         assert result["ndcg@5"] <= 1.0
+        assert result["udcg@5"] == pytest.approx(result["ndcg@5"])

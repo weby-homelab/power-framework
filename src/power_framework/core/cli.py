@@ -48,12 +48,6 @@ from .domains import (
     render_domain_template,
     route_domain,
 )
-from .handoff import (
-    advance_work_packet,
-    create_work_packet,
-    list_work_packets,
-    read_work_packet,
-)
 from .healer import heal_vault_report
 from .ignore import should_skip
 from .importer import (
@@ -131,6 +125,22 @@ def _resolve_path(path_str: str) -> Path:
     if env_val:
         return Path(env_val).resolve()
     return Path.cwd().resolve()
+
+
+def _positive_int(value: str) -> int:
+    """Parse a strictly positive CLI integer."""
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("value must be at least 1")
+    return parsed
+
+
+def _non_negative_int(value: str) -> int:
+    """Parse a non-negative CLI integer."""
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be at least 0")
+    return parsed
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
@@ -962,44 +972,64 @@ def _cmd_memory(args: argparse.Namespace) -> int:
 
 
 def _cmd_handoff(args: argparse.Namespace) -> int:
-    """Create, inspect, or advance one durable cross-agent work packet."""
+    """Create, inspect, or advance one canonical Task v2 record."""
     vault_dir = _resolve_path(args.path)
+    service = ApplicationService(vault_dir)
     try:
         if args.handoff_command == "create":
-            result = create_work_packet(
-                vault_dir,
+            result = service.task(
+                action="create",
                 task_id=args.task_id,
-                objective=args.objective,
-                owner=args.owner,
-                actor=args.actor,
-                scope=args.scope,
-                authority=args.authority,
-                source_revision=args.source_revision,
-                next_action=args.next_action,
-                profile=args.profile,
-                required_approval=args.required_approval,
-                idempotency_key=args.idempotency_key,
-            )
+                values={
+                    "title": args.objective[:256],
+                    "objective": args.objective,
+                    "owner": args.owner,
+                    "scope": args.scope,
+                    "authority": args.authority,
+                    "source_revision": args.source_revision,
+                    "next_action": args.next_action,
+                    "profile": args.profile,
+                    "state": "submitted",
+                    "required_input": (
+                        {"required_approval": args.required_approval}
+                        if args.required_approval
+                        else None
+                    ),
+                },
+                context=RequestContext(
+                    actor=args.actor,
+                    authority="propose",
+                    idempotency_key=args.idempotency_key,
+                ),
+            ).data
         elif args.handoff_command == "show":
-            result = read_work_packet(vault_dir, args.task_id)
+            result = service.task(action="read", task_id=args.task_id).data
         elif args.handoff_command == "list":
-            result = {"packets": list_work_packets(vault_dir)}
+            result = {"packets": service.task(action="list").data}
         else:
-            result = advance_work_packet(
-                vault_dir,
-                args.task_id,
-                action=args.handoff_command,
-                idempotency_key=args.idempotency_key,
-                actor=args.actor,
-                approved=args.approved,
-                next_action=args.next_action,
-                blocker=args.blocker,
-                required_approval=args.required_approval,
-                receipt_id=args.receipt_id,
-                changed_artifacts=args.changed_artifacts,
-                open_gates=args.open_gates,
-                phase=args.phase,
-            )
+            result = service.task(
+                action="advance",
+                task_id=args.task_id,
+                values={
+                    "action": args.handoff_command,
+                    "expected_revision": args.expected_revision,
+                    "approved": args.approved,
+                    "next_action": args.next_action,
+                    "blocker": args.blocker,
+                    "required_approval": args.required_approval,
+                    "receipt_id": args.receipt_id,
+                    "changed_artifacts": args.changed_artifacts,
+                    "open_gates": args.open_gates,
+                    "phase": args.phase,
+                    "completion_postcondition": args.completion_postcondition,
+                    "completion_artifact_refs": args.changed_artifacts,
+                },
+                context=RequestContext(
+                    actor=args.actor,
+                    authority="apply",
+                    idempotency_key=args.idempotency_key,
+                ),
+            ).data
     except (
         FileExistsError,
         FileNotFoundError,
@@ -1009,6 +1039,81 @@ def _cmd_handoff(args: argparse.Namespace) -> int:
         OSError,
     ) as exc:
         logger.error("Handoff transaction failed: %s", exc)
+        return 1
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def _cmd_task(args: argparse.Namespace) -> int:
+    """Manage canonical Task v2 records through ApplicationService."""
+    vault_dir = _resolve_path(args.path)
+    service = ApplicationService(vault_dir)
+    try:
+        if args.task_command == "list":
+            result = service.task_list(
+                state=args.state,
+                owner=args.owner,
+                assignee=args.assignee,
+                limit=args.limit,
+                offset=args.offset,
+            ).data
+        elif args.task_command == "read":
+            result = service.task_read(args.task_id).data
+        elif args.task_command == "events":
+            result = service.task_events(
+                args.task_id,
+                since_sequence=args.since_sequence,
+            ).data
+        elif args.task_command == "create":
+            result = service.task_create(
+                args.task_id,
+                args.title,
+                objective=args.objective,
+                owner=args.owner,
+                assignee=args.assignee,
+                state=args.state,
+                priority=args.priority,
+                authority=args.authority,
+                kind=args.kind,
+                scope=args.scope,
+                dependencies=args.dependencies,
+                source_revision=args.source_revision,
+                next_action=args.next_action,
+                open_gates=args.open_gates,
+                due_at=args.due_at,
+                context=RequestContext(
+                    actor=args.actor,
+                    authority="propose",
+                    idempotency_key=args.idempotency_key,
+                ),
+            ).data
+        else:
+            result = service.task_transition(
+                args.task_id,
+                args.state,
+                expected_revision=args.expected_revision,
+                receipt_id=args.receipt_id,
+                next_action=args.next_action,
+                assignee=args.assignee,
+                open_gates=args.open_gates,
+                error_ref=args.error_ref,
+                completion_postcondition=args.completion_postcondition,
+                completion_artifact_refs=args.completion_artifacts,
+                context=RequestContext(
+                    actor=args.actor,
+                    authority="apply",
+                    idempotency_key=args.idempotency_key,
+                ),
+            ).data
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        logger.error("Task transaction failed: %s", exc)
         return 1
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0
@@ -1316,15 +1421,98 @@ def main() -> None:
         transition.add_argument("--task-id", required=True)
         transition.add_argument("--idempotency-key", required=True)
         transition.add_argument("--actor", required=True)
+        transition.add_argument("--expected-revision", required=True, type=int)
         transition.add_argument("--approved", action="store_true")
         transition.add_argument("--next-action", default=None)
         transition.add_argument("--blocker", default=None)
         transition.add_argument("--required-approval", default=None)
         transition.add_argument("--receipt-id", default=None)
+        transition.add_argument("--completion-postcondition", default=None)
         transition.add_argument("--changed-artifacts", nargs="*", default=None)
         transition.add_argument("--open-gates", nargs="*", default=None)
         transition.add_argument("--phase", default=None)
         transition.set_defaults(func=_cmd_handoff)
+
+    p_task = subparsers.add_parser("task", help="Manage canonical Task v2 records")
+    task_sub = p_task.add_subparsers(dest="task_command", required=True)
+    task_states = [
+        "backlog",
+        "ready",
+        "submitted",
+        "working",
+        "input-required",
+        "auth-required",
+        "blocked",
+        "completed",
+        "failed",
+        "canceled",
+        "rejected",
+    ]
+
+    p_task_list = task_sub.add_parser("list")
+    p_task_list.add_argument("path")
+    p_task_list.add_argument("--state", choices=task_states, default=None)
+    p_task_list.add_argument("--owner", default=None)
+    p_task_list.add_argument("--assignee", default=None)
+    p_task_list.add_argument("--limit", type=_positive_int, default=100)
+    p_task_list.add_argument("--offset", type=_non_negative_int, default=0)
+    p_task_list.set_defaults(func=_cmd_task)
+
+    p_task_read = task_sub.add_parser("read")
+    p_task_read.add_argument("path")
+    p_task_read.add_argument("--task-id", required=True)
+    p_task_read.set_defaults(func=_cmd_task)
+
+    p_task_create = task_sub.add_parser("create")
+    p_task_create.add_argument("path")
+    p_task_create.add_argument("--task-id", required=True)
+    p_task_create.add_argument("--title", required=True)
+    p_task_create.add_argument("--objective", default="")
+    p_task_create.add_argument("--owner", default="local")
+    p_task_create.add_argument("--assignee", default=None)
+    p_task_create.add_argument("--state", choices=task_states, default="backlog")
+    p_task_create.add_argument(
+        "--priority", choices=["low", "normal", "high", "critical"], default="normal"
+    )
+    p_task_create.add_argument(
+        "--authority", choices=["read-only", "propose", "apply"], default="read-only"
+    )
+    p_task_create.add_argument(
+        "--kind",
+        choices=["human", "agent", "maintenance", "fleet", "federated"],
+        default="human",
+    )
+    p_task_create.add_argument("--scope", nargs="*", default=[])
+    p_task_create.add_argument("--dependencies", nargs="*", default=[])
+    p_task_create.add_argument("--source-revision", default="")
+    p_task_create.add_argument("--next-action", default="inspect")
+    p_task_create.add_argument("--open-gates", nargs="*", default=[])
+    p_task_create.add_argument("--due-at", default=None)
+    p_task_create.add_argument("--actor", required=True)
+    p_task_create.add_argument("--idempotency-key", required=True)
+    p_task_create.set_defaults(func=_cmd_task)
+
+    p_task_transition = task_sub.add_parser("transition")
+    p_task_transition.add_argument("path")
+    p_task_transition.add_argument("--task-id", required=True)
+    p_task_transition.add_argument("--state", choices=task_states, required=True)
+    p_task_transition.add_argument("--expected-revision", type=_positive_int, required=True)
+    p_task_transition.add_argument("--actor", required=True)
+    p_task_transition.add_argument("--idempotency-key", required=True)
+    p_task_transition.add_argument("--receipt-id", default=None)
+    p_task_transition.add_argument("--next-action", default=None)
+    p_task_transition.add_argument("--assignee", default=None)
+    p_task_transition.add_argument("--open-gates", nargs="*", default=None)
+    p_task_transition.add_argument("--error-ref", default=None)
+    p_task_transition.add_argument("--completion-postcondition", default=None)
+    p_task_transition.add_argument("--completion-artifacts", nargs="*", default=None)
+    p_task_transition.set_defaults(func=_cmd_task)
+
+    p_task_events = task_sub.add_parser("events")
+    p_task_events.add_argument("path")
+    p_task_events.add_argument("--task-id", required=True)
+    p_task_events.add_argument("--since-sequence", type=_non_negative_int, default=0)
+    p_task_events.set_defaults(func=_cmd_task)
 
     p_sync = subparsers.add_parser(
         "sync", help="Build the search index for the vault (FTS + dense embeddings)"

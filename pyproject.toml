@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "3.6.1"
+version = "3.6.2"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -74,20 +74,22 @@ semantic = [
     "onnxruntime>=1.17.0",
     "tokenizers>=0.15.0",
     "huggingface-hub>=0.20.0",
-    "numpy>=1.24.0",
+    "numpy>=1.24.0,<2.5",
 ]
 rerank = [
     "onnxruntime>=1.17.0",
     "tokenizers>=0.15.0",
     "huggingface-hub>=0.20.0",
-    "numpy>=1.24.0",
+    "numpy>=1.24.0,<2.5",
     "fastembed>=0.5.0,<1.0.0",
 ]
 gpu = [
     "onnxruntime-gpu>=1.17.0",
     "tokenizers>=0.15.0",
     "huggingface-hub>=0.20.0",
-    "numpy>=1.24.0",
+    "numpy>=1.24.0,<2.5",
+    "nvidia-cuda-runtime>=13,<14; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "nvidia-cudnn-cu13>=9.24,<10; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 fleet = []
 bench = []

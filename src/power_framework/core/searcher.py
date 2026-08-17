@@ -182,6 +182,10 @@ DESCRIPTION_WEIGHT = 3.0
 CONTENT_WEIGHT = 1.0
 # Max candidates passed to the cross-encoder reranker (Performance Plan §4).
 RERANK_CANDIDATE_LIMIT = 20
+# The first-stage order represents agreement across FTS, TF-vector, and dense
+# retrieval. Preserve that three-signal prior when adding one cross-encoder
+# signal so a weak reranker cannot erase otherwise strong retrieval consensus.
+RERANK_PRIOR_WEIGHT = 3
 # Max characters of each candidate doc fed to the reranker (truncated excerpt).
 # Keeps cross-encoder token cost bounded on CPU (Performance Plan §4).
 RERANK_TEXT_CHARS = 800
@@ -1290,6 +1294,11 @@ def search_vault(
 
     expander = QueryExpander()
     variants = expander.expand(query)
+    if mode == "reranked":
+        # Cross-encoder scores are meaningful only for the user's original
+        # query. Reranking each synonym independently and then keeping the
+        # maximum lets an expanded variant silently replace the user's intent.
+        variants = [query]
 
     if mode == "hybrid":
         fts_all: list[SearchResult] = []
@@ -1510,15 +1519,17 @@ def _hybrid_reranked_search(
     with timing_span("reranker_scoring"):
         reranked_scores = reranker.rerank(query, documents)
 
-    for result, score in zip(rerank_pool, reranked_scores, strict=False):
-        result.score = score
-
-    # Keep non-reranked tail (beyond the pool) with their RRF score so results
-    # beyond the rerank limit still surface, just unsorted by the cross-encoder.
     reranked = rerank_pool[:]
+    for result, score in zip(reranked, reranked_scores, strict=False):
+        result.score = score
     reranked.sort(key=lambda r: -r.score)
-    tail = candidates[len(rerank_pool) :]
-    return (reranked + tail)[:max_results]
+
+    # The candidate order already fuses three independent retrieval signals.
+    # Treat the cross-encoder as one additional signal instead of allowing it
+    # to overwrite that consensus. The full candidate list also preserves the
+    # non-reranked tail without mixing incomparable score scales.
+    fused = _rrf_merge_many([candidates] * RERANK_PRIOR_WEIGHT + [reranked])
+    return fused[:max_results]
 
 
 def _graph_assisted_search(

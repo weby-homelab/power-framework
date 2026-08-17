@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from power_framework.core import source_service
-from power_framework.core.application import ApplicationService
+from power_framework.core.application import ApplicationService, RequestContext
 from power_framework.core.application_models import (
+    DecisionDTO,
     SourceListRequest,
 )
 
@@ -76,6 +77,16 @@ def test_path_normalization_and_containment(temp_vault: Path) -> None:
 
     with pytest.raises(PermissionError, match="Path traversal detected"):
         source_service.resolve_safe_vault_path(temp_vault, "../outside.md")
+
+
+def test_read_only_application_service_does_not_create_task_namespace(temp_vault: Path) -> None:
+    """Constructing and using read APIs must not materialize task storage."""
+    tasks_dir = temp_vault / ".power" / "tasks"
+    service = ApplicationService(temp_vault)
+
+    service.source_read("01_Projects/Project_Alpha.md")
+
+    assert not tasks_dir.exists()
 
 
 def test_source_list_and_pagination(temp_vault: Path) -> None:
@@ -156,3 +167,46 @@ def test_graph_projection(temp_vault: Path) -> None:
     edge = env.data["edges"][0]
     assert edge["source"] == "01_Projects/Project_Alpha.md"
     assert edge["target"] == "03_Resources/Resource_Beta.md"
+
+
+def test_decision_api_binds_authority_and_returns_durable_receipt(temp_vault: Path) -> None:
+    """Decision API v2 must preserve domain bindings across the application boundary."""
+    service = ApplicationService(temp_vault)
+    service.task_create(
+        "task_application_decision",
+        "Application decision",
+        state="working",
+        context=RequestContext(actor="agent-1", authority="propose"),
+    )
+    created = service.decision_create(
+        decision_id="dec_application",
+        task_id="task_application_decision",
+        title="Approve exact proposal",
+        proposal_id="proposal-application",
+        proposal_sha256="a" * 64,
+        allowed_actors=["operator-1"],
+        context=RequestContext(actor="agent-1", authority="propose"),
+    )
+    assert created.schema_version == "power.application.v2"
+    assert DecisionDTO.model_validate(created.data).status == "pending"
+
+    listed = service.decision_list(status="pending")
+    assert [item["decision_id"] for item in listed.data["items"]] == ["dec_application"]
+    assert service.decision_read("dec_application").data == created.data
+
+    with pytest.raises(PermissionError, match="insufficient authority"):
+        service.decision_resolve(
+            "dec_application",
+            action="approve",
+            proposal_sha256="a" * 64,
+            context=RequestContext(actor="operator-1", authority="propose"),
+        )
+
+    resolved = service.decision_resolve(
+        "dec_application",
+        action="approve",
+        proposal_sha256="a" * 64,
+        context=RequestContext(actor="operator-1", authority="apply"),
+    )
+    assert resolved.data["decision"]["status"] == "approved"
+    assert resolved.data["receipt"]["receipt_id"].startswith("dcr_")

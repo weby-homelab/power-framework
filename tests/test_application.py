@@ -20,8 +20,11 @@ def test_retrieve_envelope_is_bounded_and_content_free_receipt(sample_vault: Pat
     envelope = service.retrieve("Test", max_results=3, context=RequestContext(actor="test"))
     payload = envelope.as_dict()
 
-    assert payload["schema_version"] == "power.application.v1"
+    assert payload["schema_version"] == "power.application.v2"
     assert payload["operation"] == "retrieve"
+    assert payload["request_id"] == payload["receipt"]["request_id"]
+    assert payload["actual_capability"]
+    assert "source_revision" in payload
     assert payload["data"]["trust"] == "untrusted"
     assert payload["data"]["data_only"] is True
     assert payload["receipt"]["data_sha256"]
@@ -67,3 +70,26 @@ def test_apply_requires_authority_and_approval(sample_vault: Path) -> None:
         ApplicationService(sample_vault).apply(
             {}, approved=True, context=RequestContext(authority="propose")
         )
+
+
+def test_application_task_facade_uses_canonical_task_store(sample_vault: Path) -> None:
+    """The generic application task use case no longer creates legacy work packets."""
+    service = ApplicationService(sample_vault)
+    created = service.task(
+        action="create",
+        task_id="application-task",
+        values={"title": "Application task", "objective": "Canonical task truth"},
+        context=RequestContext(actor="test", authority="propose"),
+    )
+
+    transitioned = service.task(
+        action="advance",
+        task_id="application-task",
+        values={"new_state": "ready", "expected_revision": 1},
+        context=RequestContext(actor="test", authority="apply"),
+    )
+
+    assert created.data["revision"] == 1
+    assert transitioned.data["state"] == "ready"
+    assert (sample_vault / ".power" / "tasks" / "application-task.json").is_file()
+    assert not (sample_vault / ".power" / "work-packets").exists()

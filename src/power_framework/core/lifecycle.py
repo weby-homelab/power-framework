@@ -149,6 +149,7 @@ class LifecycleAdapter:
                     {
                         "task_id": task_id,
                         "action": "checkpoint",
+                        "expected_revision": application_result.data.get("revision"),
                         "approval_required": True,
                         "write_performed": False,
                     }
