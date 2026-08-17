@@ -7,6 +7,7 @@ import os
 import time
 from typing import Protocol
 
+from power_framework.core.utils import get_cpu_worker_limit
 from power_framework.experimental.embeddings import select_onnx_providers, verify_bound_provider
 
 logger = logging.getLogger(__name__)
@@ -222,7 +223,11 @@ class BGEM3Reranker:
 
             so = ort.SessionOptions()
             so.enable_cpu_mem_arena = False
-            so.intra_op_num_threads = max(1, int(os.getenv("POWER_EMBED_NUM_THREADS", "2")))
+            so.intra_op_num_threads = get_cpu_worker_limit(
+                int(os.getenv("POWER_EMBED_NUM_THREADS", "2"))
+                if os.getenv("POWER_EMBED_NUM_THREADS")
+                else None
+            )
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort, env_var="POWER_RERANKER_DEVICE")
             session = ort.InferenceSession(model_path, providers=providers, sess_options=so)

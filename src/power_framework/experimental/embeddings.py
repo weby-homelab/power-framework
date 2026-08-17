@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from power_framework.core.egress import EgressOperation, is_remote_endpoint, require_remote_egress
+from power_framework.core.utils import get_cpu_worker_limit
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,10 +41,11 @@ logger = logging.getLogger(__name__)
 # POWER_EMBED_PROVIDER for debugging only; none are the default anymore.
 EMBED_PROVIDER = os.getenv("POWER_EMBED_PROVIDER", "bge-m3").lower()
 
-# Number of threads used by the embedding engine. On small / low-core CPUs
-# (e.g. i5-5200U, 4 threads) leaving this unset lets ONNX/PyTorch saturate all
-# cores and starve the rest of the system. Default 2 keeps the box responsive.
-EMBED_NUM_THREADS = int(os.getenv("POWER_EMBED_NUM_THREADS", "2"))
+# Number of threads used by the embedding engine. Strict 50% CPU Throttling Mandate:
+# Never exceeds 50% of available CPU cores.
+EMBED_NUM_THREADS = get_cpu_worker_limit(
+    int(os.getenv("POWER_EMBED_NUM_THREADS", "2")) if os.getenv("POWER_EMBED_NUM_THREADS") else None
+)
 
 OLLAMA_EMBED_MODEL = os.getenv("POWER_OLLAMA_EMBED_MODEL", "qwen3-embedding:0.6b")
 
@@ -702,7 +704,7 @@ class BGEM3OnnxManager:
             so = ort.SessionOptions()
             # R2 arena taming: no persistent CPU mem arena; grow only on demand.
             so.enable_cpu_mem_arena = False
-            so.intra_op_num_threads = max(1, EMBED_NUM_THREADS)
+            so.intra_op_num_threads = max(1, min(EMBED_NUM_THREADS, get_cpu_worker_limit()))
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort)
             session = ort.InferenceSession(model_path, providers=providers, sess_options=so)

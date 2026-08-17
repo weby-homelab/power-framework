@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 
 from benchmarks.power35.scripts.run_continuity_benchmark import run_continuity_benchmark
+from power_framework.core import __version__
 
 
 def test_continuity_benchmark_uses_independent_processes() -> None:
     report = run_continuity_benchmark()
 
     assert report["schema_version"] == "power.phase8-continuity.v2"
-    assert report["release"] == "3.6.0"
+    assert report["release"] == __version__
     assert len(report["source"]["commit"]) == 40
     assert len(report["source"]["tree"]) == 40
     assert len(report["source"]["worktree_sha256"]) == 64

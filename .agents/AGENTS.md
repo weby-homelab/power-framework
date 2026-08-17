@@ -31,7 +31,7 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 - **Types**: Strict Pydantic v2 models for all API/data boundaries (`core/models.py`)
 - **Style**: Ruff (select E/F/W/I/N/UP/B/A/SIM/TCH/S/C4/DTZ/T20/PT/RUF/PERF/RET/LOG/FIX), line-length 100, 4-space indent, `snake_case`
 - **Validation**: `pydantic.Field` with `description` and governance fields (`owner`, `status`, `expiry`, `related`)
-- **Concurrency**: `ThreadPoolExecutor` (never raw threads)
+- **Concurrency**: `ThreadPoolExecutor` with strict 50% CPU cap: `max_workers = max(1, (os.cpu_count() or 4) // 2)` (never raw threads or unbounded pools)
 - **Commits**: GPG-signed (`git commit -S`), conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`)
 
 ## Architecture

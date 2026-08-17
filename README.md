@@ -38,9 +38,10 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Windows-safe rename** — `power rename` uses `os.replace()` for the physical
   move, so renaming onto an existing destination works on Windows instead of
   raising `FileExistsError`
-- **P.O.W.E.R. 3.6.0 release** — publication requires a verified
+- **Strict 50% CPU Throttling Mandate** — hard concurrency bounds (`max_workers <= max(1, os.cpu_count() // 2)`) and automatic environment throttling (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) ensure P.O.W.E.R. never starves host resources
+- **P.O.W.E.R. 3.6.1 release** — publication requires a verified
   wheel, source archive, SBOM, Linux upgrade matrix, and fresh release
-  receipts. Version 3.6.0 consolidates fail-closed doctor, migration, cache,
+  receipts. Version 3.6.1 consolidates the strict 50% CPU throttling mandate, fail-closed doctor, migration, cache,
   catalog, healer, and agent-contract safeguards. Platform support remains bounded by the
   [support matrix](docs/support-matrix.md).
 
@@ -62,7 +63,7 @@ the role-specific guides before touching a vault:
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
 - **[Platform support matrix](docs/support-matrix.md)** — Linux is the
-  `v3.6.0` release platform; CI currently validates it on Ubuntu, while macOS
+  `v3.6.1` release platform; CI currently validates it on Ubuntu, while macOS
   and Windows are deferred indefinitely
 
 ## Quick Start (Linux)
@@ -71,9 +72,9 @@ The commands below are the shortest supported path for Linux. They
 assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
-> **`v3.6.0` release contract:** use the signed tag, wheel, source archive,
+> **`v3.6.1` release contract:** use the signed tag, wheel, source archive,
 > SBOM, and release receipt only after they appear on the
-> [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.0).
+> [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.1).
 > The URL below is the tag-bound install target, not evidence that publication
 > has already completed. The release
 > receipt covers the declared Linux release boundary; check the
@@ -81,7 +82,7 @@ you want POWER to manage.
 > claims about another host.
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.1/power_framework-3.6.1-py3-none-any.whl
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -275,13 +276,13 @@ The [MCP client onboarding guide](docs/mcp-client-onboarding.md) contains the
 canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
 OpenCode, plus the read-only golden task and approval workflow.
 
-The wheel URL below is the tag-bound `v3.6.0` install target. Run it only after
+The wheel URL below is the tag-bound `v3.6.1` install target. Run it only after
 the signed tag and assets exist on the
-[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.0)
+[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.1)
 with the source archive, SBOM, and release receipts.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.1/power_framework-3.6.1-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -553,8 +554,8 @@ mypy src/power_framework/
 
 For current, reproducible release information and evidence:
 
-- [P.O.W.E.R. 3.6.0 release notes](docs/release-3.6.0.md) — Linux-first architecture, evidence, and upgrade guidance
-  scope, validation boundary, and upgrade guidance.
+- [P.O.W.E.R. 3.6.1 release notes](docs/release-3.6.1.md) — Strict 50% CPU throttling mandate, Linux-first architecture, evidence, and upgrade guidance.
+- [P.O.W.E.R. 3.6.0 release notes](docs/release-3.6.0.md) — Linux-first architecture, evidence, and upgrade guidance.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
   checksum-verified post-merge WS full-sync evidence; extended validation is
   explicitly tracked in issue #187.
@@ -562,18 +563,18 @@ For current, reproducible release information and evidence:
 
 ## Low-RAM Deployment (8–12 GB)
 
-`power sync` builds dense vector embeddings for the knowledge vault. Threading and batching limits are fully configurable; test them on target hardware before relying on RAM or latency guarantees. Key configuration knobs:
+`power sync` builds dense vector embeddings for the knowledge vault. Threading and batching limits are fully configurable and automatically capped to ≤ 50% CPU capacity; test them on target hardware before relying on RAM or latency guarantees. Key configuration knobs:
 
 ```bash
 export POWER_EMBED_PROVIDER=bge-m3           # Default provider (aapot/bge-m3-onnx)
-export POWER_EMBED_NUM_THREADS=2             # Cap CPU execution threads
+export POWER_EMBED_NUM_THREADS=2             # Cap CPU execution threads (max 50% CPU)
 export POWER_EMBED_BATCH_SIZE=8              # Batch size for embedding generation
 # export POWER_SYNC_VMEM_LIMIT_MB=6144       # Opt-in virtual-memory limit (RLIMIT_AS)
 ```
 
 The canonical default provider is **`bge-m3`** via direct ONNX Runtime + `tokenizers` (`BGEM3OnnxManager`), paired with the Apache-2.0 `onnx-community/bge-reranker-v2-m3-ONNX` reranker. Sync and dense search require validated model assets; if assets are missing or corrupted, retrieval fails closed. Run `power sync` to fetch or repair pinned model artifacts.
 
-> **⚠️ Resource note:** Adjust `POWER_EMBED_NUM_THREADS` and `POWER_EMBED_BATCH_SIZE` for host hardware constraints. Current releases enforce strict fail-closed contract checks; peak memory usage and latency remain hardware-dependent.
+> **⚠️ Resource note:** Adjust `POWER_EMBED_NUM_THREADS` and `POWER_EMBED_BATCH_SIZE` for host hardware constraints. Current releases enforce strict fail-closed contract checks and hard 50% CPU throttling; peak memory usage and latency remain hardware-dependent.
 
 ## License
 
@@ -598,10 +599,10 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux (v3.6.0 release boundary)",
+  "operatingSystem": "Linux (v3.6.1 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
-  "softwareVersion": "latest",
+  "softwareVersion": "3.6.1",
   "license": "https://www.gnu.org/licenses/gpl-3.0",
   "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
   "author": {
@@ -630,8 +631,8 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux (v3.6.0 release boundary)
-softwareVersion: 3.6.0
+operatingSystem: Linux (v3.6.1 release boundary)
+softwareVersion: 3.6.1
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

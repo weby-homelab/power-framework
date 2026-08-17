@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 from power_framework.core.egress import EgressDeniedError, EgressOperation, require_remote_egress
 from power_framework.core.ignore import should_skip
 from power_framework.core.parser import FRONTMATTER_PATTERN, parse_frontmatter, read_file_content
-from power_framework.core.utils import run_opencode_cli
+from power_framework.core.utils import get_cpu_worker_limit, run_opencode_cli
 from power_framework.experimental.embeddings import get_embedding_manager
 
 if TYPE_CHECKING:
@@ -427,13 +427,14 @@ class LinkRotChecker:
         if not to_check:
             return results
 
-        # Parallelize check using ThreadPoolExecutor (max 16 workers)
+        # Parallelize check using ThreadPoolExecutor (strict 50% CPU limit)
         def check_url(item: tuple[str, str]) -> tuple[str, str, int]:
             rel_path, url = item
             status = self._head_status(url)
             return rel_path, url, status
 
-        with ThreadPoolExecutor(max_workers=16) as executor:
+        cpu_limit = get_cpu_worker_limit()
+        with ThreadPoolExecutor(max_workers=cpu_limit) as executor:
             check_results = list(executor.map(check_url, to_check))
 
         for rel_path, url, status in check_results:
