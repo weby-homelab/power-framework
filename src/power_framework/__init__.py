@@ -37,10 +37,15 @@ from .core.utils import (
     RateLimiter,
     __version__,
     atomic_write,
+    enforce_cpu_throttling_env,
     get_cache_dir,
+    get_cpu_worker_limit,
     resolve_vault_path,
     validate_path_in_vault,
 )
+
+# Strict 50% CPU Throttling Mandate: Enforce thread pool limits across native libraries
+enforce_cpu_throttling_env()
 
 if TYPE_CHECKING:
     from .core.cli import main as cli_main
@@ -67,11 +72,13 @@ __all__ = [
     "build_frontmatter",
     "check_all",
     "cli_main",
+    "enforce_cpu_throttling_env",
     "fix_all",
     "format_relation_suggestions",
     "format_search_results",
     "generate_log_initial",
     "get_cache_dir",
+    "get_cpu_worker_limit",
     "heal_frontmatter",
     "heal_vault",
     "heal_vault_report",

@@ -38,9 +38,10 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Windows-safe rename** — `power rename` використовує `os.replace()` для
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
-- **Реліз P.O.W.E.R. 3.6.0** — публікація вимагає перевірені
+- **Суворий мандат 50% CPU Throttling** — жорсткі ліміти паралелізму (`max_workers <= max(1, os.cpu_count() // 2)`) та автоматичне обмеження змінних оточення (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) гарантують, що P.O.W.E.R. ніколи не перевантажує процесорні ресурси
+- **Реліз P.O.W.E.R. 3.6.1** — публікація вимагає перевірені
   wheel, source archive, SBOM, Linux upgrade matrix і fresh release receipts.
-  Версія 3.6.0 консолідує fail-closed doctor, migration, cache, catalog, healer та
+  Версія 3.6.1 консолідує суворий мандат обмеження CPU до 50%, fail-closed doctor, migration, cache, catalog, healer та
   agent-contract safeguards. Межі
   підтримки визначає [матриця платформ](docs/support-matrix.ua.md).
 
@@ -62,7 +63,7 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
 - **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — Linux є
-  release-платформою `v3.6.0`; CI зараз перевіряє її на Ubuntu, а macOS і
+  release-платформою `v3.6.1`; CI зараз перевіряє її на Ubuntu, а macOS і
   Windows відкладені на невизначений строк
 
 ## Швидкий старт (Linux)
@@ -71,16 +72,16 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 Потрібен Python 3.11+ і terminal shell; `~/my-vault` — каталог vault, яким
 керуватиме POWER.
 
-> **Контракт релізу `v3.6.0`:** використовуйте signed tag, wheel, source
+> **Контракт релізу `v3.6.1`:** використовуйте signed tag, wheel, source
 > archive, SBOM і release receipt лише після їх появи на
-> [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.0).
+> [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.1).
 > URL нижче є tag-bound install target, а не доказом уже завершеної публікації.
 > Release
 > receipt стосується заявленої Linux-межі; перед claims для іншого хоста
 > перевірте [матрицю платформ](docs/support-matrix.ua.md).
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.1/power_framework-3.6.1-py3-none-any.whl
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -270,13 +271,13 @@ power search ~/my-vault "experiment" --mode auto --domain research
 канонічні конфігурації для Claude Desktop/Code, Gemini CLI, Codex і OpenCode,
 а також read-only golden task та workflow схвалення.
 
-URL wheel нижче є tag-bound install target `v3.6.0`. Запускайте його лише
+URL wheel нижче є tag-bound install target `v3.6.1`. Запускайте його лише
 після появи signed tag та assets на
-[сторінці релізу](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.0)
+[сторінці релізу](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.1)
 разом із source archive, SBOM і release receipts.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.0/power_framework-3.6.0-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.1/power_framework-3.6.1-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -548,8 +549,8 @@ mypy src/power_framework/
 
 Для актуальної відтворюваної інформації про реліз і evidence:
 
-- [Нотатки релізу P.O.W.E.R. 3.6.0](docs/release-3.6.0.md) — Linux-first scope,
-  evidence та інструкції оновлення.
+- [Нотатки релізу P.O.W.E.R. 3.6.1](docs/release-3.6.1.md) — Суворий мандат 50% CPU throttling, Linux-first scope, evidence та інструкції оновлення.
+- [Нотатки релізу P.O.W.E.R. 3.6.0](docs/release-3.6.0.md) — Linux-first scope, evidence та інструкції оновлення.
 - [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) —
   canonical checksum-verified post-merge WS full-sync evidence; розширена
   валідація явно ведеться в issue #187.
@@ -557,18 +558,18 @@ mypy src/power_framework/
 
 ## Низько-RAM розгортання (8–12 GB)
 
-Команда `power sync` будує плотні (dense) векторні ембеддінги для всієї бази знань. Ліміти потоків та розмір батчу конфігуруються; валідуйте їх на цільовому апаратному забезпеченні перед використанням у продакшні. Ключові налаштування:
+Команда `power sync` будує плотні (dense) векторні ембеддінги для всієї бази знань. Ліміти потоків та розмір батчу конфігуруються та автоматично обмежуються до ≤ 50% CPU потужності; валідуйте їх на цільовому апаратному забезпеченні перед використанням у продакшні. Ключові налаштування:
 
 ```bash
 export POWER_EMBED_PROVIDER=bge-m3           # Провайдер за замовчуванням (aapot/bge-m3-onnx)
-export POWER_EMBED_NUM_THREADS=2             # Обмеження кількості потоків CPU
+export POWER_EMBED_NUM_THREADS=2             # Обмеження кількості потоків CPU (макс 50% CPU)
 export POWER_EMBED_BATCH_SIZE=8              # Розмір батчу для генерації ембеддінгів
 # export POWER_SYNC_VMEM_LIMIT_MB=6144       # Опціональний ліміт віртуальної пам'яті (RLIMIT_AS)
 ```
 
 Канонічним провайдером за замовчуванням є **`bge-m3`** через прямий ONNX Runtime + `tokenizers` (`BGEM3OnnxManager`), який працює в парі з реранкером Apache-2.0 `onnx-community/bge-reranker-v2-m3-ONNX`. Синхронізація та плотний пошук вимагають наявності сумісних моделей; якщо артефакти відсутні або пошкоджені, пошук працює за принципом fail-closed. Для завантаження та перевірки зафіксованих моделей виконайте `power sync`.
 
-> **⚠️ Примітка щодо ресурсів:** Налаштовуйте `POWER_EMBED_NUM_THREADS` та `POWER_EMBED_BATCH_SIZE` відповідно до можливостей хоста. Поточний реліз гарантує суворий контроль контракту fail-closed; пікове використання RAM та затримка залежать від цільового заліза.
+> **⚠️ Примітка щодо ресурсів:** Налаштовуйте `POWER_EMBED_NUM_THREADS` та `POWER_EMBED_BATCH_SIZE` відповідно до можливостей хоста. Поточний реліз гарантує суворий контроль контракту fail-closed та жорсткий 50% CPU throttling; пікове використання RAM та затримка залежать від цільового заліза.
 
 ## Ліцензія
 
@@ -593,10 +594,10 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux (v3.6.0 release boundary)",
+  "operatingSystem": "Linux (v3.6.1 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
-  "softwareVersion": "latest",
+  "softwareVersion": "3.6.1",
   "license": "https://www.gnu.org/licenses/gpl-3.0",
   "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
   "author": {
@@ -625,8 +626,8 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux (v3.6.0 release boundary)
-softwareVersion: 3.6.0
+operatingSystem: Linux (v3.6.1 release boundary)
+softwareVersion: 3.6.1
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

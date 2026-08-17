@@ -58,6 +58,7 @@ from power_framework.core import (
     build_frontmatter,
     commit_note_change,
     create_work_packet,
+    enforce_cpu_throttling_env,
     get_context,
     heal_vault,
     list_work_packets,
@@ -1053,6 +1054,7 @@ def run() -> None:
 
     Defaults to stdio. HTTP is available only on an explicit loopback address.
     """
+    enforce_cpu_throttling_env()
     transport = os.getenv("POWER_MCP_TRANSPORT", "stdio")
     if transport == "http":
         _require_configured_vault_root()

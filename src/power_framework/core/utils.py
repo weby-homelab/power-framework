@@ -444,12 +444,54 @@ def validate_path_in_vault(filepath: Path, vault_dir: Path) -> Path:
     return resolved_file
 
 
+def get_cpu_worker_limit(max_cap: int | None = None) -> int:
+    """Calculate strict CPU worker limit ensuring POWER never exceeds 50% CPU capacity.
+
+    Formula: max(1, (os.cpu_count() or 4) // 2)
+    If max_cap is provided, returns min(max_cap, cpu_limit).
+    """
+    cpu_count = os.cpu_count() or 4
+    limit = max(1, cpu_count // 2)
+    if max_cap is not None:
+        return max(1, min(max_cap, limit))
+    return limit
+
+
+def enforce_cpu_throttling_env() -> None:
+    """Strict 50% CPU Throttling Mandate.
+
+    Enforces environment variables for underlying native libraries (OpenMP, BLAS, MKL, ONNX, etc.)
+    so that thread pools never exceed 50% of available CPU cores.
+    """
+    cpu_limit_str = str(get_cpu_worker_limit())
+    env_vars = (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "POWER_EMBED_NUM_THREADS",
+    )
+    for var in env_vars:
+        val = os.getenv(var)
+        if val is None:
+            os.environ[var] = cpu_limit_str
+        else:
+            try:
+                parsed = int(val)
+                limit_int = int(cpu_limit_str)
+                if parsed > limit_int:
+                    os.environ[var] = cpu_limit_str
+            except ValueError:
+                os.environ[var] = cpu_limit_str
+
+
 try:
     from importlib.metadata import version as _get_version
 
     __version__ = _get_version("power-framework")
 except Exception:
-    __version__ = "3.6.0"
+    __version__ = "3.6.1"
 
 
 def run_opencode_cli(prompt: str) -> str:

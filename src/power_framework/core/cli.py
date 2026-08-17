@@ -87,7 +87,7 @@ from .searcher import (
 )
 from .state_migration import build_state_migration_plan
 from .synthesize import synthesize_session_ingest
-from .utils import __version__, atomic_write
+from .utils import __version__, atomic_write, enforce_cpu_throttling_env
 
 logger = logging.getLogger("power")
 
@@ -1016,6 +1016,7 @@ def _cmd_handoff(args: argparse.Namespace) -> int:
 
 def main() -> None:
     """P.O.W.E.R. CLI entry point."""
+    enforce_cpu_throttling_env()
     _configure_windows_utf8_streams()
     parser = argparse.ArgumentParser(
         prog="power",

@@ -5,6 +5,22 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-08-17
+
+### Added
+
+- **Strict 50% CPU Throttling Mandate & Concurrency Guard**:
+  - Implemented `get_cpu_worker_limit()` and `enforce_cpu_throttling_env()` in `power_framework.core.utils`.
+  - Enforced a hard upper bound of ≤ 50% CPU capacity: `max(1, (os.cpu_count() or 4) // 2)` across all worker pools, `ThreadPoolExecutor`, ONNX Runtime sessions (`intra_op_num_threads`), fastembed, and native threading libraries.
+  - Automatically enforce `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `VECLIB_MAXIMUM_THREADS`, `NUMEXPR_NUM_THREADS`, and `POWER_EMBED_NUM_THREADS` on package import, CLI invocation, and FastMCP server startup.
+  - Added comprehensive unit tests in `tests/test_cpu_throttling.py`.
+
+### Changed
+
+- Updated `LinkRotChecker` to strictly use `get_cpu_worker_limit()`.
+- Clamped ONNX session and embedding engine threads in `embeddings.py` and `reranker.py` to `get_cpu_worker_limit()`.
+- Updated release version across `pyproject.toml`, `models.lock.json`, `SKILL.md`, runtime contracts, and agent guides.
+
 ## [3.6.0] - 2026-08-13
 
 ### Changed

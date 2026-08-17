@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from power_framework.core import DEFAULT_SEARCH_MODE
+from power_framework.core import DEFAULT_SEARCH_MODE, __version__
 from power_framework.core.cli import _configure_windows_utf8_streams, main
 
 if TYPE_CHECKING:
@@ -698,7 +698,7 @@ def test_version_flag(capsys: pytest.CaptureFixture) -> None:
         main()
     assert exc.value.code == 0
     captured = capsys.readouterr()
-    assert "3.6.0" in captured.out
+    assert __version__ in captured.out
 
 
 def test_no_command_shows_help(capsys: pytest.CaptureFixture) -> None:
