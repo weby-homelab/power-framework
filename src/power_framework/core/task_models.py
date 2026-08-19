@@ -190,8 +190,7 @@ class TaskEvent(BaseModel):
         prev_event_digest: str = "",
     ) -> TaskEvent:
         event_id = f"evt_{task_id}_{sequence}_{int(datetime.now(UTC).timestamp() * 1000)}"
-        payload_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
-        payload_digest = hashlib.sha256(payload_bytes).hexdigest()
+        payload_digest = canonical_payload_digest(payload)
         return cls(
             event_id=event_id,
             task_id=task_id,
@@ -202,6 +201,12 @@ class TaskEvent(BaseModel):
             payload_digest=payload_digest,
             prev_event_digest=prev_event_digest,
         )
+
+
+def canonical_payload_digest(payload: dict[str, Any]) -> str:
+    """Return the digest used by the append-only event payload contract."""
+    payload_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(payload_bytes).hexdigest()
 
 
 class TaskCompletionReceipt(BaseModel):
@@ -253,5 +258,6 @@ __all__ = [
     "TaskKind",
     "TaskPriority",
     "TaskState",
+    "canonical_payload_digest",
     "ensure_valid_task_id",
 ]

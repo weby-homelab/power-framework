@@ -228,12 +228,36 @@ class TaskService:
                 task.error_ref = error_ref
 
             if values:
-                for k, v in values.items():
-                    if hasattr(task, k) and k not in {"task_id", "revision", "created_at"}:
-                        setattr(task, k, v)
+                mutable_fields = {
+                    "next_action",
+                    "assignee",
+                    "required_input",
+                    "open_gates",
+                    "error_ref",
+                    "artifact_refs",
+                    "external_refs",
+                    "max_attempts",
+                    "retry_at",
+                    "lease_owner",
+                    "lease_expires_at",
+                    "heartbeat_at",
+                    "execution_state",
+                    "dead_letter_reason",
+                    "due_at",
+                }
+                unknown_fields = set(values) - mutable_fields
+                if unknown_fields:
+                    raise ValueError(
+                        "Task update contains immutable or unknown fields: "
+                        + ", ".join(sorted(unknown_fields))
+                    )
+                for field_name, value in values.items():
+                    setattr(task, field_name, value)
+                task = PowerTask.model_validate(task.model_dump())
 
             last_digest = self.store.get_last_event_digest(task_id)
-            next_seq = task.revision
+            existing_events = self.store.get_task_events(task_id)
+            next_seq = existing_events[-1].sequence + 1 if existing_events else 1
 
             event = TaskEvent.create(
                 task_id=task_id,
@@ -404,7 +428,10 @@ class TaskService:
                     sequence=1,
                     actor="migration_v1",
                     event_type="migrated_from_v1",
-                    payload={"original_file": packet_file.name},
+                    payload={
+                        "original_file": packet_file.name,
+                        "checkpoint_count": len(data.get("checkpoints", [])),
+                    },
                 )
                 self.store.save_task(task, event=ev)
                 migrated += 1

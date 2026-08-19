@@ -304,6 +304,25 @@ def apply_change(
     )
 
 
+def apply_change_by_id(
+    vault_dir: Path,
+    proposal_id: str,
+    approved: bool,
+    idempotency_key: str | None = None,
+) -> dict[str, str]:
+    """Apply one durable proposal without exposing its payload to transports."""
+    if not isinstance(proposal_id, str) or not _is_sha256(proposal_id):
+        raise ValueError("proposal_id must be a SHA-256 hex digest")
+    stored = _read_proposal_file(_proposal_path(vault_dir, proposal_id))
+    payload = _public_proposal(stored)
+    return apply_change(
+        vault_dir,
+        payload,
+        approved=approved,
+        idempotency_key=idempotency_key,
+    )
+
+
 def _is_sha256(value: str) -> bool:
     """Return whether a value is a lowercase SHA-256 hex digest."""
     return len(value) == 64 and all(character in "0123456789abcdef" for character in value)

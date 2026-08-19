@@ -189,6 +189,13 @@ def test_expired_decision_fails_closed(decision_service: DecisionService) -> Non
         encoding="utf-8",
     )
 
+    effective = decision_service.get_decision(decision.decision_id)
+    assert effective is not None
+    assert effective.status == "expired"
+    assert effective.receipt_id is None
+    assert decision_service.list_decisions(status="expired")[0].decision_id == decision.decision_id
+    assert decision_service.list_decisions(status="pending") == []
+
     with pytest.raises(ValueError, match="expired"):
         decision_service.resolve_decision(
             decision.decision_id,

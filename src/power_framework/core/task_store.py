@@ -7,7 +7,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
-from .task_models import PowerTask, TaskCompletionReceipt, TaskEvent, ensure_valid_task_id
+from .task_models import (
+    PowerTask,
+    TaskCompletionReceipt,
+    TaskEvent,
+    canonical_payload_digest,
+    ensure_valid_task_id,
+)
 from .utils import atomic_write
 
 try:
@@ -250,6 +256,7 @@ class TaskStore:
         events: list[TaskEvent] = []
         with open(ev_file, encoding="utf-8") as f:
             expected_sequence = 1
+            previous_digest = ""
             for line_number, line in enumerate(f, start=1):
                 if not line.strip():
                     continue
@@ -264,6 +271,12 @@ class TaskStore:
                     raise ValueError("Task event task ID does not match its journal")
                 if ev.sequence != expected_sequence:
                     raise ValueError("Task event journal sequence is not monotonic")
+                expected_previous = previous_digest
+                if ev.prev_event_digest != expected_previous:
+                    raise ValueError("Task event journal hash chain is invalid")
+                if ev.payload_digest != canonical_payload_digest(ev.payload):
+                    raise ValueError("Task event payload digest is invalid")
+                previous_digest = ev.payload_digest
                 expected_sequence += 1
                 if ev.sequence > since_sequence:
                     events.append(ev)

@@ -1,8 +1,8 @@
 # Historical: install P.O.W.E.R. 3.5.0 on Windows 11 25H2
 
-> **Not a `v3.6.2` procedure.** Windows support is deferred indefinitely and
+> **Not a `v3.6.3` procedure.** Windows support is deferred indefinitely and
 > has no scheduled release target. The commands below preserve the historical
-> `v3.5.0` host-validation procedure and must not be presented as 3.6.2
+> `v3.5.0` host-validation procedure and must not be presented as 3.6.3
 > compatibility or release certification.
 
 This guide installs P.O.W.E.R. `v3.5.0` in an isolated virtual environment,

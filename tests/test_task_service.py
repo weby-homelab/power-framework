@@ -249,6 +249,78 @@ def test_event_hash_chaining(temp_vault: Path) -> None:
     assert events[2].prev_event_digest == events[1].payload_digest
 
 
+@pytest.mark.parametrize("tamper", ["payload", "payload_digest", "prev_event_digest"])
+def test_event_hash_chain_rejects_tampering(temp_vault: Path, tamper: str) -> None:
+    """Payload and link changes fail closed when the journal is read."""
+    service = TaskService(temp_vault)
+    service.create_task(task_id="task_tamper", title="Tamper check")
+    service.transition_task("task_tamper", "ready")
+    event_file = temp_vault / ".power" / "tasks" / "events" / "task_tamper.jsonl"
+    records = [json.loads(line) for line in event_file.read_text(encoding="utf-8").splitlines()]
+    if tamper == "payload":
+        records[1]["payload"]["to_state"] = "working"
+    elif tamper == "payload_digest":
+        records[1]["payload_digest"] = "0" * 64
+    else:
+        records[1]["prev_event_digest"] = "0" * 64
+    event_file.write_text(
+        "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match=r"hash|digest"):
+        service.get_events("task_tamper")
+
+
+def test_migrated_task_uses_event_cursor_not_revision(temp_vault: Path) -> None:
+    """Migration revision and the subsequent journal sequence remain independent."""
+    v1_dir = temp_vault / ".power" / "work-packets"
+    v1_dir.mkdir(parents=True)
+    packet = {
+        "task_id": "wp_cursor",
+        "state": "working",
+        "checkpoints": ["cp1", "cp2", "cp3"],
+    }
+    (v1_dir / "wp_cursor.json").write_text(json.dumps(packet), encoding="utf-8")
+    service = TaskService(temp_vault)
+
+    assert service.migrate_v1_work_packets()["migrated"] == 1
+    migrated = service.get_task("wp_cursor")
+    assert migrated is not None
+    assert migrated.revision == 4
+    service.transition_task("wp_cursor", "ready", expected_revision=4)
+    service.transition_task("wp_cursor", "working", expected_revision=5)
+    assert [event.sequence for event in service.get_events("wp_cursor")] == [1, 2, 3]
+    assert service.migrate_v1_work_packets()["skipped"] == 1
+
+
+@pytest.mark.parametrize("field", ["task_id", "revision", "state", "authority", "attempt"])
+def test_task_values_cannot_mutate_invariants(temp_vault: Path, field: str) -> None:
+    """Generic compatibility updates cannot bypass task identity or state rules."""
+    service = TaskService(temp_vault)
+    task = service.create_task(task_id="task_values", title="Bounded update")
+    with pytest.raises(ValueError, match="immutable or unknown"):
+        service.transition_task(
+            "task_values",
+            "ready",
+            expected_revision=task.revision,
+            values={field: "working" if field == "state" else 99},
+        )
+    unchanged = service.get_task("task_values")
+    assert unchanged is not None
+    assert unchanged.revision == task.revision
+    assert unchanged.state == task.state
+
+
+def test_task_values_are_revalidated_before_persistence(temp_vault: Path) -> None:
+    """Whitelisted compatibility fields still pass complete model validation."""
+    service = TaskService(temp_vault)
+    service.create_task(task_id="task_bounds", title="Bounded update")
+    with pytest.raises(ValueError, match="less than or equal to 10"):
+        service.transition_task(
+            "task_bounds", "ready", expected_revision=1, values={"max_attempts": 11}
+        )
+
+
 def test_v1_work_packet_migration(temp_vault: Path) -> None:
     """Test migrating v1 JSON work packets into PowerTask v2."""
     v1_dir = temp_vault / ".power" / "work-packets"

@@ -58,6 +58,32 @@ def test_propose_apply_share_idempotent_application_contract(sample_vault: Path)
     assert replay.data == receipt.data
 
 
+def test_apply_proposal_by_id_uses_durable_canonical_record(sample_vault: Path) -> None:
+    """Application boundary applies a stored proposal without a browser payload."""
+    service = ApplicationService(sample_vault)
+    proposal = service.propose(
+        "01_Projects/ApplyById.md",
+        '---\ntype: Project\ntitle: "Apply by ID"\ndescription: "test"\n'
+        "timestamp: 2026-08-11T00:00:00Z\n---\n",
+        context=RequestContext(actor="test", authority="propose"),
+    )
+    proposal_id = proposal.data["proposal_id"]
+    applied = service.apply_proposal(
+        proposal_id,
+        approved=True,
+        context=RequestContext(actor="gui", authority="apply"),
+    )
+    assert applied.status == "ok"
+    assert (sample_vault / "01_Projects" / "ApplyById.md").is_file()
+
+    with pytest.raises((FileNotFoundError, ValueError)):
+        service.apply_proposal(
+            "0" * 64,
+            approved=True,
+            context=RequestContext(actor="gui", authority="apply"),
+        )
+
+
 def test_optional_fleet_is_explicitly_unavailable(sample_vault: Path) -> None:
     result = ApplicationService(sample_vault).fleet_status()
 
