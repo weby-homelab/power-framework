@@ -14,7 +14,7 @@
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-8A2BE2?logo=materialformkdocs)](https://weby-homelab.github.io/power-framework/)
 [![OKF BundleDex](https://bundledex.net/static-badge.svg)](https://bundledex.net)
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
-[![A2A Protocol](https://img.shields.io/badge/A2A-Agent_Ready-8B5CF6?logo=openai&logoColor=white)](.agents/AGENTS.md)
+[![Discovery](https://img.shields.io/badge/discovery-experimental%2Fcustom--discovery-8B5CF6?logo=openai&logoColor=white)](.agents/AGENTS.md)
 
 ## Про P.O.W.E.R. - Hybrid Knowledge Management Framework
 
