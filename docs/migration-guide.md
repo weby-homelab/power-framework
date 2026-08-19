@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.6.3"
+title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.6.4"
 description: "Fail-closed, manifest-driven protocol for migrating an existing Markdown knowledge base to a verified P.O.W.E.R. vault without modifying the source."
 tags: [power, migration, guide, ai-agents, safety, verification]
 timestamp: 2026-08-17T12:00:00+03:00
 ---
 
-# AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.6.3
+# AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.6.4
 
 This guide is written as an execution contract for any AI agent with filesystem
 access. It migrates a Markdown or Obsidian knowledge base into the canonical
@@ -17,7 +17,7 @@ For a new empty vault, stop here and use [Getting Started](getting-started.md).
 For Windows 11 25H2 runtime setup, first use the
 [Windows installation guide](windows-11-installation.md).
 
-This guide targets the `v3.6.3` release. Select the clean-install
+This guide targets the `v3.6.4` release. Select the clean-install
 guide when the destination is empty. Select this guide when any existing note,
 attachment, or configuration must be preserved. Never run `power init` inside
 an existing knowledge base.
@@ -73,7 +73,7 @@ manifest instead of pretending that one command performs a lossless migration.
 
 ## Version-stamped executable facts
 
-This guide is verified against the `v3.6.3` release contract. CI checks these
+This guide is verified against the `v3.6.4` release contract. CI checks these
 facts against the executable capability manifest so an agent does not inherit
 an older migration recipe:
 
@@ -275,7 +275,7 @@ manifest checksum, and zero unaccounted authorized source files.
 
 ### 3.1 Install and preflight P.O.W.E.R.
 
-Use the `v3.6.3` environment from Getting Started and verify:
+Use the `v3.6.4` environment from Getting Started and verify:
 
 ```bash
 POWER_PYTHON=/absolute/path/to/venv/bin/python

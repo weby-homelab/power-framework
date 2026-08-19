@@ -35,7 +35,7 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.3-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.4-py3-none-any.whl
 ```
 
 Базовий release wheel є FTS-only: він не встановлює ONNX Runtime, model
@@ -60,7 +60,7 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.3-py3-none-any.whl"
+  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.4-py3-none-any.whl"
 ```
 
 ### Альтернатива: встановлення із закріпленого tag

@@ -35,7 +35,7 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.3-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.4-py3-none-any.whl
 ```
 
 The base release wheel is FTS-only: it does not install ONNX Runtime, model
@@ -60,7 +60,7 @@ For local MCP, install the optional remote transport from the same wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.3-py3-none-any.whl"
+  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.4-py3-none-any.whl"
 ```
 
 ### Alternative: install from the pinned tag
