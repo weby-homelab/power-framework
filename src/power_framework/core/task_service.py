@@ -132,7 +132,13 @@ class TaskService:
                 prev_event_digest="",
             )
 
-            self.store.save_task(task, event=event)
+            self.store.save_task(
+                task,
+                event=event,
+                idempotency_key=idempotency_key,
+                command_sha256=command_sha256,
+                crash_point="task.create",
+            )
             return task
 
     def transition_task(
@@ -276,7 +282,14 @@ class TaskService:
                 prev_event_digest=last_digest,
             )
 
-            self.store.save_task(task, event=event, completion_receipt=completion_receipt)
+            self.store.save_task(
+                task,
+                event=event,
+                completion_receipt=completion_receipt,
+                idempotency_key=idempotency_key,
+                command_sha256=command_sha256,
+                crash_point="task.transition",
+            )
             return task
 
     def _find_idempotent_result(
@@ -377,22 +390,34 @@ class TaskService:
         return self.store.get_task_events(task_id, since_sequence=since_sequence)
 
     def migrate_v1_work_packets(self) -> dict[str, Any]:
-        """Migrate existing .power/work-packets/ v1 JSONs into PowerTask v2."""
+        """Migrate existing .power/work-packets/ v1 JSONs into PowerTask v2.
+
+        Idempotent (re-run skips migrated tasks), recoverable (interrupt-safe:
+        each packet is committed before the next), reversible (a content-free
+        manifest + retained v1 originals enable :meth:`rollback_v1_migration`).
+        The original v1 bytes are copied to a backup directory and never deleted
+        by migration (Phase I).
+        """
+        import json
+
         v1_dir = self.vault_dir / ".power" / "work-packets"
         if not v1_dir.is_dir():
             return {"migrated": 0, "skipped": 0, "errors": 0}
+
+        backup_dir = self.vault_dir / ".power" / "migration" / "v1-backup"
+        manifest_path = self.vault_dir / ".power" / "migration" / "v1_manifest.json"
+        manifest = self._read_migration_manifest(manifest_path)
+        migrated_ids = {e["task_id"] for e in manifest.get("entries", [])}
 
         migrated = 0
         skipped = 0
         errors = 0
 
-        for packet_file in v1_dir.glob("*.json"):
+        for packet_file in sorted(v1_dir.glob("*.json")):
             try:
-                import json
-
                 data = json.loads(packet_file.read_text(encoding="utf-8"))
                 task_id = data.get("task_id") or packet_file.stem
-                if self.store.get_task(task_id):
+                if task_id in migrated_ids or self.store.get_task(task_id):
                     skipped += 1
                     continue
 
@@ -433,13 +458,78 @@ class TaskService:
                         "checkpoint_count": len(data.get("checkpoints", [])),
                     },
                 )
-                self.store.save_task(task, event=ev)
+                # Retain original v1 bytes before any further action.
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_file = backup_dir / packet_file.name
+                if not backup_file.exists():
+                    backup_file.write_bytes(packet_file.read_bytes())
+                source_sha256 = hashlib.sha256(packet_file.read_bytes()).hexdigest()
+
+                self.store.save_task(task, event=ev, crash_point="task.migrate")
+                manifest.setdefault("entries", []).append(
+                    {
+                        "task_id": task_id,
+                        "source_sha256": source_sha256,
+                        "revision": task.revision,
+                        "event_sequence": 1,
+                        "status": "migrated",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    }
+                )
+                self._write_migration_manifest(manifest_path, manifest)
                 migrated += 1
             except Exception as exc:
                 logger.error("Failed to migrate packet %s: %s", packet_file, exc)
                 errors += 1
 
-        return {"migrated": migrated, "skipped": skipped, "errors": errors}
+        return {
+            "migrated": migrated,
+            "skipped": skipped,
+            "errors": errors,
+            "manifest": str(manifest_path),
+        }
+
+    def _read_migration_manifest(self, path: Path) -> dict[str, Any]:
+        if path.is_file():
+            try:
+                return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                return {"entries": []}
+        return {"entries": []}
+
+    @staticmethod
+    def _write_migration_manifest(path: Path, manifest: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+    def rollback_v1_migration(self) -> dict[str, Any]:
+        """Reverse :meth:`migrate_v1_work_packets` using the content-free manifest.
+
+        Deletes migrated v2 tasks and restores the retained v1 originals. The
+        original v1 evidence is only copied back, never destroyed (Phase I).
+        """
+        manifest_path = self.vault_dir / ".power" / "migration" / "v1_manifest.json"
+        manifest = self._read_migration_manifest(manifest_path)
+        entries = manifest.get("entries", [])
+        backup_dir = self.vault_dir / ".power" / "migration" / "v1-backup"
+        v1_dir = self.vault_dir / ".power" / "work-packets"
+        rolled_back = 0
+        restored = 0
+        for entry in entries:
+            task_id = entry["task_id"]
+            if self.store.get_task(task_id) is not None:
+                self.store.delete_task(task_id)
+                rolled_back += 1
+            backup_file = backup_dir / f"{task_id}.json"
+            if backup_file.is_file():
+                v1_dir.mkdir(parents=True, exist_ok=True)
+                (v1_dir / f"{task_id}.json").write_bytes(backup_file.read_bytes())
+                restored += 1
+        if manifest_path.is_file():
+            manifest_path.unlink()
+        return {"rolled_back": rolled_back, "restored": restored}
 
 
 __all__ = ["TaskService"]

@@ -5,6 +5,34 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.4] - 2026-08-19
+
+### Added
+
+- **Crash-consistent multi-artifact transactions**: `TaskStore` now wraps
+  snapshot, event, checkpoint, completion-receipt, decision, decision-receipt,
+  and memory-history writes in a recoverable transaction manifest (WAL)
+  under the per-vault writer lock. A hard process kill between writes leaves a
+  `prepared` manifest; the next `lock()` runs `recover()`, which deterministically
+  reconciles to `committed`, `rolled_back`, `reconciled_rollback`, or `fail_closed`.
+- **Deterministic fault-injection harness** (`power_framework.core.fault_injection`):
+  opt-in, inert by default, lets tests arm named crash points (e.g.
+  `task.create`, `decision.resolve`, `memory.apply`) to reproduce the hard-kill
+  scenarios the manifest recovers from.
+- **Reversible v1 → v2 migration**: `migrate_v1_work_packets` now writes a
+  content-free manifest, retains the original v1 bytes in `.power/migration/v1-backup/`,
+  is idempotent and interrupt-safe, and ships `rollback_v1_migration()` which never
+  destroys the original evidence.
+- **Observability**: `recover()` appends redacted recovery records (tx id, op,
+  stage, affected IDs) to `.power/tasks/recovery.log`.
+
+### Changed
+
+- Documents now clearly distinguish **atomic single-file writes** (per-artifact
+  replace + exception-time rollback) from **crash-consistent multi-artifact
+  transactions** (manifest/WAL with automatic reconciliation). The latter is the
+  guarantee added in 3.6.4.
+
 ## [3.6.3] - 2026-08-19
 
 ### Fixed

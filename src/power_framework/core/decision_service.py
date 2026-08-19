@@ -80,7 +80,14 @@ class DecisionService:
             if decision_file.exists():
                 raise ValueError(f"Decision with ID {decision_id} already exists")
             self._ensure_dirs()
-            atomic_write(decision_file, _serialize(decision))
+            with self.store._transaction(
+                "decision_create",
+                None,
+                None,
+                [(decision_file, "decision")],
+                crash_point="decision.create",
+            ):
+                atomic_write(decision_file, _serialize(decision))
             return decision
 
     def get_decision(self, decision_id: str) -> Decision | None:
@@ -210,20 +217,15 @@ class DecisionService:
             self._ensure_dirs()
             decision_file = self._decision_file(decision_id)
             receipt_file = self._receipt_file(receipt.receipt_id)
-            previous_decision = decision_file.read_text(encoding="utf-8")
-            previous_receipt = (
-                receipt_file.read_text(encoding="utf-8") if receipt_file.is_file() else None
-            )
-            try:
+            with self.store._transaction(
+                "decision_resolve",
+                None,
+                None,
+                [(decision_file, "decision"), (receipt_file, "receipt")],
+                crash_point="decision.resolve",
+            ):
                 atomic_write(decision_file, _serialize(resolved))
                 atomic_write(receipt_file, _serialize(receipt))
-            except Exception:
-                atomic_write(decision_file, previous_decision)
-                if previous_receipt is None:
-                    receipt_file.unlink(missing_ok=True)
-                else:
-                    atomic_write(receipt_file, previous_receipt)
-                raise
             return resolved, receipt
 
     def get_receipt(self, receipt_id: str) -> DecisionReceipt | None:
