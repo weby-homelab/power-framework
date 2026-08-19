@@ -28,7 +28,7 @@ POWER_VAULT="$HOME/Documents/power-vault"
 
 python3 -m venv "$POWER_VENV"
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.3-py3-none-any.whl"
+  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.4-py3-none-any.whl"
 # Лише для нового або порожнього vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'

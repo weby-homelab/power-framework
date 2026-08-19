@@ -45,7 +45,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install \
-  "https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.3-py3-none-any.whl"
+  "https://github.com/weby-homelab/power-framework/releases/download/v3.6.3/power_framework-3.6.4-py3-none-any.whl"
 
 power init ./my-vault
 power index ./my-vault --strict
