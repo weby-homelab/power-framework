@@ -249,25 +249,74 @@ def test_event_hash_chaining(temp_vault: Path) -> None:
     assert events[2].prev_event_digest == events[1].payload_digest
 
 
-@pytest.mark.parametrize("tamper", ["payload", "payload_digest", "prev_event_digest"])
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "payload",
+        "payload_digest",
+        "prev_event_digest",
+        "duplicate_sequence",
+        "skipped_sequence",
+        "wrong_task_id",
+        "truncated_final_line",
+        "unexpected_schema_field",
+    ],
+)
 def test_event_hash_chain_rejects_tampering(temp_vault: Path, tamper: str) -> None:
-    """Payload and link changes fail closed when the journal is read."""
+    """Payload, link, sequence, identity, and schema tampering fail closed on read."""
     service = TaskService(temp_vault)
     service.create_task(task_id="task_tamper", title="Tamper check")
     service.transition_task("task_tamper", "ready")
     event_file = temp_vault / ".power" / "tasks" / "events" / "task_tamper.jsonl"
-    records = [json.loads(line) for line in event_file.read_text(encoding="utf-8").splitlines()]
+    raw = event_file.read_text(encoding="utf-8")
+    records = [json.loads(line) for line in raw.splitlines() if line.strip()]
     if tamper == "payload":
         records[1]["payload"]["to_state"] = "working"
+        event_file.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+        )
+        match = r"hash|digest"
     elif tamper == "payload_digest":
         records[1]["payload_digest"] = "0" * 64
-    else:
+        event_file.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+        )
+        match = r"hash|digest"
+    elif tamper == "prev_event_digest":
         records[1]["prev_event_digest"] = "0" * 64
-    event_file.write_text(
-        "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
-    )
+        event_file.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+        )
+        match = r"hash|digest|chain"
+    elif tamper == "duplicate_sequence":
+        records[1]["sequence"] = records[0]["sequence"]
+        event_file.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+        )
+        match = r"sequence|monotonic"
+    elif tamper == "skipped_sequence":
+        records[1]["sequence"] = records[0]["sequence"] + 2
+        event_file.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+        )
+        match = r"sequence|monotonic"
+    elif tamper == "wrong_task_id":
+        records[1]["task_id"] = "other_task"
+        event_file.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+        )
+        match = r"task_id|Task"
+    elif tamper == "truncated_final_line":
+        event_file.write_text(raw.rstrip("\n")[:-8] + "\n", encoding="utf-8")
+        match = r"Malformed|JSON|journal|event"
+    else:  # unexpected_schema_field
+        records[1]["unexpected_field"] = "nope"
+        event_file.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+        )
+        match = r"extra|unexpected|Forbidden|validation|Malformed|journal|event"
 
-    with pytest.raises(ValueError, match=r"hash|digest"):
+    with pytest.raises(ValueError, match=match):
         service.get_events("task_tamper")
 
 
@@ -319,6 +368,30 @@ def test_task_values_are_revalidated_before_persistence(temp_vault: Path) -> Non
         service.transition_task(
             "task_bounds", "ready", expected_revision=1, values={"max_attempts": 11}
         )
+
+
+def test_task_values_reject_malformed_refs_and_unknown_state(temp_vault: Path) -> None:
+    """Malformed whitelisted refs and unknown transition targets fail closed."""
+    service = TaskService(temp_vault)
+    service.create_task(task_id="task_refs", title="Refs check")
+    with pytest.raises((ValueError, TypeError), match=r"list|type|artifact|validation|Input"):
+        service.transition_task(
+            "task_refs",
+            "ready",
+            expected_revision=1,
+            values={"artifact_refs": "not-a-list"},
+        )
+    with pytest.raises(
+        (ValueError, TypeError), match=r"dict|mapping|type|external|validation|Input"
+    ):
+        service.transition_task(
+            "task_refs",
+            "ready",
+            expected_revision=1,
+            values={"external_refs": ["not-a-mapping"]},
+        )
+    with pytest.raises(ValueError, match=r"Invalid state transition|not-a-real-state|state"):
+        service.transition_task("task_refs", "not-a-real-state", expected_revision=1)
 
 
 def test_v1_work_packet_migration(temp_vault: Path) -> None:

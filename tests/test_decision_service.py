@@ -203,3 +203,58 @@ def test_expired_decision_fails_closed(decision_service: DecisionService) -> Non
             actor="operator",
             authority="apply",
         )
+
+
+def test_decision_pending_before_expiry_and_terminal_not_rewritten(
+    decision_service: DecisionService,
+) -> None:
+    """Pending before boundary stays pending; approved/rejected do not become expired."""
+    future = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+    pending = decision_service.create_decision(
+        decision_id="dec_future",
+        task_id="task_decision",
+        title="Still open",
+        requested_by="agent-1",
+        expires_at=future,
+    )
+    loaded = decision_service.get_decision(pending.decision_id)
+    assert loaded is not None
+    assert loaded.status == "pending"
+
+    approved = decision_service.create_decision(
+        decision_id="dec_approved_exp",
+        task_id="task_decision",
+        title="Already approved",
+        requested_by="agent-1",
+        expires_at=future,
+    )
+    resolved, _ = decision_service.resolve_decision(
+        approved.decision_id,
+        action="approve",
+        actor="operator",
+        authority="apply",
+    )
+    assert resolved.status == "approved"
+    # Force expires_at into the past on disk; terminal status must not flip to expired.
+    decision_file = decision_service._decision_file(approved.decision_id)
+    decision_file.write_text(
+        resolved.model_copy(
+            update={"expires_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat()}
+        ).model_dump_json(),
+        encoding="utf-8",
+    )
+    still = decision_service.get_decision(approved.decision_id)
+    assert still is not None
+    assert still.status == "approved"
+
+
+def test_decision_rejects_naive_expires_at(decision_service: DecisionService) -> None:
+    """Naive timestamps are rejected or fail closed (tz-aware contract)."""
+    with pytest.raises((ValueError, TypeError)):
+        decision_service.create_decision(
+            decision_id="dec_naive",
+            task_id="task_decision",
+            title="Naive expiry",
+            requested_by="agent-1",
+            expires_at="2026-08-19T12:00:00",
+        )
