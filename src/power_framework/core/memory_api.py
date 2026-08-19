@@ -18,6 +18,7 @@ from .models import PARA_FOLDERS
 from .mutation import execute_vault_mutation
 from .parser import validate_metadata
 from .searcher import SearchResult, search_vault
+from .task_store import TaskStore
 from .utils import atomic_write, atomic_write_in_vault, resolve_path_in_vault
 from .vault_storage import existing_vault_cache_dir
 
@@ -152,52 +153,60 @@ def commit_note_change(
         if idempotency_key is not None:
             receipt["idempotency_key"] = idempotency_key
 
+        store = TaskStore(vault_dir)
         try:
-            atomic_write_in_vault(
-                vault_dir,
-                rel_path,
-                content,
-                allowed_directories=allowed_directories,
-            )
-            if log_entry is not None and log_file.exists():
-                _append_text(log_file, log_entry)
-            index_summary = run_generate_hierarchical_index(vault_dir)
-            lint_result = run_lint_vault(vault_dir)
-            if lint_result.has_blocking_issues:
-                raise RuntimeError(
-                    "post-mutation lint failed: "
-                    f"metadata={len(lint_result.untyped_files)}, "
-                    f"broken_links={len(lint_result.broken_links)}, "
-                    f"ambiguous_links={len(lint_result.ambiguous_links)}, "
-                    f"stale={len(lint_result.stale_notes)}"
+            with store._transaction(
+                "memory_apply",
+                idempotency_key,
+                None,
+                [(target, "note"), (history, "history")],
+                crash_point="memory.apply",
+            ):
+                atomic_write_in_vault(
+                    vault_dir,
+                    rel_path,
+                    content,
+                    allowed_directories=allowed_directories,
                 )
+                if log_entry is not None and log_file.exists():
+                    _append_text(log_file, log_entry)
+                index_summary = run_generate_hierarchical_index(vault_dir)
+                lint_result = run_lint_vault(vault_dir)
+                if lint_result.has_blocking_issues:
+                    raise RuntimeError(
+                        "post-mutation lint failed: "
+                        f"metadata={len(lint_result.untyped_files)}, "
+                        f"broken_links={len(lint_result.broken_links)}, "
+                        f"ambiguous_links={len(lint_result.ambiguous_links)}, "
+                        f"stale={len(lint_result.stale_notes)}"
+                    )
 
-            # Keep a dense projection usable when one already exists.  A new
-            # vault without dense state gets a cheap FTS publication and can
-            # later opt into the full embedding sync explicitly.
-            from .generation_index import active_dense_chunk_count, sync_vault_atomically
+                # Keep a dense projection usable when one already exists.  A new
+                # vault without dense state gets a cheap FTS publication and can
+                # later opt into the full embedding sync explicitly.
+                from .generation_index import active_dense_chunk_count, sync_vault_atomically
 
-            has_dense = active_dense_chunk_count(vault_dir) > 0
-            report = sync_vault_atomically(
-                vault_dir,
-                sync_embeddings=has_dense,
-                allow_partial=False,
-            )
-            published_search = True
-            receipt.update(
-                {
-                    "index_summary": index_summary,
-                    "search_mode": "semantic" if has_dense else "fts",
-                    "search_generation": report.generation_id,
-                    "notes_scanned": str(report.total_scanned),
-                    "notes_indexed": str(report.actual_files),
-                    "notes_excluded": str(report.invalid_sources),
-                    "lint_orphans": str(len(lint_result.orphans)),
-                    "duration_ms": f"{(time.perf_counter() - started_at) * 1000:.3f}",
-                }
-            )
-            _append_receipt(history, receipt)
-            return receipt
+                has_dense = active_dense_chunk_count(vault_dir) > 0
+                report = sync_vault_atomically(
+                    vault_dir,
+                    sync_embeddings=has_dense,
+                    allow_partial=False,
+                )
+                published_search = True
+                receipt.update(
+                    {
+                        "index_summary": index_summary,
+                        "search_mode": "semantic" if has_dense else "fts",
+                        "search_generation": report.generation_id,
+                        "notes_scanned": str(report.total_scanned),
+                        "notes_indexed": str(report.actual_files),
+                        "notes_excluded": str(report.invalid_sources),
+                        "lint_orphans": str(len(lint_result.orphans)),
+                        "duration_ms": f"{(time.perf_counter() - started_at) * 1000:.3f}",
+                    }
+                )
+                _append_receipt(history, receipt)
+                return receipt
         except Exception:
             source_restore_error: Exception | None = None
             projection_restore_error: Exception | None = None
