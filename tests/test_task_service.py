@@ -374,21 +374,23 @@ def test_task_values_reject_malformed_refs_and_unknown_state(temp_vault: Path) -
     """Malformed whitelisted refs and unknown transition targets fail closed."""
     service = TaskService(temp_vault)
     service.create_task(task_id="task_refs", title="Refs check")
-    with pytest.raises((ValueError, TypeError)):
+    with pytest.raises((ValueError, TypeError), match=r"list|type|artifact|validation|Input"):
         service.transition_task(
             "task_refs",
             "ready",
             expected_revision=1,
             values={"artifact_refs": "not-a-list"},
         )
-    with pytest.raises((ValueError, TypeError)):
+    with pytest.raises(
+        (ValueError, TypeError), match=r"dict|mapping|type|external|validation|Input"
+    ):
         service.transition_task(
             "task_refs",
             "ready",
             expected_revision=1,
             values={"external_refs": ["not-a-mapping"]},
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Invalid state transition|not-a-real-state|state"):
         service.transition_task("task_refs", "not-a-real-state", expected_revision=1)
 
 
