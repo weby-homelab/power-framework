@@ -1,6 +1,6 @@
 # Матриця підтримки платформ P.O.W.E.R.
 
-Ця матриця визначає операційні межі контракту релізу `v3.6.2`. Вона
+Ця матриця визначає операційні межі контракту релізу `v3.6.3`. Вона
 відділяє автоматизоване покриття життєвого циклу від доказів для model-backed
 режимів, фізичних хостів, GPU та якості пошуку. Зелений CI не сертифікує інший
 хост, провайдер, корпус або envelope продуктивності.
@@ -10,9 +10,9 @@
 | Платформа / середовище | Перевірено зараз | Умовно підтримується | Ця матриця не сертифікує |
 | --- | --- | --- | --- |
 | Linux, Python 3.11–3.14 | Ubuntu CI запускає повний suite, Ruff, MyPy, documentation і release-contract gates; package smoke перевіряє wheel/sdist поза checkout. | Dense, reranked і provider-backed workflows потребують локального model cache та реально прив'язаного provider. | Host-independent latency, GPU benefit, ANN recall і якість reranker поза опублікованими release receipts. |
-| macOS | Відкладено на невизначений строк для `v3.6.2`; macOS CI та release upgrade evidence не заявляються. | Цільового релізу не заплановано. Майбутня пропозиція потребує названого runner, owner і свіжих receipts. | Усі claims сумісності, продуктивності, GPU, dense real-vault і reranker для macOS. |
-| Hosted Windows CI | Відкладено на невизначений строк для `v3.6.2`; Windows CI та release upgrade evidence не заявляються. | Цільового релізу не заплановано. Майбутня пропозиція потребує названого runner, owner і свіжих receipts. | Усі claims lifecycle, provider, performance, GPU, dense real-vault і quality для Windows. |
-| Фізичний Windows 11 25H2 | Відкладено на невизначений строк для `v3.6.2`; installation guide є лише інформаційним і не є release certification. | Цільового релізу не заплановано. Майбутня пропозиція потребує точних host/artifact receipts. | Фізична сумісність Windows, GPU performance, CUDA availability і latency claims. |
+| macOS | Відкладено на невизначений строк для `v3.6.3`; macOS CI та release upgrade evidence не заявляються. | Цільового релізу не заплановано. Майбутня пропозиція потребує названого runner, owner і свіжих receipts. | Усі claims сумісності, продуктивності, GPU, dense real-vault і reranker для macOS. |
+| Hosted Windows CI | Відкладено на невизначений строк для `v3.6.3`; Windows CI та release upgrade evidence не заявляються. | Цільового релізу не заплановано. Майбутня пропозиція потребує названого runner, owner і свіжих receipts. | Усі claims lifecycle, provider, performance, GPU, dense real-vault і quality для Windows. |
+| Фізичний Windows 11 25H2 | Відкладено на невизначений строк для `v3.6.3`; installation guide є лише інформаційним і не є release certification. | Цільового релізу не заплановано. Майбутня пропозиція потребує точних host/artifact receipts. | Фізична сумісність Windows, GPU performance, CUDA availability і latency claims. |
 
 ## Правила доказів для агентів
 
@@ -31,7 +31,7 @@
 Виконувані перевірки живуть у [CI](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/ci.yml), release
 workflow — у [release.yml](https://github.com/weby-homelab/power-framework/blob/main/.github/workflows/release.yml), а фізична
 процедура Windows — у [windows-11-installation.ua.md](windows-11-installation.ua.md),
-але Windows і macOS не входять до межі `v3.6.2` та не мають запланованого
+але Windows і macOS не входять до межі `v3.6.3` та не мають запланованого
 release target.
 Roadmap фіксує межі доказів і pending gates у
 [`ROADMAP_POWER.md`](https://github.com/weby-homelab/knowledge-base/blob/main/01_Projects/ROADMAP_POWER.md).

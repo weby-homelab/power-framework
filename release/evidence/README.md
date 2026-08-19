@@ -34,14 +34,14 @@ JSON artifacts are intentionally ignored because each run records the exact
 working-tree commit, hardware and model state and should be archived by CI or
 the release process, not committed as mutable repository state.
 
-## 3.6.2 candidate boundary
+## 3.6.3 candidate boundary
 
 `scripts/generate_release_candidate.py` creates a candidate-only baseline from
 the content-free `power.release-validation.v1` receipt plus the current commit
 and a SHA-256 of the dirty worktree. Validate it with
 `scripts/verify_release_contract.py --candidate --require-worktree-hash`; this
-mode is never a final release proof. A publishable 3.6.2 baseline must instead
-be generated from a clean signed `v3.6.2` tag and checked with `--require-tag`.
+mode is never a final release proof. A publishable 3.6.3 baseline must instead
+be generated from a clean signed `v3.6.3` tag and checked with `--require-tag`.
 
 When local technical receipts are available, pass them with
 `--phase8-outcome-receipt` and `--phase8-continuity-receipt`; the candidate then
@@ -61,7 +61,7 @@ upgrade receipt produced on the Ubuntu CI runner.
 
 The synthetic `benchmarks/power35` receipts are technical CI evidence only.
 Real-vault and sealed-human evidence are optional quality evaluations and are
-not required to publish a stable 3.6.2 tag. If a maintainer wants to make those
+not required to publish a stable 3.6.3 tag. If a maintainer wants to make those
 additional quality claims, two content-free files can be validated separately:
 
 - `real-vault-receipt.json`, validated by `scripts/verify_phase8_evidence.py`
@@ -91,7 +91,7 @@ receipts from the stable `benchmarks/power35` harness and binds their SHA-256
 values into the tag-bound baseline. Their v2 schemas also carry release,
 commit, tree, clean-state, and worktree-hash identity; candidate and final
 baseline generation rejects stale receipts from another checkout. For
-`v3.6.2`, the Linux upgrade aggregate is executed on the Ubuntu runner;
+`v3.6.3`, the Linux upgrade aggregate is executed on the Ubuntu runner;
 macOS and Windows are explicitly deferred and do not appear as supported
 platforms in the release artifact. Their deferral has no scheduled release
 target. The synthetic receipts prove only technical safety/continuity;

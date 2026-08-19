@@ -89,7 +89,8 @@ class DecisionService:
         if not decision_file.is_file():
             return None
         try:
-            return Decision.model_validate_json(decision_file.read_text(encoding="utf-8"))
+            decision = Decision.model_validate_json(decision_file.read_text(encoding="utf-8"))
+            return _effective_decision(decision)
         except (OSError, UnicodeError, ValueError) as exc:
             raise ValueError(f"Malformed decision snapshot {decision_id}") from exc
 
@@ -153,6 +154,8 @@ class DecisionService:
                 response,
             )
             receipt_id = f"dcr_{response_sha256}"
+            if decision.status == "expired":
+                raise ValueError("Decision has expired")
             if decision.status != "pending":
                 receipt = self.get_receipt(decision.receipt_id or "")
                 if (
@@ -164,10 +167,6 @@ class DecisionService:
                     return decision, receipt
                 raise ValueError("Decision is already resolved")
 
-            if decision.expires_at is not None and _parse_timestamp(
-                decision.expires_at
-            ) <= datetime.now(UTC):
-                raise ValueError("Decision has expired")
             if "*" not in decision.allowed_actors and actor not in decision.allowed_actors:
                 raise PermissionError("Actor is not allowed to resolve this decision")
             if _AUTHORITY_RANK.get(authority, -1) < _AUTHORITY_RANK[decision.required_authority]:
@@ -293,6 +292,15 @@ def _parse_timestamp(value: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("Decision timestamp must include a timezone")
     return parsed.astimezone(UTC)
+
+
+def _effective_decision(decision: Decision, *, now: datetime | None = None) -> Decision:
+    """Project pending decisions past expiry as terminal without hidden writes."""
+    if decision.status != "pending" or decision.expires_at is None:
+        return decision
+    if _parse_timestamp(decision.expires_at) > (now or datetime.now(UTC)):
+        return decision
+    return Decision.model_validate(decision.model_dump() | {"status": "expired"})
 
 
 def _serialize(model: Decision | DecisionReceipt) -> str:

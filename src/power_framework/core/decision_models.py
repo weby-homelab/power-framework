@@ -90,7 +90,7 @@ class Decision(BaseModel):
             raise ValueError("proposal_id requires proposal_sha256")
         if self.status == "pending" and self.receipt_id is not None:
             raise ValueError("pending decisions cannot have a resolution receipt")
-        if self.status != "pending" and self.receipt_id is None:
+        if self.status in {"approved", "rejected"} and self.receipt_id is None:
             raise ValueError("resolved decisions require a resolution receipt")
         return self
 

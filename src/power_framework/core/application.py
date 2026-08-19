@@ -23,7 +23,7 @@ from .application_models import (
 )
 from .capabilities import manifest
 from .decision_service import DecisionService
-from .memory_api import apply_change, propose_change, read_history
+from .memory_api import apply_change, apply_change_by_id, propose_change, read_history
 from .searcher import (
     DEFAULT_SEARCH_MODE,
     format_untrusted_search_envelope,
@@ -222,6 +222,28 @@ class ApplicationService:
             lambda: apply_change(
                 self.vault_dir,
                 proposal,
+                approved=True,
+                idempotency_key=request.idempotency_key,
+            ),
+        )
+
+    def apply_proposal(
+        self,
+        proposal_id: str,
+        *,
+        approved: bool,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Apply a durable content-addressed proposal by ID only."""
+        request = context or RequestContext(authority="apply")
+        if not approved or request.authority != "apply":
+            raise PermissionError("apply requires explicit approved=True and apply authority")
+        return self._run(
+            "apply",
+            request,
+            lambda: apply_change_by_id(
+                self.vault_dir,
+                proposal_id,
                 approved=True,
                 idempotency_key=request.idempotency_key,
             ),
