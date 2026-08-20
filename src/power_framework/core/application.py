@@ -55,12 +55,16 @@ class RequestContext:
     request_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     def __post_init__(self) -> None:
-        if not self.actor.strip():
+        if not isinstance(self.actor, str) or not self.actor.strip():
             raise ValueError("actor must be a non-empty string")
+        if self.authority not in {"read-only", "propose", "apply"}:
+            raise ValueError("authority must be read-only, propose, or apply")
         if self.idempotency_key is not None and not _TOKEN_PATTERN.fullmatch(self.idempotency_key):
             raise ValueError("idempotency_key must be a safe token")
         if self.deadline_ms is not None and self.deadline_ms <= 0:
             raise ValueError("deadline_ms must be positive")
+        if not isinstance(self.request_id, str) or not _TOKEN_PATTERN.fullmatch(self.request_id):
+            raise ValueError("request_id must be a safe token")
 
 
 @dataclass(frozen=True)
@@ -97,6 +101,7 @@ class ApplicationEnvelope:
     receipt: AuditReceipt
     actual_capability: str
     source_revision: str | None = None
+    degraded_reason: str | None = None
     schema_version: str = "power.application.v2"
 
     def as_dict(self) -> dict[str, object]:
@@ -109,6 +114,7 @@ class ApplicationEnvelope:
             "request_id": self.receipt.request_id,
             "actual_capability": self.actual_capability,
             "source_revision": self.source_revision,
+            "degraded_reason": self.degraded_reason,
         }
 
 
@@ -723,9 +729,13 @@ class ApplicationService:
         )
         if self._audit_hook is not None:
             self._audit_hook(receipt)
-        actual_capability = str(serializable.get("actual_mode", operation))
+        actual_capability = str(
+            serializable.get("actual_capability", serializable.get("actual_mode", operation))
+        )
         raw_source_revision = serializable.get("source_revision")
         source_revision = str(raw_source_revision) if raw_source_revision is not None else None
+        raw_degraded_reason = serializable.get("degraded_reason")
+        degraded_reason = str(raw_degraded_reason) if raw_degraded_reason is not None else None
         return ApplicationEnvelope(
             operation=operation,
             status=status,
@@ -733,6 +743,7 @@ class ApplicationService:
             receipt=receipt,
             actual_capability=actual_capability,
             source_revision=source_revision,
+            degraded_reason=degraded_reason,
         )
 
 

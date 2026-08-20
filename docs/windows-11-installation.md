@@ -1,9 +1,9 @@
 # Historical: install P.O.W.E.R. 3.5.0 on Windows 11 25H2
 
-> **Not a `v3.6.3` procedure.** Windows support is deferred indefinitely and
+> **Not a `v3.6.5` procedure.** Windows support is deferred indefinitely and
 > has no scheduled release target. The commands below preserve the historical
-> `v3.5.0` host-validation procedure and must not be presented as 3.6.3
-> compatibility or release certification.
+> `v3.5.0` host-validation procedure and must not be presented as 3.6.5
+> compatibility or release certification for the 3.6.5 candidate.
 
 This guide installs P.O.W.E.R. `v3.5.0` in an isolated virtual environment,
 creates a clean vault, verifies the CLI, and configures an MCP client. It uses

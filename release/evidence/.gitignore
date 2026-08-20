@@ -3,8 +3,9 @@
 !benchmark-manifest.schema.json
 !baselines/
 !baselines/*.json
-# The 3.6.2 candidate is generated outside the checkout and is not release evidence.
+# The 3.6.5 candidate is generated outside the checkout and is not release evidence.
 # The final baseline is generated from the clean signed tag into dist/ by CI.
 baselines/v3.5.0.json
 baselines/v3.6.0.json
 baselines/v3.6.2.json
+baselines/v3.6.5.json

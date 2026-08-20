@@ -49,6 +49,8 @@ class SourceListResponse(BaseDTO):
     total_count: int = Field(default=0, ge=0)
     next_cursor: str | None = None
     source_revision: str = Field(default="", description="Vault snapshot or Git commit hash")
+    actual_capability: str = "active_source_projection"
+    degraded_reason: str | None = None
 
 
 class SourceReadRequest(BaseDTO):
@@ -69,6 +71,9 @@ class SourceReadResponse(BaseDTO):
     modified_at: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     trust_label: str = "local"
+    source_revision: str = ""
+    actual_capability: str = "direct_file_read"
+    degraded_reason: str | None = None
 
 
 class SourceStatsResponse(BaseDTO):
@@ -82,6 +87,9 @@ class SourceStatsResponse(BaseDTO):
     storage_bytes: int = Field(default=0, ge=0)
     last_indexed_at: str | None = None
     healthy: bool = True
+    source_revision: str = ""
+    actual_capability: str = "active_source_projection"
+    degraded_reason: str | None = None
 
 
 class GraphNodeDTO(BaseDTO):
@@ -113,6 +121,10 @@ class GraphProjectionResponse(BaseDTO):
     total_edges: int = Field(default=0, ge=0)
     max_depth: int = Field(default=2, ge=1, le=10)
     is_truncated: bool = False
+    source_revision: str = ""
+    actual_capability: str = "active_source_projection"
+    degraded_reason: str | None = None
+    ambiguities: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class TaskDTO(BaseDTO):

@@ -20,6 +20,7 @@ from .db import _init_db
 from .ignore import should_skip
 from .index_sync import _sync_vault_to_db
 from .parser import read_file_content, validate_metadata
+from .source_projection import scan_projection, write_projection
 from .vault_storage import (
     ensure_vault_identity,
     existing_vault_cache_dir,
@@ -35,7 +36,7 @@ class IndexGenerationError(RuntimeError):
     """A staged index did not meet the active-generation publication contract."""
 
 
-GENERATION_STORE_SCHEMA_VERSION = 1
+GENERATION_STORE_SCHEMA_VERSION = 2
 RETAIN_READY_GENERATIONS = 2
 STALE_BUILD_TTL_SECONDS = 3600.0
 STALE_BUILD_TTL_ENV = "POWER_GENERATION_BUILD_TTL_SECONDS"
@@ -78,6 +79,8 @@ class ActiveGeneration:
     source_snapshot_hash: str
     db_sha256: str
     db_size: int
+    completed_at: str
+    activated_at: str
 
 
 # A generation file is immutable after publication.  Cache only its verified
@@ -457,7 +460,9 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
         with closing(sqlite3.connect(f"file:{state_path}?mode=ro", uri=True, timeout=30)) as conn:
             row = conn.execute(
                 """
-                SELECT generation_id, state, source_snapshot_hash, db_sha256, db_size
+                SELECT generation_id, state, source_snapshot_hash, db_sha256, db_size,
+                       completed_at,
+                       (SELECT activated_at FROM active_generation WHERE id = 1)
                 FROM index_generations
                 WHERE generation_id = (SELECT generation_id FROM active_generation WHERE id = 1)
                 """
@@ -466,8 +471,15 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
         raise ActiveGenerationError("generation state store is unreadable") from exc
     if row is None:
         return None
-    generation_id, state, source_snapshot_hash, db_sha256, db_size = row
-    if state != "ready" or not source_snapshot_hash or not db_sha256 or db_size is None:
+    generation_id, state, source_snapshot_hash, db_sha256, db_size, completed_at, activated_at = row
+    if (
+        state != "ready"
+        or not source_snapshot_hash
+        or not db_sha256
+        or db_size is None
+        or not completed_at
+        or not activated_at
+    ):
         raise ActiveGenerationError(f"active generation is not ready: {generation_id}")
     verified_path = _verified_generation_path(root, generation_id, str(db_sha256), int(db_size))
     active = ActiveGeneration(
@@ -476,6 +488,8 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
         source_snapshot_hash=str(source_snapshot_hash),
         db_sha256=str(db_sha256),
         db_size=int(db_size),
+        completed_at=str(completed_at),
+        activated_at=str(activated_at),
     )
     generation_fingerprint = _file_fingerprint(verified_path)
     if generation_fingerprint is None:  # pragma: no cover - verified path exists above
@@ -710,7 +724,10 @@ def _publish(
 
 
 def _validate_staging(
-    conn: sqlite3.Connection, expected_paths: set[str], sync_embeddings: bool
+    conn: sqlite3.Connection,
+    expected_paths: set[str],
+    sync_embeddings: bool,
+    expected_source_revision: str | None = None,
 ) -> tuple[int, int, str | None, str | None]:
     actual_paths = {row[0] for row in conn.execute("SELECT rel_path FROM file_metadata")}
     missing = sorted(expected_paths - actual_paths)
@@ -719,6 +736,38 @@ def _validate_staging(
         raise IndexGenerationError(
             f"source coverage mismatch: missing={missing[:10]} extra={extra[:10]}"
         )
+    projection_tables = {
+        str(row[0]) for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    required_projection_tables = {
+        "source_metadata",
+        "source_links",
+        "source_link_ambiguities",
+        "source_projection_meta",
+    }
+    if not required_projection_tables <= projection_tables:
+        missing_projection = ", ".join(sorted(required_projection_tables - projection_tables))
+        raise IndexGenerationError(
+            f"source projection schema mismatch: missing={missing_projection}"
+        )
+    projected_paths = {str(row[0]) for row in conn.execute("SELECT rel_path FROM source_metadata")}
+    if projected_paths != expected_paths:
+        raise IndexGenerationError(
+            f"source projection coverage mismatch: missing={sorted(expected_paths - projected_paths)[:10]} "
+            f"extra={sorted(projected_paths - expected_paths)[:10]}"
+        )
+    projection_meta = dict(conn.execute("SELECT meta_key, meta_value FROM source_projection_meta"))
+    if projection_meta.get("schema_version") != "1":
+        raise IndexGenerationError("source projection metadata is missing schema version")
+    if projection_meta.get("source_count") != str(len(expected_paths)):
+        raise IndexGenerationError("source projection metadata count mismatch")
+    if not projection_meta.get("source_revision"):
+        raise IndexGenerationError("source projection metadata revision is missing")
+    if (
+        expected_source_revision is not None
+        and projection_meta["source_revision"] != expected_source_revision
+    ):
+        raise IndexGenerationError("source projection revision does not match source snapshot")
     actual_chunks = int(conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0])
     if sync_embeddings:
         chunk_paths = {
@@ -785,8 +834,13 @@ def _migrate_legacy_database(
             closing(sqlite3.connect(staging_path, timeout=30)) as staging_conn,
         ):
             legacy_conn.backup(staging_conn)
+            _init_db(staging_conn)
+            write_projection(staging_conn, scan_projection(vault_dir))
             actual_files, actual_chunks, provider, model = _validate_staging(
-                staging_conn, set(inventory.valid_sources), sync_embeddings
+                staging_conn,
+                set(inventory.valid_sources),
+                sync_embeddings,
+                expected_source_revision=snapshot_hash,
             )
             staging_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         _assert_source_snapshot_unchanged(vault_dir, inventory)
@@ -902,7 +956,10 @@ def sync_vault_atomically(
             )
             _assert_source_snapshot_unchanged(root, inventory)
             actual_files, actual_chunks, provider, model = _validate_staging(
-                conn, set(sources), sync_embeddings
+                conn,
+                set(sources),
+                sync_embeddings,
+                expected_source_revision=snapshot_hash,
             )
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         _publish(

@@ -5,10 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from power_framework.core.memory_api import commit_note_change
 from power_framework.core.task_store import TaskStore
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 OKF = "---\ntype: Resource\ntitle: N\ndescription: d\ntimestamp: 2026-01-01T00:00:00\n---\n\n"
 OLD = OKF + "old\n"
@@ -63,8 +66,8 @@ def test_memory_apply_crash_without_receipt_rolls_back(tmp_path: Path) -> None:
     # Retry with the same idempotency key -> exactly one receipt, no duplicate.
     commit_note_change(vault, "01_Projects/n.md", NEW, idempotency_key="m1")
     history = vault / ".power" / "memory-history.jsonl"
-    lines = [l for l in history.read_text(encoding="utf-8").splitlines() if l.strip()]
-    m1 = [l for l in lines if "m1" in l]
+    lines = [line for line in history.read_text(encoding="utf-8").splitlines() if line.strip()]
+    m1 = [line for line in lines if "m1" in line]
     assert len(m1) == 1
     assert note.read_text() == NEW
 
