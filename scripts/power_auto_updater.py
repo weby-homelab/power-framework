@@ -19,7 +19,6 @@ import logging
 import os
 import re
 import shutil
-import stat
 import subprocess
 import tempfile
 import time
@@ -108,14 +107,10 @@ def split_paths(value: str) -> tuple[Path, ...]:
     return tuple(Path(item) for item in value.split(os.pathsep) if item)
 
 
-def atomic_write(path: Path, content: str, mode: int | None = None) -> None:
-    """Write content atomically while preserving an existing file mode."""
+def atomic_write(path: Path, content: str, *, executable: bool = False) -> None:
+    """Write updater-managed content atomically with owner-only permissions."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    if mode is None and path.exists():
-        mode = stat.S_IMODE(path.stat().st_mode)
-    if mode is None:
-        mode = 0o600
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
     ) as handle:
@@ -123,7 +118,10 @@ def atomic_write(path: Path, content: str, mode: int | None = None) -> None:
         handle.write(content)
         handle.flush()
         os.fsync(handle.fileno())
-    os.chmod(temporary, mode)
+    if executable:
+        os.chmod(temporary, 0o700)
+    else:
+        os.chmod(temporary, 0o600)
     os.replace(temporary, path)
     directory_fd = os.open(path.parent, os.O_RDONLY)
     try:
@@ -336,8 +334,11 @@ def update_skills(config: Config, release: Release) -> list[str]:
         for target in targets:
             target.mkdir(parents=True, exist_ok=True)
             for relative_path, content in payloads.items():
-                mode = 0o755 if relative_path.endswith(".py") else 0o644
-                atomic_write(target / relative_path, content, mode=mode)
+                atomic_write(
+                    target / relative_path,
+                    content,
+                    executable=relative_path.endswith(".py"),
+                )
             LOG.info("synchronized Skill %s to %s", version_text(release.version), target)
         return []
     except Exception as exc:
@@ -589,7 +590,7 @@ def update_compose_env(path: Path, key: str, value: str) -> str:
         output.append(replacement)
     new = "\n".join(output).rstrip("\n") + "\n"
     if old != new:
-        atomic_write(path, new, mode=0o600)
+        atomic_write(path, new)
     return old
 
 
@@ -720,7 +721,7 @@ def update_gui(config: Config, release: Release, wheel: Path) -> list[str]:
         if old_env is None:
             env_path.unlink(missing_ok=True)
         else:
-            atomic_write(env_path, old_env, mode=0o600)
+            atomic_write(env_path, old_env)
         run_command(("docker", "compose", "config", "--quiet"), cwd=compose_dir, timeout=60)
         run_command(
             ("docker", "compose", "up", "-d", "--no-build", service), cwd=compose_dir, timeout=300
