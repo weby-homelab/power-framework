@@ -10,10 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from power_framework.core.task_service import TaskService
-from power_framework.core.task_store import TaskStore
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from power_framework.core.task_store import TaskStore
 
 
 def _sha256(path: Path) -> str:
@@ -135,7 +139,8 @@ def test_recovery_runs_on_next_process_lock_and_allows_retry(tmp_path: Path) -> 
     assert log
     for line in log:
         rec = json.loads(line)
-        assert "note" not in rec and "proposal" not in rec
+        assert "note" not in rec
+        assert "proposal" not in rec
 
 
 def test_no_manifest_leftover_on_happy_path(tmp_path: Path) -> None:

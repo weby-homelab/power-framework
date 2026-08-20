@@ -152,6 +152,55 @@ def _init_db(conn: sqlite3.Connection) -> None:
             mtime REAL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS source_metadata (
+            rel_path TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            note_type TEXT NOT NULL,
+            category TEXT NOT NULL,
+            stem TEXT NOT NULL,
+            tags_json TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            modified_at TEXT NOT NULL,
+            content_sha256 TEXT NOT NULL,
+            metadata_json TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS source_links (
+            source_path TEXT NOT NULL,
+            target_path TEXT NOT NULL,
+            relation_type TEXT NOT NULL,
+            weight REAL NOT NULL,
+            is_candidate INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (source_path, target_path, relation_type),
+            FOREIGN KEY (source_path) REFERENCES source_metadata(rel_path),
+            FOREIGN KEY (target_path) REFERENCES source_metadata(rel_path)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS source_link_ambiguities (
+            source_path TEXT NOT NULL,
+            raw_target TEXT NOT NULL,
+            relation_type TEXT NOT NULL,
+            candidates_json TEXT NOT NULL,
+            PRIMARY KEY (source_path, raw_target, relation_type),
+            FOREIGN KEY (source_path) REFERENCES source_metadata(rel_path)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS source_projection_meta (
+            meta_key TEXT PRIMARY KEY,
+            meta_value TEXT NOT NULL
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_source_metadata_category ON source_metadata(category)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_source_metadata_stem ON source_metadata(stem)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_source_links_source ON source_links(source_path)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_source_links_target ON source_links(target_path)")
     # M1.2: only reviewed candidates become accepted relations.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS relations (

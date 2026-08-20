@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # pragma: no cover - package import path in tests/t
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PYPROJECT = REPO_ROOT / "pyproject.toml"
 DEFAULT_MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
-DEFAULT_BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.6.3.json"
+DEFAULT_BASELINE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.4.5.json"
 DEFAULT_DATASET_MANIFEST = (
     REPO_ROOT / "benchmarks" / "power31" / "dataset" / "v1" / "corpus-manifest.json"
 )

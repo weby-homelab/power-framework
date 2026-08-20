@@ -16,6 +16,7 @@ from .chunker import SemanticChunker
 from .constants import is_catalog_filename
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
+from .source_projection import scan_projection, write_projection
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -290,6 +291,10 @@ def _sync_vault_to_db(
             "Dense index invalidated by FTS-only source changes; run power sync for dense search"
         )
     conn.commit()
+
+    # Source APIs consume this complete, rebuildable projection. It is written
+    # into the same staged generation transaction as FTS/TF metadata.
+    write_projection(conn, scan_projection(vault_dir))
 
     if not (sync_embeddings and embedder is not None):
         _maybe_vacuum(conn, to_delete, db_files)

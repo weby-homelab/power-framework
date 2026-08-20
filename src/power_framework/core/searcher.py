@@ -34,11 +34,7 @@ from .generation_index import (
     resolve_active_generation_path,
 )
 from .ignore import should_skip
-from .index_sync import (
-    _compute_tf_vector,
-    _sync_vault_to_db,
-    _tokenize,
-)
+from .index_sync import _compute_tf_vector, _sync_vault_to_db, _tokenize
 from .models import OKFMetadata  # noqa: TC001
 from .parser import FRONTMATTER_PATTERN, read_file_content, validate_metadata
 from .temporal import (
@@ -553,7 +549,9 @@ def _score_note(
     return total_score, total_matches, snippet
 
 
-def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
+def _scan_and_search(
+    vault_dir: Path, terms: list[str], *, require_all: bool = False
+) -> list[SearchResult]:
     """Scan vault and return scored search results (fallback)."""
     results: list[SearchResult] = []
 
@@ -570,7 +568,7 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
                 continue
 
             score, match_count, snippet = _score_note(content, metadata, terms)
-            if score == 0:
+            if score == 0 or (require_all and match_count < len(terms)):
                 continue
 
             rel_path = filepath.relative_to(vault_dir).as_posix()
@@ -591,6 +589,74 @@ def _scan_and_search(vault_dir: Path, terms: list[str]) -> list[SearchResult]:
             continue
 
     return results
+
+
+def _scan_and_vector_search(
+    vault_dir: Path, query: str, max_results: int = 20
+) -> list[SearchResult]:
+    """Run a bounded in-memory TF search without publishing cache state."""
+    query_tokens = _tokenize(query)
+    if not query_tokens:
+        return []
+    query_vec = _compute_tf_vector(query_tokens)
+    results: list[SearchResult] = []
+    scanned = 0
+    for filepath in sorted(vault_dir.rglob("*.md")):
+        rel_path = filepath.relative_to(vault_dir).as_posix()
+        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
+            continue
+        if should_skip(vault_dir, rel_path):
+            continue
+        scanned += 1
+        if scanned > 5000:
+            break
+        try:
+            if filepath.stat().st_size > 2_000_000:
+                continue
+            content = read_file_content(filepath)
+            metadata = validate_metadata(content)
+            if metadata is None:
+                continue
+            document_tokens = _tokenize(
+                " ".join(
+                    (
+                        metadata.title,
+                        metadata.description,
+                        " ".join(metadata.tags),
+                        content,
+                    )
+                )
+            )
+        except (OSError, UnicodeError, ValueError):
+            continue
+        similarity = _cosine_similarity(query_vec, _compute_tf_vector(document_tokens))
+        if similarity <= 0:
+            continue
+        results.append(
+            SearchResult(
+                rel_path=rel_path,
+                title=metadata.title,
+                description=metadata.description,
+                note_type=str(metadata.type),
+                score=similarity,
+                snippet=_make_snippet(content, query_tokens),
+                match_count=len(query_tokens),
+                matched_text=_matched_text(content, query_tokens),
+                tags=metadata.tags,
+            )
+        )
+    results.sort(key=lambda result: (-result.score, result.rel_path))
+    return results[:max_results]
+
+
+def _fallback_query_terms(query: str) -> list[str]:
+    """Extract lexical terms for a read-only source fallback."""
+    terms: list[str] = []
+    for match in re.finditer(r'"([^"]+)"|(\S+)', query.strip()):
+        term = (match.group(1) or match.group(2)).strip().lower()
+        if term and ("-" in term or term.casefold() not in FTS_STOPWORDS):
+            terms.append(term)
+    return terms
 
 
 def _fts_search(
@@ -636,10 +702,28 @@ def _fts_search(
 
     db_path = resolved_db.path if resolved_db is not None else _read_db_path(vault_dir)
 
-    if db_path is None:
-        fallback = _scan_and_search(vault_dir, [term.strip('"') for term in terms])
-        fallback.sort(key=lambda result: (-result.score, -result.match_count, result.title))
-        return fallback[:max_results]
+    if db_path is None or not db_path.is_file():
+        if os.getenv("POWER_SEARCH_DB"):
+            db_path = _db_path(vault_dir)
+            bootstrap_conn: sqlite3.Connection | None = None
+            try:
+                bootstrap_conn = sqlite3.connect(str(db_path), timeout=30)
+                bootstrap_conn.execute("PRAGMA busy_timeout=30000")
+                bootstrap_conn.execute("PRAGMA journal_mode=WAL")
+                _init_db(bootstrap_conn)
+                _sync_vault_to_db(vault_dir, bootstrap_conn, sync_embeddings=False)
+                bootstrap_conn.commit()
+            finally:
+                if bootstrap_conn is not None:
+                    bootstrap_conn.close()
+        else:
+            fallback = _scan_and_search(
+                vault_dir,
+                _fallback_query_terms(query),
+                require_all=operator == "AND",
+            )
+            fallback.sort(key=lambda result: (-result.score, -result.match_count, result.title))
+            return fallback[:max_results]
 
     conn: sqlite3.Connection | None = None
     try:
@@ -691,11 +775,7 @@ def _fts_search(
     except ActiveGenerationError:
         raise
     except Exception:
-        terms_fallback: list[str] = []
-        for match in re.finditer(r'"([^"]+)"|(\S+)', query.strip()):
-            term = (match.group(1) or match.group(2)).strip().lower()
-            if term and ("-" in term or term.casefold() not in FTS_STOPWORDS):
-                terms_fallback.append(term)
+        terms_fallback = _fallback_query_terms(query)
         if not terms_fallback:
             return []
         fallback_results = _scan_and_search(vault_dir, terms_fallback)
@@ -743,25 +823,31 @@ def _vector_search(
         active_generation_path = resolved_db.path if resolved_db.is_generation else None
         db_path = active_generation_path or _db_path(vault_dir)
 
+    if db_path is None or not db_path.is_file():
+        if not os.getenv("POWER_SEARCH_DB"):
+            return _scan_and_vector_search(vault_dir, query, max_results=max_results)
+        bootstrap_conn: sqlite3.Connection | None = None
+        try:
+            bootstrap_conn = sqlite3.connect(str(db_path or _db_path(vault_dir)), timeout=30)
+            bootstrap_conn.execute("PRAGMA busy_timeout=30000")
+            bootstrap_conn.execute("PRAGMA journal_mode=WAL")
+            _init_db(bootstrap_conn)
+            _sync_vault_to_db(vault_dir, bootstrap_conn, sync_embeddings=False)
+            bootstrap_conn.commit()
+        finally:
+            if bootstrap_conn is not None:
+                bootstrap_conn.close()
+        db_path = db_path or _db_path(vault_dir)
+
     conn: sqlite3.Connection | None = None
     try:
-        if active_generation_path is not None:
-            conn = _open_readonly_db(db_path)
-        else:
-            conn = sqlite3.connect(str(db_path), timeout=30)
-            conn.execute("PRAGMA busy_timeout=30000")
-            conn.execute("PRAGMA journal_mode=WAL")
-            _init_db(conn)
+        conn = _open_readonly_db(db_path)
 
         cursor = conn.cursor()
         with timing_span("sqlite_read"):
             cursor.execute("SELECT COUNT(*) FROM tf_vectors")
             if cursor.fetchone()[0] == 0:
-                if active_generation_path is not None:
-                    return []
-                # Materialize TF vectors (cheap FTS-only sync) so direct
-                # _vector_search calls work even before an explicit index.
-                _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
+                return []
 
             cursor.execute("""
                 SELECT t.rel_path, t.tf_data, f.title, f.description, f.note_type, f.tags, f.content
@@ -1237,6 +1323,13 @@ def search_vault(
     temporal_view = normalize_temporal_view(temporal_view).value
     boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
+    if (
+        not mode_spec.requires_dense_index
+        and not resolved_db.is_generation
+        and resolved_db.path is None
+        and not os.getenv("POWER_SEARCH_DB")
+    ):
+        fallback_reason = fallback_reason or "no_active_generation_bounded_scan"
     if mode_spec.requires_dense_index:
         try:
             validate_dense_index(vault_dir, resolved_db)
@@ -1262,33 +1355,35 @@ def search_vault(
             else:
                 raise
 
-    # Dense-capable modes never create or refresh embeddings from a read request:
-    # the caller must explicitly run ``power sync``. Sparse modes retain their
-    # lightweight first-use FTS refresh.
-    if not mode_spec.requires_dense_index and not resolved_db.is_generation:
-        # Cheap synchronous FTS refresh ONLY when the index is empty/missing,
-        # so non-semantic modes stay correct on first use without re-syncing
-        # the whole vault on every query (Performance Plan §1). Incremental
-        # mtime checks inside _sync_vault_to_db keep repeat calls near-free.
+    # Read operations never create or refresh a vault-owned index. An explicit
+    # POWER_SEARCH_DB override is retained as a test/developer compatibility
+    # escape hatch; production callers must run ``power sync`` explicitly.
+    if (
+        not mode_spec.requires_dense_index
+        and not resolved_db.is_generation
+        and os.getenv("POWER_SEARCH_DB")
+    ):
         conn: sqlite3.Connection | None = None
-        synchronization_completed = False
         try:
             conn = sqlite3.connect(str(_db_path(vault_dir)), timeout=30)
             conn.execute("PRAGMA busy_timeout=30000")
             conn.execute("PRAGMA journal_mode=WAL")
             _init_db(conn)
-            cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM file_metadata")
-            if cur.fetchone()[0] == 0:
+            if conn.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0] == 0:
                 _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
-                synchronization_completed = True
-        except Exception as e:
-            logger.warning("Session-level FTS sync failed: %s", e)
+                conn.commit()
+                resolved_db = _resolve_request_db(vault_dir)
+        except sqlite3.Error:
+            fallback = _scan_and_search(vault_dir, _fallback_query_terms(query))
+            fallback.sort(key=lambda result: (-result.score, -result.match_count, result.title))
+            return _with_runtime_metadata(
+                fallback[:requested_max_results],
+                actual_mode=mode,
+                fallback_reason="fts_index_unavailable",
+            )
         finally:
             if conn is not None:
                 conn.close()
-        if synchronization_completed:
-            resolved_db = _resolve_request_db(vault_dir)
 
     from power_framework.experimental.query_expansion import QueryExpander
 

@@ -5,6 +5,21 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.5] - 2026-08-20
+
+### Added
+
+- Added the immutable source read-model projection for `source.list`, `source.stats`,
+  `source.read`, and `source.graph`, with generation-bound revision and coverage
+  validation.
+
+### Changed
+
+- Hardened generation activation and readback metadata for the POWER Application
+  API v2 contract.
+- Kept the public release boundary Linux-only; dense and reranked providers remain
+  conditional on a verified local model snapshot and provider binding.
+
 ## [3.6.4] - 2026-08-19
 
 ### Added

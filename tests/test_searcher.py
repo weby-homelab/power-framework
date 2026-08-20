@@ -459,6 +459,31 @@ class TestSearchModeContract:
         assert report.data["actual_mode"] == "fts"
         assert report.data["fallback_reason"] == "dense_index_unavailable"
 
+    def test_sparse_search_without_generation_does_not_publish_state(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A first read uses a bounded fallback and never creates cache state."""
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        cache_root = tmp_path / "cache"
+        monkeypatch.setenv("XDG_CACHE_HOME", str(cache_root))
+        note = tmp_path / "01_Projects" / "Read-only.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\ntype: Project\ntitle: Read-only\n"
+            "description: no write search\ntimestamp: 2026-01-01T00:00:00Z\n---\n\n"
+            "read-only-search-token\n",
+            encoding="utf-8",
+        )
+
+        results = search_vault(tmp_path, "read-only-search-token", mode="fts")
+
+        assert results
+        assert all(
+            result.fallback_reason == "no_active_generation_bounded_scan" for result in results
+        )
+        assert not (tmp_path / ".power").exists()
+        assert not cache_root.exists()
+
     def test_normalize_mode_accepts_case_and_legacy_alias(self):
         assert normalize_search_mode("RERANKED") == "reranked"
         with pytest.warns(DeprecationWarning, match="deprecated"):

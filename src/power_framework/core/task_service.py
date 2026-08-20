@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
+from .errors import ConflictError
 from .task_models import (
     PowerTask,
     TaskAuthority,
@@ -86,7 +87,7 @@ class TaskService:
                 replay = self._find_idempotent_result(task_id, idempotency_key, command_sha256)
                 if replay is not None:
                     return replay
-                raise ValueError(f"Task with ID {task_id} already exists")
+                raise ConflictError(f"Task with ID {task_id} already exists")
 
             now_iso = datetime.now(UTC).isoformat()
             task = PowerTask(
@@ -187,7 +188,7 @@ class TaskService:
                 return replay
 
             if expected_revision is not None and task.revision != expected_revision:
-                raise ValueError(
+                raise ConflictError(
                     f"Revision conflict for task {task_id}: expected {expected_revision}, found {task.revision}"
                 )
 

@@ -6,13 +6,16 @@ Arms a named crash point and verifies the operation leaves a recoverable
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from power_framework.core.decision_service import DecisionService
 from power_framework.core.fault_injection import InjectedFaultError, fault_injector
 from power_framework.core.memory_api import commit_note_change
 from power_framework.core.task_service import TaskService
 from power_framework.core.task_store import TaskStore
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 OKF = "---\ntype: Resource\ntitle: N\ndescription: d\ntimestamp: 2026-01-01T00:00:00\n---\n\n"
 OLD = OKF + "old\n"

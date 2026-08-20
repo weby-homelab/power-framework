@@ -1,8 +1,8 @@
 # Інвентаризація документації встановлення та міграції
 
-**Стан на:** 2026-08-17
+**Стан на:** 2026-08-20
 
-**Версія коду:** 3.6.3
+**Версія коду:** 3.6.5 candidate
 
 **Обсяг:** публічні стартові описи, усі безпосередньо пов'язані з ними операційні
 документи та виконуваний контракт CLI/MCP.
@@ -11,10 +11,10 @@
 
 | Документ | Призначення | Перевірений стан |
 | --- | --- | --- |
-| `README.md` | Англійський огляд і маршрути для агента | Вирівняно з 3.6.3 |
+| `README.md` | Англійський огляд і маршрути для агента | Вирівняно з 3.6.5 candidate |
 | `README.ua.md` | Український огляд і маршрути для агента | Вирівняно з англійським описом |
 | `docs/getting-started.md` | Чисте встановлення на POSIX | Повний acceptance gate |
-| `docs/getting-started.ua.md` | Українська чиста установка | Семантично паритетна |
+| `docs/getting-started.ua.md` | Українська чиста установка | Семантично паритетна з 3.6.5 candidate |
 | `docs/windows-11-installation.md` | Windows 11 25H2 / PowerShell | Повна окрема процедура |
 | `docs/windows-11-installation.ua.md` | Українська Windows-процедура | Семантично паритетна |
 | `docs/migration-guide.md` | Міграція наявної бази | Шість fail-closed фаз |
@@ -33,7 +33,7 @@
 | Документ або посилання | Класифікація | Результат аудиту |
 | --- | --- | --- |
 | `CONTRIBUTING.md` | Поточний development workflow | Існує; не є інструкцією кінцевого користувача |
-| `docs/release-3.6.3.md` | Поточні release notes | Task v2, typed decisions, search ranking та evidence boundary |
+| `docs/release-3.6.3.md` | Історичні release notes | Task v2, typed decisions, search ranking та evidence boundary |
 | `docs/release-3.6.1.md` | Історичні release notes | Суворий CPU throttling і Linux-first release contract |
 | `docs/release-3.6.0.md` | Історичні release notes | Linux-first architecture, evidence та upgrade contract |
 | `docs/release-3.5.0.md` | Історичні release notes | Опублікований release contract; receipt і remote readback перевірені |
@@ -41,7 +41,7 @@
 | `docs/tests/P.O.W.E.R.3.2.1-TEST-2.md` | Історичний тестовий артефакт | Залишено з явною версією у назві |
 | `docs/tests/P.O.W.E.R.3.0.0-TEST.md` | Історичний search-quality звіт | Залишено з явною версією у назві |
 | Документаційний сайт | Опублікований рендер | URL відповідав під час аудиту |
-| Release wheel `v3.6.3` | Immutable install artifact | Tag-bound wheel; signed tag/readback перевіряє GitHub Release workflow |
+| Release wheel `v3.6.5` | Candidate install artifact | Tag-bound candidate wheel; signed tag/readback перевіряє GitHub Release workflow |
 | Python, Git, Microsoft, ONNX Runtime | Зовнішні prerequisites | Посилання ведуть на офіційні джерела |
 
 ## Усунений дрейф
@@ -53,7 +53,7 @@
 - Видалено небезпечне оновлення через destructive reset, непереносний `/tmp`,
   `%USERPROFILE%` у PowerShell і запуск MCP через глобальний `py` замість точного
   інтерпретатора venv.
-- Встановлення прив'язано до release wheel `v3.6.3`, а не до
+- Встановлення прив'язано до candidate release wheel `v3.6.5`, а не до
   рухомої гілки; tag, assets і release receipts перевірені через GitHub Release.
 - Міграція більше не обіцяє автоматичне розпізнавання довільних папок, переписування
   всіх посилань або відновлення тексту через LLM. Додано manifest/hash reconciliation,
@@ -65,7 +65,7 @@
 Локальний smoke test підтверджує створення чистої бази, ingest, strict index, lint,
 Markdown-перевірку, FTS sync/search і status. Фізична перевірка Windows 11 25H2
 для follow-up revision `4e5b2b9` є історичною; результати наведено у [звіті
-перевірки](tests/windows-11-25h2-validation.md). `v3.6.3` не запускає
+перевірки](tests/windows-11-25h2-validation.md). `v3.6.5` не запускає
 `windows-latest` або `macos-latest`: обидві платформи відкладені на невизначений
 строк і не мають release certification. Межі та заборонені inference claims
 зведені у [матриці підтримки](support-matrix.ua.md).

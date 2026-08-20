@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from .constants import INDEX_FOLDERS, is_catalog_filename
+from .errors import ConflictError
 from .indexer import run_generate_hierarchical_index
 from .linter import run_lint_vault
 from .models import PARA_FOLDERS
@@ -114,14 +115,14 @@ def commit_note_change(
                     and prior_receipt.get("after_sha256") == expected_after
                 ):
                     return prior_receipt
-                raise RuntimeError("idempotency key was already used for a different mutation")
+                raise ConflictError("idempotency key was already used for a different mutation")
         target_snapshot = _capture_file(target)
         before = target_snapshot.content if target_snapshot.existed else ""
         before_sha256 = hashlib.sha256(before.encode()).hexdigest()
         if require_absent and target_snapshot.existed:
             raise FileExistsError(f"Note already exists at {rel_path}")
         if expected_before_sha256 is not None and before_sha256 != expected_before_sha256:
-            raise RuntimeError("proposal is stale; note changed after proposal")
+            raise ConflictError("proposal is stale; note changed after proposal")
 
         # Validate before the first write.  This prevents an approved but
         # malformed proposal from entering the vault and disappearing from the

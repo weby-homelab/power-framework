@@ -5,10 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from power_framework.core.decision_service import DecisionService, _serialize
 from power_framework.core.task_service import TaskService
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _sha256(data: bytes) -> str:

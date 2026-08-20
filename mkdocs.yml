@@ -9,8 +9,7 @@ edit_uri: "edit/main/docs/"
 # Historical receipts and working papers remain buildable, but are intentionally
 # outside the curated navigation. This keeps the public navigation focused on
 # the current contract without deleting evidence.
-not_in_nav:
-  |
+not_in_nav: |
   release-3.2.md
   release-3.2.2.md
   release-3.2.3.md
@@ -78,6 +77,7 @@ nav:
       - Healer: api/healer.md
       - Markdown Checks: api/markdown_checks.md
       - Constants: api/constants.md
+      - Application API: api/application.md
       - ROT Scoring: api/rot_scoring.md
       - Searcher: api/searcher.md
       - Utils: api/utils.md
@@ -90,6 +90,8 @@ nav:
   - POWER 3.1 Release Evidence: release-3.1.md
   - POWER 3.4.0 Release Notes: release-3.4.0.md
   - POWER 3.3.2 Release Notes: release-3.3.2.md
+  - POWER 3.6.5 Release Notes: release-3.6.5.md
+  - POWER 3.6.4 Release Notes: release-3.6.4.md
   - POWER 3.6.2 Release Notes: release-3.6.2.md
   - POWER 3.6.1 Release Notes: release-3.6.1.md
   - POWER 3.6.0 Release Notes: release-3.6.0.md

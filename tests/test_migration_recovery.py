@@ -21,13 +21,15 @@ def test_migration_is_idempotent_and_reversible(tmp_path: Path) -> None:
     svc = TaskService(vault)
 
     res1 = svc.migrate_v1_work_packets()
-    assert res1["migrated"] == 2 and res1["skipped"] == 0
+    assert res1["migrated"] == 2
+    assert res1["skipped"] == 0
     assert svc.get_task("wp1").state == "working"
     assert svc.get_task("wp2") is not None
 
     # Idempotent re-run.
     res2 = svc.migrate_v1_work_packets()
-    assert res2["migrated"] == 0 and res2["skipped"] == 2
+    assert res2["migrated"] == 0
+    assert res2["skipped"] == 2
 
     # Manifest is content-free (no objective/body).
     manifest = json.loads(Path(res1["manifest"]).read_text(encoding="utf-8"))
@@ -36,7 +38,8 @@ def test_migration_is_idempotent_and_reversible(tmp_path: Path) -> None:
 
     # Rollback restores originals and removes migrated tasks.
     rb = svc.rollback_v1_migration()
-    assert rb["rolled_back"] == 2 and rb["restored"] == 2
+    assert rb["rolled_back"] == 2
+    assert rb["restored"] == 2
     assert svc.get_task("wp1") is None
     assert (vault / ".power" / "work-packets" / "wp1.json").is_file()
 

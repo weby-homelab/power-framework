@@ -14,6 +14,7 @@ from .decision_models import (
     DecisionReceipt,
     ResponseType,
 )
+from .errors import ConflictError
 from .task_models import ensure_valid_task_id
 from .task_service import TaskService
 from .utils import atomic_write
@@ -172,20 +173,20 @@ class DecisionService:
                     and decision.resolved_by == actor
                 ):
                     return decision, receipt
-                raise ValueError("Decision is already resolved")
+                raise ConflictError("Decision is already resolved")
 
             if "*" not in decision.allowed_actors and actor not in decision.allowed_actors:
                 raise PermissionError("Actor is not allowed to resolve this decision")
             if _AUTHORITY_RANK.get(authority, -1) < _AUTHORITY_RANK[decision.required_authority]:
                 raise PermissionError("Decision resolution has insufficient authority")
             if decision.proposal_sha256 is not None and proposal_sha256 != decision.proposal_sha256:
-                raise ValueError("Decision proposal hash does not match")
+                raise ConflictError("Decision proposal hash does not match")
 
             task = self.task_service.get_task(decision.task_id)
             if task is None:
                 raise FileNotFoundError(f"Task {decision.task_id} not found")
             if task.revision != decision.task_revision:
-                raise ValueError(
+                raise ConflictError(
                     f"Decision task revision is stale: expected {decision.task_revision}, "
                     f"found {task.revision}"
                 )

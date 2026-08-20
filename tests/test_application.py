@@ -32,6 +32,16 @@ def test_retrieve_envelope_is_bounded_and_content_free_receipt(sample_vault: Pat
     assert "Test" not in json.dumps(audit[0].as_dict())
 
 
+def test_request_context_rejects_invalid_authority_actor_and_request_id() -> None:
+    """Invalid transport context metadata fails closed before a use case runs."""
+    with pytest.raises(ValueError, match="actor"):
+        RequestContext(actor="")
+    with pytest.raises(ValueError, match="authority"):
+        RequestContext(authority="execute")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="request_id"):
+        RequestContext(request_id="/unsafe/request-id")
+
+
 def test_propose_apply_share_idempotent_application_contract(sample_vault: Path) -> None:
     service = ApplicationService(sample_vault)
     content = (
