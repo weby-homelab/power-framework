@@ -39,9 +39,9 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
   move, so renaming onto an existing destination works on Windows instead of
   raising `FileExistsError`
 - **Strict 50% CPU Throttling Mandate** — hard concurrency bounds (`max_workers <= max(1, os.cpu_count() // 2)`) and automatic environment throttling (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) ensure P.O.W.E.R. never starves host resources
-- **P.O.W.E.R. 3.6.5 candidate** — publication requires a verified
+- **P.O.W.E.R. 3.6.6 candidate** — publication requires a verified
   wheel, source archive, SBOM, Linux upgrade matrix, and fresh release
-  receipts. Version 3.6.5 carries canonical Task v2 and typed decision workflows,
+  receipts. Version 3.6.6 carries canonical Task v2 and typed decision workflows,
   fail-closed task persistence, Application envelope v2, and consensus-aware
   reranked search. Platform support remains bounded by the
   [support matrix](docs/support-matrix.md).
@@ -64,7 +64,7 @@ the role-specific guides before touching a vault:
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
 - **[Platform support matrix](docs/support-matrix.md)** — Linux is the
-  `v3.6.5` release platform; CI currently validates it on Ubuntu, while macOS
+  `v3.6.6` release platform; CI currently validates it on Ubuntu, while macOS
   and Windows are deferred indefinitely
 
 ## Quick Start (Linux)
@@ -73,9 +73,9 @@ The commands below are the shortest supported path for Linux. They
 assume Python 3.11+ and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
-> **`v3.6.5` candidate release contract:** use the signed tag, wheel, source archive,
+> **`v3.6.6` candidate release contract:** use the signed tag, wheel, source archive,
 > SBOM, and release receipt only after they appear on the
-> [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.5).
+> [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.6).
 > The URL below is the tag-bound install target, not evidence that publication
 > has already completed. The release
 > receipt covers the declared Linux release boundary; check the
@@ -83,7 +83,7 @@ you want POWER to manage.
 > claims about another host.
 
 ```bash
-python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.5/power_framework-3.6.5-py3-none-any.whl
+python3 -m pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -111,13 +111,13 @@ power --version
 
 ## Windows 11 25H2 installation (deferred)
 
-Windows 11 25H2 remains outside the `v3.6.5` supported-platform boundary. The
+Windows 11 25H2 remains outside the `v3.6.6` supported-platform boundary. The
 dedicated [Windows 11 25H2 guide](docs/windows-11-installation.md) describes a
 separate installation and host-validation path; it is not a Stable release
 platform certification.
 
 No Windows CI, upgrade-matrix, compatibility, performance, or GPU claim is
-made for `v3.6.5`. Windows and macOS have no scheduled release target.
+made for `v3.6.6`. Windows and macOS have no scheduled release target.
 
 ## What's Inside
 
@@ -145,7 +145,7 @@ made for `v3.6.5`. Windows and macOS have no scheduled release target.
 | **CI/CD**                        | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest.                                                                                                                                                                                                                                                                                                                  |
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
 
-> **POWER 3.6.5 evidence contract:** publication requires machine validation
+> **POWER 3.6.6 evidence contract:** publication requires machine validation
 > gates, package/CI provenance, an SBOM, a Linux upgrade matrix executed on the
 > Ubuntu CI runner, and source-bound technical receipts. Real-vault and human
 > evaluation are optional benchmarks, not release secrets or publication
@@ -159,7 +159,7 @@ made for `v3.6.5`. Windows and macOS have no scheduled release target.
 
 Read the historical v1.6.0 snapshot of the transition from flat to hierarchical
 indexing. Its measured vault counts, token estimates, source paths, test counts,
-and MCP inventory are historical evidence, not the current `v3.6.5` contract:
+and MCP inventory are historical evidence, not the current `v3.6.6` contract:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
@@ -277,13 +277,13 @@ The [MCP client onboarding guide](docs/mcp-client-onboarding.md) contains the
 canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
 OpenCode, plus the read-only golden task and approval workflow.
 
-The wheel URL below is the tag-bound `v3.6.5` install target. Run it only after
+The wheel URL below is the tag-bound `v3.6.6` install target. Run it only after
 the signed tag and assets exist on the
-[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.5)
+[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.6)
 with the source archive, SBOM, and release receipts.
 
 ```bash
-pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.5/power_framework-3.6.5-py3-none-any.whl
+pip install https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl
 ```
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
@@ -601,10 +601,10 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux (v3.6.5 release boundary)",
+  "operatingSystem": "Linux (v3.6.6 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.11+",
-  "softwareVersion": "3.6.5",
+  "softwareVersion": "3.6.6",
   "license": "https://www.gnu.org/licenses/gpl-3.0",
   "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
   "author": {
@@ -633,8 +633,8 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux (v3.6.5 release boundary)
-softwareVersion: 3.6.5
+operatingSystem: Linux (v3.6.6 release boundary)
+softwareVersion: 3.6.6
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

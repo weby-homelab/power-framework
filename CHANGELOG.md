@@ -5,6 +5,16 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.6] - 2026-08-20
+
+### Changed
+
+- Published the machine-only retrieval/runtime evidence release boundary.
+- Updated the clean-install, upgrade-matrix, and release receipts from 3.6.5
+  to 3.6.6 while preserving Linux-first support and fail-closed contracts.
+- Human-annotated retrieval evaluation is excluded from this release; no
+  human-quality or real-vault quality claim is made.
+
 ## [3.6.5] - 2026-08-20
 
 ### Added

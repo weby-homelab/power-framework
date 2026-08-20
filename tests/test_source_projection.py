@@ -1,4 +1,4 @@
-"""Hermetic tests for the 3.6.5 read projection contract."""
+"""Hermetic tests for the 3.6.6 read projection contract."""
 
 from __future__ import annotations
 
