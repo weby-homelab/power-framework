@@ -5,6 +5,17 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.7] - 2026-08-21
+
+### Changed
+
+- Narrowed the supported Python contract and CI matrix to the two latest stable
+  feature releases, Python 3.13 and Python 3.14 (`>=3.13,<3.15`).
+- Updated the GUI Docker runtime and active installation documentation to match
+  the two-version support boundary.
+- Carried the 3.6.6 machine-only evidence boundary forward without claiming
+  real-vault quality or human-annotated retrieval quality.
+
 ## [3.6.6] - 2026-08-20
 
 ### Changed

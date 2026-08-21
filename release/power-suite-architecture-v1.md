@@ -115,7 +115,7 @@ heads:
 
 | Component | Version/tag | Source SHA |
 | --- | --- | --- |
-| POWER core | 3.6.6 / `v3.6.6` | candidate base `origin/main` `527cc8a77187e9fa6d724b604d1a6634545da575`; tag commit `6c6b6ae52f4b29382f0d2ec82fbb4e75ba1f471a` |
+| POWER core | 3.6.7 / `v3.6.7` | candidate base `origin/main` `527cc8a77187e9fa6d724b604d1a6634545da575`; tag commit `6c6b6ae52f4b29382f0d2ec82fbb4e75ba1f471a` |
 | POWER-GUI | 0.7.4 / `v0.7.4` | candidate base `origin/main` `068b4d32d5d55170de52c81a897526e3d640078a`; tag commit `f1c918c7a8c6de011ff0553f08d00675ad296f59` |
 
 The pre-existing dirty worktrees under `projects/P.O.W.E.R` and

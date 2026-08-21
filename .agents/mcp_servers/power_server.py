@@ -3,7 +3,7 @@
 P.O.W.E.R. MCP Server entry-point for OpenCode/Antigravity CLI.
 This script launches the official MCP SDK v2 server from power_framework.mcp.
 
-Version: 3.6.6
+Version: 3.6.7
 Updated: 2026-08-21
 """
 

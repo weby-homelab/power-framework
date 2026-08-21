@@ -1,9 +1,9 @@
 # Historical: install P.O.W.E.R. 3.5.0 on Windows 11 25H2
 
-> **Not a `v3.6.6` procedure.** Windows support is deferred indefinitely and
+> **Not a `v3.6.7` procedure.** Windows support is deferred indefinitely and
 > has no scheduled release target. The commands below preserve the historical
-> `v3.5.0` host-validation procedure and must not be presented as 3.6.6
-> compatibility or release certification for the 3.6.6 candidate.
+> `v3.5.0` host-validation procedure and must not be presented as 3.6.7
+> compatibility or release certification for the 3.6.7 candidate.
 
 This guide installs P.O.W.E.R. `v3.5.0` in an isolated virtual environment,
 creates a clean vault, verifies the CLI, and configures an MCP client. It uses
@@ -52,7 +52,7 @@ CPU ONNX Runtime; no CUDA toolkit is required.
 
 Install a 64-bit CPython release from python.org. During setup, enable the
 Python launcher and `PATH` options offered by the installer. Python 3.13 is a
-conservative recommended choice; Python 3.11–3.14 satisfy the current package
+conservative recommended choice; Python 3.13 or 3.14 satisfy the current package
 contract.
 
 Install the current Microsoft Visual C++ 2015–2022 Redistributable matching the

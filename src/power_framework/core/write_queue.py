@@ -8,17 +8,15 @@ that used ``run_blocking`` or ``enqueue_write`` directly.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 from .mutation import enqueue_compatibility_write, run_blocking
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-T = TypeVar("T")
 
-
-async def enqueue_write(sync_fn: Callable[[], T]) -> T:
+async def enqueue_write[T](sync_fn: Callable[[], T]) -> T:
     """Run a legacy write call without creating a background worker task."""
     return await enqueue_compatibility_write(sync_fn)
 

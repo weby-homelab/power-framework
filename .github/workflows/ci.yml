@@ -34,13 +34,13 @@ jobs:
       - name: Execute content-free upgrade and rollback invariants
         run: >-
           uv run python scripts/verify_upgrade_matrix.py
-          --from-version 3.6.5 --to-version 3.6.6
+          --from-version 3.6.6 --to-version 3.6.7
           --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power366-upgrade-${{ matrix.os }}
+          name: power367-upgrade-${{ matrix.os }}
           path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
           if-no-files-found: error
           retention-days: 7
@@ -54,22 +54,22 @@ jobs:
       - name: Download platform upgrade matrix evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: power366-upgrade-*
-          path: ${{ runner.temp }}/power366-upgrade-reports
+          pattern: power367-upgrade-*
+          path: ${{ runner.temp }}/power367-upgrade-reports
           merge-multiple: true
 
       - name: Aggregate supported Linux reports from Ubuntu CI
         run: >-
           python scripts/aggregate_upgrade_matrix.py
-          --input-dir "${{ runner.temp }}/power366-upgrade-reports"
+          --input-dir "${{ runner.temp }}/power367-upgrade-reports"
           --require-supported-platforms
-          --output "${{ runner.temp }}/power366-upgrade-aggregate.json"
+          --output "${{ runner.temp }}/power367-upgrade-aggregate.json"
 
       - name: Upload aggregated upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power366-upgrade-aggregate
-          path: ${{ runner.temp }}/power366-upgrade-aggregate.json
+          name: power367-upgrade-aggregate
+          path: ${{ runner.temp }}/power367-upgrade-aggregate.json
           if-no-files-found: error
           retention-days: 7
 
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -279,7 +279,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install dependencies
         run: |

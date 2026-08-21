@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 VALIDATOR = REPO_ROOT / "scripts" / "verify_release_contract.py"
 TEMPLATE = REPO_ROOT / "release" / "evidence" / "baselines" / "v3.4.5.json"
 MODELS_LOCK = REPO_ROOT / "release" / "models.lock.json"
-RELEASE_NOTES = REPO_ROOT / "docs" / "release-3.6.6.md"
+RELEASE_NOTES = REPO_ROOT / "docs" / "release-3.6.7.md"
 PREPUBLICATION_DOCS = (
     REPO_ROOT / "README.md",
     REPO_ROOT / "README.ua.md",
@@ -152,16 +152,16 @@ def test_release_notes_keep_governance_claims_within_evidence_boundary() -> None
     notes = RELEASE_NOTES.read_text(encoding="utf-8")
 
     assert "Zero open repository issues" not in notes
-    assert "published `v3.6.6` release" not in notes
+    assert "published `v3.6.7` release" not in notes
     assert "real-vault quality or human-quality claim" in notes
-    assert "3.6.5 -> 3.6.6" in notes
+    assert "3.6.6 -> 3.6.7" in notes
     assert "macOS and Windows remain outside the supported release boundary" in notes
 
 
 def test_current_docs_do_not_claim_3_6_publication_without_remote_readback() -> None:
     forbidden_claims = (
-        "`v3.6.6` is available",
-        "`v3.6.6` доступний",
+        "`v3.6.7` is available",
+        "`v3.6.7` доступний",
         "реліз містить machine",
         "the release contains the machine",
     )
@@ -175,8 +175,8 @@ def test_current_docs_do_not_claim_3_6_publication_without_remote_readback() -> 
 def test_default_3_6_6_baseline_is_fail_closed_until_tag_workflow_generates_it() -> None:
     ignore_text = EVIDENCE_IGNORE.read_text(encoding="utf-8")
 
-    assert not (REPO_ROOT / "release" / "evidence" / "baselines" / "v3.6.6.json").exists()
-    assert "baselines/v3.6.6.json" in ignore_text
+    assert not (REPO_ROOT / "release" / "evidence" / "baselines" / "v3.6.7.json").exists()
+    assert "baselines/v3.6.7.json" in ignore_text
     assert "final baseline is generated from the clean signed tag" in ignore_text
 
 

@@ -1,4 +1,4 @@
-# P.O.W.E.R. Framework 3.6.6
+# P.O.W.E.R. Framework 3.6.7
 
 P.O.W.E.R. is a local-first, Git-native toolkit for structured knowledge bases. It combines
 P.A.R.A., validated OKF frontmatter, hierarchical indexes, full-text and semantic retrieval,
@@ -19,7 +19,7 @@ and an MCP interface for AI agents.
 - [Матриця підтримки платформ](support-matrix.ua.md)
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
-These guides define the current `v3.6.6` candidate artifact contract, use an
+These guides define the current `v3.6.7` candidate artifact contract, use an
 isolated virtual environment, and include acceptance checks. Publication is
 complete only when the signed tag, wheel, source archive, SBOM, and release
 receipts can be read back from GitHub. The
@@ -28,7 +28,7 @@ and hash, and make cutover reversible.
 
 ## Executable contract
 
-- Python 3.11 or newer.
+- Python 3.13 or 3.14.
 - 26 top-level CLI commands; see the [CLI reference](cli.md).
 - 20 MCP tools; see the [MCP server reference](mcp-server.md).
 - `auto` is the default search profile: verified dense when ready, otherwise
@@ -45,7 +45,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install \
-  "https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
+  "https://github.com/weby-homelab/power-framework/releases/download/v3.6.7/power_framework-3.6.7-py3-none-any.whl"
 
 power init ./my-vault
 power index ./my-vault --strict

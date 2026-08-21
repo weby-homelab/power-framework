@@ -56,7 +56,7 @@ class TaskStore:
         self.tx_dir.mkdir(parents=True, exist_ok=True)
 
     @contextmanager
-    def lock(self) -> Generator[None, None, None]:
+    def lock(self) -> Generator[None]:
         """Acquire a per-vault writer lock with thread reentrancy."""
         with self._thread_lock:
             self._ensure_dirs()

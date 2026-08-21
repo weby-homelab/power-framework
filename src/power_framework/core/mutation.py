@@ -14,7 +14,7 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 try:  # POSIX advisory locks.
     import fcntl
@@ -28,8 +28,6 @@ except ImportError:  # pragma: no cover - exercised on POSIX
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
-
-T = TypeVar("T")
 
 _registry_guard = threading.Lock()
 _vault_locks: dict[Path, threading.RLock] = {}
@@ -94,13 +92,13 @@ def vault_mutation(vault_dir: Path) -> Iterator[Path]:
             os.close(descriptor)
 
 
-def execute_vault_mutation(vault_dir: Path, operation: Callable[[], T]) -> T:
+def execute_vault_mutation[T](vault_dir: Path, operation: Callable[[], T]) -> T:
     """Execute one synchronous operation under the canonical vault boundary."""
     with vault_mutation(vault_dir):
         return operation()
 
 
-async def run_blocking(sync_fn: Callable[[], T]) -> T:
+async def run_blocking[T](sync_fn: Callable[[], T]) -> T:
     """Run a blocking operation and join its executor before returning.
 
     Polling the submitted future avoids a Python 3.13 runtime deadlock seen
@@ -115,12 +113,12 @@ async def run_blocking(sync_fn: Callable[[], T]) -> T:
         return future.result()
 
 
-async def run_vault_mutation(vault_dir: Path, operation: Callable[[], T]) -> T:
+async def run_vault_mutation[T](vault_dir: Path, operation: Callable[[], T]) -> T:
     """Run a synchronous mutation under per-vault locks without blocking asyncio."""
     return await run_blocking(lambda: execute_vault_mutation(vault_dir, operation))
 
 
-async def enqueue_compatibility_write(sync_fn: Callable[[], T]) -> T:
+async def enqueue_compatibility_write[T](sync_fn: Callable[[], T]) -> T:
     """Preserve the legacy queue API for callers without a vault argument.
 
     Production CLI/MCP paths use :func:`run_vault_mutation`; this fallback is
@@ -129,7 +127,7 @@ async def enqueue_compatibility_write(sync_fn: Callable[[], T]) -> T:
     return await run_blocking(lambda: _run_compatibility_write(sync_fn))
 
 
-def _run_compatibility_write(sync_fn: Callable[[], T]) -> T:
+def _run_compatibility_write[T](sync_fn: Callable[[], T]) -> T:
     with _compatibility_lock:
         return sync_fn()
 

@@ -17,10 +17,10 @@ SPEC.loader.exec_module(MODULE)
 
 class TestPowerAutoUpdater:
     def test_parse_stable_versions(self) -> None:
-        assert MODULE.parse_version("v3.6.6") == (3, 6, 6)
+        assert MODULE.parse_version("v3.6.7") == (3, 6, 7)
         assert MODULE.parse_version("3.6.10") == (3, 6, 10)
         with pytest.raises(ValueError, match="unsupported stable version"):
-            MODULE.parse_version("v3.6.6-rc1")
+            MODULE.parse_version("v3.6.7-rc1")
 
     def test_redact_credentials(self) -> None:
         message = "token=ghp_abcdefghijklmnop123456 password=hidden"
@@ -31,14 +31,14 @@ class TestPowerAutoUpdater:
 
     def test_compose_replacement_is_narrow(self) -> None:
         compose = "services:\n  power-gui:\n    image: webyhomelab/power-gui:0.7.4\n"
-        updated = MODULE.replace_compose_image(compose, "local/power-gui:3.6.6")
-        assert "image: local/power-gui:3.6.6" in updated
+        updated = MODULE.replace_compose_image(compose, "local/power-gui:3.6.7")
+        assert "image: local/power-gui:3.6.7" in updated
         assert "0.7.4" not in updated
 
     def test_compose_replacement_rejects_ambiguous_input(self) -> None:
         compose = "services:\n  one:\n    image: one:latest\n  two:\n    image: two:latest\n"
         with pytest.raises(RuntimeError):
-            MODULE.replace_compose_image(compose, "local/power-gui:3.6.6")
+            MODULE.replace_compose_image(compose, "local/power-gui:3.6.7")
 
     def test_python_discovery_uses_only_explicit_allowlist(self, tmp_path: Path) -> None:
         target = Path(sys.executable)

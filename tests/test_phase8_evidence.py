@@ -109,7 +109,7 @@ def test_real_receipt_requires_all_four_experiments() -> None:
 
 
 def test_technical_receipts_are_content_free_and_complete(tmp_path: Path) -> None:
-    release = "3.6.6"
+    release = "3.6.7"
     source_commit = "a" * 40
     source_tree = "b" * 40
     worktree_sha256 = "c" * 64
@@ -235,13 +235,13 @@ def test_technical_receipts_reject_stale_release_or_source(tmp_path: Path) -> No
     errors = phase8.validate_technical_receipts(
         outcome_path=outcome,
         continuity_path=continuity,
-        release="3.6.6",
+        release="3.6.7",
         source_commit="d" * 40,
         source_tree="e" * 40,
         require_clean=True,
     )
 
-    assert any("release must be 3.6.6" in error for error in errors)
+    assert any("release must be 3.6.7" in error for error in errors)
     assert any("source.commit" in error for error in errors)
     assert any("source.tree" in error for error in errors)
 
