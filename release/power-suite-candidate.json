@@ -1,0 +1,141 @@
+{
+  "schema": "power.suite.candidate.v1",
+  "status": "candidate-validation",
+  "generated_at": "2026-08-21T22:20:10+03:00",
+  "source": {
+    "power": {
+      "repository": "https://github.com/weby-homelab/power-framework",
+      "tag": "v3.6.6",
+      "version": "3.6.6",
+      "ref": "origin/main-candidate-base",
+      "sha": "527cc8a77187e9fa6d724b604d1a6634545da575",
+      "tag_commit": "6c6b6ae52f4b29382f0d2ec82fbb4e75ba1f471a",
+      "implementation_ref": "feature/power-suite-3.7",
+      "implementation_commit": "08ca9326dc849921db0c61a852ecb83cd6dd96b0"
+    },
+    "gui": {
+      "repository": "https://github.com/weby-homelab/ai-second-brain-gui",
+      "tag": "v0.7.4",
+      "version": "0.7.4",
+      "ref": "origin/main-candidate-base",
+      "sha": "068b4d32d5d55170de52c81a897526e3d640078a",
+      "tag_commit": "f1c918c7a8c6de011ff0553f08d00675ad296f59",
+      "implementation_ref": "feature/power-gui-suite-3.7",
+      "implementation_commit": "27ed678593647f000cc77462611df1fba43808d9"
+    }
+  },
+  "application": {
+    "schema": "power.application.v2",
+    "authority": "ApplicationService",
+    "receipts": "power.receipt.v1"
+  },
+  "native": {
+    "venv": "~/.local/share/power/venv",
+    "launchers": [
+      "~/.local/bin/power",
+      "~/.local/bin/power-mcp",
+      "~/.local/bin/power-gui"
+    ],
+    "transport": "mcp-stdio",
+    "system_python_mutation": false,
+    "daemon_required": false,
+    "fresh_home_install": "verified"
+  },
+  "mcp": {
+    "entry_point": "power-mcp",
+    "transport": "stdio",
+    "vault_root": "POWER_VAULT_DIR",
+    "adapter_target": "official-mcp-python-sdk-v2",
+    "current_adapter": "official-mcp-python-sdk-v2",
+    "tool_contract_hash": "bb4a0790eeb7c47138917508d8556a1f45c8a311995f552388499183b195755c",
+    "protocols_tested": ["legacy", "2026-07-28"],
+    "stdout": "wire-clean-subprocess-verified"
+  },
+  "skill": {
+    "source": "skills/power",
+    "format": "agentskills",
+    "version": "3.6.6",
+    "tree_sha256": "c30126eafca2e3890a0441f9e6803cde88750c16ada975df6fde5a66e81df3d1",
+    "packaged": true,
+    "compatible_core": "3.6.6",
+    "global_targets": [
+      "/root/.agents/skills/power",
+      "/root/.opencode/skills/power",
+      "/root/.config/opencode/skills/power"
+    ]
+  },
+  "gui": {
+    "native": {
+      "profile": "systemd-user",
+      "bind": "127.0.0.1",
+      "opt_in": true,
+      "restart_policy": "bounded",
+      "unit_syntax": "verified",
+      "lifecycle": "not-run-in-live-home"
+    },
+    "container": {
+      "profile": "supported-server",
+      "required_for_mcp": false,
+      "cache_sharing": "separate-rebuildable-cache",
+      "image_digest": null,
+      "local_image_id": "sha256:fabdfba555aa77b30cc1330295a75224426926110500e471cb93fdfd8aacc5f2",
+      "base_image_digest": "sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317",
+      "security": "non-root-10001-cap-drop-all-no-new-privileges",
+      "health": "local-candidate-verified"
+    }
+  },
+  "product_updater": {
+    "automatic": false,
+    "mode": "manual-hash-bound",
+    "policy": "release/power-suite-updater-policy.md",
+    "reason": "suite-aware stage/verify/activate/readback/rollback is not proven for this candidate"
+  },
+  "artifacts": {
+    "power_wheel_sha256": "cf853aa73aca5847c43e8097be335c49196a17149eb88a931a000765f85fb512",
+    "gui_wheel_sha256": "dd98f67dfa9a824aa09803d9c78a0eb304c228d187c4012a3bdca84dd3a6f39e",
+    "sbom_sha256": null,
+    "local_sbom_sha256": {
+      "power_lock_cyclonedx1_5": "233f99862dc68189deba59a5206cb95d0e0bfde67772048f23f47ca6966ad7a0",
+      "gui_lock_cyclonedx1_5": "48a7357395e014442d4ec1913e73e6fa66676fa22cad3d89df5938ca944a20b2"
+    },
+    "attestation": "not-published-at-candidate-validation"
+  },
+  "validation": {
+    "core_full_cpu_pytest": "1150 passed, 11 skipped, 2 warnings",
+    "gui_full_pytest": "53 passed, 3 skipped, 1 warning",
+    "mcp_integration_pytest_no_cov": "69 passed",
+    "core_mypy": "pass",
+    "core_ruff": "pass",
+    "gui_ruff": "pass",
+    "documentation_drift": "pass",
+    "native_fresh_home": "power/power-mcp/power-gui launchers, versions, preflight and receipt verified",
+    "container_local": "healthz/login/non-root/cap-drop/no-new-privileges verified",
+    "vault_doctor": "read-only environment warning: five pre-existing invalid-metadata notes and index coverage mismatch; no vault mutation",
+    "m2_human": "EXCLUDED_BY_POLICY"
+  },
+  "release_decision": {
+    "3.6.7": "NO-GO: local implementation gates pass; publication, attestation and lifecycle gates remain open",
+    "3.6.8": "SKIP: blocker-only scope has no additional code blocker after 3.6.7 validation",
+    "3.7.0": "NO-GO: public artifact/digest/SBOM/attestation and native lifecycle evidence are not published or read back"
+  },
+  "evidence_policy": {
+    "m2_human": "EXCLUDED_BY_POLICY",
+    "sealed": "DO_NOT_OPEN",
+    "human_retrieval_quality_claim": "NONE"
+  },
+  "closed_gates": [
+    "B0 exact-version-pair",
+    "B1 power-mcp-entry-point",
+    "B2 official-mcp-sdk-v2-compatibility",
+    "B3 application-service-boundary",
+    "B4 skill-packaging",
+    "B5 native-installer"
+  ],
+  "open_blockers": [
+    "B6 final public suite manifest, artifact publication and readback",
+    "B7 real opt-in systemd-user lifecycle and native GUI E2E",
+    "B8 published container digest plus release SBOM/attestation",
+    "B9 host CLI/MCP plus container GUI concurrent mutation and recovery"
+  ],
+  "validation_report": "release/power-suite-validation-report.md"
+}
