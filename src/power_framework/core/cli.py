@@ -57,6 +57,15 @@ from .importer import (
     format_import_report,
 )
 from .indexer import generate_log_initial, run_generate_hierarchical_index
+from .integrations import (
+    apply_mcp_config_integration_plan,
+    apply_native_install_plan,
+    apply_skill_install_plan,
+    build_integrations_doctor,
+    build_mcp_config_integration_plan,
+    build_native_install_plan,
+    build_skill_check_plan,
+)
 from .linter import (
     archive_stale_notes,
     run_lint_report,
@@ -898,6 +907,78 @@ def _cmd_connect(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_integrations(args: argparse.Namespace) -> int:
+    """Plan or apply generic, path-safe suite integration operations."""
+    try:
+        if args.integration_command == "doctor":
+            print(json.dumps(build_integrations_doctor(), ensure_ascii=False, sort_keys=True))
+        elif args.integration_command == "mcp-config":
+            plan = build_mcp_config_integration_plan(
+                args.path,
+                client=args.client,
+                config_path=args.config,
+                executable=args.executable,
+                remove=args.remove,
+            )
+            if args.plan_output:
+                atomic_write(
+                    Path(args.plan_output).expanduser(),
+                    json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                )
+            if args.apply:
+                print(
+                    json.dumps(
+                        apply_mcp_config_integration_plan(plan, approved=args.approved),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
+        elif args.integration_command == "skill-check":
+            print(
+                json.dumps(build_skill_check_plan(args.target), ensure_ascii=False, sort_keys=True)
+            )
+        elif args.integration_command == "skill-install":
+            plan = build_skill_check_plan(args.target)
+            if args.apply:
+                print(
+                    json.dumps(
+                        apply_skill_install_plan(plan, approved=args.approved),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
+        elif args.integration_command == "install":
+            plan = build_native_install_plan(
+                home=args.home,
+                power_wheel=args.power_wheel,
+                gui_wheel=args.gui_wheel,
+            )
+            if args.apply:
+                print(
+                    json.dumps(
+                        apply_native_install_plan(
+                            plan,
+                            approved=args.approved,
+                            no_deps=args.no_deps,
+                        ),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
+        else:  # pragma: no cover - argparse enforces the choices
+            raise ValueError(f"unsupported integration command: {args.integration_command}")
+    except (KeyError, PermissionError, RuntimeError, ValueError, OSError) as exc:
+        logger.error("Integration transaction failed: %s", exc)
+        return 1
+    return 0
+
+
 def _cmd_memory(args: argparse.Namespace) -> int:
     vault_dir = _resolve_path(args.path)
     try:
@@ -1312,6 +1393,78 @@ def main() -> None:
         help="Explicitly probe the configured provider without downloading a model",
     )
     p_doctor.set_defaults(func=_cmd_doctor)
+
+    p_integrations = subparsers.add_parser(
+        "integrations",
+        help="Plan or apply generic POWER suite integrations (dry-run by default)",
+    )
+    integration_sub = p_integrations.add_subparsers(dest="integration_command", required=True)
+    integration_sub.add_parser(
+        "doctor", help="Read-only integration, launcher, SDK, and Skill diagnostics"
+    ).set_defaults(func=_cmd_integrations)
+
+    p_mcp_config = integration_sub.add_parser(
+        "mcp-config", help="Plan or apply a hash-bound local MCP client configuration"
+    )
+    p_mcp_config.add_argument("path", help="Path to the POWER vault")
+    p_mcp_config.add_argument(
+        "--client",
+        choices=["auto", "codex", "opencode", "gemini", "claude"],
+        default="auto",
+        help="Client to configure",
+    )
+    p_mcp_config.add_argument("--config", default=None, help="Explicit client config path")
+    p_mcp_config.add_argument(
+        "--executable",
+        default="power-mcp",
+        help="Public MCP launcher (default: power-mcp)",
+    )
+    p_mcp_config.add_argument("--remove", action="store_true", help="Plan removal")
+    p_mcp_config.add_argument("--apply", action="store_true", help="Apply the plan")
+    p_mcp_config.add_argument(
+        "--approved", action="store_true", help="Explicitly approve the config write"
+    )
+    p_mcp_config.add_argument("--plan-output", default=None, help="Write the plan to JSON")
+    p_mcp_config.set_defaults(func=_cmd_integrations)
+
+    p_skill_check = integration_sub.add_parser(
+        "skill-check", help="Read-only check of a packaged POWER Skill installation"
+    )
+    p_skill_check.add_argument(
+        "--target",
+        default=str(Path.home() / ".agents" / "skills" / "power"),
+        help="Skill target directory",
+    )
+    p_skill_check.set_defaults(func=_cmd_integrations)
+
+    p_skill_install = integration_sub.add_parser(
+        "skill-install", help="Plan or atomically install the packaged POWER Skill"
+    )
+    p_skill_install.add_argument(
+        "--target",
+        default=str(Path.home() / ".agents" / "skills" / "power"),
+        help="Skill target directory",
+    )
+    p_skill_install.add_argument("--apply", action="store_true", help="Apply the plan")
+    p_skill_install.add_argument(
+        "--approved", action="store_true", help="Explicitly approve the Skill write"
+    )
+    p_skill_install.set_defaults(func=_cmd_integrations)
+
+    p_install = integration_sub.add_parser(
+        "install", help="Plan or install an exact wheel pair into the managed native venv"
+    )
+    p_install.add_argument(
+        "--home", default=None, help="Disposable HOME root for the managed profile"
+    )
+    p_install.add_argument("--power-wheel", required=True, help="Exact POWER framework wheel")
+    p_install.add_argument("--gui-wheel", default=None, help="Optional exact POWER-GUI wheel")
+    p_install.add_argument("--no-deps", action="store_true", help="Skip dependency resolution")
+    p_install.add_argument("--apply", action="store_true", help="Apply the plan")
+    p_install.add_argument(
+        "--approved", action="store_true", help="Explicitly approve the native install"
+    )
+    p_install.set_defaults(func=_cmd_integrations)
 
     p_connect = subparsers.add_parser(
         "connect", help="Plan or apply a conflict-safe local MCP client connection"

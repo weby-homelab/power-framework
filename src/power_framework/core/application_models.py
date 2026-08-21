@@ -1,7 +1,7 @@
 """Versioned DTO models for POWER Application API v2.
 
 These models define standard, serialization-safe, and bounded data transfer
-objects used across all transport adapters (CLI, FastMCP, POWER-GUI, Federation, A2A).
+objects used across all transport adapters (CLI, official MCP SDK, POWER-GUI, Federation, A2A).
 """
 
 from __future__ import annotations

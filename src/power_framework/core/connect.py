@@ -64,7 +64,13 @@ def _client_for_path(path: Path) -> str:
 
 def _server_entry(client: str, vault_path: Path, executable: str) -> dict[str, Any]:
     """Return the client-specific, content-free local stdio server entry."""
-    command = [str(Path(executable)), "-m", "power_framework.mcp"]
+    executable_path = Path(executable)
+    if executable_path.name.startswith("python"):
+        # Preserve the explicit-interpreter compatibility path for existing
+        # configs; native suite installs use the public power-mcp launcher.
+        command = [str(executable_path), "-m", "power_framework.mcp"]
+    else:
+        command = [str(executable_path)]
     environment = {"POWER_VAULT_DIR": str(vault_path.resolve())}
     if client == "opencode":
         return {"type": "local", "command": command, "environment": environment, "enabled": True}

@@ -29,7 +29,7 @@ and hash, and make cutover reversible.
 ## Executable contract
 
 - Python 3.11 or newer.
-- 25 top-level CLI commands; see the [CLI reference](cli.md).
+- 26 top-level CLI commands; see the [CLI reference](cli.md).
 - 20 MCP tools; see the [MCP server reference](mcp-server.md).
 - `auto` is the default search profile: verified dense when ready, otherwise
   labelled FTS; `semantic` and `reranked` are explicit opt-ins.

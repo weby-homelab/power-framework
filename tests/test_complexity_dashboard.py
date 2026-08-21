@@ -14,7 +14,7 @@ def test_complexity_dashboard_reports_frozen_metrics() -> None:
 
     assert report["schema_version"] == "power.complexity-dashboard.v1"
     assert report["baseline_revision"] == "v3.4.5"
-    assert report["current"]["cli_commands"] == 25
+    assert report["current"]["cli_commands"] == 26
     assert report["current"]["mcp_tools"] == 20
     assert report["canonical_workflows"] <= 7
     assert report["budget"]["duplicate_skill_sources_zero"] is True

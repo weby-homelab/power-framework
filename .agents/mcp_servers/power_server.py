@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 P.O.W.E.R. MCP Server entry-point for OpenCode/Antigravity CLI.
-This script launches the FastMCP 3.x server from power_framework.mcp.
+This script launches the official MCP SDK v2 server from power_framework.mcp.
 
-Version: 3.6.5
-Updated: 2026-08-17
+Version: 3.6.6
+Updated: 2026-08-21
 """
 
 import os
@@ -21,8 +21,8 @@ if os.path.isfile(_env_path):
                 if _k not in os.environ:
                     os.environ[_k] = _v
 
-# Run the power_framework MCP server
-from power_framework.mcp import run  # type: ignore  # noqa: E402
+# Run the public power-mcp entry point.
+from power_framework.mcp.entrypoint import main  # type: ignore  # noqa: E402
 
 if __name__ == "__main__":
-    run()
+    main()

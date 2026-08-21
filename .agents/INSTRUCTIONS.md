@@ -1,6 +1,6 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+, hatchling, Pydantic v2, local FTS by default, and optional FastMCP/neural extras.
+Python 3.11+, hatchling, Pydantic v2, local FTS by default, and optional official MCP/neural extras.
 
 ## Commands
 
@@ -35,7 +35,7 @@ mypy src/power_framework/  # type check
 src/power_framework/
 ├── core/          # CLI, models, parser, indexer, linter, searcher, application service
 ├── experimental/  # opt-in dense, graph, reranker, query-expansion and ROT adapters
-├── mcp/           # FastMCP 3.x local server — 20 async tools
+├── mcp/           # official MCP SDK v2 local server — 20 async tools
 tests/             # pytest, asyncio_mode=auto, coverage >= 70%
 scripts/           # utility scripts (excluded from ruff T20/S310)
 ```

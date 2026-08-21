@@ -19,7 +19,7 @@
 | `docs/windows-11-installation.ua.md` | Українська Windows-процедура | Семантично паритетна |
 | `docs/migration-guide.md` | Міграція наявної бази | Шість fail-closed фаз |
 | `docs/migration-guide.ua.md` | Українська міграція | Семантично паритетна |
-| `docs/cli.md` | Виконуваний CLI-контракт | 25 команд |
+| `docs/cli.md` | Виконуваний CLI-контракт | 26 команд |
 | `docs/mcp-server.md` | Виконуваний MCP-контракт | 20 інструментів |
 | `docs/mcp-client-onboarding.md` | Golden onboarding для чотирьох клієнтів | stdio shape + proposal gate |
 | `docs/mcp-client-onboarding.ua.md` | Український golden onboarding | Семантично паритетний |
@@ -47,7 +47,8 @@
 ## Усунений дрейф
 
 - Старий MCP-інвентар замінено на фактичні `20` інструментів; CLI
-  задокументовано як `25` top-level команд.
+  задокументовано як `26` top-level команд.
+- До surface додано generic `power integrations` для suite, Skill і launcher plans.
 - `reranked` більше не називається стандартним режимом: код використовує `semantic`,
   а reranking вмикається явно.
 - Видалено небезпечне оновлення через destructive reset, непереносний `/tmp`,

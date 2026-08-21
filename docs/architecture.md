@@ -8,7 +8,7 @@ src/power_framework/
 ├── py.typed            # PEP 561 marker
 ├── core/
 │   ├── __init__.py     # Stable core exports; optional exports are lazy
-│   ├── cli.py          # CLI entry point (argparse) — 25 commands
+│   ├── cli.py          # CLI entry point (argparse) — 26 commands
 │   ├── constants.py    # Centralized constants (exclusion lists, skip files, system dirs)
 │   ├── healer.py       # Frontmatter Healer
 │   ├── markdown_checks.py  # Markdown quality checks
@@ -35,7 +35,9 @@ src/power_framework/
 └── mcp/
     ├── __init__.py     # Package marker
     ├── __main__.py     # python -m entry point
-    └── power_server.py # FastMCP 3.x server (20 tools + health)
+    ├── entrypoint.py   # public power-mcp launcher and preflight
+    ├── preflight.py    # dependency-light vault boundary check
+    └── power_server.py # official MCP SDK v2 server (20 tools + health)
 
 tests/
 ├── test_cli.py         # CLI functional tests
@@ -57,7 +59,9 @@ tests/
 ## Design decisions
 
 - **`src/` layout** — Standard Python packaging, prevents import confusion
-- **FastMCP 3.x (Prefect)** — Modern MCP framework with structured `ToolError`, `ErrorHandlingMiddleware`, `mask_error_details`, async tools, HTTP transport
+- **Official MCP Python SDK v2** — Modern MCP server/client primitives with
+  legacy and 2026-07-28 protocol-era interoperability, structured `ToolError`,
+  async tools, stdio, and loopback HTTP transport
 - **Pydantic v2** — `model_dump()`, strict validation, `field_validator`, UTC-aware timestamps
 - **Atomic file writes** — `os.replace()` for crash-safe config persistence
 - **Path traversal protection** — `Path.relative_to()` boundary checking (not string-prefix)

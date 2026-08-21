@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-P.O.W.E.R. MCP Server (FastMCP 3.x).
+P.O.W.E.R. MCP Server (official MCP Python SDK v2).
 
 Exposes MCP tools for AI agent interaction with the knowledge vault:
 - lint_vault: Health check for metadata, links, and orphans
@@ -18,24 +18,26 @@ Exposes MCP tools for AI agent interaction with the knowledge vault:
 - heal_frontmatter_tool: Auto-fix missing/invalid frontmatter
 - check_markdown_tool: Markdown quality audit
 
-Supports stdio transport (local) and HTTP transport (Docker, with /health endpoint).
+Uses the official MCP Python SDK v2 and supports stdio transport (local) plus
+Streamable HTTP transport (Docker, with /health endpoint).
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Literal
+import re
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
-from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
-from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import CallToolResult, InputRequiredResult, TextContent, ToolAnnotations
 from starlette.responses import JSONResponse
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from starlette.requests import Request
@@ -45,31 +47,17 @@ from power_framework.core import (
     DEFAULT_SEARCH_MODE,
     PARA_FOLDERS,
     ApplicationService,
-    MemoryKind,
-    MemoryMetadata,
-    NoteType,
-    OKFMetadata,
     RateLimiter,
     RequestContext,
-    WritePolicy,
     __version__,
-    archive_stale_notes,
-    build_frontmatter,
-    commit_note_change,
     enforce_cpu_throttling_env,
     get_context,
-    heal_vault,
     normalize_search_mode,
     read_file_content,
-    resolve_path_in_vault,
     resolve_vault_path,
     run_blocking,
-    run_generate_hierarchical_index,
-    run_generate_sub_index,
     run_lint_report,
     run_rot_report,
-    run_vault_mutation,
-    scan_folder_notes,
     search_vault,
     validate_state,
     validate_vault_path,
@@ -81,26 +69,128 @@ from power_framework.core.constants import SKIP_FILES
 from power_framework.core.doctor import report_as_json, run_doctor
 from power_framework.core.domains import DomainConfigError
 from power_framework.core.ignore import should_skip
-from power_framework.core.synthesize import synthesize_session_ingest
 from power_framework.experimental.relations import (
     format_relation_suggestions,
     suggest_related,
     suggest_related_semantic,
 )
 
+from .preflight import require_configured_vault_root
+
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP(
+_MCP_ANNOTATION_ALIASES = {
+    "readOnlyHint": "read_only_hint",
+    "destructiveHint": "destructive_hint",
+    "idempotentHint": "idempotent_hint",
+    "openWorldHint": "open_world_hint",
+}
+_ToolCallable = TypeVar("_ToolCallable", bound=Callable[..., Any])
+_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w])/(?:[^\s'\"`,;)]*)+")
+
+
+def _normalize_tool_annotations(
+    annotations: ToolAnnotations | Mapping[str, Any] | None,
+) -> ToolAnnotations | None:
+    """Normalize legacy dict-shaped annotation calls for the official SDK."""
+    if annotations is None or isinstance(annotations, ToolAnnotations):
+        return annotations
+    normalized = {
+        _MCP_ANNOTATION_ALIASES.get(key, key): value for key, value in annotations.items()
+    }
+    return ToolAnnotations.model_validate(normalized)
+
+
+def _safe_mcp_error_text(error: Exception) -> str:
+    """Return actionable MCP error text without absolute paths or tracebacks."""
+    message = str(error).strip()
+    if not message or "Traceback (most recent call last)" in message:
+        return "POWER MCP tool failed; inspect the server log for details."
+    message = _ABSOLUTE_PATH_RE.sub("<path>", message)
+    return message[:512]
+
+
+class PowerMCPServer(MCPServer):
+    """Official MCP SDK v2 server with POWER compatibility and safety seams."""
+
+    def tool(
+        self,
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: ToolAnnotations | Mapping[str, Any] | None = None,
+        icons: list[Any] | None = None,
+        meta: dict[str, Any] | None = None,
+        structured_output: bool | None = None,
+    ) -> Callable[[_ToolCallable], _ToolCallable]:
+        """Register a tool while accepting the pre-v2 annotation spelling."""
+        return super().tool(
+            name=name,
+            title=title,
+            description=description,
+            annotations=_normalize_tool_annotations(annotations),
+            icons=icons,
+            meta=meta,
+            structured_output=structured_output,
+        )
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        context: Any = None,
+    ) -> CallToolResult | InputRequiredResult:
+        """Execute a tool and convert SDK execution errors to safe results."""
+        try:
+            result = await super().call_tool(name, arguments, context)
+        except ToolError as exc:
+            logger.exception("MCP tool execution failed: %s", name)
+            return CallToolResult(
+                content=[TextContent(type="text", text=_safe_mcp_error_text(exc))],
+                is_error=True,
+            )
+        return result
+
+    def run(self, transport: str = "stdio", **kwargs: Any) -> None:
+        """Run official SDK transports while retaining POWER's ``http`` alias."""
+        if transport == "http":
+            transport = "streamable-http"
+        if transport not in {"stdio", "sse", "streamable-http"}:
+            raise ValueError(f"Unsupported MCP transport: {transport}")
+        supported_transport = cast("Literal['stdio', 'sse', 'streamable-http']", transport)
+        super().run(transport=supported_transport, **kwargs)
+
+    def custom_route(
+        self,
+        path: str,
+        methods: list[str],
+        name: str | None = None,
+        include_in_schema: bool = True,
+    ) -> Callable[
+        [Callable[[Request], Awaitable[Response]]], Callable[[Request], Awaitable[Response]]
+    ]:
+        """Expose a typed custom-route decorator because SDK v2 omits its return type."""
+        return cast(
+            "Callable[[Callable[[Request], Awaitable[Response]]], Callable[[Request], Awaitable[Response]]]",
+            super().custom_route(
+                path,
+                methods,
+                name=name,
+                include_in_schema=include_in_schema,
+            ),
+        )
+
+    def http_app(self, *, transport: str = "http", **kwargs: Any) -> Any:
+        """Compatibility alias for tests and integrations using the old API."""
+        if transport != "http":
+            raise ValueError(f"Unsupported HTTP transport alias: {transport}")
+        return self.streamable_http_app(**kwargs)
+
+
+mcp = PowerMCPServer(
     "power",
     version=__version__,
     instructions=f"P.O.W.E.R. {__version__} — Hybrid Knowledge Management Framework",
-    mask_error_details=True,
-)
-mcp.add_middleware(
-    ErrorHandlingMiddleware(
-        include_traceback=False,
-        transform_errors=True,
-    )
 )
 
 _write_limiter = RateLimiter(max_calls=10, period=60.0)
@@ -221,29 +311,6 @@ def _get_vault_path(vault_path: str | None = None) -> Path:
     return resolve_vault_path(args)
 
 
-def _require_configured_vault_root() -> Path:
-    """Require a canonical vault root before the MCP server accepts clients."""
-    configured_root = os.getenv("POWER_VAULT_DIR") or os.getenv("POWER_VAULT_PATH")
-    if not configured_root:
-        raise RuntimeError(
-            "POWER_VAULT_DIR (or POWER_VAULT_PATH) must be configured before starting the MCP server"
-        )
-    try:
-        return validate_vault_path(configured_root)
-    except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
-        raise RuntimeError("POWER_VAULT_DIR must reference an existing vault directory") from exc
-
-
-def _resolve_note_target(vault_path: Path, name: str) -> Path:
-    """Resolve untrusted MCP note names only within approved PARA folders."""
-    try:
-        return resolve_path_in_vault(vault_path, name, allowed_directories=PARA_FOLDERS)
-    except ValueError as exc:
-        raise ToolError(
-            "Invalid note path; use an existing PARA directory and a Markdown filename."
-        ) from exc
-
-
 def _get_http_transport_config() -> tuple[str, int]:
     """Return a fail-closed local-only HTTP MCP transport configuration."""
     host = os.getenv("POWER_MCP_HOST", "127.0.0.1")
@@ -266,7 +333,7 @@ def _get_http_transport_config() -> tuple[str, int]:
 async def health_check(_request: Request) -> Response:
     """Report whether the configured vault boundary is ready for HTTP clients."""
     try:
-        _require_configured_vault_root()
+        require_configured_vault_root()
     except RuntimeError as exc:
         return JSONResponse({"status": "error", "detail": str(exc)}, status_code=503)
     return JSONResponse({"status": "ok"})
@@ -331,8 +398,12 @@ async def generate_index(vault_path: str | None = None) -> str:
         )
 
     path = _get_vault_path(vault_path)
-    # Serialize index regeneration within this vault while preserving other-vault parallelism.
-    return await run_vault_mutation(path, lambda: run_generate_hierarchical_index(path))
+    envelope = await run_blocking(
+        lambda: ApplicationService(path).generate_index(
+            context=RequestContext(actor="mcp", authority="apply")
+        )
+    )
+    return str(envelope.data["result"])
 
 
 @mcp.tool(
@@ -372,59 +443,26 @@ async def sync_vault(
         )
 
     path = _get_vault_path(vault_path)
-
-    def _run() -> str:
-        from power_framework.core.generation_index import (
-            IndexGenerationError,
-            list_invalid_sources,
-            sync_vault_atomically,
-        )
-
-        invalid_sources = list_invalid_sources(path)
-        if invalid_sources and not allow_partial:
-            details = "; ".join(
-                f"{rel_path} ({reason})" for rel_path, reason in sorted(invalid_sources.items())
-            )
-            raise ToolError(
-                "Vault sync failed closed: "
-                f"{len(invalid_sources)} note(s) are excluded and remain unsearchable. "
-                f"Excluded: {details}. Pass allow_partial=True only to publish the valid subset."
-            )
-
-        try:
-            report = sync_vault_atomically(
-                path,
-                sync_embeddings=not fts_only,
+    try:
+        envelope = await run_blocking(
+            lambda: ApplicationService(path).sync_vault(
+                fts_only=fts_only,
+                accept_dense_loss=accept_dense_loss,
                 force_rebuild=force_rebuild,
                 allow_partial=allow_partial,
-                accept_dense_loss=accept_dense_loss,
+                context=RequestContext(actor="mcp", authority="apply"),
             )
-        except IndexGenerationError as exc:
-            raise ToolError(f"Vault sync failed; previous index remains active: {exc}") from exc
-
-        lines = [
-            "=== Vault Sync ===",
-            f"Generation: {report.generation_id}",
-            f"Mode: {'FTS only' if fts_only else 'FTS + embeddings'}",
-            f"Notes scanned: {report.total_scanned}",
-            f"Notes indexed: {report.actual_files}",
-            f"Notes excluded (invalid metadata): {report.invalid_sources}",
-            f"Chunks: {report.actual_chunks}",
-        ]
-        if report.invalid_sources:
-            lines.append("")
-            lines.append("Exclusion reasons:")
-            lines.extend(
-                f"- {rel_path}: {reason}"
-                for rel_path, reason in sorted(report.excluded_sources.items())
-            )
-            lines.append(
-                "Excluded notes are not searchable. Run 'power index <vault> --strict' "
-                "to list them, or heal_frontmatter_tool to repair them."
-            )
-        return "\n".join(lines)
-
-    return await run_vault_mutation(path, _run)
+        )
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        raise ToolError(str(exc)) from exc
+    return str(envelope.data["result"])
 
 
 @mcp.tool(
@@ -468,28 +506,26 @@ async def ensure_sub_index(category: str, vault_path: str | None = None, page: i
     """Generate and read one bounded page of a P.A.R.A. sub-index."""
     path = _get_vault_path(vault_path)
     page = _validate_catalog_page(page)
-
-    if category not in PARA_FOLDERS:
-        raise ToolError(f"Invalid category: {category}. Must be one of: {', '.join(PARA_FOLDERS)}")
-
-    category_path = path / category
-    if not category_path.is_dir():
-        raise ToolError(f"Category folder not found: {category}")
-
-    folder_notes = await run_blocking(lambda: scan_folder_notes(path))
-    notes = folder_notes.get(category, [])
-
-    if not notes:
-        return f"No notes found in {category}."
-
-    def _gen_and_read() -> str:
-        result = run_generate_sub_index(path, category)
-        content = _read_catalog_page(category_path, page)
-        if content is None:
-            raise ToolError(f"Generated catalog landing page is missing for {category}")
-        return f"{result}\n\n{content}"
-
-    return await run_vault_mutation(path, _gen_and_read)
+    try:
+        envelope = await run_blocking(
+            lambda: ApplicationService(path).ensure_sub_index(
+                category,
+                page=page,
+                context=RequestContext(actor="mcp", authority="apply"),
+            )
+        )
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        raise ToolError(str(exc)) from exc
+    result = str(envelope.data["result"])
+    content = str(envelope.data.get("content", ""))
+    return f"{result}\n\n{content}" if content else result
 
 
 @mcp.tool(
@@ -519,63 +555,33 @@ async def ingest_note(
         )
 
     path = _get_vault_path(vault_path)
-    tags = tags or []
-
-    if not name.endswith(".md"):
-        name += ".md"
-
-    target_file = _resolve_note_target(path, name)
-
-    if target_file.exists():
-        raise ToolError(f"Note already exists at {name}")
-
-    timestamp = datetime.now(UTC)
-    metadata = OKFMetadata(
-        type=NoteType(note_type),
-        title=title,
-        description=description,
-        resource=resource,
-        tags=tags,
-        okf_version="0.2",
-        memory=MemoryMetadata(
-            kind=MemoryKind.SEMANTIC,
-            sources=["power://mcp/ingest_note"],
-            evidence=[f"sha256:{hashlib.sha256(content.encode('utf-8')).hexdigest()}"],
-            write_policy=WritePolicy.AGENT_PROPOSED,
-        ),
-        timestamp=timestamp,
-    )
-
-    frontmatter = build_frontmatter(metadata)
-    full_content = f"{frontmatter}\n\n{content}\n"
-
-    def _write_and_index() -> str:
-        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
-        log_entry = (
-            f"\n## [{date_str}] ingest | Created {title}\n"
-            f"- **Action:** Created note '{name}' of type {note_type} via MCP tool ingest_note.\n"
-            f"- **Result:** Saved note to {name} and compiled hierarchical index.\n"
+    try:
+        envelope = await run_blocking(
+            lambda: ApplicationService(path).ingest_note(
+                name=name,
+                note_type=note_type,
+                title=title,
+                description=description,
+                content=content,
+                resource=resource,
+                tags=tags,
+                context=RequestContext(actor="mcp", authority="apply"),
+            )
         )
-        receipt = commit_note_change(
-            path,
-            name,
-            full_content,
-            require_absent=True,
-            allowed_directories=PARA_FOLDERS,
-            operation="mcp.ingest_note",
-            log_entry=log_entry,
-        )
-        lint_result = run_lint_report(path)
-        return (
-            f"Note '{name}' has been successfully ingested!\n"
-            f"{receipt['index_summary']}\n"
-            f"Search projection: {receipt['search_mode']} ({receipt['search_generation']})\n"
-            f"Action appended to log.md when the log exists.\n\n"
-            f"Linting Check:\n{lint_result}"
-        )
-
-    # The shared transaction owns the mutation lock and all projections.
-    return await run_blocking(_write_and_index)
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        if "path" in str(exc).lower() or "traversal" in str(exc).lower():
+            raise ToolError(
+                "Invalid note path; use an existing PARA directory and a Markdown filename."
+            ) from exc
+        raise ToolError(str(exc)) from exc
+    return str(envelope.data["result"])
 
 
 @mcp.tool(
@@ -902,34 +908,34 @@ async def synthesize_session(
         )
 
     path = _get_vault_path(vault_path)
-    tags = tags or []
-    related_list = related or []
-
-    if not name.endswith(".md"):
-        name += ".md"
-
-    target_file = _resolve_note_target(path, name)
-    if target_file.exists():
-        raise ToolError(f"Note already exists at {name}")
-
-    timestamp = datetime.now(UTC)
-
-    def _write_and_index() -> str:
-        return synthesize_session_ingest(
-            name=name,
-            title=title,
-            description=description,
-            content=content,
-            note_type=note_type,
-            tags=tags,
-            related=related_list,
-            owner=owner,
-            vault_path=path,
-            timestamp=timestamp,
+    try:
+        envelope = await run_blocking(
+            lambda: ApplicationService(path).synthesize_session(
+                name=name,
+                title=title,
+                description=description,
+                content=content,
+                note_type=note_type,
+                tags=tags,
+                related=related,
+                owner=owner,
+                context=RequestContext(actor="mcp", authority="apply"),
+            )
         )
-
-    # The shared transaction owns the mutation lock and all projections.
-    return await run_blocking(_write_and_index)
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        if "path" in str(exc).lower() or "traversal" in str(exc).lower():
+            raise ToolError(
+                "Invalid note path; use an existing PARA directory and a Markdown filename."
+            ) from exc
+        raise ToolError(str(exc)) from exc
+    return str(envelope.data["result"])
 
 
 @mcp.tool(
@@ -959,9 +965,13 @@ async def rot_audit(vault_path: str | None = None, extended: bool = False) -> st
 async def archive_notes(dry_run: bool = True, vault_path: str | None = None) -> str:
     """Move stale/expired notes to 04_Archive. Use dry_run=True (default) to preview first."""
     path = _get_vault_path(vault_path)
-    if dry_run:
-        return await run_blocking(lambda: archive_stale_notes(path, dry_run=True))
-    return await run_vault_mutation(path, lambda: archive_stale_notes(path, dry_run=False))
+    envelope = await run_blocking(
+        lambda: ApplicationService(path).archive_notes(
+            dry_run=dry_run,
+            context=RequestContext(actor="mcp", authority="apply") if not dry_run else None,
+        )
+    )
+    return str(envelope.data["result"])
 
 
 @mcp.tool(
@@ -1012,9 +1022,13 @@ async def heal_frontmatter_tool(
 ) -> str:
     """Scan and heal missing/invalid frontmatter fields across vault notes. Use dry_run=True (default) to preview first."""
     path = _get_vault_path(vault_path)
-    if dry_run:
-        return await run_blocking(lambda: heal_vault(path, dry_run=True))
-    return await run_vault_mutation(path, lambda: heal_vault(path, dry_run=False))
+    envelope = await run_blocking(
+        lambda: ApplicationService(path).heal_frontmatter(
+            dry_run=dry_run,
+            context=RequestContext(actor="mcp", authority="apply") if not dry_run else None,
+        )
+    )
+    return str(envelope.data["result"])
 
 
 @mcp.tool(
@@ -1081,11 +1095,11 @@ def run() -> None:
     enforce_cpu_throttling_env()
     transport = os.getenv("POWER_MCP_TRANSPORT", "stdio")
     if transport == "http":
-        _require_configured_vault_root()
+        require_configured_vault_root()
         host, port = _get_http_transport_config()
         mcp.run(transport="http", host=host, port=port)
     elif transport == "stdio":
-        _require_configured_vault_root()
+        require_configured_vault_root()
         mcp.run(transport="stdio")
     else:
         raise ValueError("POWER_MCP_TRANSPORT must be either 'stdio' or 'http'")

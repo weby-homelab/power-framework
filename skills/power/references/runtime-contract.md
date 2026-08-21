@@ -6,9 +6,9 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.6.6` — runtime contract: **25 CLI commands** + **20 MCP tools** (FastMCP 3.x).
+`v3.6.6` — runtime contract: **26 CLI commands** + **20 MCP tools** (official MCP Python SDK v2).
 
-## CLI (25 команд)
+## CLI (26 команд)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
@@ -35,8 +35,9 @@ sync/doctor правила. Авторитетна правда — `power docto
 23. `power control-plane <path> [--apply]` — preview або materialize visible status view
 24. `power maintenance <path> [--apply]` — hash-bound preview/apply для reversible repairs
 25. `power migrate-state <path>` — content-free read-only state-plane inventory; apply is fail-closed
+26. `power integrations <doctor|mcp-config|skill-check|skill-install|install>` — generic dry-run-first suite integration and managed native install flows
 
-## MCP Tools (20) — FastMCP 3.x
+## MCP Tools (20) — official MCP Python SDK v2
 
 - Discovery: `get_server_info` — versioned runtime, configured vault, coverage,
   and embedding configuration; `probe_provider=true` is an explicit no-download
@@ -152,8 +153,9 @@ power sync PATH [--fts-only] [--force] [--strict | --allow-partial] [--accept-de
 - Reranker: `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0);
   `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) — явний opt-in.
 - Search default: `auto`; canonical path is verified dense when ready and labelled FTS otherwise. Explicit `semantic` remains fail-closed.
-- MCP entry-point: `python -m power_framework.mcp`; `POWER_VAULT_DIR` обов'язковий
-  і задає єдиний доступний vault.
+- MCP entry-point: `power-mcp` (with `python -m power_framework.mcp` retained as a
+  compatibility module entrypoint); `POWER_VAULT_DIR` обов'язковий і задає
+  єдиний доступний vault.
 - Device: `POWER_EMBED_DEVICE` / `POWER_RERANKER_DEVICE`
   (`auto`, `cpu`, `cuda`, `rocm`, `directml`).
 - Resource control: `POWER_EMBED_BATCH_SIZE`, `POWER_EMBED_NUM_THREADS`,

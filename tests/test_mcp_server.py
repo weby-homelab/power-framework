@@ -1,6 +1,4 @@
-"""
-Tests for P.O.W.E.R. MCP Server tool calls using FastMCP functions directly.
-"""
+"""Tests for the P.O.W.E.R. MCP Server and official SDK v2 wire contract."""
 
 from __future__ import annotations
 
@@ -13,12 +11,13 @@ import subprocess
 import sys
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock
 
 import httpx
 import pytest
-from fastmcp import Client
-from fastmcp.exceptions import ToolError
+from mcp import Client
+from mcp.server.mcpserver.exceptions import ToolError
 
 from power_framework.core import __version__
 from power_framework.core.capabilities import manifest
@@ -40,6 +39,7 @@ from power_framework.mcp.power_server import (
     synthesize_session,
     validate_memory_state,
 )
+from tests.mcp_test_client import stdio_session
 
 
 def _free_tcp_port() -> int:
@@ -62,20 +62,20 @@ def _mcp_process_env(vault_path: Path, transport: str, port: int | None = None) 
     return env
 
 
-async def _assert_wire_contract(client: Client[object]) -> None:
-    assert client.initialize_result is not None
-    assert client.initialize_result.serverInfo.version == __version__
-    tools = await client.list_tools()
-    resources = await client.list_resources()
-    resource_templates = await client.list_resource_templates()
-    prompts = await client.list_prompts()
+async def _assert_wire_contract(client: Any) -> None:
+    assert client.server_info is not None
+    assert client.server_info.version == __version__
+    tools = (await client.list_tools()).tools
+    resources = (await client.list_resources()).resources
+    resource_templates = (await client.list_resource_templates()).resource_templates
+    prompts = (await client.list_prompts()).prompts
 
     expected_names = manifest()["interfaces"]["mcp_tools"]
     assert [tool.name for tool in tools] == expected_names
     assert resources == []
     assert resource_templates == []
     assert prompts == []
-    assert all(tool.outputSchema for tool in tools)
+    assert all(tool.output_schema for tool in tools)
     assert all(tool.annotations for tool in tools)
     assert all(tool.meta and tool.meta.get("power.risk") for tool in tools)
 
@@ -122,56 +122,55 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
 
     archive = by_name["archive_notes"]
     assert archive.annotations is not None
-    assert archive.annotations.readOnlyHint is False
-    assert archive.annotations.destructiveHint is True
-    assert archive.annotations.idempotentHint is False
-    assert archive.annotations.openWorldHint is False
+    assert archive.annotations.read_only_hint is False
+    assert archive.annotations.destructive_hint is True
+    assert archive.annotations.idempotent_hint is False
+    assert archive.annotations.open_world_hint is False
     assert archive.meta == {
         "power.risk": {"local_only": True, "egress": "none", "approval": "explicit"}
     }
 
     search = by_name["search_vault_tool"]
     assert search.annotations is not None
-    assert search.annotations.readOnlyHint is True
+    assert search.annotations.read_only_hint is True
     assert search.meta["power.risk"]["egress"] == "model_download"
 
     proposal = by_name["propose_memory_change"]
     assert proposal.annotations is not None
-    assert proposal.annotations.readOnlyHint is False
-    assert proposal.annotations.destructiveHint is False
-    assert proposal.annotations.idempotentHint is True
+    assert proposal.annotations.read_only_hint is False
+    assert proposal.annotations.destructive_hint is False
+    assert proposal.annotations.idempotent_hint is True
     assert proposal.meta == {
         "power.risk": {"local_only": True, "egress": "none", "approval": "caller"}
     }
 
     for catalog_name in ("read_sub_index", "ensure_sub_index"):
-        catalog_parameters = by_name[catalog_name].parameters
-        assert catalog_parameters["properties"]["page"] == {"default": 1, "type": "integer"}
+        catalog_parameters = by_name[catalog_name].input_schema
+        assert catalog_parameters["properties"]["page"]["default"] == 1
+        assert catalog_parameters["properties"]["page"]["type"] == "integer"
         assert "page" not in catalog_parameters["required"]
 
     discovery = by_name["get_server_info"]
     assert discovery.annotations is not None
-    assert discovery.annotations.readOnlyHint is True
-    assert discovery.annotations.destructiveHint is False
-    assert discovery.annotations.idempotentHint is True
-    assert discovery.annotations.openWorldHint is False
+    assert discovery.annotations.read_only_hint is True
+    assert discovery.annotations.destructive_hint is False
+    assert discovery.annotations.idempotent_hint is True
+    assert discovery.annotations.open_world_hint is False
     assert discovery.meta == {
         "power.risk": {"local_only": True, "egress": "none", "approval": "none"}
     }
-    assert discovery.parameters["properties"]["probe_provider"] == {
-        "default": False,
-        "type": "boolean",
-    }
-    assert "probe_provider" not in discovery.parameters.get("required", [])
+    assert discovery.input_schema["properties"]["probe_provider"]["default"] is False
+    assert discovery.input_schema["properties"]["probe_provider"]["type"] == "boolean"
+    assert "probe_provider" not in discovery.input_schema.get("required", [])
 
 
 async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections() -> None:
     async with Client(power_server.mcp) as client:
-        tools = await client.list_tools()
-        resources = await client.list_resources()
-        resource_templates = await client.list_resource_templates()
-        prompts = await client.list_prompts()
-        tools_again = await client.list_tools()
+        tools = (await client.list_tools()).tools
+        resources = (await client.list_resources()).resources
+        resource_templates = (await client.list_resource_templates()).resource_templates
+        prompts = (await client.list_prompts()).prompts
+        tools_again = (await client.list_tools()).tools
 
     expected_names = manifest()["interfaces"]["mcp_tools"]
     assert [tool.name for tool in tools] == expected_names
@@ -180,7 +179,7 @@ async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections(
     assert resources == []
     assert resource_templates == []
     assert prompts == []
-    assert all(tool.outputSchema for tool in tools)
+    assert all(tool.output_schema for tool in tools)
     assert all(tool.annotations for tool in tools)
     assert all(tool.meta and tool.meta.get("power.risk") for tool in tools)
 
@@ -189,8 +188,8 @@ async def test_mcp_server_advertises_truthful_package_version() -> None:
     from power_framework.core import __version__
 
     async with Client(power_server.mcp) as client:
-        assert client.initialize_result is not None
-        assert client.initialize_result.serverInfo.version == __version__
+        assert client.server_info is not None
+        assert client.server_info.version == __version__
 
 
 async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
@@ -242,7 +241,11 @@ async def test_get_server_info_can_request_the_no_download_provider_probe(
     assert not any(issue["code"] == "embedding_binding_not_requested" for issue in result["issues"])
 
 
-async def test_mcp_stdio_process_preserves_wire_contract(sample_vault: Path) -> None:
+@pytest.mark.parametrize("protocol_mode", ["legacy", "2026-07-28"])
+async def test_mcp_stdio_process_preserves_wire_contract(
+    sample_vault: Path,
+    protocol_mode: str,
+) -> None:
     config = {
         "mcpServers": {
             "power": {
@@ -253,7 +256,7 @@ async def test_mcp_stdio_process_preserves_wire_contract(sample_vault: Path) -> 
         }
     }
 
-    async with Client(config) as client:
+    async with stdio_session(config, mode=protocol_mode) as client:
         await _assert_wire_contract(client)
         info_result = await client.call_tool("get_server_info")
         assert info_result.content
@@ -395,7 +398,9 @@ async def test_ensure_sub_index_can_return_requested_page(
         )
         return "Generated test catalog"
 
-    monkeypatch.setattr(power_server, "run_generate_sub_index", fake_generate)
+    from power_framework.core import application
+
+    monkeypatch.setattr(application, "run_generate_sub_index", fake_generate)
 
     result = await ensure_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
 

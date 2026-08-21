@@ -28,7 +28,7 @@ POWER_VAULT="$HOME/Documents/power-vault"
 
 python3 -m venv "$POWER_VENV"
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
 # Only for a new or empty vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'
@@ -39,13 +39,17 @@ configuration below. The MCP process must receive `POWER_VAULT_DIR`; it is the
 configured vault boundary. The server is local stdio, so its stdout is
 reserved for MCP protocol traffic.
 
+The installed public launcher is `power-mcp`. The source-checkout compatibility
+entry point `python -m power_framework.mcp` remains available for tests and
+legacy wrappers, but it is not the canonical client configuration.
+
 Do not point a client at a repository wrapper, a shell script that loads
 secrets, or a different Python installation. Do not add a second vault path to
 the client configuration.
 
 ## Client configurations
 
-Replace `/absolute/path/to/python` and `/absolute/path/to/vault` in exactly one
+Replace `/absolute/path/to/power-mcp` and `/absolute/path/to/vault` in exactly one
 of the following client configurations.
 
 <!-- power-client-config:claude-desktop -->
@@ -59,8 +63,8 @@ macOS, or `~/.config/Claude/claude_desktop_config.json` on Linux:
 {
   "mcpServers": {
     "power": {
-      "command": "/absolute/path/to/python",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "/absolute/path/to/power-mcp",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "/absolute/path/to/vault"
       }
@@ -79,8 +83,8 @@ Add the `power` entry to `~/.gemini/settings.json`:
 {
   "mcpServers": {
     "power": {
-      "command": "/absolute/path/to/python",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "/absolute/path/to/power-mcp",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "/absolute/path/to/vault"
       }
@@ -101,8 +105,8 @@ Add this table to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.power]
-command = "/absolute/path/to/python"
-args = ["-m", "power_framework.mcp"]
+command = "/absolute/path/to/power-mcp"
+args = []
 env = { "POWER_VAULT_DIR" = "/absolute/path/to/vault" }
 ```
 
@@ -122,7 +126,7 @@ Add the `power` entry directly under `mcp` in `~/.config/opencode/opencode.jsonc
   "mcp": {
     "power": {
       "type": "local",
-      "command": ["/absolute/path/to/python", "-m", "power_framework.mcp"],
+      "command": ["/absolute/path/to/power-mcp"],
       "environment": {
         "POWER_VAULT_DIR": "/absolute/path/to/vault"
       },
@@ -144,7 +148,7 @@ the server name, and `--` separates Claude options from the launch command:
 ```bash
 claude mcp add --transport stdio \
   --env POWER_VAULT_DIR=/absolute/path/to/vault \
-  power -- /absolute/path/to/python -m power_framework.mcp
+  power -- /absolute/path/to/power-mcp
 ```
 
 Run `claude mcp list` and then `/mcp` inside a session to verify the server.
