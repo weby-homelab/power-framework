@@ -21,7 +21,7 @@ the required `weby-homelab <rekvizitor.ua@gmail.com>` identity.
 
 The feature branches are clean and PR-ready:
 
-- POWER: `feature/power-suite-3.7`, local HEAD `2971550c6e915f82b59e6707641ab6db496e8571`;
+- POWER: `feature/power-suite-3.7`, local HEAD `815256aa8d9bbdd48a1f276729830c3999b914cb`;
 - POWER-GUI: `feature/power-gui-suite-3.7`, local HEAD `b8001e1e5d3f57ed679b6941c6d0a12a752c931e`.
 
 No remote feature branch or PR was created because the configured GitHub
