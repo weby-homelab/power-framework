@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "3.6.6"
+version = "3.6.7"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
-requires-python = ">=3.11"
+requires-python = ">=3.13,<3.15"
 authors = [
     { name = "Weby Homelab", email = "rekvizitor.ua@gmail.com" }
 ]
@@ -18,8 +18,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -135,7 +133,7 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]

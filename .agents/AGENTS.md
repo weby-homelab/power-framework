@@ -1,6 +1,6 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 26 top-level
+Python 3.13–3.14 toolkit for AI-native Second Brain management. CLI (`power`, 26 top-level
 commands) + local MCP server (20 tools).
 
 ## Project Structure

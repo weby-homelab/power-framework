@@ -1,6 +1,6 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+, hatchling, Pydantic v2, local FTS by default, and optional official MCP/neural extras.
+Python 3.13–3.14, hatchling, Pydantic v2, local FTS by default, and optional official MCP/neural extras.
 
 ## Commands
 

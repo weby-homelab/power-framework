@@ -1,4 +1,4 @@
-"""Measure the frozen 3.6.6 complexity budget without reading note content."""
+"""Measure the frozen 3.6.7 complexity budget without reading note content."""
 
 from __future__ import annotations
 

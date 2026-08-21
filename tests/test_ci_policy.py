@@ -44,17 +44,17 @@ def test_ci_aggregates_all_supported_ubuntu_reports() -> None:
     assert "scripts/aggregate_upgrade_matrix.py" in ci_text
     assert "os: [ubuntu-latest]" in ci_text
     assert "--require-supported-platforms" in ci_text
-    assert "name: power366-upgrade-aggregate" in ci_text
-    assert "power366-upgrade-aggregate.json" in ci_text
+    assert "name: power367-upgrade-aggregate" in ci_text
+    assert "power367-upgrade-aggregate.json" in ci_text
 
 
 def test_current_python_support_starts_at_3_11() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
     pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert 'requires-python = ">=3.11"' in pyproject_text
+    assert 'requires-python = ">=3.13,<3.15"' in pyproject_text
     assert '"Programming Language :: Python :: 3.10"' not in pyproject_text
-    assert 'python-version: ["3.11", "3.12", "3.13", "3.14"]' in ci_text
+    assert 'python-version: ["3.13", "3.14"]' in ci_text
     assert '"3.10"' not in ci_text
 
 
@@ -107,7 +107,7 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
 def test_release_does_not_require_private_phase8_secrets() -> None:
     release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
 
-    assert "name: power366-stable-release" not in release_text
+    assert "name: power367-stable-release" not in release_text
     assert "POWER365_REAL_VAULT_RECEIPT_JSON" not in release_text
     assert "POWER365_HUMAN_MANIFEST_JSON" not in release_text
     assert "scripts/materialize_phase8_evidence.py" not in release_text
@@ -139,12 +139,12 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "scripts/generate_release_gate_manifest.py" in release_text
     assert "scripts/generate_release_candidate.py" in release_text
     assert "--require-worktree-hash" in release_text
-    assert "power366-gates.json" in release_text
-    assert "power366-validation.json" in release_text
+    assert "power367-gates.json" in release_text
+    assert "power367-validation.json" in release_text
     assert "--gate-manifest" in release_text
-    assert '--junitxml="$RUNNER_TEMP/power366-junit.xml"' in release_text
-    assert '--cov-report=json:"$RUNNER_TEMP/power366-coverage.json"' in release_text
-    assert "power366-phase8-technical-receipts" in release_text
+    assert '--junitxml="$RUNNER_TEMP/power367-junit.xml"' in release_text
+    assert '--cov-report=json:"$RUNNER_TEMP/power367-coverage.json"' in release_text
+    assert "power367-phase8-technical-receipts" in release_text
     assert 'assert outcome["raw_content_in_report"] is False' in release_text
     assert 'assert outcome["comparison"]["practical_improvement"] is True' in release_text
     assert 'assert continuity["gate"]["power_beats_plain_handoff"] is True' in release_text
@@ -153,7 +153,7 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "--validation-report" in release_text
     assert "--sbom" in release_text
     assert "--upgrade-matrix-aggregate" in release_text
-    assert "power366-release-upgrade-aggregate" in release_text
+    assert "power367-release-upgrade-aggregate" in release_text
 
 
 def test_quarantined_fleet_docs_and_helper_forbid_live_cache_transfer() -> None:
