@@ -19,6 +19,16 @@ sealed human-evaluation material was not opened.
 Both implementation commits are signed with GPG key `2D49E810C7F2527E` and
 the required `weby-homelab <rekvizitor.ua@gmail.com>` identity.
 
+The feature branches are clean and PR-ready:
+
+- POWER: `feature/power-suite-3.7`, local HEAD `2971550c6e915f82b59e6707641ab6db496e8571`;
+- POWER-GUI: `feature/power-gui-suite-3.7`, local HEAD `b8001e1e5d3f57ed679b6941c6d0a12a752c931e`.
+
+No remote feature branch or PR was created because the configured GitHub
+credentials are invalid (`gh auth status` reports invalid `GITHUB_TOKEN` and
+account token). No token was read from or written to a file, and no push, merge,
+tag, or publication was attempted.
+
 ## 3.6.7 implementation gates
 
 The following local gates passed:
