@@ -27,7 +27,7 @@ jobs:
 
       - name: Install locked development environment
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
           uv sync --locked --group dev
 
@@ -91,7 +91,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
           uv sync --locked --group dev --extra semantic --extra rerank
 
@@ -135,7 +135,7 @@ jobs:
 
       - name: Install only the locked base runtime
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
           base_env="$RUNNER_TEMP/power-base"
           UV_PROJECT_ENVIRONMENT="$base_env" uv sync --locked --no-dev
@@ -168,7 +168,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
           uv sync --locked --group dev
 
@@ -283,7 +283,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
           uv sync --locked --group dev
 
@@ -304,7 +304,7 @@ jobs:
 
       - name: Install locked runtime dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
           uv sync --locked --group dev
 
