@@ -40,8 +40,8 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 Базовий release wheel є FTS-only: він не встановлює ONNX Runtime, model
 tokenizers, numerical packages або optional MCP transport. Перед MCP додайте
-явний extra `remote`, а `semantic` використовуйте лише для локальних dense
-експериментів.
+явний extra `mcp` (або compatibility alias `remote`), а `semantic`
+використовуйте лише для локальних dense експериментів.
 
 Перевірте executable, package metadata та lean import:
 
@@ -56,11 +56,11 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
 Обидві команди версії мають показати `3.6.6`, а остання команда —
 `lean FTS import: OK`.
 
-Для локального MCP встановіть optional transport з того самого wheel:
+Для локального MCP встановіть official SDK extra з того самого wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
 ```
 
 ### Альтернатива: встановлення із закріпленого tag
@@ -162,8 +162,8 @@ interpreter virtual environment:
 {
   "mcpServers": {
     "power": {
-      "command": "/home/YOU/.local/share/power-framework/venv/bin/python",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "/home/YOU/.local/share/power-framework/venv/bin/power-mcp",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "/home/YOU/Documents/power-vault"
       }
@@ -175,8 +175,7 @@ interpreter virtual environment:
 Перевірте точний interpreter і vault перед перезапуском клієнта:
 
 ```bash
-POWER_VAULT_DIR="$POWER_VAULT" "$POWER_PYTHON" -c \
-  'import os; from pathlib import Path; import power_framework.mcp; p=Path(os.environ["POWER_VAULT_DIR"]); assert p.is_dir(); print("MCP preflight: OK")'
+POWER_VAULT_DIR="$POWER_VAULT" "$POWER_VENV/bin/power-mcp" preflight
 ```
 
 Після зміни конфігурації або Python environment перезапустіть long-lived

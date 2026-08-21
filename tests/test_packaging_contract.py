@@ -30,11 +30,14 @@ def test_optional_profiles_are_explicit() -> None:
     project = _project_metadata()
     extras = project["optional-dependencies"]
 
-    assert {"semantic", "rerank", "gpu", "fleet", "bench", "remote", "experimental"} <= set(extras)
+    assert {"semantic", "rerank", "gpu", "fleet", "bench", "mcp", "remote", "experimental"} <= set(
+        extras
+    )
     assert any(str(item).startswith("onnxruntime>=") for item in extras["semantic"])
     assert any(str(item).startswith("onnxruntime-gpu>=") for item in extras["gpu"])
     assert any(str(item).startswith("fastembed>=") for item in extras["rerank"])
-    assert any(str(item).startswith("fastmcp>=") for item in extras["remote"])
+    assert any(str(item).startswith("mcp>=2.0") for item in extras["mcp"])
+    assert any(str(item).startswith("mcp>=2.0") for item in extras["remote"])
 
 
 def test_fts_path_runs_when_optional_neural_imports_are_blocked(tmp_path: Path) -> None:

@@ -40,8 +40,8 @@ POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
 
 The base release wheel is FTS-only: it does not install ONNX Runtime, model
 tokenizers, numerical packages, or the optional MCP transport. Add the explicit
-`remote` extra before configuring MCP, and add `semantic` only for local dense
-experiments.
+`mcp` (or compatibility alias `remote`) extra before configuring MCP, and add
+`semantic` only for local dense experiments.
 
 Verify the executable, package metadata, and lean import:
 
@@ -56,11 +56,11 @@ Verify the executable, package metadata, and lean import:
 Both version commands must report `3.6.6`; the final command must print
 `lean FTS import: OK`.
 
-For local MCP, install the optional remote transport from the same wheel:
+For local MCP, install the official SDK extra from the same wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
 ```
 
 ### Alternative: install from the pinned tag
@@ -161,8 +161,8 @@ the same virtual-environment interpreter used above:
 {
   "mcpServers": {
     "power": {
-      "command": "/home/YOU/.local/share/power-framework/venv/bin/python",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "/home/YOU/.local/share/power-framework/venv/bin/power-mcp",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "/home/YOU/Documents/power-vault"
       }
@@ -174,8 +174,7 @@ the same virtual-environment interpreter used above:
 Preflight the exact interpreter and vault before restarting the client:
 
 ```bash
-POWER_VAULT_DIR="$POWER_VAULT" "$POWER_PYTHON" -c \
-  'import os; from pathlib import Path; import power_framework.mcp; p=Path(os.environ["POWER_VAULT_DIR"]); assert p.is_dir(); print("MCP preflight: OK")'
+POWER_VAULT_DIR="$POWER_VAULT" "$POWER_VENV/bin/power-mcp" preflight
 ```
 
 Restart long-lived MCP clients after changing their configuration or Python
@@ -214,7 +213,7 @@ it up before removing either location.
 - CLI and distribution metadata both report `3.6.6`.
 - `power_framework` imports successfully without neural or MCP extras.
 - If MCP is configured, the explicit `remote` extra is installed and MCP
-  preflight imports `power_framework.mcp` successfully.
+  preflight validates the configured vault through the public `power-mcp` launcher.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.
 - FTS sync exits `0` and FTS search returns the first note.
 - MCP preflight uses the same interpreter and prints `MCP preflight: OK`.

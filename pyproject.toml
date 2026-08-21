@@ -34,6 +34,7 @@ dependencies = [
 
 [project.scripts]
 power = "power_framework.core.cli:main"
+power-mcp = "power_framework.mcp.entrypoint:main"
 
 [dependency-groups]
 dev = [
@@ -41,13 +42,14 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
+    "httpx>=0.27.0",
     "jsonschema>=4.23.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "types-PyYAML>=6.0.0",
     "pre-commit>=4.0.0",
     "pip-audit>=2.7.0",
-    "fastmcp>=3.2,<4.0",
+    "mcp>=2.0,<3.0",
     "mkdocs>=1.6.0",
     "mkdocs-material>=9.7.0",
 ]
@@ -58,13 +60,14 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
+    "httpx>=0.27.0",
     "jsonschema>=4.23.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "types-PyYAML>=6.0.0",
     "pre-commit>=4.0.0",
     "pip-audit>=2.7.0",
-    "fastmcp>=3.2,<4.0",
+    "mcp>=2.0,<3.0",
     "mkdocs>=1.6.0",
     "mkdocs-material>=9.7.0",
 ]
@@ -93,8 +96,11 @@ gpu = [
 ]
 fleet = []
 bench = []
+mcp = [
+    "mcp>=2.0,<3.0",
+]
 remote = [
-    "fastmcp>=3.2,<4.0",
+    "mcp>=2.0,<3.0",
 ]
 experimental = [
     "qwen3-embed>=1.12.0",
@@ -114,6 +120,7 @@ packages = ["src/power_framework"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/power_framework/data/semantic_gt.json" = "power_framework/data/semantic_gt.json"
+"skills/power" = "power_framework/data/skills/power"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

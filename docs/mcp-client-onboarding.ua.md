@@ -28,7 +28,7 @@ POWER_VAULT="$HOME/Documents/power-vault"
 
 python3 -m venv "$POWER_VENV"
 "$POWER_PYTHON" -m pip install \
-  "power-framework[remote] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.6/power_framework-3.6.6-py3-none-any.whl"
 # Лише для нового або порожнього vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'
@@ -39,13 +39,17 @@ python3 -m venv "$POWER_VENV"
 vault. Сервер працює через локальний stdio, тому його stdout зарезервований для
 MCP-протоколу.
 
+Встановлений public launcher — `power-mcp`. Compatibility entry point
+`python -m power_framework.mcp` залишається для тестів і legacy wrappers, але не
+є канонічною конфігурацією клієнта.
+
 Не підключайте клієнт до repository wrapper, shell-скрипту, який завантажує
 секрети, або іншої установки Python. Не додавайте до клієнтської конфігурації
 другий шлях до vault.
 
 ## Конфігурації клієнтів
 
-Замініть `/absolute/path/to/python` і `/absolute/path/to/vault` рівно в одній із
+Замініть `/absolute/path/to/power-mcp` і `/absolute/path/to/vault` рівно в одній із
 наведених конфігурацій.
 
 <!-- power-client-config:claude-desktop -->
@@ -59,8 +63,8 @@ MCP-протоколу.
 {
   "mcpServers": {
     "power": {
-      "command": "/absolute/path/to/python",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "/absolute/path/to/power-mcp",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "/absolute/path/to/vault"
       }
@@ -79,8 +83,8 @@ MCP-протоколу.
 {
   "mcpServers": {
     "power": {
-      "command": "/absolute/path/to/python",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "/absolute/path/to/power-mcp",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "/absolute/path/to/vault"
       }
@@ -101,8 +105,8 @@ MCP-протоколу.
 
 ```toml
 [mcp_servers.power]
-command = "/absolute/path/to/python"
-args = ["-m", "power_framework.mcp"]
+command = "/absolute/path/to/power-mcp"
+args = []
 env = { "POWER_VAULT_DIR" = "/absolute/path/to/vault" }
 ```
 
@@ -123,7 +127,7 @@ project scope не потрібен навмисно.
   "mcp": {
     "power": {
       "type": "local",
-      "command": ["/absolute/path/to/python", "-m", "power_framework.mcp"],
+      "command": ["/absolute/path/to/power-mcp"],
       "environment": {
         "POWER_VAULT_DIR": "/absolute/path/to/vault"
       },
@@ -145,7 +149,7 @@ OpenCode використовує масив для `command` і `environment` �
 ```bash
 claude mcp add --transport stdio \
   --env POWER_VAULT_DIR=/absolute/path/to/vault \
-  power -- /absolute/path/to/python -m power_framework.mcp
+  power -- /absolute/path/to/power-mcp
 ```
 
 Виконайте `claude mcp list`, а потім `/mcp` усередині сесії, щоб перевірити

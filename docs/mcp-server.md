@@ -1,9 +1,10 @@
-# MCP Server (FastMCP 3.x)
+# MCP Server (official Python SDK v2)
 
 P.O.W.E.R. `v3.6.6` exposes 20 governed tools through the
 [Model Context Protocol](https://modelcontextprotocol.io), powered by
-[FastMCP 3.x](https://gofastmcp.com). MCP-compatible agents can validate,
-index, retrieve, and perform bounded writes in one configured vault.
+the official [MCP Python SDK v2](https://github.com/modelcontextprotocol/python-sdk).
+MCP-compatible agents can validate, index, retrieve, and perform bounded writes
+in one configured vault.
 
 ## Required vault boundary
 
@@ -21,7 +22,7 @@ configurations must use `POWER_VAULT_DIR`.
 
 ```bash
 POWER_VAULT_DIR=/absolute/path/to/vault \
-  /absolute/path/to/venv/bin/python -m power_framework.mcp
+  /absolute/path/to/venv/bin/power-mcp
 ```
 
 ### Local loopback HTTP
@@ -29,7 +30,7 @@ POWER_VAULT_DIR=/absolute/path/to/vault \
 ```bash
 POWER_VAULT_DIR=/absolute/path/to/vault \
 POWER_MCP_TRANSPORT=http \
-  /absolute/path/to/venv/bin/python -m power_framework.mcp
+  /absolute/path/to/venv/bin/power-mcp
 ```
 
 - host defaults to `127.0.0.1` and may be only `127.0.0.1` or `::1`;
@@ -56,7 +57,7 @@ Point the client to the exact interpreter where `power-framework` is installed:
   "mcpServers": {
     "power": {
       "command": "/home/YOU/.local/share/power-framework/venv/bin/python",
-      "args": ["-m", "power_framework.mcp"],
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "/home/YOU/Documents/power-vault"
       }
@@ -72,8 +73,8 @@ Windows paths and preflight commands.
 
 ## Error and retrieved-content boundaries
 
-Tools raise structured `ToolError` messages. FastMCP error masking and
-`ErrorHandlingMiddleware` hide internal tracebacks from clients.
+Tools raise structured SDK `ToolError` messages. POWER converts failures to
+bounded client-safe results and keeps tracebacks in the server log only.
 
 `search_vault_tool` returns a `power.retrieval-envelope.v1` object. The envelope
 and results are marked `trust: "untrusted"` and `data_only: true`; note text is

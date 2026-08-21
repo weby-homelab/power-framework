@@ -14,6 +14,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -23,7 +24,19 @@ from .application_models import (
 )
 from .capabilities import manifest
 from .decision_service import DecisionService
-from .memory_api import apply_change, apply_change_by_id, propose_change, read_history
+from .healer import heal_vault
+from .indexer import run_generate_hierarchical_index, run_generate_sub_index, scan_folder_notes
+from .linter import archive_stale_notes, run_lint_report
+from .memory_api import (
+    apply_change,
+    apply_change_by_id,
+    commit_note_change,
+    propose_change,
+    read_history,
+)
+from .models import PARA_FOLDERS, MemoryKind, MemoryMetadata, NoteType, OKFMetadata, WritePolicy
+from .mutation import execute_vault_mutation
+from .parser import build_frontmatter
 from .searcher import (
     DEFAULT_SEARCH_MODE,
     format_untrusted_search_envelope,
@@ -35,7 +48,9 @@ from .source_service import (
     list_sources,
     read_source,
 )
+from .synthesize import synthesize_session_ingest
 from .task_service import TaskService
+from .utils import resolve_path_in_vault
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -119,6 +134,56 @@ class ApplicationEnvelope:
 
 
 _TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+
+
+def _catalog_page_filename(page: int) -> str:
+    """Return the stable generated catalog filename for a one-based page."""
+    return "_index.md" if page == 1 else f"_index-{page}.md"
+
+
+def _read_generated_catalog_page(vault_dir: Path, category: str, page: int) -> str:
+    """Read one generated catalog page after the application mutation."""
+    category_dir = vault_dir / category
+    landing = category_dir / _catalog_page_filename(1)
+    if page == 1:
+        try:
+            return landing.read_text(encoding="utf-8")
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                f"Generated catalog landing page is missing for {category}"
+            ) from exc
+        except (OSError, UnicodeError) as exc:
+            raise RuntimeError("Unable to read the generated catalog landing page") from exc
+
+    try:
+        prefix = landing.read_text(encoding="utf-8")[:4096]
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"Generated catalog landing page is missing for {category}"
+        ) from exc
+    except (OSError, UnicodeError) as exc:
+        raise RuntimeError("Unable to read the generated catalog landing page") from exc
+
+    page_count = 1
+    for line in prefix.splitlines():
+        if line.startswith("x-index-pages:"):
+            try:
+                page_count = int(line.split(":", 1)[1].strip())
+            except (IndexError, ValueError) as exc:
+                raise ValueError("Generated catalog page metadata is invalid") from exc
+            break
+    if page > page_count:
+        raise ValueError(f"Catalog page {page} is out of range; available pages: 1-{page_count}")
+
+    target = category_dir / _catalog_page_filename(page)
+    try:
+        return target.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"Catalog page {page} is missing although the landing page declares {page_count}"
+        ) from exc
+    except (OSError, UnicodeError) as exc:
+        raise RuntimeError(f"Unable to read catalog page {page}") from exc
 
 
 class ApplicationService:
@@ -253,6 +318,296 @@ class ApplicationService:
                 approved=True,
                 idempotency_key=request.idempotency_key,
             ),
+        )
+
+    @staticmethod
+    def _mutation_context(context: RequestContext | None) -> RequestContext:
+        """Require an explicit application authority for a write use case."""
+        request = context or RequestContext(authority="apply")
+        if request.authority not in {"propose", "apply"}:
+            raise PermissionError("mutation requires propose or apply authority")
+        return request
+
+    def generate_index(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
+        """Regenerate the hierarchical index under the canonical vault lock."""
+        request = self._mutation_context(context)
+        return self._run(
+            "index.generate",
+            request,
+            lambda: {
+                "result": execute_vault_mutation(
+                    self.vault_dir, lambda: run_generate_hierarchical_index(self.vault_dir)
+                )
+            },
+        )
+
+    def ensure_sub_index(
+        self,
+        category: str,
+        *,
+        page: int = 1,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Generate and return one bounded P.A.R.A. catalog page."""
+        request = self._mutation_context(context)
+        if category not in PARA_FOLDERS:
+            raise ValueError(
+                f"Invalid category: {category}. Must be one of: {', '.join(PARA_FOLDERS)}"
+            )
+        if not (self.vault_dir / category).is_dir():
+            raise ValueError(f"Category folder not found: {category}")
+        if isinstance(page, bool) or not isinstance(page, int) or page < 1:
+            raise ValueError("page must be a positive integer starting at 1")
+
+        def execute() -> dict[str, object]:
+            notes = scan_folder_notes(self.vault_dir).get(category, [])
+            if not notes:
+                return {"result": f"No notes found in {category}.", "content": ""}
+
+            def mutate() -> dict[str, object]:
+                result = run_generate_sub_index(self.vault_dir, category)
+                content = _read_generated_catalog_page(self.vault_dir, category, page)
+                return {"result": result, "content": content}
+
+            return execute_vault_mutation(self.vault_dir, mutate)
+
+        return self._run("index.ensure-sub-index", request, execute)
+
+    def sync_vault(
+        self,
+        *,
+        fts_only: bool = True,
+        accept_dense_loss: bool = False,
+        force_rebuild: bool = False,
+        allow_partial: bool = False,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Publish an atomic search generation through the application boundary."""
+        request = self._mutation_context(context)
+
+        def build() -> dict[str, object]:
+            from .generation_index import (
+                IndexGenerationError,
+                list_invalid_sources,
+                sync_vault_atomically,
+            )
+
+            invalid_sources = list_invalid_sources(self.vault_dir)
+            if invalid_sources and not allow_partial:
+                details = "; ".join(
+                    f"{rel_path} ({reason})" for rel_path, reason in sorted(invalid_sources.items())
+                )
+                raise ValueError(
+                    "Vault sync failed closed: "
+                    f"{len(invalid_sources)} note(s) are excluded and remain unsearchable. "
+                    f"Excluded: {details}. Pass allow_partial=True only to publish the valid subset."
+                )
+
+            try:
+                report = sync_vault_atomically(
+                    self.vault_dir,
+                    sync_embeddings=not fts_only,
+                    force_rebuild=force_rebuild,
+                    allow_partial=allow_partial,
+                    accept_dense_loss=accept_dense_loss,
+                )
+            except IndexGenerationError as exc:
+                raise RuntimeError(
+                    f"Vault sync failed; previous index remains active: {exc}"
+                ) from exc
+
+            lines = [
+                "=== Vault Sync ===",
+                f"Generation: {report.generation_id}",
+                f"Mode: {'FTS only' if fts_only else 'FTS + embeddings'}",
+                f"Notes scanned: {report.total_scanned}",
+                f"Notes indexed: {report.actual_files}",
+                f"Notes excluded (invalid metadata): {report.invalid_sources}",
+                f"Chunks: {report.actual_chunks}",
+            ]
+            if report.invalid_sources:
+                lines.append("")
+                lines.append("Exclusion reasons:")
+                lines.extend(
+                    f"- {rel_path}: {reason}"
+                    for rel_path, reason in sorted(report.excluded_sources.items())
+                )
+                lines.append(
+                    "Excluded notes are not searchable. Run 'power index <vault> --strict' "
+                    "to list them, or heal_frontmatter_tool to repair them."
+                )
+            return {
+                "result": "\n".join(lines),
+                "generation_id": report.generation_id,
+                "actual_files": report.actual_files,
+                "actual_chunks": report.actual_chunks,
+                "excluded_sources": report.excluded_sources,
+            }
+
+        return self._run(
+            "index.sync",
+            request,
+            lambda: execute_vault_mutation(self.vault_dir, build),
+        )
+
+    def ingest_note(
+        self,
+        *,
+        name: str,
+        note_type: str,
+        title: str,
+        description: str,
+        content: str,
+        resource: str | None = None,
+        tags: list[str] | None = None,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Create one validated note and publish all required projections."""
+        request = self._mutation_context(context)
+        note_name = name if name.endswith(".md") else f"{name}.md"
+        try:
+            target_file = resolve_path_in_vault(
+                self.vault_dir, note_name, allowed_directories=PARA_FOLDERS
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "Invalid note path; use an existing PARA directory and a Markdown filename."
+            ) from exc
+        if target_file.exists():
+            raise FileExistsError(f"Note already exists at {note_name}")
+
+        metadata = OKFMetadata(
+            type=NoteType(note_type),
+            title=title,
+            description=description,
+            resource=resource,
+            tags=tags or [],
+            okf_version="0.2",
+            memory=MemoryMetadata(
+                kind=MemoryKind.SEMANTIC,
+                sources=["power://mcp/ingest_note"],
+                evidence=[f"sha256:{hashlib.sha256(content.encode('utf-8')).hexdigest()}"],
+                write_policy=WritePolicy.AGENT_PROPOSED,
+            ),
+            timestamp=datetime.now(UTC),
+        )
+        full_content = f"{build_frontmatter(metadata)}\n\n{content}\n"
+
+        def execute() -> dict[str, object]:
+            date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+            log_entry = (
+                f"\n## [{date_str}] ingest | Created {title}\n"
+                f"- **Action:** Created note '{note_name}' of type {note_type} via MCP tool ingest_note.\n"
+                f"- **Result:** Saved note to {note_name} and compiled hierarchical index.\n"
+            )
+            receipt = commit_note_change(
+                self.vault_dir,
+                note_name,
+                full_content,
+                require_absent=True,
+                allowed_directories=PARA_FOLDERS,
+                operation="mcp.ingest_note",
+                log_entry=log_entry,
+            )
+            lint_result = run_lint_report(self.vault_dir)
+            return {
+                "result": (
+                    f"Note '{note_name}' has been successfully ingested!\n"
+                    f"{receipt['index_summary']}\n"
+                    f"Search projection: {receipt['search_mode']} ({receipt['search_generation']})\n"
+                    "Action appended to log.md when the log exists.\n\n"
+                    f"Linting Check:\n{lint_result}"
+                ),
+                "note": note_name,
+                "receipt": receipt,
+            }
+
+        return self._run("memory.ingest-note", request, execute)
+
+    def synthesize_session(
+        self,
+        *,
+        name: str,
+        title: str,
+        description: str,
+        content: str,
+        note_type: str = "Daily Log",
+        tags: list[str] | None = None,
+        related: list[str] | None = None,
+        owner: str | None = None,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Create a governed session artifact through the core ingest workflow."""
+        request = self._mutation_context(context)
+        note_name = name if name.endswith(".md") else f"{name}.md"
+        try:
+            resolve_path_in_vault(self.vault_dir, note_name, allowed_directories=PARA_FOLDERS)
+        except ValueError as exc:
+            raise ValueError(
+                "Invalid note path; use an existing PARA directory and a Markdown filename."
+            ) from exc
+        return self._run(
+            "synthesize.session",
+            request,
+            lambda: {
+                "result": synthesize_session_ingest(
+                    name=name,
+                    title=title,
+                    description=description,
+                    content=content,
+                    note_type=note_type,
+                    tags=tags,
+                    related=related,
+                    owner=owner,
+                    vault_path=self.vault_dir,
+                )
+            },
+        )
+
+    def archive_notes(
+        self,
+        *,
+        dry_run: bool = True,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Preview or apply stale-note archival through the core boundary."""
+        request = context if dry_run else self._mutation_context(context)
+        return self._run(
+            "maintenance.archive-notes",
+            request,
+            lambda: {
+                "result": (
+                    archive_stale_notes(self.vault_dir, dry_run=True)
+                    if dry_run
+                    else execute_vault_mutation(
+                        self.vault_dir,
+                        lambda: archive_stale_notes(self.vault_dir, dry_run=False),
+                    )
+                )
+            },
+        )
+
+    def heal_frontmatter(
+        self,
+        *,
+        dry_run: bool = True,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Preview or apply frontmatter healing through the core boundary."""
+        request = context if dry_run else self._mutation_context(context)
+        return self._run(
+            "maintenance.heal-frontmatter",
+            request,
+            lambda: {
+                "result": (
+                    heal_vault(self.vault_dir, dry_run=True)
+                    if dry_run
+                    else execute_vault_mutation(
+                        self.vault_dir,
+                        lambda: heal_vault(self.vault_dir, dry_run=False),
+                    )
+                )
+            },
         )
 
     def task(

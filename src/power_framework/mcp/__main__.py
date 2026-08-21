@@ -1,4 +1,4 @@
-"""P.O.W.E.R. MCP Server — Entry point. Run with: python -m power_framework.mcp"""
+"""Compatibility module entry point; native installs should use ``power-mcp``."""
 
 from __future__ import annotations
 

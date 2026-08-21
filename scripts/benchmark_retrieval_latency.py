@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from contextlib import closing
+from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +38,30 @@ from power_framework.core.timing import collect_timings
 
 DEFAULT_MODES = ("fts", "semantic", "hybrid", "reranked")
 MCP_WORKER = Path(__file__).with_name("benchmark_retrieval_mcp_worker.py")
+
+
+@asynccontextmanager
+async def _stdio_session(environment: dict[str, str]):
+    """Open the benchmark worker through the official SDK v2 stdio client."""
+    try:
+        from mcp import ClientSession, StdioServerParameters, stdio_client
+    except ImportError as exc:  # pragma: no cover - exercised by the packaging gate
+        raise RuntimeError(
+            "official MCP SDK v2 is required for the MCP latency shape "
+            "(pip install 'power-framework[mcp]')"
+        ) from exc
+
+    parameters = StdioServerParameters(
+        command=sys.executable,
+        args=[str(MCP_WORKER.resolve())],
+        env=environment,
+    )
+    async with (
+        stdio_client(parameters) as (read_stream, write_stream),
+        ClientSession(read_stream, write_stream) as session,
+    ):
+        await session.initialize()
+        yield session
 
 
 def _percentile(values: list[float], quantile: float) -> float | None:
@@ -170,11 +194,6 @@ async def _mcp_samples(
     rounds: int,
     max_results: int,
 ) -> list[dict[str, Any]]:
-    try:
-        from fastmcp import Client
-    except ImportError as exc:  # pragma: no cover - packaging gate covers this
-        raise RuntimeError("fastmcp is required for the MCP latency shape") from exc
-
     with tempfile.TemporaryDirectory(prefix="power-timing-") as receipt_dir:
         receipt_path = Path(receipt_dir) / "receipt.json"
         environment = os.environ.copy()
@@ -185,21 +204,13 @@ async def _mcp_samples(
                 "POWER_BENCHMARK_RECEIPT": str(receipt_path),
             }
         )
-        config = {
-            "mcpServers": {
-                "power": {
-                    "command": sys.executable,
-                    "args": [str(MCP_WORKER.resolve())],
-                    "env": environment,
-                }
-            }
-        }
         samples: list[dict[str, Any]] = []
-        async with Client(config) as client:
+        async with _stdio_session(dict(environment)) as client:
             warmup_query = queries[0]
             await client.call_tool(
                 "search_vault_tool",
                 {"query": warmup_query, "max_results": max_results, "search_mode": mode},
+                read_timeout_seconds=300,
             )
             for _ in range(rounds):
                 for query in queries:
@@ -207,6 +218,7 @@ async def _mcp_samples(
                     await client.call_tool(
                         "search_vault_tool",
                         {"query": query, "max_results": max_results, "search_mode": mode},
+                        read_timeout_seconds=300,
                     )
                     elapsed = (time.perf_counter() - started) * 1000
                     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))

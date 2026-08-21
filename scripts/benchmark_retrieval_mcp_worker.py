@@ -48,7 +48,7 @@ application.format_untrusted_search_envelope = _format_with_receipt
 
 
 if __name__ == "__main__":
-    # FastMCP's startup banner is useful interactively but would pollute the
-    # benchmark operator's stdout/stderr receipt stream.
+    # Keep the official SDK v2 stdio channel free of benchmark chatter; the
+    # content-free receipt is written to the explicit side-channel path.
     sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
     power_server.run()

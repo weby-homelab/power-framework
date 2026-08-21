@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastmcp import Client
 
 from power_framework.core.capabilities import manifest
+from tests.mcp_test_client import stdio_session
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ONBOARDING_DOC = REPO_ROOT / "docs" / "mcp-client-onboarding.md"
@@ -61,8 +61,8 @@ def test_documented_client_shapes_are_native_and_consistent() -> None:
 
     for name, config in configs.items():
         command, args, environment = _stdio_parts(name, config)
-        assert command == "/absolute/path/to/python"
-        assert args == ["-m", "power_framework.mcp"]
+        assert command == "/absolute/path/to/power-mcp"
+        assert args == []
         assert environment == {"POWER_VAULT_DIR": "/absolute/path/to/vault"}
         assert "POWER_VAULT_PATH" not in json.dumps(config)
 
@@ -76,10 +76,10 @@ async def test_each_documented_shape_reaches_golden_stdio_workflow(
     client_name: str, sample_vault: Path
 ) -> None:
     """Exercise discovery, read-only context, and proposal-without-write per shape."""
-    command, args, _documented_environment = _stdio_parts(
+    command, _args, _documented_environment = _stdio_parts(
         client_name, _documented_configs()[client_name]
     )
-    assert command == "/absolute/path/to/python"
+    assert command == "/absolute/path/to/power-mcp"
 
     process_environment = os.environ.copy()
     process_environment.update(
@@ -92,19 +92,22 @@ async def test_each_documented_shape_reaches_golden_stdio_workflow(
         "mcpServers": {
             "power": {
                 "command": sys.executable,
-                "args": args,
+                # The test process uses the compatibility module entrypoint so
+                # it remains runnable from the source checkout; docs use the
+                # installed public power-mcp launcher above.
+                "args": ["-m", "power_framework.mcp"],
                 "env": process_environment,
             }
         }
     }
 
-    async with Client(config) as client:
-        tools = await client.list_tools()
+    async with stdio_session(config, mode="legacy") as client:
+        tools = (await client.list_tools()).tools
         assert [tool.name for tool in tools] == manifest()["interfaces"]["mcp_tools"]
-        assert await client.list_resources() == []
-        assert await client.list_resource_templates() == []
-        assert await client.list_prompts() == []
-        assert all(tool.outputSchema and tool.annotations for tool in tools)
+        assert (await client.list_resources()).resources == []
+        assert (await client.list_resource_templates()).resource_templates == []
+        assert (await client.list_prompts()).prompts == []
+        assert all(tool.output_schema and tool.annotations for tool in tools)
 
         await client.call_tool("get_memory_context", {"query": "golden onboarding"})
         proposal_result = await client.call_tool(

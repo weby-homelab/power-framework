@@ -57,7 +57,7 @@ def _literal_dict(node: ast.AST) -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _mcp_tool_contracts() -> list[dict[str, Any]]:
-    """Read FastMCP tool contracts without importing FastMCP or the server."""
+    """Read SDK-independent tool contracts without importing the MCP server."""
     source = ast.parse(_read_source(_package_root() / "mcp" / "power_server.py"))
     contracts: list[dict[str, Any]] = []
     for node in ast.walk(source):

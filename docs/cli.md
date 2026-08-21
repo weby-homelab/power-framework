@@ -6,7 +6,7 @@ This reference is aligned with the executable P.O.W.E.R. `v3.6.6` parser.
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,import,search,cache,doctor,connect,memory,handoff,task,sync,rot,archive,status,control-plane,maintenance,migrate-state,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,cache,doctor,integrations,connect,memory,handoff,task,sync,rot,archive,status,control-plane,maintenance,migrate-state,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -483,3 +483,25 @@ The transaction refuses symlinked, malformed, commented JSONC, or foreign
 pre-image hash, writes atomically, and creates a `.power-backups` copy before
 changing an existing config. A stale plan must be regenerated; the command
 never starts a client or contacts a network service.
+
+### `integrations`
+
+Build generic, dry-run-first integration plans for the official MCP launcher,
+the packaged POWER Skill, and the managed native Linux installation profile.
+Every write requires `--apply --approved`; Skill installation is atomic and
+never overwrites a non-matching target. Native installation accepts exact wheel
+paths, verifies their SHA-256 digests, uses only the managed
+`~/.local/share/power/venv`, and writes launchers under `~/.local/bin`.
+
+```text
+power integrations doctor
+power integrations mcp-config PATH [--client ...] [--config ...]
+power integrations skill-check [--target PATH]
+power integrations skill-install [--target PATH] [--apply --approved]
+power integrations install --power-wheel POWER.whl [--gui-wheel GUI.whl]
+                            [--home PATH] [--no-deps] [--apply --approved]
+```
+
+`mcp-config` defaults to the public `power-mcp` launcher. `doctor`, all plan
+commands, and omitted `--apply` paths are read-only; no remote service or
+client configuration is contacted during planning.

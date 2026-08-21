@@ -1,6 +1,6 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 25 top-level
+Python 3.11+ toolkit for AI-native Second Brain management. CLI (`power`, 26 top-level
 commands) + local MCP server (20 tools).
 
 ## Project Structure
@@ -8,7 +8,7 @@ commands) + local MCP server (20 tools).
 ```
 src/power_framework/       # Core library
   core/                    #   models, parser, indexer, linter, searcher, application service
-  mcp/                     #   FastMCP-3.x server (20 async tools)
+  mcp/                     #   official MCP SDK v2 server (20 async tools)
 tests/                     # Pytest suite; CI enforces coverage >=70%
 scripts/                   # Dev/CI utilities
 docs/                      # MkDocs-material documentation site
@@ -44,7 +44,7 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 | `core/linter.py`      | Health checks: links, metadata, orphans, stale/expired |
 | `core/searcher.py`    | FTS5/dense/hybrid/reranked search (`auto` default; labelled FTS fallback) |
 | `experimental/embeddings.py` | Optional BGE-M3 ONNX (1024d) + MiniLM fallback       |
-| `mcp/power_server.py` | FastMCP 3.x, 20 async tools, stdio/loopback HTTP + /health  |
+| `mcp/power_server.py` | official MCP SDK v2, 20 async tools, stdio/loopback HTTP + /health |
 
 ## Workflow
 
@@ -60,7 +60,7 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 - Base: `pydantic>=2.0`, `pyyaml>=6.0`, `pathspec>=0.12`, `defusedxml>=0.7.1` — offline FTS/core path
 - `semantic` extra: `onnxruntime`, `tokenizers`, `huggingface-hub`, and `numpy`
 - `rerank` extra: `fastembed` and its explicit neural runtime dependencies
-- `remote`/development: `fastmcp>=3.2` — local MCP server framework
+- `mcp`/`remote`: `mcp>=2.0,<3.0` — official local MCP server/client SDK
 
 ## Skills (on-demand)
 

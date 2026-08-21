@@ -4,7 +4,7 @@
 Requires a running MCP server:
     POWER_VAULT_DIR=/root/gemma/brain POWER_MCP_TRANSPORT=http \\
     POWER_MCP_HOST=127.0.0.1 POWER_MCP_PORT=8765 \\
-    python -m power_framework.mcp
+    power-mcp
 
 Usage:
     python scripts/benchmark_mcp_latency.py
@@ -34,9 +34,12 @@ async def main(fixture: Path | None = None) -> int:
         return 1
 
     try:
-        from fastmcp import Client
+        from mcp import Client
     except ImportError:
-        print("ERROR: fastmcp not installed (pip install fastmcp)", file=sys.stderr)
+        print(
+            "ERROR: official MCP SDK v2 is not installed (pip install 'power-framework[mcp]')",
+            file=sys.stderr,
+        )
         return 1
 
     client = Client(SERVER_URL)
@@ -48,7 +51,7 @@ async def main(fixture: Path | None = None) -> int:
                 await client.call_tool(
                     "search_vault_tool",
                     {"query": queries[0], "max_results": 20, "search_mode": mode},
-                    timeout=120,
+                    read_timeout_seconds=120,
                 )
             except Exception as e:
                 print(f"  {mode}: warmup failed ({e}) — skipping mode")
@@ -62,7 +65,7 @@ async def main(fixture: Path | None = None) -> int:
                         await client.call_tool(
                             "search_vault_tool",
                             {"query": query, "max_results": 20, "search_mode": mode},
-                            timeout=120,
+                            read_timeout_seconds=120,
                         )
                     except Exception as e:
                         print(f"  {mode}: query '{query}' failed: {e}", file=sys.stderr)

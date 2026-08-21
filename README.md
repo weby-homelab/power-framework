@@ -31,7 +31,7 @@ Unlike generic knowledge management tools, P.O.W.E.R. is designed from the groun
 - **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
 - **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
-- **MCP-native** — expose 20 tools to MCP-compatible AI clients through FastMCP 3.x
+- **MCP-native** — expose 20 tools to MCP-compatible AI clients through the official MCP Python SDK v2
 - **Truthful agent discovery** — call `get_server_info` first to verify the
   running package version, vault boundary, coverage, and explicit provider
   binding state; the default discovery call performs no model load or network access
@@ -56,7 +56,7 @@ the role-specific guides before touching a vault:
   executable acceptance gate, FTS, and MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.md)** — complete PowerShell
   installation, Visual C++ prerequisite, exact interpreter paths, and checks
-- **[CLI reference](docs/cli.md)** — all 25 commands, flags, and actual exit behavior
+- **[CLI reference](docs/cli.md)** — all 26 commands, flags, and actual exit behavior
 - **[MCP server](docs/mcp-server.md)** — all 20 governed tools, rate limits,
   configured-vault boundary, and untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.md)** — 6-phase, manifest/hash-driven
@@ -123,7 +123,7 @@ made for `v3.6.6`. Windows and macOS have no scheduled release target.
 
 | Feature                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI**                          | 25 commands, including `power doctor` for read-only runtime/index diagnosis, `power connect` for conflict-safe local MCP setup, `power cache` for namespace hygiene, `power import` for preflighted Markdown migration, `power memory` for explicit proposal/approval, `power handoff` for compatibility workflows, and `power task` for canonical Task v2 lifecycle management                                                                                                                                                                                                                                  |
+| **CLI**                          | 26 commands, including `power doctor` for read-only runtime/index diagnosis, `power connect` for conflict-safe local MCP setup, `power integrations` for generic suite installers and Skill/config plans, `power cache` for namespace hygiene, `power import` for preflighted Markdown migration, `power memory` for explicit proposal/approval, `power handoff` for compatibility workflows, and `power task` for canonical Task v2 lifecycle management                                                                                                                                                                                                                                  |
 | **MCP Server**                   | 20 tools, including governed memory context, proposal, apply, validation, history, `handoff_work`, and search-index synchronization operations                                                                                                                                                                                                                                                                                                                                                    |
 | **OKF Validation**               | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                             |
 | **Knowledge Graph (Graph RAG)**  | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                                                                             |
@@ -292,8 +292,8 @@ pip install https://github.com/weby-homelab/power-framework/releases/download/v3
 {
     "mcpServers": {
         "power": {
-            "command": "python3",
-            "args": ["-m", "power_framework.mcp"],
+            "command": "power-mcp",
+            "args": [],
             "env": {
                 "POWER_VAULT_DIR": "/path/to/your/my-vault"
             }
@@ -308,7 +308,7 @@ pip install https://github.com/weby-homelab/power-framework/releases/download/v3
 "mcp": {
   "power": {
     "type": "local",
-    "command": ["python3", "-m", "power_framework.mcp"],
+    "command": ["power-mcp"],
     "environment": {
       "POWER_VAULT_DIR": "/path/to/your/my-vault"
     },
@@ -456,7 +456,7 @@ flowchart TD
         LogMD[("📜 log.md (Change Log)")]:::wiki
     end
 
-    subgraph AI ["🤖 AI Agent (FastMCP 3.x)"]
+    subgraph AI ["🤖 AI Agent (official MCP SDK v2)"]
         Tools[["🔌 20 Async MCP Tools (stdio/HTTP)"]]:::agent
         Search[["🔍 Hybrid / Reranked Search"]]:::agent
         ROT{{"🛠️ ROT & Contradiction Audit (Semantic/LLM)"}}:::agent
@@ -525,8 +525,8 @@ flowchart TD
 | `core/markdown_checks.py`                 | Markdown quality checks: trailing whitespace, list markers, header jumps                                                                                                                                                           |
 | `core/constants.py`                       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
 | `core/utils.py`                           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                                                                                    |
-| `core/cli.py`                             | Command-line interface with 25 commands, including read-only doctor diagnostics, conflict-safe MCP connection plans, preflighted import, transactional memory, compatibility handoff workflows, and canonical Task v2 lifecycle management                                                                              |
-| `mcp/power_server.py`                     | FastMCP 3.x server with 20 async tools, loopback HTTP transport, and `/health`                                                                                                                                                     |
+| `core/cli.py`                             | Command-line interface with 26 commands, including read-only doctor diagnostics, generic suite integration plans, conflict-safe MCP connection plans, preflighted import, transactional memory, compatibility handoff workflows, and canonical Task v2 lifecycle management                                                                              |
+| `mcp/power_server.py`                     | Official MCP SDK v2 server with 20 async tools, stdio/loopback HTTP transport, and `/health`                                                                                                                                                     |
 
 All components share `power_framework.core` as the single source of truth.
 
