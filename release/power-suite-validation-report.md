@@ -14,7 +14,7 @@ sealed human-evaluation material was not opened.
 | Component | Candidate base | Tag readback | Implementation commit |
 | --- | --- | --- | --- |
 | POWER | `origin/main` `527cc8a77187e9fa6d724b604d1a6634545da575` | `v3.6.6` → `6c6b6ae52f4b29382f0d2ec82fbb4e75ba1f471a` | `08ca9326dc849921db0c61a852ecb83cd6dd96b0` |
-| POWER-GUI | `origin/main` `068b4d32d5d55170de52c81a897526e3d640078a` | `v0.7.4` → `f1c918c7a8c6de011ff0553f08d00675ad296f59` | `27ed678593647f000cc77462611df1fba43808d9` |
+| POWER-GUI | `origin/main` `068b4d32d5d55170de52c81a897526e3d640078a` | `v0.7.4` → `f1c918c7a8c6de011ff0553f08d00675ad296f59` | `b8001e1e5d3f57ed679b6941c6d0a12a752c931e` |
 
 Both implementation commits are signed with GPG key `2D49E810C7F2527E` and
 the required `weby-homelab <rekvizitor.ua@gmail.com>` identity.
@@ -50,7 +50,7 @@ The following local gates passed:
 - The GUI container candidate was built from the pinned Python base image
   `sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317`.
   Local image ID is
-  `sha256:fabdfba555aa77b30cc1330295a75224426926110500e471cb93fdfd8aacc5f2`.
+  `sha256:017970ee75b40c1ea16f39c8ecaaf5e33c4da7dbebfc8a5d182f09ebdc0d2b26`.
   A disposable run returned `/healthz` version `3.6.6`, returned HTTP 200 for
   `/login`, ran as UID/GID `10001`, used `cap_drop=ALL`,
   `no-new-privileges:true`, and kept `/data` as rebuildable cache state.
@@ -60,7 +60,7 @@ The following local gates passed:
 | Surface | Command/result |
 | --- | --- |
 | POWER full suite | `POWER_EMBED_DEVICE=cpu POWER_RERANKER_DEVICE=cpu uv run --extra dev --extra rerank python -m pytest --no-cov -q` → **1150 passed, 11 skipped, 2 warnings** |
-| GUI full suite | `uv run --extra dev python -m pytest -q` → **53 passed, 3 skipped, 1 warning** |
+| GUI full suite | `uv run --extra dev python -m pytest -q` → **54 passed, 3 skipped, 1 warning** |
 | MCP/integration focus | `uv run --extra dev --extra mcp python -m pytest --no-cov -q` over entrypoint, packaging, onboarding, boundary, server, integrations and cross-process tests → **69 passed** |
 | POWER formatting/lint | Ruff format check and Ruff check → **pass** |
 | GUI formatting/lint | Ruff format check and Ruff check → **pass** |
@@ -71,6 +71,14 @@ The following local gates passed:
 The first inherited automatic/CUDA test invocation was not used as a release
 gate because this host has no CUDA execution provider. The explicit CPU gate
 above is the canonical reproducible result and passed in full.
+
+The Web Interface Guidelines review also passed as a static product gate after
+the GUI accessibility hardening commit: form controls have associated labels,
+the skip link and focus-visible ring remain present, `transition: all` and
+focus-outline suppression were removed from the owned stylesheet, and a
+`prefers-reduced-motion` fallback is present. The graph keeps its accessible
+table fallback. This is static evidence; it does not replace the still-open
+live native GUI lifecycle gate.
 
 The required read-only startup health check
 `uv run power doctor /root/geminicli/brain --json` returned an environment
@@ -85,7 +93,7 @@ the verified installer was run only in disposable HOME roots.
 | Artifact | SHA-256 or status |
 | --- | --- |
 | `power_framework-3.6.6-py3-none-any.whl` | `cf853aa73aca5847c43e8097be335c49196a17149eb88a931a000765f85fb512` |
-| `power_gui-0.7.4-py3-none-any.whl` | `dd98f67dfa9a824aa09803d9c78a0eb304c228d187c4012a3bdca84dd3a6f39e` |
+| `power_gui-0.7.4-py3-none-any.whl` | `aef46cdde6baa3c88f407e8966ffe66acb16fdaf19198d0cf65edeb2b329bffc` |
 | Local POWER CycloneDX 1.5 export | `233f99862dc68189deba59a5206cb95d0e0bfde67772048f23f47ca6966ad7a0` |
 | Local GUI CycloneDX 1.5 export | `48a7357395e014442d4ec1913e73e6fa66676fa22cad3d89df5938ca944a20b2` |
 | Published suite SBOM/digest | **not available** |

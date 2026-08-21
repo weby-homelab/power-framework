@@ -21,7 +21,7 @@
       "sha": "068b4d32d5d55170de52c81a897526e3d640078a",
       "tag_commit": "f1c918c7a8c6de011ff0553f08d00675ad296f59",
       "implementation_ref": "feature/power-gui-suite-3.7",
-      "implementation_commit": "27ed678593647f000cc77462611df1fba43808d9"
+      "implementation_commit": "b8001e1e5d3f57ed679b6941c6d0a12a752c931e"
     }
   },
   "application": {
@@ -78,7 +78,7 @@
       "required_for_mcp": false,
       "cache_sharing": "separate-rebuildable-cache",
       "image_digest": null,
-      "local_image_id": "sha256:fabdfba555aa77b30cc1330295a75224426926110500e471cb93fdfd8aacc5f2",
+      "local_image_id": "sha256:017970ee75b40c1ea16f39c8ecaaf5e33c4da7dbebfc8a5d182f09ebdc0d2b26",
       "base_image_digest": "sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317",
       "security": "non-root-10001-cap-drop-all-no-new-privileges",
       "health": "local-candidate-verified"
@@ -92,7 +92,7 @@
   },
   "artifacts": {
     "power_wheel_sha256": "cf853aa73aca5847c43e8097be335c49196a17149eb88a931a000765f85fb512",
-    "gui_wheel_sha256": "dd98f67dfa9a824aa09803d9c78a0eb304c228d187c4012a3bdca84dd3a6f39e",
+    "gui_wheel_sha256": "aef46cdde6baa3c88f407e8966ffe66acb16fdaf19198d0cf65edeb2b329bffc",
     "sbom_sha256": null,
     "local_sbom_sha256": {
       "power_lock_cyclonedx1_5": "233f99862dc68189deba59a5206cb95d0e0bfde67772048f23f47ca6966ad7a0",
@@ -102,11 +102,12 @@
   },
   "validation": {
     "core_full_cpu_pytest": "1150 passed, 11 skipped, 2 warnings",
-    "gui_full_pytest": "53 passed, 3 skipped, 1 warning",
+    "gui_full_pytest": "54 passed, 3 skipped, 1 warning",
     "mcp_integration_pytest_no_cov": "69 passed",
     "core_mypy": "pass",
     "core_ruff": "pass",
     "gui_ruff": "pass",
+    "gui_accessibility_review": "pass: labels, focus-visible guard, reduced-motion fallback and explicit transitions",
     "documentation_drift": "pass",
     "native_fresh_home": "power/power-mcp/power-gui launchers, versions, preflight and receipt verified",
     "container_local": "healthz/login/non-root/cap-drop/no-new-privileges verified",
