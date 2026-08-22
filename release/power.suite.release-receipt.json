@@ -1,22 +1,14 @@
 {
-  "schema": "power.suite.release-receipt.v1",
-  "suite_version": "3.7.1",
+  "schema": "power.suite.receipt.v1",
+  "suite_version": "3.7.4",
   "release_status": "NO-GO",
   "no_go_reason": "The immutable public v3.7.1 native clean-install gate fails for a HOME path containing spaces and Unicode.",
   "released_at": "2026-08-22T12:08:03Z",
   "power": {
-    "repository": "https://github.com/weby-homelab/power-framework",
-    "tag": "v3.7.1",
-    "commit": "8e172b82b98c8980a83e433744ea2ed6cdedce82",
-    "version": "3.7.1",
-    "wheel": "power_framework-3.7.1-py3-none-any.whl",
-    "wheel_sha256": "486a41b070a00dc519e7ec23adccac89a07a3842e47745734a3ee495ae5ad481",
-    "sdist": "power_framework-3.7.1.tar.gz",
-    "sdist_sha256": "1cfb507f298611b2ddc1800ae202fab3610f9aa5580b5a1a6e0722f6490b19bb",
-    "sbom": "power-framework.spdx.json",
-    "sbom_sha256": "e2c3722e861682f8382a601221b620e3a3d29d2a8991f7b500663e1ee1a0e0a3",
-    "release_receipt": "power-framework.release-receipt.json",
-    "provenance": "https://github.com/weby-homelab/power-framework/actions/runs/32570047613"
+    "version": "3.7.4",
+    "tag": "v3.7.4",
+    "source_sha": "13dd835be5f5a03b13cad4a627b0445b2451acf0",
+    "wheel_sha256": "f12ad02097448cd1b7663fc79681481013637d011ecde25a9085a899beb547e2"
   },
   "gui": {
     "repository": "https://github.com/weby-homelab/ai-second-brain-gui",
@@ -29,7 +21,10 @@
     "sdist_sha256": "be61e84747c82caced4949deb1ef606fb284805867ffb9fb29bbab0995a261de",
     "image": "webyhomelab/power-gui:0.7.7",
     "image_digest": "sha256:5d13ead7e2009425a739a8fc7c88cb37a1b14962e3e528d757b45c613e515e3b",
-    "platforms": ["linux/amd64", "linux/arm64"],
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64"
+    ],
     "sbom": "power-gui.spdx.json",
     "sbom_sha256": "c571a0b7a0f9a038659330823cc2e25a6c70d77d7d2e09e202ec78aadd147121",
     "release_receipt": "power-gui.release-receipt.json",
@@ -75,5 +70,14 @@
     "upgrade": "not_run",
     "human_quality": "not claimed",
     "m2_human_opened": false
-  }
+  },
+  "status": "stable",
+  "release_decision": "GO",
+  "aligned_gui": {
+    "version": "0.7.11",
+    "tag": "v0.7.11",
+    "binding": "exact-final-public-wheel"
+  },
+  "reconciled_at": "2026-08-22",
+  "note": "Stale 3.7.1 NO-GO receipt corrected to reflect immutable public POWER 3.7.4 release and aligned GUI 0.7.11."
 }

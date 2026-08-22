@@ -1,6 +1,6 @@
 # Exact suite dependency pins; artifact hashes are bound by power.suite.manifest.json.
 power-framework==3.7.4
-power-gui==0.7.10
+power-gui==0.7.11
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.14.2

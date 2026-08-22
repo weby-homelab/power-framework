@@ -1,46 +1,33 @@
 {
   "schema": "power.suite.manifest.v1",
-  "status": "candidate",
-  "suite_version": "3.7.1",
-  "release_decision": "NO-GO",
-  "no_go_reason": "The immutable public v3.7.1 native clean-install gate fails: moved console shims retain the removed staging venv when HOME contains spaces or Unicode.",
+  "status": "stable",
+  "suite_version": "3.7.4",
+  "release_decision": "GO",
   "application_schema": "power.application.v2",
   "python": {
     "requires_python": ">=3.13,<3.15"
   },
   "power": {
     "distribution": "power-framework",
-    "version": "3.7.1",
-    "filename": "power_framework-3.7.1-py3-none-any.whl",
-    "sha256": "486a41b070a00dc519e7ec23adccac89a07a3842e47745734a3ee495ae5ad481",
+    "version": "3.7.4",
+    "filename": "power_framework-3.7.4-py3-none-any.whl",
+    "sha256": "f12ad02097448cd1b7663fc79681481013637d011ecde25a9085a899beb547e2",
     "requires_python": ">=3.13,<3.15",
-    "source_sha": "8e172b82b98c8980a83e433744ea2ed6cdedce82",
-    "tag": "v3.7.1",
-    "sdist_filename": "power_framework-3.7.1.tar.gz",
-    "sdist_sha256": "1cfb507f298611b2ddc1800ae202fab3610f9aa5580b5a1a6e0722f6490b19bb",
+    "source_sha": "13dd835be5f5a03b13cad4a627b0445b2451acf0",
+    "tag": "v3.7.4",
+    "tag_object": "c2146789d414f6bcc62dfb6b61221b1b73a67e29",
+    "sdist_filename": "power_framework-3.7.4.tar.gz",
+    "sdist_sha256": "6592789b6d603b39764e7127b62323966807a6c41385cf7a3024a154a197395f",
     "sbom_filename": "power-framework.spdx.json",
-    "sbom_sha256": "e2c3722e861682f8382a601221b620e3a3d29d2a8991f7b500663e1ee1a0e0a3"
-  },
-  "gui": {
-    "distribution": "power-gui",
-    "version": "0.7.7",
-    "filename": "power_gui-0.7.7-py3-none-any.whl",
-    "sha256": "8e7904a12abf30e4e458125c36d621ae383caff764a46471223b919dc7591853",
-    "requires_python": ">=3.13,<3.15",
-    "source_sha": "339388ee4f77401a033ed50d4cac25ad3b82fefd",
-    "tag": "v0.7.7",
-    "sdist_filename": "power_gui-0.7.7.tar.gz",
-    "sdist_sha256": "be61e84747c82caced4949deb1ef606fb284805867ffb9fb29bbab0995a261de",
-    "sbom_filename": "power-gui.spdx.json",
-    "sbom_sha256": "c571a0b7a0f9a038659330823cc2e25a6c70d77d7d2e09e202ec78aadd147121"
-  },
-  "skill": {
-    "tree_sha256": "4ac2ad7e851f4bc17f32cd54369263a94738929f34df2b5844f66f702819331e",
-    "compatible_power_version": "3.7.1"
+    "sbom_sha256": "c27742526fd795fcf751de4cc42365610256e95d4587a8b9c9875ba61999c20e"
   },
   "dependencies": {
-    "constraints": "power-suite-3.7.1-gui-0.7.7.constraints.txt",
-    "sha256": "e0ded6bc17bbbfc38a0834dcd32fad50e2fc3a2d23b03145deca76920e948898"
+    "constraints": "power-suite.constraints.txt",
+    "sha256": "ec26ef4c3bb8c43e41fe07f7b448631fe694fb58fd972f425f02b7be53ddfa5f"
+  },
+  "skill": {
+    "tree_sha256": "c834a3606604643748a94ec6216409400eb341f9d2f077148f3fc121819f22f2",
+    "compatible_power_version": "3.7.4"
   },
   "mcp": {
     "transport": "stdio",
@@ -48,21 +35,15 @@
     "stdout": "protocol-only",
     "application_schema": "power.application.v2"
   },
-  "publication": {
-    "core_tag": "v3.7.1",
-    "gui_tag": "v0.7.7",
-    "stable_readback": false,
-    "readback_status": "component_publication_verified_suite_gate_failed",
-    "core_release_run": "32570047613",
-    "gui_release_run": "32571844771",
-    "gui_image_run": "32571844803",
-    "core_release_url": "https://github.com/weby-homelab/power-framework/releases/tag/v3.7.1",
-    "gui_release_url": "https://github.com/weby-homelab/ai-second-brain-gui/releases/tag/v0.7.7"
+  "aligned_gui": {
+    "distribution": "power-gui",
+    "version": "0.7.11",
+    "source_sha": "5abe58734f75f806aef87d2375b69ebce108ebc3",
+    "tag": "v0.7.11",
+    "wheel_sha256": "21225b27ea31b9d277da1d0dd37f627383a0edd743eeb4f087037bd7f37c673e",
+    "sdist_sha256": "0658cde8a62b890a174545e5b9df40e3086ad2b71940e7d423ee38db00921ed8",
+    "binding": "exact-final-public-wheel",
+    "release_decision": "GO"
   },
-  "container": {
-    "image": "webyhomelab/power-gui:0.7.7",
-    "digest": "sha256:5d13ead7e2009425a739a8fc7c88cb37a1b14962e3e528d757b45c613e515e3b",
-    "platforms": ["linux/amd64", "linux/arm64"],
-    "readback": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32571844803"
-  }
+  "notes": "Reconciled 2026-08-22: prior 3.7.1 NO-GO manifest was stale current-facing evidence. POWER 3.7.4 is the immutable public release (tag v3.7.4, commit 13dd835, wheel f12ad020...). Aligned GUI 0.7.11 binds the exact final public wheel via single build-input power.gui.suite-input.v1. No core re-release performed; this document only corrects release-truth metadata."
 }
