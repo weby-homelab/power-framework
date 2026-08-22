@@ -56,6 +56,8 @@ def _walk_resource_tree(root: Any, prefix: str = "") -> dict[str, bytes]:
     """Read a Traversable resource tree without assuming a filesystem path."""
     files: dict[str, bytes] = {}
     for child in sorted(root.iterdir(), key=lambda item: item.name):
+        if child.name == "__pycache__" or child.name.endswith(".pyc"):
+            continue
         relative = f"{prefix}/{child.name}" if prefix else child.name
         if child.is_dir():
             files.update(_walk_resource_tree(child, relative))
@@ -72,7 +74,7 @@ def packaged_skill_tree() -> SkillTree:
         files = {
             path.relative_to(source).as_posix(): path.read_bytes()
             for path in source.rglob("*")
-            if path.is_file()
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
         }
     else:
         resource_root = (
@@ -91,7 +93,12 @@ def _tree_from_directory(root: Path) -> dict[str, bytes]:
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in root.rglob("*")
-        if path.is_file() and not path.is_symlink()
+        if (
+            path.is_file()
+            and not path.is_symlink()
+            and "__pycache__" not in path.parts
+            and path.suffix != ".pyc"
+        )
     }
 
 
