@@ -1,7 +1,7 @@
 {
   "schema": "power.suite.release-receipt.v1",
   "suite_version": "3.7.1",
-  "released_at": "2026-08-22T11:33:53Z",
+  "released_at": "2026-08-22T12:08:03Z",
   "power": {
     "repository": "https://github.com/weby-homelab/power-framework",
     "tag": "v3.7.1",
@@ -18,20 +18,20 @@
   },
   "gui": {
     "repository": "https://github.com/weby-homelab/ai-second-brain-gui",
-    "tag": "v0.7.6",
-    "commit": "78c74eab8881258b7e2014044aed4837a0cbcb30",
-    "version": "0.7.6",
-    "wheel": "power_gui-0.7.6-py3-none-any.whl",
-    "wheel_sha256": "03244984c089766980dbbe4cd28de51fd9d294519e46f60aa64de6fe6154b591",
-    "sdist": "power_gui-0.7.6.tar.gz",
-    "sdist_sha256": "461fd33adde25d53860ce14c0ac3ff98ae6e95bc704dbf1092325e7487623904",
-    "image": "webyhomelab/power-gui:0.7.6",
-    "image_digest": "sha256:5377536a6552c7c86c892fb1c1eec5fd2ed54e81784c4a9be939a090d826b470",
+    "tag": "v0.7.7",
+    "commit": "339388ee4f77401a033ed50d4cac25ad3b82fefd",
+    "version": "0.7.7",
+    "wheel": "power_gui-0.7.7-py3-none-any.whl",
+    "wheel_sha256": "8e7904a12abf30e4e458125c36d621ae383caff764a46471223b919dc7591853",
+    "sdist": "power_gui-0.7.7.tar.gz",
+    "sdist_sha256": "be61e84747c82caced4949deb1ef606fb284805867ffb9fb29bbab0995a261de",
+    "image": "webyhomelab/power-gui:0.7.7",
+    "image_digest": "sha256:5d13ead7e2009425a739a8fc7c88cb37a1b14962e3e528d757b45c613e515e3b",
     "platforms": ["linux/amd64", "linux/arm64"],
     "sbom": "power-gui.spdx.json",
-    "sbom_sha256": "50ed0bd3dd7d8026e3789052fe5bae86b9258927895cd0114e21145a2e966701",
+    "sbom_sha256": "c571a0b7a0f9a038659330823cc2e25a6c70d77d7d2e09e202ec78aadd147121",
     "release_receipt": "power-gui.release-receipt.json",
-    "provenance": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290365"
+    "provenance": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32571844771"
   },
   "runtime": {
     "python_range": ">=3.13,<3.15",
@@ -56,8 +56,8 @@
     "foreign_target_protection": "passed"
   },
   "dependencies": {
-    "constraints_artifact": "power-suite.constraints.txt",
-    "constraints_sha256": "cae5417ce4df81c8b1ca18d74021503c9be40fc941b6bc1b9ff9dec2395373a5",
+    "constraints_artifact": "power-suite-3.7.1-gui-0.7.7.constraints.txt",
+    "constraints_sha256": "e0ded6bc17bbbfc38a0834dcd32fad50e2fc3a2d23b03145deca76920e948898",
     "lockfile": "uv.lock"
   },
   "validation": {

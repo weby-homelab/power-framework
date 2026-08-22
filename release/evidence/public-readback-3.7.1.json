@@ -1,6 +1,6 @@
 {
   "schema": "power.public-readback.v1",
-  "captured_at": "2026-08-22T11:33:53Z",
+  "captured_at": "2026-08-22T12:08:03Z",
   "power": {
     "repository": "weby-homelab/power-framework",
     "tag": "v3.7.1",
@@ -18,24 +18,24 @@
   },
   "gui": {
     "repository": "weby-homelab/ai-second-brain-gui",
-    "tag": "v0.7.6",
-    "commit": "78c74eab8881258b7e2014044aed4837a0cbcb30",
-    "release": "https://github.com/weby-homelab/ai-second-brain-gui/releases/tag/v0.7.6",
-    "workflow_run": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290365",
+    "tag": "v0.7.7",
+    "commit": "339388ee4f77401a033ed50d4cac25ad3b82fefd",
+    "release": "https://github.com/weby-homelab/ai-second-brain-gui/releases/tag/v0.7.7",
+    "workflow_run": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32571844771",
     "assets": {
-      "power_gui-0.7.6-py3-none-any.whl": "03244984c089766980dbbe4cd28de51fd9d294519e46f60aa64de6fe6154b591",
-      "power_gui-0.7.6.tar.gz": "461fd33adde25d53860ce14c0ac3ff98ae6e95bc704dbf1092325e7487623904",
-      "power-gui.spdx.json": "50ed0bd3dd7d8026e3789052fe5bae86b9258927895cd0114e21145a2e966701",
-      "power-gui.release-receipt.json": "543fe514c98fe7cbe8b7477bff667bf90f9198ef987894d9ebbf5fb8ef68e0de"
+      "power_gui-0.7.7-py3-none-any.whl": "8e7904a12abf30e4e458125c36d621ae383caff764a46471223b919dc7591853",
+      "power_gui-0.7.7.tar.gz": "be61e84747c82caced4949deb1ef606fb284805867ffb9fb29bbab0995a261de",
+      "power-gui.spdx.json": "c571a0b7a0f9a038659330823cc2e25a6c70d77d7d2e09e202ec78aadd147121",
+      "power-gui.release-receipt.json": "c0a65a37316917873a4925c8421843fb186e048ffeea0d458988928c808569e6"
     },
     "release_receipt": "power-gui.release-receipt.json",
-    "provenance": "attest-build-provenance passed in workflow run 32570290365"
+    "provenance": "attest-build-provenance passed in workflow run 32571844771"
   },
   "container": {
-    "image": "webyhomelab/power-gui:0.7.6",
-    "digest": "sha256:5377536a6552c7c86c892fb1c1eec5fd2ed54e81784c4a9be939a090d826b470",
+    "image": "webyhomelab/power-gui:0.7.7",
+    "digest": "sha256:5d13ead7e2009425a739a8fc7c88cb37a1b14962e3e528d757b45c613e515e3b",
     "platforms": ["linux/amd64", "linux/arm64"],
-    "workflow_run": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290281",
+    "workflow_run": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32571844803",
     "live_e2e": "passed",
     "registry_readback": "Docker Registry Docker-Content-Digest matched workflow digest"
   },
@@ -43,6 +43,8 @@
     "application_schema": "power.application.v2",
     "power_source_matches_tag": true,
     "gui_source_matches_tag": true,
-    "container_core_source": "8e172b82b98c8980a83e433744ea2ed6cdedce82"
+    "container_core_source": "8e172b82b98c8980a83e433744ea2ed6cdedce82",
+    "constraints_artifact": "power-suite-3.7.1-gui-0.7.7.constraints.txt",
+    "constraints_sha256": "e0ded6bc17bbbfc38a0834dcd32fad50e2fc3a2d23b03145deca76920e948898"
   }
 }
