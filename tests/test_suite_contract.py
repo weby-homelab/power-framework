@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from power_framework.core.integrations import (
+    _rewrite_venv_shebangs,
     apply_native_install_plan,
     build_native_install_plan,
 )
@@ -137,3 +138,20 @@ def test_wrong_distribution_is_rejected_before_install(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="distribution"):
         validate_suite_artifacts(manifest, foreign, gui)
+
+
+def test_moved_venv_console_scripts_use_active_interpreter(tmp_path: Path) -> None:
+    venv_root = tmp_path / "active" / "venv"
+    bin_dir = venv_root / "bin"
+    bin_dir.mkdir(parents=True)
+    script = bin_dir / "power"
+    script.write_text(
+        "#!/tmp/staging-venv/bin/python\nprint('synthetic')\n",
+        encoding="utf-8",
+    )
+
+    _rewrite_venv_shebangs(venv_root)
+
+    assert script.read_text(encoding="utf-8").startswith(
+        f"#!{venv_root}/bin/python\n"
+    )

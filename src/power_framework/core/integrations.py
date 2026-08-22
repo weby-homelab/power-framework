@@ -371,6 +371,22 @@ def _write_executable(path: Path, content: str) -> None:
     os.replace(temporary, path)
 
 
+def _rewrite_venv_shebangs(venv_root: Path) -> None:
+    """Point generated console scripts at the activated venv after a move."""
+    python_path = venv_root / "bin" / "python"
+    bin_dir = venv_root / "bin"
+    for script in bin_dir.iterdir():
+        if script.is_symlink() or not script.is_file():
+            continue
+        content = script.read_bytes()
+        first_line, separator, remainder = content.partition(b"\n")
+        if not separator or not first_line.startswith(b"#!"):
+            continue
+        if b"/bin/python" not in first_line:
+            continue
+        script.write_bytes(b"#!" + str(python_path).encode("utf-8") + b"\n" + remainder)
+
+
 def apply_native_install_plan(
     plan: dict[str, Any],
     *,
@@ -483,6 +499,7 @@ def apply_native_install_plan(
         if venv_root.exists():
             os.replace(venv_root, previous_venv)
         os.replace(staging_venv, venv_root)
+        _rewrite_venv_shebangs(venv_root)
         activated = True
         for name in launcher_names:
             os.replace(launcher_stage / name, launcher_dir / name)
