@@ -106,9 +106,7 @@ def test_normalize_sdist_is_order_and_metadata_independent(tmp_path: Path) -> No
 
         extracted = tmp_path / "extracted"
         extracted.mkdir()
-        archive.extractall(  # noqa: S202 -- the archive is synthetic and test-local.
-            extracted, filter="fully_trusted"
-        )
+        archive.extractall(extracted, filter="data")
         assert (extracted / "pkg/z.txt").read_text() == "hello"
         assert (extracted / "pkg/hard").read_text() == "hello"
         assert (extracted / "pkg/z.txt").stat().st_ino == (extracted / "pkg/hard").stat().st_ino

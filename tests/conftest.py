@@ -46,7 +46,7 @@ class FakeTokenizer:
     """Minimal tokenizer surface consumed by ``BGEM3OnnxManager`` tests."""
 
     def enable_truncation(self, max_length: int) -> None:
-        del max_length
+        return None
 
     def enable_padding(self) -> None:
         return None
