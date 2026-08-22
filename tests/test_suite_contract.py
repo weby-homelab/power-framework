@@ -153,3 +153,21 @@ def test_moved_venv_console_scripts_use_active_interpreter(tmp_path: Path) -> No
     _rewrite_venv_shebangs(venv_root)
 
     assert script.read_text(encoding="utf-8").startswith(f"#!{venv_root}/bin/python\n")
+
+
+def test_moved_venv_shell_shims_drop_staging_root(tmp_path: Path) -> None:
+    staging_root = tmp_path / ".venv.staging-with spaces-Ж"
+    venv_root = tmp_path / "active with spaces-Ж" / "venv"
+    bin_dir = venv_root / "bin"
+    bin_dir.mkdir(parents=True)
+    script = bin_dir / "power"
+    script.write_text(
+        f"#!/bin/sh\n'''exec' \"{staging_root}/bin/python\" \"$0\" \"$@\"\n' '''\n",
+        encoding="utf-8",
+    )
+
+    _rewrite_venv_shebangs(venv_root, staging_root=staging_root)
+
+    rewritten = script.read_text(encoding="utf-8")
+    assert str(staging_root) not in rewritten
+    assert f"{venv_root}/bin/python" in rewritten
