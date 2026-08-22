@@ -17,6 +17,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import uuid
 import venv
 import zipfile
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from .connect import ConnectClient, apply_connect_plan, build_connect_plan
+from .suite_contract import validate_suite_artifacts
 from .utils import atomic_write
 
 INTEGRATIONS_SCHEMA_VERSION = "power.integrations.v1"
@@ -286,14 +288,31 @@ def build_native_install_plan(
     home: str | Path | None = None,
     power_wheel: str | Path | None = None,
     gui_wheel: str | Path | None = None,
+    manifest: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Build a dry-run native installer plan for one managed venv."""
+    """Build a dry-run native installer plan for one managed venv.
+
+    A Suite manifest is mandatory.  Artifact filenames, metadata, hashes,
+    Python support, Skill compatibility, and constraints are validated before
+    the plan can be applied.
+    """
     install_home = _safe_target(home or Path.home() / ".power-install-home", label="installer home")
     if home is None:
         install_home = Path.home().resolve()
     managed = install_home / ".local" / "share" / "power"
     venv_root = managed / "venv"
     launcher_dir = install_home / ".local" / "bin"
+    if not manifest:
+        return {
+            "schema": NATIVE_INSTALL_SCHEMA_VERSION,
+            "status": "blocked",
+            "reason": "an exact Suite manifest is required",
+            "native": {
+                "home": str(install_home),
+                "venv": str(venv_root),
+                "launcher_dir": str(launcher_dir),
+            },
+        }
     if not power_wheel:
         return {
             "schema": NATIVE_INSTALL_SCHEMA_VERSION,
@@ -311,6 +330,7 @@ def build_native_install_plan(
     gui_path = Path(gui_wheel).expanduser().resolve() if gui_wheel else None
     if gui_path is not None and (not gui_path.is_file() or gui_path.suffix != ".whl"):
         raise ValueError("gui_wheel must be an existing .whl file")
+    contract = validate_suite_artifacts(manifest, power_path, gui_path)
     state_path = managed / "suite-install.json"
     return {
         "schema": NATIVE_INSTALL_SCHEMA_VERSION,
@@ -321,6 +341,7 @@ def build_native_install_plan(
             "launcher_dir": str(launcher_dir),
             "state": str(state_path),
         },
+        "contract": contract,
         "artifacts": {
             "power_wheel": {"path": str(power_path), "sha256": _sha256_file(power_path)},
             "gui_wheel": (
@@ -356,7 +377,7 @@ def apply_native_install_plan(
     approved: bool,
     no_deps: bool = False,
 ) -> dict[str, Any]:
-    """Create the managed venv, install exact wheels, and publish launchers."""
+    """Stage, verify, and atomically activate one exact Suite environment."""
     if not approved:
         raise PermissionError("native install requires explicit approved=True")
     if plan.get("schema") != NATIVE_INSTALL_SCHEMA_VERSION or plan.get("status") == "blocked":
@@ -364,86 +385,149 @@ def apply_native_install_plan(
     native = plan["native"]
     venv_root = Path(native["venv"])
     launcher_dir = Path(native["launcher_dir"])
-    venv_python = venv_root / "bin" / "python"
-    if not venv_python.is_file():
-        venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(venv_root)
-
-    power_artifact = plan["artifacts"]["power_wheel"]
-    artifacts = [power_artifact]
-    gui_artifact = plan["artifacts"].get("gui_wheel")
-    if gui_artifact:
-        artifacts.append(gui_artifact)
-    for artifact in artifacts:
-        path = Path(artifact["path"])
-        if _sha256_file(path) != artifact["sha256"]:
-            raise RuntimeError(f"artifact changed after the plan was created: {path}")
-        command = [
-            str(venv_python),
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--no-input",
-            "--upgrade",
-        ]
-        if no_deps:
-            command.append("--no-deps")
-        if artifact is power_artifact and not no_deps:
-            command.append(f"{path}[remote]")
-        elif artifact is gui_artifact and not no_deps:
-            command.append("--no-deps")
-            command.append(str(path))
-        else:
-            command.append(str(path))
-        subprocess.run(command, check=True, capture_output=True, text=True)  # noqa: S603
-        if artifact is gui_artifact and not no_deps:
-            dependencies = _wheel_dependencies(path)
-            if dependencies:
-                dependency_command = [
-                    str(venv_python),
-                    "-m",
-                    "pip",
-                    "install",
-                    "--disable-pip-version-check",
-                    "--no-input",
-                    "--upgrade",
-                    *dependencies,
-                ]
-                subprocess.run(  # noqa: S603 - dependencies come from verified wheel metadata
-                    dependency_command,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-
-    venv_text = str(venv_root)
-    _write_executable(launcher_dir / "power", f"#!/bin/sh\nexec '{venv_text}/bin/power' \"$@\"\n")
-    _write_executable(
-        launcher_dir / "power-mcp",
-        f"#!/bin/sh\nexec '{venv_text}/bin/power-mcp' \"$@\"\n",
-    )
-    if plan["artifacts"].get("gui_wheel"):
-        _write_executable(
-            launcher_dir / "power-gui",
-            f"#!/bin/sh\nexec '{venv_text}/bin/power-gui' \"$@\"\n",
-        )
-    receipt = {
-        "schema": NATIVE_INSTALL_SCHEMA_VERSION,
-        "status": "applied",
-        "venv": str(venv_root),
-        "launchers": [
-            str(launcher_dir / name)
-            for name in ("power", "power-mcp", "power-gui")
-            if name != "power-gui" or plan["artifacts"].get("gui_wheel")
-        ],
-        "artifacts": plan["artifacts"],
-        "no_deps": no_deps,
-    }
     state_path = Path(native["state"])
-    atomic_write(
-        state_path, json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    )
-    return receipt
+    manifest_path = Path(plan["contract"]["manifest_path"])
+    power_path = Path(plan["artifacts"]["power_wheel"]["path"])
+    gui_artifact = plan["artifacts"].get("gui_wheel")
+    gui_path = Path(gui_artifact["path"]) if gui_artifact else None
+    contract = validate_suite_artifacts(manifest_path, power_path, gui_path)
+    if contract["manifest_sha256"] != plan["contract"].get("manifest_sha256"):
+        raise RuntimeError("Suite manifest changed after the plan was created")
+    if contract["components"] != plan["contract"].get("components"):
+        raise RuntimeError("Suite artifacts changed after the plan was created")
+
+    managed = venv_root.parent
+    managed.mkdir(parents=True, exist_ok=True)
+    activation_id = uuid.uuid4().hex
+    staging_venv = managed / f".venv.staging-{activation_id}"
+    previous_venv = managed / f".venv.previous-{activation_id}"
+    launcher_stage = launcher_dir / f".launchers.staging-{activation_id}"
+    launcher_names = ["power", "power-mcp"]
+    if gui_path is not None:
+        launcher_names.append("power-gui")
+    launcher_snapshots: dict[Path, tuple[bytes, int] | None] = {}
+    for name in launcher_names:
+        destination = launcher_dir / name
+        if destination.is_file():
+            launcher_snapshots[destination] = (destination.read_bytes(), destination.stat().st_mode)
+        else:
+            launcher_snapshots[destination] = None
+    state_snapshot = state_path.read_bytes() if state_path.is_file() else None
+    activated = False
+    try:
+        venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(staging_venv)
+        staged_python = staging_venv / "bin" / "python"
+        constraints_path = contract["dependencies"].get("path")
+
+        def run_pip(arguments: list[str]) -> None:
+            command = [
+                str(staged_python),
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--no-input",
+                "--upgrade",
+            ]
+            if constraints_path and not no_deps:
+                command.extend(["--constraint", str(constraints_path)])
+            command.extend(arguments)
+            subprocess.run(command, check=True, capture_output=True, text=True)  # noqa: S603
+
+        if no_deps:
+            run_pip(["--no-deps", str(power_path)])
+            if gui_path is not None:
+                run_pip(["--no-deps", str(gui_path)])
+        else:
+            run_pip([f"{power_path}[remote]"])
+            if gui_path is not None:
+                run_pip(["--no-deps", str(gui_path)])
+                dependencies = [
+                    item
+                    for item in _wheel_dependencies(gui_path)
+                    if not item.lower().startswith("power-framework")
+                ]
+                if dependencies:
+                    run_pip(dependencies)
+
+        check_script = (
+            "import importlib.metadata as m; "
+            "import power_framework; "
+            "from power_framework.core.application import ApplicationEnvelope; "
+            "assert m.version('power-framework') == "
+            f"{contract['components']['power']['metadata']['version']!r}; "
+            "assert ApplicationEnvelope.__dataclass_fields__['schema_version'].default == "
+            f"{contract['application_schema']!r}"
+        )
+        if gui_path is not None:
+            check_script += (
+                "; assert m.version('power-gui') == "
+                f"{contract['components']['gui']['metadata']['version']!r}"
+            )
+        subprocess.run(  # noqa: S603 - interpreter and script are generated from verified inputs.
+            [str(staged_python), "-c", check_script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        launcher_dir.mkdir(parents=True, exist_ok=True)
+        launcher_stage.mkdir(parents=True, exist_ok=False)
+        venv_text = str(venv_root)
+        for name in launcher_names:
+            _write_executable(
+                launcher_stage / name,
+                f"#!/bin/sh\nexec '{venv_text}/bin/{name}' \"$@\"\n",
+            )
+
+        if venv_root.exists():
+            os.replace(venv_root, previous_venv)
+        os.replace(staging_venv, venv_root)
+        activated = True
+        for name in launcher_names:
+            os.replace(launcher_stage / name, launcher_dir / name)
+
+        receipt = {
+            "schema": NATIVE_INSTALL_SCHEMA_VERSION,
+            "status": "applied",
+            "suite_version": contract["suite_version"],
+            "application_schema": contract["application_schema"],
+            "manifest_sha256": contract["manifest_sha256"],
+            "venv": str(venv_root),
+            "launchers": [str(launcher_dir / name) for name in launcher_names],
+            "artifacts": plan["artifacts"],
+            "dependencies": contract["dependencies"],
+            "no_deps": no_deps,
+        }
+        atomic_write(
+            state_path, json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        )
+        if not all((launcher_dir / name).is_file() for name in launcher_names):
+            raise RuntimeError("native Suite activation readback is incomplete")
+        if previous_venv.exists():
+            shutil.rmtree(previous_venv)
+        return receipt
+    except Exception:
+        if activated and venv_root.exists():
+            shutil.rmtree(venv_root)
+        if previous_venv.exists():
+            os.replace(previous_venv, venv_root)
+        for destination, snapshot in launcher_snapshots.items():
+            if snapshot is None:
+                destination.unlink(missing_ok=True)
+            else:
+                content, mode = snapshot
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(content)
+                destination.chmod(mode & 0o7777)
+        if state_snapshot is None:
+            state_path.unlink(missing_ok=True)
+        else:
+            state_path.write_bytes(state_snapshot)
+        raise
+    finally:
+        shutil.rmtree(staging_venv, ignore_errors=True)
+        shutil.rmtree(launcher_stage, ignore_errors=True)
 
 
 __all__ = [

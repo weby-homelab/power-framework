@@ -1,6 +1,6 @@
 # MCP Server (official Python SDK v2)
 
-P.O.W.E.R. `v3.6.7` exposes 20 governed tools through the
+P.O.W.E.R. `v3.7.1` exposes 20 governed tools through the
 [Model Context Protocol](https://modelcontextprotocol.io), powered by
 the official [MCP Python SDK v2](https://github.com/modelcontextprotocol/python-sdk).
 MCP-compatible agents can validate, index, retrieve, and perform bounded writes
@@ -56,7 +56,7 @@ Point the client to the exact interpreter where `power-framework` is installed:
 {
   "mcpServers": {
     "power": {
-      "command": "/home/YOU/.local/share/power-framework/venv/bin/python",
+      "command": "/home/YOU/.local/share/power/venv/bin/python",
       "args": [],
       "env": {
         "POWER_VAULT_DIR": "/home/YOU/Documents/power-vault"

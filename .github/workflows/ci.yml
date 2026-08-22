@@ -34,7 +34,7 @@ jobs:
       - name: Execute content-free upgrade and rollback invariants
         run: >-
           uv run python scripts/verify_upgrade_matrix.py
-          --from-version 3.6.6 --to-version 3.6.7
+          --from-version 3.6.7 --to-version 3.7.1
           --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade matrix evidence
