@@ -40,7 +40,11 @@ def _version_tuple(value: str) -> tuple[int, int, int]:
     match = _VERSION_RE.fullmatch(value.strip())
     if not match:
         raise ValueError(f"unsupported version: {value}")
-    return tuple(int(part or 0) for part in match.groups())
+    return (
+        int(match.group(1)),
+        int(match.group(2)),
+        int(match.group(3) or 0),
+    )
 
 
 def _parse_specifiers(value: str) -> list[tuple[str, tuple[int, int, int]]]:
