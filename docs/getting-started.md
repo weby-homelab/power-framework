@@ -1,18 +1,18 @@
 # Getting Started from a Clean Knowledge Base
 
-This is the authoritative clean-install path for P.O.W.E.R. `v3.7.2`. It
+This is the authoritative clean-install path for P.O.W.E.R. `v3.7.3`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
 
-> **Candidate release contract:** use `v3.7.2` only after its signed tag and immutable
-> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.2).
+> **Candidate release contract:** use `v3.7.3` only after its signed tag and immutable
+> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.3).
 > This guide names the tag-bound target; the URL alone does not prove that
 > publication completed. Check the [platform support matrix](support-matrix.md)
 > before applying the procedure to a non-Linux host.
 
 The [Windows installation guide](windows-11-installation.md) is informational
 only. Windows and macOS are deferred indefinitely and are not supported release
-platforms for `v3.7.2`.
+platforms for `v3.7.3`.
 
 ## 1. Prerequisites
 
@@ -35,7 +35,7 @@ POWER_CLI="$HOME/.local/share/power/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.7.2/power_framework-3.7.2-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.7.3/power_framework-3.7.3-py3-none-any.whl
 ```
 
 The base release wheel is FTS-only: it does not install ONNX Runtime, model
@@ -53,14 +53,14 @@ Verify the executable, package metadata, and lean import:
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Both version commands must report `3.7.2`; the final command must print
+Both version commands must report `3.7.3`; the final command must print
 `lean FTS import: OK`.
 
 For local MCP, install the official SDK extra from the same wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.2/power_framework-3.7.2-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.3/power_framework-3.7.3-py3-none-any.whl"
 ```
 
 ### Alternative: install from the pinned tag
@@ -69,7 +69,7 @@ This path requires Git:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.7.2'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.7.3'
 ```
 
 Do not use an unpinned `main` install when reproducibility matters.
@@ -210,7 +210,7 @@ it up before removing either location.
 ## Acceptance checklist
 
 - Python is 3.13 or 3.14 and the selected interpreter is inside the dedicated venv.
-- CLI and distribution metadata both report `3.7.2`.
+- CLI and distribution metadata both report `3.7.3`.
 - `power_framework` imports successfully without neural or MCP extras.
 - If MCP is configured, the explicit `remote` extra is installed and MCP
   preflight validates the configured vault through the public `power-mcp` launcher.

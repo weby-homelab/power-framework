@@ -22,6 +22,7 @@ def test_packaged_skill_tree_is_content_addressed() -> None:
     skill = packaged_skill_tree()
     assert "SKILL.md" in skill.files
     assert len(skill.sha256) == 64
+    assert all("__pycache__" not in path and not path.endswith(".pyc") for path in skill.files)
     assert skill.files == packaged_skill_tree().files
 
 
@@ -37,6 +38,20 @@ def test_skill_install_is_dry_run_atomic_and_idempotent(tmp_path: Path) -> None:
     assert build_skill_check_plan(target)["status"] == "no_change"
     second = apply_skill_install_plan(build_skill_check_plan(target), approved=True)
     assert second["status"] == "no_change"
+
+
+def test_skill_install_ignores_generated_bytecode_cache(tmp_path: Path) -> None:
+    target = tmp_path / "agent" / "skills" / "power"
+    plan = build_skill_check_plan(target)
+    apply_skill_install_plan(plan, approved=True)
+
+    cache = target / "scripts" / "__pycache__"
+    cache.mkdir()
+    (cache / "generated.cpython-314.pyc").write_bytes(b"not skill content")
+
+    cached_plan = build_skill_check_plan(target)
+    assert cached_plan["status"] == "no_change"
+    assert cached_plan["source"]["tree_sha256"] == plan["source"]["tree_sha256"]
 
 
 def test_skill_install_never_overwrites_nonmatching_target(tmp_path: Path) -> None:

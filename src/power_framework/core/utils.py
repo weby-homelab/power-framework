@@ -491,7 +491,7 @@ try:
 
     __version__ = _get_version("power-framework")
 except Exception:
-    __version__ = "3.7.2"
+    __version__ = "3.7.3"
 
 
 def run_opencode_cli(prompt: str) -> str:
