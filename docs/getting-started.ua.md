@@ -1,18 +1,18 @@
 # Початок роботи з чистою базою знань
 
-Це авторитетний clean-install шлях для P.O.W.E.R. `v3.6.7`. Він створює лише
+Це авторитетний clean-install шлях для P.O.W.E.R. `v3.7.1`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
-> **Контракт кандидата релізу:** використовуйте `v3.6.7` лише після появи signed tag та
-> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.6.7).
+> **Контракт кандидата релізу:** використовуйте `v3.7.1` лише після появи signed tag та
+> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.1).
 > Цей гід називає tag-bound target; сам URL не доводить завершення публікації.
 > Перед установкою на не-Linux host
 > перевірте [матрицю підтримки платформ](support-matrix.ua.md).
 
 [Windows-гід](windows-11-installation.ua.md) є лише інформаційним. Windows і
 macOS відкладені на невизначений строк і не є підтримуваними release-платформами
-для `v3.6.7`.
+для `v3.7.1`.
 
 ## 1. Передумови
 
@@ -29,13 +29,13 @@ macOS відкладені на невизначений строк і не є �
 На Linux:
 
 ```bash
-python3 -m venv "$HOME/.local/share/power-framework/venv"
-POWER_PYTHON="$HOME/.local/share/power-framework/venv/bin/python"
-POWER_CLI="$HOME/.local/share/power-framework/venv/bin/power"
+python3 -m venv "$HOME/.local/share/power/venv"
+POWER_PYTHON="$HOME/.local/share/power/venv/bin/python"
+POWER_CLI="$HOME/.local/share/power/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.6.7/power_framework-3.6.7-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.7.1/power_framework-3.7.1-py3-none-any.whl
 ```
 
 Базовий release wheel є FTS-only: він не встановлює ONNX Runtime, model
@@ -53,14 +53,14 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Обидві команди версії мають показати `3.6.7`, а остання команда —
+Обидві команди версії мають показати `3.7.1`, а остання команда —
 `lean FTS import: OK`.
 
 Для локального MCP встановіть official SDK extra з того самого wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.6.7/power_framework-3.6.7-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.1/power_framework-3.7.1-py3-none-any.whl"
 ```
 
 ### Альтернатива: встановлення із закріпленого tag
@@ -69,7 +69,7 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.6.7'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.7.1'
 ```
 
 Не використовуйте незакріплений `main`, якщо важлива відтворюваність.
@@ -162,7 +162,7 @@ interpreter virtual environment:
 {
   "mcpServers": {
     "power": {
-      "command": "/home/YOU/.local/share/power-framework/venv/bin/power-mcp",
+      "command": "/home/YOU/.local/share/power/venv/bin/power-mcp",
       "args": [],
       "env": {
         "POWER_VAULT_DIR": "/home/YOU/Documents/power-vault"
@@ -211,7 +211,7 @@ Vault — це звичайні Markdown-файли, незалежні від P
 ## Acceptance checklist
 
 - Python має версію 3.13 або 3.14, а interpreter належить окремому venv.
-- CLI та distribution metadata повертають `3.6.7`.
+- CLI та distribution metadata повертають `3.7.1`.
 - `power_framework` імпортується без neural/MCP extras.
 - Якщо налаштовано MCP, встановлено явний extra `remote`, а preflight успішно
   імпортує `power_framework.mcp`.

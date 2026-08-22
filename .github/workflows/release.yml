@@ -183,7 +183,7 @@ jobs:
       - name: Execute the Linux release upgrade matrix on the Ubuntu runner
         run: >-
           uv run python scripts/verify_upgrade_matrix.py
-          --from-version 3.6.6 --to-version 3.6.7
+          --from-version 3.6.7 --to-version 3.7.1
           --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade evidence
@@ -241,6 +241,10 @@ jobs:
         run: |
           python -m pip install --upgrade "pip>=26.2"
           pip install build .
+
+      - name: Pin reproducible build timestamp
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct \"$GITHUB_SHA\")" >> "$GITHUB_ENV"
+
       - name: Download Phase 8 technical receipts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:

@@ -956,6 +956,7 @@ def _cmd_integrations(args: argparse.Namespace) -> int:
                 home=args.home,
                 power_wheel=args.power_wheel,
                 gui_wheel=args.gui_wheel,
+                manifest=args.manifest,
             )
             if args.apply:
                 print(
@@ -1459,6 +1460,9 @@ def main() -> None:
     )
     p_install.add_argument("--power-wheel", required=True, help="Exact POWER framework wheel")
     p_install.add_argument("--gui-wheel", default=None, help="Optional exact POWER-GUI wheel")
+    p_install.add_argument(
+        "--manifest", required=True, help="Content-addressed power.suite.manifest.v1"
+    )
     p_install.add_argument("--no-deps", action="store_true", help="Skip dependency resolution")
     p_install.add_argument("--apply", action="store_true", help="Apply the plan")
     p_install.add_argument(

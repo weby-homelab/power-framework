@@ -1390,7 +1390,7 @@ wheels = [
 
 [[package]]
 name = "power-framework"
-version = "3.6.7"
+version = "3.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "defusedxml" },

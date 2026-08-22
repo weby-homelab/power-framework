@@ -17,8 +17,8 @@ container isolation, or an authenticated gateway.
 
 | Version | Security support |
 | --- | --- |
-| `3.6.x` | Supported |
-| `<3.6` | Unsupported; upgrade before reporting a release-specific issue |
+| `3.7.x` | Supported |
+| `<3.7` | Unsupported; upgrade before reporting a release-specific issue |
 
 The `main` branch may contain security fixes before the next release. Security
 support for a release ends when a newer supported minor release supersedes it,
