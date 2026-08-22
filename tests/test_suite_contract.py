@@ -152,6 +152,4 @@ def test_moved_venv_console_scripts_use_active_interpreter(tmp_path: Path) -> No
 
     _rewrite_venv_shebangs(venv_root)
 
-    assert script.read_text(encoding="utf-8").startswith(
-        f"#!{venv_root}/bin/python\n"
-    )
+    assert script.read_text(encoding="utf-8").startswith(f"#!{venv_root}/bin/python\n")
