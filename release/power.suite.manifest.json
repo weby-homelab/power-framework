@@ -1,0 +1,46 @@
+{
+  "schema": "power.suite.manifest.v1",
+  "status": "candidate",
+  "suite_version": "3.7.1",
+  "application_schema": "power.application.v2",
+  "python": {
+    "requires_python": ">=3.13,<3.15"
+  },
+  "power": {
+    "distribution": "power-framework",
+    "version": "3.7.1",
+    "filename": "power_framework-3.7.1-py3-none-any.whl",
+    "sha256": "dc8ce03936d410bb12f71699b7ad07f9ecf5ab7a008dac00f8dccd15769a9f04",
+    "requires_python": ">=3.13,<3.15",
+    "source_sha": "be1496ae067ee66075a969335afafe315a4ac669",
+    "tag": null
+  },
+  "gui": {
+    "distribution": "power-gui",
+    "version": "0.7.6",
+    "filename": "power_gui-0.7.6-py3-none-any.whl",
+    "sha256": "253be84d3ada1c9720327cfc0ca6d4d20567aa4fd7dab6aef79b1f6f8914507d",
+    "requires_python": ">=3.13,<3.15",
+    "source_sha": "810476719610aa91646a4712f6a8a189a7ca090b",
+    "tag": null
+  },
+  "skill": {
+    "tree_sha256": "4ac2ad7e851f4bc17f32cd54369263a94738929f34df2b5844f66f702819331e",
+    "compatible_power_version": "3.7.1"
+  },
+  "dependencies": {
+    "constraints": "power-suite.constraints.txt",
+    "sha256": "cae5417ce4df81c8b1ca18d74021503c9be40fc941b6bc1b9ff9dec2395373a5"
+  },
+  "mcp": {
+    "transport": "stdio",
+    "entry_point": "power-mcp",
+    "stdout": "protocol-only",
+    "application_schema": "power.application.v2"
+  },
+  "publication": {
+    "core_tag": null,
+    "gui_tag": null,
+    "stable_readback": false
+  }
+}
