@@ -53,6 +53,18 @@ def _supported_member(member: tarfile.TarInfo) -> bool:
     return member.isreg() or member.isdir() or member.issym() or member.islnk()
 
 
+def _canonical_mode(member: tarfile.TarInfo) -> int:
+    """Return a portable mode while retaining executable-file semantics."""
+
+    if member.issym():
+        # Tar extractors ignore symlink permission bits; retaining the normal
+        # symlink mode makes that intent explicit without following the link.
+        return 0o777
+    if member.isdir():
+        return 0o755
+    return 0o755 if member.mode & 0o111 else 0o644
+
+
 def _normalize_member(member: tarfile.TarInfo, timestamp: int) -> tarfile.TarInfo:
     """Copy a member and replace metadata that can vary between build hosts."""
 
@@ -68,7 +80,7 @@ def _normalize_member(member: tarfile.TarInfo, timestamp: int) -> tarfile.TarInf
     normalized.gid = FIXED_GID
     normalized.uname = FIXED_UNAME
     normalized.gname = FIXED_GNAME
-    normalized.mode &= 0o7777
+    normalized.mode = _canonical_mode(member)
     normalized.devmajor = 0
     normalized.devminor = 0
     # TarInfo.name and TarInfo.linkname regenerate required PAX path fields.
@@ -95,6 +107,39 @@ def _write_member(
         destination.addfile(normalized, source_file)
 
 
+def _ordered_members(members: list[tarfile.TarInfo]) -> list[tarfile.TarInfo]:
+    """Sort members deterministically while placing hard-link targets first."""
+
+    by_name = {member.name: member for member in members}
+    depths: dict[str, int] = {}
+    resolving: set[str] = set()
+
+    def dependency_depth(member: tarfile.TarInfo) -> int:
+        cached = depths.get(member.name)
+        if cached is not None:
+            return cached
+        if not member.islnk():
+            depths[member.name] = 0
+            return 0
+        if member.name in resolving:
+            raise ValueError(f"cyclic hard-link dependency at {member.name!r}")
+        target = by_name.get(member.linkname)
+        if target is None:
+            raise ValueError(
+                f"hard-link member {member.name!r} targets missing member {member.linkname!r}"
+            )
+        resolving.add(member.name)
+        depth = dependency_depth(target) + 1
+        resolving.remove(member.name)
+        depths[member.name] = depth
+        return depth
+
+    return sorted(
+        members,
+        key=lambda member: (dependency_depth(member), _member_sort_key(member)),
+    )
+
+
 def _normalize_tar(source: BinaryIO, destination: BinaryIO, timestamp: int) -> None:
     with (
         tarfile.open(fileobj=source, mode="r:gz") as source_tar,
@@ -107,7 +152,7 @@ def _normalize_tar(source: BinaryIO, destination: BinaryIO, timestamp: int) -> N
         ) as gzip_stream,
         tarfile.open(fileobj=gzip_stream, mode="w", format=tarfile.PAX_FORMAT) as destination_tar,
     ):
-        for member in sorted(source_tar.getmembers(), key=_member_sort_key):
+        for member in _ordered_members(source_tar.getmembers()):
             _write_member(destination_tar, source_tar, member, timestamp)
 
 

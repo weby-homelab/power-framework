@@ -75,6 +75,13 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      POWER_EMBED_PROVIDER: bge-m3
+      POWER_EMBED_DEVICE: cpu
+      POWER_RERANKER: bge
+      POWER_RERANKER_DEVICE: cpu
+      POWER_MODEL_OFFLINE: "1"
+      HF_HUB_OFFLINE: "1"
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]

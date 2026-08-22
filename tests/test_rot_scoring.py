@@ -5,16 +5,26 @@ from __future__ import annotations
 from datetime import UTC
 from typing import TYPE_CHECKING
 
+import pytest
+
 from power_framework.core.rot_scoring import (
     ContentDedupDetector,
     FreshnessScorer,
     UsageTracker,
 )
+from power_framework.experimental.embeddings import dense_embedding_ready
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
+_DENSE_MODEL_REQUIRED = pytest.mark.skipif(
+    not dense_embedding_ready()[0],
+    reason="pinned BGE-M3 ONNX snapshot is not cached",
+)
+
+
+@_DENSE_MODEL_REQUIRED
 class TestContentDedupDetector:
     def test_detects_similar_content(self, tmp_path: Path):
         vault = tmp_path / "vault"

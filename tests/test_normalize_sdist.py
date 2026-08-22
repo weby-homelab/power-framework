@@ -82,9 +82,9 @@ def test_normalize_sdist_is_order_and_metadata_independent(tmp_path: Path) -> No
         normalized = archive.getmembers()
         assert [member.name for member in normalized] == [
             "pkg",
-            "pkg/hard",
             "pkg/link",
             "pkg/z.txt",
+            "pkg/hard",
         ]
         for member in normalized:
             assert member.mtime == 1_700_000_000
@@ -93,15 +93,125 @@ def test_normalize_sdist_is_order_and_metadata_independent(tmp_path: Path) -> No
             assert member.uname == "root"
             assert member.gname == "root"
         assert normalized[0].mode == 0o755
-        assert normalized[1].islnk()
-        assert normalized[1].linkname == "pkg/z.txt"
-        assert normalized[2].issym()
-        assert normalized[2].linkname == "z.txt"
-        assert normalized[3].mode == 0o640
-        assert normalized[3].pax_headers == {}
-        payload = archive.extractfile(normalized[3])
+        assert normalized[1].issym()
+        assert normalized[1].linkname == "z.txt"
+        assert normalized[2].mode == 0o644
+        assert normalized[3].islnk()
+        assert normalized[3].linkname == "pkg/z.txt"
+        assert normalized[3].mode == 0o644
+        assert all(member.pax_headers == {} for member in normalized)
+        payload = archive.extractfile(normalized[2])
         assert payload is not None
         assert payload.read() == b"hello"
+
+        extracted = tmp_path / "extracted"
+        extracted.mkdir()
+        archive.extractall(  # noqa: S202 -- the archive is synthetic and test-local.
+            extracted, filter="fully_trusted"
+        )
+        assert (extracted / "pkg/z.txt").read_text() == "hello"
+        assert (extracted / "pkg/hard").read_text() == "hello"
+        assert (extracted / "pkg/z.txt").stat().st_ino == (extracted / "pkg/hard").stat().st_ino
+
+
+def test_normalize_sdist_canonicalizes_modes(tmp_path: Path) -> None:
+    first_members = [
+        (
+            _member(
+                "pkg", tarfile.DIRTYPE, mode=0o700, mtime=1, uid=1, gid=1, uname="a", gname="a"
+            ),
+            None,
+        ),
+        (
+            _member(
+                "pkg/plain",
+                tarfile.REGTYPE,
+                mode=0o600,
+                mtime=1,
+                uid=1,
+                gid=1,
+                uname="a",
+                gname="a",
+            ),
+            b"plain",
+        ),
+        (
+            _member(
+                "pkg/run", tarfile.REGTYPE, mode=0o700, mtime=1, uid=1, gid=1, uname="a", gname="a"
+            ),
+            b"run",
+        ),
+        (
+            _member(
+                "pkg/link",
+                tarfile.SYMTYPE,
+                mode=0o600,
+                mtime=1,
+                uid=1,
+                gid=1,
+                uname="a",
+                gname="a",
+                linkname="plain",
+            ),
+            None,
+        ),
+    ]
+    second_members = [
+        (
+            _member(
+                "pkg", tarfile.DIRTYPE, mode=0o755, mtime=2, uid=2, gid=2, uname="b", gname="b"
+            ),
+            None,
+        ),
+        (
+            _member(
+                "pkg/plain",
+                tarfile.REGTYPE,
+                mode=0o644,
+                mtime=2,
+                uid=2,
+                gid=2,
+                uname="b",
+                gname="b",
+            ),
+            b"plain",
+        ),
+        (
+            _member(
+                "pkg/run", tarfile.REGTYPE, mode=0o755, mtime=2, uid=2, gid=2, uname="b", gname="b"
+            ),
+            b"run",
+        ),
+        (
+            _member(
+                "pkg/link",
+                tarfile.SYMTYPE,
+                mode=0o777,
+                mtime=2,
+                uid=2,
+                gid=2,
+                uname="b",
+                gname="b",
+                linkname="plain",
+            ),
+            None,
+        ),
+    ]
+    first = tmp_path / "first.tar.gz"
+    second = tmp_path / "second.tar.gz"
+    _write_archive(first, first_members, gzip_mtime=1)
+    _write_archive(second, second_members, gzip_mtime=2)
+
+    normalize_sdist(first, timestamp=0)
+    normalize_sdist(second, timestamp=0)
+
+    assert first.read_bytes() == second.read_bytes()
+    with (
+        gzip.open(first, "rb") as compressed,
+        tarfile.open(fileobj=compressed, mode="r:") as archive,
+    ):
+        modes = {member.name: member.mode for member in archive.getmembers()}
+    assert modes == {"pkg": 0o755, "pkg/link": 0o777, "pkg/plain": 0o644, "pkg/run": 0o755}
 
 
 def test_normalize_sdist_defaults_to_epoch_zero(

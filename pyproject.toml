@@ -37,6 +37,7 @@ power-mcp = "power_framework.mcp.entrypoint:main"
 [dependency-groups]
 dev = [
     "build>=1.2.0",
+    "hatchling>=1.27.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",

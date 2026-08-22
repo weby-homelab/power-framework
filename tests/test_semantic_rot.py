@@ -10,9 +10,16 @@ from power_framework.core.rot_scoring import (
     ContradictionDetector,
     _dense_cosine_similarity,
 )
+from power_framework.experimental.embeddings import dense_embedding_ready
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+_DENSE_MODEL_REQUIRED = pytest.mark.skipif(
+    not dense_embedding_ready()[0],
+    reason="pinned BGE-M3 ONNX snapshot is not cached",
+)
 
 
 LONG_BODY = (
@@ -51,6 +58,7 @@ class TestDenseCosineSimilarity:
         assert _dense_cosine_similarity(vec_a, vec_b) == 0.0
 
 
+@_DENSE_MODEL_REQUIRED
 class TestContentDedupDetectorEmbedding:
     """Verify ContentDedupDetector works with EmbeddingManager."""
 
@@ -113,6 +121,7 @@ class TestContentDedupDetectorEmbedding:
         assert len(pairs) == 0
 
 
+@_DENSE_MODEL_REQUIRED
 class TestContradictionDetectorMetadataFallback:
     """Test ContradictionDetector fallback (no OPENROUTER_API_KEY)."""
 
@@ -220,6 +229,7 @@ class TestContradictionDetectorMetadataFallback:
         return vault
 
 
+@_DENSE_MODEL_REQUIRED
 class TestContradictionDetectorLLM:
     """Test ContradictionDetector with mocked LLM call."""
 
@@ -326,6 +336,7 @@ class TestContradictionDetectorLLM:
         return vault
 
 
+@_DENSE_MODEL_REQUIRED
 class TestRotReportSemanticContradictions:
     """Test that run_rot_report includes contradictions section."""
 

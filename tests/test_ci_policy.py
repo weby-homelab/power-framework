@@ -154,6 +154,12 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "--sbom" in release_text
     assert "--upgrade-matrix-aggregate" in release_text
     assert "power374-release-upgrade-aggregate" in release_text
+    assert '"hatchling>=' in pyproject_text
+    assert "uv sync --locked --group dev" in release_text
+    assert "uv run python -m build --no-isolation" in release_text
+    assert "pip install build ." not in release_text
+    assert "PYTHONPATH: src:." not in release_text
+    assert "--system-site-packages" not in release_text
 
 
 def test_quarantined_fleet_docs_and_helper_forbid_live_cache_transfer() -> None:

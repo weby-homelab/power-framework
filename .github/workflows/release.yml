@@ -19,6 +19,13 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      POWER_EMBED_PROVIDER: bge-m3
+      POWER_EMBED_DEVICE: cpu
+      POWER_RERANKER: bge
+      POWER_RERANKER_DEVICE: cpu
+      POWER_MODEL_OFFLINE: "1"
+      HF_HUB_OFFLINE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -237,7 +244,6 @@ jobs:
     needs: [validate, upgrade-matrix-aggregate]
     runs-on: ubuntu-latest
     env:
-      PYTHONPATH: src:.
       RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -253,7 +259,8 @@ jobs:
       - name: Install build tools and framework dependencies
         run: |
           python -m pip install --upgrade "pip>=26.2"
-          pip install build .
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev
 
       - name: Pin reproducible build timestamp
         run: |
@@ -286,10 +293,10 @@ jobs:
           git archive --format=tar HEAD | tar -xf - -C "$source_one"
           git archive --format=tar HEAD | tar -xf - -C "$source_two"
 
-          python -m build --outdir "$dist_one" "$source_one"
-          python scripts/normalize_sdist.py "$dist_one"/*.tar.gz
-          python -m build --outdir "$dist_two" "$source_two"
-          python scripts/normalize_sdist.py "$dist_two"/*.tar.gz
+          uv run python -m build --no-isolation --outdir "$dist_one" "$source_one"
+          uv run python scripts/normalize_sdist.py "$dist_one"/*.tar.gz
+          uv run python -m build --no-isolation --outdir "$dist_two" "$source_two"
+          uv run python scripts/normalize_sdist.py "$dist_two"/*.tar.gz
 
           mapfile -t wheels_one < <(
             find "$dist_one" -maxdepth 1 -type f -name '*.whl' -print | sort
@@ -339,7 +346,7 @@ jobs:
       - name: Generate and verify tag-bound release baseline
         run: |
           mkdir -p dist
-          python scripts/generate_release_baseline.py \
+          uv run python scripts/generate_release_baseline.py \
             --tag "$RELEASE_TAG" \
             --validation-report "$RUNNER_TEMP/power374-phase8-technical/power374-validation.json" \
             --sbom dist/power-framework.spdx.json \
@@ -347,7 +354,7 @@ jobs:
             --phase8-outcome-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-outcome.json" \
             --phase8-continuity-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-continuity.json" \
             --output dist/power-framework.release-baseline.json
-          python scripts/verify_release_contract.py \
+          uv run python scripts/verify_release_contract.py \
             --require-tag \
             --require-signed-tag \
             --sbom dist/power-framework.spdx.json \
@@ -356,7 +363,7 @@ jobs:
 
       - name: Smoke-test wheel and sdist outside checkout
         run: |
-          python scripts/smoke_package.py \
+          uv run python scripts/smoke_package.py \
             --wheel dist/power_framework-*.whl \
             --sdist dist/power_framework-*.tar.gz
 
@@ -384,7 +391,7 @@ jobs:
 
       - name: Generate release receipt
         run: |
-          python scripts/generate_release_receipt.py \
+          uv run python scripts/generate_release_receipt.py \
             --tag "$RELEASE_TAG" \
             --assets-dir dist \
             --output dist/power-framework.release-receipt.json
@@ -402,7 +409,7 @@ jobs:
           set -euo pipefail
           gh release view "$RELEASE_TAG" --json tagName,body,assets \
             > dist/power-framework.github-readback.json
-          python - "$RELEASE_TAG" <<'PY'
+          uv run python - "$RELEASE_TAG" <<'PY'
           import json
           import pathlib
           import sys
