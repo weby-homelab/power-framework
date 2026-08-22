@@ -1,7 +1,9 @@
 {
   "schema": "power.suite.manifest.v1",
-  "status": "stable",
+  "status": "candidate",
   "suite_version": "3.7.1",
+  "release_decision": "NO-GO",
+  "no_go_reason": "The immutable public v3.7.1 native clean-install gate fails: moved console shims retain the removed staging venv when HOME contains spaces or Unicode.",
   "application_schema": "power.application.v2",
   "python": {
     "requires_python": ">=3.13,<3.15"
@@ -49,7 +51,8 @@
   "publication": {
     "core_tag": "v3.7.1",
     "gui_tag": "v0.7.7",
-    "stable_readback": true,
+    "stable_readback": false,
+    "readback_status": "component_publication_verified_suite_gate_failed",
     "core_release_run": "32570047613",
     "gui_release_run": "32571844771",
     "gui_image_run": "32571844803",

@@ -1,0 +1,38 @@
+{
+  "schema": "power.public-native-failure.v1",
+  "captured_at": "2026-08-22T17:09:10+03:00",
+  "test": "immutable POWER v3.7.1 and GUI v0.7.7 public wheels; disposable HOME contains spaces and Unicode",
+  "power": {
+    "repository": "weby-homelab/power-framework",
+    "tag": "v3.7.1",
+    "commit": "8e172b82b98c8980a83e433744ea2ed6cdedce82",
+    "wheel": "power_framework-3.7.1-py3-none-any.whl",
+    "wheel_sha256": "486a41b070a00dc519e7ec23adccac89a07a3842e47745734a3ee495ae5ad481"
+  },
+  "gui": {
+    "repository": "weby-homelab/ai-second-brain-gui",
+    "tag": "v0.7.7",
+    "commit": "339388ee4f77401a033ed50d4cac25ad3b82fefd",
+    "wheel": "power_gui-0.7.7-py3-none-any.whl",
+    "wheel_sha256": "8e7904a12abf30e4e458125c36d621ae383caff764a46471223b919dc7591853"
+  },
+  "runtime": {
+    "python": "3.14.4",
+    "platform": "Linux x86_64",
+    "home_shape": "dedicated HOME path with spaces and Unicode"
+  },
+  "result": {
+    "install_exit_code": 0,
+    "install_status": "applied",
+    "launcher_exit_code": 127,
+    "affected_launchers": ["power", "power-mcp", "power-gui"],
+    "staging_reference": ".local/share/power/.venv.staging-<generated-id>/bin/python",
+    "absolute_staging_path_exists_after_install": false,
+    "failure_class": "moved_console_shell_shim_retained_removed_staging_root",
+    "launcher_sha256": "70d18174ec2efdc8b61fbf9fc1b2f998bd231e6db26ec9f064c4e1db2d24ceba",
+    "stderr_sha256": "96fcf5f9583470cfab28387b5401e96a988cdf8d09672514af2a15352159cbea"
+  },
+  "decision": "NO-GO",
+  "human_quality_claim": "none",
+  "m2_human_opened": false
+}

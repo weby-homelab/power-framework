@@ -1,6 +1,8 @@
 {
   "schema": "power.suite.release-receipt.v1",
   "suite_version": "3.7.1",
+  "release_status": "NO-GO",
+  "no_go_reason": "The immutable public v3.7.1 native clean-install gate fails for a HOME path containing spaces and Unicode.",
   "released_at": "2026-08-22T12:08:03Z",
   "power": {
     "repository": "https://github.com/weby-homelab/power-framework",
@@ -61,12 +63,16 @@
     "lockfile": "uv.lock"
   },
   "validation": {
-    "native_clean_install": "passed",
+    "native_clean_install": "failed: moved console shell shims reference the removed staging venv",
     "mcp_subprocess": "passed",
-    "systemd_user": "passed",
-    "container_e2e": "passed",
-    "cross_runtime": "passed",
-    "public_readback": "passed",
+    "systemd_user": "not_run_after_native_blocker",
+    "container_e2e": "component_readback_passed_not_suite_stable",
+    "cross_runtime": "not_run",
+    "public_readback": "component_assets_passed_native_gate_failed",
+    "gui_lifecycle": "not_run",
+    "concurrency": "not_run",
+    "recovery": "not_run",
+    "upgrade": "not_run",
     "human_quality": "not claimed",
     "m2_human_opened": false
   }
