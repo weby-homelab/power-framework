@@ -371,20 +371,29 @@ def _write_executable(path: Path, content: str) -> None:
     os.replace(temporary, path)
 
 
-def _rewrite_venv_shebangs(venv_root: Path) -> None:
-    """Point generated console scripts at the activated venv after a move."""
+def _rewrite_venv_shebangs(venv_root: Path, *, staging_root: Path | None = None) -> None:
+    """Point generated console scripts at the activated venv after a move.
+
+    Recent pip versions may emit shell shims whose interpreter path appears on
+    the second line rather than in the shebang.  Replace the exact staging
+    root in every regular ``bin`` file so both shim formats survive the
+    atomic staging-venv move, including homes containing spaces or Unicode.
+    """
     python_path = venv_root / "bin" / "python"
+    staging_bytes = str(staging_root).encode("utf-8") if staging_root is not None else None
+    active_bytes = str(venv_root).encode("utf-8")
     bin_dir = venv_root / "bin"
     for script in bin_dir.iterdir():
         if script.is_symlink() or not script.is_file():
             continue
-        content = script.read_bytes()
+        original = content = script.read_bytes()
+        if staging_bytes and staging_bytes in content:
+            content = content.replace(staging_bytes, active_bytes)
         first_line, separator, remainder = content.partition(b"\n")
-        if not separator or not first_line.startswith(b"#!"):
-            continue
-        if b"/bin/python" not in first_line:
-            continue
-        script.write_bytes(b"#!" + str(python_path).encode("utf-8") + b"\n" + remainder)
+        if separator and first_line.startswith(b"#!") and b"/bin/python" in first_line:
+            content = b"#!" + str(python_path).encode("utf-8") + b"\n" + remainder
+        if content != original:
+            script.write_bytes(content)
 
 
 def apply_native_install_plan(
@@ -499,7 +508,7 @@ def apply_native_install_plan(
         if venv_root.exists():
             os.replace(venv_root, previous_venv)
         os.replace(staging_venv, venv_root)
-        _rewrite_venv_shebangs(venv_root)
+        _rewrite_venv_shebangs(venv_root, staging_root=staging_venv)
         activated = True
         for name in launcher_names:
             os.replace(launcher_stage / name, launcher_dir / name)
