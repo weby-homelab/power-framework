@@ -22,6 +22,7 @@ import shutil
 from datetime import UTC, datetime
 from datetime import date as date_type
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 from .constants import is_catalog_filename
@@ -36,6 +37,9 @@ from .parser import (
 from .utils import clean_note_name, is_excluded_orphan
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from power_framework.experimental.rot_scoring import EmbeddingProvider
 
 WIKI_LINK_PATTERN = re.compile(r"(?<!!)\[\[(.*?)\]\]")
 GFM_LINK_PATTERN = re.compile(
@@ -446,7 +450,11 @@ def run_lint_report(vault_dir: Path) -> str:
     return result.format_report(vault_dir)
 
 
-def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
+def run_rot_audit(
+    vault_dir: Path,
+    extended: bool = False,
+    embedder: EmbeddingProvider | None = None,
+) -> ROTResult:
     """
     Run ROT (Redundant, Outdated, Trivial) audit on the vault.
 
@@ -533,13 +541,13 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
         )
 
         try:
-            dedup = ContentDedupDetector()
+            dedup = ContentDedupDetector(embedder=embedder)
             result.content_dedup = dedup.detect(vault_dir)
         except Exception as exc:
             logger.warning("Content dedup failed: %s", exc)
 
         try:
-            contra = ContradictionDetector()
+            contra = ContradictionDetector(embedder=embedder)
             result.semantic_contradictions = contra.detect(vault_dir)
         except Exception as exc:
             logger.warning("Contradiction detection failed: %s", exc)
@@ -565,9 +573,13 @@ def run_rot_audit(vault_dir: Path, extended: bool = False) -> ROTResult:
     return result
 
 
-def run_rot_report(vault_dir: Path, extended: bool = False) -> str:
+def run_rot_report(
+    vault_dir: Path,
+    extended: bool = False,
+    embedder: EmbeddingProvider | None = None,
+) -> str:
     """Run ROT audit and return formatted report string."""
-    result = run_rot_audit(vault_dir, extended=extended)
+    result = run_rot_audit(vault_dir, extended=extended, embedder=embedder)
     return result.format_report(vault_dir)
 
 

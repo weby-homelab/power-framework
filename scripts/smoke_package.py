@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import tempfile
@@ -21,14 +22,23 @@ print(f"package smoke passed: {len(qrels)} queries")
 
 def _run(command: list[str], *, cwd: Path) -> None:
     """Run one smoke command and preserve its output in the CI log."""
-    subprocess.run(command, check=True, cwd=cwd)  # noqa: S603 -- commands are assembled by this script.
+    environment = os.environ.copy()
+    # The release job must not let a checkout-relative source path shadow the
+    # package installed from the wheel/sdist under test.
+    environment.pop("PYTHONPATH", None)
+    subprocess.run(  # noqa: S603 -- commands are assembled by this script.
+        command,
+        check=True,
+        cwd=cwd,
+        env=environment,
+    )
 
 
 def smoke_artifact(artifact: Path, root: Path) -> None:
     """Install one artifact into a fresh venv outside the repository."""
     name = artifact.stem.replace("-", "_")
     venv_dir = root / f"venv-{name}"
-    _run([sys.executable, "-m", "venv", "--system-site-packages", str(venv_dir)], cwd=root)
+    _run([sys.executable, "-m", "venv", str(venv_dir)], cwd=root)
     python = (
         venv_dir
         / ("Scripts" if sys.platform == "win32" else "bin")

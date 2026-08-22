@@ -51,21 +51,15 @@ def indexed_vault(sample_vault: Path, monkeypatch):
 
 
 @pytest.fixture
-def semantic_indexed_vault(sample_vault: Path, monkeypatch):
-    """Build a full FTS + embedding index, skipping if no embedder is available.
-
-    This is environment-gated: if BGE-M3 cannot be loaded (offline CI), the
-    fixture is skipped rather than failing — Phase 1 guarantees FTS works
-    regardless of the embedder.
-    """
+def semantic_indexed_vault(sample_vault: Path, monkeypatch, deterministic_embedder):
+    """Build a full FTS + deterministic dense index without a model download."""
 
     monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
 
-    from power_framework.core import embeddings as _emb
+    import power_framework.core.index_sync as index_sync
     from power_framework.core.searcher import _sync_vault_to_db
 
-    if not _emb._embeddings_available():
-        pytest.skip("BGE-M3 embedder unavailable in this environment")
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: deterministic_embedder)
 
     db_path = get_cache_dir() / "power_search.db"
     conn = sqlite3.connect(str(db_path), timeout=30)

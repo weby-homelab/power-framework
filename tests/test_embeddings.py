@@ -148,15 +148,15 @@ class TestEmbeddingManager:
     def test_import_has_no_hardcoded_env_file_side_effect(self):
         assert "/root/geminicli/.env" not in inspect.getsource(embeddings)
 
-    def test_embed_single_text(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_single_text(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec = manager.embed("Hello world")
         assert isinstance(vec, list)
         assert len(vec) == manager.dimension
         assert all(isinstance(v, float) for v in vec)
 
-    def test_embed_batch(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_batch(self, fake_bge_manager):
+        manager = fake_bge_manager
         texts = ["Hello world", "Second test text", "Third one here"]
         vectors = manager.embed_batch(texts)
         assert len(vectors) == 3
@@ -165,25 +165,25 @@ class TestEmbeddingManager:
             assert len(vec) == manager.dimension
             assert all(isinstance(v, float) for v in vec)
 
-    def test_embed_empty_string(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_empty_string(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec = manager.embed("")
         assert isinstance(vec, list)
         assert len(vec) == manager.dimension
 
-    def test_embed_batch_empty(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_batch_empty(self, fake_bge_manager):
+        manager = fake_bge_manager
         vectors = manager.embed_batch([])
         assert vectors == []
 
-    def test_embedding_deterministic(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embedding_deterministic(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec1 = manager.embed("Some consistent text")
         vec2 = manager.embed("Some consistent text")
         assert vec1 == vec2
 
-    def test_embedding_different_texts(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embedding_different_texts(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec1 = manager.embed("Kittens are cute")
         vec2 = manager.embed("Rocket science")
         assert vec1 != vec2

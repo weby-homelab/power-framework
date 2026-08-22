@@ -153,7 +153,7 @@ The main postgresql database configuration settings are hosted on host PRXMX-01.
 
         assert any(r.target_path == "03_Resources/DatabaseConfig.md" for r in relations)
 
-    def test_conflict_resolution(self, tmp_path: Path):
+    def test_conflict_resolution(self, tmp_path: Path, deterministic_embedder):
         """CR Competency: Reconcile contradicting information over time."""
         vault = tmp_path / "memory_vault"
         vault.mkdir()
@@ -190,7 +190,7 @@ Under this configuration, Nginx is listening on port 9090 for web queries.
         )
 
         # Use ContentDedupDetector to locate similar pages that might contain conflicts
-        detector = ContentDedupDetector(threshold=0.5)
+        detector = ContentDedupDetector(threshold=0.5, embedder=deterministic_embedder)
         duplicates = detector.detect(vault)
         print("DEBUG DUPLICATES:", duplicates)
         assert len(duplicates) > 0

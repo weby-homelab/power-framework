@@ -37,6 +37,7 @@ power-mcp = "power_framework.mcp.entrypoint:main"
 [dependency-groups]
 dev = [
     "build>=1.2.0",
+    "hatchling>=1.27.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
@@ -130,6 +131,8 @@ filterwarnings = [
 addopts = "-v --tb=short --cov=power_framework --cov-report=term-missing --cov-fail-under=70"
 markers = [
     "bench: optional real-vault benchmark; never a blocking hermetic CI gate",
+    "neural_hermetic: mandatory offline neural contract checks using injected doubles",
+    "real_neural: optional pinned local-model integration checks; never downloads in CI",
 ]
 
 [tool.ruff]

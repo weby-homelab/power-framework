@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,13 +23,17 @@ from power_framework.core.reranker import (
 
 def _bge_reranker_available() -> bool:
     """True only if the BGE reranker ONNX snapshot is already cached locally."""
-    return (
-        try_to_load_from_cache(
-            BGE_RERANKER_PINNED_REPO,
-            "onnx/model.onnx",
-            revision=BGE_RERANKER_PINNED_REVISION,
+    return all(
+        isinstance(
+            cached := try_to_load_from_cache(
+                BGE_RERANKER_PINNED_REPO,
+                filename,
+                revision=BGE_RERANKER_PINNED_REVISION,
+            ),
+            str,
         )
-        is not None
+        and Path(cached).is_file()
+        for filename in ("onnx/model.onnx", "onnx/model.onnx_data", "tokenizer.json")
     )
 
 
@@ -213,6 +218,7 @@ class TestRerankerManager:
         assert scores[2] > scores[1]
         assert all(0.0 <= s <= 1.0 for s in scores)
 
+    @pytest.mark.real_neural
     def test_bgem3_reranker_ranks_relevant_first(self):
         """Real BGE reranker ranking (skipped if the ONNX snapshot is not cached)."""
         if not _bge_reranker_available():

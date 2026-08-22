@@ -19,7 +19,7 @@ import sqlite3
 import threading
 import urllib.request
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from power_framework.core.egress import EgressDeniedError, EgressOperation, require_remote_egress
 from power_framework.core.ignore import should_skip
@@ -29,6 +29,14 @@ from power_framework.experimental.embeddings import get_embedding_manager
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+class EmbeddingProvider(Protocol):
+    """Minimal embedding contract consumed by semantic ROT detectors."""
+
+    def embed(self, text: str) -> list[float]:
+        """Return one deterministic vector for ``text``."""
+
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +71,13 @@ def _dense_cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
 class ContentDedupDetector:
     """Detect content-level duplicates using dense embedding cosine similarity."""
 
-    def __init__(self, threshold: float = CONTENT_DEDUP_THRESHOLD):
+    def __init__(
+        self,
+        threshold: float = CONTENT_DEDUP_THRESHOLD,
+        embedder: EmbeddingProvider | None = None,
+    ):
         self.threshold = threshold
-        self.embedder = get_embedding_manager()
+        self.embedder = embedder or get_embedding_manager()
 
     def detect(
         self,
@@ -139,6 +151,7 @@ class ContradictionDetector:
         self,
         similarity_threshold: float = CONTRADICTION_SIMILARITY_THRESHOLD,
         api_key: str | None = None,
+        embedder: EmbeddingProvider | None = None,
     ):
         self.similarity_threshold = similarity_threshold
         self.api_key = (
@@ -150,7 +163,7 @@ class ContradictionDetector:
             "/"
         )
         self.model = os.environ.get("POWER_LLM_MODEL", OPENROUTER_MODELS[0])
-        self.embedder = get_embedding_manager()
+        self.embedder = embedder or get_embedding_manager()
 
     def detect(self, vault_dir: Path) -> list[tuple[str, str, str]]:
         """

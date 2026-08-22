@@ -1147,10 +1147,13 @@ class TestFtsOnlyDenseGuard:
             )
         )
 
-    def _vault_with_dense(self, tmp_path):
+    def _vault_with_dense(self, tmp_path, monkeypatch, deterministic_embedder):
         import argparse
 
+        import power_framework.core.index_sync as index_sync
         from power_framework.core.cli import _cmd_init
+
+        monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: deterministic_embedder)
 
         vault = tmp_path / "vault"
         _cmd_init(argparse.Namespace(path=str(vault)))
@@ -1159,12 +1162,14 @@ class TestFtsOnlyDenseGuard:
         self._sync(vault, fts_only=False)
         return vault, note
 
-    def test_fts_only_refuses_to_discard_an_existing_dense_index(self, tmp_path, caplog):
+    def test_fts_only_refuses_to_discard_an_existing_dense_index(
+        self, tmp_path, caplog, monkeypatch, deterministic_embedder
+    ):
         import logging
 
         from power_framework.core.generation_index import active_dense_chunk_count
 
-        vault, note = self._vault_with_dense(tmp_path)
+        vault, note = self._vault_with_dense(tmp_path, monkeypatch, deterministic_embedder)
         assert active_dense_chunk_count(vault) > 0
 
         note.write_text(self.NOTE.format(body="Body EDITED."), encoding="utf-8")
@@ -1173,10 +1178,12 @@ class TestFtsOnlyDenseGuard:
         assert any("Refusing --fts-only" in r.getMessage() for r in caplog.records)
         assert active_dense_chunk_count(vault) > 0, "the dense index must survive a refusal"
 
-    def test_explicit_opt_in_still_allows_the_downgrade(self, tmp_path):
+    def test_explicit_opt_in_still_allows_the_downgrade(
+        self, tmp_path, monkeypatch, deterministic_embedder
+    ):
         from power_framework.core.generation_index import active_dense_chunk_count
 
-        vault, note = self._vault_with_dense(tmp_path)
+        vault, note = self._vault_with_dense(tmp_path, monkeypatch, deterministic_embedder)
         note.write_text(self.NOTE.format(body="Body EDITED."), encoding="utf-8")
         assert self._sync(vault, fts_only=True, accept_dense_loss=True) == 0
         assert active_dense_chunk_count(vault) == 0

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+import power_framework.experimental.rot_scoring as rot_scoring
 from power_framework.core.rot_scoring import (
     ContradictionDetector,
     _dense_cosine_similarity,
@@ -13,6 +14,13 @@ from power_framework.core.rot_scoring import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+@pytest.fixture(autouse=True)
+def _inject_hermetic_embedder(monkeypatch: pytest.MonkeyPatch, deterministic_embedder):
+    """Keep ROT detector tests offline while exercising their real code paths."""
+
+    monkeypatch.setattr(rot_scoring, "get_embedding_manager", lambda: deterministic_embedder)
 
 
 LONG_BODY = (

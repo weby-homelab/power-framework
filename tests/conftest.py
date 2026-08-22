@@ -6,9 +6,101 @@ Provides temporary vault directories with sample notes for testing.
 
 from __future__ import annotations
 
+import hashlib
+import re
 from pathlib import Path  # noqa: TC003
 
 import pytest
+
+
+class DeterministicEmbedder:
+    """Small lexical embedder for mandatory offline semantic contract tests.
+
+    Stable SHA-256 buckets make the fixture independent of Python's randomized
+    ``hash()`` seed while retaining enough shared-token signal for dedup and
+    contradiction scenarios. It is deliberately not a production model.
+    """
+
+    dimension = 128
+
+    def embed(self, text: str) -> list[float]:
+        vector = [0.0] * self.dimension
+        for token in re.findall(r"\w+", text.casefold()):
+            digest = hashlib.sha256(token.encode("utf-8")).digest()
+            index = int.from_bytes(digest[:4], "big") % self.dimension
+            vector[index] += 1.0
+        return vector
+
+    def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+        del batch_size
+        return [self.embed(text) for text in texts]
+
+
+class _FakeEncoding:
+    def __init__(self, ids: list[int], attention_mask: list[int]) -> None:
+        self.ids = ids
+        self.attention_mask = attention_mask
+
+
+class FakeTokenizer:
+    """Minimal tokenizer surface consumed by ``BGEM3OnnxManager`` tests."""
+
+    def enable_truncation(self, max_length: int) -> None:
+        return None
+
+    def enable_padding(self) -> None:
+        return None
+
+    def encode_batch(self, texts: list[str]) -> list[_FakeEncoding]:
+        token_rows = []
+        for text in texts:
+            tokens = re.findall(r"\w+", text.casefold()) or ["<empty>"]
+            ids = [
+                int.from_bytes(hashlib.sha256(token.encode("utf-8")).digest()[:4], "big") % 10_000
+                for token in tokens
+            ]
+            token_rows.append(ids)
+        width = max(map(len, token_rows), default=1)
+        return [
+            _FakeEncoding(ids + [0] * (width - len(ids)), [1] * len(ids) + [0] * (width - len(ids)))
+            for ids in token_rows
+        ]
+
+
+class FakeSession:
+    """Deterministic ONNX-session double with the production output shape."""
+
+    def get_providers(self) -> list[str]:
+        return ["CPUExecutionProvider"]
+
+    def run(self, output_names: list[str], inputs: dict[str, object]) -> list[list[list[float]]]:
+        del output_names
+        rows = inputs["input_ids"]
+        vectors: list[list[float]] = []
+        for row in rows:  # type: ignore[union-attr]
+            seed = int(sum(int(value) for value in row)) % 997
+            vectors.append([float(seed + (index % 17)) for index in range(1024)])
+        return [vectors]
+
+
+@pytest.fixture
+def deterministic_embedder() -> DeterministicEmbedder:
+    """Return the explicit fake embedder used by hermetic semantic tests."""
+
+    return DeterministicEmbedder()
+
+
+@pytest.fixture
+def fake_bge_manager():
+    """Return a BGE manager with injected tokenizer/session doubles."""
+
+    from power_framework.experimental.embeddings import BGEM3OnnxManager
+
+    manager = BGEM3OnnxManager()
+    manager._session = FakeSession()
+    manager._tokenizer = FakeTokenizer()
+    manager.active_provider = "CPUExecutionProvider"
+    return manager
 
 
 @pytest.fixture(autouse=True)

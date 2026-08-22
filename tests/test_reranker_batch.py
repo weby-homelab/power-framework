@@ -72,6 +72,7 @@ def test_reranker_cached_model_path_is_available(tmp_path: Path):
     assert _cached_model_file_exists(str(model_path))
 
 
+@pytest.mark.real_neural
 @pytest.mark.skipif(not _reranker_available(), reason="BGE reranker ONNX not cached")
 class TestBGEM3RerankerBatchEquivalence:
     """Batch-size equivalence: per-document vs batch=8 must produce same ranking."""

@@ -19,6 +19,13 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      POWER_EMBED_PROVIDER: bge-m3
+      POWER_EMBED_DEVICE: cpu
+      POWER_RERANKER: bge
+      POWER_RERANKER_DEVICE: cpu
+      POWER_MODEL_OFFLINE: "1"
+      HF_HUB_OFFLINE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -36,6 +43,14 @@ jobs:
           python -m pip install uv==0.11.33
           uv sync --locked --group dev --extra semantic --extra rerank
 
+      - name: Run mandatory hermetic neural contract
+        run: |
+          uv run pytest tests/test_neural_hermetic_contract.py -q --no-cov \
+            --override-ini=addopts= --strict-markers \
+            --junitxml="$RUNNER_TEMP/power374-neural-hermetic.xml"
+          uv run python scripts/verify_neural_contract.py \
+            "$RUNNER_TEMP/power374-neural-hermetic.xml"
+
       - name: Run release-gate static and documentation checks
         run: |
           uv run ruff check src/ tests/ scripts/ benchmarks/power35/
@@ -48,6 +63,7 @@ jobs:
       - name: Run the full release-gate test suite
         run: >-
           uv run pytest tests/ -v --tb=short
+          -m "not real_neural and not bench"
           --junitxml="$RUNNER_TEMP/power374-junit.xml"
           --cov=src/power_framework/ --cov-report=term-missing
           --cov-report=json:"$RUNNER_TEMP/power374-coverage.json" --cov-fail-under=70
@@ -237,7 +253,6 @@ jobs:
     needs: [validate, upgrade-matrix-aggregate]
     runs-on: ubuntu-latest
     env:
-      PYTHONPATH: src:.
       RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -253,7 +268,8 @@ jobs:
       - name: Install build tools and framework dependencies
         run: |
           python -m pip install --upgrade "pip>=26.2"
-          pip install build .
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev
 
       - name: Pin reproducible build timestamp
         run: |
@@ -274,8 +290,45 @@ jobs:
           name: power374-release-upgrade-aggregate
           path: ${{ runner.temp }}/power374-upgrade
 
-      - name: Build package before binding final evidence
-        run: python -m build
+      - name: Build reproducible package before binding final evidence
+        run: |
+          set -euo pipefail
+          build_root="$RUNNER_TEMP/power-framework-repro-build"
+          source_one="$build_root/source-one"
+          source_two="$build_root/source-two"
+          dist_one="$build_root/dist-one"
+          dist_two="$build_root/dist-two"
+          mkdir -p "$source_one" "$source_two" "$dist_one" "$dist_two"
+          git archive --format=tar HEAD | tar -xf - -C "$source_one"
+          git archive --format=tar HEAD | tar -xf - -C "$source_two"
+
+          uv run python -m build --no-isolation --outdir "$dist_one" "$source_one"
+          uv run python scripts/normalize_sdist.py "$dist_one"/*.tar.gz
+          uv run python -m build --no-isolation --outdir "$dist_two" "$source_two"
+          uv run python scripts/normalize_sdist.py "$dist_two"/*.tar.gz
+
+          mapfile -t wheels_one < <(
+            find "$dist_one" -maxdepth 1 -type f -name '*.whl' -print | sort
+          )
+          mapfile -t wheels_two < <(
+            find "$dist_two" -maxdepth 1 -type f -name '*.whl' -print | sort
+          )
+          mapfile -t sdists_one < <(
+            find "$dist_one" -maxdepth 1 -type f -name '*.tar.gz' -print | sort
+          )
+          mapfile -t sdists_two < <(
+            find "$dist_two" -maxdepth 1 -type f -name '*.tar.gz' -print | sort
+          )
+          test "${#wheels_one[@]}" -eq 1
+          test "${#wheels_two[@]}" -eq 1
+          test "${#sdists_one[@]}" -eq 1
+          test "${#sdists_two[@]}" -eq 1
+          cmp -- "${wheels_one[0]}" "${wheels_two[0]}"
+          cmp -- "${sdists_one[0]}" "${sdists_two[0]}"
+
+          mkdir -p dist
+          find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -delete
+          cp -- "${wheels_one[0]}" "${sdists_one[0]}" dist/
 
       - name: Generate SPDX SBOM before binding final evidence
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
@@ -302,7 +355,7 @@ jobs:
       - name: Generate and verify tag-bound release baseline
         run: |
           mkdir -p dist
-          python scripts/generate_release_baseline.py \
+          uv run python scripts/generate_release_baseline.py \
             --tag "$RELEASE_TAG" \
             --validation-report "$RUNNER_TEMP/power374-phase8-technical/power374-validation.json" \
             --sbom dist/power-framework.spdx.json \
@@ -310,7 +363,7 @@ jobs:
             --phase8-outcome-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-outcome.json" \
             --phase8-continuity-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-continuity.json" \
             --output dist/power-framework.release-baseline.json
-          python scripts/verify_release_contract.py \
+          uv run python scripts/verify_release_contract.py \
             --require-tag \
             --require-signed-tag \
             --sbom dist/power-framework.spdx.json \
@@ -319,7 +372,7 @@ jobs:
 
       - name: Smoke-test wheel and sdist outside checkout
         run: |
-          python scripts/smoke_package.py \
+          uv run python scripts/smoke_package.py \
             --wheel dist/power_framework-*.whl \
             --sdist dist/power_framework-*.tar.gz
 
@@ -347,7 +400,7 @@ jobs:
 
       - name: Generate release receipt
         run: |
-          python scripts/generate_release_receipt.py \
+          uv run python scripts/generate_release_receipt.py \
             --tag "$RELEASE_TAG" \
             --assets-dir dist \
             --output dist/power-framework.release-receipt.json
@@ -365,7 +418,7 @@ jobs:
           set -euo pipefail
           gh release view "$RELEASE_TAG" --json tagName,body,assets \
             > dist/power-framework.github-readback.json
-          python - "$RELEASE_TAG" <<'PY'
+          uv run python - "$RELEASE_TAG" <<'PY'
           import json
           import pathlib
           import sys
