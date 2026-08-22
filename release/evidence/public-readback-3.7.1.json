@@ -1,0 +1,48 @@
+{
+  "schema": "power.public-readback.v1",
+  "captured_at": "2026-08-22T11:33:53Z",
+  "power": {
+    "repository": "weby-homelab/power-framework",
+    "tag": "v3.7.1",
+    "commit": "8e172b82b98c8980a83e433744ea2ed6cdedce82",
+    "release": "https://github.com/weby-homelab/power-framework/releases/tag/v3.7.1",
+    "workflow_run": "https://github.com/weby-homelab/power-framework/actions/runs/32570047613",
+    "assets": {
+      "power_framework-3.7.1-py3-none-any.whl": "486a41b070a00dc519e7ec23adccac89a07a3842e47745734a3ee495ae5ad481",
+      "power_framework-3.7.1.tar.gz": "1cfb507f298611b2ddc1800ae202fab3610f9aa5580b5a1a6e0722f6490b19bb",
+      "power-framework.spdx.json": "e2c3722e861682f8382a601221b620e3a3d29d2a8991f7b500663e1ee1a0e0a3",
+      "power-framework.release-receipt.json": "14293a6502767111319617db1a48b4c04df9218f60d6fe0344e39fc9542b03af"
+    },
+    "release_receipt": "power-framework.release-receipt.json",
+    "provenance": "attest-build-provenance passed in workflow run 32570047613"
+  },
+  "gui": {
+    "repository": "weby-homelab/ai-second-brain-gui",
+    "tag": "v0.7.6",
+    "commit": "78c74eab8881258b7e2014044aed4837a0cbcb30",
+    "release": "https://github.com/weby-homelab/ai-second-brain-gui/releases/tag/v0.7.6",
+    "workflow_run": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290365",
+    "assets": {
+      "power_gui-0.7.6-py3-none-any.whl": "03244984c089766980dbbe4cd28de51fd9d294519e46f60aa64de6fe6154b591",
+      "power_gui-0.7.6.tar.gz": "461fd33adde25d53860ce14c0ac3ff98ae6e95bc704dbf1092325e7487623904",
+      "power-gui.spdx.json": "50ed0bd3dd7d8026e3789052fe5bae86b9258927895cd0114e21145a2e966701",
+      "power-gui.release-receipt.json": "543fe514c98fe7cbe8b7477bff667bf90f9198ef987894d9ebbf5fb8ef68e0de"
+    },
+    "release_receipt": "power-gui.release-receipt.json",
+    "provenance": "attest-build-provenance passed in workflow run 32570290365"
+  },
+  "container": {
+    "image": "webyhomelab/power-gui:0.7.6",
+    "digest": "sha256:5377536a6552c7c86c892fb1c1eec5fd2ed54e81784c4a9be939a090d826b470",
+    "platforms": ["linux/amd64", "linux/arm64"],
+    "workflow_run": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290281",
+    "live_e2e": "passed",
+    "registry_readback": "Docker Registry Docker-Content-Digest matched workflow digest"
+  },
+  "pair": {
+    "application_schema": "power.application.v2",
+    "power_source_matches_tag": true,
+    "gui_source_matches_tag": true,
+    "container_core_source": "8e172b82b98c8980a83e433744ea2ed6cdedce82"
+  }
+}

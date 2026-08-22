@@ -1,0 +1,73 @@
+{
+  "schema": "power.suite.release-receipt.v1",
+  "suite_version": "3.7.1",
+  "released_at": "2026-08-22T11:33:53Z",
+  "power": {
+    "repository": "https://github.com/weby-homelab/power-framework",
+    "tag": "v3.7.1",
+    "commit": "8e172b82b98c8980a83e433744ea2ed6cdedce82",
+    "version": "3.7.1",
+    "wheel": "power_framework-3.7.1-py3-none-any.whl",
+    "wheel_sha256": "486a41b070a00dc519e7ec23adccac89a07a3842e47745734a3ee495ae5ad481",
+    "sdist": "power_framework-3.7.1.tar.gz",
+    "sdist_sha256": "1cfb507f298611b2ddc1800ae202fab3610f9aa5580b5a1a6e0722f6490b19bb",
+    "sbom": "power-framework.spdx.json",
+    "sbom_sha256": "e2c3722e861682f8382a601221b620e3a3d29d2a8991f7b500663e1ee1a0e0a3",
+    "release_receipt": "power-framework.release-receipt.json",
+    "provenance": "https://github.com/weby-homelab/power-framework/actions/runs/32570047613"
+  },
+  "gui": {
+    "repository": "https://github.com/weby-homelab/ai-second-brain-gui",
+    "tag": "v0.7.6",
+    "commit": "78c74eab8881258b7e2014044aed4837a0cbcb30",
+    "version": "0.7.6",
+    "wheel": "power_gui-0.7.6-py3-none-any.whl",
+    "wheel_sha256": "03244984c089766980dbbe4cd28de51fd9d294519e46f60aa64de6fe6154b591",
+    "sdist": "power_gui-0.7.6.tar.gz",
+    "sdist_sha256": "461fd33adde25d53860ce14c0ac3ff98ae6e95bc704dbf1092325e7487623904",
+    "image": "webyhomelab/power-gui:0.7.6",
+    "image_digest": "sha256:5377536a6552c7c86c892fb1c1eec5fd2ed54e81784c4a9be939a090d826b470",
+    "platforms": ["linux/amd64", "linux/arm64"],
+    "sbom": "power-gui.spdx.json",
+    "sbom_sha256": "50ed0bd3dd7d8026e3789052fe5bae86b9258927895cd0114e21145a2e966701",
+    "release_receipt": "power-gui.release-receipt.json",
+    "provenance": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290365"
+  },
+  "runtime": {
+    "python_range": ">=3.13,<3.15",
+    "linux_support_boundary": "Linux native and Linux multi-arch container profiles",
+    "application_schema": "power.application.v2"
+  },
+  "mcp": {
+    "sdk_identity": "mcp==2.0.0",
+    "entry_point": "power-mcp",
+    "transport": "stdio",
+    "tool_count": 20,
+    "tool_contract_sha256": "bb4a0790eeb7c47138917508d8556a1f45c8a311995f552388499183b195755c",
+    "protocol_stdout": "clean",
+    "application_service_bypass_count": 0
+  },
+  "skill": {
+    "source": "skills/power",
+    "packaged": true,
+    "tree_sha256": "4ac2ad7e851f4bc17f32cd54369263a94738929f34df2b5844f66f702819331e",
+    "install": "passed",
+    "upgrade": "passed",
+    "foreign_target_protection": "passed"
+  },
+  "dependencies": {
+    "constraints_artifact": "power-suite.constraints.txt",
+    "constraints_sha256": "cae5417ce4df81c8b1ca18d74021503c9be40fc941b6bc1b9ff9dec2395373a5",
+    "lockfile": "uv.lock"
+  },
+  "validation": {
+    "native_clean_install": "passed",
+    "mcp_subprocess": "passed",
+    "systemd_user": "passed",
+    "container_e2e": "passed",
+    "cross_runtime": "passed",
+    "public_readback": "passed",
+    "human_quality": "not claimed",
+    "m2_human_opened": false
+  }
+}

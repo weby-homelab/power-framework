@@ -1,0 +1,35 @@
+{
+  "schema": "power.python-matrix.v1",
+  "suite_version": "3.7.1",
+  "python": {
+    "3.11": {
+      "status": "unsupported",
+      "reason": "Outside the final Requires-Python contract; candidate matrix resolution did not produce a supported runtime."
+    },
+    "3.12": {
+      "status": "unsupported",
+      "reason": "Outside the final Requires-Python contract; candidate matrix resolution did not produce a supported runtime."
+    },
+    "3.13": {
+      "status": "supported",
+      "core_targeted_tests": "10 passed",
+      "gui_targeted_tests": "19 passed",
+      "release_full_matrix": "passed",
+      "evidence": [
+        "https://github.com/weby-homelab/power-framework/actions/runs/32570047613",
+        "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290365"
+      ]
+    },
+    "3.14": {
+      "status": "supported",
+      "core_local_full_suite": "1155 passed, 11 skipped",
+      "gui_local_full_suite": "58 passed, 3 skipped",
+      "release_full_matrix": "passed",
+      "evidence": [
+        "https://github.com/weby-homelab/power-framework/actions/runs/32570047613"
+      ]
+    }
+  },
+  "requires_python": ">=3.13,<3.15",
+  "decision": "Support is intentionally limited to Python 3.13 and 3.14; 3.11 and 3.12 are not stable claims."
+}
