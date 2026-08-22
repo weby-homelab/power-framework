@@ -19,8 +19,11 @@ prohibited.
 | POWER | `v3.7.1` | `8e172b82b98c8980a83e433744ea2ed6cdedce82` | `3.7.1` |
 | GUI | `v0.7.7` | `339388ee4f77401a033ed50d4cac25ad3b82fefd` | `0.7.7` |
 
-No immutable tag was rewritten. Later `3.7.2`/`3.7.3` corrective lines are
-separate historical releases and are not used to certify this target.
+The current public tag refs and locally verified signed tags resolve to the
+source identities above. This present-state audit found no mismatch, but it
+cannot independently prove the absence of a historical force-update. Later
+`3.7.2`/`3.7.3` corrective lines are separate releases and are not used to
+certify this target.
 
 ## Exact public artifacts
 
@@ -41,10 +44,10 @@ separate historical releases and are not used to certify this target.
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| Exact pair and public artifact readback | PASS (component scope) | `release/evidence/public-readback-3.7.1.json` |
-| Native clean install from public wheels | **FAIL** | `release/evidence/public-native-failure-3.7.1.json` |
-| `power-mcp` / MCP contract | PASS for tested component surface; not sufficient to promote Suite | prior release evidence and component receipts |
-| Packaged Skill | PASS for the tested 3.7.1 component | component evidence; no human-quality claim |
+| Exact pair and public artifact readback | PASS (component scope; independently re-downloaded hashes matched) | `release/evidence/public-readback-3.7.1.json` |
+| Native clean install from public wheels | **FAIL (independently reproduced)** | `release/evidence/public-native-failure-3.7.1.json` |
+| `power-mcp` / MCP contract | PASS per component receipt; target-specific raw log was not retained locally and was not independently revalidated | component receipt; not sufficient to promote Suite |
+| Packaged Skill | PARTIAL independent proof: packaged tree hash matched; install/upgrade/foreign-target checks rely on component receipt | component evidence; no human-quality claim |
 | Native GUI lifecycle | NOT RUN after the blocking native failure | mandatory gate remains open |
 | Cross-runtime concurrency/recovery | NOT RUN as final public Stable proof | mandatory gate remains open |
 | Upgrade and rollback | NOT RUN as final public Stable proof | mandatory gate remains open |
@@ -54,6 +57,12 @@ The reproduced failure is deterministic: on Python 3.14.4, the installer
 returns `applied`, but the moved `power`, `power-mcp`, and `power-gui` shims
 retain a generated `.venv.staging-*` interpreter path. That staging path no
 longer exists, so the public launcher exits `127`.
+
+Independent revalidation on 2026-08-22 downloaded the public POWER and GUI
+release assets again, matched every wheel, sdist, SBOM, receipt, and constraints
+SHA-256 listed above, verified both signed tag targets against GPG fingerprint
+`2D49E810C7F2527E`, and reproduced `install_exit=0` followed by exit `127` for
+all three launchers in a disposable HOME containing spaces and Unicode.
 
 ## Boundaries and policy
 
