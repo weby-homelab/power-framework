@@ -25,9 +25,7 @@ workflow succeeds:
 - the final clean-tag validation report, including Skill hash equality, native,
   MCP, GUI, lifecycle, concurrency, recovery, and upgrade evidence.
 
-Local synthetic tests or a disposable vault do not constitute a real-vault
-quality or human-quality claim. Human-quality evidence remains sealed and is
-not inferred from technical test counts.
+Local synthetic tests or a disposable vault do not constitute a real-vault quality or human-quality claim. Human-quality evidence remains sealed and is not inferred from technical test counts.
 
 ## Support boundary
 
