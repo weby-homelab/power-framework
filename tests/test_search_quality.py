@@ -58,6 +58,7 @@ def _load_harness():
     return module
 
 
+@pytest.mark.real_neural
 @pytest.mark.bench
 @pytest.mark.skipif(not _vault_present(REAL_VAULT), reason="real brain vault not present")
 def test_search_quality_gate():

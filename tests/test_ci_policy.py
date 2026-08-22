@@ -184,3 +184,32 @@ def test_quarantined_fleet_docs_and_helper_forbid_live_cache_transfer() -> None:
         assert not forbidden.search(helper_text), (
             "legacy helper must not reintroduce live-cache copy"
         )
+
+
+def test_mandatory_neural_contract_is_explicit_and_zero_skip() -> None:
+    """CI must execute hermetic neural paths even when no HF snapshot exists."""
+
+    contract = (REPO_ROOT / "tests" / "test_neural_hermetic_contract.py").read_text(
+        encoding="utf-8"
+    )
+    assert "pytestmark = pytest.mark.neural_hermetic" in contract
+    assert "pytest.skip" not in contract
+    assert "skipif" not in contract
+    for required in (
+        "test_embedding_manager_contract_uses_fake_tokenizer_and_session",
+        "test_dedup_contract_accepts_injected_embedder",
+        "test_contradiction_contract_accepts_injected_embedder",
+        "test_rot_report_contract_executes_dedup_and_contradiction_paths",
+    ):
+        assert f"def {required}" in contract
+
+    verify_script = (REPO_ROOT / "scripts" / "verify_neural_contract.py").read_text(
+        encoding="utf-8"
+    )
+    assert "skipped" in verify_script
+    assert "mandatory neural contract skipped" in verify_script
+    for workflow_name in ("ci.yml", "release.yml"):
+        workflow = (WORKFLOWS_DIR / workflow_name).read_text(encoding="utf-8")
+        assert "tests/test_neural_hermetic_contract.py" in workflow
+        assert "scripts/verify_neural_contract.py" in workflow
+        assert '-m "not real_neural and not bench"' in workflow

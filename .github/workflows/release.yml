@@ -43,6 +43,14 @@ jobs:
           python -m pip install uv==0.11.33
           uv sync --locked --group dev --extra semantic --extra rerank
 
+      - name: Run mandatory hermetic neural contract
+        run: |
+          uv run pytest tests/test_neural_hermetic_contract.py -q --no-cov \
+            --override-ini=addopts= --strict-markers \
+            --junitxml="$RUNNER_TEMP/power374-neural-hermetic.xml"
+          uv run python scripts/verify_neural_contract.py \
+            "$RUNNER_TEMP/power374-neural-hermetic.xml"
+
       - name: Run release-gate static and documentation checks
         run: |
           uv run ruff check src/ tests/ scripts/ benchmarks/power35/
@@ -55,6 +63,7 @@ jobs:
       - name: Run the full release-gate test suite
         run: >-
           uv run pytest tests/ -v --tb=short
+          -m "not real_neural and not bench"
           --junitxml="$RUNNER_TEMP/power374-junit.xml"
           --cov=src/power_framework/ --cov-report=term-missing
           --cov-report=json:"$RUNNER_TEMP/power374-coverage.json" --cov-fail-under=70

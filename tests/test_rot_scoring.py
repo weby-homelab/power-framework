@@ -5,28 +5,18 @@ from __future__ import annotations
 from datetime import UTC
 from typing import TYPE_CHECKING
 
-import pytest
-
 from power_framework.core.rot_scoring import (
     ContentDedupDetector,
     FreshnessScorer,
     UsageTracker,
 )
-from power_framework.experimental.embeddings import dense_embedding_ready
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-_DENSE_MODEL_REQUIRED = pytest.mark.skipif(
-    not dense_embedding_ready()[0],
-    reason="pinned BGE-M3 ONNX snapshot is not cached",
-)
-
-
-@_DENSE_MODEL_REQUIRED
 class TestContentDedupDetector:
-    def test_detects_similar_content(self, tmp_path: Path):
+    def test_detects_similar_content(self, tmp_path: Path, deterministic_embedder):
         vault = tmp_path / "vault"
         vault.mkdir()
         (vault / "01_Projects").mkdir()
@@ -49,12 +39,12 @@ class TestContentDedupDetector:
             "to note A because they share the same topic and vocabulary across the text."
         )
 
-        detector = ContentDedupDetector(threshold=0.5)
+        detector = ContentDedupDetector(threshold=0.5, embedder=deterministic_embedder)
         pairs = detector.detect(vault)
         assert len(pairs) >= 1
         assert any("note_a" in p[0] or "note_a" in p[1] for p in pairs)
 
-    def test_different_content_not_deduped(self, tmp_path: Path):
+    def test_different_content_not_deduped(self, tmp_path: Path, deterministic_embedder):
         vault = tmp_path / "vault"
         vault.mkdir()
         (vault / "01_Projects").mkdir()
@@ -75,7 +65,7 @@ class TestContentDedupDetector:
             "Quantum physics explores the behavior of matter at the atomic and subatomic level."
         )
 
-        detector = ContentDedupDetector(threshold=0.75)
+        detector = ContentDedupDetector(threshold=0.75, embedder=deterministic_embedder)
         pairs = detector.detect(vault)
         assert len(pairs) == 0
 

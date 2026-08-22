@@ -12,21 +12,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
-
 from power_framework.core.relations import suggest_related
 from power_framework.core.rot_scoring import ContentDedupDetector, FreshnessScorer
 from power_framework.core.searcher import search_vault
-from power_framework.experimental.embeddings import dense_embedding_ready
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-
-_DENSE_MODEL_REQUIRED = pytest.mark.skipif(
-    not dense_embedding_ready()[0],
-    reason="pinned BGE-M3 ONNX snapshot is not cached",
-)
 
 
 class TestMemoryAgentBench:
@@ -162,8 +153,7 @@ The main postgresql database configuration settings are hosted on host PRXMX-01.
 
         assert any(r.target_path == "03_Resources/DatabaseConfig.md" for r in relations)
 
-    @_DENSE_MODEL_REQUIRED
-    def test_conflict_resolution(self, tmp_path: Path):
+    def test_conflict_resolution(self, tmp_path: Path, deterministic_embedder):
         """CR Competency: Reconcile contradicting information over time."""
         vault = tmp_path / "memory_vault"
         vault.mkdir()
@@ -200,7 +190,7 @@ Under this configuration, Nginx is listening on port 9090 for web queries.
         )
 
         # Use ContentDedupDetector to locate similar pages that might contain conflicts
-        detector = ContentDedupDetector(threshold=0.5)
+        detector = ContentDedupDetector(threshold=0.5, embedder=deterministic_embedder)
         duplicates = detector.detect(vault)
         print("DEBUG DUPLICATES:", duplicates)
         assert len(duplicates) > 0

@@ -16,19 +16,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _dense_model_available() -> bool:
-    """Run model-backed tests only when the pinned local snapshot is present."""
-
-    ready, _reason = embeddings.dense_embedding_ready()
-    return ready
-
-
-_DENSE_MODEL_REQUIRED = pytest.mark.skipif(
-    not _dense_model_available(),
-    reason="pinned BGE-M3 ONNX snapshot is not cached",
-)
-
-
 class TestEmbeddingManager:
     def test_dense_readiness_is_read_only_and_reports_missing_snapshot(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -161,17 +148,15 @@ class TestEmbeddingManager:
     def test_import_has_no_hardcoded_env_file_side_effect(self):
         assert "/root/geminicli/.env" not in inspect.getsource(embeddings)
 
-    @_DENSE_MODEL_REQUIRED
-    def test_embed_single_text(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_single_text(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec = manager.embed("Hello world")
         assert isinstance(vec, list)
         assert len(vec) == manager.dimension
         assert all(isinstance(v, float) for v in vec)
 
-    @_DENSE_MODEL_REQUIRED
-    def test_embed_batch(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_batch(self, fake_bge_manager):
+        manager = fake_bge_manager
         texts = ["Hello world", "Second test text", "Third one here"]
         vectors = manager.embed_batch(texts)
         assert len(vectors) == 3
@@ -180,29 +165,25 @@ class TestEmbeddingManager:
             assert len(vec) == manager.dimension
             assert all(isinstance(v, float) for v in vec)
 
-    @_DENSE_MODEL_REQUIRED
-    def test_embed_empty_string(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_empty_string(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec = manager.embed("")
         assert isinstance(vec, list)
         assert len(vec) == manager.dimension
 
-    @_DENSE_MODEL_REQUIRED
-    def test_embed_batch_empty(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embed_batch_empty(self, fake_bge_manager):
+        manager = fake_bge_manager
         vectors = manager.embed_batch([])
         assert vectors == []
 
-    @_DENSE_MODEL_REQUIRED
-    def test_embedding_deterministic(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embedding_deterministic(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec1 = manager.embed("Some consistent text")
         vec2 = manager.embed("Some consistent text")
         assert vec1 == vec2
 
-    @_DENSE_MODEL_REQUIRED
-    def test_embedding_different_texts(self):
-        manager = embeddings.get_embedding_manager()
+    def test_embedding_different_texts(self, fake_bge_manager):
+        manager = fake_bge_manager
         vec1 = manager.embed("Kittens are cute")
         vec2 = manager.embed("Rocket science")
         assert vec1 != vec2

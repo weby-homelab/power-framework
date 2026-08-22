@@ -102,6 +102,14 @@ jobs:
           python -m pip install uv==0.11.33
           uv sync --locked --group dev --extra semantic --extra rerank
 
+      - name: Run mandatory hermetic neural contract
+        run: |
+          uv run pytest tests/test_neural_hermetic_contract.py -q --no-cov \
+            --override-ini=addopts= --strict-markers \
+            --junitxml="$RUNNER_TEMP/power374-neural-hermetic.xml"
+          uv run python scripts/verify_neural_contract.py \
+            "$RUNNER_TEMP/power374-neural-hermetic.xml"
+
       - name: Run Ruff linter
         run: uv run ruff check src/ tests/ scripts/ benchmarks/power35/
 
@@ -125,7 +133,7 @@ jobs:
         run: uv run pytest tests/test_release_contract.py -q --no-cov --override-ini=addopts=
 
       - name: Run tests with coverage and resource warning gates
-        run: uv run pytest tests/ -v --tb=short --cov=src/power_framework/ --cov-report=term-missing --cov-fail-under=70 -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
+        run: uv run pytest tests/ -v --tb=short -m "not real_neural and not bench" --cov=src/power_framework/ --cov-report=term-missing --cov-fail-under=70 -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
 
       - name: Run maintenance fault-injection rollback gate
         run: uv run pytest tests/test_maintenance.py tests/test_maintenance_faults.py -q --no-cov --override-ini=addopts=

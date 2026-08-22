@@ -131,6 +131,8 @@ filterwarnings = [
 addopts = "-v --tb=short --cov=power_framework --cov-report=term-missing --cov-fail-under=70"
 markers = [
     "bench: optional real-vault benchmark; never a blocking hermetic CI gate",
+    "neural_hermetic: mandatory offline neural contract checks using injected doubles",
+    "real_neural: optional pinned local-model integration checks; never downloads in CI",
 ]
 
 [tool.ruff]

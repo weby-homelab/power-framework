@@ -218,6 +218,7 @@ class TestRerankerManager:
         assert scores[2] > scores[1]
         assert all(0.0 <= s <= 1.0 for s in scores)
 
+    @pytest.mark.real_neural
     def test_bgem3_reranker_ranks_relevant_first(self):
         """Real BGE reranker ranking (skipped if the ONNX snapshot is not cached)."""
         if not _bge_reranker_available():

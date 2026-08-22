@@ -61,6 +61,7 @@ _REPEATS_IN_PROCESS = 5
 
 
 @pytest.mark.bench
+@pytest.mark.real_neural
 @pytest.mark.skipif(
     not (_benchmarks_enabled() and _vault_present()),
     reason="set POWER_RUN_BENCHMARKS=1 with a real brain vault to run neural benchmarks",
@@ -95,6 +96,7 @@ class TestSemanticDeterminism:
 
 
 @pytest.mark.bench
+@pytest.mark.real_neural
 @pytest.mark.skipif(
     not (_benchmarks_enabled() and _vault_present()),
     reason="set POWER_RUN_BENCHMARKS=1 with a real brain vault to run neural benchmarks",
