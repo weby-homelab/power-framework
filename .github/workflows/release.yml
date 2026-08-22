@@ -274,8 +274,45 @@ jobs:
           name: power374-release-upgrade-aggregate
           path: ${{ runner.temp }}/power374-upgrade
 
-      - name: Build package before binding final evidence
-        run: python -m build
+      - name: Build reproducible package before binding final evidence
+        run: |
+          set -euo pipefail
+          build_root="$RUNNER_TEMP/power-framework-repro-build"
+          source_one="$build_root/source-one"
+          source_two="$build_root/source-two"
+          dist_one="$build_root/dist-one"
+          dist_two="$build_root/dist-two"
+          mkdir -p "$source_one" "$source_two" "$dist_one" "$dist_two"
+          git archive --format=tar HEAD | tar -xf - -C "$source_one"
+          git archive --format=tar HEAD | tar -xf - -C "$source_two"
+
+          python -m build --outdir "$dist_one" "$source_one"
+          python scripts/normalize_sdist.py "$dist_one"/*.tar.gz
+          python -m build --outdir "$dist_two" "$source_two"
+          python scripts/normalize_sdist.py "$dist_two"/*.tar.gz
+
+          mapfile -t wheels_one < <(
+            find "$dist_one" -maxdepth 1 -type f -name '*.whl' -print | sort
+          )
+          mapfile -t wheels_two < <(
+            find "$dist_two" -maxdepth 1 -type f -name '*.whl' -print | sort
+          )
+          mapfile -t sdists_one < <(
+            find "$dist_one" -maxdepth 1 -type f -name '*.tar.gz' -print | sort
+          )
+          mapfile -t sdists_two < <(
+            find "$dist_two" -maxdepth 1 -type f -name '*.tar.gz' -print | sort
+          )
+          test "${#wheels_one[@]}" -eq 1
+          test "${#wheels_two[@]}" -eq 1
+          test "${#sdists_one[@]}" -eq 1
+          test "${#sdists_two[@]}" -eq 1
+          cmp -- "${wheels_one[0]}" "${wheels_two[0]}"
+          cmp -- "${sdists_one[0]}" "${sdists_two[0]}"
+
+          mkdir -p dist
+          find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -delete
+          cp -- "${wheels_one[0]}" "${sdists_one[0]}" dist/
 
       - name: Generate SPDX SBOM before binding final evidence
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
