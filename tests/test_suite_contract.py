@@ -54,11 +54,11 @@ def _manifest(root: Path, power: Path, gui: Path) -> Path:
     document = {
         "schema": "power.suite.manifest.v1",
         "status": "candidate",
-        "suite_version": "3.7.1",
+        "suite_version": "3.7.2",
         "application_schema": "power.application.v2",
-        "power": component(power, "power-framework", "3.7.1"),
-        "gui": component(gui, "power-gui", "0.7.6"),
-        "skill": {"tree_sha256": "a" * 64, "compatible_power_version": "3.7.1"},
+        "power": component(power, "power-framework", "3.7.2"),
+        "gui": component(gui, "power-gui", "0.7.8"),
+        "skill": {"tree_sha256": "a" * 64, "compatible_power_version": "3.7.2"},
         "python": {"requires_python": ">=3.13,<3.15"},
         "dependencies": {
             "constraints": constraints.name,
@@ -73,15 +73,15 @@ def _manifest(root: Path, power: Path, gui: Path) -> Path:
 def _fixtures(tmp_path: Path) -> tuple[Path, Path, Path]:
     power = _wheel(
         tmp_path,
-        "power_framework-3.7.1-py3-none-any.whl",
+        "power_framework-3.7.2-py3-none-any.whl",
         distribution="power-framework",
-        version="3.7.1",
+        version="3.7.2",
     )
     gui = _wheel(
         tmp_path,
-        "power_gui-0.7.6-py3-none-any.whl",
+        "power_gui-0.7.8-py3-none-any.whl",
         distribution="power-gui",
-        version="0.7.6",
+        version="0.7.8",
     )
     return power, gui, _manifest(tmp_path, power, gui)
 
@@ -91,7 +91,7 @@ def test_exact_pair_manifest_preflight_passes(tmp_path: Path) -> None:
 
     contract = validate_suite_artifacts(manifest, power, gui)
 
-    assert contract["suite_version"] == "3.7.1"
+    assert contract["suite_version"] == "3.7.2"
     assert contract["application_schema"] == "power.application.v2"
     assert contract["components"]["power"]["metadata"]["name"] == "power-framework"
 
@@ -131,9 +131,9 @@ def test_wrong_distribution_is_rejected_before_install(tmp_path: Path) -> None:
     _power, gui, manifest = _fixtures(tmp_path)
     foreign = _wheel(
         tmp_path,
-        "foreign-3.7.1-py3-none-any.whl",
+        "foreign-3.7.2-py3-none-any.whl",
         distribution="foreign-package",
-        version="3.7.1",
+        version="3.7.2",
     )
 
     with pytest.raises(ValueError, match="distribution"):
