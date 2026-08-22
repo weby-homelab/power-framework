@@ -1,4 +1,4 @@
-# POWER Application API v2 — 3.7.3 Candidate
+# POWER Application API v2 — 3.7.4 Candidate
 
 ## Envelope
 
@@ -80,7 +80,7 @@ candidate. New transport operations require explicit capability negotiation.
 
 ## Compatibility
 
-The public immutable baseline remains POWER `v3.6.7` until the 3.7.3 candidate
+The public immutable baseline remains POWER `v3.6.7` until the 3.7.4 candidate
 is published. The local candidate changes the package version and source read
 model but must not be represented as a published release before its immutable
 revision, wheel, SBOM and release receipts exist.

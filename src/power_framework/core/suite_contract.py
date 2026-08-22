@@ -16,7 +16,12 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-SUITE_MANIFEST_SCHEMA = "power.suite.manifest.v1"
+SUITE_MANIFEST_SCHEMA = "power.suite.manifest.v2"
+LEGACY_SUITE_MANIFEST_SCHEMA = "power.suite.manifest.v1"
+SUPPORTED_SUITE_MANIFEST_SCHEMAS = {
+    LEGACY_SUITE_MANIFEST_SCHEMA,
+    SUITE_MANIFEST_SCHEMA,
+}
 APPLICATION_SCHEMA = "power.application.v2"
 _DIST_NAME_RE = re.compile(r"[^a-z0-9]+")
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)(?:\.(\d+))?(?:[-+].*)?$")
@@ -118,7 +123,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
         raise ValueError(f"unable to read Suite manifest: {path}") from exc
     if not isinstance(document, dict):
         raise ValueError("Suite manifest must be a JSON object")
-    if document.get("schema") != SUITE_MANIFEST_SCHEMA:
+    if document.get("schema") not in SUPPORTED_SUITE_MANIFEST_SCHEMAS:
         raise ValueError(f"unsupported Suite manifest schema: {document.get('schema')!r}")
     if document.get("status") not in {"candidate", "stable"}:
         raise ValueError("Suite manifest status must be candidate or stable")
@@ -135,6 +140,29 @@ def _component_manifest(manifest: dict[str, Any], name: str) -> dict[str, Any]:
     if not re.fullmatch(r"[0-9a-f]{64}", component["sha256"]):
         raise ValueError(f"Suite manifest {name}.sha256 is invalid")
     return component
+
+
+def _wheel_skill_tree_sha256(path: Path) -> str:
+    """Hash the exact packaged POWER Skill tree from a candidate wheel."""
+    prefix = "power_framework/data/skills/power/"
+    files: dict[str, bytes] = {}
+    with zipfile.ZipFile(path) as archive:
+        for name in archive.namelist():
+            if not name.startswith(prefix) or name.endswith("/"):
+                continue
+            relative = name.removeprefix(prefix)
+            relative_path = Path(relative)
+            if "__pycache__" in relative_path.parts or relative_path.suffix == ".pyc":
+                continue
+            files[relative_path.as_posix()] = archive.read(name)
+    if "SKILL.md" not in files:
+        raise ValueError("POWER wheel is missing the packaged Skill tree")
+    digest = hashlib.sha256()
+    for relative in sorted(files):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(files[relative]).digest())
+    return digest.hexdigest()
 
 
 def validate_suite_artifacts(
@@ -226,6 +254,39 @@ def validate_suite_artifacts(
         "compatible_power_version"
     ):
         errors.append("Skill/core version compatibility does not match the manifest")
+
+    power_version = components.get("power", {}).get("metadata", {}).get("version")
+    if (
+        suite_version is not None
+        and power_version is not None
+        and str(suite_version) != power_version
+    ):
+        errors.append("Suite version does not match the POWER artifact")
+
+    if manifest.get("schema") == SUITE_MANIFEST_SCHEMA:
+        gui_manifest = manifest.get("gui")
+        gui_metadata = components.get("gui", {}).get("metadata", {})
+        if not isinstance(gui_manifest, dict):
+            errors.append("Suite v2 manifest requires the GUI component")
+        else:
+            expected_power = gui_manifest.get("expected_power_version")
+            if expected_power != power_version:
+                errors.append("GUI expected POWER version does not match the POWER artifact")
+            if gui_manifest.get("application_schema") != application_schema:
+                errors.append("GUI application schema does not match the Suite schema")
+            requires_power = gui_manifest.get("requires_power")
+            if not isinstance(requires_power, str) or requires_power not in gui_metadata.get(
+                "requires_dist", []
+            ):
+                errors.append("GUI wheel does not contain the manifest-bound POWER requirement")
+            elif power_version not in requires_power:
+                errors.append("GUI POWER requirement does not bind the exact POWER version")
+        try:
+            actual_skill_hash = _wheel_skill_tree_sha256(power_path)
+            if isinstance(skill, dict) and actual_skill_hash != skill.get("tree_sha256"):
+                errors.append("POWER wheel Skill tree hash does not match the manifest")
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            errors.append(f"POWER wheel Skill validation failed: {exc}")
 
     dependencies = manifest.get("dependencies")
     constraints_path: Path | None = None

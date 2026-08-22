@@ -206,7 +206,15 @@ def build_integrations_doctor() -> dict[str, Any]:
     except importlib.metadata.PackageNotFoundError:
         power_version = None
     home = Path.home()
-    venv_root = home / ".local" / "share" / "power" / "venv"
+    managed = home / ".local" / "share" / "power"
+    compatibility_venv = managed / "venv"
+    current_link = managed / "current"
+    current_target = current_link.resolve() if current_link.is_symlink() else None
+    active_venv = (
+        current_link / "venv"
+        if current_target is not None and current_target.is_dir()
+        else compatibility_venv
+    )
     launchers = {
         name: home / ".local" / "bin" / name for name in ("power", "power-mcp", "power-gui")
     }
@@ -221,8 +229,17 @@ def build_integrations_doctor() -> dict[str, Any]:
             "python": sys.version.split()[0],
         },
         "native": {
-            "venv": str(venv_root),
-            "venv_exists": venv_root.is_dir(),
+            "managed": str(managed),
+            "releases": str(managed / "releases"),
+            "current": str(current_link),
+            "current_target": str(current_target) if current_target is not None else None,
+            "active_venv": str(active_venv),
+            "active_venv_exists": active_venv.is_dir(),
+            "venv": str(active_venv),
+            "venv_exists": active_venv.is_dir(),
+            "compatibility_venv": str(compatibility_venv),
+            "legacy_venv_present": compatibility_venv.exists()
+            and not compatibility_venv.is_symlink(),
             "launchers": {
                 name: {"path": str(path), "exists": path.is_file()}
                 for name, path in launchers.items()
@@ -307,7 +324,7 @@ def build_native_install_plan(
     if home is None:
         install_home = Path.home().resolve()
     managed = install_home / ".local" / "share" / "power"
-    venv_root = managed / "venv"
+    releases_root = managed / "releases"
     launcher_dir = install_home / ".local" / "bin"
     if not manifest:
         return {
@@ -316,7 +333,8 @@ def build_native_install_plan(
             "reason": "an exact Suite manifest is required",
             "native": {
                 "home": str(install_home),
-                "venv": str(venv_root),
+                "releases": str(releases_root),
+                "current": str(managed / "current"),
                 "launcher_dir": str(launcher_dir),
             },
         }
@@ -327,7 +345,8 @@ def build_native_install_plan(
             "reason": "an exact POWER wheel is required",
             "native": {
                 "home": str(install_home),
-                "venv": str(venv_root),
+                "releases": str(releases_root),
+                "current": str(managed / "current"),
                 "launcher_dir": str(launcher_dir),
             },
         }
@@ -339,12 +358,27 @@ def build_native_install_plan(
         raise ValueError("gui_wheel must be an existing .whl file")
     contract = validate_suite_artifacts(manifest, power_path, gui_path)
     state_path = managed / "suite-install.json"
+    slot_name = (
+        f"{contract['suite_version']}-{contract['manifest_sha256'][:12]}-{uuid.uuid4().hex[:12]}"
+    )
+    release_slot = releases_root / slot_name
+    slot_venv = release_slot / "venv"
+    current_link = managed / "current"
+    compatibility_venv = managed / "venv"
     return {
         "schema": NATIVE_INSTALL_SCHEMA_VERSION,
         "status": "ready" if not state_path.is_file() else "update",
         "native": {
             "home": str(install_home),
-            "venv": str(venv_root),
+            "managed": str(managed),
+            "releases": str(releases_root),
+            "release_slot": str(release_slot),
+            "slot_venv": str(slot_venv),
+            "current": str(current_link),
+            "active_venv": str(current_link / "venv"),
+            "compatibility_venv": str(compatibility_venv),
+            "legacy_venv_present": compatibility_venv.exists()
+            and not compatibility_venv.is_symlink(),
             "launcher_dir": str(launcher_dir),
             "state": str(state_path),
         },
@@ -378,29 +412,34 @@ def _write_executable(path: Path, content: str) -> None:
     os.replace(temporary, path)
 
 
-def _rewrite_venv_shebangs(venv_root: Path, *, staging_root: Path | None = None) -> None:
-    """Point generated console scripts at the activated venv after a move.
+def _atomic_symlink(target: Path | str, link: Path, *, identifier: str) -> None:
+    """Atomically replace one managed symlink without touching its target."""
+    temporary = link.with_name(f".{link.name}.next-{identifier}")
+    temporary.unlink(missing_ok=True)
+    temporary.symlink_to(target, target_is_directory=True)
+    try:
+        os.replace(temporary, link)
+    finally:
+        temporary.unlink(missing_ok=True)
 
-    Recent pip versions may emit shell shims whose interpreter path appears on
-    the second line rather than in the shebang.  Replace the exact staging
-    root in every regular ``bin`` file so both shim formats survive the
-    atomic staging-venv move, including homes containing spaces or Unicode.
-    """
-    python_path = venv_root / "bin" / "python"
-    staging_bytes = str(staging_root).encode("utf-8") if staging_root is not None else None
-    active_bytes = str(venv_root).encode("utf-8")
-    bin_dir = venv_root / "bin"
-    for script in bin_dir.iterdir():
-        if script.is_symlink() or not script.is_file():
-            continue
-        original = content = script.read_bytes()
-        if staging_bytes and staging_bytes in content:
-            content = content.replace(staging_bytes, active_bytes)
-        first_line, separator, remainder = content.partition(b"\n")
-        if separator and first_line.startswith(b"#!") and b"/bin/python" in first_line:
-            content = b"#!" + str(python_path).encode("utf-8") + b"\n" + remainder
-        if content != original:
-            script.write_bytes(content)
+
+def _verify_installed_launcher(
+    path: Path,
+    arguments: list[str],
+    *,
+    expected_version: str | None = None,
+) -> None:
+    """Execute an installed launcher and fail closed on identity drift."""
+    result = subprocess.run(  # noqa: S603 - exact verified install path and fixed arguments.
+        [str(path), *arguments],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if expected_version is not None:
+        output = f"{result.stdout}\n{result.stderr}"
+        if expected_version not in output:
+            raise RuntimeError(f"launcher identity mismatch: {path}")
 
 
 def apply_native_install_plan(
@@ -409,13 +448,18 @@ def apply_native_install_plan(
     approved: bool,
     no_deps: bool = False,
 ) -> dict[str, Any]:
-    """Stage, verify, and atomically activate one exact Suite environment."""
+    """Build in a final release slot, verify, and atomically activate it."""
     if not approved:
         raise PermissionError("native install requires explicit approved=True")
     if plan.get("schema") != NATIVE_INSTALL_SCHEMA_VERSION or plan.get("status") == "blocked":
         raise ValueError("native install plan is not applicable")
     native = plan["native"]
-    venv_root = Path(native["venv"])
+    managed = Path(native["managed"])
+    releases_root = Path(native["releases"])
+    release_slot = Path(native["release_slot"])
+    slot_venv = Path(native["slot_venv"])
+    current_link = Path(native["current"])
+    compatibility_venv = Path(native["compatibility_venv"])
     launcher_dir = Path(native["launcher_dir"])
     state_path = Path(native["state"])
     manifest_path = Path(plan["contract"]["manifest_path"])
@@ -428,11 +472,20 @@ def apply_native_install_plan(
     if contract["components"] != plan["contract"].get("components"):
         raise RuntimeError("Suite artifacts changed after the plan was created")
 
-    managed = venv_root.parent
     managed.mkdir(parents=True, exist_ok=True)
+    releases_root.mkdir(parents=True, exist_ok=True)
     activation_id = uuid.uuid4().hex
-    staging_venv = managed / f".venv.staging-{activation_id}"
-    previous_venv = managed / f".venv.previous-{activation_id}"
+    if release_slot.exists():
+        raise RuntimeError("release slot already exists and will not be overwritten")
+    if current_link.exists() and not current_link.is_symlink():
+        raise RuntimeError("managed current pointer exists but is not a symlink")
+    previous_current_target: str | None = None
+    previous_release_slot: Path | None = None
+    if current_link.is_symlink():
+        previous_current_target = os.readlink(current_link)
+        previous_release_slot = current_link.resolve()
+        if not previous_release_slot.is_dir():
+            raise RuntimeError("managed current pointer is dangling")
     launcher_stage = launcher_dir / f".launchers.staging-{activation_id}"
     launcher_names = ["power", "power-mcp"]
     if gui_path is not None:
@@ -445,15 +498,18 @@ def apply_native_install_plan(
         else:
             launcher_snapshots[destination] = None
     state_snapshot = state_path.read_bytes() if state_path.is_file() else None
-    activated = False
+    pointer_activated = False
+    compatibility_link_created = False
     try:
-        venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(staging_venv)
-        staged_python = staging_venv / "bin" / "python"
+        # The environment is born at its final physical path.  A populated
+        # Python venv is never moved or repaired after installation.
+        venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(slot_venv)
+        slot_python = slot_venv / "bin" / "python"
         constraints_path = contract["dependencies"].get("path")
 
         def run_pip(arguments: list[str]) -> None:
             command = [
-                str(staged_python),
+                str(slot_python),
                 "-m",
                 "pip",
                 "install",
@@ -497,28 +553,50 @@ def apply_native_install_plan(
                 f"{contract['components']['gui']['metadata']['version']!r}"
             )
         subprocess.run(  # noqa: S603 - interpreter and script are generated from verified inputs.
-            [str(staged_python), "-c", check_script],
+            [str(slot_python), "-c", check_script],
             check=True,
             capture_output=True,
             text=True,
         )
 
+        expected_power = contract["components"]["power"]["metadata"]["version"]
+        _verify_installed_launcher(
+            slot_venv / "bin" / "power", ["--version"], expected_version=expected_power
+        )
+        _verify_installed_launcher(
+            slot_venv / "bin" / "power-mcp", ["--version"], expected_version=expected_power
+        )
+        if gui_path is not None:
+            _verify_installed_launcher(slot_venv / "bin" / "power-gui", ["--help"])
+
         launcher_dir.mkdir(parents=True, exist_ok=True)
         launcher_stage.mkdir(parents=True, exist_ok=False)
-        venv_text = str(venv_root)
+        active_venv_text = str(current_link / "venv")
         for name in launcher_names:
             _write_executable(
                 launcher_stage / name,
-                f"#!/bin/sh\nexec '{venv_text}/bin/{name}' \"$@\"\n",
+                f"#!/bin/sh\nexec '{active_venv_text}/bin/{name}' \"$@\"\n",
             )
 
-        if venv_root.exists():
-            os.replace(venv_root, previous_venv)
-        os.replace(staging_venv, venv_root)
-        _rewrite_venv_shebangs(venv_root, staging_root=staging_venv)
-        activated = True
+        relative_slot = Path(os.path.relpath(release_slot, managed))
+        _atomic_symlink(relative_slot, current_link, identifier=activation_id)
+        pointer_activated = True
         for name in launcher_names:
             os.replace(launcher_stage / name, launcher_dir / name)
+
+        _verify_installed_launcher(
+            launcher_dir / "power", ["--version"], expected_version=expected_power
+        )
+        _verify_installed_launcher(
+            launcher_dir / "power-mcp", ["--version"], expected_version=expected_power
+        )
+        if gui_path is not None:
+            _verify_installed_launcher(launcher_dir / "power-gui", ["--help"])
+
+        legacy_venv_preserved = compatibility_venv.exists() and not compatibility_venv.is_symlink()
+        if not compatibility_venv.exists() and not compatibility_venv.is_symlink():
+            compatibility_venv.symlink_to(Path("current") / "venv", target_is_directory=True)
+            compatibility_link_created = True
 
         receipt = {
             "schema": NATIVE_INSTALL_SCHEMA_VERSION,
@@ -526,7 +604,14 @@ def apply_native_install_plan(
             "suite_version": contract["suite_version"],
             "application_schema": contract["application_schema"],
             "manifest_sha256": contract["manifest_sha256"],
-            "venv": str(venv_root),
+            "release_slot": str(release_slot),
+            "venv": str(slot_venv),
+            "current": str(current_link),
+            "previous_release_slot": (
+                str(previous_release_slot) if previous_release_slot is not None else None
+            ),
+            "compatibility_venv": str(compatibility_venv),
+            "legacy_venv_preserved": legacy_venv_preserved,
             "launchers": [str(launcher_dir / name) for name in launcher_names],
             "artifacts": plan["artifacts"],
             "dependencies": contract["dependencies"],
@@ -535,16 +620,23 @@ def apply_native_install_plan(
         atomic_write(
             state_path, json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
         )
+        if not current_link.is_symlink() or current_link.resolve() != release_slot.resolve():
+            raise RuntimeError("native Suite current-pointer readback is incomplete")
         if not all((launcher_dir / name).is_file() for name in launcher_names):
             raise RuntimeError("native Suite activation readback is incomplete")
-        if previous_venv.exists():
-            shutil.rmtree(previous_venv)
         return receipt
     except Exception:
-        if activated and venv_root.exists():
-            shutil.rmtree(venv_root)
-        if previous_venv.exists():
-            os.replace(previous_venv, venv_root)
+        if pointer_activated:
+            if previous_current_target is None:
+                current_link.unlink(missing_ok=True)
+            else:
+                _atomic_symlink(
+                    previous_current_target,
+                    current_link,
+                    identifier=f"rollback-{activation_id}",
+                )
+        if compatibility_link_created:
+            compatibility_venv.unlink(missing_ok=True)
         for destination, snapshot in launcher_snapshots.items():
             if snapshot is None:
                 destination.unlink(missing_ok=True)
@@ -557,9 +649,9 @@ def apply_native_install_plan(
             state_path.unlink(missing_ok=True)
         else:
             state_path.write_bytes(state_snapshot)
+        shutil.rmtree(release_slot, ignore_errors=True)
         raise
     finally:
-        shutil.rmtree(staging_venv, ignore_errors=True)
         shutil.rmtree(launcher_stage, ignore_errors=True)
 
 

@@ -1,17 +1,17 @@
 # Підключення MCP-клієнтів
 
-Це канонічне налаштування локального stdio для P.O.W.E.R. `v3.7.3` на Linux.
+Це канонічне налаштування локального stdio для P.O.W.E.R. `v3.7.4` на Linux.
 Воно дає Codex, OpenCode, Gemini CLI, Claude Desktop і Claude Code один
 і той самий процес сервера та однакову межу vault.
 
-> **Контракт кандидата релізу:** використовуйте `v3.7.3` лише після появи signed tag та
-> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.3).
+> **Контракт кандидата релізу:** використовуйте `v3.7.4` лише після появи signed tag та
+> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.4).
 > Потім використовуйте цей wheel і точний interpreter із
 > [гіда чистої установки](getting-started.ua.md).
 
 [Посібник Windows 11 25H2](windows-11-installation.ua.md) є лише
 інформаційним. Windows і macOS відкладені на невизначений строк і не є
-підтримуваними MCP onboarding платформами для `v3.7.3`.
+підтримуваними MCP onboarding платформами для `v3.7.4`.
 
 ## Одноразова підготовка
 
@@ -28,7 +28,7 @@ POWER_VAULT="$HOME/Documents/power-vault"
 
 python3 -m venv "$POWER_VENV"
 "$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.3/power_framework-3.7.3-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.4/power_framework-3.7.4-py3-none-any.whl"
 # Лише для нового або порожнього vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'

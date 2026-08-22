@@ -34,13 +34,13 @@ jobs:
       - name: Execute content-free upgrade and rollback invariants
         run: >-
           uv run python scripts/verify_upgrade_matrix.py
-          --from-version 3.6.7 --to-version 3.7.3
+          --from-version 3.6.7 --to-version 3.7.4
           --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power373-upgrade-${{ matrix.os }}
+          name: power374-upgrade-${{ matrix.os }}
           path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
           if-no-files-found: error
           retention-days: 7
@@ -54,22 +54,22 @@ jobs:
       - name: Download platform upgrade matrix evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: power373-upgrade-*
-          path: ${{ runner.temp }}/power373-upgrade-reports
+          pattern: power374-upgrade-*
+          path: ${{ runner.temp }}/power374-upgrade-reports
           merge-multiple: true
 
       - name: Aggregate supported Linux reports from Ubuntu CI
         run: >-
           python scripts/aggregate_upgrade_matrix.py
-          --input-dir "${{ runner.temp }}/power373-upgrade-reports"
+          --input-dir "${{ runner.temp }}/power374-upgrade-reports"
           --require-supported-platforms
-          --output "${{ runner.temp }}/power373-upgrade-aggregate.json"
+          --output "${{ runner.temp }}/power374-upgrade-aggregate.json"
 
       - name: Upload aggregated upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power373-upgrade-aggregate
-          path: ${{ runner.temp }}/power373-upgrade-aggregate.json
+          name: power374-upgrade-aggregate
+          path: ${{ runner.temp }}/power374-upgrade-aggregate.json
           if-no-files-found: error
           retention-days: 7
 

@@ -48,25 +48,25 @@ jobs:
       - name: Run the full release-gate test suite
         run: >-
           uv run pytest tests/ -v --tb=short
-          --junitxml="$RUNNER_TEMP/power373-junit.xml"
+          --junitxml="$RUNNER_TEMP/power374-junit.xml"
           --cov=src/power_framework/ --cov-report=term-missing
-          --cov-report=json:"$RUNNER_TEMP/power373-coverage.json" --cov-fail-under=70
+          --cov-report=json:"$RUNNER_TEMP/power374-coverage.json" --cov-fail-under=70
           -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
 
       - name: Verify upgrade and fault-injection invariants
         run: |
           uv run python scripts/retention_soak.py \
-            --output "$RUNNER_TEMP/power373-retention.json"
+            --output "$RUNNER_TEMP/power374-retention.json"
           uv run pytest tests/test_maintenance.py tests/test_maintenance_faults.py \
             -q --no-cov --override-ini=addopts=
 
       - name: Generate content-free Phase 8 technical receipts
         run: |
           uv run python benchmarks/power35/scripts/run_outcome_benchmark.py \
-            --output "$RUNNER_TEMP/power373-outcome.json"
+            --output "$RUNNER_TEMP/power374-outcome.json"
           uv run python benchmarks/power35/scripts/run_continuity_benchmark.py \
-            --output "$RUNNER_TEMP/power373-continuity.json"
-          uv run python - "$RUNNER_TEMP/power373-outcome.json" "$RUNNER_TEMP/power373-continuity.json" <<'PY'
+            --output "$RUNNER_TEMP/power374-continuity.json"
+          uv run python - "$RUNNER_TEMP/power374-outcome.json" "$RUNNER_TEMP/power374-continuity.json" <<'PY'
           import json
           import pathlib
           import sys
@@ -117,7 +117,7 @@ jobs:
       - name: Record executed release gates
         run: >-
           uv run python scripts/generate_release_gate_manifest.py
-          --output "$RUNNER_TEMP/power373-gates.json"
+          --output "$RUNNER_TEMP/power374-gates.json"
           --passed-mandatory locked-dependencies
           --passed-mandatory ruff-check
           --passed-mandatory ruff-format
@@ -137,33 +137,33 @@ jobs:
       - name: Generate content-free validation receipt
         run: >-
           uv run python scripts/generate_release_validation.py
-          --junit-xml "$RUNNER_TEMP/power373-junit.xml"
-          --coverage-json "$RUNNER_TEMP/power373-coverage.json"
-          --gate-manifest "$RUNNER_TEMP/power373-gates.json"
-          --output "$RUNNER_TEMP/power373-validation.json"
+          --junit-xml "$RUNNER_TEMP/power374-junit.xml"
+          --coverage-json "$RUNNER_TEMP/power374-coverage.json"
+          --gate-manifest "$RUNNER_TEMP/power374-gates.json"
+          --output "$RUNNER_TEMP/power374-validation.json"
 
       - name: Upload content-free Phase 8 technical receipts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power373-phase8-technical-receipts
+          name: power374-phase8-technical-receipts
           path: |
-            ${{ runner.temp }}/power373-outcome.json
-            ${{ runner.temp }}/power373-continuity.json
-            ${{ runner.temp }}/power373-gates.json
-            ${{ runner.temp }}/power373-validation.json
+            ${{ runner.temp }}/power374-outcome.json
+            ${{ runner.temp }}/power374-continuity.json
+            ${{ runner.temp }}/power374-gates.json
+            ${{ runner.temp }}/power374-validation.json
           if-no-files-found: error
           retention-days: 7
 
       - name: Verify the tag-bound candidate contract before publication
         run: |
           uv run python scripts/generate_release_candidate.py \
-            --output "$RUNNER_TEMP/power373-candidate.json" \
-            --validation-report "$RUNNER_TEMP/power373-validation.json" \
-            --phase8-outcome-receipt "$RUNNER_TEMP/power373-outcome.json" \
-            --phase8-continuity-receipt "$RUNNER_TEMP/power373-continuity.json"
+            --output "$RUNNER_TEMP/power374-candidate.json" \
+            --validation-report "$RUNNER_TEMP/power374-validation.json" \
+            --phase8-outcome-receipt "$RUNNER_TEMP/power374-outcome.json" \
+            --phase8-continuity-receipt "$RUNNER_TEMP/power374-continuity.json"
           uv run python scripts/verify_release_contract.py \
             --candidate \
-            --baseline "$RUNNER_TEMP/power373-candidate.json" \
+            --baseline "$RUNNER_TEMP/power374-candidate.json" \
             --require-worktree-hash
 
   upgrade-matrix:
@@ -192,13 +192,13 @@ jobs:
       - name: Execute the Linux release upgrade matrix on the Ubuntu runner
         run: >-
           uv run python scripts/verify_upgrade_matrix.py
-          --from-version 3.6.7 --to-version 3.7.3
+          --from-version 3.6.7 --to-version 3.7.4
           --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power373-release-upgrade-${{ matrix.os }}
+          name: power374-release-upgrade-${{ matrix.os }}
           path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
           if-no-files-found: error
           retention-days: 7
@@ -214,22 +214,22 @@ jobs:
       - name: Download platform upgrade evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: power373-release-upgrade-*
-          path: ${{ runner.temp }}/power373-release-upgrade
+          pattern: power374-release-upgrade-*
+          path: ${{ runner.temp }}/power374-release-upgrade
           merge-multiple: true
 
       - name: Aggregate and block on the supported Linux report
         run: >-
           python scripts/aggregate_upgrade_matrix.py
-          --input-dir "${{ runner.temp }}/power373-release-upgrade"
+          --input-dir "${{ runner.temp }}/power374-release-upgrade"
           --require-supported-platforms
-          --output "${{ runner.temp }}/power373-release-upgrade-aggregate.json"
+          --output "${{ runner.temp }}/power374-release-upgrade-aggregate.json"
 
       - name: Upload aggregated upgrade evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power373-release-upgrade-aggregate
-          path: ${{ runner.temp }}/power373-release-upgrade-aggregate.json
+          name: power374-release-upgrade-aggregate
+          path: ${{ runner.temp }}/power374-release-upgrade-aggregate.json
           if-no-files-found: error
           retention-days: 7
 
@@ -265,14 +265,14 @@ jobs:
       - name: Download Phase 8 technical receipts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: power373-phase8-technical-receipts
-          path: ${{ runner.temp }}/power373-phase8-technical
+          name: power374-phase8-technical-receipts
+          path: ${{ runner.temp }}/power374-phase8-technical
 
       - name: Download aggregate upgrade evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: power373-release-upgrade-aggregate
-          path: ${{ runner.temp }}/power373-upgrade
+          name: power374-release-upgrade-aggregate
+          path: ${{ runner.temp }}/power374-upgrade
 
       - name: Build package before binding final evidence
         run: python -m build
@@ -304,17 +304,17 @@ jobs:
           mkdir -p dist
           python scripts/generate_release_baseline.py \
             --tag "$RELEASE_TAG" \
-            --validation-report "$RUNNER_TEMP/power373-phase8-technical/power373-validation.json" \
+            --validation-report "$RUNNER_TEMP/power374-phase8-technical/power374-validation.json" \
             --sbom dist/power-framework.spdx.json \
-            --upgrade-matrix-aggregate "$RUNNER_TEMP/power373-upgrade/power373-release-upgrade-aggregate.json" \
-            --phase8-outcome-receipt "$RUNNER_TEMP/power373-phase8-technical/power373-outcome.json" \
-            --phase8-continuity-receipt "$RUNNER_TEMP/power373-phase8-technical/power373-continuity.json" \
+            --upgrade-matrix-aggregate "$RUNNER_TEMP/power374-upgrade/power374-release-upgrade-aggregate.json" \
+            --phase8-outcome-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-outcome.json" \
+            --phase8-continuity-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-continuity.json" \
             --output dist/power-framework.release-baseline.json
           python scripts/verify_release_contract.py \
             --require-tag \
             --require-signed-tag \
             --sbom dist/power-framework.spdx.json \
-            --upgrade-matrix-aggregate "$RUNNER_TEMP/power373-upgrade/power373-release-upgrade-aggregate.json" \
+            --upgrade-matrix-aggregate "$RUNNER_TEMP/power374-upgrade/power374-release-upgrade-aggregate.json" \
             --baseline dist/power-framework.release-baseline.json
 
       - name: Smoke-test wheel and sdist outside checkout

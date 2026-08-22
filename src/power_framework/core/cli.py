@@ -1461,7 +1461,7 @@ def main() -> None:
     p_install.add_argument("--power-wheel", required=True, help="Exact POWER framework wheel")
     p_install.add_argument("--gui-wheel", default=None, help="Optional exact POWER-GUI wheel")
     p_install.add_argument(
-        "--manifest", required=True, help="Content-addressed power.suite.manifest.v1"
+        "--manifest", required=True, help="Content-addressed power.suite.manifest.v2"
     )
     p_install.add_argument("--no-deps", action="store_true", help="Skip dependency resolution")
     p_install.add_argument("--apply", action="store_true", help="Apply the plan")
