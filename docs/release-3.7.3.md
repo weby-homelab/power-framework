@@ -30,8 +30,8 @@ Local synthetic tests or a disposable vault do not constitute a real-vault quali
 ## Support boundary
 
 The 3.7.3 release boundary is Linux with the repository-declared supported
-Python versions. macOS and Windows remain outside the supported release
-boundary and are not release platforms. The Windows guide is retained as an
+Python versions. macOS and Windows remain outside the supported release boundary
+and are not release platforms. The Windows guide is retained as an
 informational rollback and migration reference only.
 
 Until the public readback gate is complete, downstream documentation must use
