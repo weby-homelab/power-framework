@@ -17,7 +17,7 @@
       "release_full_matrix": "passed",
       "evidence": [
         "https://github.com/weby-homelab/power-framework/actions/runs/32570047613",
-        "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290365"
+        "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32571844771"
       ]
     },
     "3.14": {
@@ -26,7 +26,8 @@
       "gui_local_full_suite": "58 passed, 3 skipped",
       "release_full_matrix": "passed",
       "evidence": [
-        "https://github.com/weby-homelab/power-framework/actions/runs/32570047613"
+        "https://github.com/weby-homelab/power-framework/actions/runs/32570047613",
+        "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32571844771"
       ]
     }
   },

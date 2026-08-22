@@ -21,24 +21,24 @@
   },
   "gui": {
     "distribution": "power-gui",
-    "version": "0.7.6",
-    "filename": "power_gui-0.7.6-py3-none-any.whl",
-    "sha256": "03244984c089766980dbbe4cd28de51fd9d294519e46f60aa64de6fe6154b591",
+    "version": "0.7.7",
+    "filename": "power_gui-0.7.7-py3-none-any.whl",
+    "sha256": "8e7904a12abf30e4e458125c36d621ae383caff764a46471223b919dc7591853",
     "requires_python": ">=3.13,<3.15",
-    "source_sha": "78c74eab8881258b7e2014044aed4837a0cbcb30",
-    "tag": "v0.7.6",
-    "sdist_filename": "power_gui-0.7.6.tar.gz",
-    "sdist_sha256": "461fd33adde25d53860ce14c0ac3ff98ae6e95bc704dbf1092325e7487623904",
+    "source_sha": "339388ee4f77401a033ed50d4cac25ad3b82fefd",
+    "tag": "v0.7.7",
+    "sdist_filename": "power_gui-0.7.7.tar.gz",
+    "sdist_sha256": "be61e84747c82caced4949deb1ef606fb284805867ffb9fb29bbab0995a261de",
     "sbom_filename": "power-gui.spdx.json",
-    "sbom_sha256": "50ed0bd3dd7d8026e3789052fe5bae86b9258927895cd0114e21145a2e966701"
+    "sbom_sha256": "c571a0b7a0f9a038659330823cc2e25a6c70d77d7d2e09e202ec78aadd147121"
   },
   "skill": {
     "tree_sha256": "4ac2ad7e851f4bc17f32cd54369263a94738929f34df2b5844f66f702819331e",
     "compatible_power_version": "3.7.1"
   },
   "dependencies": {
-    "constraints": "power-suite.constraints.txt",
-    "sha256": "cae5417ce4df81c8b1ca18d74021503c9be40fc941b6bc1b9ff9dec2395373a5"
+    "constraints": "power-suite-3.7.1-gui-0.7.7.constraints.txt",
+    "sha256": "e0ded6bc17bbbfc38a0834dcd32fad50e2fc3a2d23b03145deca76920e948898"
   },
   "mcp": {
     "transport": "stdio",
@@ -48,18 +48,18 @@
   },
   "publication": {
     "core_tag": "v3.7.1",
-    "gui_tag": "v0.7.6",
+    "gui_tag": "v0.7.7",
     "stable_readback": true,
     "core_release_run": "32570047613",
-    "gui_release_run": "32570290365",
-    "gui_image_run": "32570290281",
+    "gui_release_run": "32571844771",
+    "gui_image_run": "32571844803",
     "core_release_url": "https://github.com/weby-homelab/power-framework/releases/tag/v3.7.1",
-    "gui_release_url": "https://github.com/weby-homelab/ai-second-brain-gui/releases/tag/v0.7.6"
+    "gui_release_url": "https://github.com/weby-homelab/ai-second-brain-gui/releases/tag/v0.7.7"
   },
   "container": {
-    "image": "webyhomelab/power-gui:0.7.6",
-    "digest": "sha256:5377536a6552c7c86c892fb1c1eec5fd2ed54e81784c4a9be939a090d826b470",
+    "image": "webyhomelab/power-gui:0.7.7",
+    "digest": "sha256:5d13ead7e2009425a739a8fc7c88cb37a1b14962e3e528d757b45c613e515e3b",
     "platforms": ["linux/amd64", "linux/arm64"],
-    "readback": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32570290281"
+    "readback": "https://github.com/weby-homelab/ai-second-brain-gui/actions/runs/32571844803"
   }
 }
