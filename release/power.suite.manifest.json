@@ -21,7 +21,7 @@
     "filename": "power_gui-0.7.6-py3-none-any.whl",
     "sha256": "253be84d3ada1c9720327cfc0ca6d4d20567aa4fd7dab6aef79b1f6f8914507d",
     "requires_python": ">=3.13,<3.15",
-    "source_sha": "810476719610aa91646a4712f6a8a189a7ca090b",
+    "source_sha": "334d7b388b9ed33a2881f1aecd494ef567975ac2",
     "tag": null
   },
   "skill": {
