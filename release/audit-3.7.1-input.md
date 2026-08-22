@@ -51,3 +51,17 @@ publishes the real immutable pair.
 4. Keep secrets in `/root/gemma/.env`; this audit input does not copy or expose
    them.
 
+## Post-publication immutable outcome
+
+The Stage 0 table above is a historical baseline captured before publication;
+it is not rewritten. The later public component identities were read back as:
+
+| Component | Public tag | Tag commit | Result |
+| --- | --- | --- | --- |
+| POWER core | `v3.7.1` | `8e172b82b98c8980a83e433744ea2ed6cdedce82` | Component assets read back; Suite native gate **FAIL** |
+| POWER GUI | `v0.7.7` | `339388ee4f77401a033ed50d4cac25ad3b82fefd` | Component assets/image read back; Suite pair remains **NO-GO** |
+
+The published build therefore differs from the pre-publication candidate
+source rows above. The exact native failure reproduction and content-free
+receipt are in `release/evidence/public-native-failure-3.7.1.json`. The
+immutable tag is not moved, deleted, or recreated.
