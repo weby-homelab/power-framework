@@ -3,10 +3,14 @@
   "artifacts": {
     "power_wheel": {
       "filename": "power_framework-3.7.5-py3-none-any.whl",
-      "sha256": "41c8201d7063269919f00bdc8304879e69d7a736ba0e93a6c061a9a83798f083"
+      "sha256": "34da38059ac801006887a36378da82fd85700437cdd5519fdb2bf7b6fbaeae7f"
+    },
+    "web_image": {
+      "digest": "sha256:6f9561f30f42dd302f8e899037b0231244a92ef2bcac7ecfdf4b111fad723cbe",
+      "reference": "ghcr.io/weby-homelab/power-framework-web:3.7.5"
     }
   },
-  "commit": "a445f2a98af36a61ac135c984f531b8c34dade5f",
+  "commit": "5eec7cbebe341439bac2127859dd66cb98e45ef7",
   "mcp": {
     "entry_point": "power-mcp",
     "transport": "stdio",
