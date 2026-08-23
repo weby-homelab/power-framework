@@ -140,34 +140,16 @@ block head %}
         </div>
 
         <select name="mode" class="mode-select" aria-label="Search Mode">
-            <option value="auto" {% if mode="" ="auto" %}selected{% endif %}>
+            <option value="auto" {% if mode == 'auto' %}selected{% endif %}>
                 ⚡ {{ t('mode_auto') }}
             </option>
-            <option value="fts" {% if mode="" ="fts" %}selected{% endif %}>
+            <option value="fts" {% if mode == 'fts' %}selected{% endif %}>
                 📄 {{ t('mode_fts') }}
             </option>
-            <option
-                value="semantic"
-                {%
-                if
-                mode=""
-                ="semantic"
-                %}selected{%
-                endif
-                %}
-            >
+            <option value="semantic" {% if mode == 'semantic' %}selected{% endif %}>
                 🧠 {{ t('mode_semantic') }}
             </option>
-            <option
-                value="reranked"
-                {%
-                if
-                mode=""
-                ="reranked"
-                %}selected{%
-                endif
-                %}
-            >
+            <option value="reranked" {% if mode == 'reranked' %}selected{% endif %}>
                 🎯 {{ t('mode_reranked') }}
             </option>
         </select>
