@@ -62,13 +62,16 @@ jobs:
           uv run mkdocs build --strict --site-dir "$RUNNER_TEMP/power-release-site"
 
       - name: Run the full release-gate test suite
-        run: >-
-          uv run pytest tests/ -v --tb=short
-          -m "not real_neural and not bench"
-           --junitxml="$RUNNER_TEMP/power375-junit.xml"
-          --cov=src/power_framework/ --cov-report=term-missing
-           --cov-report=json:"$RUNNER_TEMP/power375-coverage.json" --cov-fail-under=70
-          -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
+        run: |
+          uv run pytest tests/ -v --tb=short \
+            -m "not real_neural and not bench" \
+            --junitxml="$RUNNER_TEMP/power375-junit.xml" \
+            --cov=src/power_framework/ \
+            --cov-report=term-missing \
+            --cov-report=json:"$RUNNER_TEMP/power375-coverage.json" \
+            --cov-fail-under=70 \
+            -W error::ResourceWarning \
+            -W error::pytest.PytestUnraisableExceptionWarning
 
       - name: Verify upgrade and fault-injection invariants
         run: |
@@ -132,32 +135,32 @@ jobs:
           PY
 
       - name: Record executed release gates
-        run: >-
-          uv run python scripts/generate_release_gate_manifest.py
-           --output "$RUNNER_TEMP/power375-gates.json"
-          --passed-mandatory locked-dependencies
-          --passed-mandatory ruff-check
-          --passed-mandatory ruff-format
-          --passed-mandatory mypy
-          --passed-mandatory doc-drift
-          --passed-mandatory complexity-budget
-          --passed-mandatory mkdocs-strict
-          --passed-mandatory full-pytest
-          --passed-mandatory warnings-as-errors
-          --passed-mandatory maintenance-faults
-          --passed-mandatory phase8-technical
-          --passed-mandatory retention-soak
-          --skipped-optional real-vault-quality
-          --skipped-optional deferred-macos-windows
-          --skipped-optional remote-release-readback
+        run: |
+          uv run python scripts/generate_release_gate_manifest.py \
+            --output "$RUNNER_TEMP/power375-gates.json" \
+            --passed-mandatory locked-dependencies \
+            --passed-mandatory ruff-check \
+            --passed-mandatory ruff-format \
+            --passed-mandatory mypy \
+            --passed-mandatory doc-drift \
+            --passed-mandatory complexity-budget \
+            --passed-mandatory mkdocs-strict \
+            --passed-mandatory full-pytest \
+            --passed-mandatory warnings-as-errors \
+            --passed-mandatory maintenance-faults \
+            --passed-mandatory phase8-technical \
+            --passed-mandatory retention-soak \
+            --skipped-optional real-vault-quality \
+            --skipped-optional deferred-macos-windows \
+            --skipped-optional remote-release-readback
 
       - name: Generate content-free validation receipt
-        run: >-
-          uv run python scripts/generate_release_validation.py
-           --junit-xml "$RUNNER_TEMP/power375-junit.xml"
-           --coverage-json "$RUNNER_TEMP/power375-coverage.json"
-           --gate-manifest "$RUNNER_TEMP/power375-gates.json"
-           --output "$RUNNER_TEMP/power375-validation.json"
+        run: |
+          uv run python scripts/generate_release_validation.py \
+            --junit-xml "$RUNNER_TEMP/power375-junit.xml" \
+            --coverage-json "$RUNNER_TEMP/power375-coverage.json" \
+            --gate-manifest "$RUNNER_TEMP/power375-gates.json" \
+            --output "$RUNNER_TEMP/power375-validation.json"
 
       - name: Upload content-free Phase 8 technical receipts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -229,11 +232,11 @@ jobs:
           merge-multiple: true
 
       - name: Aggregate and block on the supported Linux report
-        run: >-
-          python scripts/aggregate_upgrade_matrix.py
-           --input-dir "${{ runner.temp }}/power375-release-upgrade"
-          --require-supported-platforms
-           --output "${{ runner.temp }}/power375-release-upgrade-aggregate.json"
+        run: |
+          python scripts/aggregate_upgrade_matrix.py \
+            --input-dir "${{ runner.temp }}/power375-release-upgrade" \
+            --require-supported-platforms \
+            --output "${{ runner.temp }}/power375-release-upgrade-aggregate.json"
 
       - name: Upload aggregated upgrade evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
