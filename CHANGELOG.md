@@ -5,13 +5,23 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.7] - 2026-08-23
+
+### Changed
+
+- Advanced the unified release to a new immutable patch after the `v3.7.6`
+  publication hit its mandatory validation gate; `v3.7.6` remains immutable
+  historical evidence and is not rewritten.
+- Added the missing mandatory Profile A MCP, Profile B Web, semantic, rerank,
+  and public-readback gate declarations required by the release contract.
+
 ## [3.7.5] - 2026-08-23
 
 ### Historical / superseded
 
 - The immutable `v3.7.5` tag and GitHub Release were created before the v6
   corrective release design was complete. They remain historical evidence and
-  are superseded by the corrected `3.7.6` target; no `v3.7.5` identity is
+  are superseded by the corrected `3.7.7` target; no `v3.7.5` identity is
   rewritten.
 
 ### Original migration changes (historical)

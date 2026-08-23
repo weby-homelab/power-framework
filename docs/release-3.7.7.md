@@ -1,6 +1,6 @@
-# POWER 3.7.6 release boundary
+# POWER 3.7.7 release boundary
 
-POWER 3.7.6 is the corrected unified Linux release target: one repository, one
+POWER 3.7.7 is the corrected unified Linux release target: one repository, one
 Python distribution, one version, one signed tag, and one tag-push-bound
 publication workflow. The previous immutable publication remains historical
 and superseded; immutable tags and artifacts are never rewritten.
@@ -31,8 +31,8 @@ The tag-triggered release workflow must bind and publish:
 
 1. one reproducible wheel and normalized source archive;
 2. `SHA256SUMS` and `power-release-manifest.json` bound to the tag commit;
-3. `power-framework-3.7.6.spdx.json` for the package artifact/runtime graph;
-4. `power-web-3.7.6.spdx.json` for the exact public Web image digest;
+3. `power-framework-3.7.7.spdx.json` for the package artifact/runtime graph;
+4. `power-web-3.7.7.spdx.json` for the exact public Web image digest;
 5. signed-tag provenance and attestation identifiers for the wheel, sdist, and
    Web image digest;
 6. `power-profile-acceptance.json`, `power-framework.release-baseline.json`,
