@@ -1,7 +1,7 @@
 # POWER 3.7.4 release boundary
 
-> Historical candidate record. Superseded by the unified `v3.7.5` release
-> contract in [release-3.7.5.md](release-3.7.5.md); the Suite/GUI pair below is
+> Historical candidate record. Superseded by the corrected unified `v3.7.6`
+> release contract in [release-3.7.6.md](release-3.7.6.md); the Suite/GUI pair below is
 > not a current installation or publication path.
 
 This document records the corrective 3.6.7 -> 3.7.4 stabilization line. The

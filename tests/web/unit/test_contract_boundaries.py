@@ -108,7 +108,7 @@ def test_unified_plan_is_machine_readable() -> None:
     assert plan_path.is_file()
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     assert plan["schema"] == "power.unified.plan.v1"
-    assert plan["target_version"] == "3.7.5"
+    assert plan["target_version"] == "3.7.6"
     assert plan["canonical_repository"] == "weby-homelab/power-framework"
     assert plan["canonical_package"] == "power-framework"
     assert plan["invariants"]["single_repo"] is True

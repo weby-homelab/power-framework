@@ -1,4 +1,4 @@
-# POWER Application API v2 — 3.7.5 Release
+# POWER Application API v2 — 3.7.6 Release
 
 ## Envelope
 
@@ -80,6 +80,6 @@ candidate. New transport operations require explicit capability negotiation.
 
 ## Compatibility
 
-The public immutable baseline is superseded by the unified POWER `v3.7.5`
+The public immutable baseline is superseded by the unified POWER `v3.7.6`
 release only when its exact commit, wheel, Web image digest, SBOM and release
 receipts are read back from the publication workflow.

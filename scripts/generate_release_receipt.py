@@ -50,8 +50,11 @@ def build_receipt(
     repository: str,
     workflow_run_id: str,
     manifest_path: Path | None = None,
+    attestation_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build a receipt tied to the exact tag commit, tree and local artifacts."""
+    if not all(isinstance(item, str) and item for item in (attestation_ids or [])):
+        raise ValueError("attestation IDs must be non-empty strings")
     commit = _git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}")
     tree = _git(repo, "show", "-s", "--format=%T", commit)
     assets = sorted(
@@ -96,6 +99,7 @@ def build_receipt(
             "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
             "url": run_url,
         },
+        "attestations": sorted(attestation_ids or []),
         "unified_release_manifest": {
             "name": manifest_file.name,
             "sha256": _sha256(manifest_file),
@@ -117,6 +121,7 @@ def main() -> int:
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
     parser.add_argument("--workflow-run-id", default=os.environ.get("GITHUB_RUN_ID", ""))
     parser.add_argument("--release-manifest", type=Path, default=None)
+    parser.add_argument("--attestation-id", action="append", default=[])
     args = parser.parse_args()
 
     receipt = build_receipt(
@@ -126,6 +131,7 @@ def main() -> int:
         repository=args.repository,
         workflow_run_id=args.workflow_run_id,
         manifest_path=args.release_manifest.resolve() if args.release_manifest else None,
+        attestation_ids=args.attestation_id,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(

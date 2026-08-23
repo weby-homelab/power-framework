@@ -1,4 +1,4 @@
-# P.O.W.E.R. Framework 3.7.5
+# P.O.W.E.R. Framework 3.7.6
 
 P.O.W.E.R. is a local-first, Git-native toolkit for structured knowledge bases. It combines
 P.A.R.A., validated OKF frontmatter, hierarchical indexes, full-text and semantic retrieval,
@@ -19,7 +19,7 @@ and an MCP interface for AI agents.
 - [Матриця підтримки платформ](support-matrix.ua.md)
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
-These guides define the current `v3.7.5` release artifact contract, use an
+These guides define the current `v3.7.6` release artifact contract, use an
 isolated virtual environment, and include acceptance checks. Publication is
 complete only when the signed tag, wheel, source archive, SBOM, and release
 receipts can be read back from GitHub. The
@@ -45,7 +45,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install \
-  "https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl"
+  "https://github.com/weby-homelab/power-framework/releases/download/v3.7.6/power_framework-3.7.6-py3-none-any.whl"
 
 power init ./my-vault
 power index ./my-vault --strict

@@ -4,8 +4,8 @@ services:
       context: ../..
       dockerfile: deploy/web/Dockerfile
       args:
-        POWER_VERSION: "3.7.5"
-    image: ghcr.io/weby-homelab/power-framework-web:3.7.5
+        POWER_VERSION: "3.7.6"
+    image: ghcr.io/weby-homelab/power-framework-web:3.7.6
     container_name: power-web
     ports:
       - "127.0.0.1:8080:8080"

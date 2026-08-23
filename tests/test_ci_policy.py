@@ -44,8 +44,8 @@ def test_ci_aggregates_all_supported_ubuntu_reports() -> None:
     assert "scripts/aggregate_upgrade_matrix.py" in ci_text
     assert "os: [ubuntu-latest]" in ci_text
     assert "--require-supported-platforms" in ci_text
-    assert "name: power375-upgrade-aggregate" in ci_text
-    assert "power375-upgrade-aggregate.json" in ci_text
+    assert "name: power-release-upgrade-aggregate" in ci_text
+    assert "power-release-upgrade-aggregate.json" in ci_text
 
 
 def test_current_python_support_starts_at_3_11() -> None:
@@ -74,8 +74,20 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "anchore/sbom-action@" in release_text
     assert "actions/attest-build-provenance@" in release_text
     assert "dist/*.spdx.json" in release_text
+    assert "Generate package SPDX SBOM bound to the exact wheel" in release_text
+    assert "Generate Web SPDX SBOM bound to the exact image" in release_text
+    assert (
+        "image: ${{ steps.web_image.outputs.reference }}@${{ steps.web_image.outputs.digest }}"
+        in release_text
+    )
+    assert "subject-name: ghcr.io/weby-homelab/power-framework-web" in release_text
+    assert "subject-digest:" in release_text
+    assert "scripts/profile_acceptance.py" in release_text
+    assert "Prefetch locked model snapshots for real Web acceptance" in release_text
+    assert "--profile-evidence" in release_text
     assert "attestations: write" in release_text
     assert "id-token: write" in release_text
+    assert "artifact-metadata: write" in release_text
     assert "gh release view" in release_text
     assert "GitHub release readback verified" in release_text
 
@@ -84,7 +96,9 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
 
     assert "  validate:" in release_text
-    assert "uv sync --locked --group dev --extra semantic --extra rerank" in release_text
+    assert (
+        "uv sync --locked --group dev --extra web --extra semantic --extra rerank" in release_text
+    )
     assert "uv run pytest tests/" in release_text
     assert "uv run mkdocs build --strict" in release_text
     assert "complexity_dashboard.py --baseline-revision v3.4.5 --require-budget" in release_text
@@ -102,6 +116,14 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert 'select(.key_id == "2D49E810C7F2527E")' in release_text
     assert "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E" in release_text
     assert 'gpg --batch --import "$key_file"' in release_text
+    assert "workflow_dispatch" not in release_text
+    assert "inputs.release_tag" not in release_text
+    assert "permissions: {}" in release_text
+    assert "RELEASE_TAG: ${{ github.ref_name }}" in release_text
+    assert "--passed-mandatory profile-a-mcp-stdio" in release_text
+    assert "--passed-mandatory web-semantic-acceptance" in release_text
+    assert "--passed-mandatory web-rerank-acceptance" in release_text
+    assert "--passed-mandatory public-release-readback" in release_text
 
 
 def test_release_does_not_require_private_phase8_secrets() -> None:
@@ -139,12 +161,12 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "scripts/generate_release_gate_manifest.py" in release_text
     assert "scripts/build_release_manifest.py" in release_text
     assert '--commit "$commit"' in release_text
-    assert "power375-gates.json" in release_text
-    assert "power375-validation.json" in release_text
+    assert "power-release-gates.json" in release_text
+    assert "power-release-validation.json" in release_text
     assert "--gate-manifest" in release_text
-    assert '--junitxml="$RUNNER_TEMP/power375-junit.xml"' in release_text
-    assert '--cov-report=json:"$RUNNER_TEMP/power375-coverage.json"' in release_text
-    assert "power375-phase8-technical-receipts" in release_text
+    assert '--junitxml="$RUNNER_TEMP/power-release-junit.xml"' in release_text
+    assert '--cov-report=json:"$RUNNER_TEMP/power-release-coverage.json"' in release_text
+    assert "power-release-phase8-technical-receipts" in release_text
     assert 'assert outcome["raw_content_in_report"] is False' in release_text
     assert 'assert outcome["comparison"]["practical_improvement"] is True' in release_text
     assert 'assert continuity["gate"]["power_beats_plain_handoff"] is True' in release_text
@@ -153,13 +175,17 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "--validation-report" in release_text
     assert "--sbom" in release_text
     assert "--upgrade-matrix-aggregate" in release_text
-    assert "power375-release-upgrade-aggregate" in release_text
+    assert "power-release-upgrade-aggregate" in release_text
     assert '"hatchling>=' in pyproject_text
     assert "uv sync --locked --group dev" in release_text
     assert "uv run python -m build --no-isolation" in release_text
     assert "pip install build ." not in release_text
     assert "PYTHONPATH: src:." not in release_text
     assert "--system-site-packages" not in release_text
+    assert "POWER_RELEASE_GHCR_TOKEN" not in release_text
+    assert "BUILD_DATE" not in release_text
+    assert "SOURCE_DATE_EPOCH" in release_text
+    assert "OCI_CREATED" in release_text
 
 
 def test_quarantined_fleet_docs_and_helper_forbid_live_cache_transfer() -> None:

@@ -19,6 +19,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.13
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -29,19 +31,22 @@ jobs:
         run: |
           python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
-          uv sync --locked --group dev
+          uv sync --locked --group dev --extra web --extra semantic --extra rerank
 
       - name: Execute content-free upgrade and rollback invariants
         run: |
+          set -euo pipefail
+          target_version="$(uv run python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
+          from_version="$(TARGET_VERSION="$target_version" git tag --sort=-version:refname --list 'v*.*.*' | python3 -c 'import os, sys; target=os.environ["TARGET_VERSION"]; print(next(tag[1:] for tag in sys.stdin.read().splitlines() if tag[1:] != target))')"
           uv run python scripts/verify_upgrade_matrix.py \
-            --from-version 3.6.7 \
-            --to-version 3.7.5 \
+            --from-version "$from_version" \
+            --to-version "$target_version" \
             --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power375-upgrade-${{ matrix.os }}
+          name: power-release-upgrade-${{ matrix.os }}
           path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
           if-no-files-found: error
           retention-days: 7
@@ -55,22 +60,22 @@ jobs:
       - name: Download platform upgrade matrix evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: power375-upgrade-*
-          path: ${{ runner.temp }}/power375-upgrade-reports
+          pattern: power-release-upgrade-*
+          path: ${{ runner.temp }}/power-release-upgrade-reports
           merge-multiple: true
 
       - name: Aggregate supported Linux reports from Ubuntu CI
         run: |
           python scripts/aggregate_upgrade_matrix.py \
-            --input-dir "${{ runner.temp }}/power375-upgrade-reports" \
+            --input-dir "${{ runner.temp }}/power-release-upgrade-reports" \
             --require-supported-platforms \
-            --output "${{ runner.temp }}/power375-upgrade-aggregate.json"
+            --output "${{ runner.temp }}/power-release-upgrade-aggregate.json"
 
       - name: Upload aggregated upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power375-upgrade-aggregate
-          path: ${{ runner.temp }}/power375-upgrade-aggregate.json
+          name: power-release-upgrade-aggregate
+          path: ${{ runner.temp }}/power-release-upgrade-aggregate.json
           if-no-files-found: error
           retention-days: 7
 
@@ -107,9 +112,9 @@ jobs:
         run: |
           uv run pytest tests/test_neural_hermetic_contract.py -q --no-cov \
             --override-ini=addopts= --strict-markers \
-             --junitxml="$RUNNER_TEMP/power375-neural-hermetic.xml"
+             --junitxml="$RUNNER_TEMP/power-release-neural-hermetic.xml"
           uv run python scripts/verify_neural_contract.py \
-             "$RUNNER_TEMP/power375-neural-hermetic.xml"
+              "$RUNNER_TEMP/power-release-neural-hermetic.xml"
 
       - name: Run Ruff linter
         run: uv run ruff check src/ tests/ scripts/ benchmarks/power35/
@@ -186,7 +191,7 @@ jobs:
         run: |
           python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
-          uv sync --locked --group dev
+          uv sync --locked --group dev --extra web --extra semantic --extra rerank
 
       - name: Run hermetic frozen benchmark checks
         run: uv run pytest benchmarks/power31/tests -q --no-cov --override-ini=addopts=
@@ -322,7 +327,7 @@ jobs:
         run: |
           python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
-          uv sync --locked --group dev
+          uv sync --locked --group dev --extra web --extra semantic --extra rerank
 
       - name: Build wheel and sdist
         run: uv run python -m build
@@ -335,11 +340,44 @@ jobs:
 
       - name: Verify the unified release manifest contract
         run: |
+          set -euo pipefail
+          version="$(python3 -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
+          wheel="$(python3 - <<'PY'
+          from pathlib import Path
+
+          wheels = sorted(Path("dist").glob("power_framework-*.whl"))
+          assert len(wheels) == 1, wheels
+          print(wheels[0])
+          PY
+          )"
           uv run python scripts/build_release_manifest.py \
-            --wheel dist/power_framework-3.7.5-py3-none-any.whl \
-            --version 3.7.5 \
+            --wheel "$wheel" \
+            --version "$version" \
             --commit "$(git rev-parse HEAD)" \
             --output "$RUNNER_TEMP/power-release-manifest.json"
 
       - name: Build the Web-only container
-        run: docker build --file deploy/web/Dockerfile --tag power-framework-web:ci .
+        run: |
+          set -euo pipefail
+          version="$(python3 -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
+          wheel="$(python3 - <<'PY'
+          from pathlib import Path
+
+          wheels = sorted(Path("dist").glob("power_framework-*.whl"))
+          assert len(wheels) == 1, wheels
+          print(wheels[0])
+          PY
+          )"
+          wheel_name="$(basename "$wheel")"
+          cp -- "$wheel" "release/$wheel_name"
+          epoch="$(git show -s --format=%ct HEAD)"
+          created="$(date -u -d "@$epoch" +%Y-%m-%dT%H:%M:%SZ)"
+          docker build \
+            --file deploy/web/Dockerfile \
+            --build-arg "POWER_VERSION=$version" \
+            --build-arg "POWER_WHEEL_FILE=$wheel_name" \
+            --build-arg "POWER_SOURCE_REVISION=$(git rev-parse HEAD)" \
+            --build-arg "POWER_RELEASE_TAG=ci-v$version" \
+            --build-arg "SOURCE_DATE_EPOCH=$epoch" \
+            --build-arg "OCI_CREATED=$created" \
+            --tag power-framework-web:ci .

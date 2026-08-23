@@ -3,7 +3,7 @@
 ## 1. Executive Architecture Summary
 
 P.O.W.E.R. is a single-repository, single-version, local-first Second Brain framework.
-Starting with the 3.7.5 release, the Web UI is physically integrated into the
+Starting with the 3.7.6 release, the Web UI is physically integrated into the
 `power-framework` repository and Python distribution as `power_framework.web`.
 
 ```text
@@ -43,7 +43,7 @@ Starting with the 3.7.5 release, the Web UI is physically integrated into the
    - Canonical Skills: shipped host-side in the `power-framework` wheel/distribution.
 6. **Web UI Presentation Adapter:**
     - Source resides in `src/power_framework/web/`
-    - Production server profile runs as an OCI container (`ghcr.io/weby-homelab/power-framework-web:TARGET_VERSION`)
+     - Production server profile runs as an OCI container (`ghcr.io/weby-homelab/power-framework-web:3.7.6`)
     - The Web container runs ONLY the FastAPI Web UI service; Compose publishes
       host loopback `127.0.0.1:8080`
     - The Web container interacts directly with `ApplicationService` in-process
@@ -60,7 +60,9 @@ Starting with the 3.7.5 release, the Web UI is physically integrated into the
 
 ### Profile A — headless / agent server
 
-Profile A is a complete supported POWER installation without Docker or Web UI:
+Profile A is a complete supported POWER installation without Docker or Web UI.
+Its official agent-server install resolves `power-framework[mcp]`; MCP is
+required, not optional:
 
 ```text
 one native power-framework runtime
@@ -71,14 +73,15 @@ one canonical vault
 Web UI containers: 0
 ```
 
-Install the base wheel for FTS-only operation, add the explicit `mcp` extra for
-stdio MCP, and use the same managed venv for `power` and `power-mcp`. Docker,
-reverse proxy, Web cache, and Web dependencies are not prerequisites.
+Install the exact release wheel with the `mcp` extra and use the same managed
+venv for `power` and `power-mcp`. Docker, reverse proxy, Web cache, and Web
+dependencies are not prerequisites.
 
 ### Profile B — full human + agent server
 
 Start from a valid Profile A installation, then run exactly one
-`power-web` container from the matching release image:
+`power-web` container from the matching `3.7.6` release image. The canonical
+Web image installs the locked `[web,semantic,rerank]` dependency graph:
 
 ```text
 Profile A

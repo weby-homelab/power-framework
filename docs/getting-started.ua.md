@@ -1,18 +1,18 @@
 # Початок роботи з чистою базою знань
 
-Це авторитетний clean-install шлях для P.O.W.E.R. `v3.7.5`. Він створює лише
+Це авторитетний clean-install шлях для P.O.W.E.R. `v3.7.6`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
-> **Контракт релізу:** використовуйте `v3.7.5` лише після появи signed tag та
-> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.5).
+> **Контракт релізу:** використовуйте `v3.7.6` лише після появи signed tag та
+> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.6).
 > Цей гід називає tag-bound target; сам URL не доводить завершення публікації.
 > Перед установкою на не-Linux host
 > перевірте [матрицю підтримки платформ](support-matrix.ua.md).
 
 [Windows-гід](windows-11-installation.ua.md) є лише інформаційним. Windows і
 macOS відкладені на невизначений строк і не є підтримуваними release-платформами
-для `v3.7.5`.
+для `v3.7.6`.
 
 ## 1. Передумови
 
@@ -35,13 +35,12 @@ POWER_CLI="$HOME/.local/share/power/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.6/power_framework-3.7.6-py3-none-any.whl"
 ```
 
-Базовий release wheel є FTS-only: він не встановлює ONNX Runtime, model
-tokenizers, numerical packages або optional MCP transport. Перед MCP додайте
-явний extra `mcp`, а `semantic`
-використовуйте лише для локальних dense експериментів.
+Базовий release wheel залишається доступним як lean FTS-only library profile.
+Офіційна команда Profile A вище встановлює обов'язковий extra `mcp`; `semantic`
+додавайте лише для явно обраного локального dense-пошуку.
 
 Перевірте executable, package metadata та lean import:
 
@@ -53,14 +52,14 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Обидві команди версії мають показати `3.7.5`, а остання команда —
+Обидві команди версії мають показати `3.7.6`, а остання команда —
 `lean FTS import: OK`.
 
 Для локального MCP встановіть official SDK extra з того самого wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.6/power_framework-3.7.6-py3-none-any.whl"
 ```
 
 ### Альтернатива: встановлення із закріпленого tag
@@ -69,7 +68,7 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.7.5'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.7.6'
 ```
 
 Не використовуйте незакріплений `main`, якщо важлива відтворюваність.
@@ -215,10 +214,9 @@ Vault — це звичайні Markdown-файли, незалежні від P
 ## Acceptance checklist
 
 - Python має версію 3.13 або 3.14, а interpreter належить окремому venv.
-- CLI та distribution metadata повертають `3.7.5`.
-- `power_framework` імпортується без neural/MCP extras.
-- Якщо налаштовано MCP, встановлено явний extra `mcp`, а preflight успішно
-  імпортує `power_framework.mcp`.
+- CLI та distribution metadata повертають `3.7.6`.
+- `power_framework` імпортується, а офіційний Profile A містить extra `mcp`.
+- MCP preflight успішно імпортує `power_framework.mcp` через launcher `power-mcp`.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з
   кодом `0`.
 - FTS sync завершується з кодом `0`, а FTS search повертає першу нотатку.

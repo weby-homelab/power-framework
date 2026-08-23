@@ -13,7 +13,7 @@ def test_local_upgrade_matrix_proves_safe_boundaries() -> None:
 
     assert report["schema_version"] == "power.upgrade-matrix.v1"
     assert report["from_version"] == "3.6.7"
-    assert report["to_version"] == "3.7.5"
+    assert report["to_version"] == "3.7.6"
     assert report["current_runner"]["status"] == "pass"
     assert report["current_runner"]["checks"]["free_space_sufficient"] is True
     assert report["current_runner"]["preflight"]["migration_preview"] == "pass"
@@ -65,7 +65,7 @@ def _synthetic_platform_report(platform: str) -> dict[str, object]:
     return {
         "schema_version": "power.upgrade-matrix.v1",
         "from_version": "3.6.7",
-        "to_version": "3.7.5",
+        "to_version": "3.7.6",
         "source_content": "not captured",
         "current_runner": {"platform": platform, "status": "pass"},
         "interrupted_upgrade": {

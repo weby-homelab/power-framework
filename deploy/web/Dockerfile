@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
 ARG PYTHON_IMAGE=python:3.13.15-slim-bookworm@sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1
-ARG POWER_VERSION=3.7.5
+ARG POWER_VERSION=3.7.6
 ARG POWER_WHEEL_FILE=
 ARG POWER_SOURCE_REVISION=unknown
 ARG POWER_RELEASE_TAG=unknown
-ARG BUILD_DATE=unknown
+ARG SOURCE_DATE_EPOCH=0
+ARG OCI_CREATED=unknown
 
 FROM ${PYTHON_IMAGE} AS builder
 
@@ -39,7 +40,8 @@ FROM ${PYTHON_IMAGE} AS runtime
 ARG POWER_VERSION
 ARG POWER_SOURCE_REVISION
 ARG POWER_RELEASE_TAG
-ARG BUILD_DATE
+ARG SOURCE_DATE_EPOCH
+ARG OCI_CREATED
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1
@@ -51,7 +53,10 @@ RUN groupadd --gid 10001 --system power \
 
 WORKDIR /app
 COPY --from=builder "/dist/power_framework-${POWER_VERSION}-py3-none-any.whl" "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl"
-RUN python -m pip install "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl[web]" \
+COPY --from=builder /build/release/web-runtime.constraints.txt /tmp/web-runtime.constraints.txt
+RUN python -m pip install \
+        --constraint /tmp/web-runtime.constraints.txt \
+        "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl[web,semantic,rerank]" \
     && rm "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl"
 
 LABEL org.opencontainers.image.title="P.O.W.E.R Web UI" \
@@ -59,7 +64,8 @@ LABEL org.opencontainers.image.title="P.O.W.E.R Web UI" \
       org.opencontainers.image.version="${POWER_VERSION}" \
       org.opencontainers.image.revision="${POWER_SOURCE_REVISION}" \
       org.opencontainers.image.ref.name="${POWER_RELEASE_TAG}" \
-      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.created="${OCI_CREATED}" \
+      org.opencontainers.image.created.epoch="${SOURCE_DATE_EPOCH}" \
       org.opencontainers.image.source="https://github.com/weby-homelab/power-framework"
 
 USER 10001:10001
