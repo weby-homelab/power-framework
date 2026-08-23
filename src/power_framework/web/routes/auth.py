@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, Form, Query, Request, Response
+from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..auth.csrf import get_csrf_token, validate_csrf, verify_csrf_token
@@ -146,16 +146,10 @@ async def login_action(
 @router.get("/set-lang")
 async def set_language(
     lang: str = "en",
-    redirect_path: str = Query("/dashboard", alias="next"),
 ) -> RedirectResponse:
-    """Set language preference in cookie and redirect back to previous page."""
+    """Set language preference in cookie and return to the fixed dashboard route."""
     clean_lang = "uk" if lang.lower() in {"uk", "ua", "ukr"} else "en"
-    target = (
-        redirect_path
-        if redirect_path.startswith("/") and not redirect_path.startswith("//")
-        else "/dashboard"
-    )
-    response = RedirectResponse(url=target, status_code=303)
+    response = RedirectResponse(url="/dashboard", status_code=303)
     response.set_cookie(
         key="power_web_lang",
         value=clean_lang,
@@ -169,16 +163,10 @@ async def set_language(
 @router.get("/set-theme")
 async def set_theme(
     theme: str = "dark",
-    redirect_path: str = Query("/dashboard", alias="next"),
 ) -> RedirectResponse:
-    """Set theme preference (dark/light) in cookie and redirect back to previous page."""
+    """Set theme preference and return to the fixed dashboard route."""
     clean_theme = "light" if theme.lower() in {"light", "day", "white"} else "dark"
-    target = (
-        redirect_path
-        if redirect_path.startswith("/") and not redirect_path.startswith("//")
-        else "/dashboard"
-    )
-    response = RedirectResponse(url=target, status_code=303)
+    response = RedirectResponse(url="/dashboard", status_code=303)
     response.set_cookie(
         key="power_web_theme",
         value=clean_theme,

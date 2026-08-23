@@ -119,7 +119,10 @@ async def create_task_action(
         ),
     )
 
-    return RedirectResponse(url=f"/tasks/{task_id.strip()}", status_code=303)
+    return RedirectResponse(
+        url=request.url_for("task_detail_view", task_id=task_id.strip()),
+        status_code=303,
+    )
 
 
 @router.get("/{task_id}", response_class=HTMLResponse)
@@ -183,7 +186,10 @@ async def transition_task_action(
         ),
     )
 
-    return RedirectResponse(url=f"/tasks/{task_id}", status_code=303)
+    return RedirectResponse(
+        url=request.url_for("task_detail_view", task_id=task_id),
+        status_code=303,
+    )
 
 
 @router.get("/api/events/stream")

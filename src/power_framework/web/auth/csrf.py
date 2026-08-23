@@ -6,14 +6,19 @@ import hashlib
 import hmac
 import logging
 import secrets
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from fastapi import HTTPException, Request
 
-if TYPE_CHECKING:
-    from ..config import Settings
-
 logger = logging.getLogger(__name__)
+
+
+class CsrfSettings(Protocol):
+    """Settings shape required by CSRF helpers without importing Web config."""
+
+    secret_key: str
+    session_cookie_name: str
+    csrf_cookie_name: str
 
 
 def generate_csrf_token(secret_key: str, session_id: str) -> str:
@@ -31,7 +36,7 @@ def verify_csrf_token(secret_key: str, session_id: str, token: str) -> bool:
     return hmac.compare_digest(expected, token)
 
 
-def get_csrf_token(request: Request, settings: Settings) -> str:
+def get_csrf_token(request: Request, settings: CsrfSettings) -> str:
     """
     Get or derive the valid CSRF token for the current request.
 
