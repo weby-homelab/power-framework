@@ -18,8 +18,8 @@ Exposes MCP tools for AI agent interaction with the knowledge vault:
 - heal_frontmatter_tool: Auto-fix missing/invalid frontmatter
 - check_markdown_tool: Markdown quality audit
 
-Uses the official MCP Python SDK v2 and supports stdio transport (local) plus
-Streamable HTTP transport (Docker, with /health endpoint).
+Uses the official MCP Python SDK v2. Native POWER integrations use stdio; the
+Web UI is the only supported container HTTP surface.
 """
 
 from __future__ import annotations
@@ -28,20 +28,16 @@ import json
 import logging
 import os
 import re
-from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult, InputRequiredResult, TextContent, ToolAnnotations
-from starlette.responses import JSONResponse
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
-
-    from starlette.requests import Request
-    from starlette.responses import Response
 
 from power_framework.core import (
     DEFAULT_SEARCH_MODE,
@@ -152,39 +148,10 @@ class PowerMCPServer(MCPServer):
         return result
 
     def run(self, transport: str = "stdio", **kwargs: Any) -> None:
-        """Run official SDK transports while retaining POWER's ``http`` alias."""
-        if transport == "http":
-            transport = "streamable-http"
-        if transport not in {"stdio", "sse", "streamable-http"}:
-            raise ValueError(f"Unsupported MCP transport: {transport}")
-        supported_transport = cast("Literal['stdio', 'sse', 'streamable-http']", transport)
-        super().run(transport=supported_transport, **kwargs)
-
-    def custom_route(
-        self,
-        path: str,
-        methods: list[str],
-        name: str | None = None,
-        include_in_schema: bool = True,
-    ) -> Callable[
-        [Callable[[Request], Awaitable[Response]]], Callable[[Request], Awaitable[Response]]
-    ]:
-        """Expose a typed custom-route decorator because SDK v2 omits its return type."""
-        return cast(
-            "Callable[[Callable[[Request], Awaitable[Response]]], Callable[[Request], Awaitable[Response]]]",
-            super().custom_route(
-                path,
-                methods,
-                name=name,
-                include_in_schema=include_in_schema,
-            ),
-        )
-
-    def http_app(self, *, transport: str = "http", **kwargs: Any) -> Any:
-        """Compatibility alias for tests and integrations using the old API."""
-        if transport != "http":
-            raise ValueError(f"Unsupported HTTP transport alias: {transport}")
-        return self.streamable_http_app(**kwargs)
+        """Run the official SDK over the one supported native stdio transport."""
+        if transport != "stdio":
+            raise ValueError("POWER MCP supports stdio transport only")
+        super().run(transport="stdio", **kwargs)
 
 
 mcp = PowerMCPServer(
@@ -195,7 +162,6 @@ mcp = PowerMCPServer(
 
 _write_limiter = RateLimiter(max_calls=10, period=60.0)
 _index_limiter = RateLimiter(max_calls=5, period=60.0)
-_LOOPBACK_HTTP_HOSTS = frozenset({"127.0.0.1", "::1"})
 _MAX_MCP_SEARCH_RESULTS = 20
 
 
@@ -309,34 +275,6 @@ def _get_vault_path(vault_path: str | None = None) -> Path:
 
     args = {"vault_path": vault_path} if vault_path else {}
     return resolve_vault_path(args)
-
-
-def _get_http_transport_config() -> tuple[str, int]:
-    """Return a fail-closed local-only HTTP MCP transport configuration."""
-    host = os.getenv("POWER_MCP_HOST", "127.0.0.1")
-    if host not in _LOOPBACK_HTTP_HOSTS:
-        raise ValueError(
-            "Remote HTTP MCP is disabled until an authenticated, scoped transport policy is configured."
-        )
-
-    try:
-        port = int(os.getenv("POWER_MCP_PORT", "8000"))
-    except ValueError as exc:
-        raise ValueError("POWER_MCP_PORT must be an integer between 1 and 65535") from exc
-    if not 1 <= port <= 65535:
-        raise ValueError("POWER_MCP_PORT must be an integer between 1 and 65535")
-
-    return host, port
-
-
-@mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
-async def health_check(_request: Request) -> Response:
-    """Report whether the configured vault boundary is ready for HTTP clients."""
-    try:
-        require_configured_vault_root()
-    except RuntimeError as exc:
-        return JSONResponse({"status": "error", "detail": str(exc)}, status_code=503)
-    return JSONResponse({"status": "ok"})
 
 
 @mcp.tool(
@@ -1087,22 +1025,13 @@ async def check_markdown_tool(
     return await run_blocking(_do_check)
 
 
-def run() -> None:
-    """Start the MCP server. Transport is determined by POWER_MCP_TRANSPORT env var.
-
-    Defaults to stdio. HTTP is available only on an explicit loopback address.
-    """
+def run(transport: str = "stdio") -> None:
+    """Start the MCP server over native stdio after the vault preflight."""
     enforce_cpu_throttling_env()
-    transport = os.getenv("POWER_MCP_TRANSPORT", "stdio")
-    if transport == "http":
-        require_configured_vault_root()
-        host, port = _get_http_transport_config()
-        mcp.run(transport="http", host=host, port=port)
-    elif transport == "stdio":
-        require_configured_vault_root()
-        mcp.run(transport="stdio")
-    else:
-        raise ValueError("POWER_MCP_TRANSPORT must be either 'stdio' or 'http'")
+    if transport != "stdio":
+        raise ValueError("POWER MCP supports stdio transport only")
+    require_configured_vault_root()
+    mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":

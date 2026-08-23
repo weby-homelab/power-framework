@@ -1,0 +1,45 @@
+services:
+  power-web:
+    build:
+      context: ../..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        POWER_VERSION: "3.7.6"
+    image: ghcr.io/weby-homelab/power-framework-web:3.7.6
+    container_name: power-web
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - "${POWER_BRAIN_PATH:-/mnt/brain}:/brain:rw"
+      - "power-web-cache:/var/cache/power"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    environment:
+      POWER_WEB_VAULT_PATH: /brain
+      POWER_WEB_HOST: 0.0.0.0
+      POWER_WEB_PORT: "8080"
+      POWER_WEB_AUTH_ENABLED: "true"
+      POWER_WEB_COOKIE_SECURE: "true"
+      POWER_WEB_READ_ONLY_MODE: "${POWER_WEB_READ_ONLY_MODE:-false}"
+      XDG_CACHE_HOME: /var/cache/power
+    restart: unless-stopped
+    user: "${POWER_WEB_UID:-10001}:${POWER_WEB_GID:-10001}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  power-web-cache:

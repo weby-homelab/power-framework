@@ -200,7 +200,6 @@ async def _mcp_samples(
         environment.update(
             {
                 "POWER_VAULT_DIR": str(vault),
-                "POWER_MCP_TRANSPORT": "stdio",
                 "POWER_BENCHMARK_RECEIPT": str(receipt_path),
             }
         )

@@ -16,6 +16,16 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
     assets.mkdir()
     artifact = assets / "power-framework-test.whl"
     artifact.write_bytes(b"release artifact")
+    manifest = tmp_path / "power-release-manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "power.release.manifest.v1",
+                "commit": "3f2e2b9687f96a6fc52c634a13bd75205af7dd96",
+            }
+        ),
+        encoding="utf-8",
+    )
     output = tmp_path / "receipt.json"
 
     result = subprocess.run(  # noqa: S603 -- invokes the repository-local receipt generator.
@@ -34,6 +44,8 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
             "weby-homelab/power-framework",
             "--workflow-run-id",
             "12345",
+            "--release-manifest",
+            str(manifest),
         ],
         check=False,
         capture_output=True,

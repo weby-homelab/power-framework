@@ -1,7 +1,7 @@
 ---
 name: power
-version: 3.7.4
-description: P.O.W.E.R. 3.7.4 — Hybrid Knowledge Management Framework (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
+version: 3.7.6
+description: P.O.W.E.R. 3.7.6 — Hybrid Knowledge Management Framework (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
 ---
 
 # ⚡ P.O.W.E.R. Knowledge Management Skill

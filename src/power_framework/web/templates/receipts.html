@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Аудиторські чеки{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    <h1 style="font-size: 1.75rem; font-weight: 700;">Журнал аудиторських чеків (Receipt Ledger)</h1>
+    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+        Незмінні чеки операцій (content-free audit receipts) без збереження приватного тексту
+    </p>
+</div>
+
+<div class="card">
+    {% if receipts %}
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                <th style="padding: 10px;">Операція</th>
+                <th style="padding: 10px;">Статус</th>
+                <th style="padding: 10px;">Request ID</th>
+                <th style="padding: 10px;">SHA256 Digest</th>
+                <th style="padding: 10px;">Тривалість</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in receipts %}
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 12px 10px; font-weight: 600;">{{ r.get('operation', 'receipt') }}</td>
+                <td style="padding: 12px 10px;">
+                    <span class="badge badge-success">{{ r.get('status', 'ok') }}</span>
+                </td>
+                <td style="padding: 12px 10px; font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);">
+                    {{ r.get('request_id', 'n/a') }}
+                </td>
+                <td style="padding: 12px 10px; font-family: monospace; font-size: 0.8rem; color: var(--accent);">
+                    {{ r.get('data_sha256', r.get('receipt_id', 'n/a')) }}
+                </td>
+                <td style="padding: 12px 10px; font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);">
+                    {{ r.get('duration_ms', 0) }} ms
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: var(--text-secondary); padding: 16px 0;">Аудиторських чеків не виявлено.</p>
+    {% endif %}
+</div>
+{% endblock %}

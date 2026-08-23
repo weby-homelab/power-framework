@@ -82,20 +82,12 @@ async def test_each_documented_shape_reaches_golden_stdio_workflow(
     assert command == "/absolute/path/to/power-mcp"
 
     process_environment = os.environ.copy()
-    process_environment.update(
-        {
-            "POWER_VAULT_DIR": str(sample_vault),
-            "POWER_MCP_TRANSPORT": "stdio",
-        }
-    )
+    process_environment["POWER_VAULT_DIR"] = str(sample_vault)
     config = {
         "mcpServers": {
             "power": {
-                "command": sys.executable,
-                # The test process uses the compatibility module entrypoint so
-                # it remains runnable from the source checkout; docs use the
-                # installed public power-mcp launcher above.
-                "args": ["-m", "power_framework.mcp"],
+                "command": str(Path(sys.executable).with_name("power-mcp")),
+                "args": [],
                 "env": process_environment,
             }
         }

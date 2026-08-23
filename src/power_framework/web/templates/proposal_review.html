@@ -1,0 +1,63 @@
+{% extends "base.html" %} {% block title %}Перевірка пропозиції змін{% endblock
+%} {% block content %}
+<div style="margin-bottom: 24px">
+  <h1 style="font-size: 1.75rem; font-weight: 700">
+    Перевірка пропозиції (Proposal Gate)
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.9rem">
+    Ціль: <code>{{ rel_path }}</code> &middot; Proposal ID:
+    <code>{{ proposal.get('proposal_id', 'n/a') }}</code>
+  </p>
+</div>
+
+<div class="card" style="border-left: 4px solid #22c55e">
+  <h2 style="font-size: 1.1rem; margin-bottom: 8px">
+    Аудиторський чек пропозиції (Receipt)
+  </h2>
+  <div
+    style="
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    "
+  >
+    <div>Digest SHA256: {{ receipt.get('data_sha256') }}</div>
+    <div>Request ID: {{ receipt.get('request_id') }}</div>
+    <div>
+      Операція: {{ receipt.get('operation') }} &middot; Статус: {{
+      receipt.get('status') }}
+    </div>
+  </div>
+</div>
+
+<form action="/notes/apply" method="POST" class="card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+  <input
+    type="hidden"
+    name="proposal_id"
+    value="{{ proposal.get('proposal_id', '') }}"
+  />
+  <input type="hidden" name="approved" value="true" />
+
+  <div style="margin-bottom: 16px">
+    <h3 style="font-size: 1rem; margin-bottom: 8px">
+      Підтвердження застосування:
+    </h3>
+    <p style="font-size: 0.9rem; color: var(--text-secondary)">
+      Застосування пропозиції оновить файл нотатки, переіндексує сховище,
+      перевірить лінтером OKF-метадані та згенерує незмінний фінальний чек
+      (Receipt) з можливістю відкату.
+    </p>
+  </div>
+
+  <div style="display: flex; justify-content: flex-end; gap: 12px">
+    <a href="/notes/edit?path={{ rel_path }}" class="btn btn-secondary"
+      >Повернутися до редагування</a
+    >
+    <button type="submit" class="btn btn-success">
+      ✅ Застосувати зміни (Apply)
+    </button>
+  </div>
+</form>
+{% endblock %}

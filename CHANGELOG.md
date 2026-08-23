@@ -5,6 +5,37 @@ All notable changes to the P.O.W.E.R. Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.5] - 2026-08-23
+
+### Historical / superseded
+
+- The immutable `v3.7.5` tag and GitHub Release were created before the v6
+  corrective release design was complete. They remain historical evidence and
+  are superseded by the corrected `3.7.6` target; no `v3.7.5` identity is
+  rewritten.
+
+### Original migration changes (historical)
+
+- Unified the Web UI into the `power-framework` distribution under
+  `power_framework.web`; native and Web runtimes now share one versioned wheel.
+- Made `~/.local/bin/power-mcp` over stdio the only native MCP registration and
+  retired the Docker MCP service and `power-gui` launcher.
+- Added the Web-only, non-root Docker runtime on port `8080` with a read-only
+  vault mount, dropped capabilities, and `/healthz` healthcheck.
+- Replaced Suite-era installer/release artifacts with the hash-bound
+  `power.release.manifest.v1` contract and unified release receipt.
+
+## [3.7.6] - 2026-08-23
+
+### Changed
+
+- Corrected the unified release identity to a new immutable patch after the
+  pre-merge `v3.7.5` publication path.
+- Marked Profile A MCP/stdio as required and made the canonical Profile B Web
+  image install locked `web`, `semantic`, and `rerank` extras.
+- Bound publication to a signed tag push, least-privilege job permissions,
+  deterministic OCI metadata, artifact-bound SBOMs, and public readback.
+
 ## [3.6.7] - 2026-08-21
 
 ### Changed

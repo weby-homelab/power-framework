@@ -6,7 +6,7 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.7.4` — runtime contract: **26 CLI commands** + **20 MCP tools** (official MCP Python SDK v2).
+`v3.7.6` — runtime contract: **26 CLI commands** + **20 MCP tools** (official MCP Python SDK v2).
 
 ## CLI (26 команд)
 
@@ -153,9 +153,9 @@ power sync PATH [--fts-only] [--force] [--strict | --allow-partial] [--accept-de
 - Reranker: `onnx-community/bge-reranker-v2-m3-ONNX` (SHA-pinned, Apache-2.0);
   `jinaai/jina-reranker-v2-base-multilingual` (CC-BY-NC) — явний opt-in.
 - Search default: `auto`; canonical path is verified dense when ready and labelled FTS otherwise. Explicit `semantic` remains fail-closed.
-- MCP entry-point: `power-mcp` (with `python -m power_framework.mcp` retained as a
-  compatibility module entrypoint); `POWER_VAULT_DIR` обов'язковий і задає
-  єдиний доступний vault.
+- MCP entry-point: `power-mcp`; implementation package `power_framework.mcp` is
+  not a client launcher. `POWER_VAULT_DIR` обов'язковий і задає єдиний доступний
+  vault.
 - Device: `POWER_EMBED_DEVICE` / `POWER_RERANKER_DEVICE`
   (`auto`, `cpu`, `cuda`, `rocm`, `directml`).
 - Resource control: `POWER_EMBED_BATCH_SIZE`, `POWER_EMBED_NUM_THREADS`,

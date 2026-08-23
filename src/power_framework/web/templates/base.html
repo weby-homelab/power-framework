@@ -1,0 +1,879 @@
+{% set current_lang = get_lang(request) if request is defined else 'en' %} {%
+set current_theme = get_theme(request) if request is defined else 'dark' %} {%
+set is_authed = is_authenticated() if is_authenticated is defined else false %}
+<!doctype html>
+<html
+    lang="{{ current_lang }}"
+    class="{{ current_theme }}"
+    data-theme="{{ current_theme }}"
+>
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+        />
+        <meta name="theme-color" content="#0b0f19" />
+        <title>
+            {% block title %}{{ t('dashboard', current_lang) }}{% endblock %}{%
+            if is_authed %} | P.O.W.E.R. {{ power_version }} &mdash; Web UI{%
+            endif %}
+        </title>
+        <link rel="stylesheet" href="/static/css/style.css" />
+        <style>
+            :root,
+            html.dark {
+                --bg-primary: #0b0f19;
+                --bg-surface: #131d31;
+                --bg-surface-elevated: #1e293b;
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+                --accent: #38bdf8;
+                --accent-hover: #0ea5e9;
+                --accent-subtle: rgba(56, 189, 248, 0.15);
+                --border: #1e293b;
+                --border-hover: #334155;
+                --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+                --success: #22c55e;
+                --warning: #eab308;
+                --danger: #ef4444;
+                --focus-ring: 2px solid #38bdf8;
+                --table-hover: rgba(255, 255, 255, 0.03);
+                --code-bg: #0f172a;
+                --bottom-nav-bg: rgba(19, 29, 49, 0.94);
+            }
+            html.light {
+                --bg-primary: #f8fafc;
+                --bg-surface: #ffffff;
+                --bg-surface-elevated: #f1f5f9;
+                --text-primary: #0f172a;
+                --text-secondary: #64748b;
+                --accent: #0284c7;
+                --accent-hover: #0369a1;
+                --accent-subtle: rgba(2, 132, 199, 0.12);
+                --border: #e2e8f0;
+                --border-hover: #cbd5e1;
+                --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                --success: #16a34a;
+                --warning: #ca8a04;
+                --danger: #dc2626;
+                --focus-ring: 2px solid #0284c7;
+                --table-hover: rgba(0, 0, 0, 0.02);
+                --code-bg: #f1f5f9;
+                --bottom-nav-bg: rgba(255, 255, 255, 0.94);
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Helvetica, Arial, sans-serif;
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                line-height: 1.5;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                transition:
+                    background 0.2s,
+                    color 0.2s;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .skip-link {
+                position: absolute;
+                top: -40px;
+                left: 0;
+                background: var(--accent);
+                color: #000;
+                padding: 8px 16px;
+                font-weight: 700;
+                z-index: 99999;
+                transition: top 0.2s;
+            }
+            .skip-link:focus {
+                top: 0;
+            }
+            header {
+                background: var(--bg-surface);
+                border-bottom: 1px solid var(--border);
+                padding: 12px 24px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                backdrop-filter: blur(12px);
+            }
+            .logo-group {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                text-decoration: none;
+                color: var(--text-primary);
+            }
+            .logo-badge {
+                background: #2563eb;
+                color: #fff;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-weight: 800;
+                font-size: 0.85rem;
+                letter-spacing: 0.5px;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            nav.desktop-nav {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                align-items: center;
+            }
+            nav.desktop-nav a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 0.9rem;
+                font-weight: 500;
+                transition:
+                    background 0.15s,
+                    color 0.15s;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            nav.desktop-nav a:hover {
+                background: var(--bg-surface-elevated);
+                color: var(--text-primary);
+            }
+            nav.desktop-nav a.active {
+                background: var(--accent-subtle);
+                color: var(--accent);
+                font-weight: 600;
+            }
+            .header-meta {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 0.85rem;
+                color: var(--text-secondary);
+            }
+            .theme-switcher,
+            .lang-switcher {
+                display: flex;
+                align-items: center;
+                gap: 2px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                padding: 2px;
+                font-weight: 700;
+                font-size: 0.75rem;
+            }
+            .theme-btn,
+            .lang-btn {
+                text-decoration: none;
+                padding: 5px 8px;
+                border-radius: 4px;
+                color: var(--text-secondary);
+                transition:
+                    background 0.15s,
+                    color 0.15s;
+                cursor: pointer;
+                line-height: 1;
+                min-width: 32px;
+                text-align: center;
+            }
+            .theme-btn:hover,
+            .lang-btn:hover {
+                color: var(--text-primary);
+            }
+            .theme-btn.active,
+            .lang-btn.active {
+                background: var(--accent-subtle);
+                color: var(--accent);
+            }
+            .live-clock {
+                font-family: monospace;
+                background: var(--bg-primary);
+                padding: 5px 10px;
+                border-radius: 6px;
+                border: 1px solid var(--border);
+                font-size: 0.8rem;
+                white-space: nowrap;
+            }
+            .menu-toggle-btn {
+                display: none;
+                background: var(--bg-surface-elevated);
+                border: 1px solid var(--border);
+                color: var(--text-primary);
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-size: 1.25rem;
+                cursor: pointer;
+                min-height: 44px;
+                min-width: 44px;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Off-Canvas Mobile Drawer */
+            .drawer-backdrop {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.65);
+                backdrop-filter: blur(4px);
+                z-index: 9998;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .drawer-backdrop.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .mobile-drawer {
+                position: fixed;
+                top: 0;
+                right: -320px;
+                width: min(320px, 85vw);
+                height: 100vh;
+                background: var(--bg-surface);
+                border-left: 1px solid var(--border);
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                box-shadow: -8px 0 28px rgba(0, 0, 0, 0.45);
+                transition: right 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+                overflow-y: auto;
+            }
+            .mobile-drawer.active {
+                right: 0;
+            }
+            .drawer-header {
+                padding: 16px 20px;
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .drawer-close-btn {
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 1.5rem;
+                cursor: pointer;
+                min-height: 44px;
+                min-width: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .drawer-nav {
+                padding: 16px 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                flex: 1;
+            }
+            .drawer-nav a {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 16px;
+                border-radius: 8px;
+                color: var(--text-primary);
+                text-decoration: none;
+                font-size: 1rem;
+                font-weight: 500;
+                min-height: 48px;
+                transition: background 0.15s;
+            }
+            .drawer-nav a:hover,
+            .drawer-nav a:focus-visible {
+                background: var(--bg-surface-elevated);
+            }
+            .drawer-nav a.active {
+                background: var(--accent-subtle);
+                color: var(--accent);
+                font-weight: 700;
+            }
+            .drawer-footer {
+                padding: 20px 16px;
+                border-top: 1px solid var(--border);
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            /* 2026 Thumb-Zone Mobile Bottom Navigation */
+            .bottom-nav {
+                display: none;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: calc(62px + env(safe-area-inset-bottom));
+                background: var(--bottom-nav-bg);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border-top: 1px solid var(--border);
+                z-index: 900;
+                padding-bottom: env(safe-area-inset-bottom);
+                grid-template-columns: repeat(5, 1fr);
+                box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+            }
+            .bottom-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 0.72rem;
+                font-weight: 600;
+                gap: 3px;
+                min-height: 48px;
+                transition: color 0.15s;
+                cursor: pointer;
+                border: none;
+                background: transparent;
+            }
+            .bottom-nav-item .nav-icon {
+                font-size: 1.25rem;
+                line-height: 1;
+            }
+            .bottom-nav-item:hover,
+            .bottom-nav-item:focus-visible {
+                color: var(--text-primary);
+            }
+            .bottom-nav-item.active {
+                color: var(--accent);
+            }
+            .bottom-nav-item.active .nav-icon {
+                transform: scale(1.1);
+                transition: transform 0.15s;
+            }
+
+            main {
+                flex: 1;
+                padding: 24px;
+                max-width: 1400px;
+                margin: 0 auto;
+                width: 100%;
+            }
+            footer {
+                background: var(--bg-surface);
+                border-top: 1px solid var(--border);
+                padding: 16px 24px;
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .card {
+                background: var(--bg-surface);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: var(--card-shadow);
+            }
+            .table-responsive {
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                margin-bottom: 12px;
+                border-radius: 6px;
+            }
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 10px 18px;
+                border-radius: 8px;
+                font-size: 0.92rem;
+                font-weight: 600;
+                cursor: pointer;
+                border: 1px solid transparent;
+                text-decoration: none;
+                min-height: 44px;
+                transition:
+                    background 0.15s,
+                    transform 0.05s;
+            }
+            .btn:active {
+                transform: scale(0.98);
+            }
+            .btn-primary {
+                background: #2563eb;
+                color: #fff;
+            }
+            .btn-primary:hover {
+                background: #1d4ed8;
+            }
+            .btn-secondary {
+                background: var(--bg-surface-elevated);
+                color: var(--text-primary);
+                border-color: var(--border);
+            }
+            .btn-secondary:hover {
+                background: var(--border-hover);
+            }
+            .btn-success {
+                background: #16a34a;
+                color: #fff;
+            }
+            .btn-danger {
+                background: #dc2626;
+                color: #fff;
+            }
+            .badge {
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.75rem;
+                font-weight: 600;
+            }
+            .badge-success {
+                background: rgba(34, 197, 94, 0.15);
+                color: var(--success);
+                border: 1px solid rgba(34, 197, 94, 0.3);
+            }
+            .badge-warning {
+                background: rgba(234, 179, 8, 0.15);
+                color: var(--warning);
+                border: 1px solid rgba(234, 179, 8, 0.3);
+            }
+            .badge-danger {
+                background: rgba(239, 68, 68, 0.15);
+                color: var(--danger);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+            }
+            .badge-info {
+                background: var(--accent-subtle);
+                color: var(--accent);
+                border: 1px solid var(--border);
+            }
+            code {
+                background: var(--code-bg);
+                color: var(--accent);
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.9em;
+                border: 1px solid var(--border);
+            }
+            a:focus-visible,
+            button:focus-visible,
+            input:focus-visible,
+            select:focus-visible,
+            textarea:focus-visible {
+                outline: var(--focus-ring);
+                outline-offset: 2px;
+            }
+
+            /* 📱 Responsive Mobile Breakpoint (< 768px) */
+            @media (max-width: 768px) {
+                header {
+                    padding: 10px 14px;
+                }
+                nav.desktop-nav {
+                    display: none;
+                }
+                .header-meta .live-clock,
+                .header-meta form {
+                    display: none;
+                }
+                .menu-toggle-btn {
+                    display: inline-flex;
+                }
+                .bottom-nav {
+                    display: grid;
+                }
+                main {
+                    padding: 16px 12px;
+                    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+                }
+                footer {
+                    padding: 14px 14px calc(76px + env(safe-area-inset-bottom))
+                        14px;
+                    flex-direction: column;
+                    text-align: center;
+                    gap: 6px;
+                }
+                .card {
+                    padding: 16px 14px;
+                    border-radius: 12px;
+                }
+                input,
+                select,
+                textarea {
+                    font-size: 16px !important; /* Prevents auto-zoom in iOS Safari */
+                    min-height: 48px;
+                }
+            }
+        </style>
+        {% block head %}{% endblock %}
+    </head>
+    <body>
+        <a href="#main-content" class="skip-link"
+            >{{ t('skip_to_content', current_lang) }}</a
+        >
+        <header>
+            <div style="display: flex; align-items: center; gap: 10px">
+                {% if is_authed %}
+                <a
+                    href="/dashboard"
+                    class="logo-group"
+                    aria-label="P.O.W.E.R. Web UI Dashboard"
+                >
+                    <span class="logo-badge"
+                        >P.O.W.E.R. {{ power_version }} &mdash; Web UI</span
+                    >
+                </a>
+                {% else %}
+                <span class="logo-group">
+                    <span class="logo-badge" style="background: #334155"
+                        >Web Cockpit</span
+                    >
+                </span>
+                {% endif %}
+            </div>
+
+            {% if is_authed %}
+            <nav class="desktop-nav" aria-label="Main Navigation">
+                <a
+                    href="/dashboard"
+                    class="{% if request is defined and request.url.path == '/dashboard' %}active{% endif %}"
+                    >📊 {{ t('dashboard', current_lang) }}</a
+                >
+                <a
+                    href="/notes"
+                    class="{% if request is defined and request.url.path.startswith('/notes') %}active{% endif %}"
+                    >📝 {{ t('notes', current_lang) }}</a
+                >
+                <a
+                    href="/search"
+                    class="{% if request is defined and request.url.path.startswith('/search') %}active{% endif %}"
+                    >🔍 {{ t('search', current_lang) }}</a
+                >
+                <a
+                    href="/graph"
+                    class="{% if request is defined and request.url.path.startswith('/graph') %}active{% endif %}"
+                    >🕸️ {{ t('graph', current_lang) }}</a
+                >
+                <a
+                    href="/tasks"
+                    class="{% if request is defined and request.url.path.startswith('/tasks') %}active{% endif %}"
+                    >✅ {{ t('tasks', current_lang) }}</a
+                >
+                <a
+                    href="/decisions"
+                    class="{% if request is defined and request.url.path.startswith('/decisions') %}active{% endif %}"
+                    >⚖️ {{ t('decisions', current_lang) }}</a
+                >
+                <a
+                    href="/receipts"
+                    class="{% if request is defined and request.url.path.startswith('/receipts') %}active{% endif %}"
+                    >🧾 {{ t('receipts', current_lang) }}</a
+                >
+                <a
+                    href="/federation"
+                    class="{% if request is defined and request.url.path.startswith('/federation') %}active{% endif %}"
+                    >🌐 {{ t('federation', current_lang) }}</a
+                >
+            </nav>
+            {% endif %}
+
+            <div class="header-meta">
+                <div
+                    class="theme-switcher"
+                    role="group"
+                    aria-label="Theme selection"
+                >
+                    <a
+                        href="/set-theme?theme=dark&next={{ request.url.path if request is defined else '/dashboard' }}"
+                        class="theme-btn {% if current_theme == 'dark' %}active{% endif %}"
+                        title="{{ t('theme_dark', current_lang) }}"
+                        id="themeDarkBtn"
+                        aria-label="Switch to dark theme"
+                        >🌙</a
+                    >
+                    <span style="color: var(--border)">|</span>
+                    <a
+                        href="/set-theme?theme=light&next={{ request.url.path if request is defined else '/dashboard' }}"
+                        class="theme-btn {% if current_theme == 'light' %}active{% endif %}"
+                        title="{{ t('theme_light', current_lang) }}"
+                        id="themeLightBtn"
+                        aria-label="Switch to light theme"
+                        >☀️</a
+                    >
+                </div>
+                <div
+                    class="lang-switcher"
+                    role="group"
+                    aria-label="Language selection"
+                >
+                    <a
+                        href="/set-lang?lang=en&next={{ request.url.path if request is defined else '/dashboard' }}"
+                        class="lang-btn {% if current_lang == 'en' %}active{% endif %}"
+                        title="English"
+                        >ENG</a
+                    >
+                    <span style="color: var(--border)">|</span>
+                    <a
+                        href="/set-lang?lang=uk&next={{ request.url.path if request is defined else '/dashboard' }}"
+                        class="lang-btn {% if current_lang == 'uk' %}active{% endif %}"
+                        title="Українська"
+                        >UKR</a
+                    >
+                </div>
+                {% if is_authed %}
+                <span
+                    id="liveClock"
+                    class="live-clock"
+                    role="status"
+                    aria-label="Current UTC Time"
+                    aria-live="polite"
+                    >--:--:-- UTC</span
+                >
+                <form
+                    action="/logout"
+                    method="POST"
+                    style="display: inline; margin: 0"
+                >
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    />
+                    <button
+                        type="submit"
+                        class="btn btn-secondary"
+                        style="
+                            padding: 6px 10px;
+                            font-size: 0.8rem;
+                            min-height: 34px;
+                        "
+                    >
+                        {{ t('logout', current_lang) }}
+                    </button>
+                </form>
+                <button
+                    id="mobileMenuBtn"
+                    class="menu-toggle-btn"
+                    aria-label="Open Navigation Menu"
+                    aria-expanded="false"
+                    aria-controls="mobileDrawer"
+                >
+                    ☰
+                </button>
+                {% endif %}
+            </div>
+        </header>
+
+        {% if is_authed %}
+        <!-- Mobile Off-Canvas Drawer -->
+        <div
+            id="drawerBackdrop"
+            class="drawer-backdrop"
+            aria-hidden="true"
+        ></div>
+        <aside
+            id="mobileDrawer"
+            class="mobile-drawer"
+            aria-label="Mobile Navigation Drawer"
+            aria-hidden="true"
+        >
+            <div class="drawer-header">
+                <span
+                    style="
+                        font-weight: 700;
+                        font-size: 0.95rem;
+                        color: var(--accent);
+                    "
+                    >P.O.W.E.R. &middot; Web UI {{ power_version }}</span
+                >
+                <button
+                    id="drawerCloseBtn"
+                    class="drawer-close-btn"
+                    aria-label="Close menu"
+                >
+                    &times;
+                </button>
+            </div>
+            <nav class="drawer-nav">
+                <a
+                    href="/dashboard"
+                    class="{% if request is defined and request.url.path == '/dashboard' %}active{% endif %}"
+                    >📊 {{ t('dashboard', current_lang) }}</a
+                >
+                <a
+                    href="/notes"
+                    class="{% if request is defined and request.url.path.startswith('/notes') %}active{% endif %}"
+                    >📝 {{ t('notes', current_lang) }}</a
+                >
+                <a
+                    href="/search"
+                    class="{% if request is defined and request.url.path.startswith('/search') %}active{% endif %}"
+                    >🔍 {{ t('search', current_lang) }}</a
+                >
+                <a
+                    href="/graph"
+                    class="{% if request is defined and request.url.path.startswith('/graph') %}active{% endif %}"
+                    >🕸️ {{ t('graph', current_lang) }}</a
+                >
+                <a
+                    href="/tasks"
+                    class="{% if request is defined and request.url.path.startswith('/tasks') %}active{% endif %}"
+                    >✅ {{ t('tasks', current_lang) }}</a
+                >
+                <a
+                    href="/decisions"
+                    class="{% if request is defined and request.url.path.startswith('/decisions') %}active{% endif %}"
+                    >⚖️ {{ t('decisions', current_lang) }}</a
+                >
+                <a
+                    href="/receipts"
+                    class="{% if request is defined and request.url.path.startswith('/receipts') %}active{% endif %}"
+                    >🧾 {{ t('receipts', current_lang) }}</a
+                >
+                <a
+                    href="/federation"
+                    class="{% if request is defined and request.url.path.startswith('/federation') %}active{% endif %}"
+                    >🌐 {{ t('federation', current_lang) }}</a
+                >
+            </nav>
+            <div class="drawer-footer">
+                <div
+                    style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    "
+                >
+                    <span
+                        style="font-size: 0.8rem; color: var(--text-secondary)"
+                        >UTC Time:</span
+                    >
+                    <span
+                        id="drawerLiveClock"
+                        style="
+                            font-family: monospace;
+                            font-size: 0.85rem;
+                            font-weight: 600;
+                        "
+                        >--:--:--</span
+                    >
+                </div>
+                <a
+                    href="https://github.com/weby-homelab/power-framework"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-secondary"
+                    style="font-size: 0.85rem"
+                    >🐙 GitHub Repository</a
+                >
+                <form action="/logout" method="POST" style="margin: 0">
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    />
+                    <button
+                        type="submit"
+                        class="btn btn-danger"
+                        style="width: 100%"
+                    >
+                        {{ t('logout', current_lang) }}
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- 2026 Thumb-Zone Bottom Navigation Bar -->
+        <nav
+            id="bottomNav"
+            class="bottom-nav"
+            aria-label="Quick Mobile Navigation"
+        >
+            <a
+                href="/dashboard"
+                class="bottom-nav-item {% if request is defined and request.url.path == '/dashboard' %}active{% endif %}"
+            >
+                <span class="nav-icon">📊</span>
+                <span>Дашборд</span>
+            </a>
+            <a
+                href="/notes"
+                class="bottom-nav-item {% if request is defined and request.url.path.startswith('/notes') %}active{% endif %}"
+            >
+                <span class="nav-icon">📝</span>
+                <span>Нотатки</span>
+            </a>
+            <a
+                href="/search"
+                class="bottom-nav-item {% if request is defined and request.url.path.startswith('/search') %}active{% endif %}"
+            >
+                <span class="nav-icon">🔍</span>
+                <span>Пошук</span>
+            </a>
+            <a
+                href="/graph"
+                class="bottom-nav-item {% if request is defined and request.url.path.startswith('/graph') %}active{% endif %}"
+            >
+                <span class="nav-icon">🕸️</span>
+                <span>Граф</span>
+            </a>
+            <button
+                id="bottomMenuBtn"
+                class="bottom-nav-item"
+                aria-label="Open full menu"
+            >
+                <span class="nav-icon">☰</span>
+                <span>Меню</span>
+            </button>
+        </nav>
+        {% endif %}
+
+        <main id="main-content" tabindex="-1">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer>
+            {% if is_authed %}
+            <div>
+                P.O.W.E.R. {{ power_version }} &mdash; Web UI &middot;
+                Local-First Knowledge Cockpit &middot;
+                <a
+                    href="https://github.com/weby-homelab/power-framework"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="
+                        color: var(--accent);
+                        text-decoration: underline;
+                        text-underline-offset: 0.15em;
+                    "
+                    >GitHub</a
+                >
+            </div>
+            <div>Audited &middot; Fail-Closed Security Plane</div>
+            {% else %}
+            <div>&copy; Knowledge Cockpit &middot; Protected System</div>
+            <div>All rights reserved</div>
+            {% endif %}
+        </footer>
+
+        <script src="/static/js/app.js" defer></script>
+        {% block scripts %}{% endblock %}
+    </body>
+</html>

@@ -1,6 +1,6 @@
 # MCP Server (official Python SDK v2)
 
-P.O.W.E.R. `v3.7.4` exposes 20 governed tools through the
+P.O.W.E.R. `v3.7.6` exposes 20 governed tools through the
 [Model Context Protocol](https://modelcontextprotocol.io), powered by
 the official [MCP Python SDK v2](https://github.com/modelcontextprotocol/python-sdk).
 MCP-compatible agents can validate, index, retrieve, and perform bounded writes
@@ -16,32 +16,18 @@ vault.
 The implementation accepts `POWER_VAULT_PATH` as a legacy alias. New
 configurations must use `POWER_VAULT_DIR`.
 
-## Transport modes
+## Canonical transport
 
-### Local stdio (default)
+### Local stdio
 
 ```bash
 POWER_VAULT_DIR=/absolute/path/to/vault \
   /absolute/path/to/venv/bin/power-mcp
 ```
 
-### Local loopback HTTP
-
-```bash
-POWER_VAULT_DIR=/absolute/path/to/vault \
-POWER_MCP_TRANSPORT=http \
-  /absolute/path/to/venv/bin/power-mcp
-```
-
-- host defaults to `127.0.0.1` and may be only `127.0.0.1` or `::1`;
-- port defaults to `8000` and must be between 1 and 65535;
-- health endpoint: `GET http://127.0.0.1:8000/health`;
-- any other transport, non-loopback host, invalid port, or missing vault fails
-  closed at startup.
-
-Remote HTTP is intentionally not an unauthenticated public service. Do not
-publish it through a port mapping, tunnel, or reverse proxy without a separate
-authenticated, scope-aware gateway and explicit threat model.
+The Web UI container is the only supported HTTP surface. It starts `power-web`
+on port `8080` and does not start or expose MCP. Do not publish an MCP HTTP
+transport through a port mapping, tunnel, or reverse proxy.
 
 ## Client configuration
 
@@ -56,7 +42,7 @@ Point the client to the exact interpreter where `power-framework` is installed:
 {
   "mcpServers": {
     "power": {
-      "command": "/home/YOU/.local/share/power/venv/bin/python",
+      "command": "/home/YOU/.local/bin/power-mcp",
       "args": [],
       "env": {
         "POWER_VAULT_DIR": "/home/YOU/Documents/power-vault"

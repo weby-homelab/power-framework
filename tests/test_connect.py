@@ -24,20 +24,17 @@ def test_json_connect_is_hash_bound_and_idempotent(sample_vault: Path, tmp_path:
         "gemini",
         sample_vault,
         config_path=config,
-        executable=sys.executable,
+        executable=str(tmp_path / "power-mcp"),
     )
 
     assert plan.status == "ready"
     assert plan.changed is True
     assert "power_framework.mcp" not in json.dumps(plan.as_dict())
     assert apply_connect_plan(plan.as_dict(), approved=True)["status"] == "applied"
-    assert json.loads(config.read_text(encoding="utf-8"))["mcpServers"]["power"]["args"] == [
-        "-m",
-        "power_framework.mcp",
-    ]
+    assert json.loads(config.read_text(encoding="utf-8"))["mcpServers"]["power"]["args"] == []
 
     second = build_connect_plan(
-        "gemini", sample_vault, config_path=config, executable=sys.executable
+        "gemini", sample_vault, config_path=config, executable=str(tmp_path / "power-mcp")
     )
     assert second.status == "no_change"
     assert second.changed is False
@@ -47,7 +44,7 @@ def test_json_connect_is_hash_bound_and_idempotent(sample_vault: Path, tmp_path:
         "gemini",
         sample_vault,
         config_path=config,
-        executable=sys.executable,
+        executable=str(tmp_path / "power-mcp"),
         action="remove",
     )
     receipt = apply_connect_plan(remove.as_dict(), approved=True)
@@ -84,7 +81,7 @@ def test_additional_json_clients_round_trip_without_touching_foreign_entries(
         client,
         sample_vault,
         config_path=config,
-        executable=sys.executable,  # type: ignore[arg-type]
+        executable=str(tmp_path / "power-mcp"),
     )
     assert plan.status == "ready"
     assert apply_connect_plan(plan.as_dict(), approved=True)["status"] == "applied"
@@ -96,7 +93,7 @@ def test_additional_json_clients_round_trip_without_touching_foreign_entries(
         client,
         sample_vault,
         config_path=config,
-        executable=sys.executable,  # type: ignore[arg-type]
+        executable=str(tmp_path / "power-mcp"),
     )
     assert second.status == "no_change"
     assert apply_connect_plan(second.as_dict(), approved=True)["status"] == "no_change"
@@ -105,7 +102,7 @@ def test_additional_json_clients_round_trip_without_touching_foreign_entries(
         client,
         sample_vault,
         config_path=config,
-        executable=sys.executable,  # type: ignore[arg-type]
+        executable=str(tmp_path / "power-mcp"),
         action="remove",
     )
     assert apply_connect_plan(remove.as_dict(), approved=True)["status"] == "applied"
@@ -119,14 +116,16 @@ def test_connect_refuses_foreign_entry_and_stale_plan(sample_vault: Path, tmp_pa
         encoding="utf-8",
     )
     foreign = build_connect_plan(
-        "gemini", sample_vault, config_path=config, executable=sys.executable
+        "gemini", sample_vault, config_path=config, executable=str(tmp_path / "power-mcp")
     )
     assert foreign.status == "manual_review"
     with pytest.raises(PermissionError, match="not POWER-owned"):
         apply_connect_plan(foreign.as_dict(), approved=True)
 
     config.write_text("{}", encoding="utf-8")
-    plan = build_connect_plan("gemini", sample_vault, config_path=config, executable=sys.executable)
+    plan = build_connect_plan(
+        "gemini", sample_vault, config_path=config, executable=str(tmp_path / "power-mcp")
+    )
     config.write_text('{"unrelated": true}', encoding="utf-8")
     with pytest.raises(RuntimeError, match="stale"):
         apply_connect_plan(plan.as_dict(), approved=True)
@@ -136,7 +135,9 @@ def test_codex_toml_connection_round_trip(sample_vault: Path, tmp_path: Path) ->
     config = tmp_path / "config.toml"
     preimage = b'[profile]\nname = "local"\n'
     config.write_bytes(preimage)
-    plan = build_connect_plan("codex", sample_vault, config_path=config, executable=sys.executable)
+    plan = build_connect_plan(
+        "codex", sample_vault, config_path=config, executable=str(tmp_path / "power-mcp")
+    )
     assert plan.status == "ready"
     apply_connect_plan(plan.as_dict(), approved=True)
     content = config.read_text(encoding="utf-8")
@@ -147,7 +148,7 @@ def test_codex_toml_connection_round_trip(sample_vault: Path, tmp_path: Path) ->
         "codex",
         sample_vault,
         config_path=config,
-        executable=sys.executable,
+        executable=str(tmp_path / "power-mcp"),
         action="remove",
     )
     apply_connect_plan(remove.as_dict(), approved=True)

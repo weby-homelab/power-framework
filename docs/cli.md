@@ -1,6 +1,6 @@
 # CLI Reference
 
-This reference is aligned with the executable P.O.W.E.R. `v3.7.4` parser.
+This reference is aligned with the executable P.O.W.E.R. `v3.7.6` parser.
 
 ## Synopsis
 
@@ -498,10 +498,10 @@ power integrations doctor
 power integrations mcp-config PATH [--client ...] [--config ...]
 power integrations skill-check [--target PATH]
 power integrations skill-install [--target PATH] [--apply --approved]
-power integrations install --power-wheel POWER.whl [--gui-wheel GUI.whl]
+power integrations install --power-wheel POWER.whl --manifest RELEASE.json
                             [--home PATH] [--no-deps] [--apply --approved]
 ```
 
-`mcp-config` defaults to the public `power-mcp` launcher. `doctor`, all plan
+`mcp-config` defaults to `~/.local/bin/power-mcp`. `doctor`, all plan
 commands, and omitted `--apply` paths are read-only; no remote service or
 client configuration is contacted during planning.
