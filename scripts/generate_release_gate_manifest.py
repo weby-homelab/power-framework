@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit the content-free gate inventory used by the 3.6.7 release receipt."""
+"""Emit the content-free gate inventory used by the 3.7.x release receipt."""
 
 from __future__ import annotations
 
@@ -22,6 +22,11 @@ MANDATORY_GATES = (
     "maintenance-faults",
     "phase8-technical",
     "retention-soak",
+    "profile-a-mcp-stdio",
+    "profile-b-web-acceptance",
+    "web-semantic-acceptance",
+    "web-rerank-acceptance",
+    "public-release-readback",
 )
 OPTIONAL_GATES = {
     "real-vault-quality": "real-vault neural/quality evaluation",
