@@ -42,7 +42,7 @@ jobs:
         run: |
           python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
-          uv sync --locked --group dev --extra semantic --extra rerank
+          uv sync --locked --group dev --extra semantic --extra rerank --extra web
 
       - name: Run mandatory hermetic neural contract
         run: |
@@ -199,10 +199,11 @@ jobs:
           uv sync --locked --group dev
 
       - name: Execute the Linux release upgrade matrix on the Ubuntu runner
-        run: >-
-          uv run python scripts/verify_upgrade_matrix.py
-           --from-version 3.6.7 --to-version 3.7.5
-          --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
+        run: |
+          uv run python scripts/verify_upgrade_matrix.py \
+            --from-version 3.6.7 \
+            --to-version 3.7.5 \
+            --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
