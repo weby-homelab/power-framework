@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           target_version="$(uv run python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
-          from_version="$(TARGET_VERSION="$target_version" git tag --sort=-version:refname --list 'v*.*.*' | python3 -c 'import os, sys; target=os.environ["TARGET_VERSION"]; print(next(tag[1:] for tag in sys.stdin.read().splitlines() if tag[1:] != target))')"
+          from_version="$(git tag --sort=-version:refname --list 'v*.*.*' | TARGET_VERSION="$target_version" python3 -c 'import os, sys; target=os.environ["TARGET_VERSION"]; print(next(tag[1:] for tag in sys.stdin.read().splitlines() if tag[1:] != target))')"
           uv run python scripts/verify_upgrade_matrix.py \
             --from-version "$from_version" \
             --to-version "$target_version" \
