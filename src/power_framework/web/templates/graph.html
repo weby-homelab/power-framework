@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('knowledge_graph', current_lang) }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 700;">{{ t('knowledge_graph', current_lang) }} (Knowledge Graph)</h1>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            {{ t('graph_subtitle', current_lang) }} &middot;
+            <span id="graphGlobalStats">{{ projection.total_nodes }} вузлів &middot; {{ projection.total_edges }} ребер</span>
+        </p>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <button id="graphZoomFitBtn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" title="Центрувати граф">🎯 Центрувати</button>
+        <button id="toggleTableBtn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;">📋 Показати таблицю</button>
+    </div>
+</div>
+
+<!-- Graph Filter Controls Toolbar -->
+<div class="card" style="margin-bottom: 16px; padding: 12px 16px; background: var(--bg-surface-elevated); border: 1px solid var(--border);">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; flex: 1; min-width: 280px;">
+            <div style="position: relative; flex: 1; min-width: 180px; max-width: 320px;">
+                <label class="sr-only" for="graphSearchInput">Фільтр графа за назвою або шляхом</label>
+                <input type="text" id="graphSearchInput" placeholder="🔍 Фільтр за назвою чи шляхом…" class="form-control" style="width: 100%; padding: 6px 12px; font-size: 0.85rem; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+            </div>
+            <div style="min-width: 150px;">
+                <label class="sr-only" for="graphCategorySelect">Категорія графа</label>
+                <select id="graphCategorySelect" class="form-control" style="width: 100%; padding: 6px 10px; font-size: 0.85rem; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                    <option value="">Усі категорії (All)</option>
+                </select>
+            </div>
+            <div style="min-width: 160px;">
+                <label class="sr-only" for="graphDegreeSelect">Мінімальний ступінь зв’язку</label>
+                <select id="graphDegreeSelect" class="form-control" style="width: 100%; padding: 6px 10px; font-size: 0.85rem; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                    <option value="0">Всі вузли (разом із сиротами)</option>
+                    <option value="1">Тільки зв'язані (Degree ≥ 1)</option>
+                    <option value="2">Стійкі зв'язки (Degree ≥ 2)</option>
+                    <option value="5">Головні хаби (Degree ≥ 5)</option>
+                </select>
+            </div>
+            <button id="graphToggleOrphansBtn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" title="Сховати або показати ізольовані нотатки">⚡ Сховати сироти</button>
+            <button id="graphResetBtn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;">Скинути</button>
+        </div>
+        <div>
+            <span id="graphFilteredStats" class="badge badge-info" style="font-size: 0.85rem; padding: 6px 12px; font-family: monospace;">
+                Показано: <strong id="nodesCount">{{ projection.total_nodes }}</strong> вузлів (<span id="orphansCount">0</span> сиріт) &middot; <strong id="edgesCount">{{ projection.total_edges }}</strong> ребер
+            </span>
+        </div>
+    </div>
+    <div id="graphOrphanHint" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 8px; display: flex; align-items: center; gap: 6px;">
+        💡 <span><strong>Сироти на графі:</strong> це переважно архівні нотатки (<code>04_Archive</code>) та щоденні логи (<code>06_Daily_Logs</code>), які не мають перехресних посилань. Натисніть <strong>«⚡ Сховати сироти»</strong> для фокусування на пов'язаних знаннях.</span>
+    </div>
+</div>
+
+<!-- Interactive Graph Canvas Container -->
+<div class="card" style="padding: 0; overflow: hidden; height: 600px; position: relative; background: #0b0f19; border: 1px solid var(--border); border-radius: 8px;">
+    <div id="graphContainer" style="width: 100%; height: 100%;"></div>
+</div>
+
+<!-- Accessible Table Fallback (WCAG 2.2 AA) -->
+<div id="accessibleTableContainer" class="card" style="display: none; margin-top: 20px;">
+    <h2 style="font-size: 1.2rem; margin-bottom: 12px;">Таблиця зв'язків нотаток (Accessible Matrix)</h2>
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                <th style="padding: 8px;">Нотатка</th>
+                <th style="padding: 8px;">Категорія</th>
+                <th style="padding: 8px;">Ступінь зв'язків (Degree)</th>
+                <th style="padding: 8px; text-align: right;">Дія</th>
+            </tr>
+        </thead>
+        <tbody id="accessibleTableBody">
+            {% for node in projection.nodes %}
+            <tr class="graph-table-row" data-id="{{ node.id }}" data-label="{{ node.label }}" data-category="{{ node.category }}" data-degree="{{ node.degree }}" style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px; font-weight: 600;">
+                    <a href="/notes/read?path={{ node.id }}" style="color: var(--accent); text-decoration: none;">{{ node.label }}</a>
+                    <div style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary);">{{ node.id }}</div>
+                </td>
+                <td style="padding: 8px;">
+                    <span class="badge badge-info">{{ node.category }}</span>
+                </td>
+                <td style="padding: 8px; font-family: monospace;">{{ node.degree }}</td>
+                <td style="padding: 8px; text-align: right;">
+                    <a href="/notes/read?path={{ node.id }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Відкрити</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/force-graph.min.js"></script>
+<script src="/static/js/graph.js"></script>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %} {% block title %}Черга рішень{% endblock %} {% block
+content %}
+<div style="margin-bottom: 24px">
+  <h1 style="font-size: 1.75rem; font-weight: 700">
+    Черга рішень та погоджень (Decisions Queue)
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.9rem">
+    Canonical DecisionService gates that require human approval, rejection, or
+    structured input
+  </p>
+</div>
+
+{% if pending_decisions %}
+<div style="display: grid; gap: 16px">
+  {% for d in pending_decisions %}
+  <div class="card" style="border-left: 4px solid #facc15">
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+      "
+    >
+      <div>
+        <h2 style="font-size: 1.2rem; font-weight: 600">
+          {{ d.title if d is mapping else d.get('title', d.decision_id) }}
+        </h2>
+        <div
+          style="
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+          "
+        >
+          Decision ID: {{ d.decision_id if d is mapping else
+          d.get('decision_id', '') }} &middot; Task:
+          <a
+            href="/tasks/{{ d.task_id if d is mapping else d.get('task_id', '') }}"
+            style="color: var(--accent); text-decoration: none"
+            >{{ d.task_id if d is mapping else d.get('task_id', '') }}</a
+          >
+          &middot; Rev: v{{ d.task_revision if d is mapping else
+          d.get('task_revision', '?') }} &middot; Status:
+          <span class="badge badge-warning"
+            >{{ d.status if d is mapping else d.get('status', 'pending')
+            }}</span
+          >
+        </div>
+      </div>
+      <span class="badge" style="background: var(--bg-surface-elevated)"
+        >{{ d.risk_level if d is mapping else d.get('risk_level', 'medium')
+        }}</span
+      >
+    </div>
+
+    <div
+      style="
+        margin-bottom: 16px;
+        background: var(--bg-primary);
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+      "
+    >
+      <strong>Опис:</strong> {{ d.description if d is mapping else
+      d.get('description', '') }} {% set requested_by = d.requested_by if d is
+      mapping else d.get('requested_by', '') %} {% if requested_by %}
+      <div
+        style="
+          margin-top: 6px;
+          color: var(--text-secondary);
+          font-size: 0.85rem;
+        "
+      >
+        Requested by: {{ requested_by }}
+      </div>
+      {% endif %}
+    </div>
+
+    <form
+      action="/decisions/{{ d.decision_id if d is mapping else d.get('decision_id') }}/resolve"
+      method="POST"
+      style="display: flex; gap: 12px; align-items: center"
+      >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <label class="sr-only" for="decisionInputValue">Відповідь або значення рішення</label>
+      <input
+        type="text"
+        id="decisionInputValue"
+        name="input_value"
+        placeholder="Введіть відповідь / значення (опціонально)…"
+        style="
+          flex: 1;
+          padding: 8px 12px;
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          font-size: 0.85rem;
+        "
+      />
+      <button
+        type="submit"
+        name="action"
+        value="approve"
+        class="btn btn-success"
+        style="padding: 8px 16px"
+      >
+        ✅ Затвердити
+      </button>
+      <button
+        type="submit"
+        name="action"
+        value="reject"
+        class="btn btn-danger"
+        style="padding: 8px 16px"
+      >
+        ❌ Відхилити
+      </button>
+      <button
+        type="submit"
+        name="action"
+        value="provide_input"
+        class="btn btn-secondary"
+        style="padding: 8px 16px"
+      >
+        📝 Provide input
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align: center; padding: 48px 24px">
+  <div style="font-size: 2.5rem; margin-bottom: 8px">🎉</div>
+  <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 4px">
+    Черга рішень порожня
+  </h2>
+  <p style="color: var(--text-secondary); font-size: 0.9rem">
+    Наразі немає decision gates, що очікують на підтвердження чи введення даних.
+  </p>
+</div>
+{% endif %} {% endblock %}

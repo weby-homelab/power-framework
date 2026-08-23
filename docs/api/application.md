@@ -1,4 +1,4 @@
-# POWER Application API v2 — 3.7.4 Candidate
+# POWER Application API v2 — 3.7.5 Release
 
 ## Envelope
 
@@ -66,7 +66,7 @@ as typed `source_projection_stale` and fails closed; operators must run
 
 ## Transport support matrix
 
-| Operation | Direct API | CLI | MCP | POWER-GUI |
+| Operation | Direct API | CLI | MCP stdio | Web UI |
 |---|---:|---:|---:|---:|
 | `source.list` | supported | not published | not published | supported through `PowerClient` |
 | `source.stats` | supported | not published | not published | supported through `PowerClient` |
@@ -80,7 +80,6 @@ candidate. New transport operations require explicit capability negotiation.
 
 ## Compatibility
 
-The public immutable baseline remains POWER `v3.6.7` until the 3.7.4 candidate
-is published. The local candidate changes the package version and source read
-model but must not be represented as a published release before its immutable
-revision, wheel, SBOM and release receipts exist.
+The public immutable baseline is superseded by the unified POWER `v3.7.5`
+release only when its exact commit, wheel, Web image digest, SBOM and release
+receipts are read back from the publication workflow.

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
-import socket
 import sqlite3
 import subprocess
 import sys
@@ -14,7 +12,6 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
-import httpx
 import pytest
 from mcp import Client
 from mcp.server.mcpserver.exceptions import ToolError
@@ -42,23 +39,9 @@ from power_framework.mcp.power_server import (
 from tests.mcp_test_client import stdio_session
 
 
-def _free_tcp_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
-
-
-def _mcp_process_env(vault_path: Path, transport: str, port: int | None = None) -> dict[str, str]:
+def _mcp_process_env(vault_path: Path) -> dict[str, str]:
     env = os.environ.copy()
-    env.update(
-        {
-            "POWER_VAULT_DIR": str(vault_path),
-            "POWER_MCP_TRANSPORT": transport,
-        }
-    )
-    if port is not None:
-        env["POWER_MCP_HOST"] = "127.0.0.1"
-        env["POWER_MCP_PORT"] = str(port)
+    env["POWER_VAULT_DIR"] = str(vault_path)
     return env
 
 
@@ -78,39 +61,6 @@ async def _assert_wire_contract(client: Any) -> None:
     assert all(tool.output_schema for tool in tools)
     assert all(tool.annotations for tool in tools)
     assert all(tool.meta and tool.meta.get("power.risk") for tool in tools)
-
-
-async def _stop_mcp_process(process: asyncio.subprocess.Process) -> None:
-    if process.returncode is None:
-        process.terminate()
-        try:
-            await asyncio.wait_for(process.wait(), timeout=5)
-        except TimeoutError:
-            process.kill()
-            await process.wait()
-    if process.stderr is not None:
-        await process.stderr.read()
-
-
-async def _wait_for_http_health(process: asyncio.subprocess.Process, url: str) -> None:
-    deadline = asyncio.get_running_loop().time() + 15
-    last_error = "server did not become ready"
-    async with httpx.AsyncClient(timeout=1) as http_client:
-        while asyncio.get_running_loop().time() < deadline:
-            if process.returncode is not None:
-                stderr = await process.stderr.read() if process.stderr is not None else b""
-                raise AssertionError(
-                    f"MCP HTTP process exited with {process.returncode}: {stderr.decode(errors='replace')}"
-                )
-            try:
-                response = await http_client.get(url)
-                if response.status_code == 200 and response.json() == {"status": "ok"}:
-                    return
-                last_error = f"health returned {response.status_code}: {response.text}"
-            except (httpx.HTTPError, ValueError) as exc:
-                last_error = str(exc)
-            await asyncio.sleep(0.1)
-    raise AssertionError(last_error)
 
 
 async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
@@ -249,9 +199,9 @@ async def test_mcp_stdio_process_preserves_wire_contract(
     config = {
         "mcpServers": {
             "power": {
-                "command": sys.executable,
-                "args": ["-m", "power_framework.mcp"],
-                "env": _mcp_process_env(sample_vault, "stdio"),
+                "command": str(Path(sys.executable).with_name("power-mcp")),
+                "args": [],
+                "env": _mcp_process_env(sample_vault),
             }
         }
     }
@@ -265,54 +215,6 @@ async def test_mcp_stdio_process_preserves_wire_contract(
         assert info["runtime"]["power_framework"] == __version__
         assert info["vault"]["path"] == str(sample_vault.resolve())
         assert info["embedding"]["binding"] == "not_requested"
-
-
-async def test_mcp_http_process_reports_health_and_preserves_wire_contract(
-    sample_vault: Path,
-) -> None:
-    port = _free_tcp_port()
-    process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        "-m",
-        "power_framework.mcp",
-        cwd=str(Path(__file__).parents[1]),
-        env=_mcp_process_env(sample_vault, "http", port),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-    )
-    try:
-        base_url = f"http://127.0.0.1:{port}"
-        await _wait_for_http_health(process, f"{base_url}/health")
-        async with Client(f"{base_url}/mcp") as client:
-            await _assert_wire_contract(client)
-    finally:
-        await _stop_mcp_process(process)
-
-
-async def test_http_health_route_reports_vault_readiness(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("POWER_VAULT_DIR", str(tmp_path))
-
-    transport = httpx.ASGITransport(app=power_server.mcp.http_app(transport="http"))
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-
-
-async def test_http_health_route_fails_closed_without_vault(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("POWER_VAULT_DIR", str(tmp_path / "missing-vault"))
-
-    transport = httpx.ASGITransport(app=power_server.mcp.http_app(transport="http"))
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/health")
-
-    assert response.status_code == 503
-    assert response.json()["status"] == "error"
 
 
 async def test_read_sub_index_existing_category(sample_vault: Path) -> None:
@@ -843,50 +745,22 @@ async def test_mcp_tools_reject_vault_root_substitution(
     assert "P.O.W.E.R. Health Lint Report" in result
 
 
-def test_http_transport_defaults_to_loopback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_mcp_run_uses_stdio_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     run_mock = Mock()
-    monkeypatch.setenv("POWER_MCP_TRANSPORT", "http")
     monkeypatch.setenv("POWER_VAULT_DIR", str(tmp_path))
-    monkeypatch.delenv("POWER_MCP_HOST", raising=False)
-    monkeypatch.delenv("POWER_MCP_PORT", raising=False)
     monkeypatch.setattr(power_server.mcp, "run", run_mock)
 
     power_server.run()
 
-    run_mock.assert_called_once_with(transport="http", host="127.0.0.1", port=8000)
+    run_mock.assert_called_once_with(transport="stdio")
 
 
-@pytest.mark.parametrize("host", ["0.0.0.0", "192.0.2.20", "example.test"])  # noqa: S104
-def test_http_transport_rejects_non_loopback_bind(
-    monkeypatch: pytest.MonkeyPatch,
-    host: str,
-) -> None:
-    monkeypatch.setenv("POWER_MCP_HOST", host)
-
-    with pytest.raises(ValueError, match="Remote HTTP MCP is disabled"):
-        power_server._get_http_transport_config()
-
-
-@pytest.mark.parametrize("port", ["not-a-port", "0", "65536"])
-def test_http_transport_rejects_invalid_port(monkeypatch: pytest.MonkeyPatch, port: str) -> None:
-    monkeypatch.setenv("POWER_MCP_HOST", "127.0.0.1")
-    monkeypatch.setenv("POWER_MCP_PORT", port)
-
-    with pytest.raises(ValueError, match="POWER_MCP_PORT"):
-        power_server._get_http_transport_config()
-
-
-def test_run_rejects_unknown_transport(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POWER_MCP_TRANSPORT", "tcp")
-
-    with pytest.raises(ValueError, match="POWER_MCP_TRANSPORT"):
-        power_server.run()
+def test_run_rejects_non_stdio_transport() -> None:
+    with pytest.raises(ValueError, match="stdio transport only"):
+        power_server.run(transport="http")
 
 
 def test_run_requires_configured_vault_root(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POWER_MCP_TRANSPORT", "stdio")
     monkeypatch.delenv("POWER_VAULT_DIR", raising=False)
 
     with pytest.raises(RuntimeError, match="POWER_VAULT_DIR"):

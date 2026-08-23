@@ -38,7 +38,7 @@ environment is trustworthy.
 | Read-only retrieval to mutation | search and proposal creation | an agent or caller requesting a change | Proposal creation may write only its content-addressed `.power/proposals/` ledger; it cannot write the target note, catalog, or search. Apply requires explicit `approved=True` and an unchanged pre-image hash. |
 | Agent handoff to workflow execution | validated work-packet state | packet objective, next action, retrieved note text, and caller-supplied metadata | `.power/work-packets/` stores content-free Markdown checkpoints; state transitions are idempotent and approval-gated, and no packet operation executes its `next_action`. |
 | Local process to network | local ONNX/FTS/index paths | OpenRouter, non-loopback Ollama, link/ROT HTTP targets | Default deny; an explicit sensitivity-appropriate egress policy is required before contact. |
-| MCP server to client/transport | configured local server | MCP client and any network peer | MCP requires a configured vault root; HTTP binds to loopback until authenticated scoped transport exists. |
+| MCP server to client/transport | configured local server | MCP client input | MCP requires a configured vault root and uses local stdio only; no MCP TCP listener or network peer exists. |
 | Repository/CI to dependencies | pinned and reviewed source/dependency policy | packages, model artifacts, GitHub Actions execution | dependency audit, CodeQL, integrity checks, and review gates remain required. |
 
 ### Assumptions and non-goals
@@ -49,9 +49,10 @@ environment is trustworthy.
 - Stdio MCP clients and local CLI callers are authorized to read the chosen
   vault. The framework constrains paths and writes; it cannot infer a user's
   authorization intent from arbitrary local processes.
-- Remote HTTP MCP is intentionally unavailable without a future authenticated,
-  scoped transport policy. Exposing a loopback service through a proxy is an
-  operator decision outside the current transport contract.
+- HTTP MCP is removed from the supported runtime. The Web UI is the only
+  network-facing HTTP surface, while native MCP remains local stdio; exposing
+  the Web UI remotely requires an authenticated reverse proxy, Tailscale, or an
+  equivalent trusted access layer.
 - Retrieved note content is data, not instructions. Downstream LLM clients
   must still defend their own prompt and tool-execution boundaries.
 

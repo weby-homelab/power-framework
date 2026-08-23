@@ -1,0 +1,90 @@
+{% extends "base.html" %} {% block title %}Редагування: {{ note.rel_path }}{%
+endblock %} {% block content %}
+<div
+    style="
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    "
+>
+    <div>
+        <a
+            href="/notes/read?path={{ note.rel_path }}"
+            style="
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 0.85rem;
+            "
+            >&larr; Скасувати та повернутися</a
+        >
+        <h1 style="font-size: 1.75rem; font-weight: 700; margin-top: 4px">
+            Транзакційний редактор (Proposal Flow)
+        </h1>
+        <div
+            style="
+                font-family: monospace;
+                color: var(--text-secondary);
+                font-size: 0.8rem;
+            "
+        >
+            Шлях: {{ note.rel_path }} &middot; Preimage ETag:
+            <code>{{ note.etag }}</code>
+        </div>
+    </div>
+</div>
+
+<div
+    class="card"
+    style="
+        padding: 12px 16px;
+        background: rgba(56, 189, 248, 0.1);
+        border-color: rgba(56, 189, 248, 0.3);
+        font-size: 0.85rem;
+        margin-bottom: 20px;
+    "
+>
+    ℹ️ <strong>Принцип безпеки POWER:</strong> Прямий запис на диск заблоковано.
+    Збереження створить перевіряємий Proposal, який перевіряє лінтер та вимагає
+    явного підтвердження перед застосуванням.
+</div>
+
+<form action="/notes/propose" method="POST" class="card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <input type="hidden" name="path" value="{{ note.rel_path }}" />
+
+    <div style="margin-bottom: 16px">
+        <label
+            for="editorContent"
+            style="display: block; font-weight: 600; margin-bottom: 8px"
+            >Вміст нотатки (Markdown + OKF Frontmatter):</label
+        >
+        <textarea
+            id="editorContent"
+            name="content"
+            rows="24"
+            style="
+                width: 100%;
+                font-family: monospace;
+                font-size: 0.9rem;
+                padding: 12px;
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                resize: vertical;
+            "
+        >
+{{ note.content }}</textarea>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 12px">
+        <a href="/notes/read?path={{ note.rel_path }}" class="btn btn-secondary"
+            >Скасувати</a
+        >
+        <button type="submit" class="btn btn-primary">
+            Створити Proposal &rarr;
+        </button>
+    </div>
+</form>
+{% endblock %}

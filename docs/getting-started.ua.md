@@ -1,18 +1,18 @@
 # Початок роботи з чистою базою знань
 
-Це авторитетний clean-install шлях для P.O.W.E.R. `v3.7.4`. Він створює лише
+Це авторитетний clean-install шлях для P.O.W.E.R. `v3.7.5`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
-> **Контракт кандидата релізу:** використовуйте `v3.7.4` лише після появи signed tag та
-> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.4).
+> **Контракт релізу:** використовуйте `v3.7.5` лише після появи signed tag та
+> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.5).
 > Цей гід називає tag-bound target; сам URL не доводить завершення публікації.
 > Перед установкою на не-Linux host
 > перевірте [матрицю підтримки платформ](support-matrix.ua.md).
 
 [Windows-гід](windows-11-installation.ua.md) є лише інформаційним. Windows і
 macOS відкладені на невизначений строк і не є підтримуваними release-платформами
-для `v3.7.4`.
+для `v3.7.5`.
 
 ## 1. Передумови
 
@@ -35,12 +35,12 @@ POWER_CLI="$HOME/.local/share/power/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.7.4/power_framework-3.7.4-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl
 ```
 
 Базовий release wheel є FTS-only: він не встановлює ONNX Runtime, model
 tokenizers, numerical packages або optional MCP transport. Перед MCP додайте
-явний extra `mcp` (або compatibility alias `remote`), а `semantic`
+явний extra `mcp`, а `semantic`
 використовуйте лише для локальних dense експериментів.
 
 Перевірте executable, package metadata та lean import:
@@ -53,14 +53,14 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Обидві команди версії мають показати `3.7.4`, а остання команда —
+Обидві команди версії мають показати `3.7.5`, а остання команда —
 `lean FTS import: OK`.
 
 Для локального MCP встановіть official SDK extra з того самого wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.4/power_framework-3.7.4-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl"
 ```
 
 ### Альтернатива: встановлення із закріпленого tag
@@ -69,7 +69,7 @@ tokenizers, numerical packages або optional MCP transport. Перед MCP д�
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.7.4'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.7.5'
 ```
 
 Не використовуйте незакріплений `main`, якщо важлива відтворюваність.
@@ -175,12 +175,16 @@ interpreter virtual environment:
 Перевірте точний interpreter і vault перед перезапуском клієнта:
 
 ```bash
-POWER_VAULT_DIR="$POWER_VAULT" "$POWER_VENV/bin/power-mcp" preflight
+POWER_VAULT_DIR="$POWER_VAULT" "$HOME/.local/share/power/venv/bin/power-mcp" preflight
 ```
 
 Після зміни конфігурації або Python environment перезапустіть long-lived
-MCP-клієнт. Повний контракт 20 інструментів і transport security boundary
+MCP-клієнт. Повний контракт 20 інструментів і stdio security boundary
 описано в [MCP Server](mcp-server.md).
+
+Web UI не є окремим native-продуктом: він постачається тим самим wheel і
+запускається лише у Web-only контейнері, описаному в
+[контракті розгортання Profile B](architecture/unified-runtime.md).
 
 ## 8. Щоденна послідовність
 
@@ -211,9 +215,9 @@ Vault — це звичайні Markdown-файли, незалежні від P
 ## Acceptance checklist
 
 - Python має версію 3.13 або 3.14, а interpreter належить окремому venv.
-- CLI та distribution metadata повертають `3.7.4`.
+- CLI та distribution metadata повертають `3.7.5`.
 - `power_framework` імпортується без neural/MCP extras.
-- Якщо налаштовано MCP, встановлено явний extra `remote`, а preflight успішно
+- Якщо налаштовано MCP, встановлено явний extra `mcp`, а preflight успішно
   імпортує `power_framework.mcp`.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з
   кодом `0`.

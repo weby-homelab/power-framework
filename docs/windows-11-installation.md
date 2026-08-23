@@ -1,16 +1,16 @@
-# Historical: install P.O.W.E.R. 3.5.0 on Windows 11 25H2
+# Informational: install P.O.W.E.R. 3.7.5 on Windows 11 25H2
 
-> **Not a `v3.7.4` procedure.** Windows support is deferred indefinitely and
-> has no scheduled release target. The commands below preserve the historical
-> `v3.5.0` host-validation procedure and must not be presented as 3.7.4
-> compatibility or release certification for the 3.7.4 candidate.
+> **Not a supported `v3.7.5` platform.** Windows support is deferred
+> indefinitely and has no scheduled release target. The commands below are
+> informational and must not be presented as Windows compatibility or release
+> certification for the 3.7.5 Linux release boundary.
 
-This guide installs P.O.W.E.R. `v3.5.0` in an isolated virtual environment,
+This guide installs P.O.W.E.R. `v3.7.5` in an isolated virtual environment,
 creates a clean vault, verifies the CLI, and configures an MCP client. It uses
 PowerShell syntax throughout.
 
-> **Published release:** the signed `v3.5.0` tag and immutable wheel are
-> available on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> **Release artifact:** after publication, use only the signed `v3.7.5` tag and
+> immutable wheel from the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.5).
 > Physical Windows evidence remains a separate target-host gate; see the
 > [platform support matrix](support-matrix.md).
 
@@ -20,12 +20,12 @@ PowerShell syntax throughout.
 - Windows 11 25H2 is an official Windows 11 release (OS build family `26200`).
 - ONNX Runtime supports Windows 11, and its Windows builds require the current
   Microsoft Visual C++ runtime.
-- P.O.W.E.R. `v3.5.0` includes an automated cross-platform regression for the
+- P.O.W.E.R. `v3.7.5` includes an automated cross-platform regression for the
   Windows rename-overwrite behavior.
 - Physical Windows 11 25H2 validation was completed on 2026-08-08 for follow-up
   revision `4e5b2b9`; see the [validation report](tests/windows-11-25h2-validation.md).
   This validates the follow-up source/build and does not move or reissue the
-  immutable `v3.5.0` release artifacts.
+  immutable `v3.7.5` release artifacts.
 
 Official prerequisites:
 
@@ -84,6 +84,7 @@ $PowerHome = Join-Path $env:LOCALAPPDATA "POWER"
 $VenvDir = Join-Path $PowerHome ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $PowerExe = Join-Path $VenvDir "Scripts\power.exe"
+$McpExe = Join-Path $VenvDir "Scripts\power-mcp.exe"
 
 New-Item -ItemType Directory -Force -Path $PowerHome | Out-Null
 py -m venv $VenvDir
@@ -105,7 +106,7 @@ The release wheel avoids Git and pins the P.O.W.E.R. source version. Its Python
 dependencies are still resolved from the configured Python package index.
 
 ```powershell
-$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
+$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl"
 & $VenvPython -m pip install $ReleaseWheel
 if ($LASTEXITCODE -ne 0) { throw "P.O.W.E.R. installation failed" }
 ```
@@ -119,13 +120,13 @@ Verify the executable, distribution metadata, and lean FTS import:
 if ($LASTEXITCODE -ne 0) { throw "P.O.W.E.R. import verification failed" }
 ```
 
-Both version checks must report `3.5.0`, and the import check must print
-`lean FTS import: OK`. Install the explicit `[remote]` extra before configuring
+Both version checks must report `3.7.5`, and the import check must print
+`lean FTS import: OK`. Install the explicit `[mcp]` extra before configuring
 MCP, and `[semantic]` only when dense search is intentionally enabled:
 
 ```powershell
-$RemoteRequirement = "power-framework[remote] @ $ReleaseWheel"
-& $VenvPython -m pip install $RemoteRequirement
+$McpRequirement = "power-framework[mcp] @ $ReleaseWheel"
+& $VenvPython -m pip install $McpRequirement
 ```
 
 ### Alternative: install from the pinned tag
@@ -133,7 +134,7 @@ $RemoteRequirement = "power-framework[remote] @ $ReleaseWheel"
 Use this only when Git is installed:
 
 ```powershell
-& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.5.0"
+& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.7.5"
 ```
 
 Do not install unpinned `main` when reproducibility matters.
@@ -199,9 +200,9 @@ error, proxy, available disk space, and security event first.
 
 ## 7. Configure an MCP client
 
-Always point the client at the virtual environment's exact interpreter. The
-global `py` launcher may select a different interpreter where P.O.W.E.R. is not
-installed.
+Always point the client at the virtual environment's exact `power-mcp.exe`
+launcher. The global `py` launcher may select a different interpreter where
+P.O.W.E.R. is not installed.
 
 For Claude Desktop, edit
 `$env:APPDATA\Claude\claude_desktop_config.json`. Replace `YOUR-NAME` with the
@@ -219,8 +220,8 @@ Example JSON (backslashes must be doubled):
 {
   "mcpServers": {
     "power": {
-      "command": "C:\\Users\\YOUR-NAME\\AppData\\Local\\POWER\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "C:\\Users\\YOUR-NAME\\AppData\\Local\\POWER\\.venv\\Scripts\\power-mcp.exe",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "C:\\Users\\YOUR-NAME\\Documents\\POWER-Vault"
       }
@@ -233,7 +234,7 @@ Before restarting the MCP client, validate the configured interpreter and vault:
 
 ```powershell
 $env:POWER_VAULT_DIR = $Vault
-& $VenvPython -c "import os; from pathlib import Path; import power_framework.mcp; p=Path(os.environ['POWER_VAULT_DIR']); assert p.is_dir(); print('MCP preflight: OK')"
+& $McpExe preflight
 ```
 
 Restart the MCP client after saving its configuration. A long-lived client
@@ -280,9 +281,9 @@ runtime. Back it up before deleting either directory.
 
 - Windows reports version 25H2 / build family `26200`.
 - The selected Python is 3.11 or newer and the venv check prints `True`.
-- `power --version` and distribution metadata both report `3.5.0`.
+- `power --version` and distribution metadata both report `3.7.5`.
 - `power_framework` imports successfully without neural or MCP extras.
-- If MCP is configured, install the explicit `[remote]` extra and run its
+- If MCP is configured, install the explicit `[mcp]` extra and run its
   preflight with the same interpreter.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.
 - FTS sync exits `0` and search returns the acceptance note.

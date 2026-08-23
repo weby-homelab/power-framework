@@ -49,6 +49,7 @@ def build_receipt(
     assets_dir: Path,
     repository: str,
     workflow_run_id: str,
+    manifest_path: Path | None = None,
 ) -> dict[str, Any]:
     """Build a receipt tied to the exact tag commit, tree and local artifacts."""
     commit = _git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}")
@@ -58,7 +59,7 @@ def build_receipt(
         for path in assets_dir.iterdir()
         if path.is_file()
         and path.name != "power-framework.release-receipt.json"
-        and path.suffix in {".whl", ".gz", ".json"}
+        and path.suffix in {".whl", ".gz", ".json", ".txt"}
     )
     if not assets:
         raise ValueError(f"no release assets found in {assets_dir}")
@@ -68,6 +69,18 @@ def build_receipt(
         if repository and workflow_run_id
         else None
     )
+    manifest_file = manifest_path or assets_dir / "power-release-manifest.json"
+    if not manifest_file.is_file():
+        raise ValueError(f"unified release manifest is missing: {manifest_file}")
+    try:
+        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError("unified release manifest is not valid JSON") from exc
+    if not isinstance(manifest, dict) or manifest.get("schema") != "power.release.manifest.v1":
+        raise ValueError("unified release manifest schema is invalid")
+    if manifest.get("commit") != commit:
+        raise ValueError("unified release manifest commit does not match the tag commit")
+
     return {
         "schema_version": 1,
         "generated_at": datetime.now(UTC).isoformat(),
@@ -83,6 +96,13 @@ def build_receipt(
             "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
             "url": run_url,
         },
+        "unified_release_manifest": {
+            "name": manifest_file.name,
+            "sha256": _sha256(manifest_file),
+            "version": manifest.get("version"),
+            "commit": manifest.get("commit"),
+            "web_image": manifest.get("artifacts", {}).get("web_image"),
+        },
         "assets": [_asset_receipt(path) for path in assets],
     }
 
@@ -96,6 +116,7 @@ def main() -> int:
     parser.add_argument("--git-repo", type=Path, default=Path.cwd())
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
     parser.add_argument("--workflow-run-id", default=os.environ.get("GITHUB_RUN_ID", ""))
+    parser.add_argument("--release-manifest", type=Path, default=None)
     args = parser.parse_args()
 
     receipt = build_receipt(
@@ -104,6 +125,7 @@ def main() -> int:
         assets_dir=args.assets_dir.resolve(),
         repository=args.repository,
         workflow_run_id=args.workflow_run_id,
+        manifest_path=args.release_manifest.resolve() if args.release_manifest else None,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(

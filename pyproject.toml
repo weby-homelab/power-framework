@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "3.7.4"
+version = "3.7.5"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -33,6 +33,7 @@ dependencies = [
 [project.scripts]
 power = "power_framework.core.cli:main"
 power-mcp = "power_framework.mcp.entrypoint:main"
+power-web = "power_framework.web.app:main"
 
 [dependency-groups]
 dev = [
@@ -54,21 +55,17 @@ dev = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "build>=1.2.0",
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=6.0.0",
-    "httpx>=0.27.0",
-    "jsonschema>=4.23.0",
-    "ruff>=0.8.0",
-    "mypy>=1.13.0",
-    "types-PyYAML>=6.0.0",
-    "pre-commit>=4.0.0",
-    "pip-audit>=2.7.0",
-    "mcp>=2.0,<3.0",
-    "mkdocs>=1.6.0",
-    "mkdocs-material>=9.7.0",
+web = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "jinja2>=3.1.4",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.2.0",
+    "bleach>=6.1.0",
+    "markdown>=3.6.0",
+    "pygments>=2.18.0",
+    "itsdangerous>=2.2.0",
+    "anyio>=4.4.0",
 ]
 # Optional profiles are explicit so the base install remains FTS-only and does
 # not pull a model runtime, tokenizer, numerical stack, or MCP transport.
@@ -197,6 +194,8 @@ disable_error_code = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F405"]
 "tests/*" = ["S101", "T20", "DTZ001"]
+"tests/web/*.py" = ["S105", "S106"]
+"tests/web/**/*.py" = ["S105", "S106"]
 "scripts/*" = ["T20", "S310"]
 "benchmarks/power31/scripts/*" = ["T20", "RUF001", "RUF002", "RUF003"]
 "benchmarks/power31/tests/*" = ["S101", "T20", "DTZ001", "RUF001", "RUF002", "RUF003"]
@@ -207,3 +206,8 @@ disable_error_code = [
 "scripts/check_search_quality.py" = ["T20", "S310", "RUF001"]
 "src/power_framework/core/cli.py" = ["T201"]
 "src/power_framework/mcp/power_server.py" = ["S104"]
+# FastAPI declares dependency/form providers in route signatures; these calls are
+# route metadata, not eagerly executed application work.
+"src/power_framework/web/routes/*.py" = ["B008", "TC001"]
+# These strings are intentionally Ukrainian UI translations, not confusable code.
+"src/power_framework/web/i18n.py" = ["RUF001"]

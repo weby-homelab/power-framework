@@ -1,0 +1,96 @@
+{% extends "base.html" %} {% block title %}{{ note.metadata.get('title',
+note.rel_path) }}{% endblock %} {% block content %}
+<div
+    style="
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    "
+>
+    <div>
+        <a
+            href="/notes"
+            style="
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 0.85rem;
+            "
+            >&larr; Назад до списку</a
+        >
+        <h1 style="font-size: 1.75rem; font-weight: 700; margin-top: 4px">
+            {{ note.metadata.get('title', note.rel_path) }}
+        </h1>
+        <div
+            style="
+                font-family: monospace;
+                color: var(--text-secondary);
+                font-size: 0.8rem;
+            "
+        >
+            Шлях: {{ note.rel_path }} &middot; ETag:
+            <code>{{ note.etag }}</code>
+        </div>
+    </div>
+    <div style="display: flex; gap: 8px">
+        <a href="/notes/edit?path={{ note.rel_path }}" class="btn btn-primary"
+            >✏️ Редагувати (Proposal)</a
+        >
+    </div>
+</div>
+
+<!-- Metadata Header Card -->
+{% if note.metadata %}
+<div
+    class="card"
+    style="
+        padding: 14px 20px;
+        margin-bottom: 20px;
+        font-size: 0.85rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        background: rgba(30, 41, 59, 0.7);
+    "
+>
+    <div>
+        <strong>Тип:</strong>
+        <span class="badge badge-info"
+            >{{ note.metadata.get('type', 'Unknown') }}</span
+        >
+    </div>
+    {% if note.metadata.get('tags') %}
+    <div>
+        <strong>Теги:</strong>
+        {% for t in note.metadata.get('tags', []) %}
+        <span
+            class="badge"
+            style="
+                background: var(--bg-surface-elevated);
+                color: var(--text-secondary);
+            "
+            >#{{ t }}</span
+        >
+        {% endfor %}
+    </div>
+    {% endif %} {% if note.metadata.get('timestamp') %}
+    <div>
+        <strong>Створено:</strong>
+        <span>{{ note.metadata.get('timestamp') }}</span>
+    </div>
+    {% endif %}
+    <div>
+        <strong>Довіра:</strong>
+        <span class="badge badge-success">{{ note.trust_label }}</span>
+    </div>
+</div>
+{% endif %}
+
+<!-- Rendered Content -->
+<div
+    class="card markdown-body"
+    style="line-height: 1.7; font-size: 1rem; padding: 32px"
+>
+    {{ rendered_html|safe }}
+</div>
+{% endblock %}

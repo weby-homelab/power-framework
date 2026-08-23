@@ -1,18 +1,36 @@
 # Getting Started from a Clean Knowledge Base
 
-This is the authoritative clean-install path for P.O.W.E.R. `v3.7.4`. It
+This is the authoritative clean-install path for P.O.W.E.R. `v3.7.5`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
 
-> **Candidate release contract:** use `v3.7.4` only after its signed tag and immutable
-> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.4).
+> **Release contract:** use `v3.7.5` only after its signed tag and immutable
+> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.5).
 > This guide names the tag-bound target; the URL alone does not prove that
 > publication completed. Check the [platform support matrix](support-matrix.md)
 > before applying the procedure to a non-Linux host.
 
 The [Windows installation guide](windows-11-installation.md) is informational
 only. Windows and macOS are deferred indefinitely and are not supported release
-platforms for `v3.7.4`.
+platforms for `v3.7.5`.
+
+## Choose a supported deployment profile
+
+### Profile A — headless / agent server
+
+Complete the native installation below for a full POWER installation. It
+requires one managed `power-framework` runtime, the `power` CLI, optional
+`power-mcp` stdio support, one host-side POWER Skill identity, and one canonical
+vault. Docker, Web UI, reverse proxy, and Web cache are not required.
+
+### Profile B — full human + agent server
+
+Complete Profile A first. Then run the matching `power-web` image from the
+[Profile B deployment contract](architecture/unified-runtime.md). Profile B uses the same
+canonical vault read-write for governed Web proposal/apply operations, a
+rebuildable named Web cache, host loopback `127.0.0.1:8080`, and no MCP service
+inside the container. Provision the container's non-root UID/GID with the
+intended host-side vault permissions.
 
 ## 1. Prerequisites
 
@@ -35,12 +53,12 @@ POWER_CLI="$HOME/.local/share/power/venv/bin/power"
 
 "$POWER_PYTHON" -m pip install --upgrade pip
 "$POWER_PYTHON" -m pip install \
-  https://github.com/weby-homelab/power-framework/releases/download/v3.7.4/power_framework-3.7.4-py3-none-any.whl
+  https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl
 ```
 
 The base release wheel is FTS-only: it does not install ONNX Runtime, model
-tokenizers, numerical packages, or the optional MCP transport. Add the explicit
-`mcp` (or compatibility alias `remote`) extra before configuring MCP, and add
+tokenizers, numerical packages, or the optional MCP SDK. Add the explicit
+`mcp` extra before configuring MCP, and add
 `semantic` only for local dense experiments.
 
 Verify the executable, package metadata, and lean import:
@@ -53,14 +71,14 @@ Verify the executable, package metadata, and lean import:
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Both version commands must report `3.7.4`; the final command must print
+Both version commands must report `3.7.5`; the final command must print
 `lean FTS import: OK`.
 
 For local MCP, install the official SDK extra from the same wheel:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.4/power_framework-3.7.4-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl"
 ```
 
 ### Alternative: install from the pinned tag
@@ -69,7 +87,7 @@ This path requires Git:
 
 ```bash
 "$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.7.4'
+  'git+https://github.com/weby-homelab/power-framework.git@v3.7.5'
 ```
 
 Do not use an unpinned `main` install when reproducibility matters.
@@ -174,12 +192,16 @@ the same virtual-environment interpreter used above:
 Preflight the exact interpreter and vault before restarting the client:
 
 ```bash
-POWER_VAULT_DIR="$POWER_VAULT" "$POWER_VENV/bin/power-mcp" preflight
+  POWER_VAULT_DIR="$POWER_VAULT" "$HOME/.local/share/power/venv/bin/power-mcp" preflight
 ```
 
 Restart long-lived MCP clients after changing their configuration or Python
 environment. See [MCP Server](mcp-server.md) for the 20-tool contract and
-transport security boundary.
+stdio transport security boundary.
+
+The Web UI is not a second native product. It is shipped by the same wheel and
+runs only in the Web-only container described in the
+[Profile B deployment contract](architecture/unified-runtime.md).
 
 ## 8. Daily operating sequence
 
@@ -210,9 +232,9 @@ it up before removing either location.
 ## Acceptance checklist
 
 - Python is 3.13 or 3.14 and the selected interpreter is inside the dedicated venv.
-- CLI and distribution metadata both report `3.7.4`.
+- CLI and distribution metadata both report `3.7.5`.
 - `power_framework` imports successfully without neural or MCP extras.
-- If MCP is configured, the explicit `remote` extra is installed and MCP
+- If MCP is configured, the explicit `mcp` extra is installed and MCP
   preflight validates the configured vault through the public `power-mcp` launcher.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.
 - FTS sync exits `0` and FTS search returns the first note.

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Нотатки{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 700;">Нотатки бази знань</h1>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            Всього знайдено: {{ sources.total_count }} нотаток
+        </p>
+    </div>
+</div>
+
+<!-- Category Filters -->
+<div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+    <a href="/notes" class="btn {% if not category %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">{{ t('all') }}</a>
+    {% for cat in categories %}
+    <a href="/notes?category={{ cat }}" class="btn {% if category == cat %}btn-primary{% else %}btn-secondary{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">{{ cat }} ({{ stats.category_counts.get(cat, 0) }})</a>
+    {% endfor %}
+</div>
+
+<!-- Note Cards List -->
+<div class="card">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 0.85rem;">
+                <th style="padding: 10px;">Назва</th>
+                <th style="padding: 10px;">Категорія</th>
+                <th style="padding: 10px;">Теги</th>
+                <th style="padding: 10px;">Розмір</th>
+                <th style="padding: 10px; text-align: right;">Дія</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in sources.items %}
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 12px 10px;">
+                    <a href="/notes/read?path={{ item.rel_path }}" style="color: var(--accent); text-decoration: none; font-weight: 600;">
+                        {{ item.title }}
+                    </a>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); font-family: monospace;">{{ item.rel_path }}</div>
+                </td>
+                <td style="padding: 12px 10px; font-size: 0.85rem;">
+                    <span class="badge badge-info">{{ item.category }}</span>
+                </td>
+                <td style="padding: 12px 10px;">
+                    {% for tag in item.tags %}
+                    <span style="background: var(--bg-surface-elevated); font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; color: var(--text-secondary); margin-right: 4px;">#{{ tag }}</span>
+                    {% endfor %}
+                </td>
+                <td style="padding: 12px 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                    {{ (item.size_bytes / 1024)|round(1) }} KB
+                </td>
+                <td style="padding: 12px 10px; text-align: right;">
+                    <a href="/notes/read?path={{ item.rel_path }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;">Читати</a>
+                    <a href="/notes/edit?path={{ item.rel_path }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;">Редагувати</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if sources.next_cursor %}
+    <div style="margin-top: 16px; text-align: center;">
+        <a href="/notes?cursor={{ sources.next_cursor }}{% if category %}&category={{ category }}{% endif %}" class="btn btn-secondary">Завантажити більше &rarr;</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

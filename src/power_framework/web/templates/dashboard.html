@@ -1,0 +1,291 @@
+{% extends "base.html" %} {% block title %}{{ t('dashboard', current_lang) }}{%
+endblock %} {% block head %}
+<style>
+    .dashboard-split-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+    }
+    @media (max-width: 900px) {
+        .dashboard-split-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %} {% block content %}
+<div
+    style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 12px;
+    "
+>
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 700">
+            {{ t('dashboard', current_lang) }} (P.O.W.E.R. {{ power_version }} —
+            Web UI)
+        </h1>
+        <p style="color: var(--text-secondary); font-size: 0.9rem">
+            Vault: <code>{{ settings.vault_path }}</code> &middot; Vault ID:
+            <code>{{ stats.vault_id }}</code>
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap">
+        <a href="/tasks/new" class="btn btn-primary"
+            >{{ t('new_task', current_lang) }}</a
+        >
+        <a href="/search" class="btn btn-secondary"
+            >🔍 {{ t('search', current_lang) }}</a
+        >
+        <a href="/graph" class="btn btn-secondary"
+            >🕸️ {{ t('graph', current_lang) }}</a
+        >
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div
+    style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+    "
+>
+    <div class="card" style="margin-bottom: 0">
+        <div
+            style="
+                color: var(--text-secondary);
+                font-size: 0.75rem;
+                text-transform: uppercase;
+            "
+        >
+            {{ t('total_notes', current_lang) }}
+        </div>
+        <div style="font-size: 1.8rem; font-weight: 700; color: var(--accent)">
+            {{ stats.total_notes }}
+        </div>
+    </div>
+    {% for cat, count in stats.category_counts.items() %}
+    <div class="card" style="margin-bottom: 0">
+        <div
+            style="
+                color: var(--text-secondary);
+                font-size: 0.75rem;
+                text-transform: uppercase;
+            "
+        >
+            {{ cat }}
+        </div>
+        <div
+            style="
+                font-size: 1.8rem;
+                font-weight: 700;
+                color: var(--text-primary);
+            "
+        >
+            {{ count }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Main Split: Tasks & Recent Activity -->
+<div class="dashboard-split-grid">
+    <div>
+        <div class="card">
+            <div
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 16px;
+                "
+            >
+                <h2 style="font-size: 1.25rem">
+                    {{ t('task_manager', current_lang) }}
+                </h2>
+                <a
+                    href="/tasks"
+                    style="
+                        color: var(--accent);
+                        text-decoration: none;
+                        font-size: 0.85rem;
+                    "
+                    >{{ t('view_all', current_lang) }}</a
+                >
+            </div>
+            {% if active_tasks %}
+            <div class="table-responsive">
+                <table
+                    style="
+                        width: 100%;
+                        border-collapse: collapse;
+                        text-align: left;
+                        min-width: 500px;
+                    "
+                >
+                    <thead>
+                        <tr
+                            style="
+                                border-bottom: 1px solid var(--border);
+                                color: var(--text-secondary);
+                                font-size: 0.8rem;
+                            "
+                        >
+                            <th style="padding: 8px">ID</th>
+                            <th style="padding: 8px">
+                                {{ t('task_title', current_lang) }}
+                            </th>
+                            <th style="padding: 8px">
+                                {{ t('status', current_lang) }}
+                            </th>
+                            <th style="padding: 8px">Priority</th>
+                            <th style="padding: 8px">
+                                {{ t('revision', current_lang) }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task_item in active_tasks %}
+                        <tr style="border-bottom: 1px solid var(--border)">
+                            <td
+                                style="
+                                    padding: 10px 8px;
+                                    font-family: monospace;
+                                    font-size: 0.85rem;
+                                "
+                            >
+                                <a
+                                    href="/tasks/{{ task_item.task_id }}"
+                                    style="
+                                        color: var(--accent);
+                                        text-decoration: none;
+                                    "
+                                    >{{ task_item.task_id }}</a
+                                >
+                            </td>
+                            <td style="padding: 10px 8px; font-weight: 500">
+                                {{ task_item.title }}
+                            </td>
+                            <td style="padding: 10px 8px">
+                                <span class="badge badge-info"
+                                    >{{ task_item.state }}</span
+                                >
+                            </td>
+                            <td style="padding: 10px 8px; font-size: 0.85rem">
+                                {{ task_item.priority }}
+                            </td>
+                            <td
+                                style="
+                                    padding: 10px 8px;
+                                    font-family: monospace;
+                                    font-size: 0.85rem;
+                                "
+                            >
+                                v{{ task_item.revision }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p style="color: var(--text-secondary); padding: 16px 0">
+                No active tasks in queue.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <div
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 16px;
+                "
+            >
+                <h2 style="font-size: 1.25rem">
+                    {{ t('receipts_ledger', current_lang) }}
+                </h2>
+                <a
+                    href="/receipts"
+                    style="
+                        color: var(--accent);
+                        text-decoration: none;
+                        font-size: 0.85rem;
+                    "
+                    >{{ t('view_all', current_lang) }}</a
+                >
+            </div>
+            {% if receipts %}
+            <ul style="list-style: none">
+                {% for r in receipts %}
+                <li
+                    style="
+                        padding: 8px 0;
+                        border-bottom: 1px solid var(--border);
+                        font-size: 0.85rem;
+                    "
+                >
+                    <div style="display: flex; justify-content: space-between">
+                        <strong
+                            >{{ r.operation if r.operation else 'receipt'
+                            }}</strong
+                        >
+                        <span class="badge badge-success"
+                            >{{ r.status if r.status else 'ok' }}</span
+                        >
+                    </div>
+                    <div
+                        style="
+                            font-family: monospace;
+                            color: var(--text-secondary);
+                            font-size: 0.75rem;
+                            word-break: break-all;
+                        "
+                    >
+                        Hash: {{ r.data_sha256[:16] if r.data_sha256 else
+                        r.get('receipt_id', 'n/a') }}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p style="color: var(--text-secondary); padding: 12px 0">
+                No audit receipts available.
+            </p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2 style="font-size: 1.25rem; margin-bottom: 12px">
+                {{ t('system_status', current_lang) }}
+            </h2>
+            <div style="font-size: 0.85rem; line-height: 1.8">
+                <div>
+                    OKF Vault: <span class="badge badge-success">Mounted</span>
+                </div>
+                <div>
+                    Application API:
+                    <span class="badge badge-success">v2.0 Active</span>
+                </div>
+                <div>
+                    Task Manager:
+                    <span class="badge badge-success">v2.0 Ready</span>
+                </div>
+                <div>
+                    Security Guard:
+                    <span class="badge badge-success">Hardened</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

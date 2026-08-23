@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Нове завдання{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/tasks" style="color: var(--text-secondary); text-decoration: none; font-size: 0.85rem;">&larr; Назад до списку завдань</a>
+    <h1 style="font-size: 1.75rem; font-weight: 700; margin-top: 4px;">Створення завдання (PowerTask v2)</h1>
+</div>
+
+<form action="/tasks/new" method="POST" class="card" style="max-width: 800px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div style="margin-bottom: 16px;">
+
+        <label for="taskId" style="display: block; font-weight: 600; margin-bottom: 6px;">ID завдання (унікальний):</label>
+        <input type="text" id="taskId" name="task_id" required placeholder="task_2026_08_14_01" style="width: 100%; padding: 10px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; font-family: monospace;">
+    </div>
+
+    <div style="margin-bottom: 16px;">
+        <label for="taskTitle" style="display: block; font-weight: 600; margin-bottom: 6px;">Назва завдання:</label>
+        <input type="text" id="taskTitle" name="title" required placeholder="Короткий опис цілі" style="width: 100%; padding: 10px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px;">
+    </div>
+
+    <div style="margin-bottom: 16px;">
+        <label for="taskObjective" style="display: block; font-weight: 600; margin-bottom: 6px;">Детальна мета (Objective):</label>
+        <textarea id="taskObjective" name="objective" rows="4" placeholder="Опис вимог, контексту та очікуваного результату…" style="width: 100%; padding: 10px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; resize: vertical;"></textarea>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+        <div>
+            <label for="taskOwner" style="display: block; font-weight: 600; margin-bottom: 6px;">Власник (Owner):</label>
+            <input type="text" id="taskOwner" name="owner" value="local" style="width: 100%; padding: 10px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+            <label for="taskPriority" style="display: block; font-weight: 600; margin-bottom: 6px;">Пріоритет:</label>
+            <select id="taskPriority" name="priority" style="width: 100%; padding: 10px; background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px;">
+                <option value="low">Низький (low)</option>
+                <option value="normal" selected>Звичайний (normal)</option>
+                <option value="high">Високий (high)</option>
+                <option value="critical">Критичний (critical)</option>
+            </select>
+        </div>
+        <div>
+            <label for="taskAuthority" style="display: block; font-weight: 600; margin-bottom: 6px;">Рівень повноважень:</label>
+            <select id="taskAuthority" name="authority" style="width: 100%; padding: 10px; background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px;">
+                <option value="read-only" selected>Read-Only</option>
+                <option value="propose">Propose (з пропозиціями)</option>
+                <option value="apply">Apply (із застосуванням)</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <a href="/tasks" class="btn btn-secondary">Скасувати</a>
+        <button type="submit" class="btn btn-primary">Зберегти завдання &rarr;</button>
+    </div>
+</form>
+{% endblock %}

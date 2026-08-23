@@ -1,16 +1,16 @@
-# Історичний гід: встановлення P.O.W.E.R. 3.5.0 на Windows 11 25H2
+# Інформаційний гід: встановлення P.O.W.E.R. 3.7.5 на Windows 11 25H2
 
-> **Не є процедурою для `v3.7.4`.** Підтримку Windows відкладено на
-> невизначений строк без запланованого release target. Команди нижче зберігають
-> історичну host-validation процедуру `v3.5.0` і не є доказом сумісності чи
-> release certification для кандидата 3.7.4.
+> **Не є підтримуваною платформою для `v3.7.5`.** Підтримку Windows відкладено
+> на невизначений строк без запланованого release target. Команди нижче мають
+> інформаційний характер і не є доказом сумісності Windows чи release
+> certification для Linux-релізу 3.7.5.
 
-Цей гід встановлює P.O.W.E.R. `v3.5.0` в ізольоване віртуальне середовище,
+Цей гід встановлює P.O.W.E.R. `v3.7.5` в ізольоване віртуальне середовище,
 створює чистий vault, перевіряє CLI та налаштовує MCP-клієнт. Усі команди
 наведено для PowerShell.
 
-> **Опублікований реліз:** підписаний tag `v3.5.0` та immutable wheel доступні
-> на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.5.0).
+> **Release artifact:** після публікації використовуйте лише підписаний tag
+> `v3.7.5` та immutable wheel зі [сторінки релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.5).
 > Фізичні Windows-докази залишаються окремим target-host gate; дивіться
 > [матрицю підтримки платформ](support-matrix.ua.md).
 
@@ -20,12 +20,12 @@
 - Windows 11 25H2 є офіційним релізом Windows 11 (сімейство OS build `26200`).
 - ONNX Runtime підтримує Windows 11, а його Windows-збірки потребують
   актуального Microsoft Visual C++ Runtime.
-- P.O.W.E.R. `v3.5.0` має автоматизований кросплатформний regression-тест
+- P.O.W.E.R. `v3.7.5` має автоматизований кросплатформний regression-тест
   поведінки rename-overwrite у Windows.
 - Фізичну перевірку Windows 11 25H2 завершено 2026-08-08 для follow-up revision
   `4e5b2b9`; див. [звіт перевірки](tests/windows-11-25h2-validation.md).
   Це підтверджує follow-up source/build і не переміщує та не перевидає
-  незмінні release-артефакти `v3.5.0`.
+  незмінні release-артефакти `v3.7.5`.
 
 Офіційні передумови:
 
@@ -84,6 +84,7 @@ $PowerHome = Join-Path $env:LOCALAPPDATA "POWER"
 $VenvDir = Join-Path $PowerHome ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $PowerExe = Join-Path $VenvDir "Scripts\power.exe"
+$McpExe = Join-Path $VenvDir "Scripts\power-mcp.exe"
 
 New-Item -ItemType Directory -Force -Path $PowerHome | Out-Null
 py -m venv $VenvDir
@@ -105,7 +106,7 @@ Release wheel не потребує Git і фіксує версію вихід�
 Python-залежності все одно завантажуються з налаштованого Python package index.
 
 ```powershell
-$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.5.0/power_framework-3.5.0-py3-none-any.whl"
+$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl"
 & $VenvPython -m pip install $ReleaseWheel
 if ($LASTEXITCODE -ne 0) { throw "Помилка встановлення P.O.W.E.R." }
 ```
@@ -119,13 +120,13 @@ if ($LASTEXITCODE -ne 0) { throw "Помилка встановлення P.O.W.
 if ($LASTEXITCODE -ne 0) { throw "Помилка перевірки імпортів P.O.W.E.R." }
 ```
 
-Обидві перевірки версії мають показати `3.5.0`, а import check —
-`lean FTS import: OK`. Перед MCP встановіть явний extra `[remote]`, а
+Обидві перевірки версії мають показати `3.7.5`, а import check —
+`lean FTS import: OK`. Перед MCP встановіть явний extra `[mcp]`, а
 `[semantic]` — лише для свідомо увімкненого dense search:
 
 ```powershell
-$RemoteRequirement = "power-framework[remote] @ $ReleaseWheel"
-& $VenvPython -m pip install $RemoteRequirement
+$McpRequirement = "power-framework[mcp] @ $ReleaseWheel"
+& $VenvPython -m pip install $McpRequirement
 ```
 
 ### Альтернатива: встановлення із закріпленого tag
@@ -133,7 +134,7 @@ $RemoteRequirement = "power-framework[remote] @ $ReleaseWheel"
 Використовуйте лише коли Git уже встановлено:
 
 ```powershell
-& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.5.0"
+& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.7.5"
 ```
 
 Не встановлюйте незакріплений `main`, якщо важлива відтворюваність.
@@ -205,8 +206,9 @@ SmartScreen заради успішного download: спочатку пере�
 
 ## 7. Налаштуйте MCP-клієнт
 
-Завжди вказуйте точний interpreter virtual environment. Глобальний launcher
-`py` може обрати інший Python, у якому P.O.W.E.R. не встановлено.
+Завжди вказуйте точний launcher `power-mcp.exe` із virtual environment.
+Глобальний launcher `py` може обрати інший Python, у якому P.O.W.E.R. не
+встановлено.
 
 Для Claude Desktop відредагуйте
 `$env:APPDATA\Claude\claude_desktop_config.json`. Замініть `YOUR-NAME` на
@@ -223,8 +225,8 @@ $Vault
 {
   "mcpServers": {
     "power": {
-      "command": "C:\\Users\\YOUR-NAME\\AppData\\Local\\POWER\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "power_framework.mcp"],
+      "command": "C:\\Users\\YOUR-NAME\\AppData\\Local\\POWER\\.venv\\Scripts\\power-mcp.exe",
+      "args": [],
       "env": {
         "POWER_VAULT_DIR": "C:\\Users\\YOUR-NAME\\Documents\\POWER-Vault"
       }
@@ -237,7 +239,7 @@ $Vault
 
 ```powershell
 $env:POWER_VAULT_DIR = $Vault
-& $VenvPython -c "import os; from pathlib import Path; import power_framework.mcp; p=Path(os.environ['POWER_VAULT_DIR']); assert p.is_dir(); print('MCP preflight: OK')"
+& $McpExe preflight
 ```
 
 Після збереження конфігурації перезапустіть MCP-клієнт. Long-lived client не
@@ -274,7 +276,7 @@ runtime. Зробіть backup перед видаленням будь-яког
 | `Activate.ps1` заблоковано | Activation не потрібна. Продовжуйте через `$VenvPython` і `$PowerExe`. Якщо змінюєте execution policy, спочатку прочитайте офіційний гід Microsoft і перевірте Group Policy організації. |
 | `DLL load failed` під час import `onnxruntime` | Встановіть або відновіть актуальний Visual C++ 2015–2022 Redistributable для архітектури хоста, потім відкрийте Terminal знову. |
 | `pip install git+...` падає | Встановіть Git for Windows або використовуйте release wheel, який не потребує Git. |
-| MCP-клієнт повідомляє `module not found` | Його `command` вказує на неправильний Python. Використайте повний шлях `.venv\Scripts\python.exe` і перезапустіть клієнт. |
+| MCP-клієнт повідомляє `power-mcp.exe` не знайдено | Його `command` вказує на неправильне середовище. Використайте повний шлях `.venv\Scripts\power-mcp.exe` і перезапустіть клієнт. |
 | Явний `POWER_EMBED_DEVICE=cuda` завершується `requested_onnx_provider_not_bound` | Це fail-closed GPU-контракт: сесія не прив'язала CUDA. Не приховуйте помилку; перевірте `nvidia-*` runtime, `onnxruntime-gpu`, або задайте `POWER_EMBED_DEVICE=auto` лише коли CPU fallback справді потрібен. |
 | `power init` відмовляється працювати | Каталог не порожній. Не обходьте захисну перевірку; оберіть новий шлях або migration guide. |
 | Dense sync падає | Залишайте failure closed. Перевірте диск, network/proxy та точну model error; FTS доступний через `sync --fts-only` і `search --mode fts`. |
@@ -283,9 +285,9 @@ runtime. Зробіть backup перед видаленням будь-яког
 
 - Windows повідомляє version 25H2 / build family `26200`.
 - Обраний Python має версію 3.11+; venv-перевірка повертає `True`.
-- `power --version` і distribution metadata повертають `3.5.0`.
+- `power --version` і distribution metadata повертають `3.7.5`.
 - `power_framework` імпортується без neural/MCP extras.
-- Якщо налаштовано MCP, встановіть явний extra `[remote]` і запустіть preflight
+- Якщо налаштовано MCP, встановіть явний extra `[mcp]` і запустіть preflight
   тим самим interpreter.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з
   кодом `0`.

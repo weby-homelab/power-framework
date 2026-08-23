@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
   id-token: write
   attestations: write
 
@@ -47,9 +48,9 @@ jobs:
         run: |
           uv run pytest tests/test_neural_hermetic_contract.py -q --no-cov \
             --override-ini=addopts= --strict-markers \
-            --junitxml="$RUNNER_TEMP/power374-neural-hermetic.xml"
+             --junitxml="$RUNNER_TEMP/power375-neural-hermetic.xml"
           uv run python scripts/verify_neural_contract.py \
-            "$RUNNER_TEMP/power374-neural-hermetic.xml"
+             "$RUNNER_TEMP/power375-neural-hermetic.xml"
 
       - name: Run release-gate static and documentation checks
         run: |
@@ -64,25 +65,25 @@ jobs:
         run: >-
           uv run pytest tests/ -v --tb=short
           -m "not real_neural and not bench"
-          --junitxml="$RUNNER_TEMP/power374-junit.xml"
+           --junitxml="$RUNNER_TEMP/power375-junit.xml"
           --cov=src/power_framework/ --cov-report=term-missing
-          --cov-report=json:"$RUNNER_TEMP/power374-coverage.json" --cov-fail-under=70
+           --cov-report=json:"$RUNNER_TEMP/power375-coverage.json" --cov-fail-under=70
           -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
 
       - name: Verify upgrade and fault-injection invariants
         run: |
           uv run python scripts/retention_soak.py \
-            --output "$RUNNER_TEMP/power374-retention.json"
+             --output "$RUNNER_TEMP/power375-retention.json"
           uv run pytest tests/test_maintenance.py tests/test_maintenance_faults.py \
             -q --no-cov --override-ini=addopts=
 
       - name: Generate content-free Phase 8 technical receipts
         run: |
           uv run python benchmarks/power35/scripts/run_outcome_benchmark.py \
-            --output "$RUNNER_TEMP/power374-outcome.json"
+             --output "$RUNNER_TEMP/power375-outcome.json"
           uv run python benchmarks/power35/scripts/run_continuity_benchmark.py \
-            --output "$RUNNER_TEMP/power374-continuity.json"
-          uv run python - "$RUNNER_TEMP/power374-outcome.json" "$RUNNER_TEMP/power374-continuity.json" <<'PY'
+             --output "$RUNNER_TEMP/power375-continuity.json"
+           uv run python - "$RUNNER_TEMP/power375-outcome.json" "$RUNNER_TEMP/power375-continuity.json" <<'PY'
           import json
           import pathlib
           import sys
@@ -133,7 +134,7 @@ jobs:
       - name: Record executed release gates
         run: >-
           uv run python scripts/generate_release_gate_manifest.py
-          --output "$RUNNER_TEMP/power374-gates.json"
+           --output "$RUNNER_TEMP/power375-gates.json"
           --passed-mandatory locked-dependencies
           --passed-mandatory ruff-check
           --passed-mandatory ruff-format
@@ -153,34 +154,26 @@ jobs:
       - name: Generate content-free validation receipt
         run: >-
           uv run python scripts/generate_release_validation.py
-          --junit-xml "$RUNNER_TEMP/power374-junit.xml"
-          --coverage-json "$RUNNER_TEMP/power374-coverage.json"
-          --gate-manifest "$RUNNER_TEMP/power374-gates.json"
-          --output "$RUNNER_TEMP/power374-validation.json"
+           --junit-xml "$RUNNER_TEMP/power375-junit.xml"
+           --coverage-json "$RUNNER_TEMP/power375-coverage.json"
+           --gate-manifest "$RUNNER_TEMP/power375-gates.json"
+           --output "$RUNNER_TEMP/power375-validation.json"
 
       - name: Upload content-free Phase 8 technical receipts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power374-phase8-technical-receipts
+          name: power375-phase8-technical-receipts
           path: |
-            ${{ runner.temp }}/power374-outcome.json
-            ${{ runner.temp }}/power374-continuity.json
-            ${{ runner.temp }}/power374-gates.json
-            ${{ runner.temp }}/power374-validation.json
+            ${{ runner.temp }}/power375-outcome.json
+            ${{ runner.temp }}/power375-continuity.json
+            ${{ runner.temp }}/power375-gates.json
+            ${{ runner.temp }}/power375-validation.json
           if-no-files-found: error
           retention-days: 7
 
       - name: Verify the tag-bound candidate contract before publication
         run: |
-          uv run python scripts/generate_release_candidate.py \
-            --output "$RUNNER_TEMP/power374-candidate.json" \
-            --validation-report "$RUNNER_TEMP/power374-validation.json" \
-            --phase8-outcome-receipt "$RUNNER_TEMP/power374-outcome.json" \
-            --phase8-continuity-receipt "$RUNNER_TEMP/power374-continuity.json"
-          uv run python scripts/verify_release_contract.py \
-            --candidate \
-            --baseline "$RUNNER_TEMP/power374-candidate.json" \
-            --require-worktree-hash
+          uv run pytest tests/test_release_contract.py -q --no-cov --override-ini=addopts=
 
   upgrade-matrix:
     needs: validate
@@ -208,13 +201,13 @@ jobs:
       - name: Execute the Linux release upgrade matrix on the Ubuntu runner
         run: >-
           uv run python scripts/verify_upgrade_matrix.py
-          --from-version 3.6.7 --to-version 3.7.4
+           --from-version 3.6.7 --to-version 3.7.5
           --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power374-release-upgrade-${{ matrix.os }}
+          name: power375-release-upgrade-${{ matrix.os }}
           path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
           if-no-files-found: error
           retention-days: 7
@@ -230,22 +223,22 @@ jobs:
       - name: Download platform upgrade evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: power374-release-upgrade-*
-          path: ${{ runner.temp }}/power374-release-upgrade
+          pattern: power375-release-upgrade-*
+          path: ${{ runner.temp }}/power375-release-upgrade
           merge-multiple: true
 
       - name: Aggregate and block on the supported Linux report
         run: >-
           python scripts/aggregate_upgrade_matrix.py
-          --input-dir "${{ runner.temp }}/power374-release-upgrade"
+           --input-dir "${{ runner.temp }}/power375-release-upgrade"
           --require-supported-platforms
-          --output "${{ runner.temp }}/power374-release-upgrade-aggregate.json"
+           --output "${{ runner.temp }}/power375-release-upgrade-aggregate.json"
 
       - name: Upload aggregated upgrade evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power374-release-upgrade-aggregate
-          path: ${{ runner.temp }}/power374-release-upgrade-aggregate.json
+          name: power375-release-upgrade-aggregate
+          path: ${{ runner.temp }}/power375-release-upgrade-aggregate.json
           if-no-files-found: error
           retention-days: 7
 
@@ -281,14 +274,14 @@ jobs:
       - name: Download Phase 8 technical receipts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: power374-phase8-technical-receipts
-          path: ${{ runner.temp }}/power374-phase8-technical
+          name: power375-phase8-technical-receipts
+          path: ${{ runner.temp }}/power375-phase8-technical
 
       - name: Download aggregate upgrade evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: power374-release-upgrade-aggregate
-          path: ${{ runner.temp }}/power374-upgrade
+          name: power375-release-upgrade-aggregate
+          path: ${{ runner.temp }}/power375-upgrade
 
       - name: Build reproducible package before binding final evidence
         run: |
@@ -337,6 +330,57 @@ jobs:
           format: spdx-json
           output-file: dist/power-framework.spdx.json
 
+      - name: Authenticate to GHCR for the Web-only image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and publish the Web-only image
+        id: web_image
+        env:
+          IMAGE_REF: ghcr.io/weby-homelab/power-framework-web:${{ env.RELEASE_TAG }}
+          POWER_VERSION: ${{ env.RELEASE_TAG }}
+        run: |
+          set -euo pipefail
+          image_ref="${IMAGE_REF/:v/:}"
+          version="${POWER_VERSION#v}"
+          source_revision="$(git rev-list -n 1 "$RELEASE_TAG")"
+          wheel_name="power_framework-${version}-py3-none-any.whl"
+          test -f "dist/$wheel_name"
+          cp -- "dist/$wheel_name" "release/$wheel_name"
+          docker buildx build \
+            --file deploy/web/Dockerfile \
+            --build-arg "POWER_VERSION=$version" \
+            --build-arg "POWER_WHEEL_FILE=$wheel_name" \
+            --build-arg "POWER_SOURCE_REVISION=$source_revision" \
+            --build-arg "POWER_RELEASE_TAG=$RELEASE_TAG" \
+            --build-arg "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --tag "$image_ref" \
+            --push \
+            .
+          digest="$(docker buildx imagetools inspect "$image_ref" | awk '/^Digest:/ {print $2; exit}')"
+          test "${digest#sha256:}" != "$digest"
+          test "$(printf '%s' "$digest" | wc -c)" -eq 71
+          echo "reference=$image_ref" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Generate the exact unified release manifest
+        env:
+          WEB_IMAGE_REF: ${{ steps.web_image.outputs.reference }}
+          WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+          uv run python scripts/build_release_manifest.py \
+            --wheel "dist/power_framework-${version}-py3-none-any.whl" \
+            --version "$version" \
+            --commit "$commit" \
+            --web-image "$WEB_IMAGE_REF" \
+            --web-image-digest "$WEB_IMAGE_DIGEST" \
+            --output dist/power-release-manifest.json
+          sha256sum dist/* > dist/SHA256SUMS
+
       - name: Install the pinned maintainer release signing key
         env:
           GH_TOKEN: ${{ github.token }}
@@ -357,17 +401,17 @@ jobs:
           mkdir -p dist
           uv run python scripts/generate_release_baseline.py \
             --tag "$RELEASE_TAG" \
-            --validation-report "$RUNNER_TEMP/power374-phase8-technical/power374-validation.json" \
+             --validation-report "$RUNNER_TEMP/power375-phase8-technical/power375-validation.json" \
             --sbom dist/power-framework.spdx.json \
-            --upgrade-matrix-aggregate "$RUNNER_TEMP/power374-upgrade/power374-release-upgrade-aggregate.json" \
-            --phase8-outcome-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-outcome.json" \
-            --phase8-continuity-receipt "$RUNNER_TEMP/power374-phase8-technical/power374-continuity.json" \
+             --upgrade-matrix-aggregate "$RUNNER_TEMP/power375-upgrade/power375-release-upgrade-aggregate.json" \
+             --phase8-outcome-receipt "$RUNNER_TEMP/power375-phase8-technical/power375-outcome.json" \
+             --phase8-continuity-receipt "$RUNNER_TEMP/power375-phase8-technical/power375-continuity.json" \
             --output dist/power-framework.release-baseline.json
           uv run python scripts/verify_release_contract.py \
             --require-tag \
             --require-signed-tag \
             --sbom dist/power-framework.spdx.json \
-            --upgrade-matrix-aggregate "$RUNNER_TEMP/power374-upgrade/power374-release-upgrade-aggregate.json" \
+             --upgrade-matrix-aggregate "$RUNNER_TEMP/power375-upgrade/power375-release-upgrade-aggregate.json" \
             --baseline dist/power-framework.release-baseline.json
 
       - name: Smoke-test wheel and sdist outside checkout
@@ -394,6 +438,8 @@ jobs:
           generate_release_notes: false
           files: |
             dist/power-framework.release-baseline.json
+            dist/power-release-manifest.json
+            dist/SHA256SUMS
             dist/*.whl
             dist/*.tar.gz
             dist/*.spdx.json
@@ -401,9 +447,10 @@ jobs:
       - name: Generate release receipt
         run: |
           uv run python scripts/generate_release_receipt.py \
-            --tag "$RELEASE_TAG" \
-            --assets-dir dist \
-            --output dist/power-framework.release-receipt.json
+           --tag "$RELEASE_TAG" \
+           --assets-dir dist \
+           --release-manifest dist/power-release-manifest.json \
+           --output dist/power-framework.release-receipt.json
 
       - name: Upload release receipt
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
@@ -431,10 +478,11 @@ jobs:
           assert readback["tagName"] == expected_tag
           assert readback["body"] == notes_path.read_text()
           asset_names = {asset["name"] for asset in readback["assets"]}
-          required = {
-              "power-framework.release-baseline.json",
-              "power-framework.release-receipt.json",
-          }
+           required = {
+               "power-framework.release-baseline.json",
+               "power-release-manifest.json",
+               "power-framework.release-receipt.json",
+           }
           assert required <= asset_names
           assert any(name.endswith(".whl") for name in asset_names)
           assert any(name.endswith(".tar.gz") for name in asset_names)

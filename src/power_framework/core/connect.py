@@ -6,7 +6,6 @@ import hashlib
 import json
 import platform
 import re
-import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +16,7 @@ from .utils import atomic_write, create_backup, restore_backup
 ConnectClient = Literal["auto", "codex", "opencode", "gemini", "claude"]
 ConnectAction = Literal["install", "remove"]
 CONNECT_SCHEMA_VERSION = "power.connect-plan.v1"
+DEFAULT_MCP_EXECUTABLE = str(Path.home() / ".local" / "bin" / "power-mcp")
 _JSON_ROOTS = {"opencode": "mcp", "gemini": "mcpServers", "claude": "mcpServers"}
 
 
@@ -63,14 +63,11 @@ def _client_for_path(path: Path) -> str:
 
 
 def _server_entry(client: str, vault_path: Path, executable: str) -> dict[str, Any]:
-    """Return the client-specific, content-free local stdio server entry."""
-    executable_path = Path(executable)
-    if executable_path.name.startswith("python"):
-        # Preserve the explicit-interpreter compatibility path for existing
-        # configs; native suite installs use the public power-mcp launcher.
-        command = [str(executable_path), "-m", "power_framework.mcp"]
-    else:
-        command = [str(executable_path)]
+    """Return a client entry bound to the one managed ``power-mcp`` launcher."""
+    executable_path = Path(executable).expanduser()
+    if executable_path.name != "power-mcp":
+        raise ValueError("MCP integrations must invoke the managed power-mcp launcher")
+    command = [str(executable_path)]
     environment = {"POWER_VAULT_DIR": str(vault_path.resolve())}
     if client == "opencode":
         return {"type": "local", "command": command, "environment": environment, "enabled": True}
@@ -290,7 +287,7 @@ def build_connect_plan(
     vault_path: Path,
     *,
     config_path: Path | None = None,
-    executable: str = sys.executable,
+    executable: str = DEFAULT_MCP_EXECUTABLE,
     action: ConnectAction = "install",
 ) -> ConnectPlan:
     """Build a read-only plan for one supported local client."""

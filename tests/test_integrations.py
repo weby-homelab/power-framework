@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from power_framework.core.integrations import (
     apply_mcp_config_integration_plan,
@@ -13,9 +13,6 @@ from power_framework.core.integrations import (
     build_skill_check_plan,
     packaged_skill_tree,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_packaged_skill_tree_is_content_addressed() -> None:
@@ -97,7 +94,9 @@ def test_mcp_config_integration_uses_public_launcher_and_is_hash_bound(
     receipt = apply_mcp_config_integration_plan(plan, approved=True)
     assert receipt["status"] == "applied"
     configured = json.loads(config.read_text(encoding="utf-8"))
-    assert configured["mcpServers"]["power"]["command"] == "power-mcp"
+    assert configured["mcpServers"]["power"]["command"] == str(
+        Path.home() / ".local" / "bin" / "power-mcp"
+    )
     assert configured["mcpServers"]["power"]["args"] == []
     second = build_mcp_config_integration_plan(
         sample_vault,

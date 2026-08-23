@@ -1,0 +1,39 @@
+{
+  "application_schema": "power.application.v2",
+  "artifacts": {
+    "power_wheel": {
+      "filename": "power_framework-3.7.5-py3-none-any.whl",
+      "sha256": "41c8201d7063269919f00bdc8304879e69d7a736ba0e93a6c061a9a83798f083"
+    }
+  },
+  "commit": "a445f2a98af36a61ac135c984f531b8c34dade5f",
+  "mcp": {
+    "entry_point": "power-mcp",
+    "transport": "stdio",
+    "vault_environment": "POWER_VAULT_DIR"
+  },
+  "mcp_contract_sha256": "28d1590c85c0f0c5c539468e8efd53acf5a9edff31acf73585e614dc460dac64",
+  "profiles": {
+    "native": [
+      "power",
+      "power-mcp"
+    ],
+    "skill": [
+      "power"
+    ],
+    "web": [
+      "power-web"
+    ]
+  },
+  "repository": "weby-homelab/power-framework",
+  "requires_python": "<3.15,>=3.13",
+  "schema": "power.release.manifest.v1",
+  "skill_tree_sha256": "b99d868b87258619c6c721dd2f6c92d675174eb3fac07051d9a5ac27d1df2cc8",
+  "version": "3.7.5",
+  "web": {
+    "application_service_boundary": true,
+    "entry_point": "power-web",
+    "port": 8080,
+    "transport": "asgi"
+  }
+}

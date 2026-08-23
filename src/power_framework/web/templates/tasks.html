@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Task Manager v2{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 700;">Task Manager v2 Cockpit</h1>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            Канонічний центр управління завданнями з контролем ревізій та незмінними чеками
+        </p>
+    </div>
+    <div>
+        <a href="/tasks/new" class="btn btn-primary">+ Створити завдання</a>
+    </div>
+</div>
+
+<!-- Kanban Swimlanes -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+    <!-- Backlog -->
+    <div class="card" style="background: rgba(30, 41, 59, 0.5); padding: 12px;">
+        <h2 style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 12px; display: flex; justify-content: space-between;">
+            <span>Backlog</span>
+            <span class="badge" style="background: var(--bg-surface-elevated);">{{ lanes.backlog|length }}</span>
+        </h2>
+        {% for t in lanes.backlog %}
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <a href="/tasks/{{ t.task_id }}" style="color: var(--accent); font-weight: 600; text-decoration: none; font-size: 0.9rem;">{{ t.title }}</a>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; display: flex; justify-content: space-between;">
+                <span>ID: {{ t.task_id }}</span>
+                <span>Rev: v{{ t.revision }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Ready -->
+    <div class="card" style="background: rgba(30, 41, 59, 0.5); padding: 12px;">
+        <h2 style="font-size: 1rem; color: #38bdf8; margin-bottom: 12px; display: flex; justify-content: space-between;">
+            <span>Ready / Submitted</span>
+            <span class="badge badge-info">{{ lanes.ready|length }}</span>
+        </h2>
+        {% for t in lanes.ready %}
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <a href="/tasks/{{ t.task_id }}" style="color: var(--accent); font-weight: 600; text-decoration: none; font-size: 0.9rem;">{{ t.title }}</a>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; display: flex; justify-content: space-between;">
+                <span>{{ t.owner }}</span>
+                <span>Rev: v{{ t.revision }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Working -->
+    <div class="card" style="background: rgba(30, 41, 59, 0.5); padding: 12px;">
+        <h2 style="font-size: 1rem; color: #a855f7; margin-bottom: 12px; display: flex; justify-content: space-between;">
+            <span>In Progress (Working)</span>
+            <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">{{ lanes.working|length }}</span>
+        </h2>
+        {% for t in lanes.working %}
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <a href="/tasks/{{ t.task_id }}" style="color: #c084fc; font-weight: 600; text-decoration: none; font-size: 0.9rem;">{{ t.title }}</a>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; display: flex; justify-content: space-between;">
+                <span>{{ t.assignee or t.owner }}</span>
+                <span>Rev: v{{ t.revision }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Blocked -->
+    <div class="card" style="background: rgba(30, 41, 59, 0.5); padding: 12px;">
+        <h2 style="font-size: 1rem; color: #facc15; margin-bottom: 12px; display: flex; justify-content: space-between;">
+            <span>Blocked / Input</span>
+            <span class="badge badge-warning">{{ lanes.blocked|length }}</span>
+        </h2>
+        {% for t in lanes.blocked %}
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <a href="/tasks/{{ t.task_id }}" style="color: #facc15; font-weight: 600; text-decoration: none; font-size: 0.9rem;">{{ t.title }}</a>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; display: flex; justify-content: space-between;">
+                <span>{{ t.state }}</span>
+                <a href="/decisions" style="color: var(--accent); text-decoration: none;">Вирішити &rarr;</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Completed -->
+    <div class="card" style="background: rgba(30, 41, 59, 0.5); padding: 12px;">
+        <h2 style="font-size: 1rem; color: #4ade80; margin-bottom: 12px; display: flex; justify-content: space-between;">
+            <span>Completed</span>
+            <span class="badge badge-success">{{ lanes.completed|length }}</span>
+        </h2>
+        {% for t in lanes.completed %}
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <a href="/tasks/{{ t.task_id }}" style="color: #4ade80; font-weight: 600; text-decoration: none; font-size: 0.9rem;">{{ t.title }}</a>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                Receipt: {{ t.receipt_ids[0] if t.receipt_ids else 'verified' }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -34,13 +34,13 @@ jobs:
       - name: Execute content-free upgrade and rollback invariants
         run: >-
           uv run python scripts/verify_upgrade_matrix.py
-          --from-version 3.6.7 --to-version 3.7.4
+           --from-version 3.6.7 --to-version 3.7.5
           --output "${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json"
 
       - name: Upload platform upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power374-upgrade-${{ matrix.os }}
+          name: power375-upgrade-${{ matrix.os }}
           path: ${{ runner.temp }}/power-upgrade-matrix-${{ matrix.os }}.json
           if-no-files-found: error
           retention-days: 7
@@ -54,22 +54,22 @@ jobs:
       - name: Download platform upgrade matrix evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: power374-upgrade-*
-          path: ${{ runner.temp }}/power374-upgrade-reports
+          pattern: power375-upgrade-*
+          path: ${{ runner.temp }}/power375-upgrade-reports
           merge-multiple: true
 
       - name: Aggregate supported Linux reports from Ubuntu CI
         run: >-
           python scripts/aggregate_upgrade_matrix.py
-          --input-dir "${{ runner.temp }}/power374-upgrade-reports"
+           --input-dir "${{ runner.temp }}/power375-upgrade-reports"
           --require-supported-platforms
-          --output "${{ runner.temp }}/power374-upgrade-aggregate.json"
+           --output "${{ runner.temp }}/power375-upgrade-aggregate.json"
 
       - name: Upload aggregated upgrade matrix evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: power374-upgrade-aggregate
-          path: ${{ runner.temp }}/power374-upgrade-aggregate.json
+          name: power375-upgrade-aggregate
+          path: ${{ runner.temp }}/power375-upgrade-aggregate.json
           if-no-files-found: error
           retention-days: 7
 
@@ -106,9 +106,9 @@ jobs:
         run: |
           uv run pytest tests/test_neural_hermetic_contract.py -q --no-cov \
             --override-ini=addopts= --strict-markers \
-            --junitxml="$RUNNER_TEMP/power374-neural-hermetic.xml"
+             --junitxml="$RUNNER_TEMP/power375-neural-hermetic.xml"
           uv run python scripts/verify_neural_contract.py \
-            "$RUNNER_TEMP/power374-neural-hermetic.xml"
+             "$RUNNER_TEMP/power375-neural-hermetic.xml"
 
       - name: Run Ruff linter
         run: uv run ruff check src/ tests/ scripts/ benchmarks/power35/
@@ -331,3 +331,14 @@ jobs:
           uv run python scripts/smoke_package.py \
             --wheel dist/power_framework-*.whl \
             --sdist dist/power_framework-*.tar.gz
+
+      - name: Verify the unified release manifest contract
+        run: |
+          uv run python scripts/build_release_manifest.py \
+            --wheel dist/power_framework-3.7.5-py3-none-any.whl \
+            --version 3.7.5 \
+            --commit "$(git rev-parse HEAD)" \
+            --output "$RUNNER_TEMP/power-release-manifest.json"
+
+      - name: Build the Web-only container
+        run: docker build --file deploy/web/Dockerfile --tag power-framework-web:ci .

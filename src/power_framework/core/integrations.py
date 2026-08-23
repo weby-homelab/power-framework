@@ -1,4 +1,4 @@
-"""Safe, generic integration plans for the POWER suite.
+"""Safe, generic integration plans for unified POWER.
 
 Every operation is dry-run by default.  The functions in this module return
 content-free plans first; apply functions require an explicit approval flag and
@@ -24,8 +24,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .connect import ConnectClient, apply_connect_plan, build_connect_plan
-from .suite_contract import validate_suite_artifacts
+from .connect import (
+    DEFAULT_MCP_EXECUTABLE,
+    ConnectClient,
+    apply_connect_plan,
+    build_connect_plan,
+)
 from .utils import atomic_write
 
 INTEGRATIONS_SCHEMA_VERSION = "power.integrations.v1"
@@ -195,7 +199,7 @@ def apply_skill_install_plan(plan: dict[str, Any], *, approved: bool) -> dict[st
 
 
 def build_integrations_doctor() -> dict[str, Any]:
-    """Return read-only facts about the available suite integration surfaces."""
+    """Return read-only facts about the available unified POWER surfaces."""
     skill = packaged_skill_tree()
     try:
         mcp_version = importlib.metadata.version("mcp")
@@ -207,17 +211,15 @@ def build_integrations_doctor() -> dict[str, Any]:
         power_version = None
     home = Path.home()
     managed = home / ".local" / "share" / "power"
-    compatibility_venv = managed / "venv"
+    legacy_venv = managed / "venv"
     current_link = managed / "current"
     current_target = current_link.resolve() if current_link.is_symlink() else None
     active_venv = (
         current_link / "venv"
         if current_target is not None and current_target.is_dir()
-        else compatibility_venv
+        else legacy_venv
     )
-    launchers = {
-        name: home / ".local" / "bin" / name for name in ("power", "power-mcp", "power-gui")
-    }
+    launchers = {name: home / ".local" / "bin" / name for name in ("power", "power-mcp")}
     return {
         "schema": INTEGRATIONS_SCHEMA_VERSION,
         "status": "ok"
@@ -237,9 +239,8 @@ def build_integrations_doctor() -> dict[str, Any]:
             "active_venv_exists": active_venv.is_dir(),
             "venv": str(active_venv),
             "venv_exists": active_venv.is_dir(),
-            "compatibility_venv": str(compatibility_venv),
-            "legacy_venv_present": compatibility_venv.exists()
-            and not compatibility_venv.is_symlink(),
+            "legacy_venv": str(legacy_venv),
+            "legacy_venv_present": legacy_venv.exists() and not legacy_venv.is_symlink(),
             "launchers": {
                 name: {"path": str(path), "exists": path.is_file()}
                 for name, path in launchers.items()
@@ -250,7 +251,11 @@ def build_integrations_doctor() -> dict[str, Any]:
             "tree_sha256": skill.sha256,
             "files": len(skill.files),
         },
-        "mcp": {"entry_point": "power-mcp", "transport": "stdio", "vault_env": "POWER_VAULT_DIR"},
+        "mcp": {
+            "entry_point": "power-mcp",
+            "transport": "stdio",
+            "vault_environment": "POWER_VAULT_DIR",
+        },
     }
 
 
@@ -259,7 +264,7 @@ def build_mcp_config_integration_plan(
     *,
     client: ConnectClient = "auto",
     config_path: str | Path | None = None,
-    executable: str = "power-mcp",
+    executable: str = DEFAULT_MCP_EXECUTABLE,
     remove: bool = False,
 ) -> dict[str, Any]:
     """Build the generic, hash-bound MCP client config plan."""
@@ -289,107 +294,212 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _wheel_dependencies(path: Path) -> list[str]:
-    """Read ordinary runtime dependencies from a wheel without importing it."""
+def _wheel_text(path: Path, suffix: str) -> str:
+    """Read exactly one metadata file from a wheel."""
     with zipfile.ZipFile(path) as archive:
-        metadata_name = next(
-            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
-        )
-        metadata = archive.read(metadata_name).decode("utf-8")
-    dependencies = []
+        names = [name for name in archive.namelist() if name.endswith(suffix)]
+        if len(names) != 1:
+            raise ValueError(f"wheel must contain exactly one {suffix} file")
+        return archive.read(names[0]).decode("utf-8")
+
+
+def _metadata_value(metadata: str, key: str) -> str | None:
+    """Read one RFC-822 style wheel metadata field."""
+    prefix = f"{key}:"
     for line in metadata.splitlines():
-        if not line.startswith("Requires-Dist:"):
-            continue
-        requirement = line.split(":", 1)[1].strip()
-        if requirement.lower().startswith("power-framework"):
-            continue
-        dependencies.append(requirement)
-    return dependencies
+        if line.startswith(prefix):
+            return line[len(prefix) :].strip()
+    return None
+
+
+def _wheel_tree(path: Path, prefix: str) -> dict[str, bytes]:
+    """Read a deterministic subtree from a wheel."""
+    files: dict[str, bytes] = {}
+    with zipfile.ZipFile(path) as archive:
+        for name in archive.namelist():
+            if not name.startswith(prefix) or name.endswith("/"):
+                continue
+            relative = name[len(prefix) :]
+            if not relative or "__pycache__" in relative or relative.endswith(".pyc"):
+                continue
+            files[relative] = archive.read(name)
+    return files
+
+
+def _release_contract(manifest: str | Path, power_wheel: Path) -> dict[str, Any]:
+    """Validate one release manifest against one exact unified wheel."""
+    manifest_path = Path(manifest).expanduser().resolve()
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"release manifest is not valid JSON: {manifest_path}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("release manifest must contain a JSON object")
+    if payload.get("schema") != "power.release.manifest.v1":
+        raise ValueError("unsupported POWER release manifest schema")
+
+    version = payload.get("version")
+    commit = payload.get("commit")
+    requires_python = payload.get("requires_python")
+    application_schema = payload.get("application_schema")
+    if not all(
+        isinstance(item, str) and item.strip() for item in (version, commit, requires_python)
+    ):
+        raise ValueError("release manifest version, commit, and requires_python are required")
+    if application_schema != "power.application.v2":
+        raise ValueError("release manifest application schema is not power.application.v2")
+
+    profiles = payload.get("profiles")
+    if not isinstance(profiles, dict):
+        raise ValueError("release manifest profiles are required")
+    if profiles.get("native") != ["power", "power-mcp"]:
+        raise ValueError("native profile must expose only power and power-mcp")
+    if "power-gui" in json.dumps(profiles, sort_keys=True):
+        raise ValueError("release manifest contains retired power-gui runtime")
+
+    mcp = payload.get("mcp")
+    if (
+        not isinstance(mcp, dict)
+        or mcp.get("entry_point") != "power-mcp"
+        or mcp.get("transport") != "stdio"
+    ):
+        raise ValueError("release manifest MCP contract must be power-mcp over stdio")
+    web = payload.get("web")
+    if (
+        not isinstance(web, dict)
+        or web.get("entry_point") != "power-web"
+        or web.get("port") != 8080
+    ):
+        raise ValueError("release manifest Web contract must expose power-web on port 8080")
+
+    artifacts = payload.get("artifacts")
+    wheel_artifact = artifacts.get("power_wheel") if isinstance(artifacts, dict) else None
+    if not isinstance(wheel_artifact, dict):
+        raise ValueError("release manifest must contain an exact power_wheel artifact")
+    if wheel_artifact.get("filename") != power_wheel.name:
+        raise ValueError("release manifest wheel filename does not match the supplied artifact")
+    wheel_sha256 = wheel_artifact.get("sha256")
+    if not isinstance(wheel_sha256, str) or wheel_sha256 != _sha256_file(power_wheel):
+        raise ValueError("release manifest wheel hash does not match the supplied artifact")
+
+    metadata = _wheel_text(power_wheel, ".dist-info/METADATA")
+    if _metadata_value(metadata, "Name") != "power-framework":
+        raise ValueError("native installer accepts only the power-framework distribution")
+    if _metadata_value(metadata, "Version") != version:
+        raise ValueError("wheel version does not match the release manifest")
+    if _metadata_value(metadata, "Requires-Python") != requires_python:
+        raise ValueError("wheel Python requirement does not match the release manifest")
+
+    skill_files = _wheel_tree(power_wheel, "power_framework/data/skills/power/")
+    if not skill_files or "SKILL.md" not in skill_files:
+        raise ValueError("unified wheel does not contain the packaged POWER Skill")
+    skill_sha256 = _aggregate_tree_hash(skill_files)
+    if payload.get("skill_tree_sha256") != skill_sha256:
+        raise ValueError("release manifest Skill tree hash does not match the wheel")
+
+    mcp_files = _wheel_tree(power_wheel, "power_framework/mcp/")
+    mcp_sha256 = _aggregate_tree_hash(mcp_files)
+    if payload.get("mcp_contract_sha256") != mcp_sha256:
+        raise ValueError("release manifest MCP contract hash does not match the wheel")
+
+    return {
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": _sha256_file(manifest_path),
+        "version": version,
+        "commit": commit,
+        "requires_python": requires_python,
+        "application_schema": application_schema,
+        "skill_tree_sha256": skill_sha256,
+        "mcp_contract_sha256": mcp_sha256,
+        "profiles": profiles,
+        "mcp": mcp,
+        "web": web,
+    }
+
+
+def _native_layout(install_home: Path) -> dict[str, Path]:
+    """Return the managed native layout without creating any path."""
+    managed = install_home / ".local" / "share" / "power"
+    return {
+        "managed": managed,
+        "releases": managed / "releases",
+        "current": managed / "current",
+        "legacy_venv": managed / "venv",
+        "launcher_dir": install_home / ".local" / "bin",
+        "state": managed / "install.json",
+    }
 
 
 def build_native_install_plan(
     *,
     home: str | Path | None = None,
     power_wheel: str | Path | None = None,
-    gui_wheel: str | Path | None = None,
     manifest: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Build a dry-run native installer plan for one managed venv.
-
-    A Suite manifest is mandatory.  Artifact filenames, metadata, hashes,
-    Python support, Skill compatibility, and constraints are validated before
-    the plan can be applied.
-    """
-    install_home = _safe_target(home or Path.home() / ".power-install-home", label="installer home")
-    if home is None:
-        install_home = Path.home().resolve()
-    managed = install_home / ".local" / "share" / "power"
-    releases_root = managed / "releases"
-    launcher_dir = install_home / ".local" / "bin"
+    """Build a dry-run installer plan for one exact unified POWER wheel."""
+    install_home = _safe_target(home, label="installer home") if home else Path.home().resolve()
+    layout = _native_layout(install_home)
+    common_native = {
+        "home": str(install_home),
+        "managed": str(layout["managed"]),
+        "releases": str(layout["releases"]),
+        "current": str(layout["current"]),
+        "launcher_dir": str(layout["launcher_dir"]),
+        "state": str(layout["state"]),
+    }
     if not manifest:
         return {
             "schema": NATIVE_INSTALL_SCHEMA_VERSION,
             "status": "blocked",
-            "reason": "an exact Suite manifest is required",
-            "native": {
-                "home": str(install_home),
-                "releases": str(releases_root),
-                "current": str(managed / "current"),
-                "launcher_dir": str(launcher_dir),
-            },
+            "reason": "an exact POWER release manifest is required",
+            "native": common_native,
         }
     if not power_wheel:
         return {
             "schema": NATIVE_INSTALL_SCHEMA_VERSION,
             "status": "blocked",
-            "reason": "an exact POWER wheel is required",
-            "native": {
-                "home": str(install_home),
-                "releases": str(releases_root),
-                "current": str(managed / "current"),
-                "launcher_dir": str(launcher_dir),
-            },
+            "reason": "an exact power-framework wheel is required",
+            "native": common_native,
         }
     power_path = Path(power_wheel).expanduser().resolve()
     if not power_path.is_file() or power_path.suffix != ".whl":
         raise ValueError("power_wheel must be an existing .whl file")
-    gui_path = Path(gui_wheel).expanduser().resolve() if gui_wheel else None
-    if gui_path is not None and (not gui_path.is_file() or gui_path.suffix != ".whl"):
-        raise ValueError("gui_wheel must be an existing .whl file")
-    contract = validate_suite_artifacts(manifest, power_path, gui_path)
-    state_path = managed / "suite-install.json"
-    slot_name = (
-        f"{contract['suite_version']}-{contract['manifest_sha256'][:12]}-{uuid.uuid4().hex[:12]}"
+    contract = _release_contract(manifest, power_path)
+    slot_name = f"{contract['version']}-{contract['manifest_sha256'][:12]}-{uuid.uuid4().hex[:12]}"
+    release_slot = layout["releases"] / slot_name
+    state = None
+    if layout["state"].is_file():
+        try:
+            state = json.loads(layout["state"].read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            state = None
+    current_target = layout["current"].resolve() if layout["current"].is_symlink() else None
+    status = (
+        "no_change"
+        if isinstance(state, dict)
+        and state.get("manifest_sha256") == contract["manifest_sha256"]
+        and current_target is not None
+        and current_target.is_dir()
+        else "update"
+        if state is not None
+        else "ready"
     )
-    release_slot = releases_root / slot_name
-    slot_venv = release_slot / "venv"
-    current_link = managed / "current"
-    compatibility_venv = managed / "venv"
     return {
         "schema": NATIVE_INSTALL_SCHEMA_VERSION,
-        "status": "ready" if not state_path.is_file() else "update",
+        "status": status,
         "native": {
-            "home": str(install_home),
-            "managed": str(managed),
-            "releases": str(releases_root),
+            **common_native,
             "release_slot": str(release_slot),
-            "slot_venv": str(slot_venv),
-            "current": str(current_link),
-            "active_venv": str(current_link / "venv"),
-            "compatibility_venv": str(compatibility_venv),
-            "legacy_venv_present": compatibility_venv.exists()
-            and not compatibility_venv.is_symlink(),
-            "launcher_dir": str(launcher_dir),
-            "state": str(state_path),
+            "slot_venv": str(release_slot / "venv"),
+            "active_venv": str(layout["current"] / "venv"),
+            "legacy_venv": str(layout["legacy_venv"]),
+            "legacy_venv_present": layout["legacy_venv"].exists()
+            and not layout["legacy_venv"].is_symlink(),
         },
         "contract": contract,
-        "artifacts": {
-            "power_wheel": {"path": str(power_path), "sha256": _sha256_file(power_path)},
-            "gui_wheel": (
-                {"path": str(gui_path), "sha256": _sha256_file(gui_path)} if gui_path else None
-            ),
-        },
-        "launchers": ["power", "power-mcp", "power-gui"] if gui_path else ["power", "power-mcp"],
+        "artifacts": {"power_wheel": {"path": str(power_path), "sha256": _sha256_file(power_path)}},
+        "launchers": ["power", "power-mcp"],
+        "retired_launchers": ["power-gui"],
         "system_python_mutation": False,
         "dry_run_default": True,
     }
@@ -442,35 +552,51 @@ def _verify_installed_launcher(
             raise RuntimeError(f"launcher identity mismatch: {path}")
 
 
+def _is_managed_launcher(path: Path) -> bool:
+    """Recognize a wrapper generated by the native installer."""
+    if path.is_symlink():
+        return True
+    if not path.is_file():
+        return False
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    return content.startswith("#!/bin/sh\n") and "/.local/share/power/current/venv/bin/" in content
+
+
 def apply_native_install_plan(
     plan: dict[str, Any],
     *,
     approved: bool,
     no_deps: bool = False,
 ) -> dict[str, Any]:
-    """Build in a final release slot, verify, and atomically activate it."""
+    """Build, verify, and atomically activate one unified POWER release slot."""
     if not approved:
         raise PermissionError("native install requires explicit approved=True")
     if plan.get("schema") != NATIVE_INSTALL_SCHEMA_VERSION or plan.get("status") == "blocked":
         raise ValueError("native install plan is not applicable")
+    if plan.get("status") == "no_change":
+        return {
+            "schema": NATIVE_INSTALL_SCHEMA_VERSION,
+            "status": "no_change",
+            "manifest_sha256": plan["contract"]["manifest_sha256"],
+            "version": plan["contract"]["version"],
+        }
     native = plan["native"]
     managed = Path(native["managed"])
     releases_root = Path(native["releases"])
     release_slot = Path(native["release_slot"])
     slot_venv = Path(native["slot_venv"])
     current_link = Path(native["current"])
-    compatibility_venv = Path(native["compatibility_venv"])
+    legacy_venv = Path(native["legacy_venv"])
     launcher_dir = Path(native["launcher_dir"])
     state_path = Path(native["state"])
     manifest_path = Path(plan["contract"]["manifest_path"])
     power_path = Path(plan["artifacts"]["power_wheel"]["path"])
-    gui_artifact = plan["artifacts"].get("gui_wheel")
-    gui_path = Path(gui_artifact["path"]) if gui_artifact else None
-    contract = validate_suite_artifacts(manifest_path, power_path, gui_path)
-    if contract["manifest_sha256"] != plan["contract"].get("manifest_sha256"):
-        raise RuntimeError("Suite manifest changed after the plan was created")
-    if contract["components"] != plan["contract"].get("components"):
-        raise RuntimeError("Suite artifacts changed after the plan was created")
+    contract = _release_contract(manifest_path, power_path)
+    if contract != plan["contract"]:
+        raise RuntimeError("POWER release manifest or wheel changed after the plan was created")
 
     managed.mkdir(parents=True, exist_ok=True)
     releases_root.mkdir(parents=True, exist_ok=True)
@@ -488,24 +614,24 @@ def apply_native_install_plan(
             raise RuntimeError("managed current pointer is dangling")
     launcher_stage = launcher_dir / f".launchers.staging-{activation_id}"
     launcher_names = ["power", "power-mcp"]
-    if gui_path is not None:
-        launcher_names.append("power-gui")
+    retired_launcher_names = ["power-gui"]
     launcher_snapshots: dict[Path, tuple[bytes, int] | None] = {}
-    for name in launcher_names:
+    for name in [*launcher_names, *retired_launcher_names]:
         destination = launcher_dir / name
-        if destination.is_file():
+        if destination.is_symlink():
+            launcher_snapshots[destination] = (os.readlink(destination).encode("utf-8"), 0o120777)
+        elif destination.is_file():
             launcher_snapshots[destination] = (destination.read_bytes(), destination.stat().st_mode)
         else:
             launcher_snapshots[destination] = None
     state_snapshot = state_path.read_bytes() if state_path.is_file() else None
     pointer_activated = False
-    compatibility_link_created = False
+    retired_legacy_link: str | None = None
     try:
         # The environment is born at its final physical path.  A populated
         # Python venv is never moved or repaired after installation.
         venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(slot_venv)
         slot_python = slot_venv / "bin" / "python"
-        constraints_path = contract["dependencies"].get("path")
 
         def run_pip(arguments: list[str]) -> None:
             command = [
@@ -517,41 +643,23 @@ def apply_native_install_plan(
                 "--no-input",
                 "--upgrade",
             ]
-            if constraints_path and not no_deps:
-                command.extend(["--constraint", str(constraints_path)])
             command.extend(arguments)
             subprocess.run(command, check=True, capture_output=True, text=True)  # noqa: S603
 
         if no_deps:
             run_pip(["--no-deps", str(power_path)])
-            if gui_path is not None:
-                run_pip(["--no-deps", str(gui_path)])
         else:
-            run_pip([f"{power_path}[remote]"])
-            if gui_path is not None:
-                run_pip(["--no-deps", str(gui_path)])
-                dependencies = [
-                    item
-                    for item in _wheel_dependencies(gui_path)
-                    if not item.lower().startswith("power-framework")
-                ]
-                if dependencies:
-                    run_pip(dependencies)
+            run_pip([f"{power_path}[mcp]"])
 
         check_script = (
             "import importlib.metadata as m; "
             "import power_framework; "
             "from power_framework.core.application import ApplicationEnvelope; "
             "assert m.version('power-framework') == "
-            f"{contract['components']['power']['metadata']['version']!r}; "
+            f"{contract['version']!r}; "
             "assert ApplicationEnvelope.__dataclass_fields__['schema_version'].default == "
             f"{contract['application_schema']!r}"
         )
-        if gui_path is not None:
-            check_script += (
-                "; assert m.version('power-gui') == "
-                f"{contract['components']['gui']['metadata']['version']!r}"
-            )
         subprocess.run(  # noqa: S603 - interpreter and script are generated from verified inputs.
             [str(slot_python), "-c", check_script],
             check=True,
@@ -559,15 +667,13 @@ def apply_native_install_plan(
             text=True,
         )
 
-        expected_power = contract["components"]["power"]["metadata"]["version"]
+        expected_power = contract["version"]
         _verify_installed_launcher(
             slot_venv / "bin" / "power", ["--version"], expected_version=expected_power
         )
         _verify_installed_launcher(
             slot_venv / "bin" / "power-mcp", ["--version"], expected_version=expected_power
         )
-        if gui_path is not None:
-            _verify_installed_launcher(slot_venv / "bin" / "power-gui", ["--help"])
 
         launcher_dir.mkdir(parents=True, exist_ok=True)
         launcher_stage.mkdir(parents=True, exist_ok=False)
@@ -590,18 +696,25 @@ def apply_native_install_plan(
         _verify_installed_launcher(
             launcher_dir / "power-mcp", ["--version"], expected_version=expected_power
         )
-        if gui_path is not None:
-            _verify_installed_launcher(launcher_dir / "power-gui", ["--help"])
 
-        legacy_venv_preserved = compatibility_venv.exists() and not compatibility_venv.is_symlink()
-        if not compatibility_venv.exists() and not compatibility_venv.is_symlink():
-            compatibility_venv.symlink_to(Path("current") / "venv", target_is_directory=True)
-            compatibility_link_created = True
+        retired_launchers: list[str] = []
+        for name in retired_launcher_names:
+            destination = launcher_dir / name
+            if destination.exists() or destination.is_symlink():
+                if not _is_managed_launcher(destination):
+                    raise PermissionError(f"retired launcher is not POWER-managed: {destination}")
+                destination.unlink()
+                retired_launchers.append(str(destination))
+
+        if legacy_venv.is_symlink():
+            retired_legacy_link = os.readlink(legacy_venv)
+            legacy_venv.unlink()
 
         receipt = {
             "schema": NATIVE_INSTALL_SCHEMA_VERSION,
             "status": "applied",
-            "suite_version": contract["suite_version"],
+            "version": contract["version"],
+            "commit": contract["commit"],
             "application_schema": contract["application_schema"],
             "manifest_sha256": contract["manifest_sha256"],
             "release_slot": str(release_slot),
@@ -610,20 +723,23 @@ def apply_native_install_plan(
             "previous_release_slot": (
                 str(previous_release_slot) if previous_release_slot is not None else None
             ),
-            "compatibility_venv": str(compatibility_venv),
-            "legacy_venv_preserved": legacy_venv_preserved,
+            "legacy_venv": str(legacy_venv),
+            "legacy_venv_preserved": legacy_venv.exists() and not legacy_venv.is_symlink(),
+            "legacy_venv_link_retired": retired_legacy_link is not None,
             "launchers": [str(launcher_dir / name) for name in launcher_names],
+            "retired_launchers": retired_launchers,
             "artifacts": plan["artifacts"],
-            "dependencies": contract["dependencies"],
+            "profiles": contract["profiles"],
+            "web": contract["web"],
             "no_deps": no_deps,
         }
         atomic_write(
             state_path, json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
         )
         if not current_link.is_symlink() or current_link.resolve() != release_slot.resolve():
-            raise RuntimeError("native Suite current-pointer readback is incomplete")
+            raise RuntimeError("native POWER current-pointer readback is incomplete")
         if not all((launcher_dir / name).is_file() for name in launcher_names):
-            raise RuntimeError("native Suite activation readback is incomplete")
+            raise RuntimeError("native POWER activation readback is incomplete")
         return receipt
     except Exception:
         if pointer_activated:
@@ -635,11 +751,14 @@ def apply_native_install_plan(
                     current_link,
                     identifier=f"rollback-{activation_id}",
                 )
-        if compatibility_link_created:
-            compatibility_venv.unlink(missing_ok=True)
+        if retired_legacy_link is not None:
+            legacy_venv.symlink_to(retired_legacy_link, target_is_directory=True)
         for destination, snapshot in launcher_snapshots.items():
             if snapshot is None:
                 destination.unlink(missing_ok=True)
+            elif snapshot[1] & stat.S_IFMT(stat.S_IFLNK):
+                destination.unlink(missing_ok=True)
+                destination.symlink_to(snapshot[0].decode("utf-8"), target_is_directory=False)
             else:
                 content, mode = snapshot
                 destination.parent.mkdir(parents=True, exist_ok=True)

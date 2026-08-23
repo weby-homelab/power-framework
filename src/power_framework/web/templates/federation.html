@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('federation') }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 700;">{{ t('federation_title') }}</h1>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            {{ t('federation_subtitle') }}
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="/federation" class="btn btn-secondary">🔄 {{ t('probe_refresh') }}</a>
+        <a href="/federation/agent.json" target="_blank" class="btn btn-secondary">📄 {{ t('view_agent_card') }}</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+        <h2 style="font-size: 1.2rem; font-weight: 600;">{{ t('fleet_nodes_registered') }}</h2>
+        <span class="badge badge-info" style="font-family: monospace;">{{ nodes|length }} nodes probed</span>
+    </div>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                    <th style="padding: 10px;">{{ t('node_id') }}</th>
+                    <th style="padding: 10px;">{{ t('role_host') }}</th>
+                    <th style="padding: 10px;">{{ t('endpoint') }}</th>
+                    <th style="padding: 10px;">{{ t('status') }}</th>
+                    <th style="padding: 10px;">{{ t('vault_id') }}</th>
+                    <th style="padding: 10px;">{{ t('trust_authority') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for n in nodes %}
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 12px 10px; font-weight: 600; font-family: monospace;">{{ n.node_id }}</td>
+                    <td style="padding: 12px 10px; font-weight: 500;">{{ n.role }}</td>
+                    <td style="padding: 12px 10px; font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);">
+                        {{ n.endpoint }}
+                    </td>
+                    <td style="padding: 12px 10px;">
+                        <span class="badge {% if n.status == 'online' %}badge-success{% else %}badge-danger{% endif %}">
+                            {{ n.status }}
+                        </span>
+                        {% if n.latency_ms is not none %}
+                        <span style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">
+                            {{ n.latency_ms }}ms
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px 10px; font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);">
+                        {{ n.vault_id }}
+                    </td>
+                    <td style="padding: 12px 10px;">
+                        <span class="badge badge-info" style="font-family: monospace;">{{ n.trust_level }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="background: rgba(30, 41, 59, 0.5);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h2 style="font-size: 1.2rem; font-weight: 600;">{{ t('a2a_protocol') }}</h2>
+        <span class="badge badge-success" style="font-family: monospace;">P.O.W.E.R {{ power_version }} Active</span>
+    </div>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6; margin-bottom: 12px;">
+        {{ t('a2a_description') }}
+    </p>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span class="badge" style="background: var(--bg-surface-elevated); color: var(--accent);">power.search</span>
+        <span class="badge" style="background: var(--bg-surface-elevated); color: var(--accent);">power.source.read</span>
+        <span class="badge" style="background: var(--bg-surface-elevated); color: var(--accent);">power.source.list</span>
+        <span class="badge" style="background: var(--bg-surface-elevated); color: var(--accent);">power.source.stats</span>
+        <span class="badge" style="background: var(--bg-surface-elevated); color: var(--accent);">power.task.status</span>
+        <span class="badge" style="background: var(--bg-surface-elevated); color: var(--accent);">power.graph</span>
+    </div>
+</div>
+{% endblock %}

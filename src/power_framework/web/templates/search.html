@@ -1,0 +1,405 @@
+{% extends "base.html" %} {% block title %}{{ t('search') }}{% endblock %} {%
+block head %}
+<style>
+    .search-hero {
+        background: linear-gradient(
+            135deg,
+            rgba(37, 99, 235, 0.12) 0%,
+            rgba(56, 189, 248, 0.05) 100%
+        );
+        border: 1px solid rgba(56, 189, 248, 0.25);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .search-input-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 14px;
+    }
+    .search-field-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+    }
+    .search-input-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        pointer-events: none;
+    }
+    .search-input {
+        width: 100%;
+        padding: 12px 14px 12px 42px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
+    }
+    .search-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-subtle);
+    }
+    .mode-select {
+        padding: 12px 14px;
+        background: var(--bg-surface-elevated);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    .search-submit-btn {
+        padding: 12px 24px;
+        font-size: 1rem;
+        font-weight: 700;
+        border-radius: 8px;
+    }
+    .result-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px;
+        margin-bottom: 14px;
+        transition:
+            border-color 0.15s,
+            transform 0.1s,
+            box-shadow 0.15s;
+    }
+    .result-card:hover {
+        border-color: var(--border-hover);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    .result-snippet {
+        font-size: 0.92rem;
+        color: var(--text-primary);
+        line-height: 1.55;
+        background: rgba(15, 23, 42, 0.6);
+        padding: 10px 14px;
+        border-radius: 6px;
+        border-left: 3px solid var(--accent);
+        margin: 10px 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    @media (max-width: 768px) {
+        .search-hero {
+            padding: 16px;
+        }
+        .search-input-group {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .search-field-wrap {
+            min-width: 100%;
+        }
+        .search-submit-btn {
+            width: 100%;
+        }
+        .result-card {
+            padding: 14px;
+        }
+    }
+</style>
+{% endblock %} {% block content %}
+<div class="search-hero">
+    <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 6px">
+        {{ t('search_title') }}
+    </h1>
+    <p style="color: var(--text-secondary); font-size: 0.92rem">
+        {{ t('search_subtitle') }}
+    </p>
+
+    <!-- Search Form -->
+    <form action="/search" method="GET" class="search-input-group">
+        <div class="search-field-wrap">
+            <span class="search-input-icon">🔍</span>
+            <label class="sr-only" for="searchQuery"
+                >{{ t('search_input_label') }}</label
+            >
+            <input
+                type="text"
+                id="searchQuery"
+                name="q"
+                value="{{ query }}"
+                placeholder="{{ t('search_input_placeholder') }}"
+                class="search-input"
+                autofocus
+                autocomplete="off"
+            />
+        </div>
+
+        <select name="mode" class="mode-select" aria-label="Search Mode">
+            <option value="auto" {% if mode="" ="auto" %}selected{% endif %}>
+                ⚡ {{ t('mode_auto') }}
+            </option>
+            <option value="fts" {% if mode="" ="fts" %}selected{% endif %}>
+                📄 {{ t('mode_fts') }}
+            </option>
+            <option
+                value="semantic"
+                {%
+                if
+                mode=""
+                ="semantic"
+                %}selected{%
+                endif
+                %}
+            >
+                🧠 {{ t('mode_semantic') }}
+            </option>
+            <option
+                value="reranked"
+                {%
+                if
+                mode=""
+                ="reranked"
+                %}selected{%
+                endif
+                %}
+            >
+                🎯 {{ t('mode_reranked') }}
+            </option>
+        </select>
+
+        <button type="submit" class="btn btn-primary search-submit-btn">
+            {{ t('search_btn') }}
+        </button>
+    </form>
+</div>
+
+<!-- Results Section -->
+{% if query %}
+<div class="card">
+    <div
+        style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        "
+    >
+        <div>
+            <h2 style="font-size: 1.15rem; font-weight: 700">
+                {{ t('search_results_for') }}:
+                <span style="color: var(--accent)">"{{ query }}"</span>
+            </h2>
+            {% set items = results.get('results', results.get('items', [])) %}
+            <span style="font-size: 0.85rem; color: var(--text-secondary)"
+                >Знайдено результатів: <strong>{{ items|length }}</strong></span
+            >
+        </div>
+        <div
+            style="
+                font-size: 0.85rem;
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+            "
+        >
+            <span
+                >{{ t('mode_label') }}:
+                <span class="badge badge-info"
+                    >{{ results.get('actual_mode', mode)|upper }}</span
+                ></span
+            >
+            {% if results.get('fallback_reason') %}
+            <span
+                class="badge badge-warning"
+                title="{{ results.get('fallback_reason') }}"
+                >{{ t('fallback_label') }}: {{ results.get('fallback_reason')
+                }}</span
+            >
+            {% endif %}
+        </div>
+    </div>
+
+    {% if items %}
+    <div style="display: flex; flex-direction: column; gap: 12px">
+        {% for item in items %} {% set note_path = item.path or item.rel_path or
+        (item.source.path if item.source is defined and item.source else '') %}
+        {% set note_title = item.title or (item.metadata.title if item.metadata
+        is defined and item.metadata else '') or note_path or 'Note' %} {% set
+        note_snippet = item.snippet or item.matched_text or item.description or
+        (item.metadata.description if item.metadata is defined and item.metadata
+        else '') %}
+        <div class="result-card">
+            <div
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 10px;
+                    margin-bottom: 6px;
+                    flex-wrap: wrap;
+                "
+            >
+                <div style="flex: 1; min-width: 200px">
+                    {% if note_path %}
+                    <a
+                        href="/notes/read?path={{ note_path }}"
+                        style="
+                            color: var(--accent);
+                            font-weight: 700;
+                            font-size: 1.1rem;
+                            text-decoration: none;
+                            display: inline-block;
+                            margin-bottom: 2px;
+                        "
+                    >
+                        📄 {{ note_title }}
+                    </a>
+                    {% else %}
+                    <span
+                        style="
+                            color: var(--text-primary);
+                            font-weight: 700;
+                            font-size: 1.1rem;
+                        "
+                    >
+                        📄 {{ note_title }}
+                    </span>
+                    {% endif %} {% if note_path %}
+                    <div
+                        style="
+                            font-family: monospace;
+                            font-size: 0.78rem;
+                            color: var(--text-secondary);
+                            word-break: break-all;
+                        "
+                    >
+                        📁 {{ note_path }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center">
+                    <span
+                        class="badge"
+                        style="
+                            background: var(--bg-surface-elevated);
+                            color: var(--text-secondary);
+                            font-family: monospace;
+                            font-size: 0.8rem;
+                        "
+                    >
+                        {{ t('score_label') }}: {{ (item.score or 0)|round(3) }}
+                    </span>
+                </div>
+            </div>
+
+            {% if note_snippet %}
+            <div class="result-snippet">{{ note_snippet }}</div>
+            {% endif %} {% if note_path %}
+            <div
+                style="
+                    margin-top: 10px;
+                    display: flex;
+                    justify-content: flex-end;
+                "
+            >
+                <a
+                    href="/notes/read?path={{ note_path }}"
+                    class="btn btn-secondary"
+                    style="
+                        font-size: 0.85rem;
+                        padding: 6px 14px;
+                        min-height: 38px;
+                    "
+                >
+                    Читати нотатку &rarr;
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 40px 16px">
+        <div style="font-size: 2.5rem; margin-bottom: 10px">🔍</div>
+        <p
+            style="
+                color: var(--text-primary);
+                font-weight: 700;
+                font-size: 1.05rem;
+                margin-bottom: 8px;
+            "
+        >
+            {{ t('no_results_found') }}
+        </p>
+        {% if results.get('fallback_reason') %}
+        <div
+            style="
+                margin: 14px auto;
+                max-width: 480px;
+                background: rgba(234, 179, 8, 0.1);
+                border: 1px solid rgba(234, 179, 8, 0.3);
+                border-radius: 8px;
+                padding: 12px 16px;
+                text-align: left;
+                font-size: 0.88rem;
+            "
+        >
+            <strong style="color: var(--warning)"
+                >⚠️ Режим пошуку деградований:</strong
+            >
+            <code style="display: block; margin-top: 6px; font-size: 0.82rem"
+                >{{ results.get('fallback_reason') }}</code
+            >
+            <p style="color: var(--text-secondary); margin-top: 8px">
+                Семантичний індекс ще не побудовано. FTS пошук активний.
+            </p>
+        </div>
+        {% endif %}
+        <p
+            style="
+                color: var(--text-secondary);
+                font-size: 0.9rem;
+                margin-top: 10px;
+            "
+        >
+            Спробуйте:
+            <strong>змінити запит</strong>, перемкнути режим на
+            <strong>FTS</strong> або скористайтесь
+            <strong>переглядом нотаток</strong>.
+        </p>
+        <div
+            style="
+                margin-top: 16px;
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+                flex-wrap: wrap;
+            "
+        >
+            <a
+                href="/notes"
+                class="btn btn-secondary"
+                style="font-size: 0.88rem"
+                >📝 Переглянути нотатки</a
+            >
+            <a
+                href="/search?q={{ query }}&mode=fts"
+                class="btn btn-secondary"
+                style="font-size: 0.88rem"
+                >📄 Спробувати FTS</a
+            >
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %} {% endblock %}

@@ -32,12 +32,15 @@ src/power_framework/
 │   ├── relations.py     # Graph relation suggestions
 │   ├── rot_scoring.py   # Semantic ROT scoring
 │   └── graph_extraction.py # Untrusted graph candidates
-└── mcp/
+├── mcp/
     ├── __init__.py     # Package marker
-    ├── __main__.py     # python -m entry point
     ├── entrypoint.py   # public power-mcp launcher and preflight
     ├── preflight.py    # dependency-light vault boundary check
-    └── power_server.py # official MCP SDK v2 server (20 tools + health)
+    └── power_server.py # official MCP SDK v2 stdio server (20 tools)
+└── web/               # optional Web UI adapter shipped in the same wheel
+    ├── app.py         # power-web ASGI entry point
+    ├── clients/       # ApplicationService adapter
+    └── routes/        # authenticated Web UI routes
 
 tests/
 ├── test_cli.py         # CLI functional tests
@@ -60,8 +63,8 @@ tests/
 
 - **`src/` layout** — Standard Python packaging, prevents import confusion
 - **Official MCP Python SDK v2** — Modern MCP server/client primitives with
-  legacy and 2026-07-28 protocol-era interoperability, structured `ToolError`,
-  async tools, stdio, and loopback HTTP transport
+  2026-07-28 protocol interoperability, structured `ToolError`, async tools,
+  and stdio transport
 - **Pydantic v2** — `model_dump()`, strict validation, `field_validator`, UTC-aware timestamps
 - **Atomic file writes** — `os.replace()` for crash-safe config persistence
 - **Path traversal protection** — `Path.relative_to()` boundary checking (not string-prefix)
@@ -73,7 +76,8 @@ tests/
   previous active DB readable.
 - **Centralized constants** — `core/constants.py` as single source for all exclusion lists, skip files, system dirs
 - **Strict mypy** — All core source modules pass `--strict` type checking
-- **Transport flexibility** — stdio (local) or HTTP (Docker) via `POWER_MCP_TRANSPORT` env var
+- **Transport boundary** — native `power-mcp` uses stdio; Docker runs only the
+  authenticated `power-web` Web UI on port 8080
 
 ## API boundaries
 

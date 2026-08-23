@@ -44,8 +44,8 @@ def test_ci_aggregates_all_supported_ubuntu_reports() -> None:
     assert "scripts/aggregate_upgrade_matrix.py" in ci_text
     assert "os: [ubuntu-latest]" in ci_text
     assert "--require-supported-platforms" in ci_text
-    assert "name: power374-upgrade-aggregate" in ci_text
-    assert "power374-upgrade-aggregate.json" in ci_text
+    assert "name: power375-upgrade-aggregate" in ci_text
+    assert "power375-upgrade-aggregate.json" in ci_text
 
 
 def test_current_python_support_starts_at_3_11() -> None:
@@ -137,14 +137,14 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "run_continuity_benchmark.py" in release_text
     assert "scripts/generate_release_validation.py" in release_text
     assert "scripts/generate_release_gate_manifest.py" in release_text
-    assert "scripts/generate_release_candidate.py" in release_text
-    assert "--require-worktree-hash" in release_text
-    assert "power374-gates.json" in release_text
-    assert "power374-validation.json" in release_text
+    assert "scripts/build_release_manifest.py" in release_text
+    assert '--commit "$commit"' in release_text
+    assert "power375-gates.json" in release_text
+    assert "power375-validation.json" in release_text
     assert "--gate-manifest" in release_text
-    assert '--junitxml="$RUNNER_TEMP/power374-junit.xml"' in release_text
-    assert '--cov-report=json:"$RUNNER_TEMP/power374-coverage.json"' in release_text
-    assert "power374-phase8-technical-receipts" in release_text
+    assert '--junitxml="$RUNNER_TEMP/power375-junit.xml"' in release_text
+    assert '--cov-report=json:"$RUNNER_TEMP/power375-coverage.json"' in release_text
+    assert "power375-phase8-technical-receipts" in release_text
     assert 'assert outcome["raw_content_in_report"] is False' in release_text
     assert 'assert outcome["comparison"]["practical_improvement"] is True' in release_text
     assert 'assert continuity["gate"]["power_beats_plain_handoff"] is True' in release_text
@@ -153,7 +153,7 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "--validation-report" in release_text
     assert "--sbom" in release_text
     assert "--upgrade-matrix-aggregate" in release_text
-    assert "power374-release-upgrade-aggregate" in release_text
+    assert "power375-release-upgrade-aggregate" in release_text
     assert '"hatchling>=' in pyproject_text
     assert "uv sync --locked --group dev" in release_text
     assert "uv run python -m build --no-isolation" in release_text

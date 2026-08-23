@@ -908,7 +908,7 @@ def _cmd_connect(args: argparse.Namespace) -> int:
 
 
 def _cmd_integrations(args: argparse.Namespace) -> int:
-    """Plan or apply generic, path-safe suite integration operations."""
+    """Plan or apply generic, path-safe unified POWER integration operations."""
     try:
         if args.integration_command == "doctor":
             print(json.dumps(build_integrations_doctor(), ensure_ascii=False, sort_keys=True))
@@ -955,7 +955,6 @@ def _cmd_integrations(args: argparse.Namespace) -> int:
             plan = build_native_install_plan(
                 home=args.home,
                 power_wheel=args.power_wheel,
-                gui_wheel=args.gui_wheel,
                 manifest=args.manifest,
             )
             if args.apply:
@@ -1397,7 +1396,7 @@ def main() -> None:
 
     p_integrations = subparsers.add_parser(
         "integrations",
-        help="Plan or apply generic POWER suite integrations (dry-run by default)",
+        help="Plan or apply unified POWER integrations (dry-run by default)",
     )
     integration_sub = p_integrations.add_subparsers(dest="integration_command", required=True)
     integration_sub.add_parser(
@@ -1417,8 +1416,8 @@ def main() -> None:
     p_mcp_config.add_argument("--config", default=None, help="Explicit client config path")
     p_mcp_config.add_argument(
         "--executable",
-        default="power-mcp",
-        help="Public MCP launcher (default: power-mcp)",
+        default=str(Path.home() / ".local" / "bin" / "power-mcp"),
+        help="Managed MCP launcher (default: ~/.local/bin/power-mcp)",
     )
     p_mcp_config.add_argument("--remove", action="store_true", help="Plan removal")
     p_mcp_config.add_argument("--apply", action="store_true", help="Apply the plan")
@@ -1453,15 +1452,15 @@ def main() -> None:
     p_skill_install.set_defaults(func=_cmd_integrations)
 
     p_install = integration_sub.add_parser(
-        "install", help="Plan or install an exact wheel pair into the managed native venv"
+        "install",
+        help="Plan or install one exact power-framework wheel into the managed native venv",
     )
     p_install.add_argument(
         "--home", default=None, help="Disposable HOME root for the managed profile"
     )
     p_install.add_argument("--power-wheel", required=True, help="Exact POWER framework wheel")
-    p_install.add_argument("--gui-wheel", default=None, help="Optional exact POWER-GUI wheel")
     p_install.add_argument(
-        "--manifest", required=True, help="Content-addressed power.suite.manifest.v2"
+        "--manifest", required=True, help="Content-addressed power.release.manifest.v1"
     )
     p_install.add_argument("--no-deps", action="store_true", help="Skip dependency resolution")
     p_install.add_argument("--apply", action="store_true", help="Apply the plan")
@@ -1487,8 +1486,8 @@ def main() -> None:
     )
     p_connect.add_argument(
         "--executable",
-        default=sys.executable,
-        help="Python executable used by the local MCP server command",
+        default=str(Path.home() / ".local" / "bin" / "power-mcp"),
+        help="Managed power-mcp launcher used by the local stdio server command",
     )
     p_connect.add_argument(
         "--remove", action="store_true", help="Plan removal of the POWER-owned entry"

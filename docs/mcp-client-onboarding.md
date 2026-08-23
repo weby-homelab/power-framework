@@ -1,17 +1,17 @@
 # MCP client onboarding
 
-This is the canonical local-stdio setup for P.O.W.E.R. `v3.7.4` on Linux.
+This is the canonical local-stdio setup for P.O.W.E.R. `v3.7.5` on Linux.
 It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
 the same server process and the same vault boundary.
 
-> **Candidate release contract:** use `v3.7.4` only after its signed tag and immutable
-> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.4).
+> **Release contract:** use `v3.7.5` only after its signed tag and immutable
+> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.5).
 > Then use that wheel and the exact interpreter created by the
 > [clean-install guide](getting-started.md).
 
 The [Windows 11 25H2 guide](windows-11-installation.md) is informational only.
 Windows and macOS are deferred indefinitely and are not supported MCP onboarding
-platforms for `v3.7.4`.
+platforms for `v3.7.5`.
 
 ## One-time preparation
 
@@ -28,7 +28,7 @@ POWER_VAULT="$HOME/Documents/power-vault"
 
 python3 -m venv "$POWER_VENV"
 "$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.4/power_framework-3.7.4-py3-none-any.whl"
+  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.5/power_framework-3.7.5-py3-none-any.whl"
 # Only for a new or empty vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'
@@ -39,9 +39,10 @@ configuration below. The MCP process must receive `POWER_VAULT_DIR`; it is the
 configured vault boundary. The server is local stdio, so its stdout is
 reserved for MCP protocol traffic.
 
-The installed public launcher is `power-mcp`. The source-checkout compatibility
-entry point `python -m power_framework.mcp` remains available for tests and
-legacy wrappers, but it is not the canonical client configuration.
+The installed public launcher is `~/.local/bin/power-mcp`. The implementation
+package is `power_framework.mcp`, but clients must use this single managed stdio
+entry point; no ad-hoc Python module or Docker MCP runner is part of the release
+contract.
 
 Do not point a client at a repository wrapper, a shell script that loads
 secrets, or a different Python installation. Do not add a second vault path to

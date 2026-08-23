@@ -1,0 +1,22 @@
+{
+  "schema": "power.unified.plan.v1",
+  "target_version": "3.7.5",
+  "base_power_commit": "a445f2a98af36a61ac135c984f531b8c34dade5f",
+  "gui_migration_source_sha": "09429e65beb4f56225bb0f5643ea9bff1e318f52",
+  "canonical_repository": "weby-homelab/power-framework",
+  "canonical_package": "power-framework",
+  "profiles": {
+    "native": "supported",
+    "mcp_stdio": "supported",
+    "web_container": "supported"
+  },
+  "invariants": {
+    "single_repo": true,
+    "single_package": true,
+    "single_version": true,
+    "no_standalone_gui_wheel": true,
+    "mcp_stdio_canonical": true,
+    "docker_web_only": true,
+    "applicationservice_bypass_allowed": false
+  }
+}

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="power-mcp",
-        description="Run the local POWER MCP server over stdio or the explicitly configured loopback HTTP profile.",
+        description="Run the local POWER MCP server over stdio.",
     )
     parser.add_argument(
         "--version",
