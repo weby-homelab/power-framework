@@ -482,11 +482,11 @@ jobs:
           assert readback["tagName"] == expected_tag
           assert readback["body"] == notes_path.read_text()
           asset_names = {asset["name"] for asset in readback["assets"]}
-           required = {
-               "power-framework.release-baseline.json",
-               "power-release-manifest.json",
-               "power-framework.release-receipt.json",
-           }
+          required = {
+              "power-framework.release-baseline.json",
+              "power-release-manifest.json",
+              "power-framework.release-receipt.json",
+          }
           assert required <= asset_names
           assert any(name.endswith(".whl") for name in asset_names)
           assert any(name.endswith(".tar.gz") for name in asset_names)
