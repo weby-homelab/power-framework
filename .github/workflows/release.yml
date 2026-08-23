@@ -336,7 +336,7 @@ jobs:
 
       - name: Authenticate to GHCR for the Web-only image
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
         run: printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
       - name: Build and publish the Web-only image
