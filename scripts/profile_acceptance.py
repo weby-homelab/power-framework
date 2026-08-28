@@ -181,6 +181,10 @@ def web_mutation(browser: Browser, relative_path: str, vault: Path, password: st
     )
     if status not in {200, 303}:
         raise RuntimeError(f"Web apply returned HTTP {status}")
+    # Governed apply may atomically replace the note and create proposal
+    # entries with restrictive modes under UID 10001.  Restore access before
+    # the host verifies the canonical source and before temporary cleanup.
+    prepare_vault_for_container(vault)
     if MARKER not in (vault / relative_path).read_text(encoding="utf-8"):
         raise RuntimeError("Web governed apply did not change the canonical vault")
 
@@ -428,6 +432,9 @@ def main() -> int:
             web_search(restarted, "reranked")
             if MARKER not in web_read(restarted, relative_path):
                 raise RuntimeError("canonical vault did not survive cache-volume rebuild")
+            prepare_vault_for_container(vault)
+            if os.environ.get("KEEP_PROFILE_CONTAINER") != "1":
+                stop_container(container)
 
             image_config = json.loads(run(["docker", "image", "inspect", image]))[0]
             labels = image_config.get("Config", {}).get("Labels", {})
