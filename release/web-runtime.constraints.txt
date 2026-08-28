@@ -38,7 +38,7 @@ pillow==12.3.0
 protobuf==7.35.1
 py-rust-stemmers==0.1.8
 pydantic==2.13.4
-pydantic-core==2.46.4
+pydantic-core==2.48.0
 pydantic-settings==2.15.0
 pygments==2.20.0
 python-dotenv==1.2.3

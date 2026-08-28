@@ -45,7 +45,7 @@ protobuf==7.36.0
 py-rust-stemmers==0.1.8
 pycparser==3.0
 pydantic==2.13.4
-pydantic-core==2.46.4
+pydantic-core==2.48.0
 pydantic-settings==2.15.0
 pygments==2.21.0
 pyjwt==2.13.0
