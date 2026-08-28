@@ -52,6 +52,43 @@ def _active_db(vault: Path) -> Path:
     return active
 
 
+def test_snapshot_hash_matches_projection_for_prefix_colliding_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A directory and file sharing a prefix must publish one source revision."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = tmp_path / "prefix-collision"
+    note_paths = (
+        vault / "01_Projects" / "Abazivka" / "nested.md",
+        vault / "01_Projects" / "Abazivka-logistics-hub.md",
+    )
+    for path in note_paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "---\n"
+            "type: Project\n"
+            f"title: {path.stem}\n"
+            "description: prefix collision regression\n"
+            "timestamp: 2026-08-28T00:00:00Z\n"
+            "---\n\nshared-prefix\n",
+            encoding="utf-8",
+        )
+
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    with closing(sqlite3.connect(_active_db(vault))) as conn:
+        projected_revision = conn.execute(
+            "SELECT meta_value FROM source_projection_meta WHERE meta_key = 'source_revision'"
+        ).fetchone()[0]
+        projected_paths = {row[0] for row in conn.execute("SELECT rel_path FROM source_metadata")}
+    assert report.source_snapshot_hash == projected_revision
+    assert projected_paths == {
+        "01_Projects/Abazivka/nested.md",
+        "01_Projects/Abazivka-logistics-hub.md",
+    }
+
+
 def test_vault_identity_and_database_namespace_are_stable_and_isolated(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
