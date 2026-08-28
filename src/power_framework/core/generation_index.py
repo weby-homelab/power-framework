@@ -268,7 +268,7 @@ def _source_inventory(vault_dir: Path) -> SourceInventory:
 
 def _snapshot_hash(sources: dict[str, str]) -> str:
     digest = hashlib.blake2b(digest_size=32)
-    for rel_path, content_hash in sources.items():
+    for rel_path, content_hash in sorted(sources.items()):
         digest.update(rel_path.encode("utf-8"))
         digest.update(b"\0")
         digest.update(content_hash.encode("ascii"))

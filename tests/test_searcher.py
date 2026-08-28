@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from power_framework.core import index_sync, searcher
+from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
 from power_framework.core.db import _init_db
 from power_framework.core.generation_index import (
     ActiveGeneration,
@@ -586,7 +587,7 @@ class TestSearchModeContract:
             conn.executemany(
                 "INSERT INTO dense_index_manifest VALUES (?, ?)",
                 [
-                    ("schema_version", "2"),
+                    ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
                     ("embedding_dimension", "4"),
                     ("chunk_count", "3"),
                     ("embedding_provider", "PinnedProvider"),
@@ -639,7 +640,7 @@ class TestSearchModeContract:
             conn.executemany(
                 "INSERT INTO dense_index_manifest VALUES (?, ?)",
                 [
-                    ("schema_version", "2"),
+                    ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
                     ("embedding_dimension", "4"),
                     ("chunk_count", "1"),
                     ("embedding_provider", "PinnedProvider"),
@@ -1416,7 +1417,7 @@ class TestVectorSearch:
         )
         conn.executemany(
             "INSERT INTO dense_index_manifest(manifest_key, manifest_value) VALUES (?, ?)",
-            [("schema_version", "2"), ("chunk_count", "1")],
+            [("schema_version", DENSE_INDEX_SCHEMA_VERSION), ("chunk_count", "1")],
         )
         conn.commit()
 

@@ -68,6 +68,10 @@ SKIP_FILES: frozenset[str] = frozenset({"index.md", "log.md", "_index.md", "POWE
 
 SYSTEM_SKIP_PARTS: tuple[str, ...] = (".git", "05_Templates", ".system_generated")
 
+# Dense chunk IDs include their ordinal so repeated identical sections cannot
+# overwrite one another in the globally keyed chunk_embeddings table.
+DENSE_INDEX_SCHEMA_VERSION = "3"
+
 
 def is_catalog_filename(filename: str) -> bool:
     """Return whether *filename* is a generated hierarchical catalog page."""
