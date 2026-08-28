@@ -25,7 +25,7 @@ from pathlib import Path
 from threading import RLock
 from typing import TYPE_CHECKING, Any
 
-from .constants import is_catalog_filename
+from .constants import DENSE_INDEX_SCHEMA_VERSION, is_catalog_filename
 from .db import _init_db
 from .domains import DomainConfigError, resolve_search_policy
 from .generation_index import (
@@ -425,7 +425,7 @@ def validate_dense_index(vault_dir: Path, resolved_db: _ResolvedDb | None = None
     dimension = min_size // 4
     expected_provider, expected_model = configured_embedding_identity()
     required_manifest = {
-        "schema_version": "2",
+        "schema_version": DENSE_INDEX_SCHEMA_VERSION,
         "embedding_dimension": str(dimension),
         "chunk_count": str(rows),
         "embedding_provider": expected_provider,
