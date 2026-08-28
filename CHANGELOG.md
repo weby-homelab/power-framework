@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.8] - 2026-08-28
+
 ### Fixed
 
 - Aligned generation and source-projection snapshot digests on one
@@ -18,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dense manifests, so repeated identical sections cannot overwrite embeddings.
 - Documented pausing live-vault writers while `power sync` captures and verifies
   its source snapshot.
+- Corrected the locked dependency graph for MCP, filelock, fsspec, charset-
+  normalizer, and the compatible stable `pydantic==2.13.5` /
+  `pydantic-core==2.46.5` pair.
+
+### Changed
+
+- Updated the unified runtime, deployment defaults, release metadata, tests,
+  onboarding guides, and both bundled POWER skills to the `v3.7.8` boundary.
 
 ## [3.7.7] - 2026-08-23
 

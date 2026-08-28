@@ -1,16 +1,16 @@
-# Інформаційний гід: встановлення P.O.W.E.R. 3.7.7 на Windows 11 25H2
+# Інформаційний гід: встановлення P.O.W.E.R. 3.7.8 на Windows 11 25H2
 
-> **Не є підтримуваною платформою для `v3.7.7`.** Підтримку Windows відкладено
+> **Не є підтримуваною платформою для `v3.7.8`.** Підтримку Windows відкладено
 > на невизначений строк без запланованого release target. Команди нижче мають
 > інформаційний характер і не є доказом сумісності Windows чи release
-> certification для Linux-релізу 3.7.7.
+> certification для Linux-релізу 3.7.8.
 
-Цей гід встановлює P.O.W.E.R. `v3.7.7` в ізольоване віртуальне середовище,
+Цей гід встановлює P.O.W.E.R. `v3.7.8` в ізольоване віртуальне середовище,
 створює чистий vault, перевіряє CLI та налаштовує MCP-клієнт. Усі команди
 наведено для PowerShell.
 
 > **Release artifact:** після публікації використовуйте лише підписаний tag
-> `v3.7.7` та immutable wheel зі [сторінки релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.7).
+> `v3.7.8` та immutable wheel зі [сторінки релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.8).
 > Фізичні Windows-докази залишаються окремим target-host gate; дивіться
 > [матрицю підтримки платформ](support-matrix.ua.md).
 
@@ -20,12 +20,12 @@
 - Windows 11 25H2 є офіційним релізом Windows 11 (сімейство OS build `26200`).
 - ONNX Runtime підтримує Windows 11, а його Windows-збірки потребують
   актуального Microsoft Visual C++ Runtime.
-- P.O.W.E.R. `v3.7.7` має автоматизований кросплатформний regression-тест
+- P.O.W.E.R. `v3.7.8` має автоматизований кросплатформний regression-тест
   поведінки rename-overwrite у Windows.
 - Фізичну перевірку Windows 11 25H2 завершено 2026-08-08 для follow-up revision
   `4e5b2b9`; див. [звіт перевірки](tests/windows-11-25h2-validation.md).
   Це підтверджує follow-up source/build і не переміщує та не перевидає
-  незмінні release-артефакти `v3.7.7`.
+  незмінні release-артефакти `v3.7.8`.
 
 Офіційні передумови:
 
@@ -106,7 +106,7 @@ Release wheel не потребує Git і фіксує версію вихід�
 Python-залежності все одно завантажуються з налаштованого Python package index.
 
 ```powershell
-$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.7.7/power_framework-3.7.7-py3-none-any.whl"
+$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power_framework-3.7.8-py3-none-any.whl"
 & $VenvPython -m pip install $ReleaseWheel
 if ($LASTEXITCODE -ne 0) { throw "Помилка встановлення P.O.W.E.R." }
 ```
@@ -120,7 +120,7 @@ if ($LASTEXITCODE -ne 0) { throw "Помилка встановлення P.O.W.
 if ($LASTEXITCODE -ne 0) { throw "Помилка перевірки імпортів P.O.W.E.R." }
 ```
 
-Обидві перевірки версії мають показати `3.7.7`, а import check —
+Обидві перевірки версії мають показати `3.7.8`, а import check —
 `lean FTS import: OK`. Для офіційного agent-server contract встановіть extra `[mcp]`, а
 `[semantic]` — лише для свідомо увімкненого dense search:
 
@@ -134,7 +134,7 @@ $McpRequirement = "power-framework[mcp] @ $ReleaseWheel"
 Використовуйте лише коли Git уже встановлено:
 
 ```powershell
-& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.7.7"
+& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.7.8"
 ```
 
 Не встановлюйте незакріплений `main`, якщо важлива відтворюваність.
@@ -285,7 +285,7 @@ runtime. Зробіть backup перед видаленням будь-яког
 
 - Windows повідомляє version 25H2 / build family `26200`.
 - Обраний Python має версію 3.11+; venv-перевірка повертає `True`.
-- `power --version` і distribution metadata повертають `3.7.7`.
+- `power --version` і distribution metadata повертають `3.7.8`.
 - `power_framework` імпортується, а офіційний agent-server install містить extra
   `[mcp]`.
 - MCP preflight запускається тим самим interpreter.

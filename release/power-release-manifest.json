@@ -2,11 +2,11 @@
   "application_schema": "power.application.v2",
   "artifacts": {
     "power_sdist": {
-      "filename": "power_framework-3.7.7.tar.gz",
+      "filename": "power_framework-3.7.8.tar.gz",
       "sha256": "29f2ceb238f532ba5961df6b5694dfc95f96a862e99480be5c1a97937d59f6b0"
     },
     "power_wheel": {
-      "filename": "power_framework-3.7.7-py3-none-any.whl",
+      "filename": "power_framework-3.7.8-py3-none-any.whl",
       "sha256": "1115019edc57f58702919a200a38def565a5d56c2e8415aae9f0aaa57b9cceee"
     }
   },
@@ -48,7 +48,7 @@
   "requires_python": "<3.15,>=3.13",
   "schema": "power.release.manifest.v1",
   "skill_tree_sha256": "003515188c9e78fe4b806301bc3fa8f36a6c6544ef92151a0e556315716afeb8",
-  "version": "3.7.7",
+  "version": "3.7.8",
   "web": {
     "application_service_boundary": true,
     "entry_point": "power-web",
