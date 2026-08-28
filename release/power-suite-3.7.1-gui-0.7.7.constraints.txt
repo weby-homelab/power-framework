@@ -33,7 +33,7 @@ loguru==0.7.3
 markdown==3.10.3
 markupsafe==3.0.3
 mcp==2.1.0
-mcp-types==2.0.0
+mcp-types==2.1.0
 mmh3==5.2.1
 numpy==2.4.6
 onnxruntime==1.29.0
