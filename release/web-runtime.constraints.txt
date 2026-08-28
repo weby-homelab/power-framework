@@ -15,7 +15,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
 defusedxml==0.7.1
 fastapi==0.141.1
 fastembed==0.8.0
-filelock==3.32.0
+filelock==3.32.4
 flatbuffers==25.12.19
 fsspec==2026.6.0
 h11==0.16.0
