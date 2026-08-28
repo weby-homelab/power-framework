@@ -35,7 +35,9 @@ def test_prepare_vault_uses_privileged_shared_mount_permissions(
     ]
 
 
-def test_prepare_vault_fallback_keeps_host_access(monkeypatch, tmp_path: Path) -> None:
+def test_prepare_vault_fallback_keeps_host_access_after_restrictive_app_write(
+    monkeypatch, tmp_path: Path
+) -> None:
     vault = tmp_path / "vault"
     vault.mkdir(mode=0o700)
     note = vault / "note.md"
