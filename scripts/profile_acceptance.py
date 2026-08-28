@@ -266,6 +266,26 @@ def stop_container(container: str) -> None:
     )
 
 
+def prepare_vault_for_container(vault: Path) -> None:
+    """Share the disposable bind mount with the container and host runner.
+
+    The Web proof runs as UID 10001 and then reads the canonical vault from
+    the host to verify the governed mutation.  The vault is disposable and
+    isolated, so its entries must remain traversable, readable, and removable
+    by both identities after ownership changes.
+    """
+    try:
+        run(["sudo", "chown", "-R", "10001:10001", str(vault)])
+        run(["sudo", "chmod", "-R", "a+rwX", str(vault)])
+    except FileNotFoundError:
+        for path in [vault, *sorted(vault.rglob("*"))]:
+            if not path.exists():
+                continue
+            os.chown(path, 10001, 10001)
+            mode = path.stat().st_mode
+            os.chmod(path, mode | (0o777 if path.is_dir() else 0o666))
+
+
 def inspect_container(container: str) -> tuple[str, list[str], bool, str]:
     """Return user, dropped capabilities, read-only flag, and PID command line."""
     payload = json.loads(run(["docker", "inspect", container]))[0]
@@ -344,12 +364,7 @@ def main() -> int:
                 env={**host_environment, "POWER_VAULT_DIR": str(vault)},
             )
             asyncio.run(mcp_acceptance(mcp, vault, host_environment))
-            try:
-                run(["sudo", "chown", "-R", "10001:10001", str(vault)])
-            except FileNotFoundError:
-                for path in [vault, *sorted(vault.rglob("*"))]:
-                    if path.exists():
-                        os.chown(path, 10001, 10001)
+            prepare_vault_for_container(vault)
 
             stop_container(container)
             subprocess.run(  # noqa: S603 -- fixed Docker executable and generated volume name.
