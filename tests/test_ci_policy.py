@@ -94,6 +94,7 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "artifact-metadata: write" in release_text
     assert "gh release view" in release_text
     assert "GitHub release readback verified" in release_text
+    assert 'item.removeprefix("github:") for item in manifest["attestations"]' in release_text
 
 
 def test_release_package_sbom_scans_the_wheel_as_a_file() -> None:
