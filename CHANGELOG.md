@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a sibling file share a name prefix (issue #360).
 - Passed the packaged wheel to `anchore/sbom-action` through its file input,
   restoring the failed package SBOM release gate.
+- Salted dense chunk IDs with their ordinal and automatically rebuilds stale
+  dense manifests, so repeated identical sections cannot overwrite embeddings.
+- Documented pausing live-vault writers while `power sync` captures and verifies
+  its source snapshot.
 
 ## [3.7.7] - 2026-08-23
 

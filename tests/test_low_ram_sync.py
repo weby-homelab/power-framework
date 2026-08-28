@@ -10,9 +10,11 @@ i5-5200U). After the fix, embeddings are produced in batches via
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from typing import TYPE_CHECKING
 
 from power_framework.core import index_sync, searcher
+from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -120,6 +122,94 @@ def test_sync_adaptive_batch_on_memory_error(monkeypatch, tmp_path):
     assert len(fake.batch_calls) >= 1
     # And critically: it never fell back to per-item embed().
     assert fake.embed_calls == 0
+
+
+def test_repeated_sections_get_distinct_chunk_ids(monkeypatch, tmp_path):
+    """Identical sections in one note must not overwrite each other's vectors."""
+    vault = tmp_path / "vault"
+    notes = vault / "03_Resources"
+    notes.mkdir(parents=True)
+    repeated_body = " ".join(["identical-section-token"] * 210)
+    (notes / "repeated.md").write_text(
+        "---\n"
+        "type: Resource\n"
+        "title: Repeated sections\n"
+        "description: duplicate section regression\n"
+        "timestamp: 2026-01-01T00:00:00Z\n"
+        "---\n\n"
+        f"## Repeated\n{repeated_body}\n\n"
+        f"## Repeated\n{repeated_body}\n",
+        encoding="utf-8",
+    )
+
+    fake = _FakeManager()
+    _patch_manager(monkeypatch, fake)
+    db = tmp_path / "power_search.db"
+    monkeypatch.setenv("POWER_SEARCH_DB", str(db))
+
+    with closing(sqlite3.connect(db)) as conn:
+        searcher._init_db(conn)
+        searcher._sync_vault_to_db(vault, conn, sync_embeddings=True)
+        rows = conn.execute("SELECT chunk_id, rel_path FROM chunk_embeddings").fetchall()
+
+    assert len(rows) == 2
+    assert len({row[0] for row in rows}) == 2
+
+
+def test_stale_dense_manifest_rebuilds_chunk_identity_schema(monkeypatch, tmp_path):
+    """Changing chunk identity rules must rebuild unchanged notes automatically."""
+    vault = tmp_path / "vault"
+    notes = vault / "03_Resources"
+    notes.mkdir(parents=True)
+    note = notes / "stable.md"
+    note.write_text(
+        "---\n"
+        "type: Resource\n"
+        "title: Stable note\n"
+        "description: stale manifest regression\n"
+        "timestamp: 2026-01-01T00:00:00Z\n"
+        "---\n\n"
+        "stable dense content\n",
+        encoding="utf-8",
+    )
+
+    fake = _FakeManager()
+    _patch_manager(monkeypatch, fake)
+    db = tmp_path / "power_search.db"
+    monkeypatch.setenv("POWER_SEARCH_DB", str(db))
+
+    with closing(sqlite3.connect(db)) as conn:
+        searcher._init_db(conn)
+        mtime = note.stat().st_mtime
+        conn.execute(
+            "INSERT INTO file_metadata(rel_path, mtime) VALUES (?, ?)",
+            ("03_Resources/stable.md", mtime),
+        )
+        conn.execute(
+            "INSERT INTO chunk_embeddings(chunk_id, rel_path, embedding, content, mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("legacy-chunk-id", "03_Resources/stable.md", b"legacy", "legacy", mtime),
+        )
+        conn.executemany(
+            "INSERT INTO dense_index_manifest(manifest_key, manifest_value) VALUES (?, ?)",
+            [
+                ("schema_version", "2"),
+                ("embedding_dimension", "3"),
+                ("chunk_count", "1"),
+                ("embedding_provider", "_FakeManager"),
+                ("embedding_model", "unknown"),
+            ],
+        )
+        conn.commit()
+
+        searcher._sync_vault_to_db(vault, conn, sync_embeddings=True)
+        manifest = dict(
+            conn.execute("SELECT manifest_key, manifest_value FROM dense_index_manifest")
+        )
+        chunk_ids = {row[0] for row in conn.execute("SELECT chunk_id FROM chunk_embeddings")}
+
+    assert manifest["schema_version"] == DENSE_INDEX_SCHEMA_VERSION
+    assert "legacy-chunk-id" not in chunk_ids
 
 
 def test_sync_fts_only_skips_embedding(monkeypatch, tmp_path):

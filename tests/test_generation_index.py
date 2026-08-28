@@ -604,10 +604,14 @@ def test_state_transaction_setup_failure_keeps_previous_pointer_and_search(
 def test_chunk_identity_is_content_addressed_and_path_independent() -> None:
     first = _stable_chunk_id("source-hash-a", "Overview", "# Overview\nStable content")
     same = _stable_chunk_id("source-hash-a", "Overview", "# Overview\nStable content")
+    repeated = _stable_chunk_id(
+        "source-hash-a", "Overview", "# Overview\nStable content", ordinal=1
+    )
     changed_source = _stable_chunk_id("source-hash-b", "Overview", "# Overview\nStable content")
     changed_section = _stable_chunk_id("source-hash-a", "Details", "# Overview\nStable content")
 
     assert first == same
+    assert first != repeated
     assert first != changed_source
     assert first != changed_section
     assert "::chunk_" not in first
