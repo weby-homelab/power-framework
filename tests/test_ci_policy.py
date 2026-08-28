@@ -92,6 +92,13 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "GitHub release readback verified" in release_text
 
 
+def test_release_package_sbom_scans_the_wheel_as_a_file() -> None:
+    release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
+
+    assert "file: ${{ runner.temp }}/power-framework-package.whl" in release_text
+    assert "path: ${{ runner.temp }}/power-framework-package.whl" not in release_text
+
+
 def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
 
