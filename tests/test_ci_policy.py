@@ -123,10 +123,13 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert 'select(.key_id == "2D49E810C7F2527E")' in release_text
     assert "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E" in release_text
     assert 'gpg --batch --import "$key_file"' in release_text
-    assert "workflow_dispatch" not in release_text
-    assert "inputs.release_tag" not in release_text
+    assert "workflow_dispatch" in release_text
+    assert "inputs.release_tag" in release_text
     assert "permissions: {}" in release_text
-    assert "RELEASE_TAG: ${{ github.ref_name }}" in release_text
+    assert (
+        "RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+        in release_text
+    )
     assert "--passed-mandatory profile-a-mcp-stdio" in release_text
     assert "--passed-mandatory web-semantic-acceptance" in release_text
     assert "--passed-mandatory web-rerank-acceptance" in release_text
@@ -189,7 +192,7 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "pip install build ." not in release_text
     assert "PYTHONPATH: src:." not in release_text
     assert "--system-site-packages" not in release_text
-    assert "POWER_RELEASE_GHCR_TOKEN" not in release_text
+    assert "GH_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}" in release_text
     assert "BUILD_DATE" not in release_text
     assert "SOURCE_DATE_EPOCH" in release_text
     assert "OCI_CREATED" in release_text
