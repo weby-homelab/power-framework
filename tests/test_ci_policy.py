@@ -86,6 +86,8 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "Prefetch locked model snapshots for real Web acceptance" in release_text
     assert "Checkout current acceptance harness for tag recovery" in release_text
     assert "ACCEPTANCE_HARNESS_ROOT" in release_text
+    assert "Remove tag recovery harness checkout" in release_text
+    assert "rm -rf -- .release-acceptance-harness" in release_text
     assert "--profile-evidence" in release_text
     assert "attestations: write" in release_text
     assert "id-token: write" in release_text

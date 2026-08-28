@@ -456,6 +456,14 @@ jobs:
             --version "${RELEASE_TAG#v}" \
             --output "$RUNNER_TEMP/power-profile-acceptance.json"
 
+      - name: Remove tag recovery harness checkout
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          test -d .release-acceptance-harness
+          rm -rf -- .release-acceptance-harness
+          test ! -e .release-acceptance-harness
+
       - name: Generate Web SPDX SBOM bound to the exact image
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
