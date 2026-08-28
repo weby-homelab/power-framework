@@ -709,7 +709,10 @@ jobs:
 
           receipt = json.loads((root / "power-framework.release-receipt.json").read_text())
           assert receipt["release"]["tag"] == tag
-          assert receipt["attestations"] == manifest["attestations"]
+          manifest_attestations = [
+              item.removeprefix("github:") for item in manifest["attestations"]
+          ]
+          assert receipt["attestations"] == manifest_attestations
           print("public artifact and manifest readback verified")
           PY
           registry_digest="$(docker buildx imagetools inspect "$WEB_IMAGE_REF" | python3 -c 'import sys; print(next(line.split()[1] for line in sys.stdin if line.startswith("Digest:")))')"
