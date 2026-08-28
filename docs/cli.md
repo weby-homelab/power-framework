@@ -261,6 +261,12 @@ exclusion reasons. Full sync downloads and validates the pinned embedding assets
 as needed. It can be resource intensive. The default is fail-closed when any
 note is excluded; use `--allow-partial` only when a partial index is deliberate.
 
+On a live vault, pause any editor, filesystem watcher, or external sync daemon
+that can write Markdown while `power sync` is running. POWER rechecks the source
+snapshot before publication and deliberately rejects a build whose inputs changed;
+after pausing the writer, rerun the same command. The previous active generation
+remains readable when this guard fires.
+
 ### `rot`
 
 Report redundant, outdated, and trivial notes.

@@ -13,7 +13,7 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
 
 from .chunker import SemanticChunker
-from .constants import is_catalog_filename
+from .constants import DENSE_INDEX_SCHEMA_VERSION, is_catalog_filename
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 from .source_projection import scan_projection, write_projection
@@ -52,11 +52,16 @@ def _compute_tf_vector(tokens: list[str]) -> dict[str, float]:
     return {word: count / total for word, count in counter.items()}
 
 
-def _stable_chunk_id(source_content_hash: str, section_identity: str, chunk_text: str) -> str:
-    """Return a content-addressed chunk identifier independent of vault paths."""
+def _stable_chunk_id(
+    source_content_hash: str,
+    section_identity: str,
+    chunk_text: str,
+    ordinal: int = 0,
+) -> str:
+    """Return a stable chunk ID that distinguishes repeated section content."""
     normalized_chunk = " ".join(chunk_text.split()).casefold()
     normalized_section = " ".join(section_identity.split()).casefold()
-    payload = "\x00".join((source_content_hash, normalized_section, normalized_chunk))
+    payload = "\x00".join((source_content_hash, normalized_section, str(ordinal), normalized_chunk))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -98,8 +103,14 @@ def _sync_vault_to_db(
     cursor = conn.cursor()
     if sync_embeddings:
         chunk_cnt = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
-        if force_rebuild or chunk_cnt == 0:
-            logger.info("Dense embeddings missing or force rebuild requested: resetting mtime ...")
+        dense_manifest = dict(
+            cursor.execute("SELECT manifest_key, manifest_value FROM dense_index_manifest")
+        )
+        schema_stale = dense_manifest.get("schema_version") != DENSE_INDEX_SCHEMA_VERSION
+        if force_rebuild or chunk_cnt == 0 or schema_stale:
+            logger.info(
+                "Dense embeddings missing, stale, or force rebuild requested: resetting mtime ..."
+            )
             try:
                 cursor.execute("DELETE FROM doc_embeddings")
                 cursor.execute("DELETE FROM chunk_embeddings")
@@ -339,6 +350,7 @@ def _sync_vault_to_db(
                             source_content_hash,
                             _chunk_section_identity(chunk_text, i),
                             chunk_text,
+                            ordinal=i,
                         ),
                         rel_path,
                         chunk_text,
@@ -376,7 +388,7 @@ def _sync_vault_to_db(
         cursor.executemany(
             "INSERT OR REPLACE INTO dense_index_manifest (manifest_key, manifest_value) VALUES (?, ?)",
             [
-                ("schema_version", "2"),
+                ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
                 ("embedding_dimension", str(embedding_bytes // 4)),
                 ("chunk_count", str(dense_count)),
                 ("embedding_provider", provider),

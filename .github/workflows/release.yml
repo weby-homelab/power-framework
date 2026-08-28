@@ -350,7 +350,7 @@ jobs:
       - name: Generate package SPDX SBOM bound to the exact wheel
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
-          path: ${{ runner.temp }}/power-framework-package.whl
+          file: ${{ runner.temp }}/power-framework-package.whl
           format: spdx-json
           output-file: dist/power-framework.spdx.json
 
