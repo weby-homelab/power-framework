@@ -16,7 +16,7 @@
 
 ## Межа підтримки та доказів
 
-- P.O.W.E.R. потребує Python 3.11 або новішого.
+- P.O.W.E.R. потребує Python 3.13 або 3.14.
 - Windows 11 25H2 є офіційним релізом Windows 11 (сімейство OS build `26200`).
 - ONNX Runtime підтримує Windows 11, а його Windows-збірки потребують
   актуального Microsoft Visual C++ Runtime.
@@ -284,7 +284,7 @@ runtime. Зробіть backup перед видаленням будь-яког
 ## Acceptance checklist
 
 - Windows повідомляє version 25H2 / build family `26200`.
-- Обраний Python має версію 3.11+; venv-перевірка повертає `True`.
+- Обраний Python має версію 3.13 або 3.14; venv-перевірка повертає `True`.
 - `power --version` і distribution metadata повертають `3.7.8`.
 - `power_framework` імпортується, а офіційний agent-server install містить extra
   `[mcp]`.

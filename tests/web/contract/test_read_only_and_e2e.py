@@ -262,7 +262,7 @@ def test_task_completion_evidence_creates_canonical_tcr_receipt(hermetic_vault: 
 
 
 def test_task_sse_resume_cursor_starts_after_requested_sequence(
-    hermetic_vault: Path,
+    hermetic_vault: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """SSE resumes from the caller cursor instead of replaying the full journal."""
     svc = ApplicationService(hermetic_vault)
@@ -277,6 +277,15 @@ def test_task_sse_resume_cursor_starts_after_requested_sequence(
         expected_revision=1,
         context=RequestContext(actor="seed", authority="apply"),
     )
+
+    async def _run_power_call(request, settings, function, *args, **kwargs):
+        del request, settings
+        kwargs.pop("timeout_seconds", None)
+        return function(*args, **kwargs)
+
+    from power_framework.web.routes import tasks as task_routes
+
+    monkeypatch.setattr(task_routes, "run_power_call", _run_power_call)
 
     settings = Settings(
         vault_path=hermetic_vault,
