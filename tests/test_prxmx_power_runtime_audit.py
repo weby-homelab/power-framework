@@ -1242,15 +1242,36 @@ def test_audit_mcp_config_with_shell_wrapper(tmp_path: Path) -> None:
 
 
 def test_audit_mcp_extract_and_validate_structure(tmp_path: Path) -> None:
+    venv = tmp_path / "venv"
+    bin_dir = venv / "bin"
+    bin_dir.mkdir(parents=True)
+    py_bin = bin_dir / "python"
+    py_bin.write_text("#!/bin/sh\n", encoding="utf-8")
+    py_bin.chmod(0o755)
+
+    dist_info = venv / "lib" / "python3.13" / "site-packages" / "power_framework-3.7.8.dist-info"
+    dist_info.mkdir(parents=True)
+    (dist_info / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: power-framework\nVersion: 3.7.8\n",
+        encoding="utf-8",
+    )
+
+    power_mcp = bin_dir / "power-mcp"
+    power_mcp.write_text(
+        f'#!/bin/sh\nexec {py_bin} -m power_framework.mcp "$@"\n',
+        encoding="utf-8",
+    )
+    power_mcp.chmod(0o755)
+
     config = tmp_path / "mcp_config.json"
     config.write_text(
         json.dumps(
             {
                 "mcpServers": {
                     "power": {
-                        "command": "/root/.local/bin/power-mcp",
+                        "command": str(power_mcp),
                         "args": [],
-                        "env": {"POWER_VAULT_DIR": "/root/geminicli/brain", "SECRET": "xyz"},
+                        "env": {"POWER_VAULT_DIR": "/custom/brain", "SECRET": "xyz"},
                     }
                 }
             }
@@ -1258,7 +1279,11 @@ def test_audit_mcp_extract_and_validate_structure(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     res = audit_mcp_config(config)
-    assert res.executable == "/root/.local/bin/power-mcp"
+    assert res.executable == str(power_mcp)
+    assert res.resolved_executable == str(power_mcp)
+    assert res.runtime_python == str(py_bin)
+    assert res.installed_version == "3.7.8"
+    assert res.status == "canonical"
     assert res.env_keys == ["POWER_VAULT_DIR", "SECRET"]
     assert "xyz" not in json.dumps(res.as_dict())
 
@@ -1297,16 +1322,31 @@ def test_is_safe_skill_relative_path_rules() -> None:
     assert is_safe_skill_relative_path(".hidden") is False
 
 
-def test_is_allowed_skill_target_protection() -> None:
+def test_is_allowed_skill_target_protection(tmp_path: Path) -> None:
     # Disallowed: system prefixes, root directory, user home root
     assert is_allowed_skill_target(Path("/usr/local/skills/power")) is False
     assert is_allowed_skill_target(Path("/etc/power")) is False
     assert is_allowed_skill_target(Path("/root")) is False
     assert is_allowed_skill_target(Path("/")) is False
 
-    # Allowed: standard default targets
-    assert is_allowed_skill_target(Path("/root/geminicli/.agents/skills/power")) is True
-    assert is_allowed_skill_target(Path("/root/.gemini/config/skills/power")) is True
+    # Allowed: valid non-system target under explicit allowed roots
+    allowed_root_1 = tmp_path / "agents_skills"
+    allowed_root_2 = tmp_path / "gemini_skills"
+    allowed_root_1.mkdir(parents=True)
+    allowed_root_2.mkdir(parents=True)
+
+    target_1 = allowed_root_1 / "power"
+    target_2 = allowed_root_2 / "power"
+    target_1.mkdir()
+    target_2.mkdir()
+
+    allowed_roots = [allowed_root_1, allowed_root_2]
+    assert is_allowed_skill_target(target_1, allowed_roots=allowed_roots) is True
+    assert is_allowed_skill_target(target_2, allowed_roots=allowed_roots) is True
+    assert (
+        is_allowed_skill_target(tmp_path / "disallowed" / "power", allowed_roots=allowed_roots)
+        is False
+    )
 
 
 def test_audit_skill_and_extract_metadata(tmp_path: Path) -> None:
