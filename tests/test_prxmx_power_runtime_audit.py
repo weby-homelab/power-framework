@@ -339,13 +339,7 @@ def test_fetch_local_release_wheel_hash_mismatch_fails_closed(tmp_path: Path) ->
 
 
 def test_fetch_from_github_api_failure_fails_closed() -> None:
-    http_err = urllib.error.HTTPError(
-        url="https://api.github.com/repos/test/releases/latest",
-        code=404,
-        msg="Not Found",
-        hdrs={},  # type: ignore[arg-type]
-        fp=None,
-    )
+    http_err = urllib.error.URLError("release endpoint unavailable")
     with (
         patch("urllib.request.urlopen", side_effect=http_err),
         pytest.raises(ReleaseValidationError, match="Could not resolve release"),
@@ -530,7 +524,7 @@ def test_fetch_from_github_wheel_asset_digest_without_manifest_succeeds() -> Non
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
         elif "power-release-manifest.json" in url:
-            raise urllib.error.HTTPError(url=url, code=404, msg="Not Found", hdrs={}, fp=None)  # type: ignore[arg-type]
+            raise urllib.error.URLError("manifest endpoint unavailable")
         return mock
 
     with patch("urllib.request.urlopen", side_effect=urlopen_side_effect):
@@ -1426,13 +1420,7 @@ def test_run_audit_release_failure_persists_state_and_log(tmp_path: Path) -> Non
 
     with patch(
         "urllib.request.urlopen",
-        side_effect=urllib.error.HTTPError(
-            url="https://api.github.com/repos/invalid/power/releases/latest",
-            code=404,
-            msg="Not Found",
-            hdrs={},  # type: ignore[arg-type]
-            fp=None,
-        ),
+        side_effect=urllib.error.URLError("release endpoint unavailable"),
     ):
         report, code = run_audit(
             repo="invalid/power",
@@ -1658,7 +1646,7 @@ def test_fetch_from_github_apply_requires_verified_wheel(tmp_path: Path) -> None
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
         elif "power-release-manifest.json" in url:
-            raise urllib.error.HTTPError(url=url, code=404, msg="Not Found", hdrs={}, fp=None)  # type: ignore[arg-type]
+            raise urllib.error.URLError("manifest endpoint unavailable")
         return mock
 
     state_dir = tmp_path / "state"
@@ -1721,7 +1709,7 @@ def test_fetch_from_github_apply_missing_wheel_digest_fails_closed(tmp_path: Pat
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
         elif "power-release-manifest.json" in url:
-            raise urllib.error.HTTPError(url=url, code=404, msg="Not Found", hdrs={}, fp=None)  # type: ignore[arg-type]
+            raise urllib.error.URLError("manifest endpoint unavailable")
         return mock
 
     state_dir = tmp_path / "state"
