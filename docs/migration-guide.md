@@ -77,7 +77,7 @@ This guide is verified against the `v3.7.8` release contract. CI checks these
 facts against the executable capability manifest so an agent does not inherit
 an older migration recipe:
 
-- the current surface is 25 top-level CLI commands and 20 MCP tools;
+- the current surface is 26 top-level CLI commands and 20 MCP tools;
 - the default search mode is `auto`; it uses verified dense when ready and
   otherwise labelled FTS; `semantic` and `reranked` are explicit opt-ins;
 - database and cache paths are runtime-owned. Use `power doctor DESTINATION

@@ -77,7 +77,7 @@ rollback path.
 executable capability manifest, щоб агент не успадковував старий migration
 recipe:
 
-- поточна surface — 25 top-level CLI commands і 20 MCP tools;
+- поточна surface — 26 top-level CLI commands і 20 MCP tools;
 - режим пошуку за замовчуванням — `auto`; він використовує verified dense лише
   коли runtime готовий, інакше повертає labelled FTS; `semantic` та `reranked` є
   explicit opt-in;

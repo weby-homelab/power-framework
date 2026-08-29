@@ -16,7 +16,7 @@ PowerShell syntax throughout.
 
 ## Support and evidence boundary
 
-- P.O.W.E.R. requires Python 3.11 or newer.
+- P.O.W.E.R. requires Python 3.13 or 3.14.
 - Windows 11 25H2 is an official Windows 11 release (OS build family `26200`).
 - ONNX Runtime supports Windows 11, and its Windows builds require the current
   Microsoft Visual C++ runtime.
@@ -281,7 +281,7 @@ runtime. Back it up before deleting either directory.
 ## Acceptance checklist
 
 - Windows reports version 25H2 / build family `26200`.
-- The selected Python is 3.11 or newer and the venv check prints `True`.
+- The selected Python is 3.13 or 3.14 and the venv check prints `True`.
 - `power --version` and distribution metadata both report `3.7.8`.
 - `power_framework` imports successfully and the official agent-server install
   includes the `[mcp]` extra.

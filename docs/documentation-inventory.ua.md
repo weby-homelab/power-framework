@@ -49,7 +49,7 @@
 - Старий MCP-інвентар замінено на фактичні `20` інструментів; CLI
   задокументовано як `26` top-level команд.
 - До surface додано `power integrations` для unified native, Skill і launcher plans.
-- `reranked` більше не називається стандартним режимом: код використовує `semantic`,
+- `reranked` більше не називається стандартним режимом: код використовує `auto`,
   а reranking вмикається явно.
 - Видалено небезпечне оновлення через destructive reset, непереносний `/tmp`,
   `%USERPROFILE%` у PowerShell і запуск MCP через глобальний `py` замість точного
