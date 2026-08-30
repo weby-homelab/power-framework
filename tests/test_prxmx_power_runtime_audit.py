@@ -1983,7 +1983,7 @@ def test_github_fetch_uses_published_manifest_asset_not_raw_source() -> None:
             mock.read.return_value = pyproject_text.encode("utf-8")
         elif url.endswith("/releases/download/v3.7.8/power-release-manifest.json"):
             mock.read.return_value = json.dumps(public_manifest).encode("utf-8")
-        elif "raw.githubusercontent.com" in url and url.endswith(
+        elif url.startswith("https://raw.githubusercontent.com/") and url.endswith(
             "/release/power-release-manifest.json"
         ):
             mock.read.return_value = json.dumps(stale_manifest).encode("utf-8")
@@ -2000,7 +2000,9 @@ def test_github_fetch_uses_published_manifest_asset_not_raw_source() -> None:
         in calls
     )
     assert not any(
-        "raw.githubusercontent.com" in url and "power-release-manifest.json" in url for url in calls
+        url.startswith("https://raw.githubusercontent.com/")
+        and "power-release-manifest.json" in url
+        for url in calls
     )
 
 
