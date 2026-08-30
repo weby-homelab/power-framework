@@ -1,23 +1,14 @@
 {
   "application_schema": "power.application.v2",
-  "artifacts": {
-    "power_sdist": {
-      "filename": "power_framework-3.7.8.tar.gz",
-      "sha256": "29f2ceb238f532ba5961df6b5694dfc95f96a862e99480be5c1a97937d59f6b0"
-    },
-    "power_wheel": {
-      "filename": "power_framework-3.7.8-py3-none-any.whl",
-      "sha256": "1115019edc57f58702919a200a38def565a5d56c2e8415aae9f0aaa57b9cceee"
-    }
-  },
+  "authority": "candidate-only",
+  "generated_manifest": "dist/power-release-manifest.json",
+  "artifacts": {},
   "attestations": [],
-  "commit": "d3a40833048292174bbee048bb0210c9570cd1ee",
   "mcp": {
     "entry_point": "power-mcp",
     "transport": "stdio",
     "vault_environment": "POWER_VAULT_DIR"
   },
-  "mcp_contract_sha256": "28d1590c85c0f0c5c539468e8efd53acf5a9edff31acf73585e614dc460dac64",
   "profiles": {
     "native": [
       "power",
@@ -46,9 +37,8 @@
   },
   "repository": "weby-homelab/power-framework",
   "requires_python": "<3.15,>=3.13",
-  "schema": "power.release.manifest.v1",
-  "skill_tree_sha256": "003515188c9e78fe4b806301bc3fa8f36a6c6544ef92151a0e556315716afeb8",
-  "version": "3.7.8",
+  "schema": "power.release.manifest.template.v1",
+  "version": "3.7.9",
   "web": {
     "application_service_boundary": true,
     "entry_point": "power-web",

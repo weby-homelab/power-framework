@@ -7,10 +7,19 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+try:
+    from release_bindings import normalize_attestation_id
+except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
+    from scripts.release_bindings import normalize_attestation_id
+
+HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+IMAGE_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -35,11 +44,57 @@ def _sha256(path: Path) -> str:
 
 def _asset_receipt(path: Path) -> dict[str, Any]:
     """Return stable, path-safe metadata for one uploaded asset."""
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"release asset must be a regular file: {path}")
     return {
         "name": path.name,
         "size_bytes": path.stat().st_size,
         "sha256": _sha256(path),
     }
+
+
+def _parse_attestation_roles(values: list[str]) -> dict[str, str]:
+    """Parse ``attestation-id=package|web`` role bindings."""
+    roles: dict[str, str] = {}
+    for value in values:
+        if not isinstance(value, str) or "=" not in value:
+            raise ValueError("attestation role must use id=package|web syntax")
+        raw_id, role = value.split("=", 1)
+        try:
+            identity = normalize_attestation_id(raw_id)
+        except ValueError as exc:
+            raise ValueError(f"invalid attestation role identity: {exc}") from exc
+        role = role.strip()
+        if role not in {"package", "web"}:
+            raise ValueError("attestation role must be package or web")
+        if identity in roles:
+            raise ValueError(f"duplicate attestation role identity: {identity}")
+        roles[identity] = role
+    return roles
+
+
+def _parse_attestation_subjects(values: list[str], roles: dict[str, str]) -> list[dict[str, Any]]:
+    """Parse ``attestation-id=digest`` values into deterministic receipt entries."""
+    subjects: dict[str, set[str]] = {}
+    for value in values:
+        if not isinstance(value, str) or "=" not in value:
+            raise ValueError("attestation subject must use id=digest syntax")
+        raw_id, raw_digest = value.split("=", 1)
+        try:
+            identity = normalize_attestation_id(raw_id)
+        except ValueError as exc:
+            raise ValueError(f"invalid attestation subject identity: {exc}") from exc
+        digest = raw_digest.strip()
+        if digest.startswith("sha256:"):
+            if IMAGE_DIGEST_RE.fullmatch(digest) is None:
+                raise ValueError("attestation image subject must use sha256:<64 lowercase hex>")
+        elif HASH_RE.fullmatch(digest) is None:
+            raise ValueError("attestation package subject must be a lowercase SHA-256")
+        subjects.setdefault(identity, set()).add(digest)
+    return [
+        {"id": identity, "role": roles.get(identity), "subjects": sorted(digests)}
+        for identity, digests in sorted(subjects.items())
+    ]
 
 
 def build_receipt(
@@ -51,16 +106,27 @@ def build_receipt(
     workflow_run_id: str,
     manifest_path: Path | None = None,
     attestation_ids: list[str] | None = None,
+    attestation_subjects: list[str] | None = None,
+    attestation_subject_roles: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build a receipt tied to the exact tag commit, tree and local artifacts."""
-    if not all(isinstance(item, str) and item for item in (attestation_ids or [])):
-        raise ValueError("attestation IDs must be non-empty strings")
+    try:
+        normalized_attestation_ids = [
+            normalize_attestation_id(value) for value in (attestation_ids or [])
+        ]
+    except ValueError as exc:
+        raise ValueError(f"invalid attestation identity: {exc}") from exc
+    if len(set(normalized_attestation_ids)) != len(normalized_attestation_ids):
+        raise ValueError("attestation IDs must be unique")
+    parsed_roles = _parse_attestation_roles(attestation_subject_roles or [])
+    parsed_subjects = _parse_attestation_subjects(attestation_subjects or [], parsed_roles)
     commit = _git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}")
     tree = _git(repo, "show", "-s", "--format=%T", commit)
     assets = sorted(
         path
         for path in assets_dir.iterdir()
         if path.is_file()
+        and not path.is_symlink()
         and path.name != "power-framework.release-receipt.json"
         and path.suffix in {".whl", ".gz", ".json", ".txt"}
     )
@@ -83,9 +149,63 @@ def build_receipt(
         raise ValueError("unified release manifest schema is invalid")
     if manifest.get("commit") != commit:
         raise ValueError("unified release manifest commit does not match the tag commit")
+    manifest_attestation_values = manifest.get("attestations", [])
+    if not isinstance(manifest_attestation_values, list):
+        raise ValueError("unified release manifest attestations must be a list")
+    try:
+        manifest_attestation_ids = {
+            normalize_attestation_id(value) for value in manifest_attestation_values
+        }
+    except ValueError as exc:
+        raise ValueError(f"invalid manifest attestation identity: {exc}") from exc
+    if manifest_attestation_ids != set(normalized_attestation_ids):
+        raise ValueError("receipt attestation IDs do not match the release manifest")
+    if normalized_attestation_ids:
+        subject_ids = {item["id"] for item in parsed_subjects}
+        if subject_ids != manifest_attestation_ids:
+            raise ValueError("receipt attestation subjects do not match attestation IDs")
+        if set(parsed_roles) != manifest_attestation_ids or set(parsed_roles.values()) != {
+            "package",
+            "web",
+        }:
+            raise ValueError("receipt attestation roles must map one package ID and one web ID")
+        artifacts = manifest.get("artifacts")
+        if not isinstance(artifacts, dict):
+            raise ValueError(
+                "unified release manifest artifacts are required for attestation subjects"
+            )
+        expected_subjects: set[str] = set()
+        for key in ("power_wheel", "power_sdist"):
+            entry = artifacts.get(key)
+            if not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str):
+                raise ValueError(f"manifest artifact {key} is required for attestation subjects")
+            expected_subjects.add(entry["sha256"])
+        image_entry = artifacts.get("web_image")
+        if not isinstance(image_entry, dict) or not isinstance(image_entry.get("digest"), str):
+            raise ValueError("manifest web_image is required for attestation subjects")
+        expected_subjects.add(image_entry["digest"])
+        observed_subjects = {subject for item in parsed_subjects for subject in item["subjects"]}
+        if observed_subjects != expected_subjects:
+            raise ValueError("attestation subjects do not match final manifest digests")
+        subjects_by_role = {
+            role: {
+                subject
+                for item in parsed_subjects
+                if item["role"] == role
+                for subject in item["subjects"]
+            }
+            for role in {"package", "web"}
+        }
+        if subjects_by_role["package"] != {
+            artifacts["power_wheel"]["sha256"],
+            artifacts["power_sdist"]["sha256"],
+        }:
+            raise ValueError("package attestation subjects do not match wheel and sdist")
+        if subjects_by_role["web"] != {image_entry["digest"]}:
+            raise ValueError("web attestation subject does not match the image digest")
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(UTC).isoformat(),
         "release": {
             "repository": repository,
@@ -99,7 +219,8 @@ def build_receipt(
             "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
             "url": run_url,
         },
-        "attestations": sorted(attestation_ids or []),
+        "attestations": sorted(normalized_attestation_ids),
+        "attestation_subjects": parsed_subjects,
         "unified_release_manifest": {
             "name": manifest_file.name,
             "sha256": _sha256(manifest_file),
@@ -122,6 +243,8 @@ def main() -> int:
     parser.add_argument("--workflow-run-id", default=os.environ.get("GITHUB_RUN_ID", ""))
     parser.add_argument("--release-manifest", type=Path, default=None)
     parser.add_argument("--attestation-id", action="append", default=[])
+    parser.add_argument("--attestation-subject", action="append", default=[])
+    parser.add_argument("--attestation-subject-role", action="append", default=[])
     args = parser.parse_args()
 
     receipt = build_receipt(
@@ -132,6 +255,8 @@ def main() -> int:
         workflow_run_id=args.workflow_run_id,
         manifest_path=args.release_manifest.resolve() if args.release_manifest else None,
         attestation_ids=args.attestation_id,
+        attestation_subjects=args.attestation_subject,
+        attestation_subject_roles=args.attestation_subject_role,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(

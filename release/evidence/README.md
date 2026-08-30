@@ -18,6 +18,19 @@ Historical artifacts without a matching manifest are diagnostic only, not a
 release guarantee. The governing definitions are in
 [`docs/adr/0002-memory-os-principles.md`](../../docs/adr/0002-memory-os-principles.md).
 
+## Release manifest authority
+
+`release/power-release-manifest.json` is a candidate-only source template. It
+must not contain final commit, artifact, SBOM, profile, image, or attestation
+identities. The release workflow builds `dist/power-release-manifest.json`
+after freezing the exact wheel, sdist, SBOMs, profile evidence, and Web image;
+that generated object is the final manifest uploaded to the GitHub Release.
+
+Public consumers must download the release asset, not the raw repository file.
+Use `scripts/verify_public_release_bindings.py` to compare every downloaded
+hash-bound file directly with both `SHA256SUMS` and the published manifest, and
+to verify the tag, receipt, profile image digest, and attestation subjects.
+
 ## POWER 3.1 harness
 
 Run the POWER 3.1 harness to create a local JSON evidence artifact:

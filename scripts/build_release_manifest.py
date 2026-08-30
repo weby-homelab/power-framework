@@ -13,6 +13,11 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+try:
+    from release_bindings import normalize_attestation_id
+except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
+    from scripts.release_bindings import normalize_attestation_id
+
 
 def aggregate_tree_hash(files: dict[str, bytes]) -> str:
     """Hash relative paths and file bytes in deterministic lexical order."""
@@ -65,7 +70,12 @@ def source_tree(root: Path) -> dict[str, bytes]:
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in root.rglob("*")
-        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+        if (
+            path.is_file()
+            and not path.is_symlink()
+            and "__pycache__" not in path.parts
+            and path.suffix != ".pyc"
+        )
     }
 
 
@@ -145,8 +155,12 @@ def build_manifest(
         raise ValueError("Web SBOM must be an existing file")
     if profile_evidence is not None and not profile_evidence.is_file():
         raise ValueError("Profile A/B evidence must be an existing file")
-    if not all(isinstance(item, str) and item for item in attestations):
-        raise ValueError("attestation identities must be non-empty strings")
+    try:
+        normalized_attestations = [normalize_attestation_id(item) for item in attestations]
+    except ValueError as exc:
+        raise ValueError(f"invalid attestation identity: {exc}") from exc
+    if len(set(normalized_attestations)) != len(normalized_attestations):
+        raise ValueError("attestation identities must be unique")
 
     manifest: dict[str, Any] = {
         "schema": "power.release.manifest.v1",
@@ -189,7 +203,7 @@ def build_manifest(
                 "sha256": sha256_file(wheel),
             },
         },
-        "attestations": sorted(attestations),
+        "attestations": sorted(normalized_attestations),
     }
     if sdist is not None:
         manifest["artifacts"]["power_sdist"] = {

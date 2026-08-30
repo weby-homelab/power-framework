@@ -23,6 +23,7 @@ import tempfile
 import time
 import tomllib
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass, field
@@ -51,6 +52,10 @@ DEFAULT_REPO = "weby-homelab/power-framework"
 DEFAULT_REF = "latest"
 DEFAULT_VAULT = Path("/root/geminicli/brain")
 DEFAULT_STATE_DIR = Path.home() / ".local" / "share" / "power" / "audit"
+MAX_RELEASE_WHEEL_BYTES = 100 * 1024 * 1024
+MAX_RELEASE_MANIFEST_BYTES = 10 * 1024 * 1024
+MAX_RELEASE_METADATA_BYTES = 10 * 1024 * 1024
+MAX_RELEASE_PYPROJECT_BYTES = 1 * 1024 * 1024
 
 DEFAULT_VENV_ROOTS = [
     "/root/.config/opencode",
@@ -489,13 +494,35 @@ def download_and_verify_wheel(
     """Download wheel from URL and verify its SHA-256 digest."""
     if not expected_sha256:
         raise ReleaseValidationError("Cannot download wheel without verified expected SHA-256")
+    parsed_url = urllib.parse.urlsplit(wheel_url)
+    if (
+        parsed_url.scheme != "https"
+        or parsed_url.netloc != "github.com"
+        or not parsed_url.path.startswith("/")
+        or "/releases/download/" not in parsed_url.path
+        or parsed_url.query
+        or parsed_url.fragment
+    ):
+        raise ReleaseValidationError("Release wheel URL must be a canonical GitHub release URL")
 
     headers = {"User-Agent": "power-runtime-audit/1.0"}
     req = urllib.request.Request(wheel_url, headers=headers)
     fd, tmp_file = tempfile.mkstemp(prefix="power_wheel_", suffix=".whl", dir=dest_dir)
     try:
         with os.fdopen(fd, "wb") as handle, urllib.request.urlopen(req, timeout=60) as resp:
-            shutil.copyfileobj(resp, handle)
+            content_length = getattr(resp, "headers", {}).get("Content-Length")
+            if (
+                isinstance(content_length, str)
+                and content_length.isdigit()
+                and int(content_length) > MAX_RELEASE_WHEEL_BYTES
+            ):
+                raise ReleaseValidationError("Release wheel exceeds the maximum download size")
+            total = 0
+            while chunk := resp.read(1024 * 1024):
+                total += len(chunk)
+                if total > MAX_RELEASE_WHEEL_BYTES:
+                    raise ReleaseValidationError("Release wheel exceeds the maximum download size")
+                handle.write(chunk)
         actual_sha256 = sha256_file(Path(tmp_file))
         if actual_sha256.lower() != expected_sha256.lower():
             raise ReleaseValidationError(
@@ -555,11 +582,23 @@ def _fetch_from_local_source(source_dir: Path, ref: str) -> ReleasePayload:
             raise ReleaseValidationError(f"Invalid release manifest JSON: {exc}") from exc
         if not isinstance(manifest, dict):
             raise ReleaseValidationError("Release manifest root is not an object")
-        if manifest.get("schema") != "power.release.manifest.v1":
-            raise ReleaseValidationError(
-                f"Unsupported release manifest schema: {manifest.get('schema')}"
-            )
-        if manifest.get("version") != expected_ver:
+        manifest_schema = manifest.get("schema")
+        if manifest_schema == "power.release.manifest.template.v1":
+            if manifest.get("authority") != "candidate-only":
+                raise ReleaseValidationError(
+                    "source release manifest template must declare authority=candidate-only"
+                )
+            template_version = manifest.get("version")
+            if template_version not in {None, expected_ver}:
+                raise ReleaseValidationError(
+                    f"Source manifest template version {template_version} does not match {expected_ver}"
+                )
+            # A source template is not release evidence.  Final package/image
+            # identities are read only from a published release asset.
+            manifest = {}
+        elif manifest_schema != "power.release.manifest.v1":
+            raise ReleaseValidationError(f"Unsupported release manifest schema: {manifest_schema}")
+        if manifest and manifest.get("version") != expected_ver:
             raise ReleaseValidationError(
                 f"Manifest version {manifest.get('version')} does not match {expected_ver}"
             )
@@ -656,6 +695,10 @@ def _fetch_from_local_source(source_dir: Path, ref: str) -> ReleasePayload:
 
 def _fetch_from_github(repo: str, ref: str) -> ReleasePayload:
     """Fetch release information from public GitHub repository, failing closed if unresolved."""
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) is None:
+        raise ReleaseValidationError("GitHub repository must use owner/name syntax")
+    if ref != "latest" and re.fullmatch(r"v\d+\.\d+\.\d+", ref) is None:
+        raise ReleaseValidationError("GitHub release ref must be latest or a stable v<version> tag")
     headers = {"User-Agent": "power-runtime-audit/1.0", "Accept": "application/json"}
 
     api_url = (
@@ -668,7 +711,10 @@ def _fetch_from_github(repo: str, ref: str) -> ReleasePayload:
     try:
         req = urllib.request.Request(api_url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as resp:
-            release_data = json.loads(resp.read().decode("utf-8"))
+            release_bytes = resp.read(MAX_RELEASE_METADATA_BYTES + 1)
+        if len(release_bytes) > MAX_RELEASE_METADATA_BYTES:
+            raise ReleaseValidationError("GitHub release metadata exceeds the maximum size")
+        release_data = json.loads(release_bytes.decode("utf-8"))
     except Exception as exc:
         raise ReleaseValidationError(
             f"Could not resolve release '{ref}' from GitHub API for {repo}: {exc}"
@@ -680,6 +726,10 @@ def _fetch_from_github(repo: str, ref: str) -> ReleasePayload:
         )
 
     tag_name = str(release_data["tag_name"]).strip()
+    if re.fullmatch(r"v\d+\.\d+\.\d+(?:(?:a|b|rc|dev)\d+)?", tag_name) is None:
+        raise ReleaseValidationError(f"Release tag '{tag_name}' is not a valid version tag")
+    if ref != "latest" and tag_name != ref:
+        raise ReleaseValidationError(f"Requested release ref {ref} resolved to {tag_name}")
     expected_ver = tag_name.lstrip("v")
     if not expected_ver or tag_name != f"v{expected_ver}":
         raise ReleaseValidationError(
@@ -702,7 +752,10 @@ def _fetch_from_github(repo: str, ref: str) -> ReleasePayload:
     try:
         req = urllib.request.Request(raw_pyproject_url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as resp:
-            pyproject_content = resp.read().decode("utf-8")
+            pyproject_bytes = resp.read(MAX_RELEASE_PYPROJECT_BYTES + 1)
+        if len(pyproject_bytes) > MAX_RELEASE_PYPROJECT_BYTES:
+            raise ReleaseValidationError("Release pyproject.toml exceeds the maximum size")
+        pyproject_content = pyproject_bytes.decode("utf-8")
     except Exception as exc:
         raise ReleaseValidationError(
             f"Failed to fetch pyproject.toml for {repo}@{tag_name}: {exc}"
@@ -714,30 +767,60 @@ def _fetch_from_github(repo: str, ref: str) -> ReleasePayload:
             f"Release tag {tag_name} does not match pyproject.toml version {pyproject_ver}"
         )
 
-    # 3. Fetch release manifest if present
-    raw_manifest_url = (
-        f"https://raw.githubusercontent.com/{repo}/{tag_name}/release/power-release-manifest.json"
-    )
-    manifest: dict[str, Any] = {}
-    try:
-        req = urllib.request.Request(raw_manifest_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            manifest_text = resp.read().decode("utf-8")
-            manifest = json.loads(manifest_text)
-    except Exception:
-        manifest = {}
+    release_assets = release_data.get("assets")
+    if not isinstance(release_assets, list):
+        raise ReleaseValidationError("GitHub release assets must be a list")
 
-    if manifest:
-        if not isinstance(manifest, dict):
-            raise ReleaseValidationError("Release manifest root is not an object")
-        if manifest.get("schema") != "power.release.manifest.v1":
+    # 3. Fetch the authoritative manifest from the immutable release asset.
+    manifest_assets = [
+        asset
+        for asset in release_assets
+        if isinstance(asset, dict) and asset.get("name") == "power-release-manifest.json"
+    ]
+    if len(manifest_assets) != 1:
+        raise ReleaseValidationError(
+            "GitHub release must contain exactly one published power-release-manifest.json asset"
+        )
+    raw_manifest_digest = manifest_assets[0].get("digest")
+    manifest_digest = str(raw_manifest_digest or "").strip().removeprefix("sha256:").lower()
+    if len(manifest_digest) != 64 or not re.fullmatch(r"[0-9a-f]{64}", manifest_digest):
+        raise ReleaseValidationError("published release manifest is missing a valid API SHA-256")
+    manifest_url = (
+        f"https://github.com/{repo}/releases/download/{tag_name}/power-release-manifest.json"
+    )
+    try:
+        req = urllib.request.Request(
+            manifest_url,
+            headers={**headers, "Accept": "application/octet-stream"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            manifest_bytes = resp.read(MAX_RELEASE_MANIFEST_BYTES + 1)
+        if len(manifest_bytes) > MAX_RELEASE_MANIFEST_BYTES:
+            raise ReleaseValidationError("Published release manifest exceeds the maximum size")
+        if hashlib.sha256(manifest_bytes).hexdigest() != manifest_digest:
             raise ReleaseValidationError(
-                f"Unsupported release manifest schema: {manifest.get('schema')}"
+                "published release manifest bytes do not match the GitHub asset digest"
             )
-        if manifest.get("version") != expected_ver:
-            raise ReleaseValidationError(
-                f"Manifest version {manifest.get('version')} does not match {expected_ver}"
-            )
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except ReleaseValidationError:
+        raise
+    except Exception as exc:
+        raise ReleaseValidationError(
+            f"Failed to fetch authoritative published release manifest: {exc}"
+        ) from exc
+
+    if not isinstance(manifest, dict):
+        raise ReleaseValidationError("Release manifest root is not an object")
+    if manifest.get("schema") != "power.release.manifest.v1":
+        raise ReleaseValidationError(
+            f"Unsupported release manifest schema: {manifest.get('schema')}"
+        )
+    if manifest.get("version") != expected_ver:
+        raise ReleaseValidationError(
+            f"Manifest version {manifest.get('version')} does not match {expected_ver}"
+        )
+    if re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("commit", ""))) is None:
+        raise ReleaseValidationError("Published release manifest commit is invalid")
 
     manifest_wheel_filename: str | None = None
     manifest_wheel_sha256: str | None = None
@@ -767,11 +850,20 @@ def _fetch_from_github(repo: str, ref: str) -> ReleasePayload:
     asset_wheel_name: str | None = None
     asset_wheel_url: str | None = None
     asset_wheel_digest: str | None = None
-    for asset in release_data.get("assets", []):
+    for asset in release_assets:
         name = asset.get("name", "")
         if name.endswith(".whl"):
+            if not isinstance(name, str) or name != Path(name).name or "\\" in name:
+                raise ReleaseValidationError("Wheel asset name is not a safe filename")
             asset_wheel_name = name
-            asset_wheel_url = asset.get("browser_download_url")
+            expected_wheel_url = (
+                f"https://github.com/{repo}/releases/download/{tag_name}/{asset_wheel_name}"
+            )
+            if asset.get("browser_download_url") != expected_wheel_url:
+                raise ReleaseValidationError(
+                    "Wheel asset URL is not the canonical GitHub release URL"
+                )
+            asset_wheel_url = expected_wheel_url
             raw_digest = asset.get("digest")
             if raw_digest is not None:
                 norm_digest = str(raw_digest).strip()
@@ -1906,7 +1998,7 @@ def persist_state_report(report: AuditReport, state_dir: Path) -> Path:
     return report_file
 
 
-def record_brain_log(vault_path: Path, report: AuditReport) -> bool:
+def record_brain_log(vault_path: Path, report: AuditReport, *, strict: bool = False) -> bool:
     """Record a deduplicated Action/Result entry in the canonical brain log with file locking."""
     vault = Path(vault_path).expanduser().resolve()
     if not vault.is_dir():
@@ -1955,7 +2047,7 @@ def record_brain_log(vault_path: Path, report: AuditReport) -> bool:
                 content = log_file.read_text(encoding="utf-8")
                 last_entries = "\n".join(content.splitlines()[-20:])
                 if sig in last_entries and drift_desc in last_entries:
-                    return False  # Deduplicated
+                    return strict  # Deduplicated
 
                 fd, tmp = tempfile.mkstemp(prefix=".log.", dir=log_file.parent)
                 with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -1965,6 +2057,8 @@ def record_brain_log(vault_path: Path, report: AuditReport) -> bool:
             finally:
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
     except Exception:
+        if strict:
+            raise
         return False
 
 
@@ -2298,8 +2392,14 @@ def _run_audit_internal(
 
         # Record in canonical brain log if requested
         if record:
-            rec_ok = record_brain_log(vault_path, report)
+            try:
+                rec_ok = record_brain_log(vault_path, report, strict=True)
+            except Exception as exc:
+                errors.append(redact_secrets(f"Failed to record canonical brain log: {exc}"))
+                rec_ok = False
             report.recorded = rec_ok
+            if not rec_ok:
+                errors.append("Canonical brain log recording did not reach its postcondition")
             try:
                 persist_state_report(report, state_dir)
             except Exception as exc:

@@ -85,16 +85,25 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "scripts/profile_acceptance.py" in release_text
     assert "Prefetch locked model snapshots for real Web acceptance" in release_text
     assert "Checkout current acceptance harness for tag recovery" in release_text
+    assert "path: ${{ runner.temp }}/.release-acceptance-harness" in release_text
     assert "ACCEPTANCE_HARNESS_ROOT" in release_text
-    assert "Remove tag recovery harness checkout" in release_text
-    assert "rm -rf -- .release-acceptance-harness" in release_text
+    assert "Verify acceptance harness revision" in release_text
+    assert "ACCEPTANCE_HARNESS_REVISION" in release_text
+    assert "format('{0}/.release-acceptance-harness', runner.temp)" in release_text
+    assert "Remove tag recovery harness checkout" not in release_text
+    assert "rm -rf -- .release-acceptance-harness" not in release_text
     assert "--profile-evidence" in release_text
     assert "attestations: write" in release_text
     assert "id-token: write" in release_text
     assert "artifact-metadata: write" in release_text
     assert "gh release view" in release_text
     assert "GitHub release readback verified" in release_text
-    assert 'item.removeprefix("github:") for item in manifest["attestations"]' in release_text
+    assert "scripts/verify_public_release_bindings.py" in release_text
+    assert "--expected-tag-target" in release_text
+    assert "--attestation-subject" in release_text
+    assert release_text.index("Generate release receipt from frozen assets") < release_text.index(
+        "Create GitHub Release"
+    )
 
 
 def test_release_package_sbom_scans_the_wheel_as_a_file() -> None:
@@ -120,25 +129,38 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "macos-latest" not in release_text
     assert "windows-latest" not in release_text
     assert "  upgrade-matrix-aggregate:" in release_text
-    assert "needs: validate" in release_text
-    assert "needs: [validate, upgrade-matrix-aggregate]" in release_text
+    assert "needs: [release_input, validate]" in release_text
+    assert "needs: [release_input, validate, upgrade-matrix-aggregate]" in release_text
     assert "--require-signed-tag" in release_text
-    assert "Install the pinned maintainer release signing key" in release_text
+    assert "Verify signed release tag and maintainer fingerprint" in release_text
+    assert "Install the pinned maintainer release signing key" not in release_text
+    assert "GNUPGHOME" in release_text
+    assert "VALIDSIG" in release_text
     assert "gh api users/weby-homelab/gpg_keys" in release_text
     assert 'select(.key_id == "2D49E810C7F2527E")' in release_text
     assert "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E" in release_text
     assert 'gpg --batch --import "$key_file"' in release_text
+    assert "Reject an existing GitHub release for this tag" in release_text
+    assert "api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" in release_text
+    assert "Unable to prove release absence" in release_text
+    assert "Reject mutable manual release recovery" in release_text
+    assert "Manual release recovery is validation-only" in release_text
     assert "workflow_dispatch" in release_text
     assert "inputs.release_tag" in release_text
+    assert "Validate the exact release tag checkout" in release_text
+    assert '[[ "$RELEASE_TAG" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]' in release_text
+    assert 'git ls-remote origin "refs/tags/${RELEASE_TAG}^{}"' in release_text
+    assert "REMOTE_TAG_TARGET" in release_text
     assert "permissions: {}" in release_text
     assert (
-        "RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+        "RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && needs.release_input.outputs.release_tag || github.ref_name }}"
         in release_text
     )
-    assert "--passed-mandatory profile-a-mcp-stdio" in release_text
-    assert "--passed-mandatory web-semantic-acceptance" in release_text
-    assert "--passed-mandatory web-rerank-acceptance" in release_text
-    assert "--passed-mandatory public-release-readback" in release_text
+    assert "--pending-mandatory profile-a-mcp-stdio" in release_text
+    assert "--pending-mandatory profile-b-web-acceptance" in release_text
+    assert "--pending-mandatory web-semantic-acceptance" in release_text
+    assert "--pending-mandatory web-rerank-acceptance" in release_text
+    assert "--pending-mandatory public-release-readback" in release_text
 
 
 def test_release_does_not_require_private_phase8_secrets() -> None:

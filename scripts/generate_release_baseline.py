@@ -66,8 +66,8 @@ def _load_validation_report(path: Path) -> dict[str, Any]:
     report = _load_json(path)
     if report.get("schema_version") != VALIDATION_SCHEMA_VERSION:
         raise ValueError("validation report has an unsupported schema")
-    if report.get("status") != "passed":
-        raise ValueError("validation report status must be passed")
+    if report.get("status") not in {"passed", "prepublication-passed"}:
+        raise ValueError("validation report status must be passed or prepublication-passed")
     if report.get("content_free") is not True:
         raise ValueError("validation report must be content-free")
     for field in (
@@ -105,6 +105,19 @@ def _load_validation_report(path: Path) -> dict[str, Any]:
         isinstance(gate, str) and gate for gate in skipped_gates
     ):
         raise ValueError("validation report skipped_optional_gates must be a list of strings")
+    pending_gates = report.get("pending_mandatory_gates", [])
+    if not isinstance(pending_gates, list) or not all(
+        isinstance(gate, str) and gate for gate in pending_gates
+    ):
+        raise ValueError("validation report pending_mandatory_gates must be a list of strings")
+    if report.get("status") == "prepublication-passed" and not pending_gates:
+        raise ValueError("prepublication-passed validation must list pending mandatory gates")
+    if report.get("status") == "passed" and pending_gates:
+        raise ValueError("passed validation cannot contain pending mandatory gates")
+    if "publication_pending" in report and report.get("publication_pending") is not (
+        bool(pending_gates)
+    ):
+        raise ValueError("validation report publication_pending does not match pending gates")
     return report
 
 

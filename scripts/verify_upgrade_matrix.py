@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the local, content-free 3.6.7 -> 3.7.8 upgrade safety matrix.
+"""Run the local, content-free 3.7.8 -> 3.7.9 upgrade safety matrix.
 
 The script proves invariants available on the current runner and records
 the declared release platform boundary. Deferred platforms are never treated
@@ -97,7 +97,7 @@ generation_index.sync_vault_atomically(vault, sync_embeddings=False)
 _UPGRADE_CHECKPOINTS = ("before_move", "after_move", "after_pointer")
 
 
-def build_matrix(*, from_version: str = "3.6.7", to_version: str = "3.7.8") -> dict[str, Any]:
+def build_matrix(*, from_version: str = "3.7.8", to_version: str = "3.7.9") -> dict[str, Any]:
     """Return local matrix evidence without exposing vault content."""
     current = _platform_name()
     with tempfile.TemporaryDirectory(prefix="power-upgrade-") as temporary:
@@ -332,7 +332,7 @@ def _build_interrupted_upgrade_case(
 
 
 def build_interrupted_upgrade_matrix(
-    *, from_version: str = "3.6.7", to_version: str = "3.7.8"
+    *, from_version: str = "3.7.8", to_version: str = "3.7.9"
 ) -> dict[str, Any]:
     """Prove interrupted publication recovery without exposing fixture content."""
     with tempfile.TemporaryDirectory(prefix="power-upgrade-interrupted-") as temporary:
@@ -366,8 +366,8 @@ def build_interrupted_upgrade_matrix(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--from-version", default="3.6.7")
-    parser.add_argument("--to-version", default="3.7.8")
+    parser.add_argument("--from-version", default="3.7.8")
+    parser.add_argument("--to-version", default="3.7.9")
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 

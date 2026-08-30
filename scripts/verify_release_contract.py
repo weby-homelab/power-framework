@@ -348,8 +348,8 @@ def validate_release_contract(
     else:
         if validation.get("schema_version") != "power.release-validation.v1":
             errors.append("baseline validation.schema_version must be power.release-validation.v1")
-        if validation.get("status") != "passed":
-            errors.append("baseline validation.status must be passed")
+        if validation.get("status") not in {"passed", "prepublication-passed"}:
+            errors.append("baseline validation.status must be passed or prepublication-passed")
         if validation.get("content_free") is not True:
             errors.append("baseline validation.content_free must be true")
         for field in (
@@ -389,6 +389,21 @@ def validate_release_contract(
             errors.append(
                 "baseline validation.skipped_optional_gates must be a list of non-empty strings"
             )
+        pending_gates = validation.get("pending_mandatory_gates", [])
+        if not isinstance(pending_gates, list) or not all(
+            isinstance(gate, str) and gate for gate in pending_gates
+        ):
+            errors.append(
+                "baseline validation.pending_mandatory_gates must be a list of non-empty strings"
+            )
+        if validation.get("status") == "prepublication-passed" and not pending_gates:
+            errors.append("prepublication-passed validation must list pending mandatory gates")
+        if validation.get("status") == "passed" and pending_gates:
+            errors.append("passed validation cannot contain pending mandatory gates")
+        if "publication_pending" in validation and validation.get("publication_pending") is not (
+            bool(pending_gates)
+        ):
+            errors.append("baseline validation.publication_pending does not match pending gates")
         if not candidate:
             technical_receipts = validation.get("technical_receipts")
             if (
