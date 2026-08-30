@@ -95,7 +95,6 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "--profile-evidence" in release_text
     assert "attestations: write" in release_text
     assert "id-token: write" in release_text
-    assert "artifact-metadata: write" in release_text
     assert "gh release view" in release_text
     assert "GitHub release readback verified" in release_text
     assert "scripts/verify_public_release_bindings.py" in release_text

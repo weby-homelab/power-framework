@@ -14,12 +14,11 @@ on:
 permissions: {}
 
 concurrency:
-  group: power-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+  group: power-release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   release_input:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions: {}
     outputs:
@@ -28,7 +27,7 @@ jobs:
       - name: Validate workflow dispatch release tag
         id: validate
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
@@ -301,7 +300,6 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-      artifact-metadata: write
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && needs.release_input.outputs.release_tag || github.ref_name }}
       GNUPGHOME: ${{ runner.temp }}/power-release-gnupg
