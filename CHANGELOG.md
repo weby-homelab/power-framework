@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Preparing the corrective `3.7.9` release to close the post-`3.7.8` forensic
+  release-integrity findings. The public release is not considered stable until
+  the signed tag, exact artifacts, manifest, receipt, SBOMs, attestations, OCI
+  digest, and fresh public readback all pass.
+
+## [3.7.9] - 2026-08-30
+
+### Fixed
+
+- Added one fail-closed verifier for downloaded release bytes, `SHA256SUMS`,
+  the published manifest, release receipt, Profile A/B image identity, and
+  attestation subjects.
+- Made the GitHub Release manifest asset authoritative for runtime audits;
+  checked-in `release/power-release-manifest.json` is now an explicit
+  candidate-only template and cannot bind final artifact identities.
+- Bound package and Web attestation IDs to their exact wheel/sdist and OCI
+  subjects, and moved receipt generation plus local binding verification before
+  the first GitHub Release upload.
+- Added strict signed-tag/fingerprint and remote peeled-tag checks, deterministic
+  ref validation, bounded release metadata downloads, and fail-closed manual
+  recovery behavior.
+
+### Changed
+
+- Synchronized the active `3.7.9` package, runtime, Skill, Web, upgrade-matrix,
+  support, onboarding, and migration documentation surfaces.
+- Preserved `v3.7.8` as immutable historical evidence; this entry does not
+  rewrite its tag, assets, manifest, baseline, receipt, or release notes.
+
 ## [3.7.8] - 2026-08-28
 
 ### Fixed

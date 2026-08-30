@@ -3,8 +3,9 @@
 ## 1. Executive Architecture Summary
 
 P.O.W.E.R. is a single-repository, single-version, local-first Second Brain framework.
-Starting with the 3.7.8 release, the Web UI is physically integrated into the
-`power-framework` repository and Python distribution as `power_framework.web`.
+The Web UI introduced in the 3.7.8 release remains physically integrated into the
+`power-framework` repository and Python distribution as `power_framework.web`;
+the current corrective runtime boundary is 3.7.9.
 
 ```text
                            P.O.W.E.R.
@@ -43,7 +44,7 @@ Starting with the 3.7.8 release, the Web UI is physically integrated into the
    - Canonical Skills: shipped host-side in the `power-framework` wheel/distribution.
 6. **Web UI Presentation Adapter:**
     - Source resides in `src/power_framework/web/`
-     - Production server profile runs as an OCI container (`ghcr.io/weby-homelab/power-framework-web:3.7.8`)
+     - Production server profile runs as an OCI container (`ghcr.io/weby-homelab/power-framework-web:3.7.9`)
     - The Web container runs ONLY the FastAPI Web UI service; Compose publishes
       host loopback `127.0.0.1:8080`
     - The Web container interacts directly with `ApplicationService` in-process
@@ -80,7 +81,7 @@ dependencies are not prerequisites.
 ### Profile B — full human + agent server
 
 Start from a valid Profile A installation, then run exactly one
-`power-web` container from the matching `3.7.8` release image. The canonical
+`power-web` container from the matching `3.7.9` release image. The canonical
 Web image installs the locked `[web,semantic,rerank]` dependency graph:
 
 ```text

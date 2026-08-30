@@ -7,14 +7,38 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing signed tag to publish"
+        description: "Existing signed tag to validate; publication requires a tag push"
         required: true
         type: string
 
 permissions: {}
 
+concurrency:
+  group: power-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
+  release_input:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      release_tag: ${{ steps.validate.outputs.release_tag }}
+    steps:
+      - name: Validate workflow dispatch release tag
+        id: validate
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
   validate:
+    needs: release_input
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' || needs.release_input.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,7 +53,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', needs.release_input.outputs.release_tag) || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -144,15 +168,15 @@ jobs:
             --passed-mandatory complexity-budget \
             --passed-mandatory mkdocs-strict \
             --passed-mandatory full-pytest \
-            --passed-mandatory warnings-as-errors \
-            --passed-mandatory maintenance-faults \
+             --passed-mandatory warnings-as-errors \
+             --passed-mandatory maintenance-faults \
              --passed-mandatory phase8-technical \
              --passed-mandatory retention-soak \
-             --passed-mandatory profile-a-mcp-stdio \
-             --passed-mandatory profile-b-web-acceptance \
-             --passed-mandatory web-semantic-acceptance \
-             --passed-mandatory web-rerank-acceptance \
-             --passed-mandatory public-release-readback \
+             --pending-mandatory profile-a-mcp-stdio \
+             --pending-mandatory profile-b-web-acceptance \
+             --pending-mandatory web-semantic-acceptance \
+             --pending-mandatory web-rerank-acceptance \
+             --pending-mandatory public-release-readback \
              --skipped-optional real-vault-quality \
              --skipped-optional deferred-macos-windows
 
@@ -181,7 +205,11 @@ jobs:
           uv run pytest tests/test_release_contract.py -q --no-cov --override-ini=addopts=
 
   upgrade-matrix:
-    needs: validate
+    needs: [release_input, validate]
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || needs.release_input.result == 'success')
     strategy:
       fail-fast: false
       matrix:
@@ -193,7 +221,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', needs.release_input.outputs.release_tag) || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -225,14 +253,18 @@ jobs:
           retention-days: 7
 
   upgrade-matrix-aggregate:
-    needs: upgrade-matrix
+    needs: [release_input, upgrade-matrix]
+    if: >-
+      always() &&
+      needs.upgrade-matrix.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || needs.release_input.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', needs.release_input.outputs.release_tag) || github.ref }}
 
       - name: Download platform upgrade evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -257,7 +289,12 @@ jobs:
           retention-days: 7
 
   release:
-    needs: [validate, upgrade-matrix-aggregate]
+    needs: [release_input, validate, upgrade-matrix-aggregate]
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      needs.upgrade-matrix-aggregate.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || needs.release_input.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -266,12 +303,80 @@ jobs:
       attestations: write
       artifact-metadata: write
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && needs.release_input.outputs.release_tag || github.ref_name }}
+      GNUPGHOME: ${{ runner.temp }}/power-release-gnupg
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', needs.release_input.outputs.release_tag) || github.ref }}
+
+      - name: Validate the exact release tag checkout
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          local_tag_target="$(git rev-parse --verify "${RELEASE_TAG}^{commit}")"
+          remote_tag_target="$(git ls-remote origin "refs/tags/${RELEASE_TAG}^{}" | python3 -c 'import sys; fields=sys.stdin.read().split(); print(fields[0] if fields else "")')"
+          test -n "$remote_tag_target"
+          test "$local_tag_target" = "$remote_tag_target"
+          test "$remote_tag_target" = "$(git rev-parse HEAD)"
+          printf 'REMOTE_TAG_TARGET=%s\n' "$remote_tag_target" >> "$GITHUB_ENV"
+
+      - name: Verify signed release tag and maintainer fingerprint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$GNUPGHOME"
+          key_file="$RUNNER_TEMP/power-release-signing-key.asc"
+          gh api users/weby-homelab/gpg_keys \
+            --jq '.[] | select(.key_id == "2D49E810C7F2527E") | .raw_key' \
+            > "$key_file"
+          test -s "$key_file"
+          fingerprint="$(gpg --batch --with-colons --show-keys "$key_file" | python3 -c 'import sys; print(next(field[9] for field in (line.split(":") for line in sys.stdin) if field[0] == "fpr"))')"
+          test "$fingerprint" = "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E"
+          gpg --batch --import "$key_file"
+          verification="$RUNNER_TEMP/power-tag-verification.txt"
+          git verify-tag --raw "$RELEASE_TAG" > "$verification" 2>&1
+          python3 - "$verification" <<'PY'
+          from pathlib import Path
+          import sys
+
+          expected_signing = "166E0A4F873E897A8060DD38DD92FC45BD1D6C30"
+          expected_primary = "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E"
+          lines = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace").splitlines()
+          valid = [
+              fields
+              for fields in (line.split() for line in lines)
+              if len(fields) >= 12
+              and fields[0] == "[GNUPG:]"
+              and fields[1] == "VALIDSIG"
+              and fields[2] == expected_signing
+              and fields[-1] == expected_primary
+          ]
+          if len(valid) != 1:
+              raise SystemExit("signed release tag is not verified by the pinned maintainer key")
+          print("signed release tag and maintainer fingerprint verified")
+          PY
+
+      - name: Reject mutable manual release recovery
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          printf '%s\n' "Manual release recovery is validation-only; publish a new signed tag push" >&2
+          exit 1
+
+      - name: Reject an existing GitHub release for this tag
+        run: |
+          set -euo pipefail
+          api_status="$(curl --silent --show-error \
+            --output "$RUNNER_TEMP/release-probe.json" \
+            --write-out "%{http_code}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+          case "$api_status" in
+            404) printf '%s\n' "No existing GitHub Release found for $RELEASE_TAG" ;;
+            200) printf '%s\n' "A GitHub Release already exists for $RELEASE_TAG" >&2; exit 1 ;;
+            *) printf '%s\n' "Unable to prove release absence for $RELEASE_TAG (HTTP $api_status)" >&2; exit 1 ;;
+          esac
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -427,12 +532,22 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.sha }}
-          path: .release-acceptance-harness
+          path: ${{ runner.temp }}/.release-acceptance-harness
           sparse-checkout: |
             scripts/profile_acceptance.py
             tests/__init__.py
             tests/mcp_test_client.py
           sparse-checkout-cone-mode: false
+
+      - name: Verify acceptance harness revision
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          EXPECTED_HARNESS_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          harness_revision="$(git -C "$RUNNER_TEMP/.release-acceptance-harness" rev-parse --verify HEAD)"
+          test "$harness_revision" = "$EXPECTED_HARNESS_REVISION"
+          printf 'ACCEPTANCE_HARNESS_REVISION=%s\n' "$harness_revision" >> "$GITHUB_ENV"
 
       - name: Prove Profile A/B against the exact Web image
         id: profile_acceptance
@@ -446,7 +561,8 @@ jobs:
           POWER_RERANKER_DEVICE: cpu
           WEB_IMAGE_REF: ${{ steps.web_image.outputs.reference }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
-          ACCEPTANCE_HARNESS_ROOT: ${{ github.event_name == 'workflow_dispatch' && '.release-acceptance-harness' || '.' }}
+          ACCEPTANCE_HARNESS_ROOT: ${{ github.event_name == 'workflow_dispatch' && format('{0}/.release-acceptance-harness', runner.temp) || '.' }}
+          ACCEPTANCE_HARNESS_REVISION: ${{ github.sha }}
         run: |
           image_ref="${WEB_IMAGE_REF%@*}@${WEB_IMAGE_DIGEST}"
           uv run python "$ACCEPTANCE_HARNESS_ROOT/scripts/profile_acceptance.py" \
@@ -455,14 +571,6 @@ jobs:
             --model-cache "$HF_HOME" \
             --version "${RELEASE_TAG#v}" \
             --output "$RUNNER_TEMP/power-profile-acceptance.json"
-
-      - name: Remove tag recovery harness checkout
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          set -euo pipefail
-          test -d .release-acceptance-harness
-          rm -rf -- .release-acceptance-harness
-          test ! -e .release-acceptance-harness
 
       - name: Generate Web SPDX SBOM bound to the exact image
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
@@ -523,21 +631,6 @@ jobs:
             --attestation "github:${WEB_ATTESTATION_ID}" \
             --output dist/power-release-manifest.json
 
-      - name: Install the pinned maintainer release signing key
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          key_file="$RUNNER_TEMP/power-release-signing-key.asc"
-          gh api users/weby-homelab/gpg_keys \
-            --jq '.[] | select(.key_id == "2D49E810C7F2527E") | .raw_key' \
-            > "$key_file"
-          test -s "$key_file"
-          gpg --batch --with-colons --show-keys "$key_file" \
-            | awk -F: '$1 == "fpr" {print $10; exit}' \
-            | grep -Fxq '7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E'
-          gpg --batch --import "$key_file"
-
       - name: Generate and verify tag-bound release baseline
         run: |
           set -euo pipefail
@@ -591,6 +684,39 @@ jobs:
         shell: bash
         run: echo "path=docs/release-${RELEASE_TAG#v}.md" >> "$GITHUB_OUTPUT"
 
+      - name: Generate release receipt from frozen assets
+        env:
+          PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
+          WEB_ATTESTATION_ID: ${{ steps.web_attestation.outputs.attestation-id }}
+          WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          wheel_sha="$(sha256sum -- "dist/power_framework-${version}-py3-none-any.whl" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          sdist_sha="$(sha256sum -- "dist/power_framework-${version}.tar.gz" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          uv run python scripts/generate_release_receipt.py \
+            --tag "$RELEASE_TAG" \
+            --assets-dir dist \
+            --release-manifest "dist/power-release-manifest.json" \
+            --attestation-id "$PACKAGE_ATTESTATION_ID" \
+            --attestation-id "$WEB_ATTESTATION_ID" \
+            --attestation-subject-role "${PACKAGE_ATTESTATION_ID}=package" \
+            --attestation-subject-role "${WEB_ATTESTATION_ID}=web" \
+            --attestation-subject "${PACKAGE_ATTESTATION_ID}=${wheel_sha}" \
+            --attestation-subject "${PACKAGE_ATTESTATION_ID}=${sdist_sha}" \
+            --attestation-subject "${WEB_ATTESTATION_ID}=${WEB_IMAGE_DIGEST}" \
+            --output "dist/power-framework.release-receipt.json"
+
+      - name: Verify frozen release bindings before publication
+        run: |
+          uv run python scripts/verify_public_release_bindings.py \
+            --tag "$RELEASE_TAG" \
+            --manifest "dist/power-release-manifest.json" \
+            --checksums "dist/SHA256SUMS" \
+            --asset-dir dist \
+            --receipt "dist/power-framework.release-receipt.json" \
+            --expected-tag-target "$REMOTE_TAG_TARGET"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
@@ -599,31 +725,13 @@ jobs:
           generate_release_notes: false
           files: |
             dist/power-framework.release-baseline.json
-             dist/power-release-manifest.json
-             dist/power-profile-acceptance.json
-             dist/SHA256SUMS
+            dist/power-release-manifest.json
+            dist/power-profile-acceptance.json
+            dist/power-framework.release-receipt.json
+            dist/SHA256SUMS
             dist/*.whl
             dist/*.tar.gz
             dist/*.spdx.json
-
-      - name: Generate release receipt
-        env:
-          PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
-          WEB_ATTESTATION_ID: ${{ steps.web_attestation.outputs.attestation-id }}
-        run: |
-          uv run python scripts/generate_release_receipt.py \
-           --tag "$RELEASE_TAG" \
-           --assets-dir dist \
-           --release-manifest dist/power-release-manifest.json \
-           --attestation-id "$PACKAGE_ATTESTATION_ID" \
-           --attestation-id "$WEB_ATTESTATION_ID" \
-           --output dist/power-framework.release-receipt.json
-
-      - name: Upload release receipt
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          files: dist/power-framework.release-receipt.json
 
       - name: Read back GitHub release metadata and assets
         env:
@@ -671,49 +779,12 @@ jobs:
           readback_dir="$RUNNER_TEMP/power-public-readback"
           mkdir -p "$readback_dir"
           gh release download "$RELEASE_TAG" --dir "$readback_dir" --clobber
-          uv run python - "$readback_dir" "$RELEASE_TAG" <<'PY'
-          import hashlib
-          import json
-          import pathlib
-          import sys
-
-          root = pathlib.Path(sys.argv[1])
-          tag = sys.argv[2]
-          version = tag.removeprefix("v")
-          checksums = {}
-          for line in (root / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
-              digest, name = line.split(maxsplit=1)
-              checksums[name.strip()] = digest
-          assert "power-framework.release-receipt.json" not in checksums
-          for name, expected in checksums.items():
-              actual = hashlib.sha256((root / name).read_bytes()).hexdigest()
-              assert actual == expected, (name, expected, actual)
-
-          manifest = json.loads((root / "power-release-manifest.json").read_text())
-          assert manifest["version"] == version
-          artifacts = manifest["artifacts"]
-          assert artifacts["power_wheel"]["filename"] == f"power_framework-{version}-py3-none-any.whl"
-          assert artifacts["power_sdist"]["filename"] == f"power_framework-{version}.tar.gz"
-          assert artifacts["package_sbom"]["filename"] == f"power-framework-{version}.spdx.json"
-          assert artifacts["web_sbom"]["filename"] == f"power-web-{version}.spdx.json"
-          assert artifacts["profile_evidence"]["filename"] == "power-profile-acceptance.json"
-          assert manifest["profiles"]["profile_a"]["status"] == "mcp-required"
-          assert manifest["profiles"]["profile_b"]["capabilities"] == ["web", "semantic", "rerank"]
-          assert len(manifest["attestations"]) == 2
-          profile = json.loads((root / "power-profile-acceptance.json").read_text())
-          assert profile["version"] == version
-          assert profile["profile_a"]["native_mcp_stdio"] is True
-          assert profile["profile_b"]["web_semantic_non_fallback"] is True
-          assert profile["profile_b"]["web_reranked_non_fallback"] is True
-          assert profile["image_digest"] == artifacts["web_image"]["digest"]
-
-          receipt = json.loads((root / "power-framework.release-receipt.json").read_text())
-          assert receipt["release"]["tag"] == tag
-          manifest_attestations = [
-              item.removeprefix("github:") for item in manifest["attestations"]
-          ]
-          assert receipt["attestations"] == manifest_attestations
-          print("public artifact and manifest readback verified")
-          PY
+          uv run python scripts/verify_public_release_bindings.py \
+            --tag "$RELEASE_TAG" \
+            --manifest "$readback_dir/power-release-manifest.json" \
+            --checksums "$readback_dir/SHA256SUMS" \
+            --asset-dir "$readback_dir" \
+            --receipt "$readback_dir/power-framework.release-receipt.json" \
+            --expected-tag-target "$REMOTE_TAG_TARGET"
           registry_digest="$(docker buildx imagetools inspect "$WEB_IMAGE_REF" | python3 -c 'import sys; print(next(line.split()[1] for line in sys.stdin if line.startswith("Digest:")))')"
           test "$registry_digest" = "$WEB_IMAGE_DIGEST"

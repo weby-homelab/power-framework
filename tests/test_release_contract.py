@@ -14,8 +14,11 @@ def test_release_manifest_has_one_native_profile_and_web_adapter() -> None:
     manifest = json.loads(
         (ROOT / "release" / "power-release-manifest.json").read_text(encoding="utf-8")
     )
-    assert manifest["schema"] == "power.release.manifest.v1"
-    assert manifest["version"] == "3.7.8"
+    assert manifest["schema"] == "power.release.manifest.template.v1"
+    assert manifest["authority"] == "candidate-only"
+    assert manifest["generated_manifest"] == "dist/power-release-manifest.json"
+    assert manifest["version"] == "3.7.9"
+    assert manifest["artifacts"] == {}
     assert manifest["profiles"]["native"] == ["power", "power-mcp"]
     assert manifest["profiles"]["web"] == ["power-web"]
     assert manifest["profiles"]["profile_a"]["status"] == "mcp-required"
@@ -24,7 +27,6 @@ def test_release_manifest_has_one_native_profile_and_web_adapter() -> None:
         "semantic",
         "rerank",
     ]
-    assert manifest["artifacts"]["power_sdist"]["filename"] == "power_framework-3.7.8.tar.gz"
     assert manifest["mcp"] == {
         "entry_point": "power-mcp",
         "transport": "stdio",

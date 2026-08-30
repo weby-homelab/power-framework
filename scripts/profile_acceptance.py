@@ -438,9 +438,13 @@ def main() -> int:
 
             image_config = json.loads(run(["docker", "image", "inspect", image]))[0]
             labels = image_config.get("Config", {}).get("Labels", {})
+            harness_revision = os.environ.get("ACCEPTANCE_HARNESS_REVISION", "")
+            if harness_revision and re.fullmatch(r"[0-9a-f]{40}", harness_revision) is None:
+                raise RuntimeError("acceptance harness revision is not a valid Git SHA")
             evidence: dict[str, Any] = {
                 "schema": "power.profile.acceptance.v1",
                 "version": args.version,
+                "acceptance_harness_revision": harness_revision or None,
                 "image_digest": args.image_digest or None,
                 "profile_a": {
                     "native_cli": True,

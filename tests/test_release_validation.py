@@ -95,3 +95,31 @@ def test_validation_receipt_counts_missing_mandatory_gate(tmp_path: Path) -> Non
 
     assert receipt["status"] == "failed"
     assert receipt["mandatory_skipped"] == 1
+
+
+def test_validation_receipt_records_unexecuted_mandatory_gates_as_pending(
+    tmp_path: Path,
+) -> None:
+    junit, coverage = _inputs(tmp_path)
+    pending = {"profile-a-mcp-stdio", "public-release-readback"}
+    gates = tmp_path / "gates.json"
+    gates.write_text(
+        json.dumps(
+            build_gate_manifest(
+                passed_mandatory=set(MANDATORY_GATES) - pending,
+                skipped_mandatory=set(),
+                failed_mandatory=set(),
+                pending_mandatory=pending,
+                passed_optional=set(),
+                skipped_optional=set(OPTIONAL_GATES),
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    receipt = build_validation_receipt(junit_xml=junit, coverage_json=coverage, gate_manifest=gates)
+
+    assert receipt["status"] == "prepublication-passed"
+    assert receipt["mandatory_skipped"] == 0
+    assert receipt["pending_mandatory_gates"] == sorted(pending)
+    assert receipt["publication_pending"] is True

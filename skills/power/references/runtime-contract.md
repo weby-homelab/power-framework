@@ -6,7 +6,7 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.7.8` — runtime contract: **26 CLI commands** + **20 MCP tools** (official MCP Python SDK v2).
+`v3.7.9` — runtime contract: **26 CLI commands** + **20 MCP tools** (official MCP Python SDK v2).
 
 ## CLI (26 команд)
 

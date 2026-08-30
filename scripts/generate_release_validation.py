@@ -62,7 +62,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _load_gate_manifest(path: Path) -> tuple[int, int, bool, list[str]]:
+def _load_gate_manifest(path: Path) -> tuple[int, int, bool, list[str], list[str]]:
     manifest = _load_json(path)
     if manifest.get("schema_version") != GATE_SCHEMA_VERSION:
         raise ValueError("gate manifest has an unsupported schema")
@@ -80,7 +80,7 @@ def _load_gate_manifest(path: Path) -> tuple[int, int, bool, list[str]]:
             raise ValueError(f"duplicate gate manifest item: {gate_id}")
         if not isinstance(gate.get("mandatory"), bool):
             raise ValueError(f"gate {gate_id} mandatory must be boolean")
-        if gate.get("status") not in {"passed", "skipped", "failed", "missing"}:
+        if gate.get("status") not in {"passed", "skipped", "failed", "pending", "missing"}:
             raise ValueError(f"gate {gate_id} has an invalid status")
         by_id[gate_id] = gate
     if set(by_id) != set(MANDATORY_GATES) | set(OPTIONAL_GATES):
@@ -99,7 +99,16 @@ def _load_gate_manifest(path: Path) -> tuple[int, int, bool, list[str]]:
         for gate_id in OPTIONAL_GATES
         if by_id[gate_id]["status"] == "skipped"
     ]
-    return mandatory_skipped, mandatory_failed, warnings_as_errors, skipped_optional
+    pending_mandatory = [
+        gate_id for gate_id in MANDATORY_GATES if by_id[gate_id]["status"] == "pending"
+    ]
+    return (
+        mandatory_skipped,
+        mandatory_failed,
+        warnings_as_errors,
+        skipped_optional,
+        pending_mandatory,
+    )
 
 
 def build_validation_receipt(
@@ -112,16 +121,25 @@ def build_validation_receipt(
         raise ValueError("coverage JSON totals.percent_covered must be numeric")
     if not 0 <= float(coverage) <= 100:
         raise ValueError("coverage JSON totals.percent_covered must be between 0 and 100")
-    mandatory_skipped, mandatory_failed, warnings_as_errors, skipped_optional = _load_gate_manifest(
-        gate_manifest
-    )
-    status = (
-        "passed"
-        if failures == 0
+    (
+        mandatory_skipped,
+        mandatory_failed,
+        warnings_as_errors,
+        skipped_optional,
+        pending_mandatory,
+    ) = _load_gate_manifest(gate_manifest)
+    checks_passed = (
+        failures == 0
         and errors == 0
         and mandatory_skipped == 0
         and mandatory_failed == 0
         and warnings_as_errors
+    )
+    status = (
+        "prepublication-passed"
+        if checks_passed and pending_mandatory
+        else "passed"
+        if checks_passed
         else "failed"
     )
     return {
@@ -133,6 +151,8 @@ def build_validation_receipt(
         "warning_count": 0 if warnings_as_errors else 1,
         "warning_policy": "Warnings are errors in the release-gate pytest command",
         "skipped_optional_gates": skipped_optional,
+        "pending_mandatory_gates": pending_mandatory,
+        "publication_pending": bool(pending_mandatory),
         "mandatory_skipped": mandatory_skipped,
         "mandatory_failed": mandatory_failed,
         "warnings_as_errors": warnings_as_errors,

@@ -42,24 +42,34 @@ def build_gate_manifest(
     passed_mandatory: set[str],
     skipped_mandatory: set[str],
     failed_mandatory: set[str],
+    pending_mandatory: set[str] | None = None,
     passed_optional: set[str],
     skipped_optional: set[str],
 ) -> dict[str, Any]:
-    """Build a complete gate inventory; omitted mandatory gates are explicit failures."""
+    """Build a complete gate inventory; unfinished mandatory gates stay pending."""
     known_mandatory = set(MANDATORY_GATES)
     known_optional = set(OPTIONAL_GATES)
+    pending = pending_mandatory or set()
     if not passed_mandatory <= known_mandatory:
         raise ValueError("unknown mandatory gate")
     if not skipped_mandatory <= known_mandatory:
         raise ValueError("unknown skipped mandatory gate")
     if not failed_mandatory <= known_mandatory:
         raise ValueError("unknown failed mandatory gate")
+    if not pending <= known_mandatory:
+        raise ValueError("unknown pending mandatory gate")
     if not passed_optional <= known_optional or not skipped_optional <= known_optional:
         raise ValueError("unknown optional gate")
-    if passed_mandatory & skipped_mandatory or passed_mandatory & failed_mandatory:
+    if (
+        passed_mandatory & skipped_mandatory
+        or passed_mandatory & failed_mandatory
+        or passed_mandatory & pending
+    ):
         raise ValueError("mandatory gate has conflicting statuses")
-    if skipped_mandatory & failed_mandatory:
-        raise ValueError("mandatory gate is both skipped and failed")
+    if skipped_mandatory & failed_mandatory or skipped_mandatory & pending:
+        raise ValueError("mandatory gate has conflicting statuses")
+    if failed_mandatory & pending:
+        raise ValueError("mandatory gate is both failed and pending")
     if passed_optional & skipped_optional:
         raise ValueError("optional gate has conflicting statuses")
 
@@ -72,6 +82,8 @@ def build_gate_manifest(
             if gate_id in skipped_mandatory
             else "failed"
             if gate_id in failed_mandatory
+            else "pending"
+            if gate_id in pending
             else "missing"
         )
         gates.append({"id": gate_id, "mandatory": True, "status": status})
@@ -91,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--passed-mandatory", action="append", default=[])
     parser.add_argument("--skipped-mandatory", action="append", default=[])
     parser.add_argument("--failed-mandatory", action="append", default=[])
+    parser.add_argument("--pending-mandatory", action="append", default=[])
     parser.add_argument("--passed-optional", action="append", default=[])
     parser.add_argument("--skipped-optional", action="append", default=[])
     args = parser.parse_args(argv)
@@ -99,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
             passed_mandatory=set(args.passed_mandatory),
             skipped_mandatory=set(args.skipped_mandatory),
             failed_mandatory=set(args.failed_mandatory),
+            pending_mandatory=set(args.pending_mandatory),
             passed_optional=set(args.passed_optional),
             skipped_optional=set(args.skipped_optional),
         )

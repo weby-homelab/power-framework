@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import urllib.error
@@ -17,6 +18,7 @@ from scripts.prxmx_power_runtime_audit import (
     ALLOWED_SKILL_EXTENSIONS,
     ALLOWED_SKILL_TOP_LEVEL_FILES,
     DEFAULT_MCP_CONFIGS,
+    MAX_RELEASE_WHEEL_BYTES,
     MAX_WRAPPER_DEPTH,
     AuditReport,
     ProcessLock,
@@ -60,6 +62,24 @@ from scripts.prxmx_power_runtime_audit import (
     strip_jsonc_comments,
     tree_from_directory,
 )
+
+
+def _add_published_manifest_asset(
+    release_json: dict[str, Any], manifest_json: dict[str, Any], tag: str = "v3.7.8"
+) -> None:
+    """Add the exact public manifest asset expected by the GitHub fetch contract."""
+    manifest_bytes = json.dumps(manifest_json).encode("utf-8")
+    release_json["assets"].append(
+        {
+            "name": "power-release-manifest.json",
+            "browser_download_url": (
+                f"https://github.com/weby-homelab/power-framework/releases/download/{tag}/"
+                "power-release-manifest.json"
+            ),
+            "digest": f"sha256:{hashlib.sha256(manifest_bytes).hexdigest()}",
+        }
+    )
+
 
 # ============================================================================
 # 1. Version Parsing and Prerelease Comparison Tests
@@ -307,6 +327,36 @@ def test_fetch_local_release_manifest_schema_mismatch_fails_closed(tmp_path: Pat
         fetch_release_payload(source_dir=repo)
 
 
+def test_fetch_local_release_candidate_template_does_not_bind_final_artifacts(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text(
+        '[project]\nname = "power-framework"\nversion = "3.7.8"\n',
+        encoding="utf-8",
+    )
+    release_dir = repo / "release"
+    release_dir.mkdir()
+    (release_dir / "power-release-manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": "power.release.manifest.template.v1",
+                "authority": "candidate-only",
+                "version": "3.7.8",
+                "artifacts": {"power_wheel": {"filename": "stale.whl", "sha256": "0" * 64}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = fetch_release_payload(source_dir=repo)
+
+    assert payload.manifest == {}
+    assert payload.wheel_filename is None
+    assert payload.wheel_sha256 is None
+
+
 def test_fetch_local_release_wheel_hash_mismatch_fails_closed(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -347,6 +397,11 @@ def test_fetch_from_github_api_failure_fails_closed() -> None:
         fetch_release_payload(repo="weby-homelab/power-framework", ref="latest")
 
 
+def test_fetch_from_github_rejects_non_release_ref_before_network() -> None:
+    with pytest.raises(ReleaseValidationError, match="stable v<version> tag"):
+        fetch_release_payload(repo="weby-homelab/power-framework", ref="main")
+
+
 def test_fetch_from_github_rejects_prerelease_on_latest() -> None:
     release_resp = MagicMock()
     release_resp.read.return_value = json.dumps(
@@ -373,7 +428,7 @@ def test_fetch_from_github_wheel_asset_mismatch_fails_closed() -> None:
         "assets": [
             {
                 "name": "power_framework-3.7.8-py3-none-any.whl",
-                "browser_download_url": "https://example.com/power_framework-3.7.8-py3-none-any.whl",
+                "browser_download_url": "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power_framework-3.7.8-py3-none-any.whl",
             }
         ],
     }
@@ -381,6 +436,7 @@ def test_fetch_from_github_wheel_asset_mismatch_fails_closed() -> None:
     manifest_json = {
         "schema": "power.release.manifest.v1",
         "version": "3.7.8",
+        "commit": "a" * 40,
         "artifacts": {
             "power_wheel": {
                 "filename": "power_framework-3.7.8-mismatched.whl",
@@ -388,12 +444,13 @@ def test_fetch_from_github_wheel_asset_mismatch_fails_closed() -> None:
             }
         },
     }
+    _add_published_manifest_asset(release_json, manifest_json)
 
     def urlopen_side_effect(req: urllib.request.Request, **kwargs: Any) -> MagicMock:
         url = req.full_url
         mock = MagicMock()
         mock.__enter__.return_value = mock
-        if "releases" in url:
+        if url.endswith("/releases/latest"):
             mock.read.return_value = json.dumps(release_json).encode("utf-8")
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
@@ -418,7 +475,7 @@ def test_fetch_from_github_wheel_asset_digest_manifest_mismatch_fails_closed() -
         "assets": [
             {
                 "name": "power_framework-3.7.8-py3-none-any.whl",
-                "browser_download_url": "https://example.com/power_framework-3.7.8-py3-none-any.whl",
+                "browser_download_url": "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power_framework-3.7.8-py3-none-any.whl",
                 "digest": asset_digest,
             }
         ],
@@ -427,6 +484,7 @@ def test_fetch_from_github_wheel_asset_digest_manifest_mismatch_fails_closed() -
     manifest_json = {
         "schema": "power.release.manifest.v1",
         "version": "3.7.8",
+        "commit": "a" * 40,
         "artifacts": {
             "power_wheel": {
                 "filename": "power_framework-3.7.8-py3-none-any.whl",
@@ -434,12 +492,13 @@ def test_fetch_from_github_wheel_asset_digest_manifest_mismatch_fails_closed() -
             }
         },
     }
+    _add_published_manifest_asset(release_json, manifest_json)
 
     def urlopen_side_effect(req: urllib.request.Request, **kwargs: Any) -> MagicMock:
         url = req.full_url
         mock = MagicMock()
         mock.__enter__.return_value = mock
-        if "releases" in url:
+        if url.endswith("/releases/latest"):
             mock.read.return_value = json.dumps(release_json).encode("utf-8")
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
@@ -464,7 +523,7 @@ def test_fetch_from_github_wheel_asset_digest_matching_succeeds() -> None:
         "assets": [
             {
                 "name": "power_framework-3.7.8-py3-none-any.whl",
-                "browser_download_url": "https://example.com/power_framework-3.7.8-py3-none-any.whl",
+                "browser_download_url": "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power_framework-3.7.8-py3-none-any.whl",
                 "digest": asset_digest,
             }
         ],
@@ -473,6 +532,7 @@ def test_fetch_from_github_wheel_asset_digest_matching_succeeds() -> None:
     manifest_json = {
         "schema": "power.release.manifest.v1",
         "version": "3.7.8",
+        "commit": "a" * 40,
         "artifacts": {
             "power_wheel": {
                 "filename": "power_framework-3.7.8-py3-none-any.whl",
@@ -480,12 +540,13 @@ def test_fetch_from_github_wheel_asset_digest_matching_succeeds() -> None:
             }
         },
     }
+    _add_published_manifest_asset(release_json, manifest_json)
 
     def urlopen_side_effect(req: urllib.request.Request, **kwargs: Any) -> MagicMock:
         url = req.full_url
         mock = MagicMock()
         mock.__enter__.return_value = mock
-        if "releases" in url:
+        if url.endswith("/releases/latest"):
             mock.read.return_value = json.dumps(release_json).encode("utf-8")
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
@@ -499,7 +560,7 @@ def test_fetch_from_github_wheel_asset_digest_matching_succeeds() -> None:
         assert payload.wheel_filename == "power_framework-3.7.8-py3-none-any.whl"
 
 
-def test_fetch_from_github_wheel_asset_digest_without_manifest_succeeds() -> None:
+def test_fetch_from_github_without_published_manifest_fails_closed() -> None:
     asset_digest = "sha256:" + "c" * 64
     release_json = {
         "tag_name": "v3.7.8",
@@ -508,7 +569,7 @@ def test_fetch_from_github_wheel_asset_digest_without_manifest_succeeds() -> Non
         "assets": [
             {
                 "name": "power_framework-3.7.8-py3-none-any.whl",
-                "browser_download_url": "https://example.com/power_framework-3.7.8-py3-none-any.whl",
+                "browser_download_url": "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power_framework-3.7.8-py3-none-any.whl",
                 "digest": asset_digest,
             }
         ],
@@ -527,9 +588,11 @@ def test_fetch_from_github_wheel_asset_digest_without_manifest_succeeds() -> Non
             raise urllib.error.URLError("manifest endpoint unavailable")
         return mock
 
-    with patch("urllib.request.urlopen", side_effect=urlopen_side_effect):
-        payload = fetch_release_payload(repo="weby-homelab/power-framework", ref="latest")
-        assert payload.wheel_sha256 == "c" * 64
+    with (
+        patch("urllib.request.urlopen", side_effect=urlopen_side_effect),
+        pytest.raises(ReleaseValidationError, match="exactly one published"),
+    ):
+        fetch_release_payload(repo="weby-homelab/power-framework", ref="latest")
 
 
 def test_extract_wheel_skill_tree_path_traversal_protection(tmp_path: Path) -> None:
@@ -543,8 +606,6 @@ def test_extract_wheel_skill_tree_path_traversal_protection(tmp_path: Path) -> N
 
 
 def test_download_and_verify_wheel(tmp_path: Path) -> None:
-    import hashlib
-
     dummy_wheel = b"PK\x03\x04dummy_wheel_content"
     wheel_hash = hashlib.sha256(dummy_wheel).hexdigest()
 
@@ -554,7 +615,7 @@ def test_download_and_verify_wheel(tmp_path: Path) -> None:
 
     with patch("urllib.request.urlopen", return_value=resp_mock):
         downloaded = download_and_verify_wheel(
-            wheel_url="https://example.com/wheel.whl",
+            wheel_url="https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/wheel.whl",
             expected_sha256=wheel_hash,
             dest_dir=tmp_path,
         )
@@ -573,7 +634,32 @@ def test_download_and_verify_wheel_digest_mismatch_fails_closed(tmp_path: Path) 
         pytest.raises(ReleaseValidationError, match="SHA-256 mismatch"),
     ):
         download_and_verify_wheel(
+            wheel_url="https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/wheel.whl",
+            expected_sha256="0" * 64,
+            dest_dir=tmp_path,
+        )
+
+
+def test_download_and_verify_wheel_rejects_noncanonical_url(tmp_path: Path) -> None:
+    with pytest.raises(ReleaseValidationError, match="canonical GitHub release URL"):
+        download_and_verify_wheel(
             wheel_url="https://example.com/wheel.whl",
+            expected_sha256="0" * 64,
+            dest_dir=tmp_path,
+        )
+
+
+def test_download_and_verify_wheel_rejects_oversized_response(tmp_path: Path) -> None:
+    response = MagicMock()
+    response.headers = {"Content-Length": str(MAX_RELEASE_WHEEL_BYTES + 1)}
+    response.__enter__.return_value = response
+
+    with (
+        patch("urllib.request.urlopen", return_value=response),
+        pytest.raises(ReleaseValidationError, match="maximum download size"),
+    ):
+        download_and_verify_wheel(
+            wheel_url="https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/wheel.whl",
             expected_sha256="0" * 64,
             dest_dir=tmp_path,
         )
@@ -1556,6 +1642,31 @@ def test_record_brain_log_distinguishes_audit_and_apply(tmp_path: Path) -> None:
     assert record_brain_log(vault, rep_apply) is False
 
 
+def test_run_audit_record_failure_is_not_reported_as_success(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "pyproject.toml").write_text(
+        '[project]\nname = "power-framework"\nversion = "3.7.8"\n',
+        encoding="utf-8",
+    )
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    report, code = run_audit(
+        source_dir=source,
+        vault_path=vault,
+        state_dir=tmp_path / "state",
+        venv_roots=[],
+        skill_targets=[],
+        mcp_configs=[],
+        record=True,
+    )
+
+    assert code == 1
+    assert report.recorded is False
+    assert any("canonical brain log" in error.lower() for error in report.errors)
+
+
 def test_format_human_report() -> None:
     rep = AuditReport(
         timestamp="2026-08-29 18:00:00",
@@ -1676,17 +1787,29 @@ def test_fetch_from_github_apply_requires_verified_wheel(tmp_path: Path) -> None
         "assets": [],  # No wheel asset
     }
     pyproject_text = '[project]\nname = "power-framework"\nversion = "3.7.8"\n'
+    manifest_json = {
+        "schema": "power.release.manifest.v1",
+        "version": "3.7.8",
+        "commit": "a" * 40,
+        "artifacts": {
+            "power_wheel": {
+                "filename": "power_framework-3.7.8-py3-none-any.whl",
+                "sha256": "c" * 64,
+            }
+        },
+    }
+    _add_published_manifest_asset(release_json, manifest_json)
 
     def urlopen_side_effect(req: urllib.request.Request, **kwargs: Any) -> MagicMock:
         url = req.full_url
         mock = MagicMock()
         mock.__enter__.return_value = mock
-        if "releases" in url:
+        if url.endswith("/releases/latest"):
             mock.read.return_value = json.dumps(release_json).encode("utf-8")
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
         elif "power-release-manifest.json" in url:
-            raise urllib.error.URLError("manifest endpoint unavailable")
+            mock.read.return_value = json.dumps(manifest_json).encode("utf-8")
         return mock
 
     state_dir = tmp_path / "state"
@@ -1734,22 +1857,33 @@ def test_fetch_from_github_apply_missing_wheel_digest_fails_closed(tmp_path: Pat
         "assets": [
             {
                 "name": "power_framework-3.7.8-py3-none-any.whl",
-                "browser_download_url": "https://example.com/power_framework-3.7.8-py3-none-any.whl",
+                "browser_download_url": "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power_framework-3.7.8-py3-none-any.whl",
             }
         ],
     }
     pyproject_text = '[project]\nname = "power-framework"\nversion = "3.7.8"\n'
+    manifest_json = {
+        "schema": "power.release.manifest.v1",
+        "version": "3.7.8",
+        "commit": "a" * 40,
+        "artifacts": {
+            "power_wheel": {
+                "filename": "power_framework-3.7.8-py3-none-any.whl",
+            }
+        },
+    }
+    _add_published_manifest_asset(release_json, manifest_json)
 
     def urlopen_side_effect(req: urllib.request.Request, **kwargs: Any) -> MagicMock:
         url = req.full_url
         mock = MagicMock()
         mock.__enter__.return_value = mock
-        if "releases" in url:
+        if url.endswith("/releases/latest"):
             mock.read.return_value = json.dumps(release_json).encode("utf-8")
         elif "pyproject.toml" in url:
             mock.read.return_value = pyproject_text.encode("utf-8")
         elif "power-release-manifest.json" in url:
-            raise urllib.error.URLError("manifest endpoint unavailable")
+            mock.read.return_value = json.dumps(manifest_json).encode("utf-8")
         return mock
 
     state_dir = tmp_path / "state"
@@ -1787,6 +1921,87 @@ def test_fetch_from_github_apply_missing_wheel_digest_fails_closed(tmp_path: Pat
         assert code_apply == 1
         assert rep_apply.applied is True
         assert any("verified release wheel" in err for err in rep_apply.errors)
+
+
+def test_github_fetch_uses_published_manifest_asset_not_raw_source() -> None:
+    public_commit = "a" * 40
+    stale_commit = "b" * 40
+    wheel_sha = "c" * 64
+    release_json = {
+        "tag_name": "v3.7.8",
+        "prerelease": False,
+        "draft": False,
+        "assets": [
+            {
+                "name": "power_framework-3.7.8-py3-none-any.whl",
+                "browser_download_url": "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power_framework-3.7.8-py3-none-any.whl",
+                "digest": f"sha256:{wheel_sha}",
+            }
+        ],
+    }
+    pyproject_text = '[project]\nname = "power-framework"\nversion = "3.7.8"\n'
+    public_manifest = {
+        "schema": "power.release.manifest.v1",
+        "version": "3.7.8",
+        "commit": public_commit,
+        "artifacts": {
+            "power_wheel": {
+                "filename": "power_framework-3.7.8-py3-none-any.whl",
+                "sha256": wheel_sha,
+            }
+        },
+    }
+    stale_manifest = {
+        "schema": "power.release.manifest.v1",
+        "version": "3.7.8",
+        "commit": stale_commit,
+        "artifacts": {
+            "power_wheel": {
+                "filename": "power_framework-3.7.8-py3-none-any.whl",
+                "sha256": wheel_sha,
+            }
+        },
+    }
+    public_manifest_bytes = json.dumps(public_manifest).encode("utf-8")
+    release_json["assets"].append(
+        {
+            "name": "power-release-manifest.json",
+            "browser_download_url": "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power-release-manifest.json",
+            "digest": f"sha256:{hashlib.sha256(public_manifest_bytes).hexdigest()}",
+        }
+    )
+    calls: list[str] = []
+
+    def urlopen_side_effect(req: Any, **kwargs: Any) -> MagicMock:
+        url = req.full_url
+        calls.append(url)
+        mock = MagicMock()
+        mock.__enter__.return_value = mock
+        if url.endswith("/releases/tags/v3.7.8"):
+            mock.read.return_value = json.dumps(release_json).encode("utf-8")
+        elif url.endswith("/pyproject.toml"):
+            mock.read.return_value = pyproject_text.encode("utf-8")
+        elif url.endswith("/releases/download/v3.7.8/power-release-manifest.json"):
+            mock.read.return_value = json.dumps(public_manifest).encode("utf-8")
+        elif "raw.githubusercontent.com" in url and url.endswith(
+            "/release/power-release-manifest.json"
+        ):
+            mock.read.return_value = json.dumps(stale_manifest).encode("utf-8")
+        else:
+            raise AssertionError(f"unexpected URL: {url}")
+        return mock
+
+    with patch("urllib.request.urlopen", side_effect=urlopen_side_effect):
+        payload = fetch_release_payload(repo="weby-homelab/power-framework", ref="v3.7.8")
+
+    assert payload.commit == public_commit
+    assert (
+        "https://github.com/weby-homelab/power-framework/releases/download/v3.7.8/power-release-manifest.json"
+        in calls
+    )
+    assert not any(
+        "raw.githubusercontent.com" in url and "power-release-manifest.json" in url for url in calls
+    )
 
 
 def test_apply_updates_mcp_backed_venv_and_retains_comment_guard(tmp_path: Path) -> None:

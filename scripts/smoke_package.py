@@ -11,12 +11,27 @@ import tempfile
 from pathlib import Path
 
 SMOKE_CODE = """
+import importlib.metadata
+import subprocess
+
+from power_framework.core import __version__
 from power_framework.core.metrics.udcg_real import _load_semantic_gt
+
+distribution_version = importlib.metadata.version("power-framework")
+assert distribution_version == __version__, (
+    f"distribution/runtime version mismatch: {distribution_version} != {__version__}"
+)
+version_result = subprocess.run(
+    ["power", "--version"], capture_output=True, check=True, text=True
+)
+assert distribution_version in version_result.stdout, (
+    f"CLI version mismatch: {version_result.stdout!r}"
+)
 
 qrels = _load_semantic_gt()
 assert len(qrels) > 0
 assert all(qrels[query] for query in qrels)
-print(f"package smoke passed: {len(qrels)} queries")
+print(f"package smoke passed: version={distribution_version}, queries={len(qrels)}")
 """
 
 
@@ -58,10 +73,15 @@ def main() -> int:
     parser.add_argument("--sdist", type=Path, required=True)
     args = parser.parse_args()
 
-    artifacts = [args.wheel.resolve(), args.sdist.resolve()]
-    if any(not artifact.is_file() for artifact in artifacts):
-        missing = ", ".join(str(artifact) for artifact in artifacts if not artifact.is_file())
-        parser.error(f"artifact does not exist: {missing}")
+    raw_artifacts = [args.wheel, args.sdist]
+    if any(artifact.is_symlink() or not artifact.is_file() for artifact in raw_artifacts):
+        invalid = ", ".join(
+            str(artifact)
+            for artifact in raw_artifacts
+            if artifact.is_symlink() or not artifact.is_file()
+        )
+        parser.error(f"artifact is missing or symlinked: {invalid}")
+    artifacts = [artifact.resolve() for artifact in raw_artifacts]
 
     with tempfile.TemporaryDirectory(prefix="power-package-smoke-") as temp_dir:
         root = Path(temp_dir)
