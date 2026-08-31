@@ -964,6 +964,7 @@ jobs:
           trap 'docker logout ghcr.io' EXIT
           if [[ "$promote_mode" == "create" ]]; then
             docker buildx imagetools create \
+              --prefer-index=false \
               --tag "$FINAL_IMAGE_REF" \
               "${SOURCE_IMAGE_REF}@${WEB_IMAGE_DIGEST}"
           fi

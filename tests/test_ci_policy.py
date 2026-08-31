@@ -271,6 +271,7 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     assert "ghcr.io/token?service=ghcr.io" in promote_step["run"]
     assert "Unable to establish GHCR release tag state" in promote_step["run"]
     assert "docker buildx imagetools create" in promote_step["run"]
+    assert "--prefer-index=false" in promote_step["run"]
     assert '"${SOURCE_IMAGE_REF}@${WEB_IMAGE_DIGEST}"' in promote_step["run"]
     assert "docker logout ghcr.io" in promote_step["run"]
     assert "DOCKER_CONFIG" not in release_job.get("env", {})
