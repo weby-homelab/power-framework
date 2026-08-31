@@ -19,7 +19,7 @@
     "merged": false,
     "merge_state": "blocked",
     "required_review_decision": "REVIEW_REQUIRED",
-    "head_at_latest_public_readback": "1bca7ff5471095bdf9461e0d1a477c0f0087e78e"
+    "head_at_latest_public_readback": "169c90f4a3239b89ef7f82bc6143b4e5b54219d3"
   },
   "verdicts": {
     "release_validity": "PASS",

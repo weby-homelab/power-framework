@@ -102,5 +102,5 @@ def test_current_release_wording_marks_snapshots_and_local_only_history() -> Non
     assert "OWNER-ACTION-002" in next_cycle
 
     blocker_log = (EVIDENCE / "blocker-log.md").read_text(encoding="utf-8")
-    assert "1bca7ff5471095bdf9461e0d1a477c0f0087e78e" in blocker_log
+    assert "169c90f4a3239b89ef7f82bc6143b4e5b54219d3" in blocker_log
     assert "256b61200af1a0bf6060d78107b9dc5fa885aabb" not in blocker_log

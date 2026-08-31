@@ -15,7 +15,7 @@ independent approval that the current actor cannot provide.
 - Final report snapshot commit: `2c645598e8876c551e1f0cbd8c34a70764876dce`
 - Subsequent inventory-timing clarification: `e0fc3f3a198373cedf2cbcbc3f1068ec5466b6bf`
 - Closure PR: `https://github.com/weby-homelab/power-framework/pull/381`
-- Latest public PR readback head in the closure evidence: `1bca7ff5471095bdf9461e0d1a477c0f0087e78e`.
+- Latest public PR readback head in the closure evidence: `169c90f4a3239b89ef7f82bc6143b4e5b54219d3`.
 - The complete pre-existing untracked `v3.7.9` forensic inventory contains 17
   files, including ignored nested JSON/SBOM files. They are WS-local-only,
   preserved byte-for-byte, never staged, and never treated as public evidence;
@@ -169,7 +169,7 @@ evidence was retained; no temporary artifact was deleted.
   project environment.
 - Remaining `BLK-0002`: PRXMX authorization boundary; `OWNER-ACTION-001`.
 - Remaining `BLK-0005`: protected PR approval boundary; `OWNER-ACTION-002`.
-  The latest public readback recorded PR #381 head `1bca7ff5471095bdf9461e0d1a477c0f0087e78e`
+  The latest public readback recorded PR #381 head `169c90f4a3239b89ef7f82bc6143b4e5b54219d3`
   with all required checks passed and `reviewDecision=REVIEW_REQUIRED`.
 
 ## TESTS / HASHES / DIGESTS

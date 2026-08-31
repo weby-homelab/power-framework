@@ -75,12 +75,13 @@ content, or raw authorization material.
 - WHY AGENT CANNOT COMPLETE: GitHub rejects self-approval, and bypassing the
   required review would violate the repository closure policy.
 - EXACT EVIDENCE: PR `https://github.com/weby-homelab/power-framework/pull/381`,
-  head `1bca7ff5471095bdf9461e0d1a477c0f0087e78e` at the latest verified
-  pre-remediation readback, all required checks passed,
+  head `169c90f4a3239b89ef7f82bc6143b4e5b54219d3` at the latest verified
+  public readback, all required checks passed,
   `reviewDecision=REVIEW_REQUIRED`.
-- HEAD SNAPSHOT NOTE: this identifier is a point-in-time public PR readback;
-  after any later branch commit, the PR head and required checks must be read
-  back again before treating this evidence as current.
+- HEAD SNAPSHOT NOTE: this identifier is a point-in-time public PR readback
+  immediately before this evidence-refresh commit; after any later branch
+  commit, the PR head and required checks must be read back again before
+  treating this evidence as current.
 - RISK IF DEFERRED: closure changes remain only on the dedicated branch; public
   `main` has no durable post-release evidence or final merge readback.
 - RESUME PHASE: Phase 31 merge gate, then Phase 32 post-merge verification and
