@@ -15,8 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bindings, attestations, installs, and release-control provenance.
 - Added future release receipts that distinguish the signed release source from
   the workflow/control revision and the protected-main merge tree.
+- Added strict future public binding checks for source/tag/control/workflow
+  provenance, run identity, event, ref, and repository consistency.
 - Made public runtime-audit defaults home-relative instead of tied to one host
   filesystem layout.
+- Made malformed Web CSRF settings fail closed with a controlled runtime error.
 - Aligned the pre-commit mypy hook with the locked project environment so local
   validation uses the same dependency boundary as CI.
 
