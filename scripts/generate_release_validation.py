@@ -117,7 +117,7 @@ def build_validation_receipt(
     """Return exact test/coverage counts without including test or vault content."""
     passed, skipped, failures, errors = _test_counts(junit_xml)
     coverage = _load_json(coverage_json).get("totals", {}).get("percent_covered")
-    if not isinstance(coverage, (int, float)) or isinstance(coverage, bool):
+    if not isinstance(coverage, int | float) or isinstance(coverage, bool):
         raise ValueError("coverage JSON totals.percent_covered must be numeric")
     if not 0 <= float(coverage) <= 100:
         raise ValueError("coverage JSON totals.percent_covered must be between 0 and 100")
@@ -181,8 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
         return 2
-    if receipt["status"] != "passed":
-        parser.error("release validation receipt cannot be generated from failing tests")
+    if receipt["status"] not in {"passed", "prepublication-passed"}:
+        parser.error("release validation receipt cannot be generated from failing checks")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

@@ -137,6 +137,8 @@ def _manifest_file_artifacts(
         if not isinstance(entry, dict):
             raise ValueError(f"release manifest artifact {key} must be an object")
         filename = entry.get("filename")
+        if key in expected_filenames and not isinstance(filename, str):
+            raise ValueError(f"manifest artifact {key} must declare a filename")
         if filename is None:
             continue
         if key in expected_filenames and filename != expected_filenames[key]:
@@ -173,6 +175,10 @@ def _verify_receipt(
     required_files: set[str],
 ) -> list[dict[str, Any]]:
     """Verify receipt identity, file hashes, attestation IDs, and subjects."""
+    if receipt.get("schema_version") != 2:
+        raise ValueError("release receipt schema_version must be 2")
+    if manifest_path.parent.resolve() != asset_dir.resolve():
+        raise ValueError("release manifest must be inside the public asset directory")
     release = receipt.get("release")
     if not isinstance(release, dict):
         raise ValueError("release receipt release must be an object")
@@ -208,6 +214,9 @@ def _verify_receipt(
     missing = required_files - receipt_hashes.keys()
     if missing:
         raise ValueError(f"release receipt is missing hash bindings: {sorted(missing)}")
+    unexpected = receipt_hashes.keys() - required_files
+    if unexpected:
+        raise ValueError(f"release receipt has unexpected asset bindings: {sorted(unexpected)}")
 
     return receipt.get("attestation_subjects", [])
 
@@ -275,13 +284,55 @@ def verify_public_release_bindings(
 
     profile_name = manifest["artifacts"]["profile_evidence"]["filename"]
     profile = _load_json(_safe_asset_path(asset_root, profile_name), "Profile A/B evidence")
+    if profile.get("schema") != "power.profile.acceptance.v1":
+        raise ValueError("Profile A/B evidence schema is invalid")
     if profile.get("version") != version:
         raise ValueError("Profile A/B evidence version does not match tag")
+    if profile.get("acceptance_harness_revision") != commit:
+        raise ValueError("Profile A/B evidence harness revision does not match tag commit")
     if profile.get("image_digest") != image_digest:
         raise ValueError("Profile B image digest does not match manifest image digest")
+    profile_a = profile.get("profile_a")
+    if not isinstance(profile_a, dict):
+        raise ValueError("Profile A evidence is missing")
+    for field in ("native_cli", "native_mcp_stdio"):
+        if profile_a.get(field) is not True:
+            raise ValueError(f"Profile A evidence {field} must be true")
+    if profile_a.get("docker_web_containers") != 0:
+        raise ValueError("Profile A evidence must contain zero Web containers")
+    profile_b = profile.get("profile_b")
+    if not isinstance(profile_b, dict):
+        raise ValueError("Profile B evidence is missing")
+    for field in (
+        "web_health",
+        "web_authenticated_read",
+        "web_semantic_non_fallback",
+        "web_reranked_non_fallback",
+        "web_governed_mutation",
+        "host_cli_readback",
+        "host_mcp_readback",
+        "same_canonical_vault",
+        "cache_delete_rebuild",
+        "cap_drop_all",
+        "read_only_rootfs",
+    ):
+        if profile_b.get(field) is not True:
+            raise ValueError(f"Profile B evidence {field} must be true")
+    if profile_b.get("container_user") != "10001:10001":
+        raise ValueError("Profile B evidence container user is invalid")
+    if profile_b.get("web_mcp_services") != 0:
+        raise ValueError("Profile B evidence must contain zero MCP services")
+    if profile_b.get("web_applicationservice_bypass_count") != 0:
+        raise ValueError("Profile B evidence reports an ApplicationService bypass")
+    profile_image = profile.get("image")
+    if not isinstance(profile_image, str) or not profile_image.endswith(f"@{image_digest}"):
+        raise ValueError("Profile B evidence must bind an image reference to a digest")
 
-    receipt = _load_json(receipt_path.expanduser().absolute(), "release receipt")
-    required_receipt_files = set(file_hashes) | {manifest_file.name}
+    receipt_file = receipt_path.expanduser().absolute()
+    if receipt_file.parent.resolve() != asset_root:
+        raise ValueError("release receipt must be inside the public asset directory")
+    receipt = _load_json(receipt_file, "release receipt")
+    required_receipt_files = set(checksums)
     _verify_receipt(
         receipt,
         tag=tag,

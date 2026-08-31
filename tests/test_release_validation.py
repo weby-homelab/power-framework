@@ -12,7 +12,7 @@ from scripts.generate_release_gate_manifest import (
     OPTIONAL_GATES,
     build_gate_manifest,
 )
-from scripts.generate_release_validation import build_validation_receipt
+from scripts.generate_release_validation import build_validation_receipt, main
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -123,3 +123,40 @@ def test_validation_receipt_records_unexecuted_mandatory_gates_as_pending(
     assert receipt["mandatory_skipped"] == 0
     assert receipt["pending_mandatory_gates"] == sorted(pending)
     assert receipt["publication_pending"] is True
+
+
+def test_validation_cli_writes_prepublication_receipt(tmp_path: Path) -> None:
+    junit, coverage = _inputs(tmp_path)
+    gates = tmp_path / "gates.json"
+    pending = {"profile-a-mcp-stdio", "public-release-readback"}
+    gates.write_text(
+        json.dumps(
+            build_gate_manifest(
+                passed_mandatory=set(MANDATORY_GATES) - pending,
+                skipped_mandatory=set(),
+                failed_mandatory=set(),
+                pending_mandatory=pending,
+                passed_optional=set(),
+                skipped_optional=set(OPTIONAL_GATES),
+            )
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "validation.json"
+
+    assert (
+        main(
+            [
+                "--junit-xml",
+                str(junit),
+                "--coverage-json",
+                str(coverage),
+                "--gate-manifest",
+                str(gates),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "prepublication-passed"
