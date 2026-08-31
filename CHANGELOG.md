@@ -7,12 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [3.7.10] - 2026-08-31
+
+### Fixed
+
+- Added immutable signed-tag admission, exact commit/tag binding, and safe
+  recovery controls to the release workflow.
+- Preserved the Web image digest through staging, attestation, and final GHCR
+  promotion, with authenticated absence checks and public readback.
+- Made release validation and public asset verification fail closed on
+  incomplete Profile A/B, receipt, manifest, or attestation evidence.
+
 ### Changed
 
-- Preparing the corrective `3.7.9` release to close the post-`3.7.8` forensic
-  release-integrity findings. The public release is not considered stable until
-  the signed tag, exact artifacts, manifest, receipt, SBOMs, attestations, OCI
-  digest, and fresh public readback all pass.
+- Synchronized the active package, runtime, Web defaults, Skill, upgrade matrix,
+  support, onboarding, migration, and release documentation to `3.7.10`.
+- Kept `v3.7.9` and `v3.7.8` immutable historical boundaries.
 
 ## [3.7.9] - 2026-08-30
 

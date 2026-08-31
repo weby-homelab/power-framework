@@ -11,7 +11,7 @@ import pytest
 
 from scripts.verify_public_release_bindings import verify_public_release_bindings
 
-TAG = "v3.7.9"
+TAG = "v3.7.10"
 COMMIT = "a" * 40
 IMAGE_DIGEST = "sha256:" + "f" * 64
 
@@ -37,10 +37,10 @@ def _write_checksums(path: Path, files: list[Path]) -> None:
 def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:
     asset_dir = tmp_path / "public-assets"
     asset_dir.mkdir()
-    wheel = asset_dir / "power_framework-3.7.9-py3-none-any.whl"
-    sdist = asset_dir / "power_framework-3.7.9.tar.gz"
-    package_sbom = asset_dir / "power-framework-3.7.9.spdx.json"
-    web_sbom = asset_dir / "power-web-3.7.9.spdx.json"
+    wheel = asset_dir / "power_framework-3.7.10-py3-none-any.whl"
+    sdist = asset_dir / "power_framework-3.7.10.tar.gz"
+    package_sbom = asset_dir / "power-framework-3.7.10.spdx.json"
+    web_sbom = asset_dir / "power-web-3.7.10.spdx.json"
     profile = asset_dir / "power-profile-acceptance.json"
     wheel.write_bytes(b"wheel bytes from the frozen candidate")
     sdist.write_bytes(b"sdist bytes from the frozen candidate")
@@ -50,7 +50,7 @@ def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:
         json.dumps(
             {
                 "schema": "power.profile.acceptance.v1",
-                "version": "3.7.9",
+                "version": "3.7.10",
                 "acceptance_harness_revision": COMMIT,
                 "image_digest": IMAGE_DIGEST,
                 "profile_a": {
@@ -74,7 +74,7 @@ def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:
                     "web_mcp_services": 0,
                     "web_applicationservice_bypass_count": 0,
                 },
-                "image": "ghcr.io/weby-homelab/power-framework-web:3.7.9@" + IMAGE_DIGEST,
+                "image": "ghcr.io/weby-homelab/power-framework-web:3.7.10@" + IMAGE_DIGEST,
             },
             sort_keys=True,
         )
@@ -85,7 +85,7 @@ def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:
     manifest = {
         "schema": "power.release.manifest.v1",
         "repository": "weby-homelab/power-framework",
-        "version": "3.7.9",
+        "version": "3.7.10",
         "commit": COMMIT,
         "requires_python": ">=3.13,<3.15",
         "attestations": ["github:package-1", "github:web-1"],
@@ -99,7 +99,7 @@ def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:
             "web_sbom": {"filename": web_sbom.name, "sha256": _sha256_file(web_sbom)},
             "profile_evidence": {"filename": profile.name, "sha256": _sha256_file(profile)},
             "web_image": {
-                "reference": "ghcr.io/weby-homelab/power-framework-web:3.7.9",
+                "reference": "ghcr.io/weby-homelab/power-framework-web:3.7.10",
                 "digest": IMAGE_DIGEST,
             },
         },
@@ -241,7 +241,7 @@ def test_sha256sums_correct_but_manifest_sha_wrong_fails_closed(tmp_path: Path) 
 
 def test_correct_filename_with_wrong_public_content_fails_closed(tmp_path: Path) -> None:
     paths = _write_fixture(tmp_path)
-    wheel = Path(paths["asset_dir"]) / "power_framework-3.7.9-py3-none-any.whl"
+    wheel = Path(paths["asset_dir"]) / "power_framework-3.7.10-py3-none-any.whl"
     wheel.write_bytes(b"different bytes with the same filename")
     with pytest.raises(ValueError, match=r"asset|checksums|receipt"):
         _verify(paths)
@@ -249,7 +249,7 @@ def test_correct_filename_with_wrong_public_content_fails_closed(tmp_path: Path)
 
 def test_recovery_same_tag_with_different_package_bytes_fails_closed(tmp_path: Path) -> None:
     paths = _write_fixture(tmp_path)
-    wheel = Path(paths["asset_dir"]) / "power_framework-3.7.9-py3-none-any.whl"
+    wheel = Path(paths["asset_dir"]) / "power_framework-3.7.10-py3-none-any.whl"
     wheel.write_bytes(b"recovery rebuilt the same tag differently")
     with pytest.raises(ValueError, match=r"asset|checksums|receipt"):
         _verify(paths)
