@@ -327,18 +327,16 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     web_auth_step = next(
         step for step in steps if step.get("name") == "Authenticate GHCR for Web attestation"
     )
-    assert web_auth_step["env"]["DOCKER_CONFIG"] == (
-        "${{ runner.temp }}/power-release-attestation-docker-config"
-    )
+    assert web_auth_step["env"]["HOME"] == ("${{ runner.temp }}/power-release-attestation-home")
     web_attestation = next(
         step for step in steps if step.get("name") == "Attest the published Web image digest"
     )
-    assert web_attestation["env"]["DOCKER_CONFIG"] == web_auth_step["env"]["DOCKER_CONFIG"]
+    assert web_attestation["env"]["HOME"] == web_auth_step["env"]["HOME"]
     clear_auth_step = next(
         step for step in steps if step.get("name") == "Clear GHCR credentials after Web attestation"
     )
     assert clear_auth_step["if"] == "always()"
-    assert clear_auth_step["env"]["DOCKER_CONFIG"] == web_auth_step["env"]["DOCKER_CONFIG"]
+    assert clear_auth_step["env"]["HOME"] == web_auth_step["env"]["HOME"]
     assert clear_auth_step["run"] == "docker logout ghcr.io"
 
     evidence_step = next(

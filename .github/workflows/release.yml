@@ -800,17 +800,17 @@ jobs:
       - name: Authenticate GHCR for Web attestation
         env:
           GHCR_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
-          DOCKER_CONFIG: ${{ runner.temp }}/power-release-attestation-docker-config
+          HOME: ${{ runner.temp }}/power-release-attestation-home
         run: |
           set -euo pipefail
-          install -d -m 700 "$DOCKER_CONFIG"
+          install -d -m 700 "$HOME"
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
       - name: Attest the published Web image digest
         id: web_attestation
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         env:
-          DOCKER_CONFIG: ${{ runner.temp }}/power-release-attestation-docker-config
+          HOME: ${{ runner.temp }}/power-release-attestation-home
         with:
           subject-name: ghcr.io/weby-homelab/power-framework-web
           subject-digest: ${{ steps.web_image.outputs.digest }}
@@ -819,7 +819,7 @@ jobs:
       - name: Clear GHCR credentials after Web attestation
         if: always()
         env:
-          DOCKER_CONFIG: ${{ runner.temp }}/power-release-attestation-docker-config
+          HOME: ${{ runner.temp }}/power-release-attestation-home
         run: docker logout ghcr.io
 
       - name: Generate the exact unified release manifest
