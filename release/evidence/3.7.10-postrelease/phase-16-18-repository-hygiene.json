@@ -20,6 +20,10 @@
     "remote_branch_deletion_performed": false,
     "local_historical_branches_preserved": true
   },
+  "snapshot_timing": {
+    "captured_before_closure_pr_creation": true,
+    "current_closure_pr": "https://github.com/weby-homelab/power-framework/pull/381"
+  },
   "open_prs": 0,
   "open_issues": 0,
   "milestones": 0,
