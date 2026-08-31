@@ -71,6 +71,21 @@ def _payload() -> dict[str, object]:
     }
 
 
+def _gh_payload() -> dict[str, object]:
+    legacy = _payload()
+    attestation = legacy["attestation"]
+    verification = legacy["verificationResult"]
+    assert isinstance(attestation, dict)
+    assert isinstance(verification, dict)
+    return {
+        "attestation": {"bundle": {}, "bundle_url": "https://example.invalid/bundle"},
+        "verificationResult": {
+            "statement": attestation["decodedMaterial"],
+            "signature": {"certificate": verification["certificate"]},
+        },
+    }
+
+
 def _verify(payload: dict[str, object]) -> dict[str, object]:
     return verify_attestation_payload(
         payload,
@@ -164,3 +179,47 @@ def test_attestation_policy_accepts_gh_certificate_summary_shape() -> None:
 
     result = _verify(payload)
     assert result["matching_attestation_count"] == 1
+
+
+def test_attestation_policy_accepts_current_gh_json_shape() -> None:
+    result = _verify(_gh_payload())
+
+    assert result["matching_attestation_count"] == 1
+
+
+def test_attestation_policy_rejects_cross_record_composite_match() -> None:
+    subject_entry = _gh_payload()
+    subject_verification = subject_entry["verificationResult"]
+    assert isinstance(subject_verification, dict)
+    subject_signature = subject_verification["signature"]
+    assert isinstance(subject_signature, dict)
+    subject_certificate = subject_signature["certificate"]
+    assert isinstance(subject_certificate, dict)
+    subject_certificate["sourceRepositoryDigest"] = "c" * 40
+    subject_certificate["runInvocationURI"] = (
+        f"https://github.com/{REPOSITORY}/actions/runs/99999/attempts/1"
+    )
+    subject_statement = subject_verification["statement"]
+    assert isinstance(subject_statement, dict)
+    subject_predicate = subject_statement["predicate"]
+    assert isinstance(subject_predicate, dict)
+    subject_build_definition = subject_predicate["buildDefinition"]
+    assert isinstance(subject_build_definition, dict)
+    subject_build_definition["resolvedDependencies"] = []
+    subject_run_details = subject_predicate["runDetails"]
+    assert isinstance(subject_run_details, dict)
+    subject_run_details["metadata"] = {}
+
+    provenance_entry = _gh_payload()
+    provenance_verification = provenance_entry["verificationResult"]
+    assert isinstance(provenance_verification, dict)
+    provenance_statement = provenance_verification["statement"]
+    assert isinstance(provenance_statement, dict)
+    provenance_subjects = provenance_statement["subject"]
+    assert isinstance(provenance_subjects, list)
+    provenance_subject = provenance_subjects[0]
+    assert isinstance(provenance_subject, dict)
+    provenance_subject["digest"] = {"sha256": "d" * 64}
+
+    with pytest.raises(ValueError, match="no attestation satisfied"):
+        _verify({"results": [subject_entry, provenance_entry]})

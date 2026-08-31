@@ -111,30 +111,42 @@ def _workflow_nodes(payload: Any) -> list[dict[str, Any]]:
     return nodes
 
 
-def _certificate_nodes(payload: Any) -> list[dict[str, Any]]:
-    return [
-        node
-        for node in _dicts(payload)
-        if isinstance(node.get("subjectAlternativeName"), str)
-        and any(
-            key in node
-            for key in (
-                "sourceRepositoryURI",
-                "sourceRepositoryRef",
-                "buildTrigger",
-                "buildSignerURI",
-                "runInvocationURI",
-            )
-        )
-    ]
+def _attestation_units(payload: Any) -> Iterator[dict[str, Any]]:
+    """Yield paired attestation results without crossing a discovered unit boundary."""
+    if isinstance(payload, dict):
+        if isinstance(payload.get("attestation"), dict) and isinstance(
+            payload.get("verificationResult"), dict
+        ):
+            yield payload
+            return
+        for child in payload.values():
+            yield from _attestation_units(child)
+    elif isinstance(payload, list):
+        for child in payload:
+            yield from _attestation_units(child)
 
 
-def _statement_nodes(payload: Any) -> list[dict[str, Any]]:
-    return [
-        node
-        for node in _dicts(payload)
-        if isinstance(node.get("subject"), list) and isinstance(node.get("predicateType"), str)
-    ]
+def _attestation_parts(
+    unit: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    attestation = unit.get("attestation")
+    verification = unit.get("verificationResult")
+    if not isinstance(attestation, dict) or not isinstance(verification, dict):
+        return None
+    statement = verification.get("statement")
+    signature = verification.get("signature")
+    certificate = signature.get("certificate") if isinstance(signature, dict) else None
+    if not isinstance(statement, dict):
+        statement = attestation.get("decodedMaterial")
+    if not isinstance(certificate, dict):
+        certificate = verification.get("certificate")
+    if not isinstance(statement, dict) or not isinstance(certificate, dict):
+        return None
+    if not isinstance(statement.get("subject"), list) or not isinstance(
+        statement.get("predicateType"), str
+    ):
+        return None
+    return statement, certificate
 
 
 def _subject_entries(statement: dict[str, Any]) -> list[dict[str, str]]:
@@ -151,16 +163,12 @@ def _subject_entries(statement: dict[str, Any]) -> list[dict[str, str]]:
     return entries
 
 
-def _certificate_sans(payload: Any) -> list[str]:
-    values: list[str] = []
-    for node in _dicts(payload):
-        value = node.get("subjectAlternativeName")
-        if isinstance(value, str):
-            values.append(value)
-    return values
-
-
-def _workflow_revisions(workflows: list[dict[str, Any]], payload: Any, repository: str) -> set[str]:
+def _workflow_revisions(
+    workflows: list[dict[str, Any]],
+    statement: dict[str, Any],
+    certificate: dict[str, Any],
+    repository: str,
+) -> set[str]:
     revisions: set[str] = set()
 
     def add(value: Any) -> None:
@@ -174,16 +182,15 @@ def _workflow_revisions(workflows: list[dict[str, Any]], payload: Any, repositor
         for key in ("sha", "commit", "revision", "sourceRevision", "source_revision"):
             add(workflow.get(key))
 
-    for certificate in _certificate_nodes(payload):
-        for key in (
-            "sourceRepositoryDigest",
-            "githubWorkflowSHA",
-            "sourceRevision",
-            "source_revision",
-        ):
-            add(certificate.get(key))
+    for key in (
+        "sourceRepositoryDigest",
+        "githubWorkflowSHA",
+        "sourceRevision",
+        "source_revision",
+    ):
+        add(certificate.get(key))
 
-    for node in _dicts(payload):
+    for node in _dicts(statement):
         config_source = node.get("configSource")
         if isinstance(config_source, dict):
             for key in ("sha", "commit", "revision", "sourceRevision", "source_revision"):
@@ -323,12 +330,12 @@ def verify_attestation_payload(
 
     expected_san = f"https://github.com/{repository}/{workflow}@{ref}"
     matching: list[dict[str, Any]] = []
-    for record in payload if isinstance(payload, list) else [payload]:
-        if not isinstance(record, dict | list):
+    for unit in _attestation_units(payload):
+        parts = _attestation_parts(unit)
+        if parts is None:
             continue
-        workflows = _workflow_nodes(record)
-        certificates = _certificate_nodes(record)
-        statements = _statement_nodes(record)
+        statement, certificate = parts
+        workflows = _workflow_nodes(statement)
         workflow_bound = _workflow_match(
             workflows,
             repository=repository,
@@ -336,37 +343,37 @@ def verify_attestation_payload(
             event=event,
             ref=ref,
         ) or _certificate_match(
-            certificates,
+            [certificate],
             expected_san=expected_san,
             repository=repository,
             event=event,
             ref=ref,
         )
-        if not statements or not workflow_bound:
+        if not workflow_bound:
             continue
-        if expected_san not in _certificate_sans(record):
+        if certificate.get("subjectAlternativeName") != expected_san:
             continue
-        revisions = _workflow_revisions(workflows, record, repository)
+        revisions = _workflow_revisions(workflows, statement, certificate, repository)
         if source_revision not in revisions:
             continue
-        if run_id not in _invocation_run_ids(record):
+        run_ids = _invocation_run_ids(statement) | _invocation_run_ids(certificate)
+        if run_id not in run_ids:
             continue
 
-        for statement in statements:
-            if statement["predicateType"] != predicate_type:
-                continue
-            subjects = _subject_entries(statement)
-            if not any(
-                entry["name"] == subject_name and entry["sha256"] == expected_digest
-                for entry in subjects
-            ):
-                continue
-            matching.append(
-                {
-                    "predicate_type": statement["predicateType"],
-                    "subjects": subjects,
-                }
-            )
+        if statement["predicateType"] != predicate_type:
+            continue
+        subjects = _subject_entries(statement)
+        if not any(
+            entry["name"] == subject_name and entry["sha256"] == expected_digest
+            for entry in subjects
+        ):
+            continue
+        matching.append(
+            {
+                "predicate_type": statement["predicateType"],
+                "subjects": subjects,
+            }
+        )
 
     if not matching:
         raise ValueError(
