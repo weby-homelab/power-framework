@@ -518,7 +518,7 @@ class TaskStore:
             with self.recovery_log.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
         except OSError:
-            pass
+            logger.warning("Unable to append task recovery record")
 
 
 __all__ = ["TaskStore"]

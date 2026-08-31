@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+from fastapi import FastAPI
+from starlette.requests import Request
+
+from power_framework.web.auth.csrf import validate_csrf
 from power_framework.web.auth.password import hash_password, is_auth_configured, verify_password
 from power_framework.web.auth.rate_limiter import LoginRateLimiter
 from power_framework.web.config import Settings
@@ -22,6 +27,30 @@ def test_password_plaintext_verification() -> None:
     assert verify_password("test_pass", admin_password="test_pass") is True
     assert verify_password("wrong", admin_password="test_pass") is False
     assert verify_password("", admin_password="test_pass") is False
+
+
+@pytest.mark.asyncio
+async def test_csrf_fails_closed_without_application_settings() -> None:
+    """Reject CSRF validation when an app has not installed its settings object."""
+    app = FastAPI()
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/mutate",
+            "raw_path": b"/mutate",
+            "query_string": b"",
+            "headers": [],
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("127.0.0.1", 12345),
+            "root_path": "",
+            "app": app,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="CSRF settings are not initialized"):
+        await validate_csrf(request)
 
 
 def test_password_pbkdf2_hash_and_verification() -> None:

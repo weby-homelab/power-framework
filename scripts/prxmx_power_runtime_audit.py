@@ -1055,7 +1055,7 @@ def get_venv_power_framework_version(venv_dir: Path) -> str | None:
                     if match:
                         return match.group(1).strip()
                 except OSError:
-                    pass
+                    continue
 
     # Check all site-packages under venv
     for dist_info in venv_dir.glob("**/power_framework-*.dist-info"):
@@ -1067,7 +1067,7 @@ def get_venv_power_framework_version(venv_dir: Path) -> str | None:
                 if match:
                     return match.group(1).strip()
             except OSError:
-                pass
+                continue
 
     # Fallback to executing python in venv with short timeout
     python_bin = find_venv_python(venv_dir)
@@ -1087,7 +1087,7 @@ def get_venv_power_framework_version(venv_dir: Path) -> str | None:
             if res.returncode == 0 and res.stdout.strip():
                 return res.stdout.strip()
         except (subprocess.SubprocessError, OSError):
-            pass
+            return None
 
     return None
 

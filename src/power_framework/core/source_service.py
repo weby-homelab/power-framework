@@ -39,11 +39,15 @@ from .source_projection import (
     SourceRecord,
     scan_projection,
 )
-from .vault_storage import read_vault_identity
+from .vault_storage import VaultIdentity, read_vault_identity
+
 
 # Compatibility name retained for integrations that patched the old helper. It
 # is intentionally read-only and never creates vault identity state.
-ensure_vault_identity = read_vault_identity
+def ensure_vault_identity(vault_dir: Path) -> VaultIdentity | None:
+    """Read the stable identity without creating state in the source service."""
+    return read_vault_identity(vault_dir)
+
 
 ACTIVE_CAPABILITY = "active_source_projection"
 DEGRADED_CAPABILITY = "degraded_bounded_source_scan"
