@@ -7,6 +7,8 @@
   "starting_head": "1a9879ee2353d63d979da5f68e79a6065122343b",
   "origin_main_at_capture": "1a9879ee2353d63d979da5f68e79a6065122343b",
   "tracked_worktree_clean": true,
+  "untracked_inventory_captured_at": "2026-08-31T19:15:05Z",
+  "preserved_untracked_count": 17,
   "preserved_untracked": [
     {
       "path": "release/POWER_3.7.9_FORENSIC_CLOSURE_REPORT.md",
@@ -23,6 +25,126 @@
       "publicly_committed": false,
       "size_bytes": 137,
       "sha256": "3b24a1f80406c99d16df981b7edb586dc692e4707ab4a632303123498f3ea5da"
+    },
+    {
+      "path": "release/evidence/3.7.9/final-closure.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 7247,
+      "sha256": "bf2fb195658bcca7e8d17e861165cc4f067ac6b037e8f6f9ebf6fd1756a6ee7b"
+    },
+    {
+      "path": "release/evidence/3.7.9/orchestrator-state.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 797,
+      "sha256": "21cf47001be135707999b5601d3a77613be7de5f4a75eb9a67fc9160f1d67f15"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-01-baseline.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 1356,
+      "sha256": "a7a988d5044f93e700d4f5aa30a704856e273069a0b5e473a5d773773a88a5b3"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-02-v378-forensics.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 3960,
+      "sha256": "d49b3f8c9a78fb646d5975a5286669367cb4e34440f0c3cfe10ea817c6c9aad9"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-03-threat-model.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 2962,
+      "sha256": "4825544eafc87b202715f10bed17a389e9fc65c424015796c966b7c7927eb806"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-04-fix.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 2337,
+      "sha256": "23faf1ceaff9f925e136941064035f94547253cfd577fd8d67afc1d60d3a418f"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-05-candidate.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 2522,
+      "sha256": "552d9323442c63efb2b943362a604c574d26b68ebc017a596b6f499afcb3811f"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-06-ci-merge.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 1007,
+      "sha256": "12cb83e994ee0813ba1e7c9518890e15c5f6aace0bdd67a957ba8b69f2fd6bc1"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-07-publication.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 585,
+      "sha256": "547ac7540e7adb94b3e0939ea59f76417c173b81fa59f9d18d615abfe9c273a3"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-08-public-readback.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 1613,
+      "sha256": "a0c578424b55a6f3286287c1c9ede541b0a8059a731e2f91014236d80d70ccb9"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-09-prxmx.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 1578,
+      "sha256": "a840f1fcba1580efa72c71a030c6273e0c96270509ef29e64798d32f4099acc0"
+    },
+    {
+      "path": "release/evidence/3.7.9/phase-10-governance.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 1001,
+      "sha256": "cc27e625683d349871a87a6aa04fa80295f7144ee3864cd204b02fd5f0bcd793"
+    },
+    {
+      "path": "release/evidence/3.7.9/sbom/power-framework-3.7.9.prepublication.cdx.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 15023,
+      "sha256": "e493c236d5d54633412758d61433d4a763997c3980d8133bf0a90e0d357030cb"
+    },
+    {
+      "path": "release/evidence/3.7.9/sbom/power-framework-3.7.9.prepublication.spdx.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 28623,
+      "sha256": "ad5ea26c9fe7c01ce26f1246f8d6dbe19effed3861b5409c95b308147cf5affa"
+    },
+    {
+      "path": "release/evidence/3.7.9/v378-binding-matrix.json",
+      "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
+      "size_bytes": 4908,
+      "sha256": "8ecb69927b14aa05e28142056777bf8ce2d0c4014445de4fadd4e3258b711083"
     }
   ],
   "release_boundary": {

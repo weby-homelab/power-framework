@@ -16,6 +16,16 @@
   "release_permissions_scope": "job",
   "release_write_permissions_isolated_to_release_job": true,
   "credential_handling": {"ghcr_login_isolated": true, "temporary_docker_logout_present": true, "authorization_headers_not_persisted_to_artifacts": true, "secrets_echoed": false},
+  "attestation_policy": {
+    "repository_scope_flag": "--repo",
+    "signer_workflow_scope_flag": "--signer-workflow",
+    "signer_workflow_identity_includes_repository": true,
+    "predicate_type_scope_flag": "--predicate-type",
+    "exact_subject_and_provenance_verifier": "scripts/verify_attestation_provenance.py",
+    "raw_attestation_outputs_uploaded": false,
+    "sanitized_policy_summaries_uploaded": true,
+    "raw_attestation_outputs_scope": "runner temp only"
+  },
   "shell_fail_closed_contracts_present": true,
   "critical_workflow_regression_tests": "tests/test_ci_policy.py",
   "security_changes_required_for_v3.7.10_rewrite": false

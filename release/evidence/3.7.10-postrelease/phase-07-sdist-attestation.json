@@ -6,7 +6,8 @@
   "verification_method": "gh attestation verify --repo weby-homelab/power-framework --format json",
   "verification_checked_at": "2026-08-31T17:47:55Z",
   "verification_output_sha256": "db4b9c601816103ee35969abc4e430ac08303bb71334d41ebd5cfdab5653bca6",
-  "verification_output_scope": "sdist command output; byte-identical to the wheel command output in the same rerun",
+  "verification_output_scope": "complete sdist-command JSON result; byte-identical to the wheel-command result because one package attestation covers both subjects; this is not the sdist artifact digest",
+  "verification_output_is_not_artifact_digest": true,
   "predicate_type": "https://slsa.dev/provenance/v1",
   "observed_attestations": [
     {"attestation_id": null, "attestation_id_status": "AMBIGUOUS_NOT_EXPOSED_BY_GH_ATTESTATION_VERIFY_OUTPUT", "workflow_run_id": 33391322565, "attempt": 1, "event": "workflow_dispatch", "workflow_ref": "refs/heads/main", "workflow_sha": "6cab9f63e4a926996fa141d245a9863a5073ca32", "subjects": [{"name": "power_framework-3.7.10-py3-none-any.whl", "sha256": "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2"}, {"name": "power_framework-3.7.10.tar.gz", "sha256": "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae"}], "verified_timestamp": "2026-08-31T12:27:21Z"},

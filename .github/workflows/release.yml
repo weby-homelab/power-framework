@@ -477,7 +477,7 @@ jobs:
         run: |
           set -euo pipefail
           install -d -m 700 "$RELEASE_CONTROL_ROOT"
-          for file in scripts/release_bindings.py scripts/verify_public_release_bindings.py; do
+          for file in scripts/release_bindings.py scripts/verify_public_release_bindings.py scripts/verify_attestation_provenance.py; do
             gh api "repos/${GITHUB_REPOSITORY}/contents/${file}?ref=${RELEASE_CONTROL_REF}" \
               --jq '.content' |
               base64 --decode > "$RELEASE_CONTROL_ROOT/${file##*/}"
@@ -1186,19 +1186,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/power-release-docker-config
           GHCR_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
+          ATTESTATION_POLICY_ROOT: ${{ runner.temp }}/power-attestation-policy
+          ATTESTATION_PREDICATE_TYPE: https://slsa.dev/provenance/v1
+          SIGNER_WORKFLOW_PATH: .github/workflows/release.yml
           WEB_IMAGE_REF: ${{ steps.web_image.outputs.final_reference }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
         run: |
           set -euo pipefail
           readback_dir="$RUNNER_TEMP/power-public-readback"
+          version="${RELEASE_TAG#v}"
+          wheel_path="$readback_dir/power_framework-${version}-py3-none-any.whl"
+          sdist_path="$readback_dir/power_framework-${version}.tar.gz"
+          wheel_sha="$(sha256sum -- "$wheel_path" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          sdist_sha="$(sha256sum -- "$sdist_path" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          mkdir -p "$ATTESTATION_POLICY_ROOT"
           gh attestation verify \
-            "$readback_dir/power_framework-${RELEASE_TAG#v}-py3-none-any.whl" \
+            "$wheel_path" \
             --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/$SIGNER_WORKFLOW_PATH" \
+            --predicate-type "$ATTESTATION_PREDICATE_TYPE" \
             --format json \
             > "$RUNNER_TEMP/power-wheel-attestation.json"
           gh attestation verify \
-            "$readback_dir/power_framework-${RELEASE_TAG#v}.tar.gz" \
+            "$sdist_path" \
             --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/$SIGNER_WORKFLOW_PATH" \
+            --predicate-type "$ATTESTATION_PREDICATE_TYPE" \
             --format json \
             > "$RUNNER_TEMP/power-sdist-attestation.json"
           install -d -m 700 "$DOCKER_CONFIG"
@@ -1207,11 +1220,50 @@ jobs:
           gh attestation verify \
             "oci://${WEB_IMAGE_REF}@${WEB_IMAGE_DIGEST}" \
             --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/$SIGNER_WORKFLOW_PATH" \
+            --predicate-type "$ATTESTATION_PREDICATE_TYPE" \
             --bundle-from-oci \
             --format json \
             > "$RUNNER_TEMP/power-web-attestation.json"
           docker logout ghcr.io
           trap - EXIT
+
+          uv run python "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" \
+            --input "$RUNNER_TEMP/power-wheel-attestation.json" \
+            --output "$ATTESTATION_POLICY_ROOT/wheel.json" \
+            --subject-name "$(basename "$wheel_path")" \
+            --subject-digest "$wheel_sha" \
+            --predicate-type "$ATTESTATION_PREDICATE_TYPE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow "$SIGNER_WORKFLOW_PATH" \
+            --source-revision "$GITHUB_SHA" \
+            --event "$GITHUB_EVENT_NAME" \
+            --ref "$GITHUB_REF" \
+            --run-id "$GITHUB_RUN_ID"
+          uv run python "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" \
+            --input "$RUNNER_TEMP/power-sdist-attestation.json" \
+            --output "$ATTESTATION_POLICY_ROOT/sdist.json" \
+            --subject-name "$(basename "$sdist_path")" \
+            --subject-digest "$sdist_sha" \
+            --predicate-type "$ATTESTATION_PREDICATE_TYPE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow "$SIGNER_WORKFLOW_PATH" \
+            --source-revision "$GITHUB_SHA" \
+            --event "$GITHUB_EVENT_NAME" \
+            --ref "$GITHUB_REF" \
+            --run-id "$GITHUB_RUN_ID"
+          uv run python "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" \
+            --input "$RUNNER_TEMP/power-web-attestation.json" \
+            --output "$ATTESTATION_POLICY_ROOT/web.json" \
+            --subject-name "ghcr.io/weby-homelab/power-framework-web" \
+            --subject-digest "$WEB_IMAGE_DIGEST" \
+            --predicate-type "$ATTESTATION_PREDICATE_TYPE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow "$SIGNER_WORKFLOW_PATH" \
+            --source-revision "$GITHUB_SHA" \
+            --event "$GITHUB_EVENT_NAME" \
+            --ref "$GITHUB_REF" \
+            --run-id "$GITHUB_RUN_ID"
 
       - name: Upload release evidence on success or failure
         if: always()
@@ -1222,8 +1274,6 @@ jobs:
             dist/
             ${{ runner.temp }}/power-public-readback/
             ${{ runner.temp }}/power-public-bindings.json
-            ${{ runner.temp }}/power-wheel-attestation.json
-            ${{ runner.temp }}/power-sdist-attestation.json
-            ${{ runner.temp }}/power-web-attestation.json
+            ${{ runner.temp }}/power-attestation-policy/
           if-no-files-found: ignore
           retention-days: 14

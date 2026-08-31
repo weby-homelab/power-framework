@@ -64,6 +64,24 @@
     ],
     "published_v3.7.10_receipt_rewritten": false
   },
+  "future_attestation_verification_contract": {
+    "gh_repository_scope_flag": "--repo",
+    "gh_signer_workflow_scope_flag": "--signer-workflow",
+    "gh_signer_workflow_identity_includes_repository": true,
+    "gh_predicate_type_scope_flag": "--predicate-type",
+    "exact_policy_fields": [
+      "subject name and SHA-256",
+      "predicate type",
+      "signer repository and workflow certificate SAN",
+      "source revision",
+      "workflow event",
+      "workflow ref",
+      "workflow run ID"
+    ],
+    "policy_verifier": "scripts/verify_attestation_provenance.py",
+    "raw_gh_json_persistence": "runner temp only",
+    "uploaded_attestation_persistence": "sanitized policy summaries only"
+  },
   "fully_successful_release_workflow_run_id": null,
   "interpretation": "The public release was created by run 33391322565, whose publication step succeeded but whose overall workflow failed at a later readback gate. The release is independently valid by fresh public verification; no workflow result is misreported as fully successful."
 }

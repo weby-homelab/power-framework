@@ -51,7 +51,8 @@ SYSTEM_PREFIXES = (
 DEFAULT_REPO = "weby-homelab/power-framework"
 DEFAULT_REF = "latest"
 HOME = Path.home()
-DEFAULT_VAULT = HOME / "brain"
+GEMINICLI_ROOT = HOME / "geminicli"
+DEFAULT_VAULT = GEMINICLI_ROOT / "brain"
 DEFAULT_STATE_DIR = HOME / ".local" / "share" / "power" / "audit"
 MAX_RELEASE_WHEEL_BYTES = 100 * 1024 * 1024
 MAX_RELEASE_MANIFEST_BYTES = 10 * 1024 * 1024
@@ -61,11 +62,11 @@ MAX_RELEASE_PYPROJECT_BYTES = 1 * 1024 * 1024
 DEFAULT_VENV_ROOTS = [
     str(HOME / ".config" / "opencode"),
     str(HOME / ".local" / "share" / "power"),
-    str(HOME / "projects"),
+    str(GEMINICLI_ROOT / "projects"),
 ]
 
 DEFAULT_SKILL_TARGETS = [
-    str(HOME / ".agents" / "skills" / "power"),
+    str(GEMINICLI_ROOT / ".agents" / "skills" / "power"),
     str(HOME / ".opencode" / "skills" / "power"),
     str(HOME / ".config" / "opencode" / "skills" / "power"),
     str(HOME / ".gemini" / "config" / "skills" / "power"),
@@ -73,7 +74,7 @@ DEFAULT_SKILL_TARGETS = [
 ]
 
 ALLOWED_SKILL_TARGET_ROOTS = [
-    HOME / ".agents" / "skills",
+    GEMINICLI_ROOT / ".agents" / "skills",
     HOME / ".opencode" / "skills",
     HOME / ".config" / "opencode" / "skills",
     HOME / ".gemini" / "config" / "skills",

@@ -18,7 +18,8 @@
     "state": "open",
     "merged": false,
     "merge_state": "blocked",
-    "required_review_decision": "REVIEW_REQUIRED"
+    "required_review_decision": "REVIEW_REQUIRED",
+    "head_at_latest_public_readback": "1bca7ff5471095bdf9461e0d1a477c0f0087e78e"
   },
   "verdicts": {
     "release_validity": "PASS",
@@ -90,5 +91,5 @@
   "v3.7.11_created": false,
   "power_3_8_started": false,
   "final_main_sha_note": "This is the last verified public main SHA; the closure PR is not merged, so no closure merge SHA is claimed.",
-  "next_development_cycle": "NO-GO until OWNER-ACTION-001 and OWNER-ACTION-002 are completed, then post-merge verification passes"
+  "next_development_cycle": "NO-GO: OWNER-ACTION-001 (authorized PRXMX read-only audit) and OWNER-ACTION-002 (independent maintainer approval and normal protected merge of PR #381) must both complete; then Phase 32 post-merge verification and Phase 33 clean-room audit must pass"
 }

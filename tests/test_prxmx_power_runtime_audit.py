@@ -22,6 +22,7 @@ from scripts.prxmx_power_runtime_audit import (
     DEFAULT_SKILL_TARGETS,
     DEFAULT_VAULT,
     DEFAULT_VENV_ROOTS,
+    GEMINICLI_ROOT,
     MAX_RELEASE_WHEEL_BYTES,
     MAX_WRAPPER_DEPTH,
     AuditReport,
@@ -198,7 +199,13 @@ def test_default_mcp_configs_matches_prxmx_canonical_paths() -> None:
 
 def test_default_audit_paths_are_home_relative_and_not_host_specific() -> None:
     home = Path.home()
-    assert home / "brain" == DEFAULT_VAULT
+    assert home / "geminicli" == GEMINICLI_ROOT
+    assert GEMINICLI_ROOT / "brain" == DEFAULT_VAULT
+    assert str(GEMINICLI_ROOT / "projects") in DEFAULT_VENV_ROOTS
+    assert str(GEMINICLI_ROOT / ".agents" / "skills" / "power") in DEFAULT_SKILL_TARGETS
+    assert GEMINICLI_ROOT / ".agents" / "skills" in ALLOWED_SKILL_TARGET_ROOTS
+    assert home / "brain" != DEFAULT_VAULT
+    assert str(home / "projects") not in DEFAULT_VENV_ROOTS
     assert all(Path(path).is_relative_to(home) for path in DEFAULT_VENV_ROOTS)
     assert all(Path(path).is_relative_to(home) for path in DEFAULT_SKILL_TARGETS)
     assert all(path.is_relative_to(home) for path in ALLOWED_SKILL_TARGET_ROOTS)

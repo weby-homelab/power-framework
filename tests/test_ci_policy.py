@@ -166,6 +166,7 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
         "${{ runner.temp }}/power-release-control"
     )
     assert "base64 --decode" in control_fetch["run"]
+    assert "scripts/verify_attestation_provenance.py" in control_fetch["run"]
     receipt_step = next(
         step
         for step in jobs["release"]["steps"]
@@ -390,6 +391,17 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     )
     assert "gh attestation verify" in attestation_step["run"]
     assert "--bundle-from-oci" in attestation_step["run"]
+    assert attestation_step["run"].count('--repo "$GITHUB_REPOSITORY"') == 3
+    assert attestation_step["run"].count("--signer-workflow") == 3
+    assert attestation_step["run"].count("--predicate-type") == 6
+    assert "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" in attestation_step["run"]
+    assert attestation_step["run"].count("--subject-name") == 3
+    assert attestation_step["run"].count("--subject-digest") == 3
+    assert attestation_step["run"].count("--repository") == 3
+    assert '--source-revision "$GITHUB_SHA"' in attestation_step["run"]
+    assert '--event "$GITHUB_EVENT_NAME"' in attestation_step["run"]
+    assert '--ref "$GITHUB_REF"' in attestation_step["run"]
+    assert '--run-id "$GITHUB_RUN_ID"' in attestation_step["run"]
     assert "docker login ghcr.io" in attestation_step["run"]
     assert "docker logout ghcr.io" in attestation_step["run"]
 
@@ -416,6 +428,13 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     assert evidence_step["if"] == "always()"
     assert evidence_step["with"]["if-no-files-found"] == "ignore"
     assert "dist/" in evidence_step["with"]["path"]
+    assert "power-attestation-policy/" in evidence_step["with"]["path"]
+    for raw_output in (
+        "power-wheel-attestation.json",
+        "power-sdist-attestation.json",
+        "power-web-attestation.json",
+    ):
+        assert raw_output not in evidence_step["with"]["path"]
 
     final_tag_run = steps[final_tag_index]["run"]
     for required in (

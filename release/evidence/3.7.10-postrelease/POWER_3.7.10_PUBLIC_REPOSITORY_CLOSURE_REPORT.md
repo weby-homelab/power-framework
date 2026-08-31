@@ -15,8 +15,12 @@ independent approval that the current actor cannot provide.
 - Final report snapshot commit: `2c645598e8876c551e1f0cbd8c34a70764876dce`
 - Subsequent inventory-timing clarification: `e0fc3f3a198373cedf2cbcbc3f1068ec5466b6bf`
 - Closure PR: `https://github.com/weby-homelab/power-framework/pull/381`
-- Pre-existing untracked `v3.7.9` forensic artifacts are WS-local-only, were
-  preserved byte-for-byte, and were never staged or treated as public evidence.
+- Latest public PR readback head in the closure evidence: `1bca7ff5471095bdf9461e0d1a477c0f0087e78e`.
+- The complete pre-existing untracked `v3.7.9` forensic inventory contains 17
+  files, including ignored nested JSON/SBOM files. They are WS-local-only,
+  preserved byte-for-byte, never staged, and never treated as public evidence;
+  paths, sizes, hashes, and the inventory timestamp are recorded in
+  `phase-00-baseline.json` and `phase-16-18-repository-hygiene.json`.
 
 ## V3.7.10 RELEASE
 
@@ -82,6 +86,13 @@ identity, but did not expose a stable attestation ID for each observed bundle.
 Observed entries therefore carry `attestation_id=null` and an explicit
 `AMBIGUOUS_NOT_EXPOSED_BY_GH_ATTESTATION_VERIFY_OUTPUT` status. The separate
 published manifest/receipt IDs and package/Web roles remain exact.
+The wheel and sdist verification output hash is explicitly a combined package
+attestation result hash; it is not either artifact digest. Future release runs
+now pass explicit `--repo`, repository-qualified `--signer-workflow`, and
+`--predicate-type` controls, then apply the repository policy verifier to exact
+subject, predicate, signer, source revision, event, ref, and run ID. Raw
+verification JSON remains runner-temp-only; only sanitized policy summaries are
+eligible for the final evidence artifact.
 The authenticated OCI Distribution API returned HTTP 200 and the full digest:
 
 `sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1`
@@ -158,6 +169,8 @@ evidence was retained; no temporary artifact was deleted.
   project environment.
 - Remaining `BLK-0002`: PRXMX authorization boundary; `OWNER-ACTION-001`.
 - Remaining `BLK-0005`: protected PR approval boundary; `OWNER-ACTION-002`.
+  The latest public readback recorded PR #381 head `1bca7ff5471095bdf9461e0d1a477c0f0087e78e`
+  with all required checks passed and `reviewDecision=REVIEW_REQUIRED`.
 
 ## TESTS / HASHES / DIGESTS
 
@@ -170,7 +183,8 @@ attestation signature was persisted.
 
 Final public main SHA currently verified: `1a9879ee2353d63d979da5f68e79a6065122343b`.
 This is not a closure merge SHA because PR #381 is open and blocked. **NO-GO**
-until `OWNER-ACTION-001` and `OWNER-ACTION-002` are completed, an independent
-maintainer normally merges PR #381, and Phase 32 post-merge verification plus
-Phase 33 independent clean-room audit complete. No `v3.7.11` was created and
-no POWER 3.8 work was started.
+until `OWNER-ACTION-001` (authorized PRXMX read-only audit) and
+`OWNER-ACTION-002` (independent maintainer approval and normal protected merge
+of PR #381) are both completed, followed by Phase 32 post-merge verification
+and Phase 33 independent clean-room audit. No `v3.7.11` was created and no
+POWER 3.8 work was started.
