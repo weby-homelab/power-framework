@@ -46,7 +46,41 @@ def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:
     sdist.write_bytes(b"sdist bytes from the frozen candidate")
     package_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"package"}\n')
     web_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"web"}\n')
-    profile.write_bytes(b'{"version":"3.7.9","image_digest":"' + IMAGE_DIGEST.encode() + b'"}\n')
+    profile.write_text(
+        json.dumps(
+            {
+                "schema": "power.profile.acceptance.v1",
+                "version": "3.7.9",
+                "acceptance_harness_revision": COMMIT,
+                "image_digest": IMAGE_DIGEST,
+                "profile_a": {
+                    "native_cli": True,
+                    "native_mcp_stdio": True,
+                    "docker_web_containers": 0,
+                },
+                "profile_b": {
+                    "web_health": True,
+                    "web_authenticated_read": True,
+                    "web_semantic_non_fallback": True,
+                    "web_reranked_non_fallback": True,
+                    "web_governed_mutation": True,
+                    "host_cli_readback": True,
+                    "host_mcp_readback": True,
+                    "same_canonical_vault": True,
+                    "cache_delete_rebuild": True,
+                    "container_user": "10001:10001",
+                    "cap_drop_all": True,
+                    "read_only_rootfs": True,
+                    "web_mcp_services": 0,
+                    "web_applicationservice_bypass_count": 0,
+                },
+                "image": "ghcr.io/weby-homelab/power-framework-web:3.7.9@" + IMAGE_DIGEST,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     manifest = {
         "schema": "power.release.manifest.v1",
@@ -77,7 +111,7 @@ def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:
     checksum_files = [wheel, sdist, package_sbom, web_sbom, profile, manifest_path]
     _write_checksums(checksums_path, checksum_files)
 
-    receipt_path = tmp_path / "power-framework.release-receipt.json"
+    receipt_path = asset_dir / "power-framework.release-receipt.json"
     receipt = {
         "schema_version": 2,
         "release": {"tag": TAG, "commit": COMMIT},
@@ -123,7 +157,7 @@ def _refresh_manifest_receipt_and_checksum(paths: dict[str, Path | str]) -> None
     files = [
         path
         for path in Path(paths["asset_dir"]).iterdir()
-        if path.is_file() and path.name not in {checksum_path.name}
+        if path.is_file() and path.name not in {checksum_path.name, Path(paths["receipt"]).name}
     ]
     _write_checksums(checksum_path, files)
 
@@ -142,6 +176,35 @@ def _verify(paths: dict[str, Path | str]) -> dict[str, Any]:
 def test_valid_frozen_release_binding_passes(tmp_path: Path) -> None:
     result = _verify(_write_fixture(tmp_path))
     assert result["status"] == "verified"
+
+
+def test_required_manifest_filename_cannot_be_omitted(tmp_path: Path) -> None:
+    paths = _write_fixture(tmp_path)
+    _rewrite_manifest(paths, lambda data: data["artifacts"]["power_wheel"].pop("filename"))
+    _refresh_manifest_receipt_and_checksum(paths)
+    with pytest.raises(ValueError, match=r"power_wheel.*filename"):
+        _verify(paths)
+
+
+def test_release_receipt_schema_must_be_v2(tmp_path: Path) -> None:
+    paths = _write_fixture(tmp_path)
+    receipt_path = Path(paths["receipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["schema_version"] = 1
+    receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="schema_version"):
+        _verify(paths)
+
+
+def test_release_receipt_must_be_inside_public_asset_directory(tmp_path: Path) -> None:
+    paths = _write_fixture(tmp_path)
+    receipt_path = Path(paths["receipt"])
+    external_receipt = tmp_path / receipt_path.name
+    external_receipt.write_bytes(receipt_path.read_bytes())
+    paths["receipt"] = external_receipt
+
+    with pytest.raises(ValueError, match="inside the public asset directory"):
+        _verify(paths)
 
 
 def test_manifest_wheel_sha_mismatch_fails_closed(tmp_path: Path) -> None:

@@ -53,11 +53,18 @@ GHCR digest. A missing or contradictory identity is a public-release NO-GO.
 
 ## Recovery policy
 
-Manual `workflow_dispatch` is validation-only. It cannot republish an existing
-tag or release, because a new attestation identity or image digest would not be
-the same immutable release object. Publication is allowed only from the one
-validated signed tag push; a failed publication must preserve evidence and use a
-new corrective patch version after the workflow is fixed.
+Manual `workflow_dispatch` is a narrowly scoped immutable recovery path for an
+existing signed annotated tag. It may complete publication only for the exact
+requested tag after signed-tag admission and authenticated API checks prove that
+no GitHub Release exists for that tag.
+
+Recovery never creates, moves, force-updates, or deletes a Git tag, and never
+edits or replaces an existing GitHub Release. If a Release exists—or any
+identity check is inconclusive—the workflow fails closed. The checkout, package,
+Web image, SBOMs, attestations, manifest, receipt, and readback remain bound to
+the admitted annotated tag object and peeled commit. A failed publication must
+preserve its evidence; a later corrective release uses a new patch tag, while
+the historical `v3.7.8` tag and release remain untouched.
 
 ## Status boundary
 

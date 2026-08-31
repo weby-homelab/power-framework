@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 WORKFLOWS_DIR = Path(__file__).resolve().parent.parent / ".github" / "workflows"
 REPO_ROOT = WORKFLOWS_DIR.parent.parent
 FORBIDDEN_WORKFLOW_PATTERNS = ("continue-on-error", "|| true", "/root/gemma/brain")
@@ -76,6 +78,7 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "dist/*.spdx.json" in release_text
     assert "Generate package SPDX SBOM bound to the exact wheel" in release_text
     assert "Generate Web SPDX SBOM bound to the exact image" in release_text
+    assert release_text.count("upload-release-assets: false") == 2
     assert (
         "image: ${{ steps.web_image.outputs.reference }}@${{ steps.web_image.outputs.digest }}"
         in release_text
@@ -84,12 +87,11 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "subject-digest:" in release_text
     assert "scripts/profile_acceptance.py" in release_text
     assert "Prefetch locked model snapshots for real Web acceptance" in release_text
-    assert "Checkout current acceptance harness for tag recovery" in release_text
-    assert "path: ${{ runner.temp }}/.release-acceptance-harness" in release_text
     assert "ACCEPTANCE_HARNESS_ROOT" in release_text
     assert "Verify acceptance harness revision" in release_text
     assert "ACCEPTANCE_HARNESS_REVISION" in release_text
-    assert "format('{0}/.release-acceptance-harness', runner.temp)" in release_text
+    assert "ACCEPTANCE_HARNESS_ROOT: ." in release_text
+    assert "Checkout current acceptance harness for tag recovery" not in release_text
     assert "Remove tag recovery harness checkout" not in release_text
     assert "rm -rf -- .release-acceptance-harness" not in release_text
     assert "--profile-evidence" in release_text
@@ -98,8 +100,14 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "gh release view" in release_text
     assert "GitHub release readback verified" in release_text
     assert "scripts/verify_public_release_bindings.py" in release_text
+    assert release_text.count("$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py") == 2
     assert "--expected-tag-target" in release_text
     assert "--attestation-subject" in release_text
+    assert 'header = "Authorization: Bearer ' in release_text
+    assert "Re-read immutable tag objects immediately before publication" in release_text
+    assert "gh release create" in release_text
+    assert "--verify-tag" in release_text
+    assert "softprops/action-gh-release" not in release_text
     assert release_text.index("Generate release receipt from frozen assets") < release_text.index(
         "Create GitHub Release"
     )
@@ -114,8 +122,50 @@ def test_release_package_sbom_scans_the_wheel_as_a_file() -> None:
 
 def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(release_text)
+    jobs = workflow["jobs"]
 
     assert "  validate:" in release_text
+    assert "signed_tag_admission" in jobs
+    admission = jobs["signed_tag_admission"]
+    assert admission["needs"] == "release_input"
+    assert admission["outputs"] == {
+        "tag_object": "${{ steps.admit.outputs.tag_object }}",
+        "tag_target": "${{ steps.admit.outputs.tag_target }}",
+    }
+    admission_run = next(
+        step["run"]
+        for step in admission["steps"]
+        if step.get("name") == "Admit exact signed annotated tag"
+    )
+    assert 'git verify-tag --raw "$RELEASE_TAG"' in admission_run
+    assert 'git verify-commit --raw "$local_tag_target"' in admission_run
+    assert 'git cat-file -t "$local_tag_object"' in admission_run
+    assert "uv run" not in admission_run
+    assert "pytest" not in admission_run
+    assert "scripts/" not in admission_run
+    assert (
+        admission["steps"][0]["with"]["ref"]
+        == "${{ format('refs/tags/{0}', needs.release_input.outputs.release_tag) }}"
+    )
+    assert admission["steps"][0]["with"]["persist-credentials"] is False
+    assert workflow["concurrency"]["group"] == (
+        "power-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+    )
+    for job_id in ("validate", "upgrade-matrix", "upgrade-matrix-aggregate", "release"):
+        needs = jobs[job_id]["needs"]
+        needs_set = {needs} if isinstance(needs, str) else set(needs)
+        assert "signed_tag_admission" in needs_set
+    control_fetch = next(
+        step
+        for step in jobs["release"]["steps"]
+        if step.get("name") == "Fetch exact release control verifier"
+    )
+    assert control_fetch["env"]["RELEASE_CONTROL_REF"] == "${{ github.sha }}"
+    assert control_fetch["env"]["RELEASE_CONTROL_ROOT"] == (
+        "${{ runner.temp }}/power-release-control"
+    )
+    assert "base64 --decode" in control_fetch["run"]
     assert (
         "uv sync --locked --group dev --extra web --extra semantic --extra rerank" in release_text
     )
@@ -128,8 +178,12 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "macos-latest" not in release_text
     assert "windows-latest" not in release_text
     assert "  upgrade-matrix-aggregate:" in release_text
-    assert "needs: [release_input, validate]" in release_text
-    assert "needs: [release_input, validate, upgrade-matrix-aggregate]" in release_text
+    assert "needs: [release_input, signed_tag_admission, validate]" in release_text
+    assert "needs: [release_input, signed_tag_admission, upgrade-matrix]" in release_text
+    assert (
+        "needs: [release_input, signed_tag_admission, validate, upgrade-matrix-aggregate]"
+        in release_text
+    )
     assert "--require-signed-tag" in release_text
     assert "Verify signed release tag and maintainer fingerprint" in release_text
     assert "Install the pinned maintainer release signing key" not in release_text
@@ -142,14 +196,21 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "Reject an existing GitHub release for this tag" in release_text
     assert "api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" in release_text
     assert "Unable to prove release absence" in release_text
-    assert "Reject mutable manual release recovery" in release_text
-    assert "Manual release recovery is validation-only" in release_text
+    assert "Validate immutable manual release recovery" in release_text
+    assert "Manual recovery is immutable; tag mutation is forbidden" in release_text
+    assert (
+        "Recovery may publish only the existing signed tag when no Release exists" in release_text
+    )
+    assert release_text.count('header = "Authorization: Bearer ') == 3
+    assert '"Authorization: Bearer ${GH_TOKEN}"' not in release_text
     assert "workflow_dispatch" in release_text
     assert "inputs.release_tag" in release_text
     assert "Validate the exact release tag checkout" in release_text
     assert '[[ "$RELEASE_TAG" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]' in release_text
     assert 'git ls-remote origin "refs/tags/${RELEASE_TAG}^{}"' in release_text
+    assert 'git ls-remote origin "refs/tags/${RELEASE_TAG}"' in release_text
     assert "REMOTE_TAG_TARGET" in release_text
+    assert "REMOTE_TAG_OBJECT" in release_text
     assert "permissions: {}" in release_text
     assert (
         "RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && needs.release_input.outputs.release_tag || github.ref_name }}"
@@ -160,6 +221,170 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "--pending-mandatory web-semantic-acceptance" in release_text
     assert "--pending-mandatory web-rerank-acceptance" in release_text
     assert "--pending-mandatory public-release-readback" in release_text
+
+
+def test_release_harness_and_publication_guards_are_tag_bound() -> None:
+    workflow = yaml.safe_load((WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8"))
+    release_job = workflow["jobs"]["release"]
+    steps = release_job["steps"]
+
+    harness_revision = next(
+        step for step in steps if step.get("name") == "Verify acceptance harness revision"
+    )
+    assert (
+        harness_revision["env"]["EXPECTED_HARNESS_REVISION"]
+        == "${{ needs.signed_tag_admission.outputs.tag_target }}"
+    )
+    profile_acceptance = next(
+        step
+        for step in steps
+        if step.get("name") == "Prove Profile A/B against the exact Web image"
+    )
+    assert (
+        profile_acceptance["env"]["ACCEPTANCE_HARNESS_REVISION"]
+        == "${{ needs.signed_tag_admission.outputs.tag_target }}"
+    )
+    assert profile_acceptance["env"]["ACCEPTANCE_HARNESS_ROOT"] == "."
+
+    registry_step = next(
+        step for step in steps if step.get("name") == "Authenticate and publish Web-only image"
+    )
+    assert registry_step["env"]["DOCKER_CONFIG"] == (
+        "${{ runner.temp }}/power-release-docker-config"
+    )
+    assert "GH_TOKEN" in registry_step["env"]
+    assert "docker login ghcr.io" in registry_step["run"]
+    assert "docker buildx build" in registry_step["run"]
+    assert "trap 'docker logout ghcr.io' EXIT" in registry_step["run"]
+    assert "docker logout ghcr.io" in registry_step["run"]
+    assert "STAGING_IMAGE_REF" in registry_step["env"]
+    promote_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Promote exact Web image digest to release tag"
+    )
+    promote_step = steps[promote_index]
+    assert promote_step["env"]["SOURCE_IMAGE_REF"] == "${{ steps.web_image.outputs.reference }}"
+    assert promote_step["env"]["FINAL_IMAGE_REF"] == (
+        "${{ steps.web_image.outputs.final_reference }}"
+    )
+    assert "ghcr.io/token?service=ghcr.io" in promote_step["run"]
+    assert "Unable to establish GHCR release tag state" in promote_step["run"]
+    assert "docker buildx imagetools create" in promote_step["run"]
+    assert '"${SOURCE_IMAGE_REF}@${WEB_IMAGE_DIGEST}"' in promote_step["run"]
+    assert "docker logout ghcr.io" in promote_step["run"]
+    assert "DOCKER_CONFIG" not in release_job.get("env", {})
+    assert "POWER_RELEASE_GHCR_TOKEN" not in "\n".join(
+        str(step.get("run", "")) for step in steps[promote_index + 1 :]
+    )
+
+    final_absence_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Reconfirm authenticated release absence before publication"
+    )
+    final_tag_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Re-read immutable tag objects immediately before publication"
+    )
+    create_index = next(
+        index for index, step in enumerate(steps) if step.get("name") == "Create GitHub Release"
+    )
+    assert final_absence_index + 1 == final_tag_index
+    assert final_tag_index + 1 == create_index
+
+    post_create_tag_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Verify public tag binding after release creation"
+    )
+    assert create_index + 1 == post_create_tag_index
+    assert post_create_tag_index + 1 == next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Read back GitHub release metadata and assets"
+    )
+
+    public_binding_step = next(
+        step
+        for step in steps
+        if step.get("name") == "Verify public asset checksums, manifest bindings, and OCI readback"
+    )
+    assert '"$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py"' in public_binding_step["run"]
+    assert 'verified_image_digest"' in public_binding_step["run"]
+    assert 'registry_digest" = "$verified_image_digest"' in public_binding_step["run"]
+
+    attestation_step = next(
+        step for step in steps if step.get("name") == "Verify public artifact and Web attestations"
+    )
+    assert "gh attestation verify" in attestation_step["run"]
+    assert "--bundle-from-oci" in attestation_step["run"]
+    assert "docker login ghcr.io" in attestation_step["run"]
+    assert "docker logout ghcr.io" in attestation_step["run"]
+
+    evidence_step = next(
+        step
+        for step in steps
+        if step.get("name") == "Upload release evidence on success or failure"
+    )
+    assert evidence_step["if"] == "always()"
+    assert evidence_step["with"]["if-no-files-found"] == "ignore"
+    assert "dist/" in evidence_step["with"]["path"]
+
+    final_tag_run = steps[final_tag_index]["run"]
+    for required in (
+        'git ls-remote origin "$tag_ref"',
+        'git ls-remote origin "${tag_ref}^{}"',
+        'git rev-parse --verify "${tag_ref}^{tag}"',
+        'git rev-parse --verify "${tag_ref}^{commit}"',
+        'git cat-file -t "$remote_tag_object"',
+        '"$remote_tag_object" = "$EXPECTED_TAG_OBJECT"',
+        '"$remote_tag_target" = "$EXPECTED_TAG_TARGET"',
+    ):
+        assert required in final_tag_run
+
+    create_step = steps[create_index]
+    token_key = "GH" + "_TOKEN"
+    github_token_expression = "${{" + " github.token }}"
+    assert create_step["env"][token_key] == github_token_expression
+    assert 'gh release create "$RELEASE_TAG"' in create_step["run"]
+    assert "--verify-tag" in create_step["run"]
+    for forbidden in ("git push", "gh release edit", "gh release delete", "git tag "):
+        assert forbidden not in create_step["run"]
+
+
+def test_every_checkout_disables_persisted_credentials() -> None:
+    for workflow_path in WORKFLOWS_DIR.glob("*.yml"):
+        workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+        for job in workflow.get("jobs", {}).values():
+            for step in job.get("steps", []):
+                if str(step.get("uses", "")).startswith("actions/checkout@"):
+                    assert step.get("with", {}).get("persist-credentials") is False, (
+                        f"{workflow_path.name} checkout must not persist credentials"
+                    )
+
+
+def test_release_runner_context_is_scoped_to_steps() -> None:
+    """Job-level expressions cannot access runner.temp during workflow validation."""
+
+    workflow = yaml.safe_load((WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8"))
+    release_job = workflow["jobs"]["release"]
+    job_environment = release_job["env"]
+    signed_step = next(
+        step
+        for step in release_job["steps"]
+        if step.get("name") == "Verify signed release tag and maintainer fingerprint"
+    )
+    baseline_step = next(
+        step
+        for step in release_job["steps"]
+        if step.get("name") == "Generate and verify tag-bound release baseline"
+    )
+
+    assert "GNUPGHOME" not in job_environment
+    assert signed_step["env"]["GNUPGHOME"] == "${{ runner.temp }}/power-release-gnupg"
+    assert baseline_step["env"]["GNUPGHOME"] == "${{ runner.temp }}/power-release-gnupg"
 
 
 def test_release_does_not_require_private_phase8_secrets() -> None:
@@ -193,13 +418,15 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "--skipped-optional real-vault-quality" in release_text
     assert "run_outcome_benchmark.py" in release_text
     assert "run_continuity_benchmark.py" in release_text
-    assert "scripts/generate_release_validation.py" in release_text
+    assert (
+        "from scripts.generate_release_validation import build_validation_receipt" in release_text
+    )
     assert "scripts/generate_release_gate_manifest.py" in release_text
     assert "scripts/build_release_manifest.py" in release_text
     assert '--commit "$commit"' in release_text
     assert "power-release-gates.json" in release_text
     assert "power-release-validation.json" in release_text
-    assert "--gate-manifest" in release_text
+    assert "gate_manifest" in release_text
     assert '--junitxml="$RUNNER_TEMP/power-release-junit.xml"' in release_text
     assert '--cov-report=json:"$RUNNER_TEMP/power-release-coverage.json"' in release_text
     assert "power-release-phase8-technical-receipts" in release_text
