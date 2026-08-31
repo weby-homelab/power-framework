@@ -366,7 +366,7 @@ def build_interrupted_upgrade_matrix(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--from-version", default="3.7.8")
+    parser.add_argument("--from-version", default="3.7.9")
     parser.add_argument("--to-version", default="3.7.10")
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
