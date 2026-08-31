@@ -68,7 +68,41 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
     sdist.write_bytes(b"\x1f\x8b\x08\x00power_framework sdist content 3.7.9 candidate")
     package_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"power-framework"}\n')
     web_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"power-web"}\n')
-    profile.write_bytes(b'{"version":"3.7.9","image_digest":"' + IMAGE_DIGEST.encode() + b'"}\n')
+    profile.write_text(
+        json.dumps(
+            {
+                "schema": "power.profile.acceptance.v1",
+                "version": "3.7.9",
+                "acceptance_harness_revision": COMMIT,
+                "image_digest": IMAGE_DIGEST,
+                "profile_a": {
+                    "native_cli": True,
+                    "native_mcp_stdio": True,
+                    "docker_web_containers": 0,
+                },
+                "profile_b": {
+                    "web_health": True,
+                    "web_authenticated_read": True,
+                    "web_semantic_non_fallback": True,
+                    "web_reranked_non_fallback": True,
+                    "web_governed_mutation": True,
+                    "host_cli_readback": True,
+                    "host_mcp_readback": True,
+                    "same_canonical_vault": True,
+                    "cache_delete_rebuild": True,
+                    "container_user": "10001:10001",
+                    "cap_drop_all": True,
+                    "read_only_rootfs": True,
+                    "web_mcp_services": 0,
+                    "web_applicationservice_bypass_count": 0,
+                },
+                "image": "ghcr.io/weby-homelab/power-framework-web:3.7.9@" + IMAGE_DIGEST,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     baseline.write_bytes(b'{"schema":"power.release.baseline.v1","version":"3.7.9"}\n')
 
     manifest = {
@@ -401,7 +435,9 @@ def test_attack_6_web_attestation_subject_tampered(tmp_path: Path) -> None:
 def test_attack_6_profile_evidence_image_digest_mismatch(tmp_path: Path) -> None:
     """Attack 6b: Profile evidence image digest differs from manifest web image digest."""
     fix = _write_full_fixture(tmp_path)
-    fix["profile"].write_bytes(b'{"version":"3.7.9","image_digest":"sha256:' + b"8" * 64 + b'"}\n')
+    profile_data = json.loads(fix["profile"].read_text(encoding="utf-8"))
+    profile_data["image_digest"] = "sha256:" + "8" * 64
+    fix["profile"].write_text(json.dumps(profile_data, sort_keys=True) + "\n", encoding="utf-8")
 
     files = [
         fix["wheel"],
