@@ -17,7 +17,7 @@ def test_release_manifest_has_one_native_profile_and_web_adapter() -> None:
     assert manifest["schema"] == "power.release.manifest.template.v1"
     assert manifest["authority"] == "candidate-only"
     assert manifest["generated_manifest"] == "dist/power-release-manifest.json"
-    assert manifest["version"] == "3.7.9"
+    assert manifest["version"] == "3.7.10"
     assert manifest["artifacts"] == {}
     assert manifest["profiles"]["native"] == ["power", "power-mcp"]
     assert manifest["profiles"]["web"] == ["power-web"]

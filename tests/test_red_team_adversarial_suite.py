@@ -1,4 +1,4 @@
-"""Red Team Adversarial Test Suite for POWER 3.7.9 Release Verification.
+"""Red Team Adversarial Test Suite for POWER 3.7.10 Release Verification.
 
 Executes 10 distinct attack vectors against the candidate implementation:
 1. Manifest wrong hash while SHA256SUMS correct.
@@ -30,7 +30,7 @@ from scripts.prxmx_power_runtime_audit import (
 )
 from scripts.verify_public_release_bindings import verify_public_release_bindings
 
-TAG = "v3.7.9"
+TAG = "v3.7.10"
 COMMIT = "a" * 40
 IMAGE_DIGEST = "sha256:" + "f" * 64
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -57,22 +57,22 @@ def _write_checksums(path: Path, files: list[Path]) -> None:
 def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
     asset_dir = tmp_path / "public-assets"
     asset_dir.mkdir(exist_ok=True)
-    wheel = asset_dir / "power_framework-3.7.9-py3-none-any.whl"
-    sdist = asset_dir / "power_framework-3.7.9.tar.gz"
-    package_sbom = asset_dir / "power-framework-3.7.9.spdx.json"
-    web_sbom = asset_dir / "power-web-3.7.9.spdx.json"
+    wheel = asset_dir / "power_framework-3.7.10-py3-none-any.whl"
+    sdist = asset_dir / "power_framework-3.7.10.tar.gz"
+    package_sbom = asset_dir / "power-framework-3.7.10.spdx.json"
+    web_sbom = asset_dir / "power-web-3.7.10.spdx.json"
     profile = asset_dir / "power-profile-acceptance.json"
     baseline = asset_dir / "power-framework.release-baseline.json"
 
-    wheel.write_bytes(b"PK\x03\x04power_framework wheel content 3.7.9 candidate")
-    sdist.write_bytes(b"\x1f\x8b\x08\x00power_framework sdist content 3.7.9 candidate")
+    wheel.write_bytes(b"PK\x03\x04power_framework wheel content 3.7.10 candidate")
+    sdist.write_bytes(b"\x1f\x8b\x08\x00power_framework sdist content 3.7.10 candidate")
     package_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"power-framework"}\n')
     web_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"power-web"}\n')
     profile.write_text(
         json.dumps(
             {
                 "schema": "power.profile.acceptance.v1",
-                "version": "3.7.9",
+                "version": "3.7.10",
                 "acceptance_harness_revision": COMMIT,
                 "image_digest": IMAGE_DIGEST,
                 "profile_a": {
@@ -96,19 +96,19 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
                     "web_mcp_services": 0,
                     "web_applicationservice_bypass_count": 0,
                 },
-                "image": "ghcr.io/weby-homelab/power-framework-web:3.7.9@" + IMAGE_DIGEST,
+                "image": "ghcr.io/weby-homelab/power-framework-web:3.7.10@" + IMAGE_DIGEST,
             },
             sort_keys=True,
         )
         + "\n",
         encoding="utf-8",
     )
-    baseline.write_bytes(b'{"schema":"power.release.baseline.v1","version":"3.7.9"}\n')
+    baseline.write_bytes(b'{"schema":"power.release.baseline.v1","version":"3.7.10"}\n')
 
     manifest = {
         "schema": "power.release.manifest.v1",
         "repository": "weby-homelab/power-framework",
-        "version": "3.7.9",
+        "version": "3.7.10",
         "commit": COMMIT,
         "requires_python": ">=3.13,<3.15",
         "attestations": ["github:11111", "github:22222"],
@@ -122,7 +122,7 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
             "web_sbom": {"filename": web_sbom.name, "sha256": _sha256_file(web_sbom)},
             "profile_evidence": {"filename": profile.name, "sha256": _sha256_file(profile)},
             "web_image": {
-                "reference": "ghcr.io/weby-homelab/power-framework-web:3.7.9",
+                "reference": "ghcr.io/weby-homelab/power-framework-web:3.7.10",
                 "digest": IMAGE_DIGEST,
             },
         },
@@ -258,10 +258,10 @@ def test_attack_2_tampered_wheel_local_prxmx_fetch(tmp_path: Path) -> None:
     source_dir = tmp_path / "source"
     source_dir.mkdir()
     pyproject = source_dir / "pyproject.toml"
-    pyproject.write_text('[project]\nname = "power-framework"\nversion = "3.7.9"\n')
+    pyproject.write_text('[project]\nname = "power-framework"\nversion = "3.7.10"\n')
     dist_dir = source_dir / "dist"
     dist_dir.mkdir()
-    wheel = dist_dir / "power_framework-3.7.9-py3-none-any.whl"
+    wheel = dist_dir / "power_framework-3.7.10-py3-none-any.whl"
     wheel.write_bytes(b"actual disk bytes")
 
     rel_dir = source_dir / "release"
@@ -271,7 +271,7 @@ def test_attack_2_tampered_wheel_local_prxmx_fetch(tmp_path: Path) -> None:
         json.dumps(
             {
                 "schema": "power.release.manifest.v1",
-                "version": "3.7.9",
+                "version": "3.7.10",
                 "artifacts": {
                     "power_wheel": {
                         "filename": wheel.name,
@@ -283,7 +283,7 @@ def test_attack_2_tampered_wheel_local_prxmx_fetch(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ReleaseValidationError, match=r"Wheel digest mismatch"):
-        _fetch_from_local_source(source_dir, "v3.7.9")
+        _fetch_from_local_source(source_dir, "v3.7.10")
 
 
 # =========================================================================
@@ -341,7 +341,7 @@ def test_attack_4_candidate_template_passed_as_final_manifest(tmp_path: Path) ->
     template_manifest = {
         "schema": "power.release.manifest.template.v1",
         "authority": "candidate-only",
-        "version": "3.7.9",
+        "version": "3.7.10",
         "artifacts": {},
     }
     fix["manifest"].write_text(
@@ -496,7 +496,7 @@ def test_attack_7_prxmx_refuses_source_template_as_public_proof(tmp_path: Path) 
     source_dir = tmp_path / "repo"
     source_dir.mkdir()
     (source_dir / "pyproject.toml").write_text(
-        '[project]\nname = "power-framework"\nversion = "3.7.9"\n'
+        '[project]\nname = "power-framework"\nversion = "3.7.10"\n'
     )
     (source_dir / "release").mkdir()
     (source_dir / "release" / "power-release-manifest.json").write_text(
@@ -504,12 +504,12 @@ def test_attack_7_prxmx_refuses_source_template_as_public_proof(tmp_path: Path) 
             {
                 "schema": "power.release.manifest.template.v1",
                 "authority": "candidate-only",
-                "version": "3.7.9",
+                "version": "3.7.10",
                 "artifacts": {},
             }
         )
     )
-    payload = _fetch_from_local_source(source_dir, "v3.7.9")
+    payload = _fetch_from_local_source(source_dir, "v3.7.10")
     assert payload.manifest == {}
     assert payload.wheel_sha256 is None
 
@@ -521,7 +521,7 @@ def test_attack_7_source_manifest_template_missing_candidate_authority_fails(
     source_dir = tmp_path / "repo"
     source_dir.mkdir()
     (source_dir / "pyproject.toml").write_text(
-        '[project]\nname = "power-framework"\nversion = "3.7.9"\n'
+        '[project]\nname = "power-framework"\nversion = "3.7.10"\n'
     )
     (source_dir / "release").mkdir()
     (source_dir / "release" / "power-release-manifest.json").write_text(
@@ -529,7 +529,7 @@ def test_attack_7_source_manifest_template_missing_candidate_authority_fails(
             {
                 "schema": "power.release.manifest.template.v1",
                 "authority": "public-release-authority",
-                "version": "3.7.9",
+                "version": "3.7.10",
             }
         )
     )
@@ -537,7 +537,7 @@ def test_attack_7_source_manifest_template_missing_candidate_authority_fails(
         ReleaseValidationError,
         match=r"source release manifest template must declare authority=candidate-only",
     ):
-        _fetch_from_local_source(source_dir, "v3.7.9")
+        _fetch_from_local_source(source_dir, "v3.7.10")
 
 
 # =========================================================================
@@ -548,7 +548,7 @@ def test_attack_7_source_manifest_template_missing_candidate_authority_fails(
 def test_attack_8_recovery_rebuild_differs_fails_closed(tmp_path: Path) -> None:
     """Attack 8a: Same-tag recovery build produces different wheel bytes."""
     fix = _write_full_fixture(tmp_path)
-    fix["wheel"].write_bytes(b"RECOVERY RUN BUILT DIFFERENT BYTES FOR 3.7.9")
+    fix["wheel"].write_bytes(b"RECOVERY RUN BUILT DIFFERENT BYTES FOR 3.7.10")
 
     with pytest.raises(ValueError, match=r"public asset does not match SHA256SUMS"):
         _verify_fixture(fix)
@@ -562,9 +562,9 @@ def test_attack_8_recovery_rebuild_differs_fails_closed(tmp_path: Path) -> None:
 def test_attack_9_prxmx_github_fetch_missing_published_manifest_fails_closed() -> None:
     """Attack 9a: GitHub Release has raw files but lacks published power-release-manifest.json asset."""
     release_payload = {
-        "tag_name": "v3.7.9",
+        "tag_name": "v3.7.10",
         "assets": [
-            {"name": "power_framework-3.7.9-py3-none-any.whl", "digest": "sha256:" + "a" * 64}
+            {"name": "power_framework-3.7.10-py3-none-any.whl", "digest": "sha256:" + "a" * 64}
         ],
     }
     with patch("urllib.request.urlopen") as mock_urlopen:
@@ -574,7 +574,7 @@ def test_attack_9_prxmx_github_fetch_missing_published_manifest_fails_closed() -
 
         mock_resp_pyproj = MagicMock()
         mock_resp_pyproj.read.return_value = (
-            b'[project]\nname = "power-framework"\nversion = "3.7.9"\n'
+            b'[project]\nname = "power-framework"\nversion = "3.7.10"\n'
         )
         mock_resp_pyproj.__enter__.return_value = mock_resp_pyproj
 
@@ -584,19 +584,19 @@ def test_attack_9_prxmx_github_fetch_missing_published_manifest_fails_closed() -
             ReleaseValidationError,
             match=r"GitHub release must contain exactly one published power-release-manifest\.json asset",
         ):
-            _fetch_from_github("weby-homelab/power-framework", "v3.7.9")
+            _fetch_from_github("weby-homelab/power-framework", "v3.7.10")
 
 
 def test_attack_9_prxmx_github_fetch_manifest_bytes_hash_mismatch() -> None:
     """Attack 9b: GitHub release manifest asset bytes do not match GitHub API asset digest."""
-    manifest_bytes = b'{"schema": "power.release.manifest.v1", "version": "3.7.9"}'
+    manifest_bytes = b'{"schema": "power.release.manifest.v1", "version": "3.7.10"}'
     wrong_digest = "sha256:" + "0" * 64
 
     release_payload = {
-        "tag_name": "v3.7.9",
+        "tag_name": "v3.7.10",
         "assets": [
             {"name": "power-release-manifest.json", "digest": wrong_digest},
-            {"name": "power_framework-3.7.9-py3-none-any.whl", "digest": "sha256:" + "a" * 64},
+            {"name": "power_framework-3.7.10-py3-none-any.whl", "digest": "sha256:" + "a" * 64},
         ],
     }
     with patch("urllib.request.urlopen") as mock_urlopen:
@@ -606,7 +606,7 @@ def test_attack_9_prxmx_github_fetch_manifest_bytes_hash_mismatch() -> None:
 
         mock_resp_pyproj = MagicMock()
         mock_resp_pyproj.read.return_value = (
-            b'[project]\nname = "power-framework"\nversion = "3.7.9"\n'
+            b'[project]\nname = "power-framework"\nversion = "3.7.10"\n'
         )
         mock_resp_pyproj.__enter__.return_value = mock_resp_pyproj
 
@@ -620,7 +620,7 @@ def test_attack_9_prxmx_github_fetch_manifest_bytes_hash_mismatch() -> None:
             ReleaseValidationError,
             match="published release manifest bytes do not match the GitHub asset digest",
         ):
-            _fetch_from_github("weby-homelab/power-framework", "v3.7.9")
+            _fetch_from_github("weby-homelab/power-framework", "v3.7.10")
 
 
 # =========================================================================
@@ -639,7 +639,7 @@ def test_attack_10_all_filenames_present_but_wheel_hash_tampered_in_receipt(tmp_
 
     with pytest.raises(
         ValueError,
-        match=r"receipt asset digest mismatch for power_framework-3.7.9-py3-none-any.whl",
+        match=r"receipt asset digest mismatch for power_framework-3.7.10-py3-none-any.whl",
     ):
         _verify_fixture(fix)
 

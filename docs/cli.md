@@ -1,6 +1,6 @@
 # CLI Reference
 
-This reference is aligned with the executable P.O.W.E.R. `v3.7.9` parser.
+This reference is aligned with the executable P.O.W.E.R. `v3.7.10` parser.
 
 ## Synopsis
 
