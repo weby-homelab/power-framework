@@ -912,6 +912,10 @@ jobs:
           PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
           WEB_ATTESTATION_ID: ${{ steps.web_attestation.outputs.attestation-id }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
+          RELEASE_CONTROL_REVISION: ${{ github.sha }}
+          RELEASE_WORKFLOW_RUN_ID: ${{ github.run_id }}
+          RELEASE_WORKFLOW_ATTEMPT: ${{ github.run_attempt }}
+          RELEASE_WORKFLOW_EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"

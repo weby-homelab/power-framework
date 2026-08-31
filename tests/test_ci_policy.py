@@ -166,6 +166,20 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
         "${{ runner.temp }}/power-release-control"
     )
     assert "base64 --decode" in control_fetch["run"]
+    receipt_step = next(
+        step
+        for step in jobs["release"]["steps"]
+        if step.get("name") == "Generate release receipt from frozen assets"
+    )
+    assert receipt_step["env"] == {
+        "PACKAGE_ATTESTATION_ID": "${{ steps.package_attestation.outputs.attestation-id }}",
+        "WEB_ATTESTATION_ID": "${{ steps.web_attestation.outputs.attestation-id }}",
+        "WEB_IMAGE_DIGEST": "${{ steps.web_image.outputs.digest }}",
+        "RELEASE_CONTROL_REVISION": "${{ github.sha }}",
+        "RELEASE_WORKFLOW_RUN_ID": "${{ github.run_id }}",
+        "RELEASE_WORKFLOW_ATTEMPT": "${{ github.run_attempt }}",
+        "RELEASE_WORKFLOW_EVENT": "${{ github.event_name }}",
+    }
     assert (
         "uv sync --locked --group dev --extra web --extra semantic --extra rerank" in release_text
     )

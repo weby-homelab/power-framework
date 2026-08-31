@@ -149,6 +149,17 @@ def build_receipt(
         raise ValueError("unified release manifest schema is invalid")
     if manifest.get("commit") != commit:
         raise ValueError("unified release manifest commit does not match the tag commit")
+    tag_object = _git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{tag}}")
+    release_control_revision = os.environ.get("RELEASE_CONTROL_REVISION") or os.environ.get(
+        "GITHUB_SHA"
+    )
+    release_workflow_run_id = os.environ.get("RELEASE_WORKFLOW_RUN_ID") or workflow_run_id
+    release_workflow_attempt = os.environ.get("RELEASE_WORKFLOW_ATTEMPT") or os.environ.get(
+        "GITHUB_RUN_ATTEMPT"
+    )
+    release_workflow_event = os.environ.get("RELEASE_WORKFLOW_EVENT") or os.environ.get(
+        "GITHUB_EVENT_NAME"
+    )
     manifest_attestation_values = manifest.get("attestations", [])
     if not isinstance(manifest_attestation_values, list):
         raise ValueError("unified release manifest attestations must be a list")
@@ -213,11 +224,27 @@ def build_receipt(
             "commit": commit,
             "tree": tree,
         },
+        "release_provenance": {
+            "release_source_tag": tag,
+            "release_source_commit": commit,
+            "release_source_tree": tree,
+            "release_tag_object": tag_object,
+            "release_control_revision": release_control_revision,
+            "workflow_revision": release_control_revision,
+            "workflow_run_id": release_workflow_run_id or None,
+            "workflow_run_attempt": release_workflow_attempt,
+            "workflow_event": release_workflow_event,
+            "repository": repository,
+        },
         "workflow_run": {
-            "id": workflow_run_id or None,
+            "id": release_workflow_run_id or None,
             "name": os.environ.get("GITHUB_WORKFLOW"),
-            "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-            "url": run_url,
+            "attempt": release_workflow_attempt,
+            "url": (
+                f"https://github.com/{repository}/actions/runs/{release_workflow_run_id}"
+                if repository and release_workflow_run_id
+                else run_url
+            ),
         },
         "attestations": sorted(normalized_attestation_ids),
         "attestation_subjects": parsed_subjects,

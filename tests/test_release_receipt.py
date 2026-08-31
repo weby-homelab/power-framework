@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -30,6 +31,15 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     output = tmp_path / "receipt.json"
+    release_environment = os.environ.copy()
+    release_environment.update(
+        {
+            "RELEASE_CONTROL_REVISION": "c" * 40,
+            "RELEASE_WORKFLOW_RUN_ID": "12345",
+            "RELEASE_WORKFLOW_ATTEMPT": "2",
+            "RELEASE_WORKFLOW_EVENT": "workflow_dispatch",
+        }
+    )
 
     result = subprocess.run(  # noqa: S603 -- invokes the repository-local receipt generator.
         [
@@ -53,6 +63,7 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
         check=False,
         capture_output=True,
         text=True,
+        env=release_environment,
     )
 
     assert result.returncode == 0, result.stderr
@@ -61,6 +72,18 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
     assert receipt["release"]["commit"] == "3f2e2b9687f96a6fc52c634a13bd75205af7dd96"
     assert receipt["release"]["tree"] == "83fd4c776ffea2c81f89d456183e4ba6d1f3f61e"
     assert receipt["workflow_run"]["id"] == "12345"
+    assert receipt["release_provenance"] == {
+        "release_source_tag": "v3.2.5",
+        "release_source_commit": "3f2e2b9687f96a6fc52c634a13bd75205af7dd96",
+        "release_source_tree": "83fd4c776ffea2c81f89d456183e4ba6d1f3f61e",
+        "release_tag_object": "4c8c0d7b88d575ea1c6d566020269f8488b11e2d",
+        "release_control_revision": "c" * 40,
+        "workflow_revision": "c" * 40,
+        "workflow_run_id": "12345",
+        "workflow_run_attempt": "2",
+        "workflow_event": "workflow_dispatch",
+        "repository": "weby-homelab/power-framework",
+    }
     assert receipt["assets"] == [
         {
             "name": artifact.name,
