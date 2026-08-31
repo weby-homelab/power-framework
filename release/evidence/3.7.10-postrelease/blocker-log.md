@@ -10,6 +10,7 @@ content, or raw authorization material.
 | `BLK-0002` | 10 | P1 | PRXMX / AUTHORIZATION | BLOCKED_AUTHORIZATION | owner action |
 | `BLK-0003` | 6 | P2 | ENVIRONMENT | RESOLVED_WITH_OCI_API | closure branch |
 | `BLK-0004` | 27 | P2 | ENVIRONMENT | RESOLVED_WITH_UV_ENVIRONMENT | closure branch |
+| `BLK-0005` | 29-32 | P1 | AUTHORIZATION | BLOCKED_AUTHORIZATION | owner action |
 
 ## BLK-0001
 
@@ -52,6 +53,34 @@ content, or raw authorization material.
 - Fix: reran the same gate through `uv run` without changing source or system
   Python.
 - Verification: `uv run mypy src/power_framework/` passed.
+
+## BLK-0005
+
+- Symptom: PR #381 has all required exact-head checks passing, but protected
+  `main` still requires one approving review and the only recorded review is
+  `COMMENTED`.
+- Root cause: the current actor cannot approve its own pull request; an admin
+  merge bypass would weaken the required-review policy and is forbidden for
+  this closure.
+- Fix: none claimed; no bypass, protection edit, or fabricated approval was
+  used.
+- Verification: GitHub reports `reviewDecision=REVIEW_REQUIRED`,
+  `mergeStateStatus=BLOCKED`, and branch protection requires one approval.
+
+## OWNER-ACTION-002
+
+- AREA: protected merge of the closure PR.
+- REQUIRED ACTION: an independent authorized maintainer must review and approve
+  PR #381, then allow the normal protected merge flow.
+- WHY AGENT CANNOT COMPLETE: GitHub rejects self-approval, and bypassing the
+  required review would violate the repository closure policy.
+- EXACT EVIDENCE: PR `https://github.com/weby-homelab/power-framework/pull/381`,
+  head `256b61200af1a0bf6060d78107b9dc5fa885aabb`, all required checks passed,
+  `reviewDecision=REVIEW_REQUIRED`.
+- RISK IF DEFERRED: closure changes remain only on the dedicated branch; public
+  `main` has no durable post-release evidence or final merge readback.
+- RESUME PHASE: Phase 31 merge gate, then Phase 32 post-merge verification and
+  Phase 33 independent clean-room audit.
 
 ## OWNER-ACTION-001
 
