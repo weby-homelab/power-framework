@@ -9,7 +9,9 @@
   "package_version": "3.7.10",
   "current_public_main_sha": "1a9879ee2353d63d979da5f68e79a6065122343b",
   "closure_branch": "chore/power-3.7.10-public-repository-closure",
-  "closure_branch_head": "cc6e5f19e98b6037f25953959b92b70176aaf802",
+  "closure_branch_head_before_final_report": "cc6e5f19e98b6037f25953959b92b70176aaf802",
+  "final_report_snapshot_commit": "2c645598e8876c551e1f0cbd8c34a70764876dce",
+  "subsequent_timing_clarification_commit": "e0fc3f3a198373cedf2cbcbc3f1068ec5466b6bf",
   "closure_pr": {
     "number": 381,
     "url": "https://github.com/weby-homelab/power-framework/pull/381",

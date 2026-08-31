@@ -11,7 +11,9 @@ independent approval that the current actor cannot provide.
 
 - Repository: `https://github.com/weby-homelab/power-framework`
 - Starting public `main`: `1a9879ee2353d63d979da5f68e79a6065122343b`
-- Closure branch head: `cc6e5f19e98b6037f25953959b92b70176aaf802`
+- Closure branch snapshot before the final report: `cc6e5f19e98b6037f25953959b92b70176aaf802`
+- Final report snapshot commit: `2c645598e8876c551e1f0cbd8c34a70764876dce`
+- Subsequent inventory-timing clarification: `e0fc3f3a198373cedf2cbcbc3f1068ec5466b6bf`
 - Closure PR: `https://github.com/weby-homelab/power-framework/pull/381`
 - Pre-existing untracked `v3.7.9` forensic artifacts were preserved byte-for-byte and never staged.
 
