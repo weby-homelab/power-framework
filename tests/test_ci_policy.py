@@ -315,6 +315,12 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     assert '"$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py"' in public_binding_step["run"]
     assert 'verified_image_digest"' in public_binding_step["run"]
     assert 'registry_digest" = "$verified_image_digest"' in public_binding_step["run"]
+    assert public_binding_step["env"]["DOCKER_CONFIG"] == (
+        "${{ runner.temp }}/power-release-readback-docker-config"
+    )
+    assert "GHCR_TOKEN" in public_binding_step["env"]
+    assert "docker login ghcr.io" in public_binding_step["run"]
+    assert "docker logout ghcr.io" in public_binding_step["run"]
 
     attestation_step = next(
         step for step in steps if step.get("name") == "Verify public artifact and Web attestations"

@@ -1109,8 +1109,10 @@ jobs:
       - name: Verify public asset checksums, manifest bindings, and OCI readback
         env:
           GH_TOKEN: ${{ github.token }}
+          GHCR_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
           WEB_IMAGE_REF: ${{ steps.web_image.outputs.final_reference }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
+          DOCKER_CONFIG: ${{ runner.temp }}/power-release-readback-docker-config
         run: |
           set -euo pipefail
           readback_dir="$RUNNER_TEMP/power-public-readback"
@@ -1125,9 +1127,14 @@ jobs:
             --expected-tag-target "$REMOTE_TAG_TARGET")"
           printf '%s\n' "$binding_result" > "$RUNNER_TEMP/power-public-bindings.json"
           verified_image_digest="$(printf '%s\n' "$binding_result" | python3 -c 'import json, sys; print(json.load(sys.stdin)["web_image_digest"])')"
+          install -d -m 700 "$DOCKER_CONFIG"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
           registry_digest="$(docker buildx imagetools inspect "$WEB_IMAGE_REF" | python3 -c 'import sys; print(next(line.split()[1] for line in sys.stdin if line.startswith("Digest:")))')"
           test "$verified_image_digest" = "$WEB_IMAGE_DIGEST"
           test "$registry_digest" = "$verified_image_digest"
+          docker logout ghcr.io
+          trap - EXIT
 
       - name: Verify public artifact and Web attestations
         env:
