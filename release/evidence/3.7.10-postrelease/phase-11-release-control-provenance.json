@@ -46,6 +46,24 @@
     {"number": 379, "merge_commit": "6cab9f63e4a926996fa141d245a9863a5073ca32", "merged_at": "2026-08-31T12:20:53Z"},
     {"number": 380, "merge_commit": "1a9879ee2353d63d979da5f68e79a6065122343b", "merged_at": "2026-08-31T12:38:31Z"}
   ],
+  "future_receipt_provenance_contract": {
+    "strict_generation_and_public_verification": true,
+    "fields": [
+      "release_source_tag",
+      "release_source_commit",
+      "release_source_tree",
+      "release_tag_object",
+      "release_control_revision",
+      "workflow_revision",
+      "workflow_run_id",
+      "workflow_run_attempt",
+      "workflow_event",
+      "workflow_ref",
+      "workflow_ref_protected",
+      "repository"
+    ],
+    "published_v3.7.10_receipt_rewritten": false
+  },
   "fully_successful_release_workflow_run_id": null,
   "interpretation": "The public release was created by run 33391322565, whose publication step succeeded but whose overall workflow failed at a later readback gate. The release is independently valid by fresh public verification; no workflow result is misreported as fully successful."
 }

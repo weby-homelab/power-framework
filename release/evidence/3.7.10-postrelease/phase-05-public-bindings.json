@@ -43,6 +43,10 @@
     "profile_a": "passed",
     "profile_b": "passed"
   },
+  "published_receipt_provenance": {
+    "status": "not_present_legacy_release",
+    "strict_future_verification": "implemented_without_rewriting_v3.7.10_receipt"
+  },
   "equalities": {
     "manifest_commit_equals_peeled_tag_commit": true,
     "manifest_commit_equals_release_source_commit": true,

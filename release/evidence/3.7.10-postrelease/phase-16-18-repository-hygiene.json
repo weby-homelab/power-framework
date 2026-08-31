@@ -10,6 +10,7 @@
     "gitignore_covers_bak_logs_cache_and_venvs": true,
     "historical_evidence_deleted": false
   },
+  "preserved_untracked_historical_artifacts_scope": "WS-local-only; not public repository evidence",
   "preserved_untracked_historical_artifacts": [
     "release/POWER_3.7.9_FORENSIC_CLOSURE_REPORT.md",
     "release/evidence/3.7.9/blocker-log.md"

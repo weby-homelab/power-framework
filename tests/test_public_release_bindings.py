@@ -152,6 +152,9 @@ def _refresh_manifest_receipt_and_checksum(paths: dict[str, Path | str]) -> None
     receipt_path = Path(paths["receipt"])
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     receipt["unified_release_manifest"]["sha256"] = _sha256_file(manifest_path)
+    for asset in receipt["assets"]:
+        if asset.get("name") == manifest_path.name:
+            asset["sha256"] = _sha256_file(manifest_path)
     receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
     checksum_path = Path(paths["checksums"])
     files = [

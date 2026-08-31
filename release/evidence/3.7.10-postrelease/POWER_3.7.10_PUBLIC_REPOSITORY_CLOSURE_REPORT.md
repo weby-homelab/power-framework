@@ -2,8 +2,8 @@
 
 ## EXECUTIVE VERDICT
 
-**NO-GO, blocked only by external authorization gates.** The immutable
-`v3.7.10` release and all public release identities passed independent checks.
+**NO-GO, blocked only by external authorization gates.** The published
+`v3.7.10` release snapshot and all public release identities passed independent checks.
 The closure branch is not merged because protected `main` requires an
 independent approval that the current actor cannot provide.
 
@@ -15,7 +15,8 @@ independent approval that the current actor cannot provide.
 - Final report snapshot commit: `2c645598e8876c551e1f0cbd8c34a70764876dce`
 - Subsequent inventory-timing clarification: `e0fc3f3a198373cedf2cbcbc3f1068ec5466b6bf`
 - Closure PR: `https://github.com/weby-homelab/power-framework/pull/381`
-- Pre-existing untracked `v3.7.9` forensic artifacts were preserved byte-for-byte and never staged.
+- Pre-existing untracked `v3.7.9` forensic artifacts are WS-local-only, were
+  preserved byte-for-byte, and were never staged or treated as public evidence.
 
 ## V3.7.10 RELEASE
 
@@ -66,13 +67,21 @@ Profile SHA-256:
 ## MANIFEST / RECEIPT / SBOMS / PROFILE A/B
 
 `phase-05-public-bindings.json` records schema, version, source commit/tree,
-manifest SHA, receipt SHA, wheel/sdist/SBOM/Profile hashes, attestation IDs,
-Profile A/B status, and all required equality checks. Result: **PASS**.
+manifest SHA, receipt SHA, wheel/sdist/SBOM/Profile hashes, published
+manifest/receipt attestation IDs, Profile A/B status, and all required equality
+checks. Result: **PASS**.
+The already-published receipt has no control-plane provenance block; the
+future strict generator/verifier contract does not rewrite it.
 
 ## ATTESTATIONS / GHCR
 
 Wheel, sdist, and Web OCI attestations were independently verified with
 `gh attestation verify`. Subjects match the exact package and image digests.
+The public verification JSON exposed subjects, predicate, signer, and run
+identity, but did not expose a stable attestation ID for each observed bundle.
+Observed entries therefore carry `attestation_id=null` and an explicit
+`AMBIGUOUS_NOT_EXPOSED_BY_GH_ATTESTATION_VERIFY_OUTPUT` status. The separate
+published manifest/receipt IDs and package/Web roles remain exact.
 The authenticated OCI Distribution API returned HTTP 200 and the full digest:
 
 `sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1`
@@ -120,17 +129,24 @@ remains bounded to `3.7.10`, Linux, and Python `>=3.13,<3.15`.
   and `build`; PR #381 exact-head checks passed.
 - Tag ruleset `21939922`: active `update`/`deletion` protection for
   `refs/tags/v*.*.*`, with no `creation` rule; `v3.7.10` was not changed.
+- Privileged `workflow_dispatch` release control requires the canonical
+  `weby-homelab/power-framework` protected `refs/heads/main`; tag-push release
+  behavior remains enabled.
 - Actions SHA-pinning enforcement and Dependabot security updates: enabled.
+- Release write permissions are job-scoped to the dedicated release job; no
+  unsupported step-level permission scope is claimed.
 - All repository workflow action references are immutable commit SHAs and
   release credentials are isolated and logged out.
 
 ## REPOSITORY SECURITY / HYGIENE / PUBLIC METADATA
 
 The repository has CodeQL, secret scanning, push protection, `SECURITY.md`,
-public metadata, and no open issues or PRs other than this closure PR. Clear
-low-risk CodeQL hygiene findings were fixed with focused tests. The default
-branch alert readback and PR merge remain pending because the closure is not
-merged. Historical evidence was retained; no temporary artifact was deleted.
+public metadata, and no open issues or PRs other than this closure PR. The
+authenticated default-branch readback currently shows 9 open CodeQL alerts with
+null severity; their severity is therefore unknown/unclassified, and no P0/P1
+absence claim is made. Clear findings were fixed on the closure branch with
+focused tests; a default-branch rescan remains pending until merge. Historical
+evidence was retained; no temporary artifact was deleted.
 
 ## BLOCKERS
 

@@ -1,10 +1,17 @@
 {
   "schema_version": "power.release.closure.phase-07-summary.v1",
-  "status": "verified",
+  "status": "verified_subjects_observed_id_mapping_ambiguous",
+  "verification_checked_at": "2026-08-31T17:47:55Z",
   "wheel_attestation": "phase-07-wheel-attestation.json",
   "sdist_attestation": "phase-07-sdist-attestation.json",
   "web_attestation": "phase-07-web-attestation.json",
-  "release_manifest_ids": ["github:44133062", "github:44133071"],
+  "published_release_manifest_and_receipt_ids": ["github:44133062", "github:44133071"],
+  "observed_attestation_id_mapping": {
+    "status": "AMBIGUOUS",
+    "reason": "gh attestation verify JSON exposed subjects, predicate, signer, and run invocation but did not expose a stable attestation ID",
+    "observed_entries_carry_null_ids": true,
+    "raw_output_attestation_id_field_present": false
+  },
   "package_subjects_match_final_wheel_and_sdist": true,
   "web_subject_matches_final_oci_digest": true,
   "signer_repository": "weby-homelab/power-framework",

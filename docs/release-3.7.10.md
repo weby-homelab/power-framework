@@ -44,13 +44,15 @@ artifacts, or evidence.
 The following material is historical and intentionally remains unchanged:
 
 - `docs/release-3.7.9.md` and `docs/release-3.7.8.md`;
-- `release/evidence/3.7.9/` and its prepublication forensic records;
+- tracked files under `release/evidence/3.7.9/` and their prepublication
+  forensic records; the pre-existing untracked v3.7.9 report and blocker log
+  are WS-local-only artifacts and are not public repository evidence;
 - the existing `v3.7.9` and `v3.7.8` tag and artifact identities.
 
 ## Publication status
 
 This document defines the release contract; local version-surface updates and
-local tests do not prove publication. A stable 3.7.10 claim requires required CI
+local tests do not prove publication. A stable 3.7.10 claim requires CI
 and CodeQL on the exact signed release-source commit, plus proof that the
 release-source Git tree is identical to the tree merged into protected `main`.
 The merge commit may therefore differ from the signed source commit without
@@ -60,5 +62,7 @@ manifest, receipt, attestations, GHCR digest, and fresh public readback.
 
 The post-release public verification record is maintained at
 [`release/evidence/3.7.10-postrelease/`](https://github.com/weby-homelab/power-framework/tree/main/release/evidence/3.7.10-postrelease).
-It is evidence for the immutable release, not an addition to the `v3.7.10`
+It records the observed published release snapshot, not a claim that GitHub
+Release assets are globally immutable. The active tag ruleset protects stable
+tag updates and deletions; this evidence is not an addition to the `v3.7.10`
 asset set and not a replacement for any published asset.

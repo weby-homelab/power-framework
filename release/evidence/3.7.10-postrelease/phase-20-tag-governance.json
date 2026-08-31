@@ -3,7 +3,7 @@
   "status": "verified",
   "ruleset": {
     "id": 21939922,
-    "name": "Immutable stable release tags",
+    "name": "Protected stable release tags",
     "target": "tag",
     "enforcement": "active",
     "include": ["refs/tags/v*.*.*"],

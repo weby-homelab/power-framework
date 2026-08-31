@@ -4,11 +4,16 @@
   "artifact": "ghcr.io/weby-homelab/power-framework-web:3.7.10",
   "artifact_digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1",
   "verification_method": "gh attestation verify --repo weby-homelab/power-framework --bundle-from-oci --format json",
+  "verification_checked_at": "2026-08-31T17:47:55Z",
+  "verification_output_sha256": "e296a5e90bd82113807982185338b29719343ae65bf4e32a6436b9741a5f3fb9",
   "predicate_type": "https://slsa.dev/provenance/v1",
   "observed_attestations": [
-    {"workflow_run_id": 33391322565, "attempt": 1, "event": "workflow_dispatch", "workflow_ref": "refs/heads/main", "workflow_sha": "6cab9f63e4a926996fa141d245a9863a5073ca32", "subjects": [{"name": "ghcr.io/weby-homelab/power-framework-web", "digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1"}], "verified_timestamp": "2026-08-31T12:27:24Z"}
+    {"attestation_id": null, "attestation_id_status": "AMBIGUOUS_NOT_EXPOSED_BY_GH_ATTESTATION_VERIFY_OUTPUT", "workflow_run_id": 33391322565, "attempt": 1, "event": "workflow_dispatch", "workflow_ref": "refs/heads/main", "workflow_sha": "6cab9f63e4a926996fa141d245a9863a5073ca32", "subjects": [{"name": "ghcr.io/weby-homelab/power-framework-web", "digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1"}], "verified_timestamp": "2026-08-31T12:27:24Z"}
   ],
-  "declared_release_attestation_id": "github:44133071",
-  "declared_release_attestation_role": "web",
-  "raw_signatures_persisted": false
+  "published_receipt_attestation_id": "github:44133071",
+  "published_receipt_attestation_role": "web",
+  "published_receipt_attestation_id_source": "public manifest and release receipt",
+  "observed_attestation_id_mapping": "ambiguous",
+  "raw_signatures_persisted": false,
+  "raw_output_attestation_id_field_present": false
 }

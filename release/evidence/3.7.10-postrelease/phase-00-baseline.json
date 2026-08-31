@@ -11,12 +11,16 @@
     {
       "path": "release/POWER_3.7.9_FORENSIC_CLOSURE_REPORT.md",
       "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
       "size_bytes": 15079,
       "sha256": "665d28f2ca2e39b8dd45b3e66fc90031f78155dcf8e59faaf36db04981d4596c"
     },
     {
       "path": "release/evidence/3.7.9/blocker-log.md",
       "classification": "HISTORICAL",
+      "scope": "WS-local-only",
+      "publicly_committed": false,
       "size_bytes": 137,
       "sha256": "3b24a1f80406c99d16df981b7edb586dc692e4707ab4a632303123498f3ea5da"
     }

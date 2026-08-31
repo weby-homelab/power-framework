@@ -23,7 +23,7 @@
   "verdicts": {
     "release_validity": "PASS",
     "public_evidence": "PASS",
-    "attestations": "PASS",
+    "attestations": "PASS_WITH_OBSERVED_ID_MAPPING_AMBIGUITY",
     "ghcr": "PASS",
     "public_install": "PASS",
     "prxmx": "BLOCKED_EXTERNAL",
@@ -31,7 +31,7 @@
     "changelog": "PASS",
     "governance": "PASS",
     "actions_security": "PASS",
-    "repository_security": "BLOCKED_EXTERNAL",
+    "repository_security": "PARTIAL",
     "repository_hygiene": "PASS",
     "historical_immutability": "PASS"
   },
@@ -43,6 +43,24 @@
     "public_asset_count": 9,
     "public_binding_status": "verified",
     "ghcr_digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1"
+  },
+  "workflow_dispatch_trusted_ref": {
+    "required_repository": "weby-homelab/power-framework",
+    "required_ref": "refs/heads/main",
+    "requires_github_ref_protected": true,
+    "tag_push_behavior_preserved": true
+  },
+  "attestation_id_mapping": {
+    "published_manifest_and_receipt_ids": ["github:44133062", "github:44133071"],
+    "observed_verification_ids": "AMBIGUOUS_NOT_EXPOSED_BY_GH_ATTESTATION_VERIFY_OUTPUT",
+    "subjects_and_roles_verified": true
+  },
+  "repository_security_readback": {
+    "status": "available",
+    "current_main_open_code_scanning_alerts": 9,
+    "severity_classification": "unknown_or_unclassified",
+    "p0_p1_absence_claim": "not_made",
+    "post_merge_default_branch_rescan": "pending"
   },
   "tests": {
     "full_pytest": "1313 passed, 4 skipped, 17 deselected",
@@ -67,7 +85,7 @@
     "remaining_ids": ["BLK-0002", "BLK-0005"],
     "owner_actions": ["OWNER-ACTION-001", "OWNER-ACTION-002"]
   },
-  "immutable_history_rewritten": false,
+  "historical_identity_rewritten": false,
   "new_release_created": false,
   "v3.7.11_created": false,
   "power_3_8_started": false,

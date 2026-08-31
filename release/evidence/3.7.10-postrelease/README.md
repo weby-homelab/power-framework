@@ -1,8 +1,9 @@
 # POWER 3.7.10 post-release evidence
 
 This directory contains sanitized, content-free evidence collected after the
-immutable `v3.7.10` publication. It is not part of the `v3.7.10` release asset
-set and does not replace or rewrite any published asset, tag, receipt, or SBOM.
+published `v3.7.10` release snapshot. It is not part of the `v3.7.10` release
+asset set and does not replace or rewrite any published asset, tag, receipt, or
+SBOM.
 
 The evidence separates the signed release source from the later protected-main
 merge commits and records public GitHub, registry, attestation, and clean-room
@@ -14,7 +15,7 @@ The PRXMX section is explicitly `BLOCKED_AUTHORIZATION` because this WS session
 had no permitted read-only remote transport. Historical local claims are not
 used as a substitute for that required remote audit.
 
-The immutable release boundary is:
+The signed release boundary and observed source snapshot are:
 
 ```text
 tag: v3.7.10
