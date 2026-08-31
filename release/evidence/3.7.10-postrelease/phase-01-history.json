@@ -1,0 +1,40 @@
+{
+  "schema_version": "power.release.closure.phase-01.v1",
+  "status": "verified",
+  "repository": "weby-homelab/power-framework",
+  "tags": {
+    "v3.7.8": {
+      "tag_object": "d2b61ae05ede9d47fb2558a7278cea619ff24d37",
+      "tag_target": "6e7d0a48d36e564030954138fec03778ee44d6a0",
+      "tree": "99eba0a4c74e3ba4a56f055ed310bf40ec601fc8",
+      "object_type": "tag",
+      "tag_signature": "verified"
+    },
+    "v3.7.9": {
+      "tag_object": "7cdf1a76b804dd2bfdfbed38522f3e505731216e",
+      "tag_target": "766c4caf60efb6cfc3ac8b57446b813c85d58adb",
+      "tree": "3c5360a5033ce78b663a63e8cbd2f5b036d3ef0a",
+      "object_type": "tag",
+      "tag_signature": "verified"
+    },
+    "v3.7.10": {
+      "tag_object": "440a589572ba42867af92e6215a8ca4e1f8b3153",
+      "tag_target": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+      "tree": "0f6a5e399bd3a78792a6c5fab983a2136cb2b335",
+      "object_type": "tag",
+      "tag_signature": "verified",
+      "release_source_commit_signature": "verified"
+    }
+  },
+  "signing_identity": {
+    "primary_fingerprint": "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E",
+    "signing_subkey": "166E0A4F873E897A8060DD38DD92FC45BD1D6C30"
+  },
+  "pr_377_merge": {
+    "merge_commit": "84b73d24ab00e9cd3064792fa5b7e6171406bfac",
+    "tree": "0f6a5e399bd3a78792a6c5fab983a2136cb2b335"
+  },
+  "release_source_tree_equals_pr_377_merge_tree": true,
+  "historical_tag_objects_rewritten": false,
+  "release_tag_or_asset_rewritten": false
+}

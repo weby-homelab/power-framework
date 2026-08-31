@@ -1,0 +1,14 @@
+{
+  "schema_version": "power.release.closure.phase-07-summary.v1",
+  "status": "verified",
+  "wheel_attestation": "phase-07-wheel-attestation.json",
+  "sdist_attestation": "phase-07-sdist-attestation.json",
+  "web_attestation": "phase-07-web-attestation.json",
+  "release_manifest_ids": ["github:44133062", "github:44133071"],
+  "package_subjects_match_final_wheel_and_sdist": true,
+  "web_subject_matches_final_oci_digest": true,
+  "signer_repository": "weby-homelab/power-framework",
+  "signer_workflow": ".github/workflows/release.yml",
+  "sigstore_public_good_verification": true,
+  "raw_certificates_or_signatures_persisted": false
+}

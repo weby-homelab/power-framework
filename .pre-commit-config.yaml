@@ -19,10 +19,11 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+  - repo: local
     hooks:
       - id: mypy
-        args: [src/power_framework/]
-        additional_dependencies: [types-PyYAML]
+        name: mypy (locked project environment)
+        entry: uv run --locked mypy src/power_framework/
+        language: system
+        types: [python]
         pass_filenames: false

@@ -1,0 +1,32 @@
+{
+  "schema_version": "power.release.closure.phase-19.v1",
+  "status": "verified",
+  "branch": "main",
+  "protected": true,
+  "enforce_admins": true,
+  "required_pull_request_reviews": {"required_approving_review_count": 1, "dismiss_stale_reviews": true},
+  "required_conversation_resolution": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_status_checks_strict": true,
+  "required_contexts": [
+    "test (3.13)",
+    "test (3.14)",
+    "security",
+    "package-smoke",
+    "upgrade-matrix (ubuntu-latest)",
+    "upgrade-matrix-aggregate",
+    "base-runtime-smoke",
+    "benchmark-integrity",
+    "analyze (python)",
+    "CodeQL",
+    "build"
+  ],
+  "required_contexts_verified_on_pr": {
+    "pr_number": 380,
+    "head_sha": "3564999250a301e271aee40d046a269439fb22b8",
+    "all_required_contexts_success": true
+  },
+  "stale_required_context_detected": false,
+  "protection_weakened_for_closure": false
+}

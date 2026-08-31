@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Release engineering
+
+- Hardened GHCR authentication for Web attestation and public OCI readback.
+- Added durable post-release evidence for the public `v3.7.10` assets,
+  bindings, attestations, installs, and release-control provenance.
+- Added future release receipts that distinguish the signed release source from
+  the workflow/control revision and the protected-main merge tree.
+- Aligned the pre-commit mypy hook with the locked project environment so local
+  validation uses the same dependency boundary as CI.
+
+### Documentation and governance
+
+- Clarified the signed release-source versus merged-tree identity contract.
+- Recorded the current tag-governance and repository-security boundaries without
+  rewriting the immutable `v3.7.10` release.
 
 ## [3.7.10] - 2026-08-31
 

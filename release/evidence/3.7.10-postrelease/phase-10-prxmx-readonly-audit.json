@@ -1,0 +1,20 @@
+{
+  "schema_version": "power.release.closure.phase-10.v1",
+  "mode": "read-only",
+  "mutation_performed": false,
+  "remote_access_attempted": false,
+  "release": "v3.7.10",
+  "release_resolved": true,
+  "manifest_verified": true,
+  "wheel_verified": true,
+  "runtime_inventory_summary": {
+    "status": "not_collected",
+    "reason": "No permitted PRXMX read-only remote transport was available in the WS execution environment."
+  },
+  "mcp_summary": {"status": "not_collected", "private_configuration_read": false},
+  "skill_summary": {"status": "not_collected", "private_configuration_read": false},
+  "drift": {"status": "unknown", "remote_runtime_not_reached": true},
+  "status": "BLOCKED_AUTHORIZATION",
+  "owner_action_id": "OWNER-ACTION-001",
+  "historical_local_audit_used_as_remote_substitute": false
+}

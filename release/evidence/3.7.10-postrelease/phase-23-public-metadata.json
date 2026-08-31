@@ -1,0 +1,20 @@
+{
+  "schema_version": "power.release.closure.phase-23.v1",
+  "status": "verified",
+  "repository": "weby-homelab/power-framework",
+  "visibility": "public",
+  "description_present": true,
+  "homepage": "https://weby-homelab.github.io/power-framework/",
+  "license": "GPL-3.0",
+  "topics_present": true,
+  "security_policy_present": true,
+  "contributing_present": true,
+  "code_of_conduct_present": false,
+  "issue_templates_present": false,
+  "pull_request_template_present": false,
+  "readme_release_badge_present": true,
+  "readme_documentation_badge_present": true,
+  "public_release_link_present": true,
+  "documentation_link_present": true,
+  "metadata_bureaucracy_added_by_closure": false
+}

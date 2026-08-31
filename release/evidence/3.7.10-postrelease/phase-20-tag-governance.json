@@ -1,0 +1,25 @@
+{
+  "schema_version": "power.release.closure.phase-20.v1",
+  "status": "verified",
+  "ruleset": {
+    "id": 21939922,
+    "name": "Immutable stable release tags",
+    "target": "tag",
+    "enforcement": "active",
+    "include": ["refs/tags/v*.*.*"],
+    "exclude": [],
+    "rules": ["update", "deletion"],
+    "bypass_actors": []
+  },
+  "tag_creation_policy": {
+    "creation_rule_present": false,
+    "legitimate_new_signed_tag_creation_remains_allowed_by_this_ruleset": true,
+    "release_workflow_requires_tag_mutation": false,
+    "live_release_tag_creation_test_performed": false,
+    "policy_simulation_readback": "active update/deletion protection only"
+  },
+  "legacy_tag_protection_endpoint": "not configured",
+  "v3.7.10_tag_rewritten": false,
+  "v3.7.9_tag_rewritten": false,
+  "v3.7.8_tag_rewritten": false
+}

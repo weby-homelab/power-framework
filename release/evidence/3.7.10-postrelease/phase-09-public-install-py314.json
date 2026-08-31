@@ -1,0 +1,31 @@
+{
+  "schema_version": "power.release.closure.phase-09.v1",
+  "status": "verified",
+  "python": "3.14.6",
+  "provisioning": "isolated uv-managed interpreter; system Python unchanged",
+  "install_cases": [
+    {
+      "artifact": "power_framework-3.7.10-py3-none-any.whl",
+      "artifact_sha256": "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2",
+      "source": "public GitHub Release v3.7.10",
+      "local_build_outputs_used": false,
+      "distribution_version": "3.7.10",
+      "cli_version": "3.7.10",
+      "doctor": {"status": "degraded", "exit_code": 1, "reason": "embedding_binding_not_requested"},
+      "mcp": {"preflight": "passed", "stdio_initialize_and_list_tools": "passed", "tool_count": 20},
+      "lifecycle": {"init": "passed", "ingest": "passed", "index": "passed", "lint": "passed", "fts_sync": "passed", "fts_search": "passed", "search_result_count": 1}
+    },
+    {
+      "artifact": "power_framework-3.7.10.tar.gz",
+      "artifact_sha256": "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae",
+      "source": "public GitHub Release v3.7.10",
+      "local_build_outputs_used": false,
+      "distribution_version": "3.7.10",
+      "cli_version": "3.7.10",
+      "doctor": {"status": "degraded", "exit_code": 1, "reason": "embedding_binding_not_requested"},
+      "mcp": {"preflight": "passed", "stdio_initialize_and_list_tools": "passed", "tool_count": 20},
+      "lifecycle": {"init": "passed", "ingest": "passed", "index": "passed", "lint": "passed", "fts_sync": "passed", "fts_search": "passed", "search_result_count": 1}
+    }
+  ],
+  "mcp_smoke_note": "The published power-mcp entrypoint exposes the supported preflight command, not a smoke subcommand; preflight plus an official SDK initialize/list_tools handshake was used as the protocol smoke."
+}

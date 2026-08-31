@@ -1,0 +1,45 @@
+{
+  "schema_version": "power.release.closure.phase-02.v1",
+  "status": "verified",
+  "repository": "weby-homelab/power-framework",
+  "release_source_commit": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+  "release_source_tree": "0f6a5e399bd3a78792a6c5fab983a2136cb2b335",
+  "ci": {
+    "workflow": ".github/workflows/ci.yml",
+    "run_id": 33386643616,
+    "run_number": 828,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "head_sha": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "conclusion": "success",
+    "run_started_at": "2026-08-31T11:22:18Z",
+    "observed_completed_at": "2026-08-31T11:24:21Z",
+    "jobs": [
+      {"id": 99470654724, "name": "test (3.14)", "conclusion": "success"},
+      {"id": 99470654995, "name": "security", "conclusion": "success"},
+      {"id": 99470655042, "name": "upgrade-matrix (ubuntu-latest)", "conclusion": "success"},
+      {"id": 99470655065, "name": "base-runtime-smoke", "conclusion": "success"},
+      {"id": 99470655067, "name": "benchmark-integrity", "conclusion": "success"},
+      {"id": 99470655101, "name": "test (3.13)", "conclusion": "success"},
+      {"id": 99470655128, "name": "package-smoke", "conclusion": "success"},
+      {"id": 99470750800, "name": "upgrade-matrix-aggregate", "conclusion": "success"}
+    ]
+  },
+  "codeql": {
+    "workflow": ".github/workflows/codeql.yml",
+    "run_id": 33386643565,
+    "run_number": 806,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "head_sha": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "conclusion": "success",
+    "run_started_at": "2026-08-31T11:22:18Z",
+    "observed_completed_at": "2026-08-31T11:24:04Z",
+    "job": {"id": 99470654266, "name": "analyze (python)", "conclusion": "success"},
+    "required_check": {"name": "CodeQL", "check_run_id": 99471039492, "conclusion": "success"}
+  },
+  "required_release_source_identity": {
+    "ci_head_sha_matches_release_source": true,
+    "codeql_head_sha_matches_release_source": true
+  }
+}

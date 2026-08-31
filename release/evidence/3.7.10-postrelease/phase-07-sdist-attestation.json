@@ -1,0 +1,16 @@
+{
+  "schema_version": "power.release.closure.phase-07.v1",
+  "status": "verified",
+  "artifact": "power_framework-3.7.10.tar.gz",
+  "artifact_sha256": "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae",
+  "verification_method": "gh attestation verify --repo weby-homelab/power-framework --format json",
+  "predicate_type": "https://slsa.dev/provenance/v1",
+  "observed_attestations": [
+    {"workflow_run_id": 33391322565, "attempt": 1, "event": "workflow_dispatch", "workflow_ref": "refs/heads/main", "workflow_sha": "6cab9f63e4a926996fa141d245a9863a5073ca32", "subjects": [{"name": "power_framework-3.7.10-py3-none-any.whl", "sha256": "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2"}, {"name": "power_framework-3.7.10.tar.gz", "sha256": "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae"}], "verified_timestamp": "2026-08-31T12:27:21Z"},
+    {"workflow_run_id": 33389426962, "attempt": 1, "event": "workflow_dispatch", "workflow_ref": "refs/heads/main", "workflow_sha": "861bdc4128a47d37782b5fe4e5121c9d8bec88f3", "subjects": [{"name": "power_framework-3.7.10-py3-none-any.whl", "sha256": "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2"}, {"name": "power_framework-3.7.10.tar.gz", "sha256": "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae"}], "verified_timestamp": "2026-08-31T12:03:55Z"},
+    {"workflow_run_id": 33387652814, "attempt": 1, "event": "push", "workflow_ref": "refs/tags/v3.7.10", "workflow_sha": "f6cdaa35b552ed0a335051f2f268f57d52302161", "subjects": [{"name": "power_framework-3.7.10-py3-none-any.whl", "sha256": "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2"}, {"name": "power_framework-3.7.10.tar.gz", "sha256": "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae"}], "verified_timestamp": "2026-08-31T11:40:59Z"}
+  ],
+  "declared_release_attestation_id": "github:44133062",
+  "declared_release_attestation_role": "package",
+  "raw_signatures_persisted": false
+}

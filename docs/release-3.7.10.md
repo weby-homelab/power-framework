@@ -50,7 +50,15 @@ The following material is historical and intentionally remains unchanged:
 ## Publication status
 
 This document defines the release contract; local version-surface updates and
-local tests do not prove publication. A stable 3.7.10 claim requires a clean
-signed `v3.7.10` tag, exact merged-SHA CI and CodeQL evidence, reproducible wheel
-and source archive, SBOMs, Profile A/B acceptance, checksums, manifest, receipt,
-attestations, GHCR digest, and fresh public readback.
+local tests do not prove publication. A stable 3.7.10 claim requires required CI
+and CodeQL on the exact signed release-source commit, plus proof that the
+release-source Git tree is identical to the tree merged into protected `main`.
+The merge commit may therefore differ from the signed source commit without
+weakening the identity claim. It also requires a clean signed `v3.7.10` tag,
+reproducible wheel and source archive, SBOMs, Profile A/B acceptance, checksums,
+manifest, receipt, attestations, GHCR digest, and fresh public readback.
+
+The post-release public verification record is maintained at
+[`release/evidence/3.7.10-postrelease/`](https://github.com/weby-homelab/power-framework/tree/main/release/evidence/3.7.10-postrelease).
+It is evidence for the immutable release, not an addition to the `v3.7.10`
+asset set and not a replacement for any published asset.

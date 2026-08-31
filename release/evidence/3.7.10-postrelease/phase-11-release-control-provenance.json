@@ -1,0 +1,51 @@
+{
+  "schema_version": "power.release.closure.phase-11.v1",
+  "status": "verified_with_historical_workflow_failure_disclosed",
+  "repository": "weby-homelab/power-framework",
+  "release_source_revision": {
+    "tag": "v3.7.10",
+    "tag_object": "440a589572ba42867af92e6215a8ca4e1f8b3153",
+    "commit": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "tree": "0f6a5e399bd3a78792a6c5fab983a2136cb2b335"
+  },
+  "release_control_workflow_revision": {
+    "workflow": ".github/workflows/release.yml",
+    "revision": "6cab9f63e4a926996fa141d245a9863a5073ca32",
+    "github_sha": "6cab9f63e4a926996fa141d245a9863a5073ca32",
+    "run_id": 33391322565,
+    "run_number": 94,
+    "run_attempt": 1,
+    "event": "workflow_dispatch",
+    "ref": "refs/heads/main",
+    "release_control_verifier_revision": "6cab9f63e4a926996fa141d245a9863a5073ca32"
+  },
+  "publication_execution": {
+    "workflow_conclusion": "failure",
+    "release_job_conclusion": "failure",
+    "publication_step": "Create GitHub Release: success",
+    "public_tag_binding_step": "success",
+    "public_asset_binding_step": "failure",
+    "public_attestation_step": "skipped",
+    "release_id_created": 379738795,
+    "release_published_at": "2026-08-31T12:27:45Z",
+    "failure_class": "post-publication OCI readback authentication",
+    "release_asset_rewrite_after_failure": false
+  },
+  "main_revision_timeline": {
+    "at_workflow_start": "6cab9f63e4a926996fa141d245a9863a5073ca32",
+    "at_publication": "6cab9f63e4a926996fa141d245a9863a5073ca32",
+    "pr_380_merge_after_publication": "1a9879ee2353d63d979da5f68e79a6065122343b"
+  },
+  "related_runs": [
+    {"run_id": 33387652814, "run_number": 92, "event": "push", "workflow_revision": "f6cdaa35b552ed0a335051f2f268f57d52302161", "conclusion": "failure", "failure_boundary": "Web attestation"},
+    {"run_id": 33389426962, "run_number": 93, "event": "workflow_dispatch", "workflow_revision": "861bdc4128a47d37782b5fe4e5121c9d8bec88f3", "conclusion": "failure", "failure_boundary": "Web attestation"},
+    {"run_id": 33391322565, "run_number": 94, "event": "workflow_dispatch", "workflow_revision": "6cab9f63e4a926996fa141d245a9863a5073ca32", "conclusion": "failure", "publication_step": "success", "failure_boundary": "post-publication public OCI readback"}
+  ],
+  "pr_sequence": [
+    {"number": 378, "merge_commit": "861bdc4128a47d37782b5fe4e5121c9d8bec88f3", "merged_at": "2026-08-31T11:57:29Z"},
+    {"number": 379, "merge_commit": "6cab9f63e4a926996fa141d245a9863a5073ca32", "merged_at": "2026-08-31T12:20:53Z"},
+    {"number": 380, "merge_commit": "1a9879ee2353d63d979da5f68e79a6065122343b", "merged_at": "2026-08-31T12:38:31Z"}
+  ],
+  "fully_successful_release_workflow_run_id": null,
+  "interpretation": "The public release was created by run 33391322565, whose publication step succeeded but whose overall workflow failed at a later readback gate. The release is independently valid by fresh public verification; no workflow result is misreported as fully successful."
+}

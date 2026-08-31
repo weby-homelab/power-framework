@@ -1,0 +1,21 @@
+{
+  "schema_version": "power.release.closure.phase-22.v1",
+  "status": "verified_with_low_severity_backlog_disclosed",
+  "codeql_workflow": "enabled",
+  "code_scanning_alerts_at_baseline": {
+    "open_count": 9,
+    "severity": "null for all observed alerts",
+    "rule_ids": ["py/empty-except", "py/cyclic-import", "py/unused-global-variable", "py/repeated-import"],
+    "alert_numbers": [142, 143, 144, 145, 156, 157, 158, 159, 160],
+    "head_sha": "1a9879ee2353d63d979da5f68e79a6065122343b"
+  },
+  "closure_fixes_applied_for_observed_low_risk_findings": true,
+  "dependabot_security_updates": "enabled",
+  "open_dependabot_alerts": 0,
+  "secret_scanning": "enabled",
+  "secret_scanning_push_protection": "enabled",
+  "private_vulnerability_reporting": "not independently verified by the available repository metadata",
+  "security_policy": "SECURITY.md present",
+  "no_public_evidence_secret_detected": true,
+  "remaining_owner_action": "Re-read default-branch CodeQL alerts after closure merge; no release P0/P1 remains."
+}

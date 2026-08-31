@@ -1,0 +1,49 @@
+{
+  "schema_version": "power.release.closure.phase-00.v1",
+  "captured_at": "2026-08-31T15:36:17Z",
+  "repository": "weby-homelab/power-framework",
+  "starting_branch": "main",
+  "closure_branch": "chore/power-3.7.10-public-repository-closure",
+  "starting_head": "1a9879ee2353d63d979da5f68e79a6065122343b",
+  "origin_main_at_capture": "1a9879ee2353d63d979da5f68e79a6065122343b",
+  "tracked_worktree_clean": true,
+  "preserved_untracked": [
+    {
+      "path": "release/POWER_3.7.9_FORENSIC_CLOSURE_REPORT.md",
+      "classification": "HISTORICAL",
+      "size_bytes": 15079,
+      "sha256": "665d28f2ca2e39b8dd45b3e66fc90031f78155dcf8e59faaf36db04981d4596c"
+    },
+    {
+      "path": "release/evidence/3.7.9/blocker-log.md",
+      "classification": "HISTORICAL",
+      "size_bytes": 137,
+      "sha256": "3b24a1f80406c99d16df981b7edb586dc692e4707ab4a632303123498f3ea5da"
+    }
+  ],
+  "release_boundary": {
+    "package_version": "3.7.10",
+    "tag": "v3.7.10",
+    "new_release_created_by_closure": false,
+    "tag_rewritten_by_closure": false,
+    "published_assets_rewritten_by_closure": false
+  },
+  "public_release": {
+    "id": 379738795,
+    "url": "https://github.com/weby-homelab/power-framework/releases/tag/v3.7.10",
+    "tag": "v3.7.10",
+    "published_at": "2026-08-31T12:27:45Z",
+    "asset_count": 9,
+    "assets": [
+      {"id": 537954592, "name": "power-framework-3.7.10.spdx.json", "size": 1067, "updated_at": "2026-08-31T12:27:45Z", "api_digest": "sha256:c2c86216d62676da88e6178794309cd8cc9daffc3d2267973700ece04523df3e"},
+      {"id": 537954582, "name": "power-framework.release-baseline.json", "size": 2760, "updated_at": "2026-08-31T12:27:44Z", "api_digest": "sha256:2f3dfa0eeae38ac8a6724fe90d84a7886fd65bf3f16a4cc5efed6d603ff49032"},
+      {"id": 537954585, "name": "power-framework.release-receipt.json", "size": 2644, "updated_at": "2026-08-31T12:27:44Z", "api_digest": "sha256:7faec4376fcaaf70a075c00b84e146d22820cfb6dfb2f08183bb62d278163abe"},
+      {"id": 537954584, "name": "power-profile-acceptance.json", "size": 1554, "updated_at": "2026-08-31T12:27:44Z", "api_digest": "sha256:83af86ed2a3db0e6b836ca8efded9638ad1a1e22ed964f0d9662fd0c78d9bbf7"},
+      {"id": 537954581, "name": "power-release-manifest.json", "size": 2235, "updated_at": "2026-08-31T12:27:44Z", "api_digest": "sha256:1aac24ee51e6f1f36a313bbca932fd8fe77abbbdc7b0835174df05bfdc4527f4"},
+      {"id": 537954593, "name": "power-web-3.7.10.spdx.json", "size": 3031140, "updated_at": "2026-08-31T12:27:45Z", "api_digest": "sha256:0bab3337f62a0a46741f9b85cd2c8119e43be9f641cc89101abc0dd6c04fdefb"},
+      {"id": 537954589, "name": "power_framework-3.7.10-py3-none-any.whl", "size": 437694, "updated_at": "2026-08-31T12:27:45Z", "api_digest": "sha256:f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2"},
+      {"id": 537954591, "name": "power_framework-3.7.10.tar.gz", "size": 1275757, "updated_at": "2026-08-31T12:27:45Z", "api_digest": "sha256:4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae"},
+      {"id": 537954579, "name": "SHA256SUMS", "size": 688, "updated_at": "2026-08-31T12:27:44Z", "api_digest": "sha256:7eebb361d0c54a9c8f375a1bd2294b2a6fd1aa4af40ddd9b6771ee3d8268d0af"}
+    ]
+  }
+}

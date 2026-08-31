@@ -1,0 +1,15 @@
+{
+  "schema_version": "power.release.closure.phase-06.v1",
+  "status": "verified",
+  "image": "ghcr.io/weby-homelab/power-framework-web",
+  "tag": "3.7.10",
+  "resolved_digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1",
+  "manifest_digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1",
+  "profile_digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1",
+  "registry_http_status": 200,
+  "checked_at": "2026-08-31T15:36:17Z",
+  "method": "authenticated OCI Distribution API manifest readback",
+  "registry_equals_manifest": true,
+  "registry_equals_profile": true,
+  "registry_credentials_persisted_in_repository": false
+}

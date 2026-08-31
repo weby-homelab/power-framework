@@ -1,0 +1,14 @@
+{
+  "schema_version": "power.release.closure.phase-07.v1",
+  "status": "verified",
+  "artifact": "ghcr.io/weby-homelab/power-framework-web:3.7.10",
+  "artifact_digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1",
+  "verification_method": "gh attestation verify --repo weby-homelab/power-framework --bundle-from-oci --format json",
+  "predicate_type": "https://slsa.dev/provenance/v1",
+  "observed_attestations": [
+    {"workflow_run_id": 33391322565, "attempt": 1, "event": "workflow_dispatch", "workflow_ref": "refs/heads/main", "workflow_sha": "6cab9f63e4a926996fa141d245a9863a5073ca32", "subjects": [{"name": "ghcr.io/weby-homelab/power-framework-web", "digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1"}], "verified_timestamp": "2026-08-31T12:27:24Z"}
+  ],
+  "declared_release_attestation_id": "github:44133071",
+  "declared_release_attestation_role": "web",
+  "raw_signatures_persisted": false
+}

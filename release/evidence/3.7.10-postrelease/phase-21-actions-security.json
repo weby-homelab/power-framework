@@ -1,0 +1,20 @@
+{
+  "schema_version": "power.release.closure.phase-21.v1",
+  "status": "verified",
+  "workflow_files_audited": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql.yml",
+    ".github/workflows/docs.yml",
+    ".github/workflows/release.yml"
+  ],
+  "third_party_action_reference_count": 43,
+  "all_third_party_actions_pinned_to_40_hex_commits": true,
+  "repository_actions": {"enabled": true, "allowed_actions": "all", "sha_pinning_required": true, "default_workflow_permissions": "read"},
+  "checkout_persist_credentials_disabled_everywhere": true,
+  "release_permissions": {"contents": "write", "packages": "write", "id-token": "write", "attestations": "write"},
+  "release_write_permissions_step_scoped": true,
+  "credential_handling": {"ghcr_login_isolated": true, "temporary_docker_logout_present": true, "authorization_headers_not_persisted_to_artifacts": true, "secrets_echoed": false},
+  "shell_fail_closed_contracts_present": true,
+  "critical_workflow_regression_tests": "tests/test_ci_policy.py",
+  "security_changes_required_for_v3.7.10_rewrite": false
+}

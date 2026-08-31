@@ -1,0 +1,56 @@
+{
+  "schema_version": "power.release.closure.phase-05.v1",
+  "status": "verified",
+  "tag": "v3.7.10",
+  "repository": "weby-homelab/power-framework",
+  "manifest": {
+    "schema": "power.release.manifest.v1",
+    "version": "3.7.10",
+    "requires_python": "<3.15,>=3.13",
+    "commit": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "sha256": "1aac24ee51e6f1f36a313bbca932fd8fe77abbbdc7b0835174df05bfdc4527f4",
+    "wheel_sha256": "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2",
+    "sdist_sha256": "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae",
+    "package_sbom_sha256": "c2c86216d62676da88e6178794309cd8cc9daffc3d2267973700ece04523df3e",
+    "web_sbom_sha256": "0bab3337f62a0a46741f9b85cd2c8119e43be9f641cc89101abc0dd6c04fdefb",
+    "profile_sha256": "83af86ed2a3db0e6b836ca8efded9638ad1a1e22ed964f0d9662fd0c78d9bbf7",
+    "web_image": {
+      "reference": "ghcr.io/weby-homelab/power-framework-web:3.7.10",
+      "digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1"
+    },
+    "attestations": ["github:44133062", "github:44133071"]
+  },
+  "receipt": {
+    "schema_version": 2,
+    "tag": "v3.7.10",
+    "commit": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "manifest_sha256": "1aac24ee51e6f1f36a313bbca932fd8fe77abbbdc7b0835174df05bfdc4527f4",
+    "asset_binding_count": 7,
+    "attestations": ["github:44133062", "github:44133071"],
+    "package_subjects": [
+      "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2",
+      "4b828a7cb99fcaa704675cce5d94b20462205b46d9dadb0d628002c5770d1bae"
+    ],
+    "web_subject": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1",
+    "sha256": "7faec4376fcaaf70a075c00b84e146d22820cfb6dfb2f08183bb62d278163abe"
+  },
+  "profile": {
+    "schema": "power.profile.acceptance.v1",
+    "version": "3.7.10",
+    "acceptance_harness_revision": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "sha256": "83af86ed2a3db0e6b836ca8efded9638ad1a1e22ed964f0d9662fd0c78d9bbf7",
+    "image_digest": "sha256:923a3efb17ae944bf8eca7df4e46c7e287a1e9c10cd4bbedcebf2f7ee77cadf1",
+    "profile_a": "passed",
+    "profile_b": "passed"
+  },
+  "equalities": {
+    "manifest_commit_equals_peeled_tag_commit": true,
+    "manifest_commit_equals_release_source_commit": true,
+    "profile_version_equals_tag_version": true,
+    "profile_harness_equals_release_source_commit": true,
+    "profile_image_equals_manifest_image": true,
+    "receipt_manifest_binding_matches_manifest": true,
+    "receipt_asset_set_matches_sha256sums_set": true,
+    "attestation_roles_cover_wheel_sdist_and_web_image": true
+  }
+}
