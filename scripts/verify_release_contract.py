@@ -380,7 +380,7 @@ def validate_release_contract(
         if not isinstance(warning_policy, str) or not warning_policy:
             errors.append("baseline validation.warning_policy must be non-empty")
         coverage = validation.get("coverage_percent")
-        if not isinstance(coverage, (int, float)) or not 0 <= coverage <= 100:
+        if not isinstance(coverage, int | float) or not 0 <= coverage <= 100:
             errors.append("baseline validation.coverage_percent must be between 0 and 100")
         skipped_gates = validation.get("skipped_optional_gates")
         if not isinstance(skipped_gates, list) or not all(
