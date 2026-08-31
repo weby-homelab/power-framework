@@ -24,6 +24,18 @@ jobs:
     outputs:
       release_tag: ${{ steps.validate.outputs.release_tag }}
     steps:
+      - name: Validate trusted workflow-dispatch control ref
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          CONTROL_REF: ${{ github.ref }}
+          CONTROL_REF_PROTECTED: ${{ github.ref_protected }}
+          CONTROL_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$CONTROL_REF" = "refs/heads/main"
+          test "$CONTROL_REF_PROTECTED" = "true"
+          test "$CONTROL_REPOSITORY" = "weby-homelab/power-framework"
+
       - name: Validate workflow dispatch release tag
         id: validate
         env:
@@ -491,8 +503,11 @@ jobs:
           test "$remote_tag_object" = "$EXPECTED_TAG_OBJECT"
           test "$remote_tag_target" = "$EXPECTED_TAG_TARGET"
           test "$remote_tag_target" = "$(git rev-parse HEAD)"
+          remote_tag_tree="$(git show -s --format=%T "$remote_tag_target")"
+          test "${#remote_tag_tree}" -eq 40
           printf 'REMOTE_TAG_OBJECT=%s\n' "$remote_tag_object" >> "$GITHUB_ENV"
           printf 'REMOTE_TAG_TARGET=%s\n' "$remote_tag_target" >> "$GITHUB_ENV"
+          printf 'REMOTE_TAG_TREE=%s\n' "$remote_tag_tree" >> "$GITHUB_ENV"
 
       - name: Verify signed release tag and maintainer fingerprint
         env:
@@ -913,9 +928,13 @@ jobs:
           WEB_ATTESTATION_ID: ${{ steps.web_attestation.outputs.attestation-id }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
           RELEASE_CONTROL_REVISION: ${{ github.sha }}
+          RELEASE_WORKFLOW_REVISION: ${{ github.sha }}
           RELEASE_WORKFLOW_RUN_ID: ${{ github.run_id }}
           RELEASE_WORKFLOW_ATTEMPT: ${{ github.run_attempt }}
           RELEASE_WORKFLOW_EVENT: ${{ github.event_name }}
+          RELEASE_WORKFLOW_REPOSITORY: ${{ github.repository }}
+          RELEASE_WORKFLOW_REF: ${{ github.ref }}
+          RELEASE_WORKFLOW_REF_PROTECTED: ${{ github.ref_protected }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -942,7 +961,18 @@ jobs:
             --checksums "dist/SHA256SUMS" \
             --asset-dir dist \
             --receipt "dist/power-framework.release-receipt.json" \
-            --expected-tag-target "$REMOTE_TAG_TARGET"
+            --expected-tag-target "$REMOTE_TAG_TARGET" \
+            --expected-tag-object "$REMOTE_TAG_OBJECT" \
+            --expected-tag-tree "$REMOTE_TAG_TREE" \
+            --expected-release-control-revision "$GITHUB_SHA" \
+            --expected-workflow-revision "$GITHUB_SHA" \
+            --expected-workflow-run-id "$GITHUB_RUN_ID" \
+            --expected-workflow-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-workflow-event "$GITHUB_EVENT_NAME" \
+            --expected-workflow-ref "$GITHUB_REF" \
+            --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --require-release-provenance
 
       - name: Promote exact Web image digest to release tag
         env:
@@ -1128,7 +1158,18 @@ jobs:
             --checksums "$readback_dir/SHA256SUMS" \
             --asset-dir "$readback_dir" \
             --receipt "$readback_dir/power-framework.release-receipt.json" \
-            --expected-tag-target "$REMOTE_TAG_TARGET")"
+            --expected-tag-target "$REMOTE_TAG_TARGET" \
+            --expected-tag-object "$REMOTE_TAG_OBJECT" \
+            --expected-tag-tree "$REMOTE_TAG_TREE" \
+            --expected-release-control-revision "$GITHUB_SHA" \
+            --expected-workflow-revision "$GITHUB_SHA" \
+            --expected-workflow-run-id "$GITHUB_RUN_ID" \
+            --expected-workflow-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-workflow-event "$GITHUB_EVENT_NAME" \
+            --expected-workflow-ref "$GITHUB_REF" \
+            --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --require-release-provenance)"
           printf '%s\n' "$binding_result" > "$RUNNER_TEMP/power-public-bindings.json"
           verified_image_digest="$(printf '%s\n' "$binding_result" | python3 -c 'import json, sys; print(json.load(sys.stdin)["web_image_digest"])')"
           install -d -m 700 "$DOCKER_CONFIG"

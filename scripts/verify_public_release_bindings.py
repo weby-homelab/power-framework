@@ -18,6 +18,10 @@ except ModuleNotFoundError:  # pragma: no cover - package import path in tests/t
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 IMAGE_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
+REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+POSITIVE_INTEGER_RE = re.compile(r"^[1-9][0-9]*$")
+RELEASE_EVENTS = frozenset({"push", "workflow_dispatch"})
 REQUIRED_ARTIFACTS = (
     "power_wheel",
     "power_sdist",
@@ -114,6 +118,191 @@ def _canonical_subject(value: Any, label: str) -> str:
     return _digest_value(subject, label)
 
 
+def _required_text(value: Any, label: str) -> str:
+    """Require one non-empty textual provenance value."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+    return value.strip()
+
+
+def _required_git_object(value: Any, label: str) -> str:
+    """Require one lowercase 40-character Git object ID."""
+    text = _required_text(value, label)
+    if GIT_OBJECT_RE.fullmatch(text) is None:
+        raise ValueError(f"{label} must be a 40-character lowercase Git SHA")
+    return text
+
+
+def _required_positive_integer(value: Any, label: str) -> str:
+    """Require one positive decimal identifier represented as text."""
+    text = _required_text(value, label)
+    if POSITIVE_INTEGER_RE.fullmatch(text) is None:
+        raise ValueError(f"{label} must be a positive decimal integer")
+    return text
+
+
+def _required_repository(value: Any, label: str) -> str:
+    """Require one safe GitHub owner/name repository identity."""
+    text = _required_text(value, label)
+    if REPOSITORY_RE.fullmatch(text) is None:
+        raise ValueError(f"{label} must use owner/name syntax")
+    return text
+
+
+def _verify_release_provenance(
+    receipt: dict[str, Any],
+    *,
+    tag: str,
+    commit: str,
+    expected_tag_object: str | None,
+    expected_tag_tree: str | None,
+    expected_release_control_revision: str | None,
+    expected_workflow_revision: str | None,
+    expected_workflow_run_id: str | None,
+    expected_workflow_attempt: str | None,
+    expected_workflow_event: str | None,
+    expected_workflow_ref: str | None,
+    expected_workflow_ref_protected: str | None,
+    expected_repository: str | None,
+    require: bool,
+) -> dict[str, str] | None:
+    """Verify source/control provenance and optional trusted workflow bindings."""
+    provenance = receipt.get("release_provenance")
+    expected_values = {
+        "expected tag object": expected_tag_object,
+        "expected tag tree": expected_tag_tree,
+        "expected release control revision": expected_release_control_revision,
+        "expected workflow revision": expected_workflow_revision,
+        "expected workflow run ID": expected_workflow_run_id,
+        "expected workflow attempt": expected_workflow_attempt,
+        "expected workflow event": expected_workflow_event,
+        "expected workflow ref": expected_workflow_ref,
+        "expected workflow ref protection state": expected_workflow_ref_protected,
+        "expected repository": expected_repository,
+    }
+    if provenance is None:
+        if require:
+            raise ValueError("release provenance is required for strict public verification")
+        if any(value is not None for value in expected_values.values()):
+            raise ValueError("trusted provenance expectations require release provenance")
+        return None
+    if not isinstance(provenance, dict):
+        raise ValueError("release_provenance must be an object")
+    if require:
+        missing_expectations = [label for label, value in expected_values.items() if value is None]
+        if missing_expectations:
+            raise ValueError(
+                "strict release provenance requires " + ", ".join(missing_expectations)
+            )
+
+    source_tag = _required_text(provenance.get("release_source_tag"), "release source tag")
+    if TAG_RE.fullmatch(source_tag) is None:
+        raise ValueError("release source tag must be a stable v<major>.<minor>.<patch> tag")
+    source_commit = _required_git_object(
+        provenance.get("release_source_commit"), "release source commit"
+    )
+    source_tree = _required_git_object(provenance.get("release_source_tree"), "release source tree")
+    tag_object = _required_git_object(provenance.get("release_tag_object"), "release tag object")
+    control_revision = _required_git_object(
+        provenance.get("release_control_revision"), "release control revision"
+    )
+    workflow_revision = _required_git_object(
+        provenance.get("workflow_revision"), "workflow revision"
+    )
+    workflow_run_id = _required_positive_integer(
+        provenance.get("workflow_run_id"), "workflow run ID"
+    )
+    workflow_attempt = _required_positive_integer(
+        provenance.get("workflow_run_attempt"), "workflow run attempt"
+    )
+    workflow_event = _required_text(provenance.get("workflow_event"), "workflow event")
+    if workflow_event not in RELEASE_EVENTS:
+        raise ValueError(f"workflow event is not a supported release event: {workflow_event}")
+    workflow_ref = _required_text(provenance.get("workflow_ref"), "workflow ref")
+    expected_ref = (
+        "refs/heads/main" if workflow_event == "workflow_dispatch" else f"refs/tags/{tag}"
+    )
+    if workflow_ref != expected_ref:
+        raise ValueError(f"workflow ref does not match release event: expected {expected_ref}")
+    ref_protected = _required_text(
+        provenance.get("workflow_ref_protected"), "workflow ref protection state"
+    )
+    if ref_protected not in {"true", "false"}:
+        raise ValueError("workflow ref protection state must be true or false")
+    if workflow_event == "workflow_dispatch" and ref_protected != "true":
+        raise ValueError("workflow_dispatch release control ref must be protected")
+    repository = _required_repository(provenance.get("repository"), "provenance repository")
+
+    release = receipt.get("release")
+    if not isinstance(release, dict):
+        raise ValueError("release receipt release must be an object")
+    release_tree = _required_git_object(release.get("tree"), "release receipt source tree")
+    release_repository = _required_repository(
+        release.get("repository"), "release receipt repository"
+    )
+    if source_tag != tag or source_tag != release.get("tag"):
+        raise ValueError("release provenance source tag does not match receipt identity")
+    if source_commit != commit or source_commit != release.get("commit"):
+        raise ValueError("release provenance source commit does not match receipt identity")
+    if source_tree != release_tree:
+        raise ValueError("release provenance source tree does not match receipt identity")
+    if repository != release_repository:
+        raise ValueError("release provenance repository does not match receipt identity")
+    if control_revision != workflow_revision:
+        raise ValueError("release control revision does not match workflow revision")
+
+    workflow_run = receipt.get("workflow_run")
+    if not isinstance(workflow_run, dict):
+        raise ValueError("workflow_run is required with release provenance")
+    if _required_positive_integer(workflow_run.get("id"), "workflow_run.id") != workflow_run_id:
+        raise ValueError("workflow_run.id does not match release provenance")
+    if (
+        _required_positive_integer(workflow_run.get("attempt"), "workflow_run.attempt")
+        != workflow_attempt
+    ):
+        raise ValueError("workflow_run.attempt does not match release provenance")
+    if _required_text(workflow_run.get("event"), "workflow_run.event") != workflow_event:
+        raise ValueError("workflow_run.event does not match release provenance")
+    if _required_text(workflow_run.get("ref"), "workflow_run.ref") != workflow_ref:
+        raise ValueError("workflow_run.ref does not match release provenance")
+    if (
+        _required_repository(workflow_run.get("repository"), "workflow_run.repository")
+        != repository
+    ):
+        raise ValueError("workflow_run.repository does not match release provenance")
+
+    comparisons = {
+        "expected tag object": (expected_tag_object, tag_object),
+        "expected tag tree": (expected_tag_tree, source_tree),
+        "expected release control revision": (expected_release_control_revision, control_revision),
+        "expected workflow revision": (expected_workflow_revision, workflow_revision),
+        "expected workflow run ID": (expected_workflow_run_id, workflow_run_id),
+        "expected workflow attempt": (expected_workflow_attempt, workflow_attempt),
+        "expected workflow event": (expected_workflow_event, workflow_event),
+        "expected workflow ref": (expected_workflow_ref, workflow_ref),
+        "expected workflow ref protection state": (expected_workflow_ref_protected, ref_protected),
+        "expected repository": (expected_repository, repository),
+    }
+    for label, (expected, actual) in comparisons.items():
+        if expected is not None and _required_text(expected, label) != actual:
+            raise ValueError(f"{label} does not match release provenance")
+
+    return {
+        "release_source_tag": source_tag,
+        "release_source_commit": source_commit,
+        "release_source_tree": source_tree,
+        "release_tag_object": tag_object,
+        "release_control_revision": control_revision,
+        "workflow_revision": workflow_revision,
+        "workflow_run_id": workflow_run_id,
+        "workflow_run_attempt": workflow_attempt,
+        "workflow_event": workflow_event,
+        "workflow_ref": workflow_ref,
+        "workflow_ref_protected": ref_protected,
+        "repository": repository,
+    }
+
+
 def _manifest_file_artifacts(
     manifest: dict[str, Any], asset_dir: Path, checksums: dict[str, str], version: str
 ) -> tuple[dict[str, str], str]:
@@ -173,7 +362,18 @@ def _verify_receipt(
     manifest_hash: str,
     asset_dir: Path,
     required_files: set[str],
-) -> list[dict[str, Any]]:
+    expected_tag_object: str | None,
+    expected_tag_tree: str | None,
+    expected_release_control_revision: str | None,
+    expected_workflow_revision: str | None,
+    expected_workflow_run_id: str | None,
+    expected_workflow_attempt: str | None,
+    expected_workflow_event: str | None,
+    expected_workflow_ref: str | None,
+    expected_workflow_ref_protected: str | None,
+    expected_repository: str | None,
+    require_release_provenance: bool,
+) -> tuple[list[dict[str, Any]], dict[str, str] | None]:
     """Verify receipt identity, file hashes, attestation IDs, and subjects."""
     if receipt.get("schema_version") != 2:
         raise ValueError("release receipt schema_version must be 2")
@@ -218,7 +418,23 @@ def _verify_receipt(
     if unexpected:
         raise ValueError(f"release receipt has unexpected asset bindings: {sorted(unexpected)}")
 
-    return receipt.get("attestation_subjects", [])
+    provenance = _verify_release_provenance(
+        receipt,
+        tag=tag,
+        commit=commit,
+        expected_tag_object=expected_tag_object,
+        expected_tag_tree=expected_tag_tree,
+        expected_release_control_revision=expected_release_control_revision,
+        expected_workflow_revision=expected_workflow_revision,
+        expected_workflow_run_id=expected_workflow_run_id,
+        expected_workflow_attempt=expected_workflow_attempt,
+        expected_workflow_event=expected_workflow_event,
+        expected_workflow_ref=expected_workflow_ref,
+        expected_workflow_ref_protected=expected_workflow_ref_protected,
+        expected_repository=expected_repository,
+        require=require_release_provenance,
+    )
+    return receipt.get("attestation_subjects", []), provenance
 
 
 def verify_public_release_bindings(
@@ -229,6 +445,17 @@ def verify_public_release_bindings(
     asset_dir: Path,
     receipt_path: Path,
     expected_tag_target: str,
+    expected_tag_object: str | None = None,
+    expected_tag_tree: str | None = None,
+    expected_release_control_revision: str | None = None,
+    expected_workflow_revision: str | None = None,
+    expected_workflow_run_id: str | None = None,
+    expected_workflow_attempt: str | None = None,
+    expected_workflow_event: str | None = None,
+    expected_workflow_ref: str | None = None,
+    expected_workflow_ref_protected: str | None = None,
+    expected_repository: str | None = None,
+    require_release_provenance: bool = False,
 ) -> dict[str, Any]:
     """Fail closed unless all public release identities bind to the same bytes."""
     version = _tag_version(tag)
@@ -333,7 +560,7 @@ def verify_public_release_bindings(
         raise ValueError("release receipt must be inside the public asset directory")
     receipt = _load_json(receipt_file, "release receipt")
     required_receipt_files = set(checksums)
-    _verify_receipt(
+    _, release_provenance = _verify_receipt(
         receipt,
         tag=tag,
         commit=commit,
@@ -341,7 +568,24 @@ def verify_public_release_bindings(
         manifest_hash=manifest_hash,
         asset_dir=asset_root,
         required_files=required_receipt_files,
+        expected_tag_object=expected_tag_object,
+        expected_tag_tree=expected_tag_tree,
+        expected_release_control_revision=expected_release_control_revision,
+        expected_workflow_revision=expected_workflow_revision,
+        expected_workflow_run_id=expected_workflow_run_id,
+        expected_workflow_attempt=expected_workflow_attempt,
+        expected_workflow_event=expected_workflow_event,
+        expected_workflow_ref=expected_workflow_ref,
+        expected_workflow_ref_protected=expected_workflow_ref_protected,
+        expected_repository=expected_repository,
+        require_release_provenance=require_release_provenance,
     )
+    if release_provenance is not None:
+        manifest_repository = _required_repository(
+            manifest.get("repository"), "release manifest repository"
+        )
+        if manifest_repository != release_provenance["repository"]:
+            raise ValueError("release manifest repository does not match release provenance")
 
     manifest_attestations = manifest.get("attestations")
     receipt_attestations = receipt.get("attestations")
@@ -420,6 +664,10 @@ def verify_public_release_bindings(
         "file_sha256": dict(sorted(file_hashes.items())),
         "web_image_digest": image_digest,
         "attestation_count": len(subject_ids),
+        "release_provenance_status": "verified"
+        if release_provenance is not None
+        else "not_present_legacy_release",
+        "release_provenance": release_provenance,
     }
 
 
@@ -432,6 +680,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--asset-dir", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--expected-tag-target", required=True)
+    parser.add_argument("--expected-tag-object")
+    parser.add_argument("--expected-tag-tree")
+    parser.add_argument("--expected-release-control-revision")
+    parser.add_argument("--expected-workflow-revision")
+    parser.add_argument("--expected-workflow-run-id")
+    parser.add_argument("--expected-workflow-attempt")
+    parser.add_argument("--expected-workflow-event")
+    parser.add_argument("--expected-workflow-ref")
+    parser.add_argument("--expected-workflow-ref-protected")
+    parser.add_argument("--expected-repository")
+    parser.add_argument("--require-release-provenance", action="store_true")
     args = parser.parse_args(argv)
     try:
         result = verify_public_release_bindings(
@@ -441,6 +700,17 @@ def main(argv: list[str] | None = None) -> int:
             asset_dir=args.asset_dir,
             receipt_path=args.receipt,
             expected_tag_target=args.expected_tag_target,
+            expected_tag_object=args.expected_tag_object,
+            expected_tag_tree=args.expected_tag_tree,
+            expected_release_control_revision=args.expected_release_control_revision,
+            expected_workflow_revision=args.expected_workflow_revision,
+            expected_workflow_run_id=args.expected_workflow_run_id,
+            expected_workflow_attempt=args.expected_workflow_attempt,
+            expected_workflow_event=args.expected_workflow_event,
+            expected_workflow_ref=args.expected_workflow_ref,
+            expected_workflow_ref_protected=args.expected_workflow_ref_protected,
+            expected_repository=args.expected_repository,
+            require_release_provenance=args.require_release_provenance,
         )
     except (OSError, ValueError) as exc:
         parser.error(str(exc))

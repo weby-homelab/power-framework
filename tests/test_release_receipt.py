@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts.generate_release_receipt import build_receipt
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +27,7 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
         json.dumps(
             {
                 "schema": "power.release.manifest.v1",
+                "repository": "weby-homelab/power-framework",
                 "commit": "3f2e2b9687f96a6fc52c634a13bd75205af7dd96",
             }
         ),
@@ -35,9 +38,13 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
     release_environment.update(
         {
             "RELEASE_CONTROL_REVISION": "c" * 40,
+            "RELEASE_WORKFLOW_REVISION": "c" * 40,
             "RELEASE_WORKFLOW_RUN_ID": "12345",
             "RELEASE_WORKFLOW_ATTEMPT": "2",
             "RELEASE_WORKFLOW_EVENT": "workflow_dispatch",
+            "RELEASE_WORKFLOW_REPOSITORY": "weby-homelab/power-framework",
+            "RELEASE_WORKFLOW_REF": "refs/heads/main",
+            "RELEASE_WORKFLOW_REF_PROTECTED": "true",
         }
     )
 
@@ -82,6 +89,8 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
         "workflow_run_id": "12345",
         "workflow_run_attempt": "2",
         "workflow_event": "workflow_dispatch",
+        "workflow_ref": "refs/heads/main",
+        "workflow_ref_protected": "true",
         "repository": "weby-homelab/power-framework",
     }
     assert receipt["assets"] == [
@@ -93,7 +102,9 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
     ]
 
 
-def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path) -> None:
+def test_receipt_normalizes_attestation_ids_and_binds_subjects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     assets = tmp_path / "dist"
     assets.mkdir()
     wheel = assets / "power_framework-3.7.8-py3-none-any.whl"
@@ -106,6 +117,7 @@ def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path) -
         json.dumps(
             {
                 "schema": "power.release.manifest.v1",
+                "repository": "weby-homelab/power-framework",
                 "version": "3.7.8",
                 "commit": "6e7d0a48d36e564030954138fec03778ee44d6a0",
                 "attestations": ["github:123", "github:456"],
@@ -118,6 +130,18 @@ def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path) -
         ),
         encoding="utf-8",
     )
+
+    for name, value in {
+        "RELEASE_CONTROL_REVISION": "a" * 40,
+        "RELEASE_WORKFLOW_REVISION": "a" * 40,
+        "RELEASE_WORKFLOW_RUN_ID": "12345",
+        "RELEASE_WORKFLOW_ATTEMPT": "1",
+        "RELEASE_WORKFLOW_EVENT": "push",
+        "RELEASE_WORKFLOW_REPOSITORY": "weby-homelab/power-framework",
+        "RELEASE_WORKFLOW_REF": "refs/tags/v3.7.8",
+        "RELEASE_WORKFLOW_REF_PROTECTED": "false",
+    }.items():
+        monkeypatch.setenv(name, value)
 
     receipt = build_receipt(
         repo=REPO_ROOT,
@@ -150,3 +174,86 @@ def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path) -
         },
         {"id": "github:456", "role": "web", "subjects": [image_digest]},
     ]
+
+
+def _minimal_receipt_inputs(tmp_path: Path) -> tuple[Path, Path]:
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    (assets / "evidence.txt").write_text("synthetic evidence\n", encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "power.release.manifest.v1",
+                "repository": "weby-homelab/power-framework",
+                "version": "3.2.5",
+                "commit": "3f2e2b9687f96a6fc52c634a13bd75205af7dd96",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return assets, manifest
+
+
+def _set_valid_provenance_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name, value in {
+        "RELEASE_CONTROL_REVISION": "c" * 40,
+        "RELEASE_WORKFLOW_REVISION": "c" * 40,
+        "RELEASE_WORKFLOW_RUN_ID": "12345",
+        "RELEASE_WORKFLOW_ATTEMPT": "1",
+        "RELEASE_WORKFLOW_EVENT": "workflow_dispatch",
+        "RELEASE_WORKFLOW_REPOSITORY": "weby-homelab/power-framework",
+        "RELEASE_WORKFLOW_REF": "refs/heads/main",
+        "RELEASE_WORKFLOW_REF_PROTECTED": "true",
+    }.items():
+        monkeypatch.setenv(name, value)
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    [
+        ("RELEASE_CONTROL_REVISION", "not-a-sha", "release control revision"),
+        ("RELEASE_WORKFLOW_ATTEMPT", "0", "workflow run attempt"),
+        ("RELEASE_WORKFLOW_EVENT", "schedule", "workflow event"),
+        ("RELEASE_WORKFLOW_REPOSITORY", "", "workflow repository"),
+        ("RELEASE_WORKFLOW_REF", "refs/heads/feature", "workflow ref"),
+    ],
+)
+def test_receipt_rejects_malformed_control_plane_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    value: str,
+    message: str,
+) -> None:
+    assets, manifest = _minimal_receipt_inputs(tmp_path)
+    _set_valid_provenance_environment(monkeypatch)
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValueError, match=message):
+        build_receipt(
+            repo=REPO_ROOT,
+            tag="v3.2.5",
+            assets_dir=assets,
+            repository="weby-homelab/power-framework",
+            workflow_run_id="12345",
+            manifest_path=manifest,
+        )
+
+
+def test_receipt_rejects_inconsistent_control_plane_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assets, manifest = _minimal_receipt_inputs(tmp_path)
+    _set_valid_provenance_environment(monkeypatch)
+    monkeypatch.setenv("RELEASE_WORKFLOW_REVISION", "d" * 40)
+
+    with pytest.raises(ValueError, match="does not match workflow revision"):
+        build_receipt(
+            repo=REPO_ROOT,
+            tag="v3.2.5",
+            assets_dir=assets,
+            repository="weby-homelab/power-framework",
+            workflow_run_id="12345",
+            manifest_path=manifest,
+        )

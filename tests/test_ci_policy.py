@@ -176,9 +176,13 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
         "WEB_ATTESTATION_ID": "${{ steps.web_attestation.outputs.attestation-id }}",
         "WEB_IMAGE_DIGEST": "${{ steps.web_image.outputs.digest }}",
         "RELEASE_CONTROL_REVISION": "${{ github.sha }}",
+        "RELEASE_WORKFLOW_REVISION": "${{ github.sha }}",
         "RELEASE_WORKFLOW_RUN_ID": "${{ github.run_id }}",
         "RELEASE_WORKFLOW_ATTEMPT": "${{ github.run_attempt }}",
         "RELEASE_WORKFLOW_EVENT": "${{ github.event_name }}",
+        "RELEASE_WORKFLOW_REPOSITORY": "${{ github.repository }}",
+        "RELEASE_WORKFLOW_REF": "${{ github.ref }}",
+        "RELEASE_WORKFLOW_REF_PROTECTED": "${{ github.ref_protected }}",
     }
     assert (
         "uv sync --locked --group dev --extra web --extra semantic --extra rerank" in release_text
@@ -225,6 +229,21 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert 'git ls-remote origin "refs/tags/${RELEASE_TAG}"' in release_text
     assert "REMOTE_TAG_TARGET" in release_text
     assert "REMOTE_TAG_OBJECT" in release_text
+    assert "REMOTE_TAG_TREE" in release_text
+    assert "--require-release-provenance" in release_text
+    for expected_option in (
+        "--expected-tag-object",
+        "--expected-tag-tree",
+        "--expected-release-control-revision",
+        "--expected-workflow-revision",
+        "--expected-workflow-run-id",
+        "--expected-workflow-attempt",
+        "--expected-workflow-event",
+        "--expected-workflow-ref",
+        "--expected-workflow-ref-protected",
+        "--expected-repository",
+    ):
+        assert expected_option in release_text
     assert "permissions: {}" in release_text
     assert (
         "RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && needs.release_input.outputs.release_tag || github.ref_name }}"
@@ -235,6 +254,34 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "--pending-mandatory web-semantic-acceptance" in release_text
     assert "--pending-mandatory web-rerank-acceptance" in release_text
     assert "--pending-mandatory public-release-readback" in release_text
+
+
+def test_workflow_dispatch_control_requires_protected_main() -> None:
+    release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(release_text)
+    release_input = workflow["jobs"]["release_input"]
+    trusted_ref = next(
+        step
+        for step in release_input["steps"]
+        if step.get("name") == "Validate trusted workflow-dispatch control ref"
+    )
+
+    assert trusted_ref["if"] == "github.event_name == 'workflow_dispatch'"
+    assert trusted_ref["env"] == {
+        "CONTROL_REF": "${{ github.ref }}",
+        "CONTROL_REF_PROTECTED": "${{ github.ref_protected }}",
+        "CONTROL_REPOSITORY": "${{ github.repository }}",
+    }
+    assert 'test "$CONTROL_REF" = "refs/heads/main"' in trusted_ref["run"]
+    assert 'test "$CONTROL_REF_PROTECTED" = "true"' in trusted_ref["run"]
+    assert 'test "$CONTROL_REPOSITORY" = "weby-homelab/power-framework"' in trusted_ref["run"]
+    assert release_input["steps"].index(trusted_ref) < next(
+        index
+        for index, step in enumerate(release_input["steps"])
+        if step.get("name") == "Validate workflow dispatch release tag"
+    )
+    assert 'tags:\n      - "v*.*.*"' in release_text
+    assert release_input.get("permissions") == {}
 
 
 def test_release_harness_and_publication_guards_are_tag_bound() -> None:
@@ -329,6 +376,8 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     assert '"$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py"' in public_binding_step["run"]
     assert 'verified_image_digest"' in public_binding_step["run"]
     assert 'registry_digest" = "$verified_image_digest"' in public_binding_step["run"]
+    assert public_binding_step["run"].count("--expected-") >= 9
+    assert "--require-release-provenance" in public_binding_step["run"]
     assert public_binding_step["env"]["DOCKER_CONFIG"] == (
         "${{ runner.temp }}/power-release-readback-docker-config"
     )

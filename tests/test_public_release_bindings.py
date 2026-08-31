@@ -162,7 +162,55 @@ def _refresh_manifest_receipt_and_checksum(paths: dict[str, Path | str]) -> None
     _write_checksums(checksum_path, files)
 
 
-def _verify(paths: dict[str, Path | str]) -> dict[str, Any]:
+def _add_valid_provenance(paths: dict[str, Path | str]) -> None:
+    receipt_path = Path(paths["receipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["release"].update(
+        {
+            "repository": "weby-homelab/power-framework",
+            "tree": "b" * 40,
+        }
+    )
+    receipt["workflow_run"] = {
+        "id": "12345",
+        "attempt": "1",
+        "event": "workflow_dispatch",
+        "ref": "refs/heads/main",
+        "repository": "weby-homelab/power-framework",
+    }
+    receipt["release_provenance"] = {
+        "release_source_tag": TAG,
+        "release_source_commit": COMMIT,
+        "release_source_tree": "b" * 40,
+        "release_tag_object": "c" * 40,
+        "release_control_revision": "d" * 40,
+        "workflow_revision": "d" * 40,
+        "workflow_run_id": "12345",
+        "workflow_run_attempt": "1",
+        "workflow_event": "workflow_dispatch",
+        "workflow_ref": "refs/heads/main",
+        "workflow_ref_protected": "true",
+        "repository": "weby-homelab/power-framework",
+    }
+    receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _verify(paths: dict[str, Path | str], *, strict: bool = False) -> dict[str, Any]:
+    options: dict[str, Any] = {}
+    if strict:
+        options = {
+            "expected_tag_object": "c" * 40,
+            "expected_tag_tree": "b" * 40,
+            "expected_release_control_revision": "d" * 40,
+            "expected_workflow_revision": "d" * 40,
+            "expected_workflow_run_id": "12345",
+            "expected_workflow_attempt": "1",
+            "expected_workflow_event": "workflow_dispatch",
+            "expected_workflow_ref": "refs/heads/main",
+            "expected_workflow_ref_protected": "true",
+            "expected_repository": "weby-homelab/power-framework",
+            "require_release_provenance": True,
+        }
     return verify_public_release_bindings(
         tag=TAG,
         manifest_path=Path(paths["manifest"]),
@@ -170,12 +218,122 @@ def _verify(paths: dict[str, Path | str]) -> dict[str, Any]:
         asset_dir=Path(paths["asset_dir"]),
         receipt_path=Path(paths["receipt"]),
         expected_tag_target=str(paths["commit"]),
+        **options,
     )
 
 
 def test_valid_frozen_release_binding_passes(tmp_path: Path) -> None:
     result = _verify(_write_fixture(tmp_path))
     assert result["status"] == "verified"
+    assert result["release_provenance_status"] == "not_present_legacy_release"
+
+
+def test_strict_release_provenance_binding_passes(tmp_path: Path) -> None:
+    paths = _write_fixture(tmp_path)
+    _add_valid_provenance(paths)
+
+    result = _verify(paths, strict=True)
+
+    assert result["release_provenance_status"] == "verified"
+    assert result["release_provenance"]["release_tag_object"] == "c" * 40
+
+
+def test_strict_release_provenance_requires_trusted_expectations(tmp_path: Path) -> None:
+    paths = _write_fixture(tmp_path)
+    _add_valid_provenance(paths)
+
+    with pytest.raises(ValueError, match="strict release provenance requires"):
+        verify_public_release_bindings(
+            tag=TAG,
+            manifest_path=Path(paths["manifest"]),
+            checksums_path=Path(paths["checksums"]),
+            asset_dir=Path(paths["asset_dir"]),
+            receipt_path=Path(paths["receipt"]),
+            expected_tag_target=str(paths["commit"]),
+            require_release_provenance=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("release_source_tag", "v3.7.9", "source tag does not match"),
+        ("release_source_commit", "e" * 40, "source commit does not match"),
+        ("release_source_tree", "e" * 40, "source tree does not match"),
+        ("release_tag_object", "e" * 40, "expected tag object does not match"),
+        ("release_control_revision", "e" * 40, "control revision does not match"),
+        ("workflow_revision", "e" * 40, "control revision does not match"),
+        ("workflow_run_id", "0", "workflow run ID must be a positive decimal integer"),
+        ("workflow_run_attempt", "", "workflow run attempt must be a non-empty string"),
+        ("workflow_event", "schedule", "workflow event is not a supported release event"),
+        ("workflow_ref", "refs/heads/feature", "workflow ref does not match release event"),
+        ("workflow_ref_protected", "yes", "workflow ref protection state must be true or false"),
+        ("repository", "other/repository", "provenance repository does not match receipt"),
+    ],
+)
+def test_strict_release_provenance_rejects_mismatch(
+    tmp_path: Path, field: str, value: Any, message: str
+) -> None:
+    paths = _write_fixture(tmp_path)
+    _add_valid_provenance(paths)
+    receipt_path = Path(paths["receipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["release_provenance"][field] = value
+    receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        _verify(paths, strict=True)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "release_source_tag",
+        "release_source_commit",
+        "release_source_tree",
+        "release_tag_object",
+        "release_control_revision",
+        "workflow_revision",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "workflow_event",
+        "workflow_ref",
+        "workflow_ref_protected",
+        "repository",
+    ],
+)
+def test_strict_release_provenance_rejects_missing_field(tmp_path: Path, field: str) -> None:
+    paths = _write_fixture(tmp_path)
+    _add_valid_provenance(paths)
+    receipt_path = Path(paths["receipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    del receipt["release_provenance"][field]
+    receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must be"):
+        _verify(paths, strict=True)
+
+
+def test_strict_release_provenance_rejects_non_string_field(tmp_path: Path) -> None:
+    paths = _write_fixture(tmp_path)
+    _add_valid_provenance(paths)
+    receipt_path = Path(paths["receipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["release_provenance"]["workflow_run_id"] = 12345
+    receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="workflow run ID must be a non-empty string"):
+        _verify(paths, strict=True)
+
+
+def test_strict_release_provenance_rejects_manifest_repository_mismatch(tmp_path: Path) -> None:
+    paths = _write_fixture(tmp_path)
+    _add_valid_provenance(paths)
+    _rewrite_manifest(paths, lambda data: data.update(repository="other/repository"))
+    _refresh_manifest_receipt_and_checksum(paths)
+
+    with pytest.raises(ValueError, match="release manifest repository"):
+        _verify(paths, strict=True)
 
 
 def test_required_manifest_filename_cannot_be_omitted(tmp_path: Path) -> None:

@@ -20,6 +20,11 @@ except ModuleNotFoundError:  # pragma: no cover - package import path in tests/t
 
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
+TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+POSITIVE_INTEGER_RE = re.compile(r"^[1-9][0-9]*$")
+RELEASE_EVENTS = frozenset({"push", "workflow_dispatch"})
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -40,6 +45,149 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _required_text(value: Any, label: str) -> str:
+    """Require one non-empty textual provenance field."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+    return value.strip()
+
+
+def _required_git_object(value: Any, label: str) -> str:
+    """Require one lowercase 40-character Git object ID."""
+    text = _required_text(value, label)
+    if GIT_OBJECT_RE.fullmatch(text) is None:
+        raise ValueError(f"{label} must be a 40-character lowercase Git SHA")
+    return text
+
+
+def _required_positive_integer(value: Any, label: str) -> str:
+    """Require one positive decimal identifier represented as text."""
+    text = _required_text(value, label)
+    if POSITIVE_INTEGER_RE.fullmatch(text) is None:
+        raise ValueError(f"{label} must be a positive decimal integer")
+    return text
+
+
+def _required_repository(value: Any, label: str) -> str:
+    """Require one safe GitHub owner/name repository identity."""
+    text = _required_text(value, label)
+    if REPOSITORY_RE.fullmatch(text) is None:
+        raise ValueError(f"{label} must use owner/name syntax")
+    return text
+
+
+def _context_value(primary: str, fallback: Any, label: str) -> str:
+    """Read an explicit release context field without accepting an empty override."""
+    value = os.environ.get(primary, fallback)
+    return _required_text(value, label)
+
+
+def _build_release_provenance(
+    *,
+    repo: Path,
+    tag: str,
+    commit: str,
+    tree: str,
+    repository: str,
+    workflow_run_id: str,
+) -> dict[str, str]:
+    """Build and validate the source/control-plane identity for one release."""
+    if TAG_RE.fullmatch(tag) is None:
+        raise ValueError("release source tag must be a stable v<major>.<minor>.<patch> tag")
+    repository = _required_repository(repository, "release repository")
+    workflow_repository = _required_repository(
+        _context_value(
+            "RELEASE_WORKFLOW_REPOSITORY",
+            os.environ.get("GITHUB_REPOSITORY"),
+            "workflow repository",
+        ),
+        "workflow repository",
+    )
+    if workflow_repository != repository:
+        raise ValueError("workflow repository does not match release repository")
+
+    source_commit = _required_git_object(commit, "release source commit")
+    source_tree = _required_git_object(tree, "release source tree")
+    tag_object = _required_git_object(
+        _git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{tag}}"),
+        "release tag object",
+    )
+    control_revision = _required_git_object(
+        _context_value(
+            "RELEASE_CONTROL_REVISION",
+            os.environ.get("GITHUB_SHA"),
+            "release control revision",
+        ),
+        "release control revision",
+    )
+    workflow_revision = _required_git_object(
+        _context_value(
+            "RELEASE_WORKFLOW_REVISION",
+            os.environ.get("GITHUB_SHA"),
+            "workflow revision",
+        ),
+        "workflow revision",
+    )
+    if control_revision != workflow_revision:
+        raise ValueError("release control revision does not match workflow revision")
+
+    argument_run_id = _required_positive_integer(workflow_run_id, "workflow run ID argument")
+    release_workflow_run_id = _required_positive_integer(
+        _context_value("RELEASE_WORKFLOW_RUN_ID", workflow_run_id, "workflow run ID"),
+        "workflow run ID",
+    )
+    if release_workflow_run_id != argument_run_id:
+        raise ValueError("workflow run ID does not match the generator argument")
+    workflow_attempt = _required_positive_integer(
+        _context_value(
+            "RELEASE_WORKFLOW_ATTEMPT",
+            os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "workflow run attempt",
+        ),
+        "workflow run attempt",
+    )
+    workflow_event = _context_value(
+        "RELEASE_WORKFLOW_EVENT",
+        os.environ.get("GITHUB_EVENT_NAME"),
+        "workflow event",
+    )
+    if workflow_event not in RELEASE_EVENTS:
+        raise ValueError(f"workflow event is not a supported release event: {workflow_event}")
+    workflow_ref = _required_text(
+        _context_value("RELEASE_WORKFLOW_REF", os.environ.get("GITHUB_REF"), "workflow ref"),
+        "workflow ref",
+    )
+    expected_ref = (
+        "refs/heads/main" if workflow_event == "workflow_dispatch" else f"refs/tags/{tag}"
+    )
+    if workflow_ref != expected_ref:
+        raise ValueError(f"workflow ref does not match release event: expected {expected_ref}")
+    workflow_ref_protected = _context_value(
+        "RELEASE_WORKFLOW_REF_PROTECTED",
+        os.environ.get("GITHUB_REF_PROTECTED"),
+        "workflow ref protection state",
+    )
+    if workflow_ref_protected not in {"true", "false"}:
+        raise ValueError("workflow ref protection state must be true or false")
+    if workflow_event == "workflow_dispatch" and workflow_ref_protected != "true":
+        raise ValueError("workflow_dispatch release control ref must be protected")
+
+    return {
+        "release_source_tag": tag,
+        "release_source_commit": source_commit,
+        "release_source_tree": source_tree,
+        "release_tag_object": tag_object,
+        "release_control_revision": control_revision,
+        "workflow_revision": workflow_revision,
+        "workflow_run_id": release_workflow_run_id,
+        "workflow_run_attempt": workflow_attempt,
+        "workflow_event": workflow_event,
+        "workflow_ref": workflow_ref,
+        "workflow_ref_protected": workflow_ref_protected,
+        "repository": repository,
+    }
 
 
 def _asset_receipt(path: Path) -> dict[str, Any]:
@@ -133,11 +281,6 @@ def build_receipt(
     if not assets:
         raise ValueError(f"no release assets found in {assets_dir}")
 
-    run_url = (
-        f"https://github.com/{repository}/actions/runs/{workflow_run_id}"
-        if repository and workflow_run_id
-        else None
-    )
     manifest_file = manifest_path or assets_dir / "power-release-manifest.json"
     if not manifest_file.is_file():
         raise ValueError(f"unified release manifest is missing: {manifest_file}")
@@ -149,16 +292,19 @@ def build_receipt(
         raise ValueError("unified release manifest schema is invalid")
     if manifest.get("commit") != commit:
         raise ValueError("unified release manifest commit does not match the tag commit")
-    tag_object = _git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{tag}}")
-    release_control_revision = os.environ.get("RELEASE_CONTROL_REVISION") or os.environ.get(
-        "GITHUB_SHA"
+    repository = _required_repository(repository, "release repository")
+    manifest_repository = _required_repository(
+        manifest.get("repository"), "release manifest repository"
     )
-    release_workflow_run_id = os.environ.get("RELEASE_WORKFLOW_RUN_ID") or workflow_run_id
-    release_workflow_attempt = os.environ.get("RELEASE_WORKFLOW_ATTEMPT") or os.environ.get(
-        "GITHUB_RUN_ATTEMPT"
-    )
-    release_workflow_event = os.environ.get("RELEASE_WORKFLOW_EVENT") or os.environ.get(
-        "GITHUB_EVENT_NAME"
+    if manifest_repository != repository:
+        raise ValueError("release manifest repository does not match release repository")
+    release_provenance = _build_release_provenance(
+        repo=repo,
+        tag=tag,
+        commit=commit,
+        tree=tree,
+        repository=repository,
+        workflow_run_id=workflow_run_id,
     )
     manifest_attestation_values = manifest.get("attestations", [])
     if not isinstance(manifest_attestation_values, list):
@@ -225,26 +371,16 @@ def build_receipt(
             "tree": tree,
         },
         "release_provenance": {
-            "release_source_tag": tag,
-            "release_source_commit": commit,
-            "release_source_tree": tree,
-            "release_tag_object": tag_object,
-            "release_control_revision": release_control_revision,
-            "workflow_revision": release_control_revision,
-            "workflow_run_id": release_workflow_run_id or None,
-            "workflow_run_attempt": release_workflow_attempt,
-            "workflow_event": release_workflow_event,
-            "repository": repository,
+            **release_provenance,
         },
         "workflow_run": {
-            "id": release_workflow_run_id or None,
+            "id": release_provenance["workflow_run_id"],
             "name": os.environ.get("GITHUB_WORKFLOW"),
-            "attempt": release_workflow_attempt,
-            "url": (
-                f"https://github.com/{repository}/actions/runs/{release_workflow_run_id}"
-                if repository and release_workflow_run_id
-                else run_url
-            ),
+            "attempt": release_provenance["workflow_run_attempt"],
+            "event": release_provenance["workflow_event"],
+            "ref": release_provenance["workflow_ref"],
+            "repository": release_provenance["repository"],
+            "url": f"https://github.com/{repository}/actions/runs/{release_provenance['workflow_run_id']}",
         },
         "attestations": sorted(normalized_attestation_ids),
         "attestation_subjects": parsed_subjects,
@@ -260,7 +396,7 @@ def build_receipt(
 
 
 def main() -> int:
-    """Parse release context and write one immutable JSON receipt."""
+    """Parse release context and write one content-free JSON receipt."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--assets-dir", type=Path, required=True)
