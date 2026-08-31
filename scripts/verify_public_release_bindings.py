@@ -11,16 +11,25 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from release_bindings import normalize_attestation_id
+    from release_bindings import (
+        normalize_attestation_id,
+        required_git_object,
+        required_positive_integer,
+        required_repository,
+        required_text,
+    )
 except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
-    from scripts.release_bindings import normalize_attestation_id
+    from scripts.release_bindings import (
+        normalize_attestation_id,
+        required_git_object,
+        required_positive_integer,
+        required_repository,
+        required_text,
+    )
 
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 IMAGE_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
-REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-POSITIVE_INTEGER_RE = re.compile(r"^[1-9][0-9]*$")
 RELEASE_EVENTS = frozenset({"push", "workflow_dispatch"})
 REQUIRED_ARTIFACTS = (
     "power_wheel",
@@ -118,37 +127,6 @@ def _canonical_subject(value: Any, label: str) -> str:
     return _digest_value(subject, label)
 
 
-def _required_text(value: Any, label: str) -> str:
-    """Require one non-empty textual provenance value."""
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{label} must be a non-empty string")
-    return value.strip()
-
-
-def _required_git_object(value: Any, label: str) -> str:
-    """Require one lowercase 40-character Git object ID."""
-    text = _required_text(value, label)
-    if GIT_OBJECT_RE.fullmatch(text) is None:
-        raise ValueError(f"{label} must be a 40-character lowercase Git SHA")
-    return text
-
-
-def _required_positive_integer(value: Any, label: str) -> str:
-    """Require one positive decimal identifier represented as text."""
-    text = _required_text(value, label)
-    if POSITIVE_INTEGER_RE.fullmatch(text) is None:
-        raise ValueError(f"{label} must be a positive decimal integer")
-    return text
-
-
-def _required_repository(value: Any, label: str) -> str:
-    """Require one safe GitHub owner/name repository identity."""
-    text = _required_text(value, label)
-    if REPOSITORY_RE.fullmatch(text) is None:
-        raise ValueError(f"{label} must use owner/name syntax")
-    return text
-
-
 def _verify_release_provenance(
     receipt: dict[str, Any],
     *,
@@ -195,49 +173,49 @@ def _verify_release_provenance(
                 "strict release provenance requires " + ", ".join(missing_expectations)
             )
 
-    source_tag = _required_text(provenance.get("release_source_tag"), "release source tag")
+    source_tag = required_text(provenance.get("release_source_tag"), "release source tag")
     if TAG_RE.fullmatch(source_tag) is None:
         raise ValueError("release source tag must be a stable v<major>.<minor>.<patch> tag")
-    source_commit = _required_git_object(
+    source_commit = required_git_object(
         provenance.get("release_source_commit"), "release source commit"
     )
-    source_tree = _required_git_object(provenance.get("release_source_tree"), "release source tree")
-    tag_object = _required_git_object(provenance.get("release_tag_object"), "release tag object")
-    control_revision = _required_git_object(
+    source_tree = required_git_object(provenance.get("release_source_tree"), "release source tree")
+    tag_object = required_git_object(provenance.get("release_tag_object"), "release tag object")
+    control_revision = required_git_object(
         provenance.get("release_control_revision"), "release control revision"
     )
-    workflow_revision = _required_git_object(
+    workflow_revision = required_git_object(
         provenance.get("workflow_revision"), "workflow revision"
     )
-    workflow_run_id = _required_positive_integer(
+    workflow_run_id = required_positive_integer(
         provenance.get("workflow_run_id"), "workflow run ID"
     )
-    workflow_attempt = _required_positive_integer(
+    workflow_attempt = required_positive_integer(
         provenance.get("workflow_run_attempt"), "workflow run attempt"
     )
-    workflow_event = _required_text(provenance.get("workflow_event"), "workflow event")
+    workflow_event = required_text(provenance.get("workflow_event"), "workflow event")
     if workflow_event not in RELEASE_EVENTS:
         raise ValueError(f"workflow event is not a supported release event: {workflow_event}")
-    workflow_ref = _required_text(provenance.get("workflow_ref"), "workflow ref")
+    workflow_ref = required_text(provenance.get("workflow_ref"), "workflow ref")
     expected_ref = (
         "refs/heads/main" if workflow_event == "workflow_dispatch" else f"refs/tags/{tag}"
     )
     if workflow_ref != expected_ref:
         raise ValueError(f"workflow ref does not match release event: expected {expected_ref}")
-    ref_protected = _required_text(
+    ref_protected = required_text(
         provenance.get("workflow_ref_protected"), "workflow ref protection state"
     )
     if ref_protected not in {"true", "false"}:
         raise ValueError("workflow ref protection state must be true or false")
     if workflow_event == "workflow_dispatch" and ref_protected != "true":
         raise ValueError("workflow_dispatch release control ref must be protected")
-    repository = _required_repository(provenance.get("repository"), "provenance repository")
+    repository = required_repository(provenance.get("repository"), "provenance repository")
 
     release = receipt.get("release")
     if not isinstance(release, dict):
         raise ValueError("release receipt release must be an object")
-    release_tree = _required_git_object(release.get("tree"), "release receipt source tree")
-    release_repository = _required_repository(
+    release_tree = required_git_object(release.get("tree"), "release receipt source tree")
+    release_repository = required_repository(
         release.get("repository"), "release receipt repository"
     )
     if source_tag != tag or source_tag != release.get("tag"):
@@ -254,21 +232,18 @@ def _verify_release_provenance(
     workflow_run = receipt.get("workflow_run")
     if not isinstance(workflow_run, dict):
         raise ValueError("workflow_run is required with release provenance")
-    if _required_positive_integer(workflow_run.get("id"), "workflow_run.id") != workflow_run_id:
+    if required_positive_integer(workflow_run.get("id"), "workflow_run.id") != workflow_run_id:
         raise ValueError("workflow_run.id does not match release provenance")
     if (
-        _required_positive_integer(workflow_run.get("attempt"), "workflow_run.attempt")
+        required_positive_integer(workflow_run.get("attempt"), "workflow_run.attempt")
         != workflow_attempt
     ):
         raise ValueError("workflow_run.attempt does not match release provenance")
-    if _required_text(workflow_run.get("event"), "workflow_run.event") != workflow_event:
+    if required_text(workflow_run.get("event"), "workflow_run.event") != workflow_event:
         raise ValueError("workflow_run.event does not match release provenance")
-    if _required_text(workflow_run.get("ref"), "workflow_run.ref") != workflow_ref:
+    if required_text(workflow_run.get("ref"), "workflow_run.ref") != workflow_ref:
         raise ValueError("workflow_run.ref does not match release provenance")
-    if (
-        _required_repository(workflow_run.get("repository"), "workflow_run.repository")
-        != repository
-    ):
+    if required_repository(workflow_run.get("repository"), "workflow_run.repository") != repository:
         raise ValueError("workflow_run.repository does not match release provenance")
 
     comparisons = {
@@ -284,7 +259,7 @@ def _verify_release_provenance(
         "expected repository": (expected_repository, repository),
     }
     for label, (expected, actual) in comparisons.items():
-        if expected is not None and _required_text(expected, label) != actual:
+        if expected is not None and required_text(expected, label) != actual:
             raise ValueError(f"{label} does not match release provenance")
 
     return {
@@ -581,7 +556,7 @@ def verify_public_release_bindings(
         require_release_provenance=require_release_provenance,
     )
     if release_provenance is not None:
-        manifest_repository = _required_repository(
+        manifest_repository = required_repository(
             manifest.get("repository"), "release manifest repository"
         )
         if manifest_repository != release_provenance["repository"]:

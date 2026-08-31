@@ -90,5 +90,5 @@
   "v3.7.11_created": false,
   "power_3_8_started": false,
   "final_main_sha_note": "This is the last verified public main SHA; the closure PR is not merged, so no closure merge SHA is claimed.",
-  "next_development_cycle": "NO-GO until OWNER-ACTION-002 is completed and post-merge verification passes"
+  "next_development_cycle": "NO-GO until OWNER-ACTION-001 and OWNER-ACTION-002 are completed, then post-merge verification passes"
 }

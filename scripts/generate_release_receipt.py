@@ -14,16 +14,25 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from release_bindings import normalize_attestation_id
+    from release_bindings import (
+        normalize_attestation_id,
+        required_git_object,
+        required_positive_integer,
+        required_repository,
+        required_text,
+    )
 except ModuleNotFoundError:  # pragma: no cover - package import path in tests/tools.
-    from scripts.release_bindings import normalize_attestation_id
+    from scripts.release_bindings import (
+        normalize_attestation_id,
+        required_git_object,
+        required_positive_integer,
+        required_repository,
+        required_text,
+    )
 
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
 TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
-REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-POSITIVE_INTEGER_RE = re.compile(r"^[1-9][0-9]*$")
 RELEASE_EVENTS = frozenset({"push", "workflow_dispatch"})
 
 
@@ -47,41 +56,10 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _required_text(value: Any, label: str) -> str:
-    """Require one non-empty textual provenance field."""
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{label} must be a non-empty string")
-    return value.strip()
-
-
-def _required_git_object(value: Any, label: str) -> str:
-    """Require one lowercase 40-character Git object ID."""
-    text = _required_text(value, label)
-    if GIT_OBJECT_RE.fullmatch(text) is None:
-        raise ValueError(f"{label} must be a 40-character lowercase Git SHA")
-    return text
-
-
-def _required_positive_integer(value: Any, label: str) -> str:
-    """Require one positive decimal identifier represented as text."""
-    text = _required_text(value, label)
-    if POSITIVE_INTEGER_RE.fullmatch(text) is None:
-        raise ValueError(f"{label} must be a positive decimal integer")
-    return text
-
-
-def _required_repository(value: Any, label: str) -> str:
-    """Require one safe GitHub owner/name repository identity."""
-    text = _required_text(value, label)
-    if REPOSITORY_RE.fullmatch(text) is None:
-        raise ValueError(f"{label} must use owner/name syntax")
-    return text
-
-
 def _context_value(primary: str, fallback: Any, label: str) -> str:
     """Read an explicit release context field without accepting an empty override."""
     value = os.environ.get(primary, fallback)
-    return _required_text(value, label)
+    return required_text(value, label)
 
 
 def _build_release_provenance(
@@ -96,8 +74,8 @@ def _build_release_provenance(
     """Build and validate the source/control-plane identity for one release."""
     if TAG_RE.fullmatch(tag) is None:
         raise ValueError("release source tag must be a stable v<major>.<minor>.<patch> tag")
-    repository = _required_repository(repository, "release repository")
-    workflow_repository = _required_repository(
+    repository = required_repository(repository, "release repository")
+    workflow_repository = required_repository(
         _context_value(
             "RELEASE_WORKFLOW_REPOSITORY",
             os.environ.get("GITHUB_REPOSITORY"),
@@ -108,13 +86,13 @@ def _build_release_provenance(
     if workflow_repository != repository:
         raise ValueError("workflow repository does not match release repository")
 
-    source_commit = _required_git_object(commit, "release source commit")
-    source_tree = _required_git_object(tree, "release source tree")
-    tag_object = _required_git_object(
+    source_commit = required_git_object(commit, "release source commit")
+    source_tree = required_git_object(tree, "release source tree")
+    tag_object = required_git_object(
         _git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{tag}}"),
         "release tag object",
     )
-    control_revision = _required_git_object(
+    control_revision = required_git_object(
         _context_value(
             "RELEASE_CONTROL_REVISION",
             os.environ.get("GITHUB_SHA"),
@@ -122,7 +100,7 @@ def _build_release_provenance(
         ),
         "release control revision",
     )
-    workflow_revision = _required_git_object(
+    workflow_revision = required_git_object(
         _context_value(
             "RELEASE_WORKFLOW_REVISION",
             os.environ.get("GITHUB_SHA"),
@@ -133,14 +111,14 @@ def _build_release_provenance(
     if control_revision != workflow_revision:
         raise ValueError("release control revision does not match workflow revision")
 
-    argument_run_id = _required_positive_integer(workflow_run_id, "workflow run ID argument")
-    release_workflow_run_id = _required_positive_integer(
+    argument_run_id = required_positive_integer(workflow_run_id, "workflow run ID argument")
+    release_workflow_run_id = required_positive_integer(
         _context_value("RELEASE_WORKFLOW_RUN_ID", workflow_run_id, "workflow run ID"),
         "workflow run ID",
     )
     if release_workflow_run_id != argument_run_id:
         raise ValueError("workflow run ID does not match the generator argument")
-    workflow_attempt = _required_positive_integer(
+    workflow_attempt = required_positive_integer(
         _context_value(
             "RELEASE_WORKFLOW_ATTEMPT",
             os.environ.get("GITHUB_RUN_ATTEMPT"),
@@ -155,7 +133,7 @@ def _build_release_provenance(
     )
     if workflow_event not in RELEASE_EVENTS:
         raise ValueError(f"workflow event is not a supported release event: {workflow_event}")
-    workflow_ref = _required_text(
+    workflow_ref = required_text(
         _context_value("RELEASE_WORKFLOW_REF", os.environ.get("GITHUB_REF"), "workflow ref"),
         "workflow ref",
     )
@@ -292,8 +270,8 @@ def build_receipt(
         raise ValueError("unified release manifest schema is invalid")
     if manifest.get("commit") != commit:
         raise ValueError("unified release manifest commit does not match the tag commit")
-    repository = _required_repository(repository, "release repository")
-    manifest_repository = _required_repository(
+    repository = required_repository(repository, "release repository")
+    manifest_repository = required_repository(
         manifest.get("repository"), "release manifest repository"
     )
     if manifest_repository != repository:

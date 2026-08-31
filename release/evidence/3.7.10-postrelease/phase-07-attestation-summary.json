@@ -2,6 +2,8 @@
   "schema_version": "power.release.closure.phase-07-summary.v1",
   "status": "verified_subjects_observed_id_mapping_ambiguous",
   "verification_checked_at": "2026-08-31T17:47:55Z",
+  "package_verification_output_sha256_shared_by_wheel_and_sdist": "db4b9c601816103ee35969abc4e430ac08303bb71334d41ebd5cfdab5653bca6",
+  "package_verification_outputs_byte_identical": true,
   "wheel_attestation": "phase-07-wheel-attestation.json",
   "sdist_attestation": "phase-07-sdist-attestation.json",
   "web_attestation": "phase-07-web-attestation.json",

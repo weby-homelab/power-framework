@@ -170,6 +170,7 @@ attestation signature was persisted.
 
 Final public main SHA currently verified: `1a9879ee2353d63d979da5f68e79a6065122343b`.
 This is not a closure merge SHA because PR #381 is open and blocked. **NO-GO**
-until an independent maintainer approves and normally merges PR #381, then
-Phase 32 post-merge verification and Phase 33 independent clean-room audit
-complete. No `v3.7.11` was created and no POWER 3.8 work was started.
+until `OWNER-ACTION-001` and `OWNER-ACTION-002` are completed, an independent
+maintainer normally merges PR #381, and Phase 32 post-merge verification plus
+Phase 33 independent clean-room audit complete. No `v3.7.11` was created and
+no POWER 3.8 work was started.
