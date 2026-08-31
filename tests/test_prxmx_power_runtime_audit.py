@@ -16,8 +16,12 @@ import pytest
 from scripts.prxmx_power_runtime_audit import (
     ALLOWED_SKILL_DIRECTORIES,
     ALLOWED_SKILL_EXTENSIONS,
+    ALLOWED_SKILL_TARGET_ROOTS,
     ALLOWED_SKILL_TOP_LEVEL_FILES,
     DEFAULT_MCP_CONFIGS,
+    DEFAULT_SKILL_TARGETS,
+    DEFAULT_VAULT,
+    DEFAULT_VENV_ROOTS,
     MAX_RELEASE_WHEEL_BYTES,
     MAX_WRAPPER_DEPTH,
     AuditReport,
@@ -179,16 +183,29 @@ def test_strip_jsonc_comments_tokenizer() -> None:
 
 
 def test_default_mcp_configs_matches_prxmx_canonical_paths() -> None:
+    home = str(Path.home())
     expected = [
-        "/root/.config/opencode/opencode.jsonc",
-        "/root/.gemini/config/mcp_config.json",
-        "/root/.codex/config.toml",
-        "/root/.codex/mcp.json",
+        f"{home}/.config/opencode/opencode.jsonc",
+        f"{home}/.gemini/config/mcp_config.json",
+        f"{home}/.codex/config.toml",
+        f"{home}/.codex/mcp.json",
     ]
     assert expected == DEFAULT_MCP_CONFIGS
     # Ensure stale nonexistent Gemini settings paths are not present
-    assert "/root/.gemini/settings.json" not in DEFAULT_MCP_CONFIGS
-    assert "/root/.gemini/antigravity-cli/settings.json" not in DEFAULT_MCP_CONFIGS
+    assert f"{home}/.gemini/settings.json" not in DEFAULT_MCP_CONFIGS
+    assert f"{home}/.gemini/antigravity-cli/settings.json" not in DEFAULT_MCP_CONFIGS
+
+
+def test_default_audit_paths_are_home_relative_and_not_host_specific() -> None:
+    home = Path.home()
+    assert home / "brain" == DEFAULT_VAULT
+    assert all(Path(path).is_relative_to(home) for path in DEFAULT_VENV_ROOTS)
+    assert all(Path(path).is_relative_to(home) for path in DEFAULT_SKILL_TARGETS)
+    assert all(path.is_relative_to(home) for path in ALLOWED_SKILL_TARGET_ROOTS)
+
+    source = Path(__file__).resolve().parents[1] / "scripts" / "prxmx_power_runtime_audit.py"
+    source_text = source.read_text(encoding="utf-8")
+    assert "/root/geminicli" not in source_text
 
 
 # ============================================================================

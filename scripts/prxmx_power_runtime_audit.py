@@ -50,49 +50,43 @@ SYSTEM_PREFIXES = (
 
 DEFAULT_REPO = "weby-homelab/power-framework"
 DEFAULT_REF = "latest"
-DEFAULT_VAULT = Path("/root/geminicli/brain")
-DEFAULT_STATE_DIR = Path.home() / ".local" / "share" / "power" / "audit"
+HOME = Path.home()
+DEFAULT_VAULT = HOME / "brain"
+DEFAULT_STATE_DIR = HOME / ".local" / "share" / "power" / "audit"
 MAX_RELEASE_WHEEL_BYTES = 100 * 1024 * 1024
 MAX_RELEASE_MANIFEST_BYTES = 10 * 1024 * 1024
 MAX_RELEASE_METADATA_BYTES = 10 * 1024 * 1024
 MAX_RELEASE_PYPROJECT_BYTES = 1 * 1024 * 1024
 
 DEFAULT_VENV_ROOTS = [
-    "/root/.config/opencode",
-    "/root/.local/share/power",
-    "/root/geminicli/projects",
+    str(HOME / ".config" / "opencode"),
+    str(HOME / ".local" / "share" / "power"),
+    str(HOME / "projects"),
 ]
 
 DEFAULT_SKILL_TARGETS = [
-    "/root/geminicli/.agents/skills/power",
-    "/root/.opencode/skills/power",
-    "/root/.config/opencode/skills/power",
-    "/root/.gemini/config/skills/power",
-    "/root/.codex/skills/power",
+    str(HOME / ".agents" / "skills" / "power"),
+    str(HOME / ".opencode" / "skills" / "power"),
+    str(HOME / ".config" / "opencode" / "skills" / "power"),
+    str(HOME / ".gemini" / "config" / "skills" / "power"),
+    str(HOME / ".codex" / "skills" / "power"),
 ]
 
 ALLOWED_SKILL_TARGET_ROOTS = [
-    Path("/root/geminicli/.agents/skills"),
-    Path("/root/.opencode/skills"),
-    Path("/root/.config/opencode/skills"),
-    Path("/root/.gemini/config/skills"),
-    Path("/root/.gemini/skills"),
-    Path("/root/.codex/skills"),
-    Path("/root/.local/share/power/skills"),
-    Path.home() / ".agents" / "skills",
-    Path.home() / ".opencode" / "skills",
-    Path.home() / ".config" / "opencode" / "skills",
-    Path.home() / ".gemini" / "config" / "skills",
-    Path.home() / ".gemini" / "skills",
-    Path.home() / ".codex" / "skills",
-    Path.home() / ".local" / "share" / "power" / "skills",
+    HOME / ".agents" / "skills",
+    HOME / ".opencode" / "skills",
+    HOME / ".config" / "opencode" / "skills",
+    HOME / ".gemini" / "config" / "skills",
+    HOME / ".gemini" / "skills",
+    HOME / ".codex" / "skills",
+    HOME / ".local" / "share" / "power" / "skills",
 ]
 
 DEFAULT_MCP_CONFIGS = [
-    "/root/.config/opencode/opencode.jsonc",
-    "/root/.gemini/config/mcp_config.json",
-    "/root/.codex/config.toml",
-    "/root/.codex/mcp.json",
+    str(HOME / ".config" / "opencode" / "opencode.jsonc"),
+    str(HOME / ".gemini" / "config" / "mcp_config.json"),
+    str(HOME / ".codex" / "config.toml"),
+    str(HOME / ".codex" / "mcp.json"),
 ]
 
 ALLOWED_SKILL_TOP_LEVEL_FILES = frozenset({"SKILL.md", "README.md"})
@@ -196,7 +190,7 @@ class ProcessLock:
 
 @dataclass(frozen=True)
 class ReleasePayload:
-    """Validated immutable release contract and artifacts."""
+    """Validated published release contract and artifacts."""
 
     tag: str
     version: str
@@ -771,7 +765,7 @@ def _fetch_from_github(repo: str, ref: str) -> ReleasePayload:
     if not isinstance(release_assets, list):
         raise ReleaseValidationError("GitHub release assets must be a list")
 
-    # 3. Fetch the authoritative manifest from the immutable release asset.
+    # 3. Fetch the authoritative manifest from the published release asset.
     manifest_assets = [
         asset
         for asset in release_assets
@@ -2321,7 +2315,7 @@ def _run_audit_internal(
                 st_p = Path(st).expanduser().resolve()
                 if not is_system_prefix(st_p.parent) and st_p.parent not in (
                     Path("/"),
-                    Path("/root"),
+                    HOME,
                 ):
                     allowed_roots.append(st_p.parent)
 

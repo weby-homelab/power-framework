@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi import FastAPI
 from starlette.requests import Request
@@ -29,11 +31,9 @@ def test_password_plaintext_verification() -> None:
     assert verify_password("", admin_password="test_pass") is False
 
 
-@pytest.mark.asyncio
-async def test_csrf_fails_closed_without_application_settings() -> None:
-    """Reject CSRF validation when an app has not installed its settings object."""
-    app = FastAPI()
-    request = Request(
+def _request_for_app(app: FastAPI) -> Request:
+    """Build a minimal request scope for CSRF dependency tests."""
+    return Request(
         {
             "type": "http",
             "method": "POST",
@@ -49,8 +49,26 @@ async def test_csrf_fails_closed_without_application_settings() -> None:
         }
     )
 
-    with pytest.raises(RuntimeError, match="CSRF settings are not initialized"):
-        await validate_csrf(request)
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "settings",
+    [
+        None,
+        SimpleNamespace(),
+        SimpleNamespace(secret_key=123, session_cookie_name="session", csrf_cookie_name="csrf"),
+        SimpleNamespace(secret_key="secret", session_cookie_name="", csrf_cookie_name="csrf"),
+        SimpleNamespace(secret_key="secret", session_cookie_name="session", csrf_cookie_name=None),
+    ],
+)
+async def test_csrf_fails_closed_for_missing_or_malformed_settings(settings: object) -> None:
+    """Reject missing, wrong-typed, or empty application CSRF settings."""
+    app = FastAPI()
+    if settings is not None:
+        app.state.settings = settings
+
+    with pytest.raises(RuntimeError, match="CSRF settings are missing or malformed"):
+        await validate_csrf(_request_for_app(app))
 
 
 def test_password_pbkdf2_hash_and_verification() -> None:

@@ -66,7 +66,11 @@ async def validate_csrf(request: Request) -> None:
     """
     settings = getattr(request.app.state, "settings", None)
     if settings is None:
-        raise RuntimeError("CSRF settings are not initialized on the application")
+        raise RuntimeError("CSRF settings are missing or malformed on the application")
+    for field in ("secret_key", "session_cookie_name", "csrf_cookie_name"):
+        value = getattr(settings, field, None)
+        if not isinstance(value, str) or not value.strip():
+            raise RuntimeError("CSRF settings are missing or malformed on the application")
 
     # Try header first (for API / fetch requests)
     header_csrf = request.headers.get("X-CSRF-Token") or request.headers.get("X-XSRF-Token")

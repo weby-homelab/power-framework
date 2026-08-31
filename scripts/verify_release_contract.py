@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the immutable, machine-readable release baseline for POWER.
+"""Validate the published, machine-readable release baseline for POWER.
 
 The baseline is intentionally source-scoped rather than a performance claim.
 It records the exact released tree, the checked model lock, frozen benchmark
