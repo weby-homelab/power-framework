@@ -1,6 +1,6 @@
 {
   "schema_version": "power.release.closure.final.v1",
-  "status": "NO-GO_BLOCKED_AUTHORIZATION",
+  "status": "NO-GO_PRXMX_DRIFT_AND_APPROVAL",
   "overall": "NO-GO",
   "repository": "weby-homelab/power-framework",
   "public_repository_url": "https://github.com/weby-homelab/power-framework",
@@ -19,7 +19,7 @@
     "merged": false,
     "merge_state": "blocked",
     "required_review_decision": "REVIEW_REQUIRED",
-    "head_at_latest_public_readback": "169c90f4a3239b89ef7f82bc6143b4e5b54219d3"
+    "head_at_latest_public_readback": "8ab5314613f104c4aea8aa578bc602ae274ac910"
   },
   "verdicts": {
     "release_validity": "PASS",
@@ -27,11 +27,11 @@
     "attestations": "PASS_WITH_OBSERVED_ID_MAPPING_AMBIGUITY",
     "ghcr": "PASS",
     "public_install": "PASS",
-    "prxmx": "BLOCKED_EXTERNAL",
+    "prxmx": "DRIFT_REMEDIATION_REQUIRED",
     "documentation": "PASS",
     "changelog": "PASS",
     "governance": "PASS",
-    "actions_security": "PASS",
+    "actions_security": "PASS_WITH_ACTIONLINT_UNAVAILABLE",
     "repository_security": "PARTIAL",
     "repository_hygiene": "PASS",
     "historical_immutability": "PASS"
@@ -39,6 +39,7 @@
   "release_invariants": {
     "tag_object": "440a589572ba42867af92e6215a8ca4e1f8b3153",
     "tag_target": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "release_signing_fingerprint": "7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E",
     "source_tree": "0f6a5e399bd3a78792a6c5fab983a2136cb2b335",
     "merged_tree": "0f6a5e399bd3a78792a6c5fab983a2136cb2b335",
     "public_asset_count": 9,
@@ -80,10 +81,10 @@
     "actionlint": "unavailable"
   },
   "blockers": {
-    "found": 5,
-    "resolved": 3,
+    "found": 6,
+    "resolved": 4,
     "remaining": 2,
-    "remaining_ids": ["BLK-0002", "BLK-0005"],
+    "remaining_ids": ["BLK-0005", "BLK-0006"],
     "owner_actions": ["OWNER-ACTION-001", "OWNER-ACTION-002"]
   },
   "historical_identity_rewritten": false,
@@ -91,5 +92,5 @@
   "v3.7.11_created": false,
   "power_3_8_started": false,
   "final_main_sha_note": "This is the last verified public main SHA; the closure PR is not merged, so no closure merge SHA is claimed.",
-  "next_development_cycle": "NO-GO: OWNER-ACTION-001 (authorized PRXMX read-only audit) and OWNER-ACTION-002 (independent maintainer approval and normal protected merge of PR #381) must both complete; then Phase 32 post-merge verification and Phase 33 clean-room audit must pass"
+  "next_development_cycle": "NO-GO: OWNER-ACTION-001 (explicitly authorized remediation of PRXMX Skill/check-out drift followed by a clean bounded read-only audit) and OWNER-ACTION-002 (independent maintainer approval and normal protected merge of PR #381) must both complete; then Phase 32 post-merge verification and Phase 33 clean-room audit must pass"
 }

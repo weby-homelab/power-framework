@@ -11,9 +11,12 @@ runtime readbacks. Hashes, public identifiers, URLs, versions, statuses, and
 content-free summaries are retained; credentials, authorization material,
 private vault content, and unrelated host inventory are intentionally excluded.
 
-The PRXMX section is explicitly `BLOCKED_AUTHORIZATION` because this WS session
-had no permitted read-only remote transport. Historical local claims are not
-used as a substitute for that required remote audit.
+The PRXMX section records an explicitly authorized bounded read-only audit.
+Public release, manifest, wheel, runtime, and MCP checks passed, while one
+symlinked managed Skill target remains `manual_review`; the result is therefore
+`DRIFT`, not a false PASS. The pre-existing dirty checkout copy of the audit
+script was not executed: only its public-verified tracked blob was loaded in
+memory. No remote mutation was performed.
 
 The signed release boundary and observed source snapshot are:
 

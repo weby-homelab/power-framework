@@ -2,19 +2,95 @@
   "schema_version": "power.release.closure.phase-10.v1",
   "mode": "read-only",
   "mutation_performed": false,
-  "remote_access_attempted": false,
+  "remote_access_attempted": true,
+  "checked_at": "2026-08-31T23:58:31.167631Z",
+  "transport": {
+    "target_alias": "PRXMX-01",
+    "batch_mode": true,
+    "identities_only": true,
+    "strict_host_key_checking": true,
+    "connect_timeout_seconds": 10,
+    "connection_attempts": 1,
+    "clear_all_forwardings": true,
+    "forward_agent": false,
+    "permit_local_command": false,
+    "request_tty": false,
+    "temporary_permission_removed_after_audit": true,
+    "credentials_or_authorization_material_persisted": false
+  },
   "release": "v3.7.10",
   "release_resolved": true,
   "manifest_verified": true,
   "wheel_verified": true,
-  "runtime_inventory_summary": {
-    "status": "not_collected",
-    "reason": "No permitted PRXMX read-only remote transport was available in the WS execution environment."
+  "release_resolution": {
+    "version": "3.7.10",
+    "commit": "f6cdaa35b552ed0a335051f2f268f57d52302161",
+    "commit_public": true,
+    "manifest_sha256": "1aac24ee51e6f1f36a313bbca932fd8fe77abbbdc7b0835174df05bfdc4527f4",
+    "wheel_filename": "power_framework-3.7.10-py3-none-any.whl",
+    "wheel_sha256": "f06592d63a7b1176890d5d69f9f9031955f1b78dd020994c3f43e239c54bdda2",
+    "wheel_size_bytes": 437694,
+    "authority_source": "phase-03-public-assets-api-digest",
+    "resolver": "canonical-public-urls-with-pinned-digest"
   },
-  "mcp_summary": {"status": "not_collected", "private_configuration_read": false},
-  "skill_summary": {"status": "not_collected", "private_configuration_read": false},
-  "drift": {"status": "unknown", "remote_runtime_not_reached": true},
-  "status": "BLOCKED_AUTHORIZATION",
+  "runtime_inventory_summary": {
+    "status": "up_to_date",
+    "runtime_count": 6,
+    "versions": ["3.7.10"],
+    "all_target_versions_match": true,
+    "host_paths_persisted": false
+  },
+  "mcp_summary": {
+    "status": "canonical",
+    "config_count": 4,
+    "target_version": "3.7.10",
+    "canonical_count": 4,
+    "opencode_jsonc_comments_preserved": true,
+    "private_configuration_values_persisted": false
+  },
+  "skill_summary": {
+    "status": "drift_detected",
+    "target_count": 5,
+    "up_to_date_count": 4,
+    "manual_review_count": 1,
+    "drift_target": "managed-opencode-power-skill",
+    "drift_reason": "symlink target requires explicit topology review",
+    "private_skill_content_persisted": false
+  },
+  "source_audit": {
+    "repository_revision": "9e9199c4597ccdd17c810728e42950626caed71f",
+    "script_blob": "80fce6ae34cf6e56a6d6dc95c5771970c1faf5c7",
+    "script_sha256": "d9763279a3be94784ea93969d6526e15854a1fffc847c619835206d3259d9913",
+    "public_revision_and_blob_verified": true,
+    "working_copy_dirty": true,
+    "working_copy_executed": false,
+    "executed_source": "public tracked HEAD blob"
+  },
+  "drift": {
+    "status": "detected",
+    "runtime": false,
+    "mcp": false,
+    "skills": true,
+    "source_worktree": true,
+    "remote_immutability": "unchanged"
+  },
+  "immutability": {
+    "before_after_equal": true,
+    "script_revision_unchanged": true,
+    "script_blob_unchanged": true,
+    "script_index_unchanged": true,
+    "script_hash_unchanged": true,
+    "script_status_unchanged": true,
+    "source_worktree_dirty_unchanged": true,
+    "mcp_metadata_hashes_unchanged": true,
+    "skill_metadata_hashes_unchanged": true
+  },
+  "mutation_evidence": {
+    "mutation_command_invoked": false,
+    "bounded_target_metadata_unchanged": true,
+    "universal_transient_write_absence_claim": "not_made"
+  },
+  "status": "DRIFT",
   "owner_action_id": "OWNER-ACTION-001",
   "historical_local_audit_used_as_remote_substitute": false
 }

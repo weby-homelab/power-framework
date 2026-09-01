@@ -7,10 +7,11 @@ content, or raw authorization material.
 | ID | Phase | Severity | Class | Status | Owner |
 | --- | --- | --- | --- | --- | --- |
 | `BLK-0001` | 11 | P2 | WORKFLOW / RELEASE_EVIDENCE | RESOLVED_BY_PUBLIC_READBACK | closure branch |
-| `BLK-0002` | 10 | P1 | PRXMX / AUTHORIZATION | BLOCKED_AUTHORIZATION | owner action |
+| `BLK-0002` | 10 | P1 | PRXMX / AUTHORIZATION | RESOLVED_WITH_BOUNDED_TRANSPORT | closure branch |
 | `BLK-0003` | 6 | P2 | ENVIRONMENT | RESOLVED_WITH_OCI_API | closure branch |
 | `BLK-0004` | 27 | P2 | ENVIRONMENT | RESOLVED_WITH_UV_ENVIRONMENT | closure branch |
 | `BLK-0005` | 29-32 | P1 | AUTHORIZATION | BLOCKED_AUTHORIZATION | owner action |
+| `BLK-0006` | 10 | P1 | PRXMX / RUNTIME_DRIFT | OPEN_DRIFT | owner action |
 
 ## BLK-0001
 
@@ -27,15 +28,31 @@ content, or raw authorization material.
 
 ## BLK-0002
 
-- Symptom: the required PRXMX remote read-only audit could not be executed from
-  this WS session through an approved transport.
-- Root cause: no permitted remote read-only transport was available; no remote
-  mutation, apply, configuration write, system Python change, Skill change, or
-  MCP configuration change was attempted.
-- Fix: none claimed; all independent local and public phases continued.
+- Symptom: the required PRXMX remote read-only audit initially had no approved
+  transport from WS.
+- Root cause: the global OpenCode policy denied remote shell access until the
+  owner explicitly authorized this bounded read-only Phase 10 scope.
+- Fix: a temporary host-specific, batch-only transport rule was enabled for the
+  audit and removed immediately afterward; forwarding, TTY, apply, record, and
+  mutation commands were not invoked.
 - Verification: `phase-10-prxmx-readonly-audit.json` records
-  `mutation_performed=false`, `remote_access_attempted=false`, and
-  `status=BLOCKED_AUTHORIZATION`.
+  `mutation_performed=false`, `remote_access_attempted=true`, strict transport
+  controls, and identical before/after metadata hashes.
+
+## BLK-0006
+
+- Symptom: the authorized read-only audit resolved and verified `v3.7.10`; all
+  six discovered POWER runtimes and all four MCP references resolve to
+  `3.7.10`, but one managed Skill target requires topology review.
+- Root cause: one managed OpenCode Skill target is a symlink, which the runtime
+  audit intentionally classifies as `manual_review`; additionally, the checkout
+  copy of the audit script was already dirty and was not executed.
+- Fix: none claimed because this phase was explicitly read-only. The audit ran
+  only the public-verified tracked `HEAD` blob and made no remote mutation.
+- Verification: public manifest and wheel digests passed, runtime drift is
+  false, MCP drift is false, Skill drift is true, and every before/after
+  bounded metadata comparison passed. No universal transient-write absence
+  claim is made from metadata equality alone.
 
 ## BLK-0003
 
@@ -75,8 +92,8 @@ content, or raw authorization material.
 - WHY AGENT CANNOT COMPLETE: GitHub rejects self-approval, and bypassing the
   required review would violate the repository closure policy.
 - EXACT EVIDENCE: PR `https://github.com/weby-homelab/power-framework/pull/381`,
-  head `169c90f4a3239b89ef7f82bc6143b4e5b54219d3` at the latest verified
-  public readback, all required checks passed,
+  head `8ab5314613f104c4aea8aa578bc602ae274ac910` at the latest verified public
+  readback, all required checks passed,
   `reviewDecision=REVIEW_REQUIRED`.
 - HEAD SNAPSHOT NOTE: this identifier is a point-in-time public PR readback
   immediately before this evidence-refresh commit; after any later branch
@@ -90,14 +107,16 @@ content, or raw authorization material.
 ## OWNER-ACTION-001
 
 - AREA: PRXMX read-only runtime audit.
-- REQUIRED ACTION: provide an approved read-only transport and bounded target
-  scope for the PRXMX audit; permit only inventory, version, MCP/Skill drift,
-  and public-release resolution reads.
-- WHY AGENT CANNOT COMPLETE: the WS execution policy provides no permitted
-  remote transport for this operation, and the closure must not bypass it.
+- REQUIRED ACTION: review the Skill symlink topology and dirty checkout copy of
+  the audit script; explicitly authorize any repair, then rerun the same bounded
+  read-only audit until managed Skill drift is false.
+- WHY AGENT CANNOT COMPLETE: the granted scope was read-only and did not permit
+  changing a Skill target, checkout, MCP configuration, runtime, or system
+  Python.
 - EXACT EVIDENCE: `phase-10-prxmx-readonly-audit.json` with
-  `status=BLOCKED_AUTHORIZATION` and `mutation_performed=false`.
-- RISK IF DEFERRED: PRXMX runtime drift remains unverified; no claim about that
-  host can be made from this closure.
+  `status=DRIFT`, `mutation_performed=false`, six runtimes at `3.7.10`, MCP
+  drift false, Skill drift true, and immutable before/after readback.
+- RISK IF DEFERRED: the runtime itself is current, but managed Skill topology
+  remains outside a full PASS claim.
 - RESUME PHASE: Phase 10 and then final independent audit; all other phases are
   independent and continue without this action.

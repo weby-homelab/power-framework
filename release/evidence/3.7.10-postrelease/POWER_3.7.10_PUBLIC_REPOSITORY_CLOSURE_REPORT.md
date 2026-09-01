@@ -2,10 +2,11 @@
 
 ## EXECUTIVE VERDICT
 
-**NO-GO, blocked only by external authorization gates.** The published
-`v3.7.10` release snapshot and all public release identities passed independent checks.
-The closure branch is not merged because protected `main` requires an
-independent approval that the current actor cannot provide.
+**NO-GO, blocked by PRXMX drift remediation and an external approval gate.**
+The published `v3.7.10` release snapshot and all public release identities
+passed independent checks. The closure branch is not merged because one
+managed PRXMX Skill target still requires review and protected `main` requires
+an independent approval that the current actor cannot provide.
 
 ## STARTING STATE
 
@@ -15,7 +16,7 @@ independent approval that the current actor cannot provide.
 - Final report snapshot commit: `2c645598e8876c551e1f0cbd8c34a70764876dce`
 - Subsequent inventory-timing clarification: `e0fc3f3a198373cedf2cbcbc3f1068ec5466b6bf`
 - Closure PR: `https://github.com/weby-homelab/power-framework/pull/381`
-- Latest public PR readback head in the closure evidence: `169c90f4a3239b89ef7f82bc6143b4e5b54219d3`.
+- Latest public PR readback head in the closure evidence: `8ab5314613f104c4aea8aa578bc602ae274ac910`.
 - The complete pre-existing untracked `v3.7.9` forensic inventory contains 17
   files, including ignored nested JSON/SBOM files. They are WS-local-only,
   preserved byte-for-byte, never staged, and never treated as public evidence;
@@ -30,7 +31,9 @@ independent approval that the current actor cannot provide.
 - Source tree: `0f6a5e399bd3a78792a6c5fab983a2136cb2b335`
 - PR #377 merge tree: `0f6a5e399bd3a78792a6c5fab983a2136cb2b335`
 - Tree equality: **PASS**
-- Tag signature and release-source commit signature: **PASS**
+- Tag signature and release-source commit signature: **PASS**, verified against
+  public fingerprint `7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E` as recorded in
+  `phase-01-history.json`.
 
 ## CI / CODEQL
 
@@ -110,10 +113,19 @@ optional embedding provider was requested. No real vault was touched.
 
 ## PRXMX READ-ONLY AUDIT
 
-**BLOCKED_EXTERNAL.** No permitted PRXMX read-only transport was available in
-this WS session. No remote mutation, apply, configuration write, system Python
-change, Skill change, or MCP configuration change was attempted. See
-`phase-10-prxmx-readonly-audit.json` and `OWNER-ACTION-001`.
+**DRIFT.** After explicit owner authorization, a bounded batch-only read audit
+ran over the existing key-based PRXMX transport. It verified the public
+`v3.7.10` manifest and wheel digests in memory, found six POWER runtimes at
+`3.7.10`, and confirmed four MCP references resolve to `3.7.10`; comments in
+the canonical OpenCode JSONC were preserved and are not runtime drift. One
+managed OpenCode Skill target is a symlink and therefore remains
+`manual_review`. The checkout copy of the audit script was also already dirty,
+so it was not executed; the audit used the public-verified tracked `HEAD` blob
+instead. All before/after script, index, MCP, and Skill metadata comparisons
+were identical, and no mutation command was invoked. This bounded equality is
+not represented as proof about all possible transient writes outside the
+audited targets. See `phase-10-prxmx-readonly-audit.json` and
+`OWNER-ACTION-001`.
 
 ## RELEASE CONTROL PROVENANCE
 
@@ -167,23 +179,28 @@ evidence was retained; no temporary artifact was deleted.
   readback.
 - Resolved: pre-commit mypy dependency isolation was aligned with the locked
   project environment.
-- Remaining `BLK-0002`: PRXMX authorization boundary; `OWNER-ACTION-001`.
+- Resolved `BLK-0002`: a temporary bounded PRXMX read-only transport was
+  authorized, used, and removed without remote mutation.
+- Remaining `BLK-0006`: PRXMX Skill/check-out drift requires an explicitly
+  authorized remediation and clean audit rerun; `OWNER-ACTION-001`.
 - Remaining `BLK-0005`: protected PR approval boundary; `OWNER-ACTION-002`.
-  The latest public readback recorded PR #381 head `169c90f4a3239b89ef7f82bc6143b4e5b54219d3`
+  The latest public readback recorded PR #381 head `8ab5314613f104c4aea8aa578bc602ae274ac910`
   with all required checks passed and `reviewDecision=REVIEW_REQUIRED`.
 
 ## TESTS / HASHES / DIGESTS
 
 Local and exact-head validation results are recorded in the phase evidence
-files. `actionlint` was unavailable in WS, while YAML parsing and workflow
-pinning policy checks passed. No credential, private vault content, or raw
-attestation signature was persisted.
+files. `actionlint` was unavailable in WS, so Actions security is qualified as
+`PASS_WITH_ACTIONLINT_UNAVAILABLE`; YAML parsing and workflow pinning policy
+checks passed. No credential, private vault content, internal host address,
+absolute PRXMX path inventory, or raw attestation signature was persisted.
 
 ## FINAL GO / NO-GO
 
 Final public main SHA currently verified: `1a9879ee2353d63d979da5f68e79a6065122343b`.
 This is not a closure merge SHA because PR #381 is open and blocked. **NO-GO**
-until `OWNER-ACTION-001` (authorized PRXMX read-only audit) and
+until `OWNER-ACTION-001` (authorized PRXMX Skill/check-out drift remediation
+and clean read-only rerun) and
 `OWNER-ACTION-002` (independent maintainer approval and normal protected merge
 of PR #381) are both completed, followed by Phase 32 post-merge verification
 and Phase 33 independent clean-room audit. No `v3.7.11` was created and no
