@@ -807,7 +807,7 @@ jobs:
 
       - name: Attest package artifacts
         id: package_attestation
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             dist/*.whl
@@ -825,7 +825,7 @@ jobs:
 
       - name: Attest the published Web image digest
         id: web_attestation
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         env:
           HOME: ${{ runner.temp }}/power-release-attestation-home
         with:
