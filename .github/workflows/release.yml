@@ -1212,24 +1212,25 @@ jobs:
           wheel="$readback_dir/power_framework-${version}-py3-none-any.whl"
           sdist="$readback_dir/power_framework-${version}.tar.gz"
           lock="$readback_dir/power-native-requirements.txt"
+          attestation_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}"
           gh attestation verify \
             "$wheel" \
             --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-wheel-attestation.json"
           gh attestation verify \
             "$sdist" \
             --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-sdist-attestation.json"
           gh attestation verify \
             "$lock" \
             --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-dependency-lock-attestation.json"
@@ -1240,7 +1241,7 @@ jobs:
             "oci://${WEB_IMAGE_REF}@${WEB_IMAGE_DIGEST}" \
             --repo "$GITHUB_REPOSITORY" \
             --bundle-from-oci \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-web-attestation.json"
@@ -1250,7 +1251,7 @@ jobs:
           common_args=(
             --repository "$GITHUB_REPOSITORY"
             --workflow .github/workflows/release.yml
-            --source-revision "$REMOTE_TAG_TARGET"
+            --source-revision "$GITHUB_SHA"
             --event "$GITHUB_EVENT_NAME"
             --ref "$GITHUB_REF"
             --run-id "$GITHUB_RUN_ID"
