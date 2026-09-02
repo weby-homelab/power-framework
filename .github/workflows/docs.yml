@@ -6,11 +6,13 @@ on:
     paths:
       - "docs/**"
       - "mkdocs.yml"
+      - ".github/workflows/release.yml"
   pull_request:
     branches: [main]
     paths:
       - "docs/**"
       - "mkdocs.yml"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
