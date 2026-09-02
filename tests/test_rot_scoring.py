@@ -129,6 +129,10 @@ class TestFreshnessScorer:
 
 
 class TestUsageTracker:
+    def test_read_all_counts_is_read_only_when_database_is_missing(self, tmp_path: Path):
+        assert UsageTracker.read_all_counts(tmp_path) == {}
+        assert not (tmp_path / ".power_usage.db").exists()
+
     def test_track_and_count(self, tmp_path: Path):
         tracker = UsageTracker(tmp_path)
         tracker.track_access("note_a.md")
@@ -138,6 +142,15 @@ class TestUsageTracker:
         assert tracker.get_count("note_a.md") == 2
         assert tracker.get_count("note_b.md") == 1
         assert tracker.get_count("nonexistent.md") == 0
+
+    def test_read_all_counts_reads_existing_database_without_reinitializing(self, tmp_path: Path):
+        tracker = UsageTracker(tmp_path)
+        tracker.track_access("note_a.md")
+        database = tmp_path / ".power_usage.db"
+        before = database.stat().st_mtime_ns
+
+        assert UsageTracker.read_all_counts(tmp_path) == {"note_a.md": 1}
+        assert database.stat().st_mtime_ns == before
 
     def test_get_all_counts(self, tmp_path: Path):
         tracker = UsageTracker(tmp_path)

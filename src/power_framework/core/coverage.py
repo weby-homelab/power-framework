@@ -10,6 +10,7 @@ from pathlib import Path
 from .constants import is_catalog_filename
 from .generation_index import resolve_active_generation_path
 from .ignore import should_skip
+from .utils import iter_vault_markdown_files
 from .vault_storage import existing_vault_db_path
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ def get_index_coverage(vault_dir: Path) -> tuple[int, int]:
     root = Path(vault_dir).expanduser().resolve()
     total = 0
     try:
-        for filepath in root.rglob("*.md"):
+        for filepath in iter_vault_markdown_files(root):
             if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
                 continue
             if should_skip(root, filepath.relative_to(root).as_posix()):

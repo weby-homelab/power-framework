@@ -1,16 +1,16 @@
-# Informational: install P.O.W.E.R. 3.7.10 on Windows 11 25H2
+# Informational: install P.O.W.E.R. 3.7.11 on Windows 11 25H2
 
-> **Not a supported `v3.7.10` platform.** Windows support is deferred
+> **Not a supported `v3.7.11` platform.** Windows support is deferred
 > indefinitely and has no scheduled release target. The commands below are
 > informational and must not be presented as Windows compatibility or release
-> certification for the 3.7.10 Linux release boundary.
+> certification for the 3.7.11 Linux release boundary.
 
-This guide installs P.O.W.E.R. `v3.7.10` in an isolated virtual environment,
+This guide installs P.O.W.E.R. `v3.7.11` in an isolated virtual environment,
 creates a clean vault, verifies the CLI, and configures an MCP client. It uses
 PowerShell syntax throughout.
 
-> **Release artifact:** after publication, use only the signed `v3.7.10` tag and
-> immutable wheel from the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.10).
+> **Release artifact:** after publication, use only the signed `v3.7.11` tag and
+> immutable wheel from the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11).
 > Physical Windows evidence remains a separate target-host gate; see the
 > [platform support matrix](support-matrix.md).
 
@@ -20,7 +20,7 @@ PowerShell syntax throughout.
 - Windows 11 25H2 is an official Windows 11 release (OS build family `26200`).
 - ONNX Runtime supports Windows 11, and its Windows builds require the current
   Microsoft Visual C++ runtime.
-- P.O.W.E.R. `v3.7.10` includes an automated cross-platform regression for the
+- P.O.W.E.R. `v3.7.11` includes an automated cross-platform regression for the
   Windows rename-overwrite behavior.
 - Physical Windows 11 25H2 validation was completed on 2026-08-08 for follow-up
   revision `4e5b2b9`; see the [validation report](tests/windows-11-25h2-validation.md).
@@ -106,7 +106,7 @@ The release wheel avoids Git and pins the P.O.W.E.R. source version. Its Python
 dependencies are still resolved from the configured Python package index.
 
 ```powershell
-$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.7.10/power_framework-3.7.10-py3-none-any.whl"
+$ReleaseWheel = "https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
 & $VenvPython -m pip install $ReleaseWheel
 if ($LASTEXITCODE -ne 0) { throw "P.O.W.E.R. installation failed" }
 ```
@@ -120,7 +120,7 @@ Verify the executable, distribution metadata, and lean FTS import:
 if ($LASTEXITCODE -ne 0) { throw "P.O.W.E.R. import verification failed" }
 ```
 
-Both version checks must report `3.7.10`, and the import check must print
+Both version checks must report `3.7.11`, and the import check must print
 `lean FTS import: OK`. The official agent-server contract installs the explicit
 `[mcp]` extra before configuring MCP, and `[semantic]` only when dense search is
 intentionally enabled:
@@ -135,7 +135,7 @@ $McpRequirement = "power-framework[mcp] @ $ReleaseWheel"
 Use this only when Git is installed:
 
 ```powershell
-& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.7.10"
+& $VenvPython -m pip install "git+https://github.com/weby-homelab/power-framework.git@v3.7.11"
 ```
 
 Do not install unpinned `main` when reproducibility matters.
@@ -282,7 +282,7 @@ runtime. Back it up before deleting either directory.
 
 - Windows reports version 25H2 / build family `26200`.
 - The selected Python is 3.13 or 3.14 and the venv check prints `True`.
-- `power --version` and distribution metadata both report `3.7.10`.
+- `power --version` and distribution metadata both report `3.7.11`.
 - `power_framework` imports successfully and the official agent-server install
   includes the `[mcp]` extra.
 - MCP preflight runs with the same interpreter.

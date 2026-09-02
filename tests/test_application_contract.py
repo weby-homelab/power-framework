@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+from functools import partial
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -12,6 +13,7 @@ import pytest
 
 from power_framework.core.application import ApplicationService, RequestContext
 from power_framework.core.cli import main
+from power_framework.core.searcher import search_vault
 from power_framework.mcp.power_server import search_vault_tool
 
 if TYPE_CHECKING:
@@ -62,7 +64,11 @@ async def test_retrieve_data_is_identical_through_local_mcp(
 ) -> None:
     """MCP keeps the legacy retrieval envelope while delegating to the service."""
     monkeypatch.setattr("power_framework.core.searcher.time.time", lambda: 2_000_000_000)
-    direct = ApplicationService(sample_vault).retrieve(
+    monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
+    direct = ApplicationService(
+        sample_vault,
+        search_fn=partial(search_vault, allow_search_db_override=False),
+    ).retrieve(
         "Test",
         max_results=3,
         mode="fts",

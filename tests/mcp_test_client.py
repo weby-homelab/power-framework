@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from mcp import ClientSession, StdioServerParameters, stdio_client, types
+from mcp import ClientSession, StdioServerParameters, stdio_client
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -32,7 +32,7 @@ def _stdio_server_parameters(config: dict[str, Any]) -> StdioServerParameters:
 async def stdio_session(
     config: dict[str, Any],
     *,
-    mode: str = "legacy",
+    mode: Literal["legacy", "auto"] = "legacy",
 ) -> AsyncIterator[ClientSession]:
     """Connect to a real subprocess using legacy or 2026-era handshake mode."""
     parameters = _stdio_server_parameters(config)
@@ -42,7 +42,8 @@ async def stdio_session(
     ):
         if mode == "legacy":
             await session.initialize()
-        else:
-            discovered = await session.send_discover(mode)
-            session.adopt(types.DiscoverResult.model_validate(discovered))
+        elif mode == "auto":
+            await session.discover()
+        else:  # pragma: no cover - constrained by the public type contract.
+            raise ValueError(f"unsupported MCP test session mode: {mode}")
         yield session

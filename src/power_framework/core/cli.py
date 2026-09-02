@@ -90,7 +90,7 @@ from .searcher import (
 )
 from .state_migration import build_state_migration_plan
 from .synthesize import synthesize_session_ingest
-from .utils import __version__, atomic_write, enforce_cpu_throttling_env
+from .utils import __version__, atomic_write, enforce_cpu_throttling_env, iter_vault_markdown_files
 
 logger = logging.getLogger("power")
 
@@ -130,7 +130,7 @@ def _resolve_path(path_str: str) -> Path:
     """Resolve a vault path from CLI argument or environment variable."""
     if path_str:
         return Path(path_str).expanduser().resolve()
-    env_val = os.getenv("POWER_VAULT_DIR") or os.getenv("POWER_VAULT_PATH")
+    env_val = os.getenv("POWER_VAULT_DIR")
     if env_val:
         return Path(env_val).resolve()
     return Path.cwd().resolve()
@@ -770,7 +770,7 @@ def _cmd_markdown_check(args: argparse.Namespace) -> int:
         return 1
 
     total_issues = 0
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue
@@ -956,6 +956,7 @@ def _cmd_integrations(args: argparse.Namespace) -> int:
                 home=args.home,
                 power_wheel=args.power_wheel,
                 manifest=args.manifest,
+                dependency_lock=args.dependency_lock,
             )
             if args.apply:
                 print(
@@ -963,7 +964,6 @@ def _cmd_integrations(args: argparse.Namespace) -> int:
                         apply_native_install_plan(
                             plan,
                             approved=args.approved,
-                            no_deps=args.no_deps,
                         ),
                         ensure_ascii=False,
                         sort_keys=True,
@@ -1462,7 +1462,11 @@ def main() -> None:
     p_install.add_argument(
         "--manifest", required=True, help="Content-addressed power.release.manifest.v1"
     )
-    p_install.add_argument("--no-deps", action="store_true", help="Skip dependency resolution")
+    p_install.add_argument(
+        "--dependency-lock",
+        required=True,
+        help="Hash-pinned native dependency requirements artifact from the release",
+    )
     p_install.add_argument("--apply", action="store_true", help="Apply the plan")
     p_install.add_argument(
         "--approved", action="store_true", help="Explicitly approve the native install"

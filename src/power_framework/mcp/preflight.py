@@ -13,11 +13,9 @@ if TYPE_CHECKING:
 
 def require_configured_vault_root() -> Path:
     """Require one existing, explicitly configured vault directory."""
-    configured_root = os.getenv("POWER_VAULT_DIR") or os.getenv("POWER_VAULT_PATH")
+    configured_root = os.getenv("POWER_VAULT_DIR")
     if not configured_root:
-        raise RuntimeError(
-            "POWER_VAULT_DIR (or POWER_VAULT_PATH) must be configured before starting the MCP server"
-        )
+        raise RuntimeError("POWER_VAULT_DIR must be configured before starting the MCP server")
     try:
         return validate_vault_path(configured_root)
     except (FileNotFoundError, NotADirectoryError, ValueError) as exc:

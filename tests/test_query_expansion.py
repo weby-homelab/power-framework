@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+from power_framework.core.egress import SafeHttpResponse
 from power_framework.core.query_expansion import QueryExpander
 
 
@@ -83,26 +84,38 @@ class TestQueryExpanderLLM:
 
     def test_llm_graceful_on_network_error(self):
         expander = QueryExpander(use_llm=True, api_key="sk-test-key")
-        with patch("urllib.request.urlopen", side_effect=TimeoutError("network timeout")):
+        with patch(
+            "power_framework.experimental.query_expansion.safe_http_request",
+            side_effect=TimeoutError("network timeout"),
+        ):
             variants = expander.expand("docker")
         assert "docker" in variants
 
     def test_llm_graceful_on_bad_json(self):
         expander = QueryExpander(use_llm=True, api_key="sk-test-key")
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b"not json"
-        mock_resp.__enter__.return_value = mock_resp
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        response = SafeHttpResponse(
+            "https://openrouter.ai/api/v1/chat/completions", 200, {}, b"not json"
+        )
+        with patch(
+            "power_framework.experimental.query_expansion.safe_http_request",
+            return_value=response,
+        ):
             variants = expander.expand("docker")
         assert "docker" in variants
 
     def test_llm_adds_variants_on_success(self, monkeypatch):
         monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-internal")
         expander = QueryExpander(use_llm=True, api_key="sk-test-key")
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b'{"choices":[{"message":{"content":"[\\"docker orchestration\\",\\"container management\\"]"}}]}'
-        mock_resp.__enter__.return_value = mock_resp
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        response = SafeHttpResponse(
+            "https://openrouter.ai/api/v1/chat/completions",
+            200,
+            {},
+            b'{"choices":[{"message":{"content":"[\\"docker orchestration\\",\\"container management\\"]"}}]}',
+        )
+        with patch(
+            "power_framework.experimental.query_expansion.safe_http_request",
+            return_value=response,
+        ):
             variants = expander.expand("docker")
         assert "docker" in variants
         assert "docker orchestration" in variants

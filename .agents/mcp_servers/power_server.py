@@ -1,28 +1,11 @@
 #!/usr/bin/env python3
-"""
-P.O.W.E.R. MCP Server entry-point for OpenCode/Antigravity CLI.
-This script launches the official MCP SDK v2 server from power_framework.mcp.
+"""Deprecated compatibility shim for the canonical ``power-mcp`` launcher.
 
-Version: 3.6.7
-Updated: 2026-08-21
+It intentionally loads no dotenv file and performs no configuration fallback.
+New integrations must invoke the packaged ``power-mcp`` console script directly.
 """
 
-import os
-
-# Load .env from geminicli workspace
-_env_path = "/root/geminicli/.env"
-if os.path.isfile(_env_path):
-    with open(_env_path) as _f:
-        for _line in _f:
-            _line = _line.strip()
-            if _line and not _line.startswith("#") and "=" in _line:
-                _k, _, _v = _line.partition("=")
-                _v = _v.strip().strip('"').strip("'")
-                if _k not in os.environ:
-                    os.environ[_k] = _v
-
-# Run the public power-mcp entry point.
-from power_framework.mcp.entrypoint import main  # type: ignore  # noqa: E402
+from power_framework.mcp.entrypoint import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

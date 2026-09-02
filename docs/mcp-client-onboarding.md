@@ -1,22 +1,22 @@
 # MCP client onboarding
 
-This is the canonical local-stdio setup for P.O.W.E.R. `v3.7.10` on Linux.
+This is the canonical local-stdio setup for P.O.W.E.R. `v3.7.11` on Linux.
 It gives Codex, OpenCode, Gemini CLI, Claude Desktop, and Claude Code
 the same server process and the same vault boundary.
 
-> **Release contract:** use `v3.7.10` only after its signed tag and immutable
-> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.10).
+> **Release contract:** use `v3.7.11` only after its signed tag and immutable
+> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11).
 > Then use that wheel and the exact interpreter created by the
 > [clean-install guide](getting-started.md).
 
 The [Windows 11 25H2 guide](windows-11-installation.md) is informational only.
 Windows and macOS are deferred indefinitely and are not supported MCP onboarding
-platforms for `v3.7.10`.
+platforms for `v3.7.11`.
 
 ## One-time preparation
 
-Install the release wheel in an isolated environment. For a new vault, create
-it with `init`; for an existing vault, complete the
+Download the release wheel and its native dependency lock into an isolated
+environment. For a new vault, create it with `init`; for an existing vault, complete the
 [migration guide](migration-guide.md) first and do not run `init` in place:
 
 ```bash
@@ -25,10 +25,18 @@ POWER_VENV="$POWER_HOME/venv"
 POWER_PYTHON="$POWER_VENV/bin/python"
 POWER_CLI="$POWER_VENV/bin/power"
 POWER_VAULT="$HOME/Documents/power-vault"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
 
+mkdir -p "$POWER_RELEASE_DIR"
+gh release download v3.7.11 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+  --pattern 'power-native-requirements.txt' \
+  --dir "$POWER_RELEASE_DIR"
 python3 -m venv "$POWER_VENV"
-"$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.10/power_framework-3.7.10-py3-none-any.whl"
+"$POWER_PYTHON" -m pip install --require-hashes \
+  -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
+"$POWER_PYTHON" -m pip install --no-deps \
+  "$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
 # Only for a new or empty vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'

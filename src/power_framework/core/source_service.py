@@ -1,4 +1,4 @@
-"""Safe, bounded source read service for POWER 3.6.7.
+"""Safe, bounded source read service for POWER 3.7.11.
 
 This module provides side-effect-free, realpath-contained access to vault notes,
 precomputed summaries, graph projections, and metadata without modifying the vault
@@ -39,6 +39,7 @@ from .source_projection import (
     SourceRecord,
     scan_projection,
 )
+from .utils import iter_vault_markdown_files
 from .vault_storage import read_vault_identity
 
 # Compatibility name retained for integrations that patched the old helper. It
@@ -219,7 +220,7 @@ def _load_active_projection(root: Path) -> _ProjectionData | None:
                 source.rel_path: (source.size_bytes, source.modified_at) for source in sources
             }
             current_paths: set[str] = set()
-            for filepath in sorted(root.rglob("*.md")):
+            for filepath in sorted(iter_vault_markdown_files(root)):
                 rel_path = filepath.relative_to(root).as_posix()
                 if (
                     filepath.name in {"index.md", "log.md"}

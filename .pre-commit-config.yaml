@@ -12,17 +12,23 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.10
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff
+        entry: uv run ruff check src/ tests/ scripts/ benchmarks/power35/
+        language: system
+        pass_filenames: false
       - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format --check src/ tests/ scripts/ benchmarks/power35/
+        language: system
+        pass_filenames: false
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+  - repo: local
     hooks:
       - id: mypy
-        args: [src/power_framework/]
-        additional_dependencies: [types-PyYAML]
+        name: mypy
+        entry: uv run --extra web --extra semantic --extra rerank mypy src/power_framework/
+        language: system
         pass_filenames: false

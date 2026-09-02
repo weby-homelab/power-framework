@@ -11,7 +11,7 @@ import yaml
 from .handoff import list_work_packets
 from .memory_api import read_history
 from .mutation import execute_vault_mutation
-from .utils import atomic_write
+from .utils import atomic_write, vault_control_dir
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -229,11 +229,15 @@ def _render_receipts(receipts: Sequence[Mapping[str, object]]) -> list[str]:
 
 def _render_stale_evidence(vault_dir: Path) -> list[str]:
     """List explicitly stale evidence records without exposing their payload."""
-    records_dir = vault_dir / ".power" / "evidence" / "records"
+    records_dir = vault_control_dir(vault_dir) / "evidence" / "records"
+    if records_dir.is_symlink():
+        raise ValueError("control-plane evidence directory must not be a symlink")
     if not records_dir.is_dir():
         return ["- None."]
     stale: list[str] = []
     for path in sorted(records_dir.glob("*.json")):
+        if path.is_symlink() or not path.is_file():
+            continue
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, TypeError, ValueError, json.JSONDecodeError):

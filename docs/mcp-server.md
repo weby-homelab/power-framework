@@ -1,6 +1,6 @@
 # MCP Server (official Python SDK v2)
 
-P.O.W.E.R. `v3.7.10` exposes 20 governed tools through the
+P.O.W.E.R. `v3.7.11` exposes 20 governed tools through the
 [Model Context Protocol](https://modelcontextprotocol.io), powered by
 the official [MCP Python SDK v2](https://github.com/modelcontextprotocol/python-sdk).
 MCP-compatible agents can validate, index, retrieve, and perform bounded writes
@@ -13,8 +13,8 @@ vault root before startup. An optional tool argument `vault_path` may be omitted
 or must resolve to that exact root; it cannot switch the process to another
 vault.
 
-The implementation accepts `POWER_VAULT_PATH` as a legacy alias. New
-configurations must use `POWER_VAULT_DIR`.
+There is no legacy environment alias: `POWER_VAULT_DIR` is the only MCP vault
+environment contract.
 
 ## Canonical transport
 
@@ -349,7 +349,13 @@ to invent them.
 Report redundant, outdated, and trivial notes.
 
 ```text
-rot_audit(vault_path?: string, extended: boolean = false) -> string
+rot_audit(
+  vault_path?: string,
+  extended: boolean = false,
+  allow_link_rot: boolean = false,
+  allow_remote_llm: boolean = false,
+  approved: boolean = false,
+) -> string
 ```
 
 ### 15. `archive_notes`
@@ -357,7 +363,7 @@ rot_audit(vault_path?: string, extended: boolean = false) -> string
 Preview or move stale/expired notes to `04_Archive`.
 
 ```text
-archive_notes(dry_run: boolean = true, vault_path?: string) -> string
+archive_notes(dry_run: boolean = true, vault_path?: string, approved: boolean = false) -> string
 ```
 
 ### 16. `suggest_related_tool`
@@ -423,9 +429,9 @@ boundary before retrieval or mutation.
 - canonical P.A.R.A. write scope for MCP-created notes;
 - error masking and no client-facing internal tracebacks;
 - rate limits on ingest/synthesis and index generation/sync;
-- SSRF protection for external-link checks;
+- SSRF protection for external-link checks and explicitly approved LLM origins;
 - untrusted, provenance-bearing retrieval envelopes;
-- loopback-only built-in HTTP transport;
+- Web HTTP is separate from MCP; MCP itself remains local stdio-only;
 - shared per-vault mutation serialization for write/index/log operations.
 
 MCP access does not authorize Git commits, remote publication, source-vault

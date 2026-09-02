@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .utils import atomic_write, get_cache_dir
+from .utils import atomic_write, get_cache_dir, vault_control_dir
 
 VAULT_SCHEMA_VERSION = 1
 
@@ -25,8 +25,8 @@ class VaultIdentity:
     created_at: str
 
 
-def _identity_path(vault_dir: Path) -> Path:
-    return vault_dir / ".power" / "vault.json"
+def _identity_path(vault_dir: Path, *, create: bool = False) -> Path:
+    return vault_control_dir(vault_dir, create=create) / "vault.json"
 
 
 def _load_vault_identity(identity_path: Path) -> VaultIdentity:
@@ -51,9 +51,7 @@ def _load_vault_identity(identity_path: Path) -> VaultIdentity:
 def ensure_vault_identity(vault_dir: Path) -> VaultIdentity:
     """Load or atomically create the stable identity stored inside a vault."""
     root = Path(vault_dir).expanduser().resolve()
-    if not root.is_dir():
-        raise NotADirectoryError(f"Vault path is not a directory: {root}")
-    identity_path = _identity_path(root)
+    identity_path = _identity_path(root, create=True)
     if identity_path.exists():
         return _load_vault_identity(identity_path)
 
@@ -62,7 +60,6 @@ def ensure_vault_identity(vault_dir: Path) -> VaultIdentity:
         schema_version=VAULT_SCHEMA_VERSION,
         created_at=datetime.now(UTC).isoformat(),
     )
-    identity_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(
         identity_path,
         json.dumps(
@@ -165,10 +162,19 @@ def existing_vault_cache_dir(vault_dir: Path) -> Path | None:
     return get_cache_dir(create=False) / "vaults" / identity.vault_id
 
 
-def existing_vault_db_path(vault_dir: Path | None = None) -> Path | None:
-    """Return an existing vault database path without creating a namespace."""
+def existing_vault_db_path(
+    vault_dir: Path | None = None,
+    *,
+    allow_search_db_override: bool = True,
+) -> Path | None:
+    """Return an existing vault database path without creating a namespace.
+
+    ``POWER_SEARCH_DB`` is retained for controlled local tests and developer
+    workflows. Read-only service boundaries can opt out so an inherited process
+    environment cannot redirect their reads into a caller-selected database.
+    """
     override = os.getenv("POWER_SEARCH_DB")
-    if override:
+    if allow_search_db_override and override:
         return Path(override)
     if vault_dir is None:
         raise ValueError("A vault path is required when POWER_SEARCH_DB is not set")

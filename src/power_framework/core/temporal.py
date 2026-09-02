@@ -15,6 +15,7 @@ from .ignore import should_skip
 from .models import MemoryMetadata
 from .parser import read_file_content, validate_metadata
 from .timing import timing_span
+from .utils import iter_vault_markdown_files
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -70,7 +71,7 @@ def normalize_as_of(as_of: date | str | None) -> date:
 def scan_temporal_records(vault_dir: Path) -> dict[str, TemporalRecord]:
     """Read valid note metadata without trusting derived index state."""
     records: dict[str, TemporalRecord] = {}
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel_path = filepath.relative_to(vault_dir).as_posix()
         if should_skip(vault_dir, rel_path):
             continue

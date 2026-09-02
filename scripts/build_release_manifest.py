@@ -38,6 +38,41 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def require_regular_file(path: Path, label: str) -> Path:
+    """Require one existing non-symlink file without following an input alias."""
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{label} must be an existing regular file")
+    return path
+
+
+def validate_hash_pinned_requirements(path: Path) -> None:
+    """Require every exported requirement entry to carry a valid SHA-256 hash."""
+    text = path.read_text(encoding="utf-8")
+    requirement_count = 0
+    hash_count = 0
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        continuation = raw_line[0].isspace()
+        if not continuation and line.startswith(("-e ", "--editable ")):
+            raise ValueError("native dependency lock must not contain editable requirements")
+        if not continuation and line.startswith(("git+", "git://", "file:", "http://", "https://")):
+            raise ValueError("native dependency lock must not contain local or VCS requirements")
+        if not continuation and (" @ git+" in line or " @ file:" in line or " @ http" in line):
+            raise ValueError("native dependency lock must not contain direct URL requirements")
+        if not continuation and line.startswith("-"):
+            raise ValueError("native dependency lock must not contain pip option lines")
+        if not raw_line[0].isspace():
+            requirement_count += 1
+        for marker in re.findall(r"--hash=sha256:[^\s\\]+", line):
+            if re.fullmatch(r"--hash=sha256:[0-9a-f]{64}", marker) is None:
+                raise ValueError("native dependency lock contains an invalid SHA-256 hash")
+            hash_count += 1
+    if requirement_count == 0 or hash_count < requirement_count:
+        raise ValueError("native dependency lock must hash every requirement")
+
+
 def wheel_metadata(path: Path) -> dict[str, str]:
     """Read the identity fields required for release binding."""
     with zipfile.ZipFile(path) as archive:
@@ -67,6 +102,9 @@ def wheel_tree(path: Path, prefix: str) -> dict[str, bytes]:
 
 def source_tree(root: Path) -> dict[str, bytes]:
     """Read the source Skill tree for a source/artifact consistency check."""
+    require_regular_file(root / "SKILL.md", "source Skill")
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError("source Skill root must be an existing non-symlink directory")
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in root.rglob("*")
@@ -107,17 +145,21 @@ def build_manifest(
     package_sbom: Path | None,
     web_sbom: Path | None,
     profile_evidence: Path | None,
+    native_dependency_lock: Path | None,
     attestations: list[str],
 ) -> dict[str, Any]:
     """Build a release manifest bound to commit, package, SBOM, and Web identities."""
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
         raise ValueError("commit must be a 40-character lowercase Git commit SHA")
-    if not wheel.is_file() or wheel.suffix != ".whl":
+    require_regular_file(wheel, "wheel")
+    if wheel.suffix != ".whl":
         raise ValueError("wheel must be an existing .whl file")
     if sdist is None:
         inferred_sdist = wheel.with_name(f"power_framework-{version}.tar.gz")
         sdist = inferred_sdist if inferred_sdist.is_file() else None
-    if sdist is not None and (not sdist.is_file() or sdist.suffixes[-2:] != [".tar", ".gz"]):
+    if sdist is not None and (
+        sdist.is_symlink() or not sdist.is_file() or sdist.suffixes[-2:] != [".tar", ".gz"]
+    ):
         raise ValueError("sdist must be an existing .tar.gz file")
     metadata = wheel_metadata(wheel)
     if metadata.get("Name") != "power-framework":
@@ -149,12 +191,18 @@ def build_manifest(
         package_sbom is None or web_sbom is None or profile_evidence is None
     ):
         raise ValueError("final Web manifests require package, Web SBOM, and Profile A/B evidence")
-    if package_sbom is not None and not package_sbom.is_file():
-        raise ValueError("package SBOM must be an existing file")
-    if web_sbom is not None and not web_sbom.is_file():
-        raise ValueError("Web SBOM must be an existing file")
-    if profile_evidence is not None and not profile_evidence.is_file():
-        raise ValueError("Profile A/B evidence must be an existing file")
+    if package_sbom is not None:
+        require_regular_file(package_sbom, "package SBOM")
+    if web_sbom is not None:
+        require_regular_file(web_sbom, "Web SBOM")
+    if profile_evidence is not None:
+        require_regular_file(profile_evidence, "Profile A/B evidence")
+    if native_dependency_lock is None:
+        raise ValueError("native dependency lock must be an existing regular file")
+    require_regular_file(native_dependency_lock, "native dependency lock")
+    if native_dependency_lock.name != "power-native-requirements.txt":
+        raise ValueError("native dependency lock must be named power-native-requirements.txt")
+    validate_hash_pinned_requirements(native_dependency_lock)
     try:
         normalized_attestations = [normalize_attestation_id(item) for item in attestations]
     except ValueError as exc:
@@ -202,6 +250,10 @@ def build_manifest(
                 "filename": wheel.name,
                 "sha256": sha256_file(wheel),
             },
+            "native_dependency_lock": {
+                "filename": native_dependency_lock.name,
+                "sha256": sha256_file(native_dependency_lock),
+            },
         },
         "attestations": sorted(normalized_attestations),
     }
@@ -246,21 +298,21 @@ def main() -> int:
     parser.add_argument("--package-sbom", type=Path)
     parser.add_argument("--web-sbom", type=Path)
     parser.add_argument("--profile-evidence", type=Path)
+    parser.add_argument("--native-dependency-lock", type=Path, required=True)
     parser.add_argument("--attestation", action="append", default=[])
     args = parser.parse_args()
     payload = build_manifest(
         repo_root=args.repo_root.resolve(),
-        wheel=args.wheel.expanduser().resolve(),
-        sdist=args.sdist.expanduser().resolve() if args.sdist else None,
+        wheel=args.wheel.expanduser(),
+        sdist=args.sdist.expanduser() if args.sdist else None,
         version=args.version,
         commit=args.commit,
         web_image=args.web_image,
         web_image_digest=args.web_image_digest,
-        package_sbom=args.package_sbom.expanduser().resolve() if args.package_sbom else None,
-        web_sbom=args.web_sbom.expanduser().resolve() if args.web_sbom else None,
-        profile_evidence=(
-            args.profile_evidence.expanduser().resolve() if args.profile_evidence else None
-        ),
+        package_sbom=args.package_sbom.expanduser() if args.package_sbom else None,
+        web_sbom=args.web_sbom.expanduser() if args.web_sbom else None,
+        profile_evidence=(args.profile_evidence.expanduser() if args.profile_evidence else None),
+        native_dependency_lock=args.native_dependency_lock.expanduser(),
         attestations=args.attestation,
     )
     atomic_json_write(args.output.expanduser().resolve(), payload)

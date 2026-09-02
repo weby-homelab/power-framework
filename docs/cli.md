@@ -1,6 +1,6 @@
 # CLI Reference
 
-This reference is aligned with the executable P.O.W.E.R. `v3.7.10` parser.
+This reference is aligned with the executable P.O.W.E.R. `v3.7.11` parser.
 
 ## Synopsis
 
@@ -120,7 +120,7 @@ power import SOURCE --into VAULT_FOLDER [--path VAULT]
 | Flag | Description |
 | --- | --- |
 | `--into` | Required vault-relative destination beginning with `00_Inbox`, a P.A.R.A. folder, or `PROTOCOLS`. |
-| `--path` | Target vault; defaults to `POWER_VAULT_DIR`, `POWER_VAULT_PATH`, or the current directory. |
+| `--path` | Target vault; defaults to `POWER_VAULT_DIR` or the current directory. |
 | `--policy` | `strict` (default) rejects foreign known values; explicit `quarantine` retains `status`/`related` values under additive `x-status`/`x-related` fields. |
 | `--dry-run` | Print the deterministic coverage, quarantine, exclusion, and collision report without writing anything. |
 | `--allow-partial` | Explicitly permit importing valid notes when fatal source notes or collisions remain excluded. |
@@ -388,10 +388,9 @@ rewriter.
 
 ## Vault path environment
 
-CLI commands with an optional path resolve `POWER_VAULT_DIR` first. The legacy
-`POWER_VAULT_PATH` alias is accepted by the implementation, but new
-configurations should use `POWER_VAULT_DIR`, which is also the canonical MCP
-boundary.
+CLI commands with an optional path resolve `POWER_VAULT_DIR` first and otherwise
+use the current directory. `POWER_VAULT_DIR` is also the canonical MCP boundary;
+there is no legacy environment alias.
 
 ### `cache`
 

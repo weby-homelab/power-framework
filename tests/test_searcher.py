@@ -1468,6 +1468,36 @@ class TestVectorSearch:
         results = _vector_search(tmp_path / "empty", "test")
         assert results == []
 
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="Windows symlink creation requires SeCreateSymbolicLinkPrivilege",
+    )
+    def test_vector_search_rejects_symlinked_db_path(self, sample_vault: Path, tmp_path: Path):
+        outside = tmp_path / "outside.md"
+        outside.write_text("external secret", encoding="utf-8")
+        linked = sample_vault / "01_Projects" / "indexed-link.md"
+        linked.symlink_to(outside)
+        database = tmp_path / "crafted.db"
+        with closing(sqlite3.connect(database)) as conn:
+            _init_db(conn)
+            conn.execute(
+                "INSERT INTO fts_notes(title, tags, description, content, rel_path, note_type) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("External", "", "", "host secret", "01_Projects/indexed-link.md", "Resource"),
+            )
+            conn.execute(
+                "INSERT INTO tf_vectors(rel_path, tf_data, mtime) VALUES (?, ?, ?)",
+                ("01_Projects/indexed-link.md", json.dumps({"external": 1}), 0.0),
+            )
+            conn.commit()
+
+        results = _vector_search(
+            sample_vault,
+            "external",
+            resolved_db=searcher._ResolvedDb(database, False),
+        )
+        assert results == []
+
     def test_max_results(self, sample_vault: Path):
         results = _vector_search(sample_vault, "test", max_results=2)
         assert len(results) <= 2

@@ -63,7 +63,7 @@ environment is trustworthy.
 1. **CLI and library calls** accept a vault directory, Markdown, search text,
    policy settings, and transaction proposals.
 2. **MCP tools** expose read, index, ingest, maintenance, and memory operations
-   to an MCP client. The server resolves `POWER_VAULT_DIR`/`POWER_VAULT_PATH`
+   to an MCP client. The server resolves only `POWER_VAULT_DIR`
    before accepting a vault and rejects a substituted root.
 3. **Vault parsing and persistence** handle YAML frontmatter, Markdown links,
    SQLite/index files, generated catalogs, and atomic note writes.
@@ -157,4 +157,4 @@ that does not alter runtime enforcement. Informational observations without a
 credible boundary crossing are not security findings.
 
 Repository: weby-homelab/power-framework
-Version: 20a9ee9aecc5e5d11edee284e6670a4fe91d8162
+Version: 3.7.11

@@ -18,7 +18,7 @@ from .constants import INDEX_FOLDERS, INDEX_MAX_BYTES, is_catalog_filename
 from .ignore import should_skip
 from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, OKFMetadata, TypedRelation
 from .parser import read_file_content, validate_metadata
-from .utils import atomic_write
+from .utils import atomic_write, is_regular_vault_file, iter_vault_markdown_files
 from .vault_storage import vault_cache_dir
 
 INDEX_CACHE_SCHEMA_VERSION = 3
@@ -48,7 +48,7 @@ def scan_vault_notes(vault_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
     """
     concepts: dict[str, list[tuple[str, str, str]]] = {}
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
@@ -85,7 +85,7 @@ def scan_folder_notes(
     """
     folder_notes: dict[str, list[dict]] = {}
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue
 
@@ -225,7 +225,7 @@ def _scan_folder_notes_incremental(
     next_entries: dict[str, dict] = {}
     changed_dirs: set[str] = set()
     seen_paths: set[str] = set()
-    for filepath in sorted(vault_dir.rglob("*.md")):
+    for filepath in sorted(iter_vault_markdown_files(vault_dir)):
         if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue
         rel_path = filepath.relative_to(vault_dir)
@@ -731,7 +731,7 @@ def _catalog_note_counts(directory_notes: dict[str, list[dict]]) -> dict[str, in
 def _existing_catalog_dirs(vault_dir: Path) -> set[str]:
     """Find existing generated-catalog directories inside indexed roots."""
     directories: set[str] = set()
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         if not is_catalog_filename(filepath.name):
             continue
         rel_path = filepath.relative_to(vault_dir)
@@ -747,7 +747,11 @@ def _catalog_files(vault_dir: Path, folder: str) -> list[Path]:
     directory = vault_dir / Path(folder)
     if not directory.is_dir():
         return []
-    return sorted(path for path in directory.glob("_index*.md") if is_catalog_filename(path.name))
+    return sorted(
+        path
+        for path in directory.glob("_index*.md")
+        if is_catalog_filename(path.name) and is_regular_vault_file(vault_dir, path)
+    )
 
 
 def _is_owned_catalog(path: Path, vault_dir: Path) -> bool:

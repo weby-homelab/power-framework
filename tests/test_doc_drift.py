@@ -326,6 +326,29 @@ def test_fresh_agent_contract_exposes_safe_full_workflow() -> None:
         assert marker in contract
 
 
+def test_skill_references_do_not_claim_type_only_okf_requirements() -> None:
+    contract = "\n".join(
+        (
+            (REPO_SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            (REPO_SKILL_ROOT / "references" / "agent-workflow.md").read_text(encoding="utf-8"),
+        )
+    )
+
+    assert "єдине обов'язкове поле" not in contract
+    for field in ("type", "title", "description", "timestamp"):
+        assert f"`{field}`" in contract
+
+
+def test_release_onboarding_uses_the_hash_bound_native_lock() -> None:
+    gate = _load_gate()
+    facts = gate["_load_code_facts"]()
+    documents = gate["_read_current_documents"]()
+
+    errors = gate["check_onboarding"](documents, facts)
+
+    assert errors == []
+
+
 def test_global_skill_discovery_checks_both_opencode_paths(monkeypatch, tmp_path: Path) -> None:
     gate = _load_gate()
     home = tmp_path / "fake-home"

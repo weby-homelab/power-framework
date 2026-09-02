@@ -35,7 +35,9 @@ timestamp: YYYY-MM-DDTHH:MM:SS+TZ
 ---
 ```
 
-`type` — єдине обов'язкове поле.
+Runtime-required OKF fields are exactly `type`, `title`, `description`, and
+`timestamp`, as defined by the generated runtime schema. `resource`, `tags` and
+governance fields remain optional unless a specific operation requires them.
 
 ## Робочий цикл
 

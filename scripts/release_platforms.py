@@ -1,4 +1,4 @@
-"""Platform boundary declared for the POWER 3.6.7 release."""
+"""Platform boundary declared for the POWER 3.7.11 release."""
 
 from __future__ import annotations
 

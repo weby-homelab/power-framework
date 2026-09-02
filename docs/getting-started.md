@@ -1,18 +1,18 @@
 # Getting Started from a Clean Knowledge Base
 
-This is the authoritative clean-install path for P.O.W.E.R. `v3.7.10`. It
+This is the authoritative clean-install path for P.O.W.E.R. `v3.7.11`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
 
-> **Release contract:** use `v3.7.10` only after its signed tag and immutable
-> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.10).
+> **Release contract:** use `v3.7.11` only after its signed tag and immutable
+> wheel appear on the [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11).
 > This guide names the tag-bound target; the URL alone does not prove that
 > publication completed. Check the [platform support matrix](support-matrix.md)
 > before applying the procedure to a non-Linux host.
 
 The [Windows installation guide](windows-11-installation.md) is informational
 only. Windows and macOS are deferred indefinitely and are not supported release
-platforms for `v3.7.10`.
+platforms for `v3.7.11`.
 
 ## Choose a supported deployment profile
 
@@ -47,13 +47,23 @@ or relying on `--break-system-packages` for a normal installation.
 On Linux:
 
 ```bash
-python3 -m venv "$HOME/.local/share/power/venv"
-POWER_PYTHON="$HOME/.local/share/power/venv/bin/python"
-POWER_CLI="$HOME/.local/share/power/venv/bin/power"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
+mkdir -p "$POWER_RELEASE_DIR"
+gh release download v3.7.11 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+  --pattern 'power-native-requirements.txt' \
+  --pattern 'power-release-manifest.json' \
+  --dir "$POWER_RELEASE_DIR"
 
-"$POWER_PYTHON" -m pip install --upgrade pip
-"$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.10/power_framework-3.7.10-py3-none-any.whl"
+python3 -m venv "$HOME/.cache/power-3.7.11-venv"
+POWER_PYTHON="$HOME/.cache/power-3.7.11-venv/bin/python"
+POWER_CLI="$HOME/.cache/power-3.7.11-venv/bin/power"
+POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
+POWER_LOCK="$POWER_RELEASE_DIR/power-native-requirements.txt"
+POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
+
+"$POWER_PYTHON" -m pip install --require-hashes -r "$POWER_LOCK"
+"$POWER_PYTHON" -m pip install --no-deps "$POWER_WHEEL"
 ```
 
 The base release wheel remains available as a lean FTS-only library profile. The
@@ -70,26 +80,32 @@ Verify the executable, package metadata, and lean import:
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Both version commands must report `3.7.10`; the final command must print
+Both version commands must report `3.7.11`; the final command must print
 `lean FTS import: OK`.
 
-For local MCP, install the official SDK extra from the same wheel:
+For the canonical managed native launchers, review the dry-run and then apply
+the exact release plan explicitly:
 
 ```bash
-"$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.10/power_framework-3.7.10-py3-none-any.whl"
+"$POWER_CLI" integrations install \
+  --home "$HOME" \
+  --power-wheel "$POWER_WHEEL" \
+  --manifest "$POWER_MANIFEST" \
+  --dependency-lock "$POWER_LOCK"
+"$POWER_CLI" integrations install \
+  --home "$HOME" \
+  --power-wheel "$POWER_WHEEL" \
+  --manifest "$POWER_MANIFEST" \
+  --dependency-lock "$POWER_LOCK" \
+  --apply --approved
+POWER_CLI="$HOME/.local/bin/power"
 ```
 
-### Alternative: install from the pinned tag
+### Source checkout note
 
-This path requires Git:
-
-```bash
-"$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.7.10'
-```
-
-Do not use an unpinned `main` install when reproducibility matters.
+The Git tag is useful for source inspection, but it is not the public clean-install
+path: dependency resolution from a source URL is not hash-bound. For a reproducible
+`v3.7.11` installation, use the release wheel and native lock above.
 
 ## 3. Initialize an empty vault
 
@@ -231,7 +247,7 @@ it up before removing either location.
 ## Acceptance checklist
 
 - Python is 3.13 or 3.14 and the selected interpreter is inside the dedicated venv.
-- CLI and distribution metadata both report `3.7.10`.
+- CLI and distribution metadata both report `3.7.11`.
 - `power_framework` imports successfully and the official Profile A includes the MCP extra.
 - MCP preflight validates the configured vault through the public `power-mcp` launcher.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.

@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
 ARG PYTHON_IMAGE=python:3.13.15-slim-bookworm@sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1
-ARG POWER_VERSION=3.7.10
-ARG POWER_WHEEL_FILE=
+ARG POWER_VERSION=3.7.11
+ARG POWER_WHEEL_FILE
 ARG POWER_SOURCE_REVISION=unknown
 ARG POWER_RELEASE_TAG=unknown
 ARG SOURCE_DATE_EPOCH=0
@@ -25,14 +25,10 @@ COPY THIRD_PARTY_NOTICES.md ./
 COPY release/ ./release/
 
 RUN set -eux; \
-    if [ -n "${POWER_WHEEL_FILE}" ]; then \
-      test -f "release/${POWER_WHEEL_FILE}"; \
-      mkdir -p /dist; \
-      cp "release/${POWER_WHEEL_FILE}" "/dist/${POWER_WHEEL_FILE}"; \
-    else \
-      python -m pip install --upgrade pip build; \
-      python -m build --wheel --outdir /dist; \
-    fi \
+    test -n "${POWER_WHEEL_FILE}"; \
+    test -f "release/${POWER_WHEEL_FILE}"; \
+    mkdir -p /dist; \
+    cp "release/${POWER_WHEEL_FILE}" "/dist/${POWER_WHEEL_FILE}" \
     && test -f "/dist/power_framework-${POWER_VERSION}-py3-none-any.whl"
 
 FROM ${PYTHON_IMAGE} AS runtime
@@ -54,9 +50,14 @@ RUN groupadd --gid 10001 --system power \
 WORKDIR /app
 COPY --from=builder "/dist/power_framework-${POWER_VERSION}-py3-none-any.whl" "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl"
 COPY --from=builder /build/release/web-runtime.constraints.txt /tmp/web-runtime.constraints.txt
+COPY --from=builder /build/release/web-runtime.requirements.txt /tmp/web-runtime.requirements.txt
 RUN python -m pip install \
-        --constraint /tmp/web-runtime.constraints.txt \
-        "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl[web,semantic,rerank]" \
+        --require-hashes \
+        --only-binary=:all: \
+        -r /tmp/web-runtime.constraints.txt \
+    && python -m pip install \
+        --no-deps \
+        "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl" \
     && rm "/tmp/power_framework-${POWER_VERSION}-py3-none-any.whl"
 
 LABEL org.opencontainers.image.title="P.O.W.E.R Web UI" \

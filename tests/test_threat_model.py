@@ -16,7 +16,7 @@ def test_threat_model_covers_m1_security_boundaries() -> None:
         "## Attack Surface, Mitigations, and Attacker Stories",
         "## Severity Calibration",
         "Repository: weby-homelab/power-framework",
-        "Version: 20a9ee9aecc5e5d11edee284e6670a4fe91d8162",
+        "Version: 3.7.11",
     ):
         assert section in document
 

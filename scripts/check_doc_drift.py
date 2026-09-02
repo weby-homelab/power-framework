@@ -549,6 +549,16 @@ def _check_reference_file(label: str, reference: Path, facts: dict[str, Any]) ->
             for marker in ("OKF", "index.md", "log.md", "GPG")
             if marker not in text
         )
+        required_fields = ("type", "title", "description", "timestamp")
+        errors.extend(
+            f"{prefix} does not declare the executable OKF required fields: "
+            + ", ".join(required_fields)
+            + "."
+            for field in required_fields
+            if f"`{field}`" not in text
+        )
+        if re.search(r"`type`\s*[—-]\s*[^\n]*єдине обов'язкове поле", text):
+            errors.append(f"{prefix} contains the stale type-only OKF requirement claim.")
     return errors
 
 
@@ -607,6 +617,14 @@ def check_onboarding(documents: dict[str, str], facts: dict[str, Any]) -> list[s
         for pattern, description in forbidden.items():
             if re.search(pattern, documents[label], flags=re.IGNORECASE):
                 errors.append(f"{label} contains a forbidden {description}.")
+
+    for label in ("README", "README.ua", "Getting Started", "Getting Started UA"):
+        document = documents[label]
+        errors.extend(
+            f"{label} is missing the release installation marker `{marker}`."
+            for marker in ("power-native-requirements.txt", "--require-hashes", "--no-deps")
+            if marker not in document
+        )
 
     for label in ("Windows", "Windows UA"):
         windows_doc = documents[label]

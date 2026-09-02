@@ -17,6 +17,7 @@ from .constants import DENSE_INDEX_SCHEMA_VERSION, is_catalog_filename
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 from .source_projection import scan_projection, write_projection
+from .utils import iter_vault_markdown_files
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -121,7 +122,7 @@ def _sync_vault_to_db(
                 conn.rollback()
 
     disk_files: dict[str, float] = {}
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         # Generated catalogs are navigation, not knowledge. Keep every page
         # out of both sparse and dense indexes, including `_index-N.md` pages.
         if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):

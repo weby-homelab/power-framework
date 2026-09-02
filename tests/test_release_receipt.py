@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,8 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
         json.dumps(
             {
                 "schema": "power.release.manifest.v1",
+                "repository": "weby-homelab/power-framework",
+                "version": "3.2.5",
                 "commit": "3f2e2b9687f96a6fc52c634a13bd75205af7dd96",
             }
         ),
@@ -31,6 +34,19 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
     )
     output = tmp_path / "receipt.json"
 
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "RELEASE_WORKFLOW_REPOSITORY": "weby-homelab/power-framework",
+            "RELEASE_CONTROL_REVISION": "a" * 40,
+            "RELEASE_WORKFLOW_REVISION": "a" * 40,
+            "RELEASE_WORKFLOW_RUN_ID": "12345",
+            "RELEASE_WORKFLOW_ATTEMPT": "1",
+            "RELEASE_WORKFLOW_EVENT": "push",
+            "RELEASE_WORKFLOW_REF": "refs/tags/v3.2.5",
+            "RELEASE_WORKFLOW_REF_PROTECTED": "false",
+        }
+    )
     result = subprocess.run(  # noqa: S603 -- invokes the repository-local receipt generator.
         [
             sys.executable,
@@ -53,6 +69,7 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
         check=False,
         capture_output=True,
         text=True,
+        env=environment,
     )
 
     assert result.returncode == 0, result.stderr
@@ -70,31 +87,50 @@ def test_receipt_binds_tag_tree_workflow_and_asset_digest(tmp_path: Path) -> Non
     ]
 
 
-def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path) -> None:
+def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path, monkeypatch) -> None:
     assets = tmp_path / "dist"
     assets.mkdir()
     wheel = assets / "power_framework-3.7.8-py3-none-any.whl"
     sdist = assets / "power_framework-3.7.8.tar.gz"
+    dependency_lock = assets / "power-native-requirements.txt"
     wheel.write_bytes(b"wheel bytes")
     sdist.write_bytes(b"sdist bytes")
+    dependency_lock.write_text(
+        "mcp==2.1.0 --hash=sha256:" + "a" * 64 + "\n",
+        encoding="utf-8",
+    )
     image_digest = "sha256:" + "d" * 64
     manifest_path = tmp_path / "power-release-manifest.json"
     manifest_path.write_text(
         json.dumps(
             {
                 "schema": "power.release.manifest.v1",
+                "repository": "weby-homelab/power-framework",
                 "version": "3.7.8",
                 "commit": "6e7d0a48d36e564030954138fec03778ee44d6a0",
                 "attestations": ["github:123", "github:456"],
                 "artifacts": {
                     "power_wheel": {"sha256": hashlib.sha256(wheel.read_bytes()).hexdigest()},
                     "power_sdist": {"sha256": hashlib.sha256(sdist.read_bytes()).hexdigest()},
+                    "native_dependency_lock": {
+                        "filename": dependency_lock.name,
+                        "sha256": hashlib.sha256(dependency_lock.read_bytes()).hexdigest(),
+                    },
                     "web_image": {"digest": image_digest},
                 },
             }
         ),
         encoding="utf-8",
     )
+
+    monkeypatch.setenv("RELEASE_WORKFLOW_REPOSITORY", "weby-homelab/power-framework")
+    monkeypatch.setenv("RELEASE_CONTROL_REVISION", "b" * 40)
+    monkeypatch.setenv("RELEASE_WORKFLOW_REVISION", "b" * 40)
+    monkeypatch.setenv("RELEASE_WORKFLOW_RUN_ID", "12345")
+    monkeypatch.setenv("RELEASE_WORKFLOW_ATTEMPT", "1")
+    monkeypatch.setenv("RELEASE_WORKFLOW_EVENT", "push")
+    monkeypatch.setenv("RELEASE_WORKFLOW_REF", "refs/tags/v3.7.8")
+    monkeypatch.setenv("RELEASE_WORKFLOW_REF_PROTECTED", "false")
 
     receipt = build_receipt(
         repo=REPO_ROOT,
@@ -107,6 +143,7 @@ def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path) -
         attestation_subjects=[
             f"123={hashlib.sha256(wheel.read_bytes()).hexdigest()}",
             f"123={hashlib.sha256(sdist.read_bytes()).hexdigest()}",
+            f"123={hashlib.sha256(dependency_lock.read_bytes()).hexdigest()}",
             f"456={image_digest}",
         ],
         attestation_subject_roles=["123=package", "456=web"],
@@ -122,6 +159,7 @@ def test_receipt_normalizes_attestation_ids_and_binds_subjects(tmp_path: Path) -
                 [
                     hashlib.sha256(wheel.read_bytes()).hexdigest(),
                     hashlib.sha256(sdist.read_bytes()).hexdigest(),
+                    hashlib.sha256(dependency_lock.read_bytes()).hexdigest(),
                 ]
             ),
         },

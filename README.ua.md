@@ -2,7 +2,7 @@
   <a href="README.md">ENG</a> | <b>UKR</b>
 </p>
 
-# P.O.W.E.R. 3.7.10 — AI-Native Toolkit для Second Brain
+# P.O.W.E.R. 3.7.11 — AI-Native Toolkit для Second Brain
 
 Валідуйте, індексуйте, шукайте та керуйте вашою базою знань з терміналу — або дозвольте AI-агентам робити це через MCP. Створено для людей, які хочуть машиночитабельні нотатки, автоматичну перевірку якості та токен-ефективний AI-доступ до свого Second Brain.
 
@@ -39,9 +39,9 @@ P.O.W.E.R. — це гібридна система, створена для п�
   фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
   замість помилки `FileExistsError`
 - **Суворий мандат 50% CPU Throttling** — жорсткі ліміти паралелізму (`max_workers <= max(1, os.cpu_count() // 2)`) та автоматичне обмеження змінних оточення (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) гарантують, що P.O.W.E.R. ніколи не перевантажує процесорні ресурси
-- **Patch-реліз P.O.W.E.R. 3.7.10** — публікація вимагає перевірені
+- **Patch-реліз P.O.W.E.R. 3.7.11** — публікація вимагає перевірені
   wheel, source archive, SBOM, Linux upgrade matrix і fresh release receipts.
-  Версія 3.7.10 містить canonical Task v2 і typed decision workflows,
+  Версія 3.7.11 містить canonical Task v2 і typed decision workflows,
   fail-closed task persistence, Application envelope v2 та consensus-aware
   reranked search. Межі
   підтримки визначає [матриця платформ](docs/support-matrix.ua.md).
@@ -64,7 +64,7 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 - **[Інвентаризація документації](docs/documentation-inventory.ua.md)** — перевірені
   точки входу, пов'язані документи, виправлений дрейф і межі доказів
 - **[Матриця підтримки платформ](docs/support-matrix.ua.md)** — Linux є
-  release-платформою `v3.7.10`; CI зараз перевіряє її на Ubuntu, а macOS і
+  release-платформою `v3.7.11`; CI зараз перевіряє її на Ubuntu, а macOS і
   Windows відкладені на невизначений строк
 
 ## Швидкий старт (Linux)
@@ -73,16 +73,28 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 Потрібен Python 3.13 або 3.14 і terminal shell; `~/my-vault` — каталог vault, яким
 керуватиме POWER.
 
-> **Контракт patch-релізу `v3.7.10`:** використовуйте signed tag, wheel, source
+> **Контракт patch-релізу `v3.7.11`:** використовуйте signed tag, wheel, source
 > archive, SBOM і release receipt лише після їх появи на
-> [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.10).
+> [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11).
 > URL нижче є tag-bound install target, а не доказом уже завершеної публікації.
 > Release
 > receipt стосується заявленої Linux-межі; перед claims для іншого хоста
 > перевірте [матрицю платформ](docs/support-matrix.ua.md).
 
 ```bash
-python3 -m pip install "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.10/power_framework-3.7.10-py3-none-any.whl"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
+mkdir -p "$POWER_RELEASE_DIR"
+gh release download v3.7.11 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+  --pattern 'power-native-requirements.txt' \
+  --dir "$POWER_RELEASE_DIR"
+python3 -m venv "$POWER_RELEASE_DIR/venv"
+POWER_PYTHON="$POWER_RELEASE_DIR/venv/bin/python"
+"$POWER_PYTHON" -m pip install --require-hashes \
+  -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
+"$POWER_PYTHON" -m pip install --no-deps \
+  "$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
+export PATH="$POWER_RELEASE_DIR/venv/bin:$PATH"
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -125,11 +137,11 @@ power --version
 ## Встановлення на Windows 11 25H2 (відкладено)
 
 Windows 11 25H2 залишається поза межами підтримуваної платформи release
-`v3.7.10`. Окремий [гід Windows 11 25H2](docs/windows-11-installation.ua.md)
+`v3.7.11`. Окремий [гід Windows 11 25H2](docs/windows-11-installation.ua.md)
 описує установку та host validation, але не є сертифікацією Stable release для
 цієї платформи.
 
-Для `v3.7.10` немає Windows CI, upgrade-matrix, compatibility, performance або
+Для `v3.7.11` немає Windows CI, upgrade-matrix, compatibility, performance або
 GPU claim. Windows і macOS не мають запланованого release target.
 
 ## Що всередині
@@ -158,7 +170,7 @@ GPU claim. Windows і macOS не мають запланованого release t
 | **CI/CD**                        | Hermetic тести, CodeQL SAST і автоматизовані GitHub-релізи; release evidence перевіряється versioned harness `benchmarks/power31` та pinned model manifest.                                                                                                                                                                                                                                                                                                                          |
 | **Документація**                 | Повний [mkdocs-material сайт](https://weby-homelab.github.io/power-framework/) з API reference та гайдами                                                                                                                                                                                                                                                                                                                                                                            |
 
-> **Контракт evidence для POWER 3.7.10:** публікація вимагає machine validation
+> **Контракт evidence для POWER 3.7.11:** публікація вимагає machine validation
 > gates, package/CI provenance, SBOM, Linux upgrade matrix, виконану на Ubuntu
 > CI runner, і source-bound technical receipts. Real-vault та human evaluation
 > є опціональними benchmark, а не release secrets чи блокерами публікації.
@@ -171,7 +183,7 @@ GPU claim. Windows і macOS не мають запланованого release t
 
 Історичний v1.6.0 snapshot переходу від flat до hierarchical index. Його vault
 counts, token estimates, source paths, test counts і MCP inventory є
-historical evidence, а не поточним контрактом `v3.7.10`:
+historical evidence, а не поточним контрактом `v3.7.11`:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — детальний технічний звіт з метриками
@@ -286,14 +298,10 @@ power search ~/my-vault "experiment" --mode auto --domain research
 канонічні конфігурації для Claude Desktop/Code, Gemini CLI, Codex і OpenCode,
 а також read-only golden task та workflow схвалення.
 
-URL wheel нижче є tag-bound install target `v3.7.10`. Запускайте його лише
-після появи signed tag та assets на
-[сторінці релізу](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.10)
-разом із source archive, SBOM і release receipts.
-
-```bash
-pip install "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.10/power_framework-3.7.10-py3-none-any.whl"
-```
+Перед налаштуванням клієнта використовуйте lock-bound інструкцію в
+[Getting Started](docs/getting-started.ua.md): спочатку встановіть
+`power-native-requirements.txt` через `--require-hashes`, потім exact wheel через
+`--no-deps`. Не встановлюйте wheel окремо з плаваючим розв'язанням залежностей.
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
 
@@ -466,7 +474,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI-Агент (official MCP SDK v2)"]
-        Tools[["🔌 19 асинхронних інструментів MCP"]]:::agent
+        Tools[["🔌 20 асинхронних інструментів MCP (stdio)"]]:::agent
         Search[["🔍 Гібридний / Reranked пошук"]]:::agent
         ROT{{"🛠️ Аудит ROT та суперечностей (Semantic/LLM)"}}:::agent
     end
@@ -535,7 +543,7 @@ flowchart TD
 | `core/constants.py`                       | Централізовані списки виключень та системні константи                                                                                                                                                                                                  |
 | `core/utils.py`                           | Захист від path traversal, атомарний запис, бекапи, rate limiter                                                                                                                                                                                       |
 | `core/cli.py`                             | Командний рядок із 26 командами, включно з read-only doctor diagnostics, generic suite integration plans, conflict-safe MCP connection plans, cache hygiene, preflighted import, transactional memory, compatibility handoff workflows і canonical Task v2 lifecycle management                                                                            |
-| `mcp/power_server.py`                     | Сервер official MCP SDK v2 із 20 async tools, stdio/loopback HTTP transport та `/health`                                                                                                                                                                             |
+| `mcp/power_server.py`                     | Сервер official MCP SDK v2 із 20 async tools через local stdio                                                                                                                                                                                                    |
 
 Всі компоненти використовують `power_framework.core` як єдине джерело правди.
 
@@ -610,10 +618,10 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux (v3.7.10 release boundary)",
+  "operatingSystem": "Linux (v3.7.11 release boundary)",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.13–3.14",
-  "softwareVersion": "3.7.10",
+  "softwareVersion": "3.7.11",
   "license": "https://www.gnu.org/licenses/gpl-3.0",
   "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
   "author": {
@@ -642,8 +650,8 @@ alternateName: power-framework
 description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
 applicationCategory: DeveloperApplication
 applicationSubCategory: KnowledgeManagement
-operatingSystem: Linux (v3.7.10 release boundary)
-softwareVersion: 3.7.10
+operatingSystem: Linux (v3.7.11 release boundary)
+softwareVersion: 3.7.11
 keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework

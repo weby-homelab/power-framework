@@ -26,9 +26,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from collections.abc import Callable
+from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
@@ -50,7 +50,6 @@ from power_framework.core import (
     get_context,
     normalize_search_mode,
     read_file_content,
-    resolve_vault_path,
     run_blocking,
     run_lint_report,
     run_rot_report,
@@ -65,12 +64,14 @@ from power_framework.core.constants import SKIP_FILES
 from power_framework.core.doctor import report_as_json, run_doctor
 from power_framework.core.domains import DomainConfigError
 from power_framework.core.ignore import should_skip
+from power_framework.core.utils import is_regular_vault_file, iter_vault_markdown_files
 from power_framework.experimental.relations import (
     format_relation_suggestions,
     suggest_related,
     suggest_related_semantic,
 )
 
+from .contract import agent_integration_descriptor, mcp_discovery_contract
 from .preflight import require_configured_vault_root
 
 logger = logging.getLogger(__name__)
@@ -140,7 +141,7 @@ class PowerMCPServer(MCPServer):
         try:
             result = await super().call_tool(name, arguments, context)
         except ToolError as exc:
-            logger.exception("MCP tool execution failed: %s", name)
+            logger.info("MCP tool execution failed: %s", name)
             return CallToolResult(
                 content=[TextContent(type="text", text=_safe_mcp_error_text(exc))],
                 is_error=True,
@@ -226,9 +227,11 @@ def _declared_catalog_page_count(prefix: str) -> int:
     return page_count
 
 
-def _read_catalog_page(category_path: Path, page: int) -> str | None:
+def _read_catalog_page(vault_root: Path, category_path: Path, page: int) -> str | None:
     """Read one declared catalog page, failing closed on stale pagination."""
     landing_path = category_path / _catalog_page_filename(1)
+    if landing_path.is_symlink():
+        raise ToolError("Catalog landing page must not be a symlink")
     try:
         landing_path.stat()
     except FileNotFoundError:
@@ -237,6 +240,8 @@ def _read_catalog_page(category_path: Path, page: int) -> str | None:
         raise ToolError("Unable to read the catalog landing page") from exc
 
     if page == 1:
+        if not is_regular_vault_file(vault_root, landing_path):
+            raise ToolError("Catalog landing page is outside the configured vault")
         try:
             content = landing_path.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
@@ -249,32 +254,35 @@ def _read_catalog_page(category_path: Path, page: int) -> str | None:
         raise ToolError(f"Catalog page {page} is out of range; available pages: 1-{page_count}")
 
     page_path = category_path / _catalog_page_filename(page)
+    if page_path.is_symlink():
+        raise ToolError("Catalog page must not be a symlink")
     try:
-        return page_path.read_text(encoding="utf-8")
+        page_path.stat()
     except FileNotFoundError as exc:
         raise ToolError(
             f"Catalog page {page} is missing although the landing page declares {page_count}"
         ) from exc
+    except OSError as exc:
+        raise ToolError(f"Unable to read catalog page {page}") from exc
+    if not is_regular_vault_file(vault_root, page_path):
+        raise ToolError("Catalog page is outside the configured vault")
+    try:
+        return page_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
         raise ToolError(f"Unable to read catalog page {page}") from exc
 
 
 def _get_vault_path(vault_path: str | None = None) -> Path:
     """Resolve a tool vault path without allowing configured-root substitution."""
-    configured_root = os.getenv("POWER_VAULT_DIR") or os.getenv("POWER_VAULT_PATH")
-    if configured_root:
-        try:
-            root = validate_vault_path(configured_root)
-            if vault_path:
-                requested = validate_vault_path(vault_path, allowed_root=str(root))
-                if requested != root:
-                    raise ValueError("MCP tools may only use the configured vault root")
-        except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
-            raise ToolError("Vault path must match the configured POWER_VAULT_DIR root.") from exc
-        return root
-
-    args = {"vault_path": vault_path} if vault_path else {}
-    return resolve_vault_path(args)
+    try:
+        root = require_configured_vault_root()
+        if vault_path:
+            requested = validate_vault_path(vault_path, allowed_root=str(root))
+            if requested != root:
+                raise ValueError("MCP tools may only use the configured vault root")
+    except (FileNotFoundError, NotADirectoryError, RuntimeError, ValueError) as exc:
+        raise ToolError("Vault path must match the configured POWER_VAULT_DIR root.") from exc
+    return root
 
 
 @mcp.tool(
@@ -298,9 +306,13 @@ async def get_server_info(
     instead of downloading it.
     """
     path = _get_vault_path(vault_path)
-    return await run_blocking(
-        lambda: report_as_json(run_doctor(path, probe_embedding=probe_provider))
+    report = json.loads(
+        await run_blocking(lambda: report_as_json(run_doctor(path, probe_embedding=probe_provider)))
     )
+    tools = await mcp.list_tools()
+    report["mcp"] = mcp_discovery_contract(tools)
+    report["agent_integration"] = agent_integration_descriptor(tools)
+    return json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
 @mcp.tool(
@@ -421,10 +433,10 @@ async def read_sub_index(category: str, vault_path: str | None = None, page: int
         raise ToolError(f"Invalid category: {category}. Must be one of: {', '.join(PARA_FOLDERS)}")
 
     category_path = path / category
-    if not category_path.is_dir():
+    if category_path.is_symlink() or not category_path.is_dir():
         raise ToolError(f"Category folder not found: {category}")
 
-    content = _read_catalog_page(category_path, page)
+    content = _read_catalog_page(path, category_path, page)
     if content is not None:
         return content
 
@@ -790,7 +802,10 @@ async def search_vault_tool(
 
     def _do_search() -> str:
         try:
-            envelope = ApplicationService(path, search_fn=search_vault).retrieve(
+            envelope = ApplicationService(
+                path,
+                search_fn=partial(search_vault, allow_search_db_override=False),
+            ).retrieve(
                 query,
                 max_results=max_results,
                 mode=search_mode,
@@ -881,14 +896,42 @@ async def synthesize_session(
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True,
-        "openWorldHint": False,
+        "openWorldHint": True,
     },
-    meta={"power.risk": {"local_only": True, "egress": "model_download", "approval": "none"}},
+    meta={
+        "power.risk": {
+            "local_only": False,
+            "egress": "network",
+            "approval": "explicit",
+        }
+    },
 )
-async def rot_audit(vault_path: str | None = None, extended: bool = False) -> str:
-    """Run the P.O.W.E.R. ROT audit: find Redundant, Outdated, and Trivial notes across the vault. Use extended=True for A2 scoring (content dedup, link rot, freshness, usage)."""
+async def rot_audit(
+    vault_path: str | None = None,
+    extended: bool = False,
+    allow_link_rot: bool = False,
+    allow_remote_llm: bool = False,
+    approved: bool = False,
+) -> str:
+    """Run the P.O.W.E.R. ROT audit with local analysis by default.
+
+    ``extended=True`` enables local A2 scoring. External link checks and remote
+    contradiction analysis are independent capabilities; each requires the
+    explicit approval flag when enabled.
+    """
+    if (allow_link_rot or allow_remote_llm) and not extended:
+        raise ToolError("remote ROT capabilities require extended=True")
+    if (allow_link_rot or allow_remote_llm) and not approved:
+        raise ToolError("remote ROT capabilities require explicit approved=True")
     path = _get_vault_path(vault_path)
-    return await run_blocking(lambda: run_rot_report(path, extended=extended))
+    return await run_blocking(
+        lambda: run_rot_report(
+            path,
+            extended=extended,
+            allow_link_rot=allow_link_rot,
+            allow_remote_llm=allow_remote_llm,
+        )
+    )
 
 
 @mcp.tool(
@@ -900,8 +943,14 @@ async def rot_audit(vault_path: str | None = None, extended: bool = False) -> st
     },
     meta={"power.risk": {"local_only": True, "egress": "none", "approval": "explicit"}},
 )
-async def archive_notes(dry_run: bool = True, vault_path: str | None = None) -> str:
+async def archive_notes(
+    dry_run: bool = True,
+    approved: bool = False,
+    vault_path: str | None = None,
+) -> str:
     """Move stale/expired notes to 04_Archive. Use dry_run=True (default) to preview first."""
+    if not dry_run and not approved:
+        raise ToolError("archive_notes apply requires explicit approved=True")
     path = _get_vault_path(vault_path)
     envelope = await run_blocking(
         lambda: ApplicationService(path).archive_notes(
@@ -956,9 +1005,12 @@ async def suggest_related_tool(
 )
 async def heal_frontmatter_tool(
     dry_run: bool = True,
+    approved: bool = False,
     vault_path: str | None = None,
 ) -> str:
     """Scan and heal missing/invalid frontmatter fields across vault notes. Use dry_run=True (default) to preview first."""
+    if not dry_run and not approved:
+        raise ToolError("heal_frontmatter_tool apply requires explicit approved=True")
     path = _get_vault_path(vault_path)
     envelope = await run_blocking(
         lambda: ApplicationService(path).heal_frontmatter(
@@ -989,7 +1041,7 @@ async def check_markdown_tool(
         lines = ["=== Markdown Quality Check Report ===", f"Vault: {path}", ""]
         issue_types: dict[str, int] = {}
 
-        for filepath in path.rglob("*.md"):
+        for filepath in iter_vault_markdown_files(path):
             rel = filepath.relative_to(path)
             if should_skip(path, str(rel)):
                 continue

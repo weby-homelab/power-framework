@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from power_framework.core.ignore import should_skip
 from power_framework.core.parser import read_file_content, validate_metadata
+from power_framework.core.utils import iter_vault_markdown_files
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,7 @@ def suggest_related(
     """
     notes: dict[str, tuple[set[str], list[str], str, str]] = {}
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue
@@ -443,7 +444,7 @@ def suggest_related_v2(
     notes: dict[str, tuple[set[str], list[str], set[str]]] = {}
     explicit_links: dict[str, set[str]] = {}
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue
@@ -614,7 +615,7 @@ def suggest_related_semantic(
 
     target_text = ""
     notes: dict[str, str] = {}
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue

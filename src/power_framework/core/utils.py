@@ -16,10 +16,13 @@ from collections import defaultdict
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PureWindowsPath
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote
 
 from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES, is_catalog_filename
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _BACKUP_NAME_RE = re.compile(r"^.+\.\d{8}_\d{6}(?:_\d+)?\.[^.]+$")
 
@@ -33,6 +36,9 @@ def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Pat
     Raises ValueError if the path escapes the allowed boundary.
     """
     resolved = Path(vault_path).resolve()
+
+    if resolved == resolved.parent:
+        raise ValueError("Vault path must be a dedicated directory, not the filesystem root")
 
     if allowed_root:
         allowed = Path(allowed_root).resolve()
@@ -48,8 +54,62 @@ def validate_vault_path(vault_path: str, allowed_root: str | None = None) -> Pat
 
     if not resolved.is_dir():
         raise NotADirectoryError(f"Vault path is not a directory: {resolved}")
+    control_dir = resolved / ".power"
+    if control_dir.is_symlink():
+        raise ValueError("Vault control directory must not be a symlink")
+    if control_dir.exists() and not control_dir.is_dir():
+        raise NotADirectoryError(f"Vault control path is not a directory: {control_dir}")
 
     return resolved
+
+
+def _is_regular_file_in_root(root: Path, candidate: Path) -> bool:
+    """Return whether an existing candidate is a non-symlink file below ``root``."""
+    try:
+        if candidate.is_symlink() or not candidate.is_file():
+            return False
+        for parent in (candidate.parent, *candidate.parent.parents):
+            if parent == root:
+                break
+            if parent.is_symlink():
+                return False
+        candidate.resolve(strict=True).relative_to(root)
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return True
+
+
+def is_regular_vault_file(vault_root: Path, candidate: Path) -> bool:
+    """Check one candidate without following a symlink out of the vault root."""
+    return _is_regular_file_in_root(validate_vault_path(str(vault_root)), candidate)
+
+
+def iter_vault_markdown_files(vault_root: Path) -> Iterator[Path]:
+    """Yield regular Markdown files that resolve inside one validated vault.
+
+    Vault reads are intentionally fail-closed for symlinks. A symlinked note or
+    a path reached through a symlinked parent may otherwise expose an unrelated
+    host file through indexing, linting, or MCP retrieval.
+    """
+    root = validate_vault_path(str(vault_root))
+    for candidate in root.rglob("*.md"):
+        if _is_regular_file_in_root(root, candidate):
+            yield candidate
+
+
+def vault_control_dir(vault_root: Path, *, create: bool = False) -> Path:
+    """Return the vault control directory without following a symlink."""
+    root = validate_vault_path(str(vault_root))
+    control_dir = root / ".power"
+    if control_dir.is_symlink():
+        raise ValueError("Vault control directory must not be a symlink")
+    if control_dir.exists() and not control_dir.is_dir():
+        raise NotADirectoryError(f"Vault control path is not a directory: {control_dir}")
+    if create:
+        control_dir.mkdir(parents=False, exist_ok=True)
+        if control_dir.is_symlink() or not control_dir.is_dir():
+            raise ValueError("Vault control directory is not a safe directory")
+    return control_dir
 
 
 def resolve_vault_path(
@@ -66,7 +126,7 @@ def resolve_vault_path(
     if explicit:
         return validate_vault_path(explicit)
 
-    env_val = os.getenv(env_var) or os.getenv("POWER_VAULT_PATH")
+    env_val = os.getenv(env_var)
     if env_val:
         return validate_vault_path(env_val)
 
@@ -491,7 +551,7 @@ try:
 
     __version__ = _get_version("power-framework")
 except Exception:
-    __version__ = "3.7.10"
+    __version__ = "3.7.11"
 
 
 def run_opencode_cli(prompt: str) -> str:
