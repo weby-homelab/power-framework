@@ -62,7 +62,7 @@ def validate_hash_pinned_requirements(path: Path) -> None:
         if not continuation and (" @ git+" in line or " @ file:" in line or " @ http" in line):
             raise ValueError("native dependency lock must not contain direct URL requirements")
         if not continuation and line.startswith("-"):
-            continue
+            raise ValueError("native dependency lock must not contain pip option lines")
         if not raw_line[0].isspace():
             requirement_count += 1
         for marker in re.findall(r"--hash=sha256:[^\s\\]+", line):
