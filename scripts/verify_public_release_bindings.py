@@ -449,7 +449,7 @@ def _validate_hash_pinned_lock(path: Path) -> None:
                 "published native dependency lock must not contain direct URL requirements"
             )
         if not continuation and line.startswith("-"):
-            continue
+            raise ValueError("published native dependency lock must not contain pip option lines")
         if not continuation:
             requirements += 1
         for marker in re.findall(r"--hash=sha256:[^\s\\]+", line):

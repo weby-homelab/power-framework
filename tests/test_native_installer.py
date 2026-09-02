@@ -104,6 +104,39 @@ def _plan(home: Path, fixture: dict[str, Path]) -> dict[str, object]:
     )
 
 
+PIP_OPTION_DIRECTIVES = (
+    "--index-url https://example.invalid/simple",
+    "--extra-index-url https://example.invalid/simple",
+    "--trusted-host example.invalid",
+    "--find-links /tmp/packages",
+    "-r other-requirements.txt",
+    "--requirement other-requirements.txt",
+    "-c constraints.txt",
+    "--constraint constraints.txt",
+)
+
+
+@pytest.mark.parametrize("directive", PIP_OPTION_DIRECTIVES)
+def test_native_dependency_lock_rejects_top_level_pip_directives(
+    tmp_path: Path, directive: str
+) -> None:
+    lock = tmp_path / "power-native-requirements.txt"
+    lock.write_text(
+        f"{directive}\nexample==1.0 --hash=sha256:{'a' * 64}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="pip option lines"):
+        integrations._validate_native_dependency_lock(lock)
+
+
+def test_native_dependency_lock_accepts_hashed_requirement(tmp_path: Path) -> None:
+    lock = tmp_path / "power-native-requirements.txt"
+    lock.write_text(f"example==1.0 --hash=sha256:{'a' * 64}\n", encoding="utf-8")
+
+    integrations._validate_native_dependency_lock(lock)
+
+
 def test_native_install_fresh_upgrade_and_noop(tmp_path: Path, fake_native_runtime: None) -> None:
     home = tmp_path / "home"
     first = _write_release_fixture(tmp_path, "3.7.10", "a")

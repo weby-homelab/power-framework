@@ -11,11 +11,24 @@ from typing import Any
 import pytest
 
 from scripts.build_release_manifest import aggregate_tree_hash
-from scripts.verify_public_release_bindings import verify_public_release_bindings
+from scripts.verify_public_release_bindings import (
+    _validate_hash_pinned_lock,
+    verify_public_release_bindings,
+)
 
 TAG = "v3.7.10"
 COMMIT = "a" * 40
 IMAGE_DIGEST = "sha256:" + "f" * 64
+PIP_OPTION_DIRECTIVES = (
+    "--index-url https://example.invalid/simple",
+    "--extra-index-url https://example.invalid/simple",
+    "--trusted-host example.invalid",
+    "--find-links /tmp/packages",
+    "-r other-requirements.txt",
+    "--requirement other-requirements.txt",
+    "-c constraints.txt",
+    "--constraint constraints.txt",
+)
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -34,6 +47,27 @@ def _write_checksums(path: Path, files: list[Path]) -> None:
         ),
         encoding="utf-8",
     )
+
+
+@pytest.mark.parametrize("directive", PIP_OPTION_DIRECTIVES)
+def test_public_lock_validator_rejects_top_level_pip_directives(
+    tmp_path: Path, directive: str
+) -> None:
+    lock = tmp_path / "power-native-requirements.txt"
+    lock.write_text(
+        f"{directive}\nexample==1.0 --hash=sha256:{'a' * 64}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="pip option lines"):
+        _validate_hash_pinned_lock(lock)
+
+
+def test_public_lock_validator_accepts_hashed_requirement(tmp_path: Path) -> None:
+    lock = tmp_path / "power-native-requirements.txt"
+    lock.write_text(f"example==1.0 --hash=sha256:{'a' * 64}\n", encoding="utf-8")
+
+    _validate_hash_pinned_lock(lock)
 
 
 def _write_fixture(tmp_path: Path) -> dict[str, Path | str]:

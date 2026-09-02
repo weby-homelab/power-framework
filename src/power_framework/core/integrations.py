@@ -355,7 +355,7 @@ def _validate_native_dependency_lock(path: Path) -> None:
         if not continuation and (" @ git+" in line or " @ file:" in line or " @ http" in line):
             raise ValueError("native dependency lock must not contain direct URL requirements")
         if not continuation and line.startswith("-"):
-            continue
+            raise ValueError("native dependency lock must not contain pip option lines")
         markers = re.findall(r"--hash=sha256:[^\s\\]+", line)
         for marker in markers:
             if re.fullmatch(r"--hash=sha256:[0-9a-f]{64}", marker) is None:
