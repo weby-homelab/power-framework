@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, Request
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .auth.csrf import verify_csrf_token
@@ -17,6 +18,9 @@ from .auth.session import SessionManager
 
 if TYPE_CHECKING:
     from .clients.power import PowerClient
+
+
+_COOKIE_NAME_RE = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 
 
 def _default_vault_path() -> Path:
@@ -82,6 +86,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("session_cookie_name", "csrf_cookie_name")
+    @classmethod
+    def validate_cookie_name(cls, value: str) -> str:
+        """Accept only RFC token cookie names used by Starlette safely."""
+        if _COOKIE_NAME_RE.fullmatch(value) is None:
+            raise ValueError("cookie name must contain only RFC token characters")
+        return value
+
 
 @lru_cache
 def get_global_settings() -> Settings:
@@ -91,7 +103,10 @@ def get_global_settings() -> Settings:
 
 def get_settings(request: Request) -> Settings:
     """Get active Settings from current request app state."""
-    return getattr(request.app.state, "settings", None) or get_global_settings()
+    settings = getattr(request.app.state, "settings", None)
+    if not isinstance(settings, Settings):
+        raise RuntimeError("application settings are missing or malformed")
+    return settings
 
 
 def get_client(request: Request) -> PowerClient:

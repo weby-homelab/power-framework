@@ -3,8 +3,8 @@
 !benchmark-manifest.schema.json
 !baselines/
 !baselines/*.json
-!3.7.11/
-!3.7.11/*.json
+# Live 3.7.11 orchestration state belongs outside the repository.
+3.7.11/
 # The 3.6.5 candidate is generated outside the checkout and is not release evidence.
 # The final baseline is generated from the clean signed tag into dist/ by CI.
 baselines/v3.5.0.json

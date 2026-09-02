@@ -15,7 +15,7 @@
 
 ## Одноразова підготовка
 
-Спочатку встановіть release wheel в ізольоване середовище. Для нового vault
+Завантажте release wheel і native dependency lock в ізольоване середовище. Для нового vault
 створіть його через `init`; для наявного спочатку виконайте
 [гід міграції](migration-guide.ua.md) і не запускайте `init` поверх нього:
 
@@ -25,10 +25,18 @@ POWER_VENV="$POWER_HOME/venv"
 POWER_PYTHON="$POWER_VENV/bin/python"
 POWER_CLI="$POWER_VENV/bin/power"
 POWER_VAULT="$HOME/Documents/power-vault"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
 
+mkdir -p "$POWER_RELEASE_DIR"
+gh release download v3.7.11 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+  --pattern 'power-native-requirements.txt' \
+  --dir "$POWER_RELEASE_DIR"
 python3 -m venv "$POWER_VENV"
-"$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
+"$POWER_PYTHON" -m pip install --require-hashes \
+  -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
+"$POWER_PYTHON" -m pip install --no-deps \
+  "$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
 # Лише для нового або порожнього vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'

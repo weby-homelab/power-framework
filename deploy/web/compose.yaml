@@ -5,6 +5,7 @@ services:
       dockerfile: deploy/web/Dockerfile
       args:
         POWER_VERSION: "3.7.11"
+        POWER_WHEEL_FILE: "${POWER_WHEEL_FILE:?set POWER_WHEEL_FILE to an exact wheel staged under release/}"
     image: ghcr.io/weby-homelab/power-framework-web:3.7.11
     container_name: power-web
     ports:

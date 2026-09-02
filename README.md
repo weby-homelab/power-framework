@@ -83,7 +83,19 @@ you want POWER to manage.
 > claims about another host.
 
 ```bash
-python3 -m pip install "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
+mkdir -p "$POWER_RELEASE_DIR"
+gh release download v3.7.11 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+  --pattern 'power-native-requirements.txt' \
+  --dir "$POWER_RELEASE_DIR"
+python3 -m venv "$POWER_RELEASE_DIR/venv"
+POWER_PYTHON="$POWER_RELEASE_DIR/venv/bin/python"
+"$POWER_PYTHON" -m pip install --require-hashes \
+  -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
+"$POWER_PYTHON" -m pip install --no-deps \
+  "$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
+export PATH="$POWER_RELEASE_DIR/venv/bin:$PATH"
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
@@ -294,14 +306,10 @@ The [MCP client onboarding guide](docs/mcp-client-onboarding.md) contains the
 canonical configurations for Claude Desktop/Code, Gemini CLI, Codex, and
 OpenCode, plus the read-only golden task and approval workflow.
 
-The wheel URL below is the tag-bound `v3.7.11` install target. Run it only after
-the signed tag and assets exist on the
-[release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11)
-with the source archive, SBOM, and release receipts.
-
-```bash
-pip install "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
-```
+Use the lock-bound installation in [Getting Started](docs/getting-started.md)
+before configuring a client. It installs `power-native-requirements.txt` with
+`--require-hashes`, then installs the exact wheel with `--no-deps`; do not
+install the wheel alone with floating dependency resolution.
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
 
@@ -474,7 +482,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI Agent (official MCP SDK v2)"]
-        Tools[["🔌 20 Async MCP Tools (stdio/HTTP)"]]:::agent
+        Tools[["🔌 20 Async MCP Tools (stdio)"]]:::agent
         Search[["🔍 Hybrid / Reranked Search"]]:::agent
         ROT{{"🛠️ ROT & Contradiction Audit (Semantic/LLM)"}}:::agent
     end
@@ -543,7 +551,7 @@ flowchart TD
 | `core/constants.py`                       | Centralized exclusion lists and system constants                                                                                                                                                                                   |
 | `core/utils.py`                           | Path traversal protection, atomic writes, backups, rate limiter                                                                                                                                                                    |
 | `core/cli.py`                             | Command-line interface with 26 commands, including read-only doctor diagnostics, generic suite integration plans, conflict-safe MCP connection plans, preflighted import, transactional memory, compatibility handoff workflows, and canonical Task v2 lifecycle management                                                                              |
-| `mcp/power_server.py`                     | Official MCP SDK v2 server with 20 async tools, stdio/loopback HTTP transport, and `/health`                                                                                                                                                     |
+| `mcp/power_server.py`                     | Official MCP SDK v2 server with 20 async tools over local stdio                                                                                                                                                                                 |
 
 All components share `power_framework.core` as the single source of truth.
 

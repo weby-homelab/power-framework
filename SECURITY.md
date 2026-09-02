@@ -44,10 +44,10 @@ The following boundaries are part of the current contract:
   query-expansion, or ROT request requires an explicit policy appropriate to
   the content sensitivity. An endpoint configured by an operator is not, by
   itself, proof that a note may be sent there.
-- MCP stdio is a local process interface. HTTP MCP requires
-  `POWER_VAULT_DIR` (or the documented legacy alias) and binds to loopback by
-  default. Remote HTTP is fail-closed until an authenticated, vault-scoped
-  transport exists. `/health` is a readiness endpoint, not authentication.
+- MCP is a local stdio process interface and requires `POWER_VAULT_DIR` as its
+  single configured vault boundary. The Web UI is a separate HTTP application;
+  it is not an MCP transport. Remote MCP, MCP HTTP, SSE, and TCP transports are
+  outside the current release contract.
 - MCP tool annotations and `power.risk` metadata describe intended risk; they
   are not an authorization mechanism. The caller and its gateway remain
   responsible for enforcing user identity and approval policy.
@@ -92,8 +92,8 @@ CI gates:
   write targets, rate-limits mutation/index operations, and masks internal
   tracebacks from client responses.
 - CI runs the test, lint, type, dependency-audit, package-smoke, release-policy,
-  and CodeQL gates. The live stdio/HTTP MCP process contract is tested in
-  addition to direct in-process tool tests.
+  and CodeQL gates. The live stdio MCP process contract is tested in addition
+  to direct in-process tool tests.
 
 These controls reduce risk but do not make a vault safe from a compromised host,
 malicious same-user process, compromised dependency, or an operator who
@@ -149,15 +149,15 @@ P.O.W.E.R. security boundary:
   vulnerabilities in an upstream model/provider without a P.O.W.E.R. integration
   flaw;
 - retrieval ranking, model quality, latency, VRAM use, or human-quality claims;
-- deliberate operator exposure of loopback HTTP through an unauthenticated
-  reverse proxy; remote deployment is unsupported by the current transport;
+- deliberate operator exposure of the Web UI through an unauthenticated reverse
+  proxy; remote MCP deployment is unsupported by the current transport;
 - a user choosing to enable `allow-public`, `allow-internal`, or
   `allow-sensitive` egress without protecting the selected endpoint.
 
 Important current limitations and compensating controls:
 
-- HTTP MCP has no built-in user authentication or multi-tenant isolation; keep
-  it loopback-only or place it behind an authenticated, vault-scoped gateway.
+- The Web UI has no built-in multi-tenant isolation; keep it loopback-only or
+  place it behind an authenticated, vault-scoped gateway.
 - One server process is bound to one configured vault root. Run separate
   processes and enforce separate OS permissions for separate trust domains.
 - Security metadata on MCP tools is advisory for clients and gateways; it does

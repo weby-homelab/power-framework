@@ -1,4 +1,4 @@
-"""Safe, bounded source read service for POWER 3.6.7.
+"""Safe, bounded source read service for POWER 3.7.11.
 
 This module provides side-effect-free, realpath-contained access to vault notes,
 precomputed summaries, graph projections, and metadata without modifying the vault

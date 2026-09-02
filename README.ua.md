@@ -82,7 +82,19 @@ P.O.W.E.R. створений для роботи як людьми, так і A
 > перевірте [матрицю платформ](docs/support-matrix.ua.md).
 
 ```bash
-python3 -m pip install "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
+mkdir -p "$POWER_RELEASE_DIR"
+gh release download v3.7.11 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+  --pattern 'power-native-requirements.txt' \
+  --dir "$POWER_RELEASE_DIR"
+python3 -m venv "$POWER_RELEASE_DIR/venv"
+POWER_PYTHON="$POWER_RELEASE_DIR/venv/bin/python"
+"$POWER_PYTHON" -m pip install --require-hashes \
+  -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
+"$POWER_PYTHON" -m pip install --no-deps \
+  "$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
+export PATH="$POWER_RELEASE_DIR/venv/bin:$PATH"
 
 power init ~/my-vault      # Створити структуру vault
 power lint ~/my-vault      # Перевірити биті посилання та метадані
@@ -286,14 +298,10 @@ power search ~/my-vault "experiment" --mode auto --domain research
 канонічні конфігурації для Claude Desktop/Code, Gemini CLI, Codex і OpenCode,
 а також read-only golden task та workflow схвалення.
 
-URL wheel нижче є tag-bound install target `v3.7.11`. Запускайте його лише
-після появи signed tag та assets на
-[сторінці релізу](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11)
-разом із source archive, SBOM і release receipts.
-
-```bash
-pip install "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
-```
+Перед налаштуванням клієнта використовуйте lock-bound інструкцію в
+[Getting Started](docs/getting-started.ua.md): спочатку встановіть
+`power-native-requirements.txt` через `--require-hashes`, потім exact wheel через
+`--no-deps`. Не встановлюйте wheel окремо з плаваючим розв'язанням залежностей.
 
 **Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
 
@@ -466,7 +474,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI-Агент (official MCP SDK v2)"]
-        Tools[["🔌 19 асинхронних інструментів MCP"]]:::agent
+        Tools[["🔌 20 асинхронних інструментів MCP (stdio)"]]:::agent
         Search[["🔍 Гібридний / Reranked пошук"]]:::agent
         ROT{{"🛠️ Аудит ROT та суперечностей (Semantic/LLM)"}}:::agent
     end
@@ -535,7 +543,7 @@ flowchart TD
 | `core/constants.py`                       | Централізовані списки виключень та системні константи                                                                                                                                                                                                  |
 | `core/utils.py`                           | Захист від path traversal, атомарний запис, бекапи, rate limiter                                                                                                                                                                                       |
 | `core/cli.py`                             | Командний рядок із 26 командами, включно з read-only doctor diagnostics, generic suite integration plans, conflict-safe MCP connection plans, cache hygiene, preflighted import, transactional memory, compatibility handoff workflows і canonical Task v2 lifecycle management                                                                            |
-| `mcp/power_server.py`                     | Сервер official MCP SDK v2 із 20 async tools, stdio/loopback HTTP transport та `/health`                                                                                                                                                                             |
+| `mcp/power_server.py`                     | Сервер official MCP SDK v2 із 20 async tools через local stdio                                                                                                                                                                                                    |
 
 Всі компоненти використовують `power_framework.core` як єдине джерело правди.
 

@@ -15,8 +15,8 @@ platforms for `v3.7.11`.
 
 ## One-time preparation
 
-Install the release wheel in an isolated environment. For a new vault, create
-it with `init`; for an existing vault, complete the
+Download the release wheel and its native dependency lock into an isolated
+environment. For a new vault, create it with `init`; for an existing vault, complete the
 [migration guide](migration-guide.md) first and do not run `init` in place:
 
 ```bash
@@ -25,10 +25,18 @@ POWER_VENV="$POWER_HOME/venv"
 POWER_PYTHON="$POWER_VENV/bin/python"
 POWER_CLI="$POWER_VENV/bin/power"
 POWER_VAULT="$HOME/Documents/power-vault"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
 
+mkdir -p "$POWER_RELEASE_DIR"
+gh release download v3.7.11 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+  --pattern 'power-native-requirements.txt' \
+  --dir "$POWER_RELEASE_DIR"
 python3 -m venv "$POWER_VENV"
-"$POWER_PYTHON" -m pip install \
-  "power-framework[mcp] @ https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
+"$POWER_PYTHON" -m pip install --require-hashes \
+  -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
+"$POWER_PYTHON" -m pip install --no-deps \
+  "$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
 # Only for a new or empty vault:
 "$POWER_CLI" init "$POWER_VAULT"
 "$POWER_PYTHON" -c 'import sys; print(sys.executable)'

@@ -199,6 +199,60 @@ def test_native_install_rejects_release_slot_symlink_race(
     assert not (outside / "venv").exists()
 
 
+def test_native_install_rejects_interleaved_release_slot_symlink(
+    tmp_path: Path, fake_native_runtime: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    fixture = _write_release_fixture(tmp_path, "3.7.11", "a")
+    plan = _plan(home, fixture)
+    release_slot = Path(plan["native"]["release_slot"])
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    class RaceBuilder:
+        def __init__(self, **_kwargs: object) -> None:
+            release_slot.symlink_to(outside, target_is_directory=True)
+
+        def create(self, path: Path) -> None:
+            bin_dir = path / "bin"
+            bin_dir.mkdir(parents=True)
+            for name in ("power", "power-mcp"):
+                executable = bin_dir / name
+                executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                executable.chmod(0o755)
+
+    monkeypatch.setattr(integrations.venv, "EnvBuilder", RaceBuilder)
+    with pytest.raises(RuntimeError, match="release slot changed"):
+        integrations.apply_native_install_plan(plan, approved=True)
+    assert not (outside / "venv").exists()
+    assert not release_slot.exists()
+    assert not release_slot.is_symlink()
+
+
+def test_native_install_noop_requires_matching_current_slot(
+    tmp_path: Path, fake_native_runtime: None
+) -> None:
+    home = tmp_path / "home"
+    fixture = _write_release_fixture(tmp_path, "3.7.11", "a")
+    integrations.apply_native_install_plan(_plan(home, fixture), approved=True)
+    managed = home / ".local" / "share" / "power"
+    current = managed / "current"
+    foreign_slot = managed / "releases" / "foreign-valid-slot"
+    (foreign_slot / "venv").mkdir(parents=True)
+    current.unlink()
+    current.symlink_to(Path("releases/foreign-valid-slot"), target_is_directory=True)
+
+    replay = _plan(home, fixture)
+
+    assert replay["status"] == "update"
+
+
+def test_native_plan_accepts_documented_explicit_process_home() -> None:
+    plan = integrations.build_native_install_plan(home=Path.home())
+
+    assert plan["status"] == "blocked"
+
+
 def test_native_install_rejects_foreign_launcher_without_overwrite(
     tmp_path: Path, fake_native_runtime: None
 ) -> None:

@@ -615,7 +615,7 @@ def build_native_install_plan(
     install_home = _safe_target(
         home if home is not None else Path.home(),
         label="installer home",
-        allow_home=home is None,
+        allow_home=home is None or Path(home).expanduser().resolve() == Path.home().resolve(),
     )
     layout = _native_layout(install_home)
     for candidate, label in (
@@ -699,6 +699,7 @@ def build_native_install_plan(
         if isinstance(state, dict)
         and state.get("manifest_sha256") == contract["manifest_sha256"]
         and current_target is not None
+        and current_target == release_slot.resolve()
         else "update"
         if state is not None
         else "ready"
@@ -748,6 +749,14 @@ def _atomic_symlink(
         os.replace(temporary, link)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _remove_managed_path(path: Path) -> None:
+    """Remove a staged path without ever following a symlink target."""
+    if path.is_symlink():
+        path.unlink(missing_ok=True)
+    elif path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def _verify_installed_launcher(
@@ -887,11 +896,18 @@ def apply_native_install_plan(
     state_snapshot = state_path.read_bytes() if state_path.is_file() else None
     pointer_activated = False
     retired_legacy_link: str | None = None
+    staging_slot: Path | None = None
     try:
-        # The environment is born at its final physical path.  A populated
-        # Python venv is never moved or repaired after installation.
-        venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(slot_venv)
-        slot_python = slot_venv / "bin" / "python"
+        # A populated Python venv is never moved or repaired after installation.
+        # Build it in a private real directory and promote that directory only after the
+        # final release slot has been rechecked, so a slot race cannot make
+        # EnvBuilder write through an attacker-controlled symlink.
+        staging_slot = Path(
+            tempfile.mkdtemp(prefix=f".{release_slot.name}.staging-", dir=releases_root)
+        )
+        staging_venv = staging_slot / "venv"
+        venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(staging_venv)
+        slot_python = staging_venv / "bin" / "python"
 
         def run_pip(arguments: list[str]) -> None:
             command = [
@@ -935,10 +951,10 @@ def apply_native_install_plan(
 
         expected_power = contract["version"]
         _verify_installed_launcher(
-            slot_venv / "bin" / "power", ["--version"], expected_version=expected_power
+            staging_venv / "bin" / "power", ["--version"], expected_version=expected_power
         )
         _verify_installed_launcher(
-            slot_venv / "bin" / "power-mcp", ["--version"], expected_version=expected_power
+            staging_venv / "bin" / "power-mcp", ["--version"], expected_version=expected_power
         )
 
         launcher_dir.mkdir(parents=True, exist_ok=True)
@@ -949,6 +965,17 @@ def apply_native_install_plan(
                 target_is_directory=False,
             )
 
+        if release_slot.is_symlink() or release_slot.exists():
+            raise RuntimeError(
+                "release slot changed during installation and will not be overwritten"
+            )
+        if staging_slot.is_symlink() or not staging_slot.is_dir():
+            raise RuntimeError("staged release slot is unsafe")
+        os.replace(staging_slot, release_slot)
+        staging_slot = None
+        if release_slot.is_symlink() or not release_slot.is_dir():
+            raise RuntimeError("final release slot is unsafe")
+        slot_venv = release_slot / "venv"
         relative_slot = Path(os.path.relpath(release_slot, managed))
         _atomic_symlink(relative_slot, current_link, identifier=activation_id)
         pointer_activated = True
@@ -1033,9 +1060,11 @@ def apply_native_install_plan(
             state_path.unlink(missing_ok=True)
         else:
             state_path.write_bytes(state_snapshot)
-        shutil.rmtree(release_slot, ignore_errors=True)
+        _remove_managed_path(release_slot)
         raise
     finally:
+        if staging_slot is not None:
+            _remove_managed_path(staging_slot)
         shutil.rmtree(launcher_stage, ignore_errors=True)
 
 

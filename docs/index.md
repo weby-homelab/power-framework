@@ -40,18 +40,11 @@ and hash, and make cutover reversible.
 
 ## Minimal quick start
 
-```bash
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install \
-  "https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
-
-power init ./my-vault
-power index ./my-vault --strict
-power lint ./my-vault
-power sync ./my-vault --fts-only
-```
+Follow the [clean-install guide](getting-started.md). It downloads the exact
+wheel and `power-native-requirements.txt`, installs dependencies with
+`--require-hashes`, and installs the framework artifact with `--no-deps` before
+running the vault lifecycle commands. Do not install the wheel alone with
+floating dependency resolution.
 
 On Windows, use the dedicated PowerShell guide rather than translating these POSIX commands.
 

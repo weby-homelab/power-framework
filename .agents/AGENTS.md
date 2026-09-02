@@ -44,7 +44,7 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 | `core/linter.py`      | Health checks: links, metadata, orphans, stale/expired |
 | `core/searcher.py`    | FTS5/dense/hybrid/reranked search (`auto` default; labelled FTS fallback) |
 | `experimental/embeddings.py` | Optional BGE-M3 ONNX (1024d) + MiniLM fallback       |
-| `mcp/power_server.py` | official MCP SDK v2, 20 async tools, stdio/loopback HTTP + /health |
+| `mcp/power_server.py` | official MCP SDK v2, 20 async tools over local stdio |
 
 ## Workflow
 

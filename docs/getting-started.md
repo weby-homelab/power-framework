@@ -101,16 +101,11 @@ the exact release plan explicitly:
 POWER_CLI="$HOME/.local/bin/power"
 ```
 
-### Alternative: install from the pinned tag
+### Source checkout note
 
-This path requires Git:
-
-```bash
-"$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.7.11'
-```
-
-Do not use an unpinned `main` install when reproducibility matters.
+The Git tag is useful for source inspection, but it is not the public clean-install
+path: dependency resolution from a source URL is not hash-bound. For a reproducible
+`v3.7.11` installation, use the release wheel and native lock above.
 
 ## 3. Initialize an empty vault
 

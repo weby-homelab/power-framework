@@ -83,16 +83,11 @@ POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
 POWER_CLI="$HOME/.local/bin/power"
 ```
 
-### Альтернатива: встановлення із закріпленого tag
+### Примітка про source checkout
 
-Цей шлях потребує Git:
-
-```bash
-"$POWER_PYTHON" -m pip install \
-  'git+https://github.com/weby-homelab/power-framework.git@v3.7.11'
-```
-
-Не використовуйте незакріплений `main`, якщо важлива відтворюваність.
+Git tag придатний для інспекції source, але не є шляхом public clean-install:
+розв'язання залежностей із source URL не має hash binding. Для відтворюваної
+інсталяції `v3.7.11` використовуйте release wheel і native lock вище.
 
 ## 3. Ініціалізуйте порожній vault
 

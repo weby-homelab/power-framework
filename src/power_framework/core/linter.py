@@ -577,8 +577,7 @@ def run_rot_audit(
             logger.warning("Freshness scoring failed: %s", exc)
 
         try:
-            tracker = UsageTracker(vault_dir)
-            result.usage_counts = tracker.get_all_counts()
+            result.usage_counts = UsageTracker.read_all_counts(vault_dir)
         except Exception as exc:
             logger.warning("Usage tracking failed: %s", exc)
 

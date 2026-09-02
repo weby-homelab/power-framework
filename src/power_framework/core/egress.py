@@ -295,8 +295,13 @@ def safe_http_request(
     """Perform bounded direct HTTP with per-hop syntax, DNS and origin checks."""
     if max_redirects < 0 or max_redirects > 5:
         raise EndpointPolicyError("redirect limit is outside the supported range")
+    has_authorization = any(key.lower() == "authorization" for key in (headers or {}))
+    if has_authorization and allowed_origins is None:
+        raise EndpointPolicyError("authorization requires an explicit endpoint allowlist")
     current_url = url
     initial_scheme: str | None = None
+    initial_origin: str | None = None
+    authorization_forwarding_allowed = has_authorization
     visited: set[str] = set()
     for hop in range(max_redirects + 1):
         endpoint = validate_remote_endpoint(
@@ -307,22 +312,16 @@ def safe_http_request(
         )
         if initial_scheme is None:
             initial_scheme = endpoint.scheme
+            initial_origin = endpoint.origin
         elif initial_scheme == "https" and endpoint.scheme != "https":
             raise EndpointPolicyError("HTTPS endpoint downgrade through redirect is forbidden")
         if endpoint.original_url in visited:
             raise EndpointPolicyError("endpoint redirect loop detected")
         visited.add(endpoint.original_url)
         request_headers = dict(headers or {})
-        if (
-            hop
-            and endpoint.origin
-            != validate_remote_endpoint(
-                url,
-                require_https=require_https,
-                allowed_origins=allowed_origins,
-                allow_query=allow_query,
-            ).origin
-        ):
+        if hop and endpoint.origin != initial_origin:
+            authorization_forwarding_allowed = False
+        if not authorization_forwarding_allowed:
             request_headers = {
                 key: value
                 for key, value in request_headers.items()
@@ -366,7 +365,9 @@ def validate_llm_endpoint(url: str) -> ValidatedEndpoint:
         allowed_origins=configured_llm_origins(),
         allow_query=False,
     )
-    if endpoint.origin == DEFAULT_LLM_ORIGIN and not endpoint.path.startswith("/api/v1"):
+    if endpoint.origin == DEFAULT_LLM_ORIGIN and not (
+        endpoint.path == "/api/v1" or endpoint.path.startswith("/api/v1/")
+    ):
         raise EndpointPolicyError("OpenRouter endpoint must remain under /api/v1")
     return endpoint
 
@@ -393,10 +394,55 @@ def require_remote_egress(operation: EgressOperation, sensitivity: str = "intern
         )
 
 
-def is_remote_endpoint(url: str) -> bool:
-    """Treat only syntactically valid non-local HTTP endpoints as remote."""
+def validate_local_ollama_endpoint(url: str) -> None:
+    """Allow only an explicitly local Ollama endpoint.
+
+    The Ollama client owns its socket creation and cannot accept the resolved
+    address pinning used by :func:`safe_http_request`.  Remote Ollama hosts are
+    therefore rejected rather than relying on a caller-controlled DNS name or
+    a permissive egress policy.  Loopback support remains available for the
+    documented local Ollama deployment.
+    """
+    if not isinstance(url, str) or not url or len(url) > _MAX_ENDPOINT_LENGTH:
+        raise EndpointPolicyError("local Ollama endpoint is missing or exceeds the length limit")
+    if any(ord(character) < 32 or ord(character) == 127 for character in url):
+        raise EndpointPolicyError("local Ollama endpoint contains control characters")
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise EndpointPolicyError("local Ollama endpoint must use http or https")
+    if parsed.username is not None or parsed.password is not None:
+        raise EndpointPolicyError("local Ollama endpoint userinfo is forbidden")
+    if parsed.fragment:
+        raise EndpointPolicyError("local Ollama endpoint fragments are forbidden")
+    if parsed.path not in {"", "/"} or parsed.query:
+        raise EndpointPolicyError("local Ollama endpoint must not contain a path or query")
+    if not parsed.hostname:
+        raise EndpointPolicyError("local Ollama endpoint hostname is required")
     try:
-        endpoint = validate_remote_endpoint(url, require_https=False)
+        port = parsed.port
+    except ValueError as exc:
+        raise EndpointPolicyError("local Ollama endpoint port is invalid") from exc
+    if port is not None and not 1 <= port <= 65535:
+        raise EndpointPolicyError("local Ollama endpoint port is outside the valid range")
+    hostname = parsed.hostname.rstrip(".").lower()
+    if hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".localhost"):
+        return
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        raise EndpointPolicyError(
+            "remote Ollama endpoints are unsupported because their connection cannot be pinned"
+        ) from None
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    if not address.is_loopback:
+        raise EndpointPolicyError("Ollama endpoint must be loopback")
+
+
+def is_remote_endpoint(url: str) -> bool:
+    """Return whether an Ollama-style endpoint is outside the local loopback."""
+    try:
+        validate_local_ollama_endpoint(url)
     except EndpointPolicyError:
-        return False
-    return endpoint.hostname not in {"localhost", "localhost.localdomain"}
+        return True
+    return False

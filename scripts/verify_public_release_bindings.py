@@ -624,6 +624,7 @@ def verify_public_release_bindings(
     expected_workflow_ref: str | None = None,
     expected_workflow_ref_protected: str | None = None,
     expected_repository: str | None = None,
+    expected_attestation_ids: list[str] | None = None,
     require_release_provenance: bool = False,
 ) -> dict[str, Any]:
     """Fail closed unless all public release identities bind to the same bytes."""
@@ -807,6 +808,13 @@ def verify_public_release_bindings(
             observed_subjects.add(subject)
     if subject_ids != manifest_ids:
         raise ValueError("attestation subject identities differ from manifest attestations")
+    if expected_attestation_ids is not None:
+        try:
+            expected_ids = {normalize_attestation_id(value) for value in expected_attestation_ids}
+        except ValueError as exc:
+            raise ValueError(f"invalid expected attestation identity: {exc}") from exc
+        if expected_ids != manifest_ids:
+            raise ValueError("release attestation identities do not match workflow outputs")
     if observed_subjects != expected_subjects:
         raise ValueError(
             "attestation subjects do not cover every final wheel, sdist, and image digest"
@@ -868,6 +876,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-workflow-ref")
     parser.add_argument("--expected-workflow-ref-protected")
     parser.add_argument("--expected-repository")
+    parser.add_argument("--expected-attestation-id", action="append")
     parser.add_argument("--require-release-provenance", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -888,6 +897,7 @@ def main(argv: list[str] | None = None) -> int:
             expected_workflow_ref=args.expected_workflow_ref,
             expected_workflow_ref_protected=args.expected_workflow_ref_protected,
             expected_repository=args.expected_repository,
+            expected_attestation_ids=args.expected_attestation_id,
             require_release_provenance=args.require_release_provenance,
         )
     except (OSError, ValueError) as exc:

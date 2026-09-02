@@ -17,8 +17,10 @@ import os
 import re
 import sqlite3
 import threading
+from contextlib import closing
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Protocol
+from pathlib import Path
+from typing import Protocol
 
 from power_framework.core.egress import (
     DEFAULT_LLM_API_BASE,
@@ -38,9 +40,6 @@ from power_framework.core.utils import (
     run_opencode_cli,
 )
 from power_framework.experimental.embeddings import get_embedding_manager
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class EmbeddingProvider(Protocol):
@@ -548,6 +547,16 @@ class UsageTracker:
             """)
             conn.commit()
             conn.close()
+
+    @staticmethod
+    def read_all_counts(vault_dir: Path) -> dict[str, int]:
+        """Read an existing usage database without creating or changing it."""
+        database = Path(vault_dir) / ".power_usage.db"
+        if database.is_symlink() or not database.is_file():
+            return {}
+        with closing(sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True)) as conn:
+            rows = conn.execute("SELECT rel_path, access_count FROM note_usage").fetchall()
+        return {str(rel_path): int(access_count) for rel_path, access_count in rows}
 
     def track_access(self, rel_path: str) -> None:
         """Increment access counter for a note."""

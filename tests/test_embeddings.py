@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import signal
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -144,6 +144,15 @@ class TestEmbeddingManager:
         manager = embeddings.OllamaEmbeddingManager()
         monkeypatch.delattr(signal, "SIGALRM", raising=False)
         assert manager._do_attempt(lambda: "ok") == ("ok", None)
+
+    def test_ollama_rejects_unsafe_configured_host(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake_ollama = ModuleType("ollama")
+        fake_ollama.embed = lambda **_kwargs: SimpleNamespace(embeddings=[[1.0]])
+        monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+        monkeypatch.setenv("OLLAMA_HOST", "http://169.254.169.254/latest")
+
+        with pytest.raises(PermissionError, match="Ollama endpoint"):
+            embeddings.OllamaEmbeddingManager().embed("synthetic")
 
     def test_import_has_no_hardcoded_env_file_side_effect(self):
         assert "/root/geminicli/.env" not in inspect.getsource(embeddings)

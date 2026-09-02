@@ -21,7 +21,10 @@ No unreleased changes.
   CSRF settings validation.
 - Added exact SSRF endpoint policy for external ROT/LLM calls, including
   IPv4/IPv6 resolution, redirect revalidation, DNS-rebinding resistance, and
-  credential-origin restrictions.
+  credential-origin restrictions; Ollama remains loopback-only because its
+  client cannot safely pin remote connections.
+- Made extended ROT usage reads side-effect-free, rejected invalid Web CSRF
+  cookie names, and made Web image builds require an exact staged release wheel.
 
 ### Changed
 

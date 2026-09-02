@@ -2,7 +2,7 @@
 
 ARG PYTHON_IMAGE=python:3.13.15-slim-bookworm@sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1
 ARG POWER_VERSION=3.7.11
-ARG POWER_WHEEL_FILE=
+ARG POWER_WHEEL_FILE
 ARG POWER_SOURCE_REVISION=unknown
 ARG POWER_RELEASE_TAG=unknown
 ARG SOURCE_DATE_EPOCH=0
@@ -25,14 +25,10 @@ COPY THIRD_PARTY_NOTICES.md ./
 COPY release/ ./release/
 
 RUN set -eux; \
-    if [ -n "${POWER_WHEEL_FILE}" ]; then \
-      test -f "release/${POWER_WHEEL_FILE}"; \
-      mkdir -p /dist; \
-      cp "release/${POWER_WHEEL_FILE}" "/dist/${POWER_WHEEL_FILE}"; \
-    else \
-      python -m pip install --upgrade pip build; \
-      python -m build --wheel --outdir /dist; \
-    fi \
+    test -n "${POWER_WHEEL_FILE}"; \
+    test -f "release/${POWER_WHEEL_FILE}"; \
+    mkdir -p /dist; \
+    cp "release/${POWER_WHEEL_FILE}" "/dist/${POWER_WHEEL_FILE}" \
     && test -f "/dist/power_framework-${POWER_VERSION}-py3-none-any.whl"
 
 FROM ${PYTHON_IMAGE} AS runtime

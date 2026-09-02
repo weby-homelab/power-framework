@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from power_framework.core.egress import EgressOperation, is_remote_endpoint, require_remote_egress
+from power_framework.core.egress import validate_local_ollama_endpoint
 from power_framework.core.utils import get_cpu_worker_limit
 
 if TYPE_CHECKING:
@@ -298,6 +298,7 @@ def _get_embedding_dim(model_name: str) -> int:
         try:
             import ollama
 
+            validate_local_ollama_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434"))
             result = ollama.show(OLLAMA_EMBED_MODEL)
             mi = cast(
                 "dict[str, Any]",
@@ -351,6 +352,7 @@ class OllamaEmbeddingManager:
         if self._dim is None:
             import ollama
 
+            validate_local_ollama_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434"))
             try:
                 result = ollama.show(self.model_name)
                 mi = cast(
@@ -426,8 +428,7 @@ class OllamaEmbeddingManager:
     def embed(self, text: str) -> list[float]:
         import ollama
 
-        if is_remote_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")):
-            require_remote_egress(EgressOperation.EMBEDDINGS)
+        validate_local_ollama_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434"))
 
         def _do():
             result = ollama.embed(
@@ -443,8 +444,7 @@ class OllamaEmbeddingManager:
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         import ollama
 
-        if is_remote_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")):
-            require_remote_egress(EgressOperation.EMBEDDINGS)
+        validate_local_ollama_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434"))
 
         def _do():
             result = ollama.embed(

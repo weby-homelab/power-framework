@@ -56,7 +56,9 @@ def jinja_csrf_token(context: dict[str, Any]) -> str:
     request: Request | None = context.get("request")
     if not request:
         return ""
-    settings: Settings = getattr(request.app.state, "settings", None) or get_global_settings()
+    settings = getattr(request.app.state, "settings", None)
+    if not isinstance(settings, Settings):
+        raise RuntimeError("application settings are missing or malformed")
     return get_csrf_token(request, settings)
 
 

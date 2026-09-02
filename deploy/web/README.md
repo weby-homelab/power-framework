@@ -8,11 +8,21 @@ The MCP server is not a container service. Native integrations invoke the
 single `power-mcp` console script over stdio, while this container calls the
 same application service through the Web UI adapter.
 
+Use the published `3.7.11` image after the signed release is available:
+
 ```bash
 POWER_BRAIN_PATH=/mnt/brain \
 POWER_WEB_UID="$(id -u)" POWER_WEB_GID="$(id -g)" \
-docker compose -f deploy/web/compose.yaml up -d --build
+docker compose -f deploy/web/compose.yaml pull
+POWER_BRAIN_PATH=/mnt/brain \
+POWER_WEB_UID="$(id -u)" POWER_WEB_GID="$(id -g)" \
+docker compose -f deploy/web/compose.yaml up -d
 ```
+
+The Dockerfile intentionally requires an exact release wheel staged under
+`release/`; it never resolves or builds an unpinned framework dependency. Build
+candidate images through the canonical release workflow, not an ad-hoc Compose
+build.
 
 This is Profile B: complete Profile A first, then mount the same canonical vault
 read-write so governed proposal/apply routes can persist through

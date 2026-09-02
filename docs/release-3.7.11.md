@@ -27,6 +27,8 @@ clean-install evidence all bind to the same protected-main commit.
 - Semantic and reranked paths remain explicit optional profiles and must report
   their actual provider/fallback state. The base FTS install does not require
   ONNX or a GPU.
+- Ollama integration is local loopback-only; remote Ollama hosts are rejected
+  because the client cannot provide the required resolved-address pinning.
 - Windows and macOS remain outside the certified release boundary.
 
 ## Installation and verification

@@ -346,6 +346,7 @@ jobs:
           set -euo pipefail
           dependency_lock="$RUNNER_TEMP/power-native-requirements.txt"
           uv export --locked --no-dev --extra mcp --no-emit-project --no-annotate \
+            --no-header \
             --output-file "$dependency_lock"
           test -s "$dependency_lock"
           grep --quiet -- '--hash=sha256:' "$dependency_lock"

@@ -398,3 +398,19 @@ def test_attestation_subject_roles_cannot_be_swapped(tmp_path: Path) -> None:
     receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="attestation"):
         _verify(paths)
+
+
+def test_workflow_attestation_ids_must_match_manifest_and_receipt(
+    tmp_path: Path,
+) -> None:
+    paths = _write_fixture(tmp_path)
+    with pytest.raises(ValueError, match="workflow outputs"):
+        verify_public_release_bindings(
+            tag=TAG,
+            manifest_path=Path(paths["manifest"]),
+            checksums_path=Path(paths["checksums"]),
+            asset_dir=Path(paths["asset_dir"]),
+            receipt_path=Path(paths["receipt"]),
+            expected_tag_target=COMMIT,
+            expected_attestation_ids=["package-1", "wrong-web-id"],
+        )

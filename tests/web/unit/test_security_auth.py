@@ -8,10 +8,11 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
 
+from power_framework.web.app import jinja_csrf_token
 from power_framework.web.auth.csrf import generate_csrf_token, validate_csrf
 from power_framework.web.auth.password import hash_password, is_auth_configured, verify_password
 from power_framework.web.auth.rate_limiter import LoginRateLimiter
-from power_framework.web.config import Settings
+from power_framework.web.config import Settings, get_settings
 
 
 def _request_for_app(
@@ -93,6 +94,25 @@ async def test_csrf_rejects_missing_or_invalid_token(cookie: str, token: str) ->
     with pytest.raises(HTTPException) as exc_info:
         await validate_csrf(_request_for_app(app, cookie=cookie, token=token))
     assert exc_info.value.status_code == 403
+
+
+def test_request_settings_and_jinja_helpers_fail_closed_without_app_state() -> None:
+    app = FastAPI()
+    request = _request_for_app(app)
+
+    with pytest.raises(RuntimeError, match="application settings are missing or malformed"):
+        get_settings(request)
+    with pytest.raises(RuntimeError, match="application settings are missing or malformed"):
+        jinja_csrf_token({"request": request})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("session_cookie_name", "bad name"), ("csrf_cookie_name", "bad/name")],
+)
+def test_settings_reject_invalid_cookie_names(field: str, value: str) -> None:
+    with pytest.raises(ValueError, match="cookie name"):
+        Settings(**{field: value})
 
 
 def test_password_fail_closed_unconfigured() -> None:

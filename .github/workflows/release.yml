@@ -644,8 +644,9 @@ jobs:
       - name: Export hash-pinned native dependency lock
         run: |
           set -euo pipefail
-          uv export --locked --no-dev --extra mcp --no-emit-project --no-annotate \
-            --output-file dist/power-native-requirements.txt
+           uv export --locked --no-dev --extra mcp --no-emit-project --no-annotate \
+             --no-header \
+             --output-file dist/power-native-requirements.txt
           test -s dist/power-native-requirements.txt
           grep --quiet -- '--hash=sha256:' dist/power-native-requirements.txt
 
@@ -951,6 +952,9 @@ jobs:
           --output "dist/power-framework.release-receipt.json"
 
       - name: Verify frozen release bindings before publication
+        env:
+          PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
+          WEB_ATTESTATION_ID: ${{ steps.web_attestation.outputs.attestation-id }}
         run: |
           uv run python "$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py" \
             --tag "$RELEASE_TAG" \
@@ -967,9 +971,11 @@ jobs:
              --expected-workflow-attempt "$GITHUB_RUN_ATTEMPT" \
              --expected-workflow-event "$GITHUB_EVENT_NAME" \
              --expected-workflow-ref "$GITHUB_REF" \
-             --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
-             --expected-repository "$GITHUB_REPOSITORY" \
-             --require-release-provenance
+              --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
+              --expected-repository "$GITHUB_REPOSITORY" \
+              --expected-attestation-id "$PACKAGE_ATTESTATION_ID" \
+              --expected-attestation-id "$WEB_ATTESTATION_ID" \
+              --require-release-provenance
 
       - name: Promote exact Web image digest to release tag
         env:
@@ -1145,6 +1151,8 @@ jobs:
           GHCR_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
           WEB_IMAGE_REF: ${{ steps.web_image.outputs.final_reference }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
+          PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
+          WEB_ATTESTATION_ID: ${{ steps.web_attestation.outputs.attestation-id }}
           DOCKER_CONFIG: ${{ runner.temp }}/power-release-readback-docker-config
         run: |
           set -euo pipefail
@@ -1166,9 +1174,11 @@ jobs:
              --expected-workflow-attempt "$GITHUB_RUN_ATTEMPT" \
              --expected-workflow-event "$GITHUB_EVENT_NAME" \
              --expected-workflow-ref "$GITHUB_REF" \
-             --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
-             --expected-repository "$GITHUB_REPOSITORY" \
-             --require-release-provenance)"
+              --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
+              --expected-repository "$GITHUB_REPOSITORY" \
+              --expected-attestation-id "$PACKAGE_ATTESTATION_ID" \
+              --expected-attestation-id "$WEB_ATTESTATION_ID" \
+              --require-release-provenance)"
           printf '%s\n' "$binding_result" > "$RUNNER_TEMP/power-public-bindings.json"
           verified_image_digest="$(printf '%s\n' "$binding_result" | python3 -c 'import json, sys; print(json.load(sys.stdin)["web_image_digest"])')"
           install -d -m 700 "$DOCKER_CONFIG"

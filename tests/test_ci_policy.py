@@ -103,6 +103,8 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert release_text.count("$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py") == 3
     assert "--expected-tag-target" in release_text
     assert "--attestation-subject" in release_text
+    assert release_text.count('--expected-attestation-id "$PACKAGE_ATTESTATION_ID"') == 2
+    assert release_text.count('--expected-attestation-id "$WEB_ATTESTATION_ID"') == 2
     assert 'header = "Authorization: Bearer ' in release_text
     assert "Re-read immutable tag objects immediately before publication" in release_text
     assert "gh release create" in release_text
@@ -142,6 +144,15 @@ def test_web_runtime_dependency_lock_is_hash_bound_and_consumed_by_docker() -> N
     assert "--constraint /tmp/web-runtime.constraints.txt" not in dockerfile
     assert "--no-deps" in dockerfile
     assert "--no-hashes" not in workflows
+    assert "ARG POWER_WHEEL_FILE\n" in dockerfile
+    assert 'test -n "${POWER_WHEEL_FILE}"' in dockerfile
+    assert 'test -f "release/${POWER_WHEEL_FILE}"' in dockerfile
+    assert "python -m build" not in dockerfile
+    assert "pip install --upgrade pip build" not in dockerfile
+    assert workflows.count("--no-header") >= 2
+    compose = (REPO_ROOT / "deploy" / "web" / "compose.yaml").read_text(encoding="utf-8")
+    assert "POWER_WHEEL_FILE:" in compose
+    assert "POWER_WHEEL_FILE:?" in compose
 
 
 def test_release_package_sbom_scans_the_wheel_as_a_file() -> None:

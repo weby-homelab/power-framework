@@ -31,7 +31,7 @@ MANDATORY_GATES = (
 OPTIONAL_GATES = {
     "real-vault-quality": "real-vault neural/quality evaluation",
     "deferred-macos-windows": (
-        "macOS and Windows support deferred without a scheduled release target for 3.6.7"
+        "macOS and Windows support deferred without a scheduled release target for 3.7.11"
     ),
     "remote-release-readback": "remote release readback",
 }
