@@ -36,6 +36,12 @@ def test_ci_defers_non_linux_runtime_smoke_for_3_6_2() -> None:
     assert "runs-on: ubuntu-latest" in ci_text
 
 
+def test_docs_build_covers_release_workflow_changes() -> None:
+    docs_text = (WORKFLOWS_DIR / "docs.yml").read_text(encoding="utf-8")
+
+    assert docs_text.count('".github/workflows/release.yml"') == 2
+
+
 def test_ci_aggregates_all_supported_ubuntu_reports() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
 
