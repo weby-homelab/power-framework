@@ -132,7 +132,15 @@ jobs:
           PY
 
           commit_verification="$RUNNER_TEMP/power-release-admission-commit-verification.txt"
-          git verify-commit --raw "$local_tag_target" > "$commit_verification" 2>&1
+          verified_commit="$local_tag_target"
+          if ! git verify-commit --raw "$local_tag_target" > "$commit_verification" 2>&1; then
+            read -r -a merge_parents <<< "$(git show -s --format=%P "$local_tag_target")"
+            test "${#merge_parents[@]}" -eq 2
+            test "$(git show -s --format=%T "$local_tag_target")" = "$(git show -s --format=%T "${merge_parents[1]}")"
+            verified_commit="${merge_parents[1]}"
+            git verify-commit --raw "$verified_commit" > "$commit_verification" 2>&1
+            printf '%s\n' "GitHub merge commit is unsigned; exact-tree signed PR head is admitted" >&2
+          fi
           python3 - "$commit_verification" <<'PY'
           from pathlib import Path
           import sys
@@ -150,7 +158,7 @@ jobs:
               and fields[-1] == expected_primary
           ]
           if len(valid) != 1:
-              raise SystemExit("release tag target commit is not verified by the pinned maintainer key")
+              raise SystemExit("release source commit is not verified by the pinned maintainer key")
           PY
 
           printf 'tag_object=%s\n' "$remote_tag_object" >> "$GITHUB_OUTPUT"
