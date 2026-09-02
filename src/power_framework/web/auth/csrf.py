@@ -64,11 +64,13 @@ async def validate_csrf(request: Request) -> None:
     Extracts token from form body (`csrf_token`) or HTTP headers (`X-CSRF-Token`).
     Raises 403 Forbidden on mismatch or missing token.
     """
-    from ..config import Settings, get_global_settings
-
     settings = getattr(request.app.state, "settings", None)
-    if not isinstance(settings, Settings):
-        settings = get_global_settings()
+    if settings is None:
+        raise RuntimeError("CSRF settings are missing or malformed on the application")
+    for field in ("secret_key", "session_cookie_name", "csrf_cookie_name"):
+        value = getattr(settings, field, None)
+        if not isinstance(value, str) or not value.strip():
+            raise RuntimeError("CSRF settings are missing or malformed on the application")
 
     # Try header first (for API / fetch requests)
     header_csrf = request.headers.get("X-CSRF-Token") or request.headers.get("X-XSRF-Token")

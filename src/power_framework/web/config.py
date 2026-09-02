@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 def _default_vault_path() -> Path:
     """Resolve default vault path across local dev, Docker, and environment variables."""
-    for env_var in ("POWER_WEB_VAULT_PATH", "POWER_VAULT_DIR", "POWER_VAULT_PATH"):
+    for env_var in ("POWER_WEB_VAULT_PATH", "POWER_VAULT_DIR"):
         val = os.environ.get(env_var)
         if val:
             return Path(val).expanduser().resolve()

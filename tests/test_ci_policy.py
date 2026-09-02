@@ -100,7 +100,7 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert "gh release view" in release_text
     assert "GitHub release readback verified" in release_text
     assert "scripts/verify_public_release_bindings.py" in release_text
-    assert release_text.count("$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py") == 2
+    assert release_text.count("$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py") == 3
     assert "--expected-tag-target" in release_text
     assert "--attestation-subject" in release_text
     assert 'header = "Authorization: Bearer ' in release_text
@@ -111,6 +111,37 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
     assert release_text.index("Generate release receipt from frozen assets") < release_text.index(
         "Create GitHub Release"
     )
+
+
+def test_web_runtime_dependency_lock_is_hash_bound_and_consumed_by_docker() -> None:
+    constraints = (REPO_ROOT / "release" / "web-runtime.constraints.txt").read_text(
+        encoding="utf-8"
+    )
+    requirements = (REPO_ROOT / "release" / "web-runtime.requirements.txt").read_text(
+        encoding="utf-8"
+    )
+    dockerfile = (REPO_ROOT / "deploy" / "web" / "Dockerfile").read_text(encoding="utf-8")
+    workflows = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (WORKFLOWS_DIR / "ci.yml", WORKFLOWS_DIR / "release.yml")
+    )
+
+    assert "-r web-runtime.requirements.txt" in constraints
+    assert "--no-hashes" not in requirements
+    entries = [
+        line
+        for line in requirements.splitlines()
+        if line and not line[0].isspace() and "==" in line
+    ]
+    assert entries
+    assert len(re.findall(r"--hash=sha256:[0-9a-f]{64}", requirements)) >= len(entries)
+    assert "COPY --from=builder /build/release/web-runtime.constraints.txt" in dockerfile
+    assert "COPY --from=builder /build/release/web-runtime.requirements.txt" in dockerfile
+    assert "--require-hashes" in dockerfile
+    assert "-r /tmp/web-runtime.constraints.txt" in dockerfile
+    assert "--constraint /tmp/web-runtime.constraints.txt" not in dockerfile
+    assert "--no-deps" in dockerfile
+    assert "--no-hashes" not in workflows
 
 
 def test_release_package_sbom_scans_the_wheel_as_a_file() -> None:
@@ -156,16 +187,17 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
         needs = jobs[job_id]["needs"]
         needs_set = {needs} if isinstance(needs, str) else set(needs)
         assert "signed_tag_admission" in needs_set
-    control_fetch = next(
+    control_binding = next(
         step
         for step in jobs["release"]["steps"]
-        if step.get("name") == "Fetch exact release control verifier"
+        if step.get("name") == "Bind release control verifier to the admitted tag checkout"
     )
-    assert control_fetch["env"]["RELEASE_CONTROL_REF"] == "${{ github.sha }}"
-    assert control_fetch["env"]["RELEASE_CONTROL_ROOT"] == (
-        "${{ runner.temp }}/power-release-control"
+    assert control_binding["env"]["EXPECTED_TAG_TARGET"] == (
+        "${{ needs.signed_tag_admission.outputs.tag_target }}"
     )
-    assert "base64 --decode" in control_fetch["run"]
+    assert control_binding["env"]["RELEASE_CONTROL_ROOT"] == "${{ github.workspace }}/scripts"
+    assert "git rev-parse --verify HEAD" in control_binding["run"]
+    assert "github.sha" not in release_text
     assert (
         "uv sync --locked --group dev --extra web --extra semantic --extra rerank" in release_text
     )
@@ -327,6 +359,10 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     )
     assert "gh attestation verify" in attestation_step["run"]
     assert "--bundle-from-oci" in attestation_step["run"]
+    assert "--signer-workflow .github/workflows/release.yml" in attestation_step["run"]
+    assert "verify_attestation_provenance.py" in attestation_step["run"]
+    assert attestation_step["run"].count("power-native-requirements.txt") >= 2
+    assert attestation_step["run"].count("verify_attestation_provenance.py") == 4
     assert "docker login ghcr.io" in attestation_step["run"]
     assert "docker logout ghcr.io" in attestation_step["run"]
 
@@ -437,6 +473,7 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "scripts/smoke_package.py" in ci_text
     assert "scripts/smoke_package.py" in release_text
     assert "scripts/generate_release_receipt.py" in release_text
+    assert "power-native-requirements.txt" in release_text
     assert "--skipped-optional real-vault-quality" in release_text
     assert "run_outcome_benchmark.py" in release_text
     assert "run_continuity_benchmark.py" in release_text

@@ -29,6 +29,8 @@ except ImportError:  # pragma: no cover - exercised on POSIX
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
+from .utils import vault_control_dir
+
 _registry_guard = threading.Lock()
 _vault_locks: dict[Path, threading.RLock] = {}
 _compatibility_lock = threading.RLock()
@@ -78,8 +80,7 @@ def vault_mutation(vault_dir: Path) -> Iterator[Path]:
     if not root.is_dir():
         raise NotADirectoryError(f"Vault path is not a directory: {root}")
 
-    lock_path = root / ".power" / "mutation.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = vault_control_dir(root, create=True) / "mutation.lock"
     process_lock = _get_vault_lock(root)
     with process_lock:
         descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)

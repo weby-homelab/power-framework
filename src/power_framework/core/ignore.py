@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .constants import EXCLUDED_DIRS, PARA_FOLDERS_
+from .utils import iter_vault_markdown_files
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -112,7 +113,7 @@ def should_skip(vault_dir: Path, rel_path: str) -> bool:
 
 def iter_markdown(vault_dir: Path) -> Iterator[tuple[Path, str]]:
     """Yield ``(filepath, rel_path)`` for every in-scope, non-ignored ``.md`` file."""
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel_path = filepath.relative_to(vault_dir).as_posix()
         if should_skip(vault_dir, rel_path):
             continue

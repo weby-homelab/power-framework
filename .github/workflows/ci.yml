@@ -341,16 +341,27 @@ jobs:
       - name: Build wheel and sdist
         run: uv run python -m build
 
+      - name: Export hash-pinned native dependency lock
+        run: |
+          set -euo pipefail
+          dependency_lock="$RUNNER_TEMP/power-native-requirements.txt"
+          uv export --locked --no-dev --extra mcp --no-emit-project --no-annotate \
+            --output-file "$dependency_lock"
+          test -s "$dependency_lock"
+          grep --quiet -- '--hash=sha256:' "$dependency_lock"
+
       - name: Smoke-test wheel and sdist outside checkout
         run: |
           uv run python scripts/smoke_package.py \
             --wheel dist/power_framework-*.whl \
-            --sdist dist/power_framework-*.tar.gz
+            --sdist dist/power_framework-*.tar.gz \
+            --dependency-lock "$RUNNER_TEMP/power-native-requirements.txt"
 
       - name: Verify the unified release manifest contract
         run: |
           set -euo pipefail
           version="$(python3 -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
+          dependency_lock="$RUNNER_TEMP/power-native-requirements.txt"
           wheel="$(python3 - <<'PY'
           from pathlib import Path
 
@@ -363,6 +374,7 @@ jobs:
             --wheel "$wheel" \
             --version "$version" \
             --commit "$(git rev-parse HEAD)" \
+            --native-dependency-lock "$dependency_lock" \
             --output "$RUNNER_TEMP/power-release-manifest.json"
 
       - name: Build the Web-only container

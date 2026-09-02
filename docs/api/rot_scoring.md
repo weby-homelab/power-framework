@@ -25,13 +25,23 @@ pairs: list[tuple[str, str, float]] = detector.detect(vault_dir)
 ## `ContradictionDetector`
 
 ```python
-detector = ContradictionDetector(similarity_threshold=0.7, api_key=None)
+detector = ContradictionDetector(
+    similarity_threshold=0.7,
+    api_key=None,
+    allow_remote_llm=False,
+    sensitivity="sensitive",
+)
 contradicting: list[tuple[str, str, str]] = detector.detect(vault_dir)
 ```
 
 - Find semantically similar note pairs that may contain contradictory facts, instructions, or statements
 - Identifies similar notes using dense embedding similarity (threshold: `0.7`)
-- Checks for factual contradictions using a Local LLM (OpenCode) or OpenRouter API. If no API key or local model is configured, falls back to comparing metadata fields (`status`, `owner`, `expiry`, `priority`)
+- Checks for factual contradictions using the explicit local OpenCode sentinel or
+  the OpenRouter API only when `allow_remote_llm=True`. Note bodies require the
+  configured `sensitivity` policy (default `sensitive`) and the endpoint must
+  satisfy `POWER_LLM_API_BASE`/`POWER_LLM_ALLOWED_ORIGINS` HTTPS-origin policy.
+  If remote analysis is unavailable, it falls back to comparing metadata fields
+  (`status`, `owner`, `expiry`, `priority`).
 - Returns a list of tuples: `(path_a, path_b, reason_for_contradiction)`
 
 ## `FreshnessScorer`
@@ -64,6 +74,9 @@ broken: dict[str, list[tuple[str, int]]] = checker.check_all(vault_dir)
 - Performs HTTP HEAD requests on external markdown links
 - Returns dict mapping `rel_path` → `[(url, status_code)]` for broken links only (status >= 400 or connection error)
 - Connection error returns status `-1`
+- External checks require `POWER_EGRESS_POLICY=allow-public` or stronger. Every
+  A/AAAA address is validated, direct connections are pinned to a checked public
+  address, and redirects are bounded and revalidated without credentials.
 
 ## `UsageTracker`
 

@@ -457,19 +457,18 @@ jobs:
           ref: ${{ format('refs/tags/{0}', needs.release_input.outputs.release_tag) }}
           persist-credentials: false
 
-      - name: Fetch exact release control verifier
+      - name: Bind release control verifier to the admitted tag checkout
         env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_CONTROL_ROOT: ${{ runner.temp }}/power-release-control
-          RELEASE_CONTROL_REF: ${{ github.sha }}
+          EXPECTED_TAG_TARGET: ${{ needs.signed_tag_admission.outputs.tag_target }}
+          RELEASE_CONTROL_ROOT: ${{ github.workspace }}/scripts
         run: |
           set -euo pipefail
-          install -d -m 700 "$RELEASE_CONTROL_ROOT"
-          for file in scripts/release_bindings.py scripts/verify_public_release_bindings.py; do
-            gh api "repos/${GITHUB_REPOSITORY}/contents/${file}?ref=${RELEASE_CONTROL_REF}" \
-              --jq '.content' |
-              base64 --decode > "$RELEASE_CONTROL_ROOT/${file##*/}"
-          done
+          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_TAG_TARGET"
+           test -f "$RELEASE_CONTROL_ROOT/release_bindings.py"
+           # release-control sources: scripts/verify_public_release_bindings.py and
+           # scripts/verify_attestation_provenance.py from the admitted tag checkout.
+           test -f "$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py"
+           test -f "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py"
           printf 'RELEASE_CONTROL_ROOT=%s\n' "$RELEASE_CONTROL_ROOT" >> "$GITHUB_ENV"
 
       - name: Validate the exact release tag checkout
@@ -638,9 +637,17 @@ jobs:
           cmp -- "${wheels_one[0]}" "${wheels_two[0]}"
           cmp -- "${sdists_one[0]}" "${sdists_two[0]}"
 
-          mkdir -p dist
-          find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -delete
-          cp -- "${wheels_one[0]}" "${sdists_one[0]}" dist/
+           mkdir -p dist
+           find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -delete
+           cp -- "${wheels_one[0]}" "${sdists_one[0]}" dist/
+
+      - name: Export hash-pinned native dependency lock
+        run: |
+          set -euo pipefail
+          uv export --locked --no-dev --extra mcp --no-emit-project --no-annotate \
+            --output-file dist/power-native-requirements.txt
+          test -s dist/power-native-requirements.txt
+          grep --quiet -- '--hash=sha256:' dist/power-native-requirements.txt
 
       - name: Stage the exact package subject for SBOM generation
         run: |
@@ -796,6 +803,7 @@ jobs:
           subject-path: |
             dist/*.whl
             dist/*.tar.gz
+            dist/power-native-requirements.txt
 
       - name: Authenticate GHCR for Web attestation
         env:
@@ -848,6 +856,7 @@ jobs:
             --package-sbom "$package_sbom" \
             --web-sbom "$web_sbom" \
             --profile-evidence "$PROFILE_EVIDENCE" \
+            --native-dependency-lock dist/power-native-requirements.txt \
             --attestation "github:${PACKAGE_ATTESTATION_ID}" \
             --attestation "github:${WEB_ATTESTATION_ID}" \
             --output dist/power-release-manifest.json
@@ -879,7 +888,8 @@ jobs:
         run: |
           uv run python scripts/smoke_package.py \
             --wheel dist/power_framework-*.whl \
-            --sdist dist/power_framework-*.tar.gz
+            --sdist dist/power_framework-*.tar.gz \
+            --dependency-lock dist/power-native-requirements.txt
 
       - name: Generate deterministic release checksums
         run: |
@@ -912,11 +922,20 @@ jobs:
           PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
           WEB_ATTESTATION_ID: ${{ steps.web_attestation.outputs.attestation-id }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
+          RELEASE_WORKFLOW_REPOSITORY: ${{ github.repository }}
+          RELEASE_CONTROL_REVISION: ${{ needs.signed_tag_admission.outputs.tag_target }}
+          RELEASE_WORKFLOW_REVISION: ${{ needs.signed_tag_admission.outputs.tag_target }}
+          RELEASE_WORKFLOW_RUN_ID: ${{ github.run_id }}
+          RELEASE_WORKFLOW_ATTEMPT: ${{ github.run_attempt }}
+          RELEASE_WORKFLOW_EVENT: ${{ github.event_name }}
+          RELEASE_WORKFLOW_REF: ${{ github.ref }}
+          RELEASE_WORKFLOW_REF_PROTECTED: ${{ github.ref_protected }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
           wheel_sha="$(sha256sum -- "dist/power_framework-${version}-py3-none-any.whl" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
           sdist_sha="$(sha256sum -- "dist/power_framework-${version}.tar.gz" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          dependency_lock_sha="$(sha256sum -- dist/power-native-requirements.txt | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
           uv run python scripts/generate_release_receipt.py \
             --tag "$RELEASE_TAG" \
             --assets-dir dist \
@@ -927,8 +946,9 @@ jobs:
             --attestation-subject-role "${WEB_ATTESTATION_ID}=web" \
             --attestation-subject "${PACKAGE_ATTESTATION_ID}=${wheel_sha}" \
             --attestation-subject "${PACKAGE_ATTESTATION_ID}=${sdist_sha}" \
+            --attestation-subject "${PACKAGE_ATTESTATION_ID}=${dependency_lock_sha}" \
             --attestation-subject "${WEB_ATTESTATION_ID}=${WEB_IMAGE_DIGEST}" \
-            --output "dist/power-framework.release-receipt.json"
+          --output "dist/power-framework.release-receipt.json"
 
       - name: Verify frozen release bindings before publication
         run: |
@@ -937,8 +957,19 @@ jobs:
             --manifest "dist/power-release-manifest.json" \
             --checksums "dist/SHA256SUMS" \
             --asset-dir dist \
-            --receipt "dist/power-framework.release-receipt.json" \
-            --expected-tag-target "$REMOTE_TAG_TARGET"
+             --receipt "dist/power-framework.release-receipt.json" \
+             --expected-tag-target "$REMOTE_TAG_TARGET" \
+             --expected-tag-object "$REMOTE_TAG_OBJECT" \
+             --expected-tag-tree "$(git show -s --format=%T "$REMOTE_TAG_TARGET")" \
+             --expected-release-control-revision "$REMOTE_TAG_TARGET" \
+             --expected-workflow-revision "$REMOTE_TAG_TARGET" \
+             --expected-workflow-run-id "$GITHUB_RUN_ID" \
+             --expected-workflow-attempt "$GITHUB_RUN_ATTEMPT" \
+             --expected-workflow-event "$GITHUB_EVENT_NAME" \
+             --expected-workflow-ref "$GITHUB_REF" \
+             --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
+             --expected-repository "$GITHUB_REPOSITORY" \
+             --require-release-provenance
 
       - name: Promote exact Web image digest to release tag
         env:
@@ -1045,8 +1076,9 @@ jobs:
             dist/power-release-manifest.json
             dist/power-profile-acceptance.json
             dist/power-framework.release-receipt.json
-            dist/SHA256SUMS
-            dist/*.whl
+             dist/SHA256SUMS
+             dist/power-native-requirements.txt
+             dist/*.whl
             dist/*.tar.gz
             dist/*.spdx.json
           )
@@ -1096,8 +1128,9 @@ jobs:
                "power-release-manifest.json",
                "power-profile-acceptance.json",
               "power-framework.release-receipt.json",
-              "SHA256SUMS",
-              f"power_framework-{version}-py3-none-any.whl",
+               "SHA256SUMS",
+               "power-native-requirements.txt",
+               f"power_framework-{version}-py3-none-any.whl",
               f"power_framework-{version}.tar.gz",
               f"power-framework-{version}.spdx.json",
               f"power-web-{version}.spdx.json",
@@ -1121,10 +1154,21 @@ jobs:
           binding_result="$(uv run python "$RELEASE_CONTROL_ROOT/verify_public_release_bindings.py" \
             --tag "$RELEASE_TAG" \
             --manifest "$readback_dir/power-release-manifest.json" \
-            --checksums "$readback_dir/SHA256SUMS" \
-            --asset-dir "$readback_dir" \
-            --receipt "$readback_dir/power-framework.release-receipt.json" \
-            --expected-tag-target "$REMOTE_TAG_TARGET")"
+             --checksums "$readback_dir/SHA256SUMS" \
+             --asset-dir "$readback_dir" \
+             --receipt "$readback_dir/power-framework.release-receipt.json" \
+             --expected-tag-target "$REMOTE_TAG_TARGET" \
+             --expected-tag-object "$REMOTE_TAG_OBJECT" \
+             --expected-tag-tree "$(git show -s --format=%T "$REMOTE_TAG_TARGET")" \
+             --expected-release-control-revision "$REMOTE_TAG_TARGET" \
+             --expected-workflow-revision "$REMOTE_TAG_TARGET" \
+             --expected-workflow-run-id "$GITHUB_RUN_ID" \
+             --expected-workflow-attempt "$GITHUB_RUN_ATTEMPT" \
+             --expected-workflow-event "$GITHUB_EVENT_NAME" \
+             --expected-workflow-ref "$GITHUB_REF" \
+             --expected-workflow-ref-protected "$GITHUB_REF_PROTECTED" \
+             --expected-repository "$GITHUB_REPOSITORY" \
+             --require-release-provenance)"
           printf '%s\n' "$binding_result" > "$RUNNER_TEMP/power-public-bindings.json"
           verified_image_digest="$(printf '%s\n' "$binding_result" | python3 -c 'import json, sys; print(json.load(sys.stdin)["web_image_digest"])')"
           install -d -m 700 "$DOCKER_CONFIG"
@@ -1146,16 +1190,31 @@ jobs:
         run: |
           set -euo pipefail
           readback_dir="$RUNNER_TEMP/power-public-readback"
+          version="${RELEASE_TAG#v}"
+          wheel="$readback_dir/power_framework-${version}-py3-none-any.whl"
+          sdist="$readback_dir/power_framework-${version}.tar.gz"
+          lock="$readback_dir/power-native-requirements.txt"
           gh attestation verify \
-            "$readback_dir/power_framework-${RELEASE_TAG#v}-py3-none-any.whl" \
+            "$wheel" \
             --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow .github/workflows/release.yml \
+            --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-wheel-attestation.json"
           gh attestation verify \
-            "$readback_dir/power_framework-${RELEASE_TAG#v}.tar.gz" \
+            "$sdist" \
             --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow .github/workflows/release.yml \
+            --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-sdist-attestation.json"
+          gh attestation verify \
+            "$lock" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow .github/workflows/release.yml \
+            --predicate-type https://slsa.dev/provenance/v1 \
+            --format json \
+            > "$RUNNER_TEMP/power-dependency-lock-attestation.json"
           install -d -m 700 "$DOCKER_CONFIG"
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
@@ -1163,8 +1222,45 @@ jobs:
             "oci://${WEB_IMAGE_REF}@${WEB_IMAGE_DIGEST}" \
             --repo "$GITHUB_REPOSITORY" \
             --bundle-from-oci \
+            --signer-workflow .github/workflows/release.yml \
+            --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-web-attestation.json"
+          wheel_sha="$(sha256sum -- "$wheel" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          sdist_sha="$(sha256sum -- "$sdist" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          lock_sha="$(sha256sum -- "$lock" | python3 -c 'import sys; print(sys.stdin.read().split()[0])')"
+          common_args=(
+            --repository "$GITHUB_REPOSITORY"
+            --workflow .github/workflows/release.yml
+            --source-revision "$REMOTE_TAG_TARGET"
+            --event "$GITHUB_EVENT_NAME"
+            --ref "$GITHUB_REF"
+            --run-id "$GITHUB_RUN_ID"
+          )
+          uv run python "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" \
+            --input "$RUNNER_TEMP/power-wheel-attestation.json" \
+            --output "$RUNNER_TEMP/power-wheel-attestation-policy.json" \
+            --subject-name "power_framework-${version}-py3-none-any.whl" \
+            --subject-digest "$wheel_sha" \
+            "${common_args[@]}"
+          uv run python "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" \
+            --input "$RUNNER_TEMP/power-sdist-attestation.json" \
+            --output "$RUNNER_TEMP/power-sdist-attestation-policy.json" \
+            --subject-name "power_framework-${version}.tar.gz" \
+            --subject-digest "$sdist_sha" \
+            "${common_args[@]}"
+          uv run python "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" \
+            --input "$RUNNER_TEMP/power-dependency-lock-attestation.json" \
+            --output "$RUNNER_TEMP/power-dependency-lock-attestation-policy.json" \
+            --subject-name power-native-requirements.txt \
+            --subject-digest "$lock_sha" \
+            "${common_args[@]}"
+          uv run python "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py" \
+            --input "$RUNNER_TEMP/power-web-attestation.json" \
+            --output "$RUNNER_TEMP/power-web-attestation-policy.json" \
+            --subject-name ghcr.io/weby-homelab/power-framework-web \
+            --subject-digest "$WEB_IMAGE_DIGEST" \
+            "${common_args[@]}"
           docker logout ghcr.io
           trap - EXIT
 
@@ -1179,6 +1275,11 @@ jobs:
             ${{ runner.temp }}/power-public-bindings.json
             ${{ runner.temp }}/power-wheel-attestation.json
             ${{ runner.temp }}/power-sdist-attestation.json
+            ${{ runner.temp }}/power-dependency-lock-attestation.json
+            ${{ runner.temp }}/power-wheel-attestation-policy.json
+            ${{ runner.temp }}/power-sdist-attestation-policy.json
+            ${{ runner.temp }}/power-dependency-lock-attestation-policy.json
+            ${{ runner.temp }}/power-web-attestation-policy.json
             ${{ runner.temp }}/power-web-attestation.json
           if-no-files-found: ignore
           retention-days: 14

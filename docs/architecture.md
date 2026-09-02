@@ -68,7 +68,9 @@ tests/
 - **Pydantic v2** — `model_dump()`, strict validation, `field_validator`, UTC-aware timestamps
 - **Atomic file writes** — `os.replace()` for crash-safe config persistence
 - **Path traversal protection** — `Path.relative_to()` boundary checking (not string-prefix)
-- **SSRF hardening** — LinkRotChecker blocks private/loopback/link-local IPs
+- **SSRF hardening** — external checks resolve all A/AAAA records, reject every
+  non-global address, pin direct connections, and revalidate bounded redirects;
+  LLM origins require an explicit HTTPS allowlist
 - **XDG cache dir** — each vault receives a stable UUID in `.power/vault.json`
   and an isolated DB at `~/.cache/power-framework/vaults/<vault-uuid>/search.db`.
   `power sync` builds a complete staged generation, validates source coverage

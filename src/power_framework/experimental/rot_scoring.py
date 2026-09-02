@@ -17,14 +17,26 @@ import os
 import re
 import sqlite3
 import threading
-import urllib.request
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
-from power_framework.core.egress import EgressDeniedError, EgressOperation, require_remote_egress
+from power_framework.core.egress import (
+    DEFAULT_LLM_API_BASE,
+    EgressDeniedError,
+    EgressOperation,
+    configured_llm_origins,
+    require_remote_egress,
+    safe_http_request,
+    validate_llm_endpoint,
+)
 from power_framework.core.ignore import should_skip
 from power_framework.core.parser import FRONTMATTER_PATTERN, parse_frontmatter, read_file_content
-from power_framework.core.utils import get_cpu_worker_limit, run_opencode_cli
+from power_framework.core.utils import (
+    get_cpu_worker_limit,
+    is_regular_vault_file,
+    iter_vault_markdown_files,
+    run_opencode_cli,
+)
 from power_framework.experimental.embeddings import get_embedding_manager
 
 if TYPE_CHECKING:
@@ -94,7 +106,7 @@ class ContentDedupDetector:
         dedup_pairs: list[tuple[str, str, float]] = []
         checked: set[tuple[str, str]] = set()
 
-        for filepath in vault_dir.rglob("*.md"):
+        for filepath in iter_vault_markdown_files(vault_dir):
             rel = filepath.relative_to(vault_dir)
             if should_skip(vault_dir, rel.as_posix()):
                 continue
@@ -152,6 +164,8 @@ class ContradictionDetector:
         similarity_threshold: float = CONTRADICTION_SIMILARITY_THRESHOLD,
         api_key: str | None = None,
         embedder: EmbeddingProvider | None = None,
+        allow_remote_llm: bool = False,
+        sensitivity: str = "sensitive",
     ):
         self.similarity_threshold = similarity_threshold
         self.api_key = (
@@ -159,11 +173,11 @@ class ContradictionDetector:
             or os.environ.get("POWER_LLM_API_KEY")
             or os.environ.get("OPENROUTER_API_KEY", "")
         )
-        self.api_base = os.environ.get("POWER_LLM_API_BASE", "https://openrouter.ai/api/v1").rstrip(
-            "/"
-        )
+        self.api_base = os.environ.get("POWER_LLM_API_BASE", DEFAULT_LLM_API_BASE).rstrip("/")
         self.model = os.environ.get("POWER_LLM_MODEL", OPENROUTER_MODELS[0])
         self.embedder = embedder or get_embedding_manager()
+        self.allow_remote_llm = allow_remote_llm
+        self.sensitivity = sensitivity
 
     def detect(self, vault_dir: Path) -> list[tuple[str, str, str]]:
         """
@@ -177,7 +191,7 @@ class ContradictionDetector:
         results: list[tuple[str, str, str]] = []
         checked: set[tuple[str, str]] = set()
 
-        for filepath in vault_dir.rglob("*.md"):
+        for filepath in iter_vault_markdown_files(vault_dir):
             rel = filepath.relative_to(vault_dir)
             if should_skip(vault_dir, rel.as_posix()):
                 continue
@@ -227,7 +241,7 @@ class ContradictionDetector:
         vault_dir: Path,
     ) -> str | None:
         """Check if two texts contradict. Returns reason string or None."""
-        if self.api_key or self.api_base == "opencode":
+        if self.allow_remote_llm and (self.api_key or self.api_base == "opencode"):
             return self._llm_contradiction_check(body_a, body_b)
         return self._metadata_contradiction_check(path_a, path_b, vault_dir)
 
@@ -258,8 +272,9 @@ class ContradictionDetector:
         if not self.api_key:
             return None
 
-        require_remote_egress(EgressOperation.ROT, "internal")
+        require_remote_egress(EgressOperation.ROT, self.sensitivity)
 
+        endpoint_url = f"{self.api_base}/chat/completions"
         payload = json.dumps(
             {
                 "model": self.model,
@@ -269,25 +284,38 @@ class ContradictionDetector:
             }
         ).encode("utf-8")
 
-        req = urllib.request.Request(  # noqa: S310
-            f"{self.api_base}/chat/completions",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
-            method="POST",
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
-                body = json.loads(resp.read().decode("utf-8"))
-                content = body["choices"][0]["message"]["content"].strip()
-                if content.upper().startswith("YES"):
-                    reason = content[4:].strip()
-                    return reason or "Semantic contradiction detected"
-        except Exception as exc:
-            logger.debug("LLM contradiction check failed: %s", exc)
+            validate_llm_endpoint(endpoint_url)
+            response = safe_http_request(
+                endpoint_url,
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                },
+                body=payload,
+                require_https=True,
+                allowed_origins=configured_llm_origins(),
+                allow_query=False,
+                max_redirects=0,
+                timeout=15,
+            )
+            if response.status >= 400:
+                return None
+            body = json.loads(response.body.decode("utf-8"))
+            content = body["choices"][0]["message"]["content"].strip()
+            if content.upper().startswith("YES"):
+                reason = content[4:].strip()
+                return reason or "Semantic contradiction detected"
+        except (
+            EgressDeniedError,
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            KeyError,
+            IndexError,
+        ) as exc:
+            logger.debug("LLM contradiction check failed: %s", type(exc).__name__)
 
         return None
 
@@ -299,9 +327,15 @@ class ContradictionDetector:
     ) -> str | None:
         """Fallback: compare metadata fields for contradictions."""
         try:
-            content_a = read_file_content(vault_dir / path_a)
-            content_b = read_file_content(vault_dir / path_b)
-        except Exception:
+            path_a_file = vault_dir / path_a
+            path_b_file = vault_dir / path_b
+            if not is_regular_vault_file(vault_dir, path_a_file) or not is_regular_vault_file(
+                vault_dir, path_b_file
+            ):
+                return None
+            content_a = read_file_content(path_a_file)
+            content_b = read_file_content(path_b_file)
+        except (OSError, UnicodeError, ValueError):
             return None
 
         fm_a = parse_frontmatter(content_a) or {}
@@ -367,7 +401,7 @@ class FreshnessScorer:
         now = datetime.now(UTC)
         scores: dict[str, float] = {}
 
-        for filepath in vault_dir.rglob("*.md"):
+        for filepath in iter_vault_markdown_files(vault_dir):
             rel = filepath.relative_to(vault_dir)
             if should_skip(vault_dir, rel.as_posix()):
                 continue
@@ -421,7 +455,7 @@ class LinkRotChecker:
         results: dict[str, list[tuple[str, int]]] = {}
         to_check: list[tuple[str, str]] = []
 
-        for filepath in vault_dir.rglob("*.md"):
+        for filepath in iter_vault_markdown_files(vault_dir):
             rel = filepath.relative_to(vault_dir)
             if should_skip(vault_dir, rel.as_posix()):
                 continue
@@ -460,64 +494,37 @@ class LinkRotChecker:
 
     def _head_status(self, url: str) -> int:
         """Perform HTTP HEAD request and return status code. Returns -1 on error."""
-        if not url.startswith(("http://", "https://")):
-            return -1
         try:
             require_remote_egress(EgressOperation.ROT, "public")
         except EgressDeniedError:
             return -1
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        }
         try:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(url)
-            host = parsed.hostname
-            if host:
-                try:
-                    import ipaddress
-                    import socket
-
-                    addr = socket.gethostbyname(host)
-                    ip = ipaddress.ip_address(addr)
-                    if ip.is_private or ip.is_loopback or ip.is_link_local:
-                        logger.debug("Skipping private/loopback URL: %s", url)
-                        return -1
-                except (OSError, ValueError):
-                    # Host resolution failed or invalid IP; fall back to standard HTTP check.
-                    pass
-
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
+            response = safe_http_request(
+                url,
+                method="HEAD",
+                headers=headers,
+                require_https=False,
+                max_redirects=3,
+                timeout=self.timeout,
+            )
+            if response.status in {403, 405, 501}:
+                response = safe_http_request(
+                    url,
+                    method="GET",
+                    headers=headers,
+                    require_https=False,
+                    max_redirects=3,
+                    timeout=self.timeout,
                 )
-            }
-
-            try:
-                req = urllib.request.Request(  # noqa: S310
-                    url, method="HEAD", headers=headers
-                )
-                with urllib.request.urlopen(  # noqa: S310
-                    req, timeout=self.timeout
-                ) as resp:
-                    return int(resp.status)
-            except Exception as exc:
-                # Fallback to GET for any HEAD error (403, 405, timeouts, connection issues, etc.)
-                try:
-                    req_get = urllib.request.Request(  # noqa: S310
-                        url, method="GET", headers=headers
-                    )
-                    with urllib.request.urlopen(  # noqa: S310
-                        req_get, timeout=self.timeout
-                    ) as resp:
-                        return int(resp.status)
-                except urllib.error.HTTPError as e_get:
-                    return e_get.code
-                except Exception:
-                    if isinstance(exc, urllib.error.HTTPError):
-                        return exc.code
-                    return -1
-        except Exception:
+            return int(response.status)
+        except EgressDeniedError:
             return -1
 
 

@@ -20,7 +20,13 @@ from typing import TYPE_CHECKING, Literal
 from .healer import DEFAULT_EXCLUDED, heal_frontmatter
 from .ignore import should_skip
 from .mutation import execute_vault_mutation
-from .utils import atomic_write, create_backup, prune_backups, restore_backup
+from .utils import (
+    atomic_write,
+    create_backup,
+    iter_vault_markdown_files,
+    prune_backups,
+    restore_backup,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -224,7 +230,7 @@ def apply_maintenance_plan(
 
 
 def _candidate_notes(root: Path) -> Iterable[Path]:
-    for filepath in root.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(root):
         rel = filepath.relative_to(root)
         if should_skip(root, rel.as_posix()) or any(part in DEFAULT_EXCLUDED for part in rel.parts):
             continue

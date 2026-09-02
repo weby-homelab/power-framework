@@ -62,11 +62,58 @@ def _client_for_path(path: Path) -> str:
     return "claude"
 
 
-def _server_entry(client: str, vault_path: Path, executable: str) -> dict[str, Any]:
-    """Return a client entry bound to the one managed ``power-mcp`` launcher."""
+def _managed_mcp_launcher(executable: str) -> Path:
+    """Validate the one active native-installer ``power-mcp`` launcher."""
     executable_path = Path(executable).expanduser()
+    if not executable_path.is_absolute():
+        raise ValueError("MCP integrations require an absolute managed power-mcp launcher path")
     if executable_path.name != "power-mcp":
         raise ValueError("MCP integrations must invoke the managed power-mcp launcher")
+    launcher_dir = executable_path.parent
+    local_dir = launcher_dir.parent
+    if launcher_dir.name != "bin" or local_dir.name != ".local":
+        raise ValueError("MCP launcher must live at <home>/.local/bin/power-mcp")
+    home = local_dir.parent
+    managed = home / ".local" / "share" / "power"
+    current = managed / "current"
+    releases = managed / "releases"
+    state = managed / "install.json"
+    expected = current / "venv" / "bin" / "power-mcp"
+    try:
+        for parent in (launcher_dir, local_dir, home, managed, releases):
+            if parent.is_symlink():
+                raise ValueError("managed native runtime directories must not be symlinks")
+        if not executable_path.is_symlink() or state.is_symlink() or not state.is_file():
+            raise ValueError(
+                "managed native runtime state and launcher are required before MCP config"
+            )
+        if not current.is_symlink() or not current.resolve(strict=True).is_dir():
+            raise ValueError("managed native runtime current pointer is invalid")
+        current_target = current.resolve(strict=True)
+        current_target.relative_to(releases.resolve(strict=True))
+        if executable_path.resolve(strict=True) != expected.resolve(strict=True):
+            raise ValueError("MCP launcher does not target the active managed runtime")
+        receipt = json.loads(state.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "managed native runtime state and launcher are required before MCP config"
+        ) from exc
+    if (
+        not isinstance(receipt, dict)
+        or receipt.get("status") != "applied"
+        or receipt.get("current") != str(current)
+        or receipt.get("release_slot") != str(current_target)
+        or receipt.get("venv") != str(current_target / "venv")
+        or receipt.get("launchers")
+        != [str(launcher_dir / "power"), str(launcher_dir / "power-mcp")]
+    ):
+        raise ValueError("managed native runtime receipt does not match the active launcher")
+    return executable_path
+
+
+def _server_entry(client: str, vault_path: Path, executable: str) -> dict[str, Any]:
+    """Return a client entry bound to the one verified ``power-mcp`` launcher."""
+    executable_path = _managed_mcp_launcher(executable)
     command = [str(executable_path)]
     environment = {"POWER_VAULT_DIR": str(vault_path.resolve())}
     if client == "opencode":
@@ -178,8 +225,8 @@ def _prepare(
     executable: str,
 ) -> tuple[str, bytes, bytes | None, str | None]:
     """Return status, current bytes, desired bytes, and a conflict reason."""
-    if config_path.is_symlink():
-        return "manual_review", b"", None, "symlink client configs are never followed"
+    if any(path.is_symlink() for path in (config_path, *config_path.parents)):
+        return "manual_review", b"", None, "symlink client config paths are never followed"
     current = config_path.read_bytes() if config_path.is_file() else b""
     entry = _server_entry(client, vault_path, executable)
     if client == "codex":
@@ -292,7 +339,7 @@ def build_connect_plan(
 ) -> ConnectPlan:
     """Build a read-only plan for one supported local client."""
     resolved_client = resolve_client(client, config_path)
-    target = (config_path or default_config_path(resolved_client)).expanduser().resolve()
+    target = (config_path or default_config_path(resolved_client)).expanduser().absolute()
     vault = vault_path.expanduser().resolve()
     status, current, desired, reason = _prepare(resolved_client, action, target, vault, executable)
     desired_bytes = desired if desired is not None else current

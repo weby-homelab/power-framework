@@ -20,7 +20,13 @@ from .mutation import execute_vault_mutation
 from .parser import validate_metadata
 from .searcher import SearchResult, search_vault
 from .task_store import TaskStore
-from .utils import atomic_write, atomic_write_in_vault, resolve_path_in_vault
+from .utils import (
+    atomic_write,
+    atomic_write_in_vault,
+    iter_vault_markdown_files,
+    resolve_path_in_vault,
+    vault_control_dir,
+)
 from .vault_storage import existing_vault_cache_dir
 
 if TYPE_CHECKING:
@@ -37,8 +43,14 @@ class _FileSnapshot:
 
 
 def get_context(vault_dir: Path, query: str, max_results: int = 5) -> list[SearchResult]:
-    """Read context without creating a mutation or hidden proposal."""
-    return search_vault(vault_dir, query, max_results=max_results, mode="fts")
+    """Read context without creating a mutation, hidden proposal, or search DB."""
+    return search_vault(
+        vault_dir,
+        query,
+        max_results=max_results,
+        mode="fts",
+        allow_search_db_override=False,
+    )
 
 
 def propose_change(
@@ -131,7 +143,7 @@ def commit_note_change(
             raise ValueError("proposal content has invalid or missing OKF metadata")
 
         snapshots = _capture_projection_snapshot(vault_dir)
-        history = vault_dir / ".power" / "memory-history.jsonl"
+        history = vault_control_dir(vault_dir) / "memory-history.jsonl"
         history_snapshot = _capture_file(history)
         log_file = vault_dir / "log.md"
         log_snapshot = _capture_file(log_file)
@@ -362,12 +374,12 @@ def _proposal_id(payload: dict[str, str]) -> str:
 
 def _proposal_path(vault_dir: Path, proposal_id: str) -> Path:
     """Return the safe durable path for a validated proposal ID."""
-    return vault_dir / ".power" / "proposals" / f"{proposal_id}.json"
+    return vault_control_dir(vault_dir, create=True) / "proposals" / f"{proposal_id}.json"
 
 
 def _read_proposal_file(path: Path) -> dict[str, object]:
     """Read one durable proposal and reject malformed state."""
-    if not path.is_file():
+    if path.is_symlink() or not path.is_file():
         raise ValueError("proposal is not durable; call propose_memory_change first")
     try:
         proposal = json.loads(path.read_text(encoding="utf-8"))
@@ -414,6 +426,8 @@ def _public_proposal(proposal: dict[str, object]) -> dict[str, str]:
 
 def _capture_file(path: Path) -> _FileSnapshot:
     """Capture a UTF-8 file without creating a missing path."""
+    if path.is_symlink():
+        raise ValueError(f"state path must not be a symlink: {path}")
     if not path.exists():
         return _FileSnapshot(path, False)
     return _FileSnapshot(path, True, path.read_text(encoding="utf-8"))
@@ -422,7 +436,7 @@ def _capture_file(path: Path) -> _FileSnapshot:
 def _projection_paths(vault_dir: Path) -> set[Path]:
     """Return the Markdown projection files the hierarchical index may touch."""
     paths: set[Path] = {vault_dir / "index.md"}
-    for path in vault_dir.rglob("*.md"):
+    for path in iter_vault_markdown_files(vault_dir):
         relative = path.relative_to(vault_dir)
         if is_catalog_filename(path.name) and relative.parts and relative.parts[0] in INDEX_FOLDERS:
             paths.add(path)
@@ -439,6 +453,8 @@ def _capture_projection_snapshot(vault_dir: Path) -> list[_FileSnapshot]:
 
 def _restore_file_snapshot(path: Path, snapshot: _FileSnapshot) -> None:
     """Restore one file pre-image, removing files created by the failed run."""
+    if path.is_symlink():
+        raise RuntimeError(f"state path became a symlink during rollback: {path}")
     if snapshot.existed:
         atomic_write(path, snapshot.content)
     else:
@@ -471,6 +487,8 @@ def _restore_projection_snapshot(vault_dir: Path, snapshots: list[_FileSnapshot]
 
 def _append_receipt(history: Path, receipt: dict[str, str]) -> None:
     """Atomically append a content-free receipt after search publication."""
+    if history.is_symlink():
+        raise ValueError("memory history must not be a symlink")
     history.parent.mkdir(parents=True, exist_ok=True)
     previous = history.read_text(encoding="utf-8") if history.exists() else ""
     atomic_write(history, previous + json.dumps(receipt, sort_keys=True) + "\n")
@@ -478,7 +496,9 @@ def _append_receipt(history: Path, receipt: dict[str, str]) -> None:
 
 def _find_idempotent_receipt(vault_dir: Path, idempotency_key: str) -> dict[str, str] | None:
     """Find one prior receipt without treating malformed history as success."""
-    history = vault_dir / ".power" / "memory-history.jsonl"
+    history = vault_control_dir(vault_dir) / "memory-history.jsonl"
+    if history.is_symlink():
+        raise RuntimeError("memory history is a symlink; refusing idempotent replay")
     if not history.exists():
         return None
     try:
@@ -501,6 +521,8 @@ def _find_idempotent_receipt(vault_dir: Path, idempotency_key: str) -> dict[str,
 
 def _append_text(path: Path, entry: str) -> None:
     """Atomically append one operational log entry."""
+    if path.is_symlink():
+        raise ValueError(f"operational log must not be a symlink: {path}")
     previous = path.read_text(encoding="utf-8") if path.exists() else ""
     atomic_write(path, previous + entry)
 
@@ -516,7 +538,9 @@ def validate_state(vault_dir: Path) -> bool:
 
 def read_history(vault_dir: Path) -> list[dict[str, str]]:
     """Read append-only transaction receipts without exposing content."""
-    history = vault_dir / ".power" / "memory-history.jsonl"
+    history = vault_control_dir(vault_dir) / "memory-history.jsonl"
+    if history.is_symlink():
+        raise ValueError("memory history must not be a symlink")
     if not history.exists():
         return []
     return [json.loads(line) for line in history.read_text(encoding="utf-8").splitlines() if line]

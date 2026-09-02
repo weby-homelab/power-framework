@@ -4,11 +4,17 @@ import json
 import logging
 import os
 import re
-import urllib.error
-import urllib.request
 from typing import ClassVar
 
-from power_framework.core.egress import EgressOperation, require_remote_egress
+from power_framework.core.egress import (
+    DEFAULT_LLM_API_BASE,
+    EgressDeniedError,
+    EgressOperation,
+    configured_llm_origins,
+    require_remote_egress,
+    safe_http_request,
+    validate_llm_endpoint,
+)
 from power_framework.core.utils import run_opencode_cli
 
 logger = logging.getLogger(__name__)
@@ -68,9 +74,7 @@ class QueryExpander:
             self._api_credential = os.environ.get("POWER_LLM_API_KEY") or os.environ.get(
                 "OPENROUTER_API_KEY", ""
             )
-        self.api_base = os.environ.get("POWER_LLM_API_BASE", "https://openrouter.ai/api/v1").rstrip(
-            "/"
-        )
+        self.api_base = os.environ.get("POWER_LLM_API_BASE", DEFAULT_LLM_API_BASE).rstrip("/")
         self.model = os.environ.get("POWER_LLM_MODEL", OPENROUTER_MODELS[0])
         self.sensitivity = sensitivity
 
@@ -141,6 +145,7 @@ class QueryExpander:
 
         require_remote_egress(EgressOperation.QUERY_EXPANSION, self.sensitivity)
 
+        endpoint_url = f"{self.api_base}/chat/completions"
         payload = json.dumps(
             {
                 "model": self.model,
@@ -150,25 +155,38 @@ class QueryExpander:
             }
         ).encode("utf-8")
 
-        req = urllib.request.Request(  # noqa: S310
-            f"{self.api_base}/chat/completions",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
-            method="POST",
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
-                body = json.loads(resp.read().decode("utf-8"))
-                content = body["choices"][0]["message"]["content"]
-                alternatives = json.loads(content)
-                if isinstance(alternatives, list):
-                    return [str(a) for a in alternatives if a]
-        except (urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError) as e:
-            logger.warning("LLM expansion network error: %s", e)
+            validate_llm_endpoint(endpoint_url)
+            response = safe_http_request(
+                endpoint_url,
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                },
+                body=payload,
+                require_https=True,
+                allowed_origins=configured_llm_origins(),
+                allow_query=False,
+                max_redirects=0,
+                timeout=15,
+            )
+            if response.status >= 400:
+                return []
+            body = json.loads(response.body.decode("utf-8"))
+            content = body["choices"][0]["message"]["content"]
+            alternatives = json.loads(content)
+            if isinstance(alternatives, list):
+                return [str(a) for a in alternatives if a]
+        except (
+            EgressDeniedError,
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            KeyError,
+            IndexError,
+        ) as exc:
+            logger.warning("LLM expansion network error: %s", type(exc).__name__)
 
         return []
 

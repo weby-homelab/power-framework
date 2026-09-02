@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No unreleased changes.
 
+## [3.7.11] - 2026-09-02
+
+### Fixed
+
+- Hardened MCP, vault, search-index, control-state, native-installer, and
+  launcher boundaries against path traversal, symlink escapes, stale plans, and
+  unmanaged executable replacement.
+- Added explicit `POWER_VAULT_DIR` enforcement, modern/legacy stdio MCP
+  interoperability checks, deterministic tool-catalog metadata, and fail-closed
+  CSRF settings validation.
+- Added exact SSRF endpoint policy for external ROT/LLM calls, including
+  IPv4/IPv6 resolution, redirect revalidation, DNS-rebinding resistance, and
+  credential-origin restrictions.
+
+### Changed
+
+- Native installation now uses a hash-pinned dependency lock, deterministic
+  release slots, atomic activation, rollback checks, and managed public
+  launchers.
+- Release manifests, receipts, public readback, package attestations, and Web
+  image provenance are bound to the same immutable source and workflow context.
+- Synchronized the active package, runtime, Web, Skill, onboarding, migration,
+  support, and release documentation surfaces to `3.7.11`.
+
 ## [3.7.10] - 2026-08-31
 
 ### Fixed

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from .constants import is_catalog_filename
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
+from .utils import iter_vault_markdown_files
 
 if TYPE_CHECKING:
     from .models import OKFMetadata
@@ -129,7 +130,7 @@ def scan_projection(
     source_hashes: dict[str, str] = {}
     scanned_candidates = 0
 
-    for filepath in sorted(root.rglob("*.md")):
+    for filepath in sorted(iter_vault_markdown_files(root)):
         rel_path = filepath.relative_to(root).as_posix()
         if filepath.name in {"index.md", "log.md"} or is_catalog_filename(filepath.name):
             continue

@@ -1,4 +1,4 @@
-# P.O.W.E.R. Framework 3.7.10
+# P.O.W.E.R. Framework 3.7.11
 
 P.O.W.E.R. is a local-first, Git-native toolkit for structured knowledge bases. It combines
 P.A.R.A., validated OKF frontmatter, hierarchical indexes, full-text and semantic retrieval,
@@ -19,7 +19,7 @@ and an MCP interface for AI agents.
 - [Матриця підтримки платформ](support-matrix.ua.md)
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
-These guides define the current `v3.7.10` patch release artifact contract, use an
+These guides define the current `v3.7.11` patch release artifact contract, use an
 isolated virtual environment, and include acceptance checks. Publication is
 complete only when the signed tag, wheel, source archive, SBOM, and release
 receipts can be read back from GitHub. The
@@ -45,7 +45,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install \
-  "https://github.com/weby-homelab/power-framework/releases/download/v3.7.10/power_framework-3.7.10-py3-none-any.whl"
+  "https://github.com/weby-homelab/power-framework/releases/download/v3.7.11/power_framework-3.7.11-py3-none-any.whl"
 
 power init ./my-vault
 power index ./my-vault --strict
@@ -67,7 +67,7 @@ are explicitly preserved as v1.6 historical snapshots.
 - [Architecture](architecture.md)
 - [Application API v2 and source read model](api/application.md)
 - [Security threat model](threat-model.md)
-- [POWER 3.7.10 patch release notes](release-3.7.10.md)
+- [POWER 3.7.11 patch release notes](release-3.7.11.md)
 - [POWER 3.7.9 historical release notes](release-3.7.9.md)
 - [POWER 3.6.3 historical release notes](release-3.6.3.md)
 - [POWER 3.6.1 release notes](release-3.6.1.md)

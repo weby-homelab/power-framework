@@ -1,6 +1,6 @@
 {
     "schema": "power.unified.plan.v1",
-    "target_version": "3.7.10",
+    "target_version": "3.7.11",
     "base_power_commit": "ec8f5b1900146033e52ead6c186e49d385c5caf6",
     "gui_migration_source_sha": "0dead07a04d5590e2cf3308b2d289742730a8633",
     "canonical_repository": "weby-homelab/power-framework",

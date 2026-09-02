@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import zipfile
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from scripts.build_release_manifest import aggregate_tree_hash
 from scripts.prxmx_power_runtime_audit import (
     ReleaseValidationError,
     _fetch_from_github,
@@ -59,13 +61,30 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
     asset_dir.mkdir(exist_ok=True)
     wheel = asset_dir / "power_framework-3.7.10-py3-none-any.whl"
     sdist = asset_dir / "power_framework-3.7.10.tar.gz"
+    dependency_lock = asset_dir / "power-native-requirements.txt"
     package_sbom = asset_dir / "power-framework-3.7.10.spdx.json"
     web_sbom = asset_dir / "power-web-3.7.10.spdx.json"
     profile = asset_dir / "power-profile-acceptance.json"
     baseline = asset_dir / "power-framework.release-baseline.json"
 
-    wheel.write_bytes(b"PK\x03\x04power_framework wheel content 3.7.10 candidate")
+    skill_files = {"SKILL.md": b"---\nname: power\n---\n"}
+    mcp_files = {"__init__.py": b"\n", "contract.py": b"MCP contract\n"}
+    with zipfile.ZipFile(wheel, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "power_framework-3.7.10.dist-info/METADATA",
+            "Metadata-Version: 2.3\n"
+            "Name: power-framework\n"
+            "Version: 3.7.10\n"
+            "Requires-Python: >=3.13,<3.15\n",
+        )
+        archive.writestr("power_framework/data/skills/power/SKILL.md", skill_files["SKILL.md"])
+        for relative, content in mcp_files.items():
+            archive.writestr("power_framework/mcp/" + relative, content)
     sdist.write_bytes(b"\x1f\x8b\x08\x00power_framework sdist content 3.7.10 candidate")
+    dependency_lock.write_text(
+        "mcp==2.1.0 --hash=sha256:" + "a" * 64 + "\n",
+        encoding="utf-8",
+    )
     package_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"power-framework"}\n')
     web_sbom.write_bytes(b'{"spdxVersion":"SPDX-2.3","name":"power-web"}\n')
     profile.write_text(
@@ -111,10 +130,43 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
         "version": "3.7.10",
         "commit": COMMIT,
         "requires_python": ">=3.13,<3.15",
+        "application_schema": "power.application.v2",
+        "profiles": {
+            "native": ["power", "power-mcp"],
+            "web": ["power-web"],
+            "skill": ["power"],
+            "profile_a": {
+                "status": "mcp-required",
+                "mcp_transport": "stdio",
+                "docker_web_containers": 0,
+            },
+            "profile_b": {
+                "status": "web-only-container",
+                "capabilities": ["web", "semantic", "rerank"],
+                "mcp_services": 0,
+            },
+        },
+        "mcp": {
+            "entry_point": "power-mcp",
+            "transport": "stdio",
+            "vault_environment": "POWER_VAULT_DIR",
+        },
+        "web": {
+            "entry_point": "power-web",
+            "transport": "asgi",
+            "port": 8080,
+            "application_service_boundary": True,
+        },
+        "skill_tree_sha256": aggregate_tree_hash(skill_files),
+        "mcp_contract_sha256": aggregate_tree_hash(mcp_files),
         "attestations": ["github:11111", "github:22222"],
         "artifacts": {
             "power_wheel": {"filename": wheel.name, "sha256": _sha256_file(wheel)},
             "power_sdist": {"filename": sdist.name, "sha256": _sha256_file(sdist)},
+            "native_dependency_lock": {
+                "filename": dependency_lock.name,
+                "sha256": _sha256_file(dependency_lock),
+            },
             "package_sbom": {
                 "filename": package_sbom.name,
                 "sha256": _sha256_file(package_sbom),
@@ -131,7 +183,16 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
     manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
 
     checksums_path = asset_dir / "SHA256SUMS"
-    checksum_files = [wheel, sdist, package_sbom, web_sbom, profile, baseline, manifest_path]
+    checksum_files = [
+        wheel,
+        sdist,
+        dependency_lock,
+        package_sbom,
+        web_sbom,
+        profile,
+        baseline,
+        manifest_path,
+    ]
     _write_checksums(checksums_path, checksum_files)
 
     receipt_path = asset_dir / "power-framework.release-receipt.json"
@@ -143,7 +204,9 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
             {
                 "id": "github:11111",
                 "role": "package",
-                "subjects": sorted([_sha256_file(wheel), _sha256_file(sdist)]),
+                "subjects": sorted(
+                    [_sha256_file(wheel), _sha256_file(sdist), _sha256_file(dependency_lock)]
+                ),
             },
             {"id": "github:22222", "role": "web", "subjects": [IMAGE_DIGEST]},
         ],
@@ -159,6 +222,7 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
         "asset_dir": asset_dir,
         "wheel": wheel,
         "sdist": sdist,
+        "dependency_lock": dependency_lock,
         "package_sbom": package_sbom,
         "web_sbom": web_sbom,
         "profile": profile,
@@ -169,6 +233,20 @@ def _write_full_fixture(tmp_path: Path) -> dict[str, Any]:
         "commit": COMMIT,
         "tag": TAG,
     }
+
+
+def _fixture_assets(fixture: dict[str, Any]) -> list[Path]:
+    """Return every file asset that belongs in checksums and receipt fixtures."""
+    return [
+        fixture["wheel"],
+        fixture["sdist"],
+        fixture["dependency_lock"],
+        fixture["package_sbom"],
+        fixture["web_sbom"],
+        fixture["profile"],
+        fixture["baseline"],
+        fixture["manifest"],
+    ]
 
 
 def _verify_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
@@ -194,15 +272,7 @@ def test_attack_1_manifest_wrong_wheel_hash_while_sha256sums_correct(tmp_path: P
     manifest_data["artifacts"]["power_wheel"]["sha256"] = "0" * 64
     fix["manifest"].write_text(json.dumps(manifest_data, sort_keys=True) + "\n", encoding="utf-8")
 
-    files = [
-        fix["wheel"],
-        fix["sdist"],
-        fix["package_sbom"],
-        fix["web_sbom"],
-        fix["profile"],
-        fix["baseline"],
-        fix["manifest"],
-    ]
+    files = _fixture_assets(fix)
     _write_checksums(fix["checksums"], files)
     receipt_data = json.loads(fix["receipt"].read_text(encoding="utf-8"))
     receipt_data["unified_release_manifest"]["sha256"] = _sha256_file(fix["manifest"])
@@ -220,15 +290,7 @@ def test_attack_1_manifest_wrong_sdist_hash_while_sha256sums_correct(tmp_path: P
     manifest_data["artifacts"]["power_sdist"]["sha256"] = "1" * 64
     fix["manifest"].write_text(json.dumps(manifest_data, sort_keys=True) + "\n", encoding="utf-8")
 
-    files = [
-        fix["wheel"],
-        fix["sdist"],
-        fix["package_sbom"],
-        fix["web_sbom"],
-        fix["profile"],
-        fix["baseline"],
-        fix["manifest"],
-    ]
+    files = _fixture_assets(fix)
     _write_checksums(fix["checksums"], files)
     receipt_data = json.loads(fix["receipt"].read_text(encoding="utf-8"))
     receipt_data["unified_release_manifest"]["sha256"] = _sha256_file(fix["manifest"])
@@ -298,15 +360,7 @@ def test_attack_3_manifest_commit_mismatch(tmp_path: Path) -> None:
     manifest_data["commit"] = "b" * 40
     fix["manifest"].write_text(json.dumps(manifest_data, sort_keys=True) + "\n", encoding="utf-8")
 
-    files = [
-        fix["wheel"],
-        fix["sdist"],
-        fix["package_sbom"],
-        fix["web_sbom"],
-        fix["profile"],
-        fix["baseline"],
-        fix["manifest"],
-    ]
+    files = _fixture_assets(fix)
     _write_checksums(fix["checksums"], files)
     receipt_data = json.loads(fix["receipt"].read_text(encoding="utf-8"))
     receipt_data["unified_release_manifest"]["sha256"] = _sha256_file(fix["manifest"])
@@ -348,15 +402,7 @@ def test_attack_4_candidate_template_passed_as_final_manifest(tmp_path: Path) ->
         json.dumps(template_manifest, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    files = [
-        fix["wheel"],
-        fix["sdist"],
-        fix["package_sbom"],
-        fix["web_sbom"],
-        fix["profile"],
-        fix["baseline"],
-        fix["manifest"],
-    ]
+    files = _fixture_assets(fix)
     _write_checksums(fix["checksums"], files)
 
     with pytest.raises(ValueError, match=r"published release manifest schema is invalid"):
@@ -439,15 +485,7 @@ def test_attack_6_profile_evidence_image_digest_mismatch(tmp_path: Path) -> None
     profile_data["image_digest"] = "sha256:" + "8" * 64
     fix["profile"].write_text(json.dumps(profile_data, sort_keys=True) + "\n", encoding="utf-8")
 
-    files = [
-        fix["wheel"],
-        fix["sdist"],
-        fix["package_sbom"],
-        fix["web_sbom"],
-        fix["profile"],
-        fix["baseline"],
-        fix["manifest"],
-    ]
+    files = _fixture_assets(fix)
     _write_checksums(fix["checksums"], files)
     manifest_data = json.loads(fix["manifest"].read_text(encoding="utf-8"))
     manifest_data["artifacts"]["profile_evidence"]["sha256"] = _sha256_file(fix["profile"])
@@ -476,15 +514,7 @@ def test_attack_7_source_manifest_rejected_as_final_manifest(tmp_path: Path) -> 
     fix = _write_full_fixture(tmp_path)
     fix["manifest"].write_text(source_manifest_path.read_text(encoding="utf-8"), encoding="utf-8")
 
-    files = [
-        fix["wheel"],
-        fix["sdist"],
-        fix["package_sbom"],
-        fix["web_sbom"],
-        fix["profile"],
-        fix["baseline"],
-        fix["manifest"],
-    ]
+    files = _fixture_assets(fix)
     _write_checksums(fix["checksums"], files)
 
     with pytest.raises(ValueError, match=r"published release manifest schema is invalid"):

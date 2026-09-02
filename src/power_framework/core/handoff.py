@@ -20,7 +20,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .mutation import execute_vault_mutation
-from .utils import atomic_write
+from .utils import atomic_write, vault_control_dir
 
 WORK_PACKET_SCHEMA_VERSION = 1
 _TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -383,7 +383,7 @@ def _validate_token(value: str, field: str) -> None:
 
 
 def _packet_directory(vault_dir: Path) -> Path:
-    return Path(vault_dir) / ".power" / "work-packets"
+    return vault_control_dir(Path(vault_dir)) / "work-packets"
 
 
 def _packet_path(vault_dir: Path, task_id: str) -> Path:

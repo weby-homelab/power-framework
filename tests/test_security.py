@@ -15,11 +15,14 @@ from power_framework.core.utils import (
     create_backup,
     is_excluded_dir,
     is_excluded_orphan,
+    is_regular_vault_file,
+    iter_vault_markdown_files,
     prune_backups,
     resolve_path_in_vault,
     resolve_vault_path,
     restore_backup,
     validate_vault_path,
+    vault_control_dir,
 )
 
 
@@ -49,6 +52,23 @@ class TestValidateVaultPath:
     def test_allowed_root_escape(self, tmp_path: Path):
         with pytest.raises(ValueError, match="Path traversal"):
             validate_vault_path("/etc", allowed_root=str(tmp_path))
+
+    def test_filesystem_root_is_not_a_vault(self):
+        with pytest.raises(ValueError, match="filesystem root"):
+            validate_vault_path(os.sep)
+
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="Windows symlink creation requires SeCreateSymbolicLinkPrivilege",
+    )
+    def test_symlinked_control_directory_is_rejected(self, tmp_path: Path):
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        control = tmp_path / ".power"
+        control.symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(ValueError, match="control directory"):
+            vault_control_dir(tmp_path, create=True)
 
 
 class TestResolveVaultPath:
@@ -105,6 +125,33 @@ class TestAtomicWrite:
         atomic_write(filepath, "content")
         temps = list(tmp_path.glob(".test.txt.*.tmp"))
         assert len(temps) == 0
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows symlink creation requires SeCreateSymbolicLinkPrivilege",
+)
+def test_vault_markdown_iterator_excludes_symlink_escapes(
+    sample_vault: Path, tmp_path: Path
+) -> None:
+    """Read-side scans must not expose a host file through a vault symlink."""
+    external_dir = tmp_path / "outside"
+    external_dir.mkdir()
+    external_note = external_dir / "host-only.md"
+    external_note.write_text("host-only secret", encoding="utf-8")
+    direct_link = sample_vault / "01_Projects" / "external.md"
+    direct_link.symlink_to(external_note)
+    directory_link = sample_vault / "01_Projects" / "external-directory"
+    directory_link.symlink_to(external_dir, target_is_directory=True)
+
+    discovered = {
+        path.relative_to(sample_vault).as_posix()
+        for path in iter_vault_markdown_files(sample_vault)
+    }
+
+    assert "01_Projects/external.md" not in discovered
+    assert "01_Projects/external-directory/host-only.md" not in discovered
+    assert is_regular_vault_file(sample_vault, direct_link) is False
 
 
 class TestVaultRelativeWritePaths:

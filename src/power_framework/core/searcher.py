@@ -47,6 +47,7 @@ from .temporal import (
     scan_temporal_records,
 )
 from .timing import timing_span
+from .utils import iter_vault_markdown_files, resolve_path_in_vault
 from .vault_storage import existing_vault_db_path, vault_db_path
 
 if TYPE_CHECKING:
@@ -142,7 +143,11 @@ class _ResolvedDb:
     db_sha256: str | None = None
 
 
-def _resolve_request_db(vault_dir: Path) -> _ResolvedDb:
+def _resolve_request_db(
+    vault_dir: Path,
+    *,
+    allow_search_db_override: bool = True,
+) -> _ResolvedDb:
     """Verify the active generation once for one search request.
 
     Immutable generations are safe to reuse after this verification.  The
@@ -159,7 +164,13 @@ def _resolve_request_db(vault_dir: Path) -> _ResolvedDb:
                 source_snapshot_hash=active.source_snapshot_hash,
                 db_sha256=active.db_sha256,
             )
-        return _ResolvedDb(existing_vault_db_path(vault_dir), False)
+        return _ResolvedDb(
+            existing_vault_db_path(
+                vault_dir,
+                allow_search_db_override=allow_search_db_override,
+            ),
+            False,
+        )
 
 
 def _open_readonly_db(db_path: Path) -> sqlite3.Connection:
@@ -498,10 +509,30 @@ def _matched_text(text: str, terms: list[str] | None = None) -> str:
 
 def _read_matched_text(vault_dir: Path, rel_path: str, terms: list[str]) -> str:
     """Read one bounded source note to produce a body-only passage."""
-    try:
-        return _matched_text(read_file_content(vault_dir / rel_path), terms)
-    except OSError:
+    filepath = _safe_indexed_note_path(vault_dir, rel_path)
+    if filepath is None:
         return ""
+    try:
+        return _matched_text(read_file_content(filepath), terms)
+    except (OSError, UnicodeError):
+        return ""
+
+
+def _safe_indexed_note_path(vault_dir: Path, rel_path: str) -> Path | None:
+    """Resolve an index path only when every filesystem component is in-vault."""
+    if not isinstance(rel_path, str):
+        return None
+    try:
+        resolve_path_in_vault(vault_dir, rel_path)
+        parts = Path(rel_path).parts
+        candidate = vault_dir.joinpath(*parts)
+        if any(parent.is_symlink() for parent in (candidate.parent, *candidate.parent.parents)):
+            return None
+        if candidate.is_symlink() or not candidate.is_file():
+            return None
+        return candidate
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return None
 
 
 def _score_note(
@@ -555,7 +586,7 @@ def _scan_and_search(
     """Scan vault and return scored search results (fallback)."""
     results: list[SearchResult] = []
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
@@ -601,7 +632,7 @@ def _scan_and_vector_search(
     query_vec = _compute_tf_vector(query_tokens)
     results: list[SearchResult] = []
     scanned = 0
-    for filepath in sorted(vault_dir.rglob("*.md")):
+    for filepath in sorted(iter_vault_markdown_files(vault_dir)):
         rel_path = filepath.relative_to(vault_dir).as_posix()
         if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
@@ -664,6 +695,8 @@ def _fts_search(
     query: str,
     max_results: int = 20,
     resolved_db: _ResolvedDb | None = None,
+    *,
+    allow_search_db_override: bool = True,
 ) -> list[SearchResult]:
     """SQLite FTS5 full-text search with weighted BM25 scoring."""
     clean_query = re.sub(
@@ -703,7 +736,7 @@ def _fts_search(
     db_path = resolved_db.path if resolved_db is not None else _read_db_path(vault_dir)
 
     if db_path is None or not db_path.is_file():
-        if os.getenv("POWER_SEARCH_DB"):
+        if allow_search_db_override and os.getenv("POWER_SEARCH_DB"):
             db_path = _db_path(vault_dir)
             bootstrap_conn: sqlite3.Connection | None = None
             try:
@@ -804,6 +837,8 @@ def _vector_search(
     query: str,
     max_results: int = 20,
     resolved_db: _ResolvedDb | None = None,
+    *,
+    allow_search_db_override: bool = True,
 ) -> list[SearchResult]:
     """
     Search vault notes using TF vector cosine similarity.
@@ -811,6 +846,8 @@ def _vector_search(
     Loads pre-computed term-frequency vectors from SQLite,
     then ranks by cosine similarity.
     """
+    if not vault_dir.is_dir():
+        return []
     query_tokens = _tokenize(query)
     if not query_tokens:
         return []
@@ -818,13 +855,14 @@ def _vector_search(
     query_vec = _compute_tf_vector(query_tokens)
     if resolved_db is None:
         active_generation_path = resolve_active_generation_path(vault_dir)
-        db_path = active_generation_path or _db_path(vault_dir)
+        db_path = active_generation_path or (
+            _db_path(vault_dir) if allow_search_db_override else None
+        )
     else:
-        active_generation_path = resolved_db.path if resolved_db.is_generation else None
-        db_path = active_generation_path or _db_path(vault_dir)
+        db_path = resolved_db.path
 
     if db_path is None or not db_path.is_file():
-        if not os.getenv("POWER_SEARCH_DB"):
+        if not (allow_search_db_override and os.getenv("POWER_SEARCH_DB")):
             return _scan_and_vector_search(vault_dir, query, max_results=max_results)
         bootstrap_conn: sqlite3.Connection | None = None
         try:
@@ -868,8 +906,8 @@ def _vector_search(
     with timing_span("scoring"):
         for rel_path, tf_data_str, title, description, note_type, tags_str, content in rows:
             try:
-                filepath = vault_dir / rel_path
-                if not filepath.is_file():
+                filepath = _safe_indexed_note_path(vault_dir, rel_path)
+                if filepath is None:
                     continue
                 if should_skip(vault_dir, rel_path):
                     continue
@@ -1163,7 +1201,9 @@ def _semantic_search(
     results: list[SearchResult] = []
     with timing_span("result_materialization"):
         for rel_path in top_paths:
-            filepath = vault_dir / rel_path
+            filepath = _safe_indexed_note_path(vault_dir, rel_path)
+            if filepath is None:
+                continue
             try:
                 content = read_file_content(filepath)
                 metadata = validate_metadata(content)
@@ -1194,6 +1234,8 @@ def _apply_semantic_lexical_guard(
     query: str,
     results: list[SearchResult],
     resolved_db: _ResolvedDb | None = None,
+    *,
+    allow_search_db_override: bool = True,
 ) -> list[SearchResult]:
     """Use lexical evidence only to break an ambiguous dense top-1 tie.
 
@@ -1206,7 +1248,13 @@ def _apply_semantic_lexical_guard(
     if len(results) < 2 or results[0].score <= 0:
         return results
     try:
-        lexical = _fts_search(vault_dir, query, max_results=1, resolved_db=resolved_db)
+        lexical = _fts_search(
+            vault_dir,
+            query,
+            max_results=1,
+            resolved_db=resolved_db,
+            allow_search_db_override=allow_search_db_override,
+        )
     except Exception:
         return results
     if not lexical:
@@ -1265,6 +1313,8 @@ def search_vault(
     temporal_view: str = "current",
     as_of: date | str | None = None,
     domain: str | None = None,
+    *,
+    allow_search_db_override: bool = True,
 ) -> list[SearchResult]:
     """
     Search the vault for notes matching the query.
@@ -1287,6 +1337,9 @@ def search_vault(
         as_of: Inclusive ISO-8601 date boundary for temporal evaluation.
         domain: Optional domain slug. When present, results are scoped to the
             domain path and its priority is used when ``mode=auto``.
+        allow_search_db_override: Whether a caller-controlled
+            ``POWER_SEARCH_DB`` may supply the legacy writable test database.
+            Read-only service boundaries must set this to ``False``.
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -1301,7 +1354,11 @@ def search_vault(
     except DomainConfigError:
         raise
     fallback_reason: str | None = None
-    resolved_db = _resolve_request_db(vault_dir)
+    search_db_override = os.getenv("POWER_SEARCH_DB") if allow_search_db_override else None
+    resolved_db = _resolve_request_db(
+        vault_dir,
+        allow_search_db_override=allow_search_db_override,
+    )
     if mode.casefold() == "auto":
         dense_reason = "dense_index_unavailable"
         try:
@@ -1327,7 +1384,7 @@ def search_vault(
         not mode_spec.requires_dense_index
         and not resolved_db.is_generation
         and resolved_db.path is None
-        and not os.getenv("POWER_SEARCH_DB")
+        and not search_db_override
     ):
         fallback_reason = fallback_reason or "no_active_generation_bounded_scan"
     if mode_spec.requires_dense_index:
@@ -1358,11 +1415,7 @@ def search_vault(
     # Read operations never create or refresh a vault-owned index. An explicit
     # POWER_SEARCH_DB override is retained as a test/developer compatibility
     # escape hatch; production callers must run ``power sync`` explicitly.
-    if (
-        not mode_spec.requires_dense_index
-        and not resolved_db.is_generation
-        and os.getenv("POWER_SEARCH_DB")
-    ):
+    if not mode_spec.requires_dense_index and not resolved_db.is_generation and search_db_override:
         conn: sqlite3.Connection | None = None
         try:
             conn = sqlite3.connect(str(_db_path(vault_dir)), timeout=30)
@@ -1372,7 +1425,10 @@ def search_vault(
             if conn.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0] == 0:
                 _sync_vault_to_db(vault_dir, conn, sync_embeddings=False)
                 conn.commit()
-                resolved_db = _resolve_request_db(vault_dir)
+                resolved_db = _resolve_request_db(
+                    vault_dir,
+                    allow_search_db_override=allow_search_db_override,
+                )
         except sqlite3.Error:
             fallback = _scan_and_search(vault_dir, _fallback_query_terms(query))
             fallback.sort(key=lambda result: (-result.score, -result.match_count, result.title))
@@ -1402,12 +1458,20 @@ def search_vault(
         for variant in variants:
             fts_all.extend(
                 _fts_search(
-                    vault_dir, variant, max_results=max_results * 2, resolved_db=resolved_db
+                    vault_dir,
+                    variant,
+                    max_results=max_results * 2,
+                    resolved_db=resolved_db,
+                    allow_search_db_override=allow_search_db_override,
                 )
             )
             vec_all.extend(
                 _vector_search(
-                    vault_dir, variant, max_results=max_results * 2, resolved_db=resolved_db
+                    vault_dir,
+                    variant,
+                    max_results=max_results * 2,
+                    resolved_db=resolved_db,
+                    allow_search_db_override=allow_search_db_override,
                 )
             )
             with contextlib.suppress(DenseIndexUnavailableError):
@@ -1468,7 +1532,11 @@ def search_vault(
     for variant in variants:
         if mode == "vector":
             results = _vector_search(
-                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+                vault_dir,
+                variant,
+                max_results=max_results,
+                resolved_db=resolved_db,
+                allow_search_db_override=allow_search_db_override,
             )
         elif mode == "semantic":
             results = _semantic_search(
@@ -1476,11 +1544,19 @@ def search_vault(
             )
         elif mode == "graph_assisted":
             results = _graph_assisted_search(
-                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+                vault_dir,
+                variant,
+                max_results=max_results,
+                resolved_db=resolved_db,
+                allow_search_db_override=allow_search_db_override,
             )
         elif mode in ("reranked", "hybrid_reranked"):
             results = _hybrid_reranked_search(
-                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+                vault_dir,
+                variant,
+                max_results=max_results,
+                resolved_db=resolved_db,
+                allow_search_db_override=allow_search_db_override,
             )
             # ``_hybrid_reranked_search`` already fuses dense candidates before
             # assigning cross-encoder scores. Do not add a second dense fallback
@@ -1489,7 +1565,11 @@ def search_vault(
             # the reranked order with the semantic order on small vaults.
         else:
             results = _fts_search(
-                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+                vault_dir,
+                variant,
+                max_results=max_results,
+                resolved_db=resolved_db,
+                allow_search_db_override=allow_search_db_override,
             )
         all_results.extend(results)
 
@@ -1505,7 +1585,13 @@ def search_vault(
         vault_dir, final_results, temporal_view, boundary, requested_max_results, resolved_db
     )
     if mode == "semantic":
-        final_results = _apply_semantic_lexical_guard(vault_dir, query, final_results, resolved_db)
+        final_results = _apply_semantic_lexical_guard(
+            vault_dir,
+            query,
+            final_results,
+            resolved_db,
+            allow_search_db_override=allow_search_db_override,
+        )
     _attach_runtime_contract(
         final_results,
         actual_mode=mode,
@@ -1560,6 +1646,8 @@ def _hybrid_reranked_search(
     query: str,
     max_results: int = 20,
     resolved_db: _ResolvedDb | None = None,
+    *,
+    allow_search_db_override: bool = True,
 ) -> list[SearchResult]:
     """Canonical POWER 3.2 retrieval: FTS/BM25 + TF-vector + Dense -> top-20 -> rerank.
 
@@ -1569,8 +1657,20 @@ def _hybrid_reranked_search(
     fast. Includes dense candidates (POWER 3.2.1 fix) so the reranker sees
     documents the embedding model finds relevant (not just lexical matches).
     """
-    candidates = _fts_search(vault_dir, query, max_results=150, resolved_db=resolved_db)
-    vector_results = _vector_search(vault_dir, query, max_results=150, resolved_db=resolved_db)
+    candidates = _fts_search(
+        vault_dir,
+        query,
+        max_results=150,
+        resolved_db=resolved_db,
+        allow_search_db_override=allow_search_db_override,
+    )
+    vector_results = _vector_search(
+        vault_dir,
+        query,
+        max_results=150,
+        resolved_db=resolved_db,
+        allow_search_db_override=allow_search_db_override,
+    )
     candidates = _rrf_merge(candidates, vector_results)
 
     # 3.2.1: include dense/semantic candidates in the reranker pool.
@@ -1632,6 +1732,8 @@ def _graph_assisted_search(
     query: str,
     max_results: int = 20,
     resolved_db: _ResolvedDb | None = None,
+    *,
+    allow_search_db_override: bool = True,
 ) -> list[SearchResult]:
     """Expand a sparse candidate pool through the accepted knowledge graph.
 
@@ -1645,8 +1747,20 @@ def _graph_assisted_search(
 
     candidate_limit = max(20, max_results * 4)
     candidates = _rrf_merge(
-        _fts_search(vault_dir, query, max_results=candidate_limit, resolved_db=resolved_db),
-        _vector_search(vault_dir, query, max_results=candidate_limit, resolved_db=resolved_db),
+        _fts_search(
+            vault_dir,
+            query,
+            max_results=candidate_limit,
+            resolved_db=resolved_db,
+            allow_search_db_override=allow_search_db_override,
+        ),
+        _vector_search(
+            vault_dir,
+            query,
+            max_results=candidate_limit,
+            resolved_db=resolved_db,
+            allow_search_db_override=allow_search_db_override,
+        ),
     )
     if not candidates:
         return []

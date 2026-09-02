@@ -34,7 +34,7 @@ from .parser import (
     read_file_content,
     validate_metadata,
 )
-from .utils import clean_note_name, is_excluded_orphan
+from .utils import clean_note_name, is_excluded_orphan, iter_vault_markdown_files
 
 logger = logging.getLogger(__name__)
 
@@ -357,7 +357,7 @@ def run_lint_vault(vault_dir: Path) -> LintResult:
     links: dict[str, list[InternalLink]] = {}
     orphan_exempt_paths: set[str] = set()
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         rel_path = rel.as_posix()
         if should_skip(vault_dir, rel_path):
@@ -454,6 +454,9 @@ def run_rot_audit(
     vault_dir: Path,
     extended: bool = False,
     embedder: EmbeddingProvider | None = None,
+    allow_remote_egress: bool = False,
+    allow_link_rot: bool = False,
+    allow_remote_llm: bool = False,
 ) -> ROTResult:
     """
     Run ROT (Redundant, Outdated, Trivial) audit on the vault.
@@ -469,12 +472,17 @@ def run_rot_audit(
     - Freshness scoring (type-based decay)
     - Usage tracking
     """
+    if allow_remote_egress:
+        # Compatibility for direct library callers; MCP exposes the two
+        # capabilities separately so one approval cannot enable both.
+        allow_link_rot = True
+        allow_remote_llm = True
     result = ROTResult()
 
     title_map: dict[str, tuple[str, str]] = {}
     stale_list: list[tuple[str, str]] = []
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue
@@ -547,16 +555,20 @@ def run_rot_audit(
             logger.warning("Content dedup failed: %s", exc)
 
         try:
-            contra = ContradictionDetector(embedder=embedder)
+            contra = ContradictionDetector(
+                embedder=embedder,
+                allow_remote_llm=allow_remote_llm,
+            )
             result.semantic_contradictions = contra.detect(vault_dir)
         except Exception as exc:
             logger.warning("Contradiction detection failed: %s", exc)
 
-        try:
-            link_checker = LinkRotChecker()
-            result.link_rot = link_checker.check_all(vault_dir)
-        except Exception as exc:
-            logger.warning("Link rot check failed: %s", exc)
+        if allow_link_rot:
+            try:
+                link_checker = LinkRotChecker()
+                result.link_rot = link_checker.check_all(vault_dir)
+            except Exception as exc:
+                logger.warning("Link rot check failed: %s", exc)
 
         try:
             scorer = FreshnessScorer()
@@ -577,9 +589,19 @@ def run_rot_report(
     vault_dir: Path,
     extended: bool = False,
     embedder: EmbeddingProvider | None = None,
+    allow_remote_egress: bool = False,
+    allow_link_rot: bool = False,
+    allow_remote_llm: bool = False,
 ) -> str:
     """Run ROT audit and return formatted report string."""
-    result = run_rot_audit(vault_dir, extended=extended, embedder=embedder)
+    result = run_rot_audit(
+        vault_dir,
+        extended=extended,
+        embedder=embedder,
+        allow_remote_egress=allow_remote_egress,
+        allow_link_rot=allow_link_rot,
+        allow_remote_llm=allow_remote_llm,
+    )
     return result.format_report(vault_dir)
 
 
@@ -602,7 +624,7 @@ def archive_stale_notes(vault_dir: Path, dry_run: bool = True) -> str:
     moved: list[str] = []
     errors: list[str] = []
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue
@@ -706,7 +728,7 @@ def run_status_report(vault_dir: Path) -> str:
     total_external_links = 0
     external_link_pattern = re.compile(r"\[.*?\]\(((?:https?|ftp)://[^\s)]+)\)")
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
 

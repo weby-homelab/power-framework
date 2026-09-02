@@ -19,7 +19,7 @@ from .task_models import (
     canonical_payload_digest,
     ensure_valid_task_id,
 )
-from .utils import atomic_write
+from .utils import atomic_write, vault_control_dir
 
 try:
     import fcntl
@@ -36,8 +36,17 @@ class TaskStore:
     """Filesystem-backed durable store for tasks, checkpoints, and event journals."""
 
     def __init__(self, vault_dir: Path) -> None:
-        self.vault_dir = Path(vault_dir).expanduser().resolve()
-        self.tasks_dir = self.vault_dir / ".power" / "tasks"
+        raw_vault_dir = Path(vault_dir).expanduser()
+        if raw_vault_dir == raw_vault_dir.parent:
+            raise ValueError("Vault path must be a dedicated directory, not the filesystem root")
+        for parent in (raw_vault_dir, *raw_vault_dir.parents):
+            if parent.is_symlink():
+                raise ValueError("Vault path symlink ancestors are not followed")
+        if not raw_vault_dir.exists():
+            raw_vault_dir.mkdir(parents=True)
+        self.vault_dir = raw_vault_dir.resolve()
+        self.power_dir = vault_control_dir(self.vault_dir, create=True)
+        self.tasks_dir = self.power_dir / "tasks"
         self.events_dir = self.tasks_dir / "events"
         self.checkpoints_dir = self.tasks_dir / "checkpoints"
         self.receipts_dir = self.tasks_dir / "receipts"
@@ -49,11 +58,16 @@ class TaskStore:
         self._recovered = False
 
     def _ensure_dirs(self) -> None:
-        self.tasks_dir.mkdir(parents=True, exist_ok=True)
-        self.events_dir.mkdir(parents=True, exist_ok=True)
-        self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
-        self.receipts_dir.mkdir(parents=True, exist_ok=True)
-        self.tx_dir.mkdir(parents=True, exist_ok=True)
+        for directory in (
+            self.tasks_dir,
+            self.events_dir,
+            self.checkpoints_dir,
+            self.receipts_dir,
+            self.tx_dir,
+        ):
+            if directory.is_symlink():
+                raise ValueError(f"task state directory must not be a symlink: {directory}")
+            directory.mkdir(parents=True, exist_ok=True)
 
     @contextmanager
     def lock(self) -> Generator[None]:
@@ -61,6 +75,8 @@ class TaskStore:
         with self._thread_lock:
             self._ensure_dirs()
             lock_file = self.tasks_dir / ".lock"
+            if lock_file.is_symlink():
+                raise ValueError(f"task lock must not be a symlink: {lock_file}")
             if self._lock_depth == 0:
                 if fcntl is None:
                     raise RuntimeError("Task writer locking is unavailable")

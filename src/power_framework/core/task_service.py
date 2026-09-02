@@ -258,9 +258,9 @@ class TaskService:
                         "Task update contains immutable or unknown fields: "
                         + ", ".join(sorted(unknown_fields))
                     )
-                for field_name, value in values.items():
-                    setattr(task, field_name, value)
-                task = PowerTask.model_validate(task.model_dump())
+                candidate = task.model_dump()
+                candidate.update(values)
+                task = PowerTask.model_validate(candidate)
 
             last_digest = self.store.get_last_event_digest(task_id)
             existing_events = self.store.get_task_events(task_id)
@@ -401,12 +401,13 @@ class TaskService:
         """
         import json
 
-        v1_dir = self.vault_dir / ".power" / "work-packets"
+        control_dir = self.store.power_dir
+        v1_dir = control_dir / "work-packets"
         if not v1_dir.is_dir():
             return {"migrated": 0, "skipped": 0, "errors": 0}
 
-        backup_dir = self.vault_dir / ".power" / "migration" / "v1-backup"
-        manifest_path = self.vault_dir / ".power" / "migration" / "v1_manifest.json"
+        backup_dir = control_dir / "migration" / "v1-backup"
+        manifest_path = control_dir / "migration" / "v1_manifest.json"
         manifest = self._read_migration_manifest(manifest_path)
         migrated_ids = {e["task_id"] for e in manifest.get("entries", [])}
 
@@ -511,11 +512,12 @@ class TaskService:
         Deletes migrated v2 tasks and restores the retained v1 originals. The
         original v1 evidence is only copied back, never destroyed (Phase I).
         """
-        manifest_path = self.vault_dir / ".power" / "migration" / "v1_manifest.json"
+        control_dir = self.store.power_dir
+        manifest_path = control_dir / "migration" / "v1_manifest.json"
         manifest = self._read_migration_manifest(manifest_path)
         entries = manifest.get("entries", [])
-        backup_dir = self.vault_dir / ".power" / "migration" / "v1-backup"
-        v1_dir = self.vault_dir / ".power" / "work-packets"
+        backup_dir = control_dir / "migration" / "v1-backup"
+        v1_dir = control_dir / "work-packets"
         rolled_back = 0
         restored = 0
         for entry in entries:

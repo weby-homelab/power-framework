@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "power-framework"
-version = "3.7.10"
+version = "3.7.11"
 description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -135,6 +135,9 @@ markers = [
 [tool.ruff]
 target-version = "py313"
 line-length = 100
+# Agent/vendor mirrors are validated by their own Skill and runtime gates; they
+# are not part of the Python distribution's source-quality target.
+extend-exclude = [".agents", "skills/power/scripts"]
 
 [tool.ruff.lint]
 select = [

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 import power_framework.experimental.rot_scoring as rot_scoring
+from power_framework.core.egress import SafeHttpResponse
 from power_framework.core.rot_scoring import (
     ContradictionDetector,
     _dense_cosine_similarity,
@@ -250,76 +251,40 @@ class TestContradictionDetectorLLM:
 
     def test_llm_detects_contradiction(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-key")
-        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-internal")
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-sensitive")
         vault = self._make_simple_vault(tmp_path, self.LLM_BODY_A, self.LLM_BODY_B)
 
-        detector = ContradictionDetector(similarity_threshold=0.5)
-
-        import urllib.request
-
-        def mock_urlopen(req, **kwargs):
-            class MockResponse:
-                def __enter__(self):
-                    return self
-
-                def __exit__(self, *args):
-                    pass
-
-                def read(self):
-                    import json
-
-                    return json.dumps(
-                        {
-                            "choices": [
-                                {
-                                    "message": {
-                                        "content": "YES: Port configuration conflict (8080 vs 9090)"
-                                    }
-                                }
-                            ]
-                        }
-                    ).encode("utf-8")
-
-                @property
-                def status(self):
-                    return 200
-
-            return MockResponse()
-
-        monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+        detector = ContradictionDetector(similarity_threshold=0.5, allow_remote_llm=True)
+        monkeypatch.setattr(
+            rot_scoring,
+            "safe_http_request",
+            lambda *_args, **_kwargs: SafeHttpResponse(
+                "https://openrouter.ai/api/v1/chat/completions",
+                200,
+                {},
+                b'{"choices":[{"message":{"content":"YES: Port configuration conflict (8080 vs 9090)"}}]}',
+            ),
+        )
         results = detector.detect(vault)
         assert len(results) >= 1
         assert "port" in results[0][2].lower() or "conflict" in results[0][2].lower()
 
     def test_llm_no_contradiction(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-key")
-        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-internal")
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-sensitive")
         vault = self._make_simple_vault(tmp_path, self.LLM_COMPAT_A, self.LLM_COMPAT_B)
 
-        detector = ContradictionDetector(similarity_threshold=0.5)
-
-        import urllib.request
-
-        def mock_urlopen(req, **kwargs):
-            class MockResponse:
-                def __enter__(self):
-                    return self
-
-                def __exit__(self, *args):
-                    pass
-
-                def read(self):
-                    import json
-
-                    return json.dumps({"choices": [{"message": {"content": "NO"}}]}).encode("utf-8")
-
-                @property
-                def status(self):
-                    return 200
-
-            return MockResponse()
-
-        monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+        detector = ContradictionDetector(similarity_threshold=0.5, allow_remote_llm=True)
+        monkeypatch.setattr(
+            rot_scoring,
+            "safe_http_request",
+            lambda *_args, **_kwargs: SafeHttpResponse(
+                "https://openrouter.ai/api/v1/chat/completions",
+                200,
+                {},
+                b'{"choices":[{"message":{"content":"NO"}}]}',
+            ),
+        )
         results = detector.detect(vault)
         assert len(results) == 0
 

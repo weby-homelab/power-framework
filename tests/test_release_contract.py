@@ -17,7 +17,7 @@ def test_release_manifest_has_one_native_profile_and_web_adapter() -> None:
     assert manifest["schema"] == "power.release.manifest.template.v1"
     assert manifest["authority"] == "candidate-only"
     assert manifest["generated_manifest"] == "dist/power-release-manifest.json"
-    assert manifest["version"] == "3.7.10"
+    assert manifest["version"] == "3.7.11"
     assert manifest["artifacts"] == {}
     assert manifest["profiles"]["native"] == ["power", "power-mcp"]
     assert manifest["profiles"]["web"] == ["power-web"]
@@ -38,7 +38,9 @@ def test_release_manifest_has_one_native_profile_and_web_adapter() -> None:
 
 def test_native_install_requires_exact_release_inputs(tmp_path: Path) -> None:
     plan = build_native_install_plan(home=tmp_path)
-    assert plan["schema"] == "power.native-install.v1"
+    assert plan["schema"] == "power.native-install.v2"
+    assert plan["installer_version"] == 2
+    assert len(plan["plan_hash"]) == 64
     assert plan["status"] == "blocked"
     assert "release manifest" in plan["reason"]
 

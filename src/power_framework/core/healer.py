@@ -36,7 +36,7 @@ from .parser import (
     parse_frontmatter,
     read_file_content,
 )
-from .utils import atomic_write, create_backup
+from .utils import atomic_write, create_backup, iter_vault_markdown_files
 
 logger = logging.getLogger(__name__)
 
@@ -380,7 +380,7 @@ def heal_vault_report(
     """
     report = HealReport(vault_dir=vault_dir, dry_run=dry_run)
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = filepath.relative_to(vault_dir)
         if should_skip(vault_dir, rel.as_posix()):
             continue
@@ -464,7 +464,7 @@ def propagate_rename(
     old_rel = old_rel_path.replace("\\", "/").strip()
     new_rel = new_rel_path.replace("\\", "/").strip()
 
-    for filepath in vault_dir.rglob("*.md"):
+    for filepath in iter_vault_markdown_files(vault_dir):
         rel = str(filepath.relative_to(vault_dir)).replace("\\", "/")
         if any(part in DEFAULT_EXCLUDED for part in filepath.relative_to(vault_dir).parts):
             continue

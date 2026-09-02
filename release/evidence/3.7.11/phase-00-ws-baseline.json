@@ -1,0 +1,35 @@
+{
+  "schema": "power.release.evidence.phase-00-ws-baseline.v1",
+  "repository": "weby-homelab/power-framework",
+  "host": "WS",
+  "platform": "Linux",
+  "branch": "fix/power-3.7.11-critical-stabilization",
+  "head": "1a9879ee2353d63d979da5f68e79a6065122343b",
+  "head_tree": "b8079149c2001843cb796c0894201a69195fcae3",
+  "origin_main": "1a9879ee2353d63d979da5f68e79a6065122343b",
+  "pr_381_head": "7930e22f5fe548ab7a38e204ca9c5b207fadb552",
+  "worktree": {
+    "dirty": true,
+    "tracked_modified_entries": 49,
+    "staged_entries": 0,
+    "untracked": [
+      {
+        "path": "src/power_framework/mcp/contract.py",
+        "classification": "SOURCE"
+      },
+      {
+        "path": "tests/test_legacy_mcp_wrapper.py",
+        "classification": "TEST"
+      }
+    ]
+  },
+  "signature_observation": {
+    "status": "not_verified",
+    "reason": "HEAD signature key is not available in the local keyring"
+  },
+  "policy": {
+    "source_of_truth": "local worktree plus verified remote refs",
+    "historical_pr_381_evidence_is_not_current_release_proof": true,
+    "secrets_and_credentials_excluded": true
+  }
+}

@@ -74,8 +74,8 @@
                     "type": "object",
                     "required": ["local_only", "egress", "approval"],
                     "properties": {
-                      "local_only": { "const": true },
-                      "egress": { "enum": ["none", "model_download"] },
+                      "local_only": { "type": "boolean" },
+                      "egress": { "enum": ["none", "model_download", "network"] },
                       "approval": { "enum": ["none", "caller", "explicit"] }
                     },
                     "additionalProperties": false
