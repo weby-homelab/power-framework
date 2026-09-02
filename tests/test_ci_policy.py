@@ -380,7 +380,8 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     )
     assert "gh attestation verify" in attestation_step["run"]
     assert "--bundle-from-oci" in attestation_step["run"]
-    assert "--signer-workflow .github/workflows/release.yml" in attestation_step["run"]
+    assert '--cert-identity "$attestation_identity"' in attestation_step["run"]
+    assert '--source-revision "$GITHUB_SHA"' in attestation_step["run"]
     assert "verify_attestation_provenance.py" in attestation_step["run"]
     assert attestation_step["run"].count("power-native-requirements.txt") >= 2
     assert attestation_step["run"].count("verify_attestation_provenance.py") == 4
