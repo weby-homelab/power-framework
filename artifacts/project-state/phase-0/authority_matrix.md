@@ -103,14 +103,14 @@ For `ProjectEvent` v1, Phase 1 must **explicitly decide via an ADR** whether to:
 ### Current Coordination Layers in POWER 3.7.11
 The system currently operates two distinct, critical synchronization mechanisms:
 1. **Vault Mutation Lock** (`src/power_framework/core/mutation.py:69-99`):
-   - In-process `threading.RLock` + cross-process advisory file lock (`.power/vault.lock`).
+   - In-process `threading.RLock` + cross-process advisory file lock (`.power/mutation.lock`).
    - Serializes vault-wide write mutations (`execute_vault_mutation`).
 2. **TaskStore Lock & Crash-Recovery Transaction** (`src/power_framework/core/task_store.py:72-108, 366-432`):
-   - In-process `threading.RLock` + cross-process file lock (`.power/tasks/.tasks.lock`).
+   - In-process `threading.RLock` + cross-process file lock (`.power/tasks/.lock`).
    - Two-phase crash-recovery transaction manifest (`.power/tasks/.tx/<tx_id>/manifest.json`) supporting atomic multi-artifact writes (task snapshot, event append, checkpoint, receipt) with automatic rollback and crash reconciliation (`recover()`).
 
 ### Identified Concurrency & Deadlock Risks
-- If PSE introduces a third independent lock (e.g. `project_state.lock`) without a defined acquisition order, any cross-subsystem workflow (e.g. updating task and recording PSE event) can deadlock if caller A acquires `vault.lock` then `task.lock` then `pse.lock`, while caller B acquires `pse.lock` then `task.lock`.
+- If PSE introduces a third independent lock (e.g. `project_state.lock`) without a defined acquisition order, any cross-subsystem workflow (e.g. updating task and recording PSE event) can deadlock if caller A acquires `mutation.lock` then `tasks/.lock` then `pse.lock`, while caller B acquires `pse.lock` then `tasks/.lock`.
 - If PSE attempts distributed 2-phase commits or synchronous dual-writes with `TaskStore` or `DecisionService`, network or process crashes can cause dual-write corruption, orphan manifests, or inconsistent split-brain states.
 
 ### Phase 1 ADR Mandate

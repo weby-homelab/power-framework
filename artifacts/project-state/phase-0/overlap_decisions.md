@@ -114,8 +114,8 @@
 ## 3. Транзакційні шари, блокування та ризики координації
 
 В архітектурі POWER 3.7.11 наразі функціонують щонайменше два незалежні координаційні шари:
-1. `vault mutation lock` (`core/mutation.py:69-99`): in-process `RLock` + міжпроцесне блокування `.power/vault.lock` для мутацій ваулту.
-2. `TaskStore lock + TaskStore crash-recovery transaction` (`core/task_store.py:72-108, 366-432`): міжпроцесне блокування `.power/tasks/.tasks.lock` та транзакційні маніфести відновлення після збоїв.
+1. `vault mutation lock` (`core/mutation.py:69-99`): in-process `RLock` + міжпроцесне блокування `.power/mutation.lock` для мутацій ваулту.
+2. `TaskStore lock + TaskStore crash-recovery transaction` (`core/task_store.py:72-108, 366-432`): міжпроцесне блокування `.power/tasks/.lock` та транзакційні маніфести відновлення після збоїв.
 
 ### Ризики взаємних блокувань та подвійного запису:
 - Додавання третього блокування без чіткої ієрархії може призвести до deadlocks при паралельних крос-сервісних операціях.
