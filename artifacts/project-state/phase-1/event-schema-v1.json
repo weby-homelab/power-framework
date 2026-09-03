@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://power.framework/schemas/project-event-v1.json",
+  "title": "ProjectEventV1",
+  "description": "Canonical append-only ledger event schema for POWER Project State Engine (PSE) v1.",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Unique deterministic or random identifier for the event",
+      "pattern": "^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "maxLength": 132
+    },
+    "schema_version": {
+      "type": "string",
+      "description": "Schema version indicator for forward/backward compatibility",
+      "enum": [
+        "1.0",
+        "power.project-event.v1"
+      ]
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Canonical project identifier independent of filesystem paths",
+      "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$",
+      "maxLength": 68
+    },
+    "sequence": {
+      "type": "integer",
+      "description": "Strictly monotonically increasing positive integer within the project event stream",
+      "minimum": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 UTC timestamp of event generation",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?(?:Z|\\+00:00)$"
+    },
+    "actor": {
+      "type": "string",
+      "description": "Qualified entity originating the mutation (e.g. agent:agy, user:admin)",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source": {
+      "type": "string",
+      "description": "Subsystem or transport channel (e.g. cli, mcp, internal_engine, reconciliation)",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "session_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional conversational or operational session identifier",
+      "maxLength": 128
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Canonical domain event taxonomy classification",
+      "enum": [
+        "project.created",
+        "project.updated",
+        "project.renamed",
+        "project.relocated",
+        "project.phase.proposed",
+        "project.phase.changed",
+        "project.archived",
+        "project.reopened",
+        "session.started",
+        "session.ended",
+        "task.associated",
+        "task.disassociated",
+        "task.created",
+        "task.updated",
+        "task.completed",
+        "decision.associated",
+        "decision.disassociated",
+        "decision.proposed",
+        "decision.accepted",
+        "decision.rejected",
+        "decision.superseded",
+        "risk.opened",
+        "risk.updated",
+        "risk.closed",
+        "assumption.created",
+        "assumption.updated",
+        "assumption.invalidated",
+        "assumption.confirmed",
+        "issue.opened",
+        "issue.updated",
+        "issue.resolved",
+        "issue.closed",
+        "dependency.created",
+        "dependency.updated",
+        "dependency.resolved",
+        "raci.assigned",
+        "raci.revoked",
+        "dor.evaluated",
+        "dod.evaluated",
+        "gate.overridden",
+        "artifact.created",
+        "artifact.updated",
+        "observation.recorded",
+        "lesson.recorded",
+        "evidence.attached"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "description": "Domain-specific structured data associated with the event",
+      "additionalProperties": true
+    },
+    "payload_digest": {
+      "type": "string",
+      "description": "SHA-256 hex digest of the canonical JSON encoded payload",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prev_event_hash": {
+      "type": "string",
+      "description": "SHA-256 hex digest of the immediate predecessor event_hash (empty string for sequence 1)",
+      "pattern": "^([0-9a-f]{64})?$"
+    },
+    "event_hash": {
+      "type": "string",
+      "description": "SHA-256 cryptographic digest binding header, sequence, prev_hash, and payload_digest",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact_refs": {
+      "type": "array",
+      "description": "Relative paths or URIs of artifacts bound or mutated by this event",
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "References to verified receipts, test logs, or cryptographic hashes confirming validity",
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "correlation_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Identifier tying multiple events across subsystems into a single user action",
+      "maxLength": 128
+    },
+    "causation_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Direct predecessor event_id or command_id that triggered this event",
+      "maxLength": 128
+    },
+    "idempotency_key": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Client-supplied idempotency key preventing duplicate event emission",
+      "maxLength": 128
+    }
+  },
+  "required": [
+    "event_id",
+    "schema_version",
+    "project_id",
+    "sequence",
+    "timestamp",
+    "actor",
+    "source",
+    "event_type",
+    "payload",
+    "payload_digest",
+    "prev_event_hash",
+    "event_hash",
+    "artifact_refs",
+    "evidence_refs"
+  ],
+  "additionalProperties": false
+}

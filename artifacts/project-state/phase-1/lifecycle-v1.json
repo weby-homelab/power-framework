@@ -1,0 +1,265 @@
+{
+  "schema_version": "1.0",
+  "name": "POWER Project Lifecycle State Machine v1",
+  "states": [
+    {
+      "name": "DISCOVERY",
+      "description": "Initial ideation, charter drafting, feasibility study, and objective definition.",
+      "is_terminal": false
+    },
+    {
+      "name": "PLANNING",
+      "description": "Work breakdown, architecture definition, task mapping, RAID identification, and DoR gate validation.",
+      "is_terminal": false
+    },
+    {
+      "name": "EXECUTION",
+      "description": "Active task execution, code/artifact generation, decision execution, and incremental delivery.",
+      "is_terminal": false
+    },
+    {
+      "name": "MONITORING",
+      "description": "Progress tracking, health telemetry check, quality gate reviews, and risk monitoring.",
+      "is_terminal": false
+    },
+    {
+      "name": "CLOSING",
+      "description": "Postcondition verification, DoD gate evaluation, final completion receipts consolidation, and handover.",
+      "is_terminal": false
+    },
+    {
+      "name": "CLOSED",
+      "description": "Durable terminal state; deliverables archived and project state sealed.",
+      "is_terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "from_state": "DISCOVERY",
+      "to_state": "PLANNING",
+      "name": "advance_to_planning",
+      "description": "Charter agreed, baseline objectives defined.",
+      "preconditions": [
+        "charter_present",
+        "owner_assigned"
+      ],
+      "required_gate": "dor_discovery_to_planning",
+      "approval_required": false,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "DISCOVERY",
+      "to_state": "CLOSED",
+      "name": "cancel_during_discovery",
+      "description": "Project abandoned or deemed unfeasible during discovery.",
+      "preconditions": [
+        "cancellation_reason_provided"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "PLANNING",
+      "to_state": "EXECUTION",
+      "name": "start_execution",
+      "description": "Work breakdown complete, initial tasks ready, DoR passed.",
+      "preconditions": [
+        "dor_passed_or_overridden",
+        "raci_accountable_assigned",
+        "initial_tasks_registered"
+      ],
+      "required_gate": "dor_planning_to_execution",
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "PLANNING",
+      "to_state": "DISCOVERY",
+      "name": "revert_to_discovery",
+      "description": "Scope fundamental uncertainty identified during planning.",
+      "preconditions": [
+        "reversion_justification_recorded"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": true
+    },
+    {
+      "from_state": "PLANNING",
+      "to_state": "CLOSED",
+      "name": "cancel_during_planning",
+      "description": "Project canceled prior to execution.",
+      "preconditions": [
+        "cancellation_reason_provided"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "EXECUTION",
+      "to_state": "MONITORING",
+      "name": "enter_monitoring",
+      "description": "Periodic checkpoint or steady-state monitoring during execution.",
+      "preconditions": [],
+      "required_gate": null,
+      "approval_required": false,
+      "evidence_required": false,
+      "is_rollback": false
+    },
+    {
+      "from_state": "EXECUTION",
+      "to_state": "PLANNING",
+      "name": "replanning_from_execution",
+      "description": "Major scope change, architecture pivot, or invalidated core assumption.",
+      "preconditions": [
+        "replanning_justification_recorded"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": true
+    },
+    {
+      "from_state": "EXECUTION",
+      "to_state": "CLOSING",
+      "name": "begin_closing",
+      "description": "All execution deliverables completed; enter verification and sign-off.",
+      "preconditions": [
+        "all_tasks_terminal",
+        "no_blocking_issues"
+      ],
+      "required_gate": "dod_execution_to_closing",
+      "approval_required": false,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "EXECUTION",
+      "to_state": "CLOSED",
+      "name": "abort_execution",
+      "description": "Project terminated mid-execution.",
+      "preconditions": [
+        "termination_reason_recorded"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "MONITORING",
+      "to_state": "EXECUTION",
+      "name": "resume_active_execution",
+      "description": "Returning to active task implementation following monitoring checkpoint.",
+      "preconditions": [],
+      "required_gate": null,
+      "approval_required": false,
+      "evidence_required": false,
+      "is_rollback": false
+    },
+    {
+      "from_state": "MONITORING",
+      "to_state": "PLANNING",
+      "name": "replanning_from_monitoring",
+      "description": "Monitoring detected severe divergence or risk materialization requiring replanning.",
+      "preconditions": [
+        "replanning_justification_recorded"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": true
+    },
+    {
+      "from_state": "MONITORING",
+      "to_state": "CLOSING",
+      "name": "conclude_from_monitoring",
+      "description": "Monitoring confirms all deliverables met; proceed to closing.",
+      "preconditions": [
+        "all_tasks_terminal",
+        "no_blocking_issues"
+      ],
+      "required_gate": "dod_execution_to_closing",
+      "approval_required": false,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "MONITORING",
+      "to_state": "CLOSED",
+      "name": "terminate_from_monitoring",
+      "description": "Project aborted during monitoring phase.",
+      "preconditions": [
+        "termination_reason_recorded"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "CLOSING",
+      "to_state": "EXECUTION",
+      "name": "reject_closing_to_execution",
+      "description": "DoD verification failed or punch-list items rejected; return to execution.",
+      "preconditions": [
+        "closing_failure_reason_recorded"
+      ],
+      "required_gate": null,
+      "approval_required": false,
+      "evidence_required": true,
+      "is_rollback": true
+    },
+    {
+      "from_state": "CLOSING",
+      "to_state": "CLOSED",
+      "name": "finalize_close",
+      "description": "DoD fully satisfied, completion receipts verified, project officially closed.",
+      "preconditions": [
+        "dod_passed_or_overridden",
+        "all_tasks_terminal",
+        "all_decisions_resolved",
+        "all_issues_resolved_or_waived"
+      ],
+      "required_gate": "dod_final_closing",
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": false
+    },
+    {
+      "from_state": "CLOSED",
+      "to_state": "PLANNING",
+      "name": "reopen_to_planning",
+      "description": "Archived/closed project reopened for new phase or major rework.",
+      "preconditions": [
+        "reopen_justification_recorded",
+        "accountable_approval"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": true
+    },
+    {
+      "from_state": "CLOSED",
+      "to_state": "EXECUTION",
+      "name": "reopen_to_execution",
+      "description": "Immediate hotfix or defect discovery on closed project requiring execution.",
+      "preconditions": [
+        "reopen_justification_recorded",
+        "accountable_approval"
+      ],
+      "required_gate": null,
+      "approval_required": true,
+      "evidence_required": true,
+      "is_rollback": true
+    }
+  ]
+}

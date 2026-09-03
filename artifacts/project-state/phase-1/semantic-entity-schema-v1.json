@@ -1,0 +1,732 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://power.framework/schemas/semantic-entity-schema-v1.json",
+  "title": "SemanticEntitiesV1",
+  "description": "JSON Schema for Project State Engine (PSE) semantic entities: Project, RAID, RACI, DoR/DoD, and Provenance.",
+  "$defs": {
+    "Provenance": {
+      "type": "object",
+      "description": "Mandatory audit and origin metadata for every semantic entity",
+      "properties": {
+        "source_event_id": {
+          "type": "string",
+          "pattern": "^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "event_replay",
+            "direct_mutation",
+            "reconciliation",
+            "agent_inference"
+          ]
+        },
+        "correlation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "source_event_id",
+        "actor",
+        "timestamp",
+        "source_type"
+      ],
+      "additionalProperties": false
+    },
+    "Project": {
+      "type": "object",
+      "description": "Project aggregate domain entity",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "charter": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "DISCOVERY",
+            "PLANNING",
+            "EXECUTION",
+            "MONITORING",
+            "CLOSING",
+            "CLOSED"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "repo_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "vault_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "task_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decision_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "project_id",
+        "title",
+        "state",
+        "owner",
+        "task_refs",
+        "decision_refs",
+        "tags",
+        "provenance",
+        "created_at",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "Risk": {
+      "type": "object",
+      "description": "Risk entity in RAID log",
+      "properties": {
+        "risk_id": {
+          "type": "string",
+          "pattern": "^rsk_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "probability": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "impact": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "mitigation_plan": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "identified",
+            "mitigated",
+            "materialized",
+            "retired"
+          ]
+        },
+        "related_task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "risk_id",
+        "project_id",
+        "title",
+        "probability",
+        "impact",
+        "owner",
+        "status",
+        "provenance",
+        "created_at",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "Assumption": {
+      "type": "object",
+      "description": "Assumption entity in RAID log",
+      "properties": {
+        "assumption_id": {
+          "type": "string",
+          "pattern": "^asm_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "valid",
+            "invalidated",
+            "confirmed"
+          ]
+        },
+        "validated_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "invalidated_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "assumption_id",
+        "project_id",
+        "statement",
+        "confidence",
+        "status",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Issue": {
+      "type": "object",
+      "description": "Issue entity in RAID log",
+      "properties": {
+        "issue_id": {
+          "type": "string",
+          "pattern": "^iss_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "minor",
+            "major",
+            "critical",
+            "blocker"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "investigating",
+            "resolved",
+            "closed"
+          ]
+        },
+        "blocking_task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resolution": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "issue_id",
+        "project_id",
+        "title",
+        "severity",
+        "status",
+        "blocking_task_ids",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Dependency": {
+      "type": "object",
+      "description": "Typed cross-entity dependency in RAID log",
+      "properties": {
+        "dependency_id": {
+          "type": "string",
+          "pattern": "^dep_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "source_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "target_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "target_type": {
+          "type": "string",
+          "enum": [
+            "task",
+            "decision",
+            "artifact",
+            "project",
+            "external"
+          ]
+        },
+        "dependency_kind": {
+          "type": "string",
+          "enum": [
+            "blocks",
+            "blocked_by",
+            "relates_to",
+            "requires"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "satisfied",
+            "broken"
+          ]
+        },
+        "external_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "dependency_id",
+        "project_id",
+        "source_id",
+        "target_id",
+        "target_type",
+        "dependency_kind",
+        "status",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "RACI": {
+      "type": "object",
+      "description": "RACI matrix mapping for a project or deliverable scope",
+      "properties": {
+        "raci_id": {
+          "type": "string",
+          "pattern": "^raci_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "scope_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "responsible": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "accountable": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Strictly exactly one single actor accountable for delivery"
+        },
+        "consulted": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "informed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "raci_id",
+        "project_id",
+        "scope_ref",
+        "responsible",
+        "accountable",
+        "consulted",
+        "informed",
+        "provenance",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "DoRDoDRule": {
+      "type": "object",
+      "description": "Machine-evaluable DoR/DoD quality gate rule definition",
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{2,64}$"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "dor",
+            "dod"
+          ]
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "DISCOVERY",
+            "PLANNING",
+            "EXECUTION",
+            "MONITORING",
+            "CLOSING",
+            "CLOSED"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "predicate_kind": {
+          "type": "string",
+          "enum": [
+            "all_tasks_terminal",
+            "no_open_blockers",
+            "receipt_present",
+            "assumption_validated",
+            "file_exists",
+            "metric_threshold",
+            "custom_script"
+          ]
+        },
+        "predicate_params": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "blocking",
+            "advisory"
+          ]
+        }
+      },
+      "required": [
+        "rule_id",
+        "category",
+        "phase",
+        "description",
+        "predicate_kind",
+        "predicate_params",
+        "severity"
+      ],
+      "additionalProperties": false
+    },
+    "GateEvaluation": {
+      "type": "object",
+      "description": "Durable record of a quality gate evaluation run",
+      "properties": {
+        "evaluation_id": {
+          "type": "string",
+          "pattern": "^gate_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "gate_type": {
+          "type": "string",
+          "enum": [
+            "dor",
+            "dod"
+          ]
+        },
+        "target_phase": {
+          "type": "string",
+          "enum": [
+            "DISCOVERY",
+            "PLANNING",
+            "EXECUTION",
+            "MONITORING",
+            "CLOSING",
+            "CLOSED"
+          ]
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "rule_evaluations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule_id": {
+                "type": "string"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "evidence_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule_id",
+              "passed",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "overall_status": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "overridden"
+          ]
+        },
+        "override": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "overridden_by": {
+              "type": "string"
+            },
+            "justification": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "approved_by": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "overridden_by",
+            "justification",
+            "timestamp",
+            "approved_by"
+          ],
+          "additionalProperties": false
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "evaluated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "evaluation_id",
+        "project_id",
+        "gate_type",
+        "target_phase",
+        "passed",
+        "rule_evaluations",
+        "overall_status",
+        "provenance",
+        "evaluated_at"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Project"
+    },
+    {
+      "$ref": "#/$defs/Risk"
+    },
+    {
+      "$ref": "#/$defs/Assumption"
+    },
+    {
+      "$ref": "#/$defs/Issue"
+    },
+    {
+      "$ref": "#/$defs/Dependency"
+    },
+    {
+      "$ref": "#/$defs/RACI"
+    },
+    {
+      "$ref": "#/$defs/DoRDoDRule"
+    },
+    {
+      "$ref": "#/$defs/GateEvaluation"
+    }
+  ]
+}
