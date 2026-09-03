@@ -1,0 +1,14 @@
+=== POWER PSE PHASE 2 REDACTION & PRIVACY BOUNDARY TEST LOG ===
+Timestamp: 2026-09-03T21:05:10Z
+
+[TEST 1] Deterministic Secret Scrubbing Pipeline
+  - Total replacements: 8
+  - Detected secret classes: ['aws_access_key', 'bearer_token', 'credential_pair', 'env_secret', 'github_token', 'private_key']
+  - Clean field preserved: True
+  - Raw secrets present in output: False
+
+[TEST 2] Operational Privacy Modes Verification
+  - PrivacyMode.METADATA_ONLY payload: {'_privacy_mode': 'metadata-only', 'keys': ['name', 'rationale'], 'event_type': 'project.created'}
+  - PrivacyMode.STRUCTURED_EVENTS payload dialogue purged: True
+  - PrivacyMode.FULL_CONTENT evidence_refs: ['sha256:d3b631e44d94a635d3514e5738499c97a732aca0e4e7e7067775abff16dcef87']
+  - Raw evidence stored locally under .power/raw-evidence/: True

@@ -14,13 +14,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 import pytest
 
+from power_framework.core.canonical_json import (
+    canonical_json_dumps,
+    compute_event_hash,
+    compute_payload_digest,
+)
 from power_framework.core.task_models import TERMINAL_STATES
 
 PHASE1_DIR = Path(__file__).parent.parent / "artifacts" / "project-state" / "phase-1"
@@ -47,50 +51,6 @@ def lifecycle_contract() -> dict[str, Any]:
         return json.load(f)
 
 
-# NOTE: In Phase 2, the POWER Canonical JSON v1 serializer will be implemented in a single
-# authoritative production core module (e.g. core/canonical_json.py), from which all tests
-# and runtime services will import it.
-def canonical_json_dumps(data: Any) -> str:
-    """POWER Canonical JSON v1 authoritative serialization contract for ProjectEvent v1.
-
-    POWER Canonical JSON v1 is the authoritative serialization contract for ProjectEvent v1.
-    It is intentionally defined by POWER and does NOT claim full RFC 8785 / JCS compliance.
-    All ProjectEvent hashes in schema v1 MUST use exactly this canonicalization algorithm.
-
-    Contract:
-        json.dumps(
-            value,
-            sort_keys=True,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            allow_nan=False,
-        )
-    Encoding: UTF-8 without BOM. Non-finite numbers (NaN, Infinity, -Infinity) are rejected fail-closed.
-    """
-
-    def _check_floats(obj: Any) -> None:
-        if isinstance(obj, float):
-            if math.isnan(obj) or math.isinf(obj):
-                raise ValueError("NaN and Infinity values are strictly forbidden in canonical JSON")
-        elif isinstance(obj, dict):
-            for v in obj.values():
-                _check_floats(v)
-        elif isinstance(obj, (list, tuple)):
-            for item in obj:
-                _check_floats(item)
-
-    _check_floats(data)
-    return json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-
-
-def compute_payload_digest(payload: dict[str, Any]) -> str:
-    return hashlib.sha256(canonical_json_dumps(payload).encode("utf-8")).hexdigest()
-
-
-def compute_event_hash(event: dict[str, Any]) -> str:
-    """Full envelope hash computed over integrity_record (canonical ProjectEvent excluding ONLY event_hash)."""
-    integrity_record = {k: v for k, v in event.items() if k != "event_hash"}
-    return hashlib.sha256(canonical_json_dumps(integrity_record).encode("utf-8")).hexdigest()
 
 
 def make_valid_event(

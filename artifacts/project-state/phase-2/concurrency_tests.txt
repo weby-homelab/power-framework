@@ -1,0 +1,17 @@
+=== POWER PSE PHASE 2 CONCURRENCY & LOCK HIERARCHY TEST LOG ===
+Timestamp: 2026-09-03T21:05:05Z
+
+[TEST 1] Multi-Threaded Concurrent Append Stress Test
+  - Threads: 10, Writes per thread: 5, Total expected: 50
+  - Completed in 0.0914 seconds (547.2 appends/sec)
+  - Total events written: 50 (expected 50)
+  - Sequence monotonicity verified: True
+  - Ledger cryptographic verification: valid=True, errors count=0
+
+[TEST 2] Fine-Grained Project Isolation (Zero Cross-Project Contention)
+  - Project 1 events: 10, valid=True
+  - Project 2 events: 10, valid=True
+
+[TEST 3] Lock Hierarchy Violation Enforcement (ADR-PSE-007)
+  - Acquired Level 3 lock
+  - Success: Caught expected violation: Lock hierarchy violation: cannot acquire Level 2 while holding Level 3. Locks must strictly be acquired in ascending order (Level 1: Mutation -> Level 2: Task -> Level 3: Project).

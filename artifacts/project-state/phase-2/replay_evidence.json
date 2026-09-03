@@ -1,0 +1,133 @@
+{
+  "project_id": "prj_replay_evidence",
+  "verification_result": {
+    "valid": true,
+    "event_count": 5,
+    "last_sequence": 5,
+    "last_event_hash": "1a1797f2e359d6d02c08e98c8c9065f272f0716de9c178bac30614c2eb81ce1f",
+    "errors": []
+  },
+  "events_count": 5,
+  "events": [
+    {
+      "event_id": "evt_prj_replay_evidence_1_c306fa89f2c3",
+      "schema_version": "power.project-event.v1",
+      "project_id": "prj_replay_evidence",
+      "sequence": 1,
+      "timestamp": "2026-09-03T18:04:58.088280Z",
+      "actor": "user:rekvizitor",
+      "source": "cli",
+      "session_id": null,
+      "event_type": "project.created",
+      "payload": {
+        "name": "Replay Verification Project",
+        "objective": "Verify G2.1 gate"
+      },
+      "payload_digest": "e4f0778947863e6690941bfa3dee7b3e2a2726c0cb27e8f3eaa95c81a4892848",
+      "prev_event_hash": "",
+      "event_hash": "c60c85faa39250a369328eba3bee262f66d0df8c8a9833a8c01d763a3f4affbb",
+      "artifact_refs": [],
+      "evidence_refs": [],
+      "correlation_id": "corr_replay_001",
+      "causation_id": null,
+      "idempotency_key": null
+    },
+    {
+      "event_id": "evt_prj_replay_evidence_2_170b2dedebf8",
+      "schema_version": "power.project-event.v1",
+      "project_id": "prj_replay_evidence",
+      "sequence": 2,
+      "timestamp": "2026-09-03T18:04:58.090935Z",
+      "actor": "user:rekvizitor",
+      "source": "cli",
+      "session_id": null,
+      "event_type": "project.phase.changed",
+      "payload": {
+        "new_phase": "phase_1_discovery",
+        "rationale": "Charter approved"
+      },
+      "payload_digest": "eff79e82fb685ded8c6e883dc23de2fc8af1b7d2c01fb410546b67bd770e9975",
+      "prev_event_hash": "c60c85faa39250a369328eba3bee262f66d0df8c8a9833a8c01d763a3f4affbb",
+      "event_hash": "e7d32defbe387e7bc4c6366149eb406c5f77430ffb5c83ea8301cb83ddffe13f",
+      "artifact_refs": [],
+      "evidence_refs": [],
+      "correlation_id": "corr_replay_001",
+      "causation_id": null,
+      "idempotency_key": null
+    },
+    {
+      "event_id": "evt_prj_replay_evidence_3_2cd25076904c",
+      "schema_version": "power.project-event.v1",
+      "project_id": "prj_replay_evidence",
+      "sequence": 3,
+      "timestamp": "2026-09-03T18:04:58.092461Z",
+      "actor": "user:rekvizitor",
+      "source": "cli",
+      "session_id": null,
+      "event_type": "raci.assigned",
+      "payload": {
+        "actor": "user:rekvizitor",
+        "role": "Accountable"
+      },
+      "payload_digest": "ea15206e53167aa334c6a6c82a8e66b855e5d4072dde943c5424f5dd5ec8e265",
+      "prev_event_hash": "e7d32defbe387e7bc4c6366149eb406c5f77430ffb5c83ea8301cb83ddffe13f",
+      "event_hash": "226c9ff17525ed4d949db641303738d200d010ed106aa8a996b4a7beceb5b286",
+      "artifact_refs": [],
+      "evidence_refs": [],
+      "correlation_id": "corr_replay_001",
+      "causation_id": null,
+      "idempotency_key": null
+    },
+    {
+      "event_id": "evt_prj_replay_evidence_4_9edc0ac10846",
+      "schema_version": "power.project-event.v1",
+      "project_id": "prj_replay_evidence",
+      "sequence": 4,
+      "timestamp": "2026-09-03T18:04:58.093989Z",
+      "actor": "agent:agy",
+      "source": "internal_engine",
+      "session_id": null,
+      "event_type": "risk.opened",
+      "payload": {
+        "risk_id": "rsk_001",
+        "severity": "medium",
+        "title": "Concurrency contention"
+      },
+      "payload_digest": "d3bb4456929688dbe9197eb7451e7c6eb5dbed6a04cd65896accc3b7df0dd52d",
+      "prev_event_hash": "226c9ff17525ed4d949db641303738d200d010ed106aa8a996b4a7beceb5b286",
+      "event_hash": "8184a950a293159bad5d3e791917c3271e2fcffebcba60443069d24bdf124dd4",
+      "artifact_refs": [],
+      "evidence_refs": [],
+      "correlation_id": "corr_replay_001",
+      "causation_id": null,
+      "idempotency_key": null
+    },
+    {
+      "event_id": "evt_prj_replay_evidence_5_ad896eaf155f",
+      "schema_version": "power.project-event.v1",
+      "project_id": "prj_replay_evidence",
+      "sequence": 5,
+      "timestamp": "2026-09-03T18:04:58.095563Z",
+      "actor": "agent:agy",
+      "source": "internal_engine",
+      "session_id": null,
+      "event_type": "dod.evaluated",
+      "payload": {
+        "checklist": [
+          "contracts frozen",
+          "tests pass"
+        ],
+        "passed": true,
+        "phase": "phase_1_discovery"
+      },
+      "payload_digest": "173c3a90db6e322704220a7b53d857b096ca0c181592d5841b97778a5c755723",
+      "prev_event_hash": "8184a950a293159bad5d3e791917c3271e2fcffebcba60443069d24bdf124dd4",
+      "event_hash": "1a1797f2e359d6d02c08e98c8c9065f272f0716de9c178bac30614c2eb81ce1f",
+      "artifact_refs": [],
+      "evidence_refs": [],
+      "correlation_id": "corr_replay_001",
+      "causation_id": null,
+      "idempotency_key": null
+    }
+  ]
+}
