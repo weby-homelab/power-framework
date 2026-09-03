@@ -19,23 +19,30 @@ import fcntl
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 from power_framework.core.canonical_json import (
     canonical_json_dumps,
+    compute_command_fingerprint,
     compute_event_hash,
     compute_payload_digest,
 )
+from power_framework.core.lock_tracker import (
+    LockHierarchyTracker,
+)
 from power_framework.core.project_models import (
     AppendCommand,
+    IdempotencyConflictError,
+    LedgerIntegrityError,
     LedgerVerificationResult,
     ProjectEvent,
     validate_project_id,
@@ -48,44 +55,7 @@ class LockAcquisitionTimeoutError(TimeoutError):
     """Raised when lock acquisition exceeds the configured timeout."""
 
 
-class LockHierarchyTracker:
-    """Thread-local tracker for the strict 3-level lock acquisition hierarchy (ADR-PSE-007).
-
-    Level 1: Vault Mutation Lock (.power/mutation.lock)
-    Level 2: TaskStore Process Lock (.power/tasks/.lock)
-    Level 3: PSE Project Process Lock (.power/projects/<project_id>/.lock)
-    """
-
-    LEVEL_MUTATION = 1
-    LEVEL_TASK = 2
-    LEVEL_PROJECT = 3
-
-    _local = threading.local()
-
-    @classmethod
-    def get_held_levels(cls) -> list[int]:
-        if not hasattr(cls._local, "levels"):
-            cls._local.levels = []
-        return cast("list[int]", cls._local.levels)
-
-    @classmethod
-    def push_level(cls, level: int) -> None:
-        held = cls.get_held_levels()
-        if held and max(held) > level:
-            raise RuntimeError(
-                f"Lock hierarchy violation: cannot acquire Level {level} while holding Level {max(held)}. "
-                "Locks must strictly be acquired in ascending order (Level 1: Mutation -> Level 2: Task -> Level 3: Project)."
-            )
-        held.append(level)
-
-    @classmethod
-    def pop_level(cls, level: int) -> None:
-        held = cls.get_held_levels()
-        if held and held[-1] == level:
-            held.pop()
-        elif level in held:
-            held.remove(level)
-
+ROTATION_FILE_PATTERN = re.compile(r"^events_[0-9]{6}\.jsonl$")
 
 _project_thread_locks: dict[str, threading.RLock] = {}
 _project_thread_locks_guard = threading.Lock()
@@ -99,16 +69,41 @@ def _get_project_thread_lock(project_dir: Path) -> threading.RLock:
         return _project_thread_locks[key]
 
 
+def validate_vault_root(vault_root: Path) -> Path:
+    """Validate that vault root exists, is not a symlink, and return resolved path."""
+    raw_root = Path(vault_root).expanduser()
+    if raw_root.is_symlink():
+        raise ValueError(f"Vault root must not be a symlink: {vault_root}")
+    resolved = raw_root.resolve()
+    if resolved.is_symlink():
+        raise ValueError(f"Vault root must not be a symlink: {vault_root}")
+    return resolved
+
+
 def get_projects_dir(vault_root: Path) -> Path:
     """Resolve and validate the root projects directory."""
-    root = Path(vault_root).expanduser().resolve()
-    if root.is_symlink():
-        raise ValueError(f"Vault root must not be a symlink: {vault_root}")
-    projects_dir = root / ".power" / "projects"
+    resolved_root = validate_vault_root(vault_root)
+
+    power_dir = resolved_root / ".power"
+    if power_dir.is_symlink():
+        raise ValueError(f".power directory must not be a symlink: {power_dir}")
+    power_dir.mkdir(parents=True, exist_ok=True)
+    if power_dir.is_symlink():
+        raise ValueError(f".power directory must not be a symlink: {power_dir}")
+
+    projects_dir = power_dir / "projects"
     if projects_dir.is_symlink():
         raise ValueError(f"Projects directory must not be a symlink: {projects_dir}")
     projects_dir.mkdir(parents=True, exist_ok=True)
-    return projects_dir.resolve()
+    if projects_dir.is_symlink():
+        raise ValueError(f"Projects directory must not be a symlink: {projects_dir}")
+
+    resolved_projects = projects_dir.resolve()
+    try:
+        resolved_projects.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError(f"Projects directory escapes vault boundary: {projects_dir}") from exc
+    return resolved_projects
 
 
 def get_project_dir(project_id: str, vault_root: Path) -> Path:
@@ -119,13 +114,16 @@ def get_project_dir(project_id: str, vault_root: Path) -> Path:
     if project_dir.is_symlink():
         raise ValueError(f"Project directory must not be a symlink: {project_dir}")
 
+    project_dir.mkdir(parents=True, exist_ok=True)
+    if project_dir.is_symlink():
+        raise ValueError(f"Project directory must not be a symlink: {project_dir}")
+
     resolved = project_dir.resolve()
     try:
         resolved.relative_to(projects_dir)
     except ValueError as exc:
         raise ValueError(f"Project path escapes vault boundary: {project_id}") from exc
 
-    resolved.mkdir(parents=True, exist_ok=True)
     return resolved
 
 
@@ -136,20 +134,19 @@ def project_lock(
     timeout: float = 10.0,
 ) -> Iterator[Path]:
     """Level 3 fine-grained project lock context manager (ADR-PSE-007)."""
-    project_dir = get_project_dir(project_id, vault_root)
-    lock_file = project_dir / ".lock"
-    if lock_file.is_symlink():
-        raise ValueError(f"Project lock must not be a symlink: {lock_file}")
+    with LockHierarchyTracker.hold_level(LockHierarchyTracker.LEVEL_PROJECT):
+        project_dir = get_project_dir(project_id, vault_root)
+        lock_file = project_dir / ".lock"
+        if lock_file.is_symlink():
+            raise ValueError(f"Project lock must not be a symlink: {lock_file}")
 
-    thread_lock = _get_project_thread_lock(project_dir)
-    acquired_thread = thread_lock.acquire(timeout=timeout)
-    if not acquired_thread:
-        raise LockAcquisitionTimeoutError(
-            f"Intra-process thread lock timeout for {project_id} after {timeout}s"
-        )
+        thread_lock = _get_project_thread_lock(project_dir)
+        acquired_thread = thread_lock.acquire(timeout=timeout)
+        if not acquired_thread:
+            raise LockAcquisitionTimeoutError(
+                f"Intra-process thread lock timeout for {project_id} after {timeout}s"
+            )
 
-    try:
-        LockHierarchyTracker.push_level(LockHierarchyTracker.LEVEL_PROJECT)
         try:
             fd = os.open(lock_file, os.O_RDWR | os.O_CREAT, 0o600)
             try:
@@ -167,24 +164,28 @@ def project_lock(
                     raise LockAcquisitionTimeoutError(
                         f"Inter-process lock acquisition timed out after {timeout}s for project {project_id}"
                     )
-                try:
-                    yield project_dir
-                finally:
-                    with contextlib.suppress(OSError):
-                        fcntl.flock(fd, fcntl.LOCK_UN)
+                yield project_dir
             finally:
+                with contextlib.suppress(OSError):
+                    fcntl.flock(fd, fcntl.LOCK_UN)
                 os.close(fd)
         finally:
-            LockHierarchyTracker.pop_level(LockHierarchyTracker.LEVEL_PROJECT)
-    finally:
-        thread_lock.release()
+            thread_lock.release()
 
 
 def recover_torn_tail(file_path: Path) -> int:
-    """Detect and truncate incomplete or corrupted trailing line at EOF.
+    """Detect and truncate incomplete trailing bytes without newline at EOF.
+
+    Torn tail definition:
+    - If a file ends with bytes not terminated by '\\n', those trailing bytes represent
+      an incomplete atomic append (e.g. abrupt crash or power loss during write) and
+      are safely truncated back to the last valid '\\n'.
+    - If a file ends with '\\n', every record line is complete. Any malformed JSON,
+      schema invalidity, payload tampering, or broken hash chain is CORRUPTION,
+      NOT a torn tail! Automatic truncation is strictly forbidden: the file remains
+      untouched and LedgerIntegrityError is raised.
 
     Returns the number of bytes truncated (0 if no truncation was performed).
-    Non-trailing corruptions are preserved so integrity verification can detect them.
     """
     if not file_path.exists() or file_path.stat().st_size == 0:
         return 0
@@ -198,44 +199,69 @@ def recover_torn_tail(file_path: Path) -> int:
     if not content:
         return 0
 
-    lines = content.splitlines(keepends=True)
+    # 1. Check if file ends with '\n' (complete records) or has an unterminated tail
+    if not content.endswith(b"\n"):
+        last_nl_idx = content.rfind(b"\n")
+        valid_len = last_nl_idx + 1 if last_nl_idx >= 0 else 0
+        truncated_bytes = len(content) - valid_len
+        logger.warning(
+            f"Truncating unterminated torn tail in {file_path}: discarded {truncated_bytes} bytes from EOF"
+        )
+        with open(file_path, "wb") as f_out:
+            if valid_len > 0:
+                f_out.write(content[:valid_len])
+            f_out.flush()
+            os.fsync(f_out.fileno())
+        return truncated_bytes
+
+    # 2. File ends with '\n': records are complete. Check for corruption.
+    lines = [ln for ln in content.splitlines(keepends=True) if ln.strip()]
     if not lines:
         return 0
 
-    valid_up_to = 0
-    for i, line in enumerate(lines):
-        is_last = i == len(lines) - 1
-        line_valid = False
+    last_line = lines[-1].decode("utf-8", errors="replace").strip()
+    try:
+        data = json.loads(last_line)
+    except Exception as exc:
+        raise LedgerIntegrityError(f"Corruption detected in complete record (malformed JSON): {exc}") from exc
 
-        if line.endswith(b"\n"):
-            try:
-                line_str = line.decode("utf-8")
-                data = json.loads(line_str)
-                if isinstance(data, dict) and "event_hash" in data and "payload_digest" in data:
-                    calc_hash = compute_event_hash(data)
-                    if calc_hash == data["event_hash"]:
-                        line_valid = True
-            except Exception:
-                line_valid = False
+    try:
+        event = ProjectEvent.model_validate(data)
+    except Exception as exc:
+        raise LedgerIntegrityError(f"Corruption detected in complete record (schema violation): {exc}") from exc
 
-        if line_valid:
-            valid_up_to += len(line)
-        else:
-            if is_last:
-                # Torn tail at EOF!
-                truncated_bytes = len(content) - valid_up_to
-                logger.warning(
-                    f"Truncating torn tail in {file_path}: discarded {truncated_bytes} bytes from EOF"
+    calc_payload_digest = compute_payload_digest(event.payload)
+    if event.payload_digest != calc_payload_digest:
+        raise LedgerIntegrityError(
+            f"Corruption detected in complete record (payload digest mismatch): {event.payload_digest} != {calc_payload_digest}"
+        )
+
+    calc_event_hash = compute_event_hash(event.model_dump())
+    if event.event_hash != calc_event_hash:
+        raise LedgerIntegrityError(
+            f"Corruption detected in complete record (event hash mismatch): {event.event_hash} != {calc_event_hash}"
+        )
+
+    if len(lines) > 1:
+        prev_line = lines[-2].decode("utf-8", errors="replace").strip()
+        try:
+            prev_data = json.loads(prev_line)
+            prev_event = ProjectEvent.model_validate(prev_data)
+            if event.sequence != prev_event.sequence + 1:
+                raise LedgerIntegrityError(
+                    f"Corruption detected in complete record (broken sequence: {event.sequence} != {prev_event.sequence + 1})"
                 )
-                with open(file_path, "wb") as f_out:
-                    f_out.write(content[:valid_up_to])
-                    f_out.flush()
-                    os.fsync(f_out.fileno())
-                return truncated_bytes
-            # Non-trailing corruption; keep intact for integrity detection
-            break
+            if event.prev_event_hash != prev_event.event_hash:
+                raise LedgerIntegrityError(
+                    "Corruption detected in complete record (broken prev_event_hash)"
+                )
+        except LedgerIntegrityError:
+            raise
+        except Exception as exc:
+            raise LedgerIntegrityError(f"Corruption detected in preceding complete record: {exc}") from exc
 
     return 0
+
 
 
 class ProjectEventStore:
@@ -243,8 +269,8 @@ class ProjectEventStore:
 
     def __init__(self, project_id: str, vault_root: Path) -> None:
         self.project_id = validate_project_id(project_id)
-        self.vault_root = Path(vault_root).expanduser().resolve()
-        self.project_dir = get_project_dir(self.project_id, self.vault_root)
+        self.vault_root = validate_vault_root(vault_root)
+        self.project_dir = get_project_dir(self.project_id, vault_root)
         self.active_events_file = self.project_dir / "events.jsonl"
 
     def list_event_files(self) -> list[Path]:
@@ -267,6 +293,12 @@ class ProjectEventStore:
             result.append(self.active_events_file)
         return result
 
+    @contextlib.contextmanager
+    def lock(self, timeout: float = 10.0) -> Iterator[Path]:
+        """Context manager for holding Level 3 project lock."""
+        with project_lock(self.project_id, self.vault_root, timeout=timeout) as p:
+            yield p
+
     def append(self, command: AppendCommand, timeout: float = 10.0) -> ProjectEvent:
         """Append an event under Level 3 project lock with atomic fsync and idempotency deduplication."""
         if command.project_id != self.project_id:
@@ -274,33 +306,76 @@ class ProjectEventStore:
                 f"Command project_id '{command.project_id}' does not match store '{self.project_id}'"
             )
 
-        with project_lock(self.project_id, self.vault_root, timeout=timeout):
-            # 1. Crash recovery on active file if present
+        with self.lock(timeout=timeout):
+            # 1. Crash recovery on active file if present (truncates only unterminated tail)
             if self.active_events_file.exists():
                 recover_torn_tail(self.active_events_file)
 
-            # 2. Idempotency and tail inspection
-            last_sequence = 0
-            last_event_hash = ""
+            # 2. Full ledger integrity verification before append
+            verify_res = self.verify()
+            if not verify_res.valid:
+                raise LedgerIntegrityError(
+                    f"Ledger integrity verification failed for project {self.project_id}: {'; '.join(verify_res.errors)}"
+                )
+
+            # 3. Idempotency resolution with command fingerprint conflict checking
+            cmd_fingerprint = compute_command_fingerprint(
+                actor=command.actor,
+                event_type=command.event_type,
+                payload=command.payload,
+                artifact_refs=command.artifact_refs,
+                source=command.source,
+                session_id=command.session_id,
+                correlation_id=command.correlation_id,
+                causation_id=command.causation_id,
+            )
 
             for event in self.replay(from_sequence=1):
                 if command.idempotency_key and event.idempotency_key == command.idempotency_key:
+                    ev_fingerprint = compute_command_fingerprint(
+                        actor=event.actor,
+                        event_type=event.event_type,
+                        payload=event.payload,
+                        artifact_refs=event.artifact_refs,
+                        source=event.source,
+                        session_id=event.session_id,
+                        correlation_id=event.correlation_id,
+                        causation_id=event.causation_id,
+                    )
+                    if cmd_fingerprint != ev_fingerprint:
+                        raise IdempotencyConflictError(
+                            f"Idempotency conflict for key '{command.idempotency_key}': command fingerprint mismatch"
+                        )
                     logger.info(
                         f"Idempotent match for key {command.idempotency_key} on project {self.project_id}"
                     )
                     return event
+
                 if command.event_id and event.event_id == command.event_id:
+                    ev_fingerprint = compute_command_fingerprint(
+                        actor=event.actor,
+                        event_type=event.event_type,
+                        payload=event.payload,
+                        artifact_refs=event.artifact_refs,
+                        source=event.source,
+                        session_id=event.session_id,
+                        correlation_id=event.correlation_id,
+                        causation_id=event.causation_id,
+                    )
+                    if cmd_fingerprint != ev_fingerprint:
+                        raise IdempotencyConflictError(
+                            f"Idempotency conflict for event_id '{command.event_id}': command fingerprint mismatch"
+                        )
                     logger.info(
                         f"Idempotent match for event_id {command.event_id} on project {self.project_id}"
                     )
                     return event
 
-                last_sequence = event.sequence
-                last_event_hash = event.event_hash
+            # 4. Monotonic sequence and hash from verified state
+            new_sequence = verify_res.last_sequence + 1
+            prev_event_hash = "" if new_sequence == 1 else verify_res.last_event_hash
 
-            new_sequence = last_sequence + 1
-            prev_event_hash = "" if new_sequence == 1 else last_event_hash
-
+            # 5. Build event
             timestamp = command.timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
             event_id = command.event_id or f"evt_{self.project_id}_{new_sequence}_{uuid.uuid4().hex[:12]}"
             payload_digest = compute_payload_digest(command.payload)
@@ -330,7 +405,7 @@ class ProjectEventStore:
 
             event = ProjectEvent.model_validate(raw_envelope)
 
-            # 3. Durable write with atomic fsync
+            # 6. Durable write with atomic fsync
             line = canonical_json_dumps(event.model_dump()) + "\n"
             with open(self.active_events_file, "a", encoding="utf-8") as f:
                 f.write(line)
@@ -456,19 +531,32 @@ class ProjectEventStore:
 
     def rotate(self, archive_name: str | None = None, timeout: float = 10.0) -> Path | None:
         """Rotate the active events.jsonl into an archive partition under Level 3 lock."""
-        with project_lock(self.project_id, self.vault_root, timeout=timeout):
+        with self.lock(timeout=timeout):
             if not self.active_events_file.exists() or self.active_events_file.stat().st_size == 0:
                 return None
 
             if archive_name is None:
                 existing_rotated = [
                     p for p in self.project_dir.iterdir()
-                    if p.name.startswith("events_") and p.name.endswith(".jsonl")
+                    if p.is_file() and p.name.startswith("events_") and p.name.endswith(".jsonl")
                 ]
                 next_index = len(existing_rotated) + 1
                 archive_name = f"events_{next_index:06d}.jsonl"
+            else:
+                if not ROTATION_FILE_PATTERN.match(archive_name):
+                    raise ValueError(
+                        f"Invalid archive_name '{archive_name}'. Only store-generated format 'events_XXXXXX.jsonl' is allowed."
+                    )
 
             archive_path = self.project_dir / archive_name
+            if archive_path.is_symlink():
+                raise ValueError(f"Archive path must not be a symlink: {archive_path}")
+
+            try:
+                archive_path.resolve().relative_to(self.project_dir.resolve())
+            except ValueError as exc:
+                raise ValueError(f"Archive path escapes project directory: {archive_name}") from exc
+
             if archive_path.exists():
                 raise FileExistsError(f"Target archive file already exists: {archive_path}")
 
@@ -484,6 +572,17 @@ def verify_event_ledger(project_id: str, vault_root: Path) -> LedgerVerification
     return store.verify()
 
 
+def verify_ledger_integrity(project_id: str, vault_root: Path) -> LedgerVerificationResult:
+    """Convenience function to verify a project event ledger and raise on corruption."""
+    store = ProjectEventStore(project_id, vault_root)
+    res = store.verify()
+    if not res.valid:
+        raise LedgerIntegrityError(
+            f"Ledger integrity verification failed for project {project_id}: {'; '.join(res.errors)}"
+        )
+    return res
+
+
 def replay_events(
     project_id: str,
     vault_root: Path,
@@ -492,3 +591,4 @@ def replay_events(
     """Convenience generator to replay events from a project ledger."""
     store = ProjectEventStore(project_id, vault_root)
     yield from store.replay(from_sequence=from_sequence)
+

@@ -20,14 +20,15 @@ import contextlib
 import logging
 import re
 import sqlite3
+import threading
 import time
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
 from power_framework.core.canonical_json import (
     canonical_json_dumps,
@@ -35,7 +36,9 @@ from power_framework.core.canonical_json import (
     compute_payload_digest,
 )
 from power_framework.core.project_models import (
+    SAGA_PAYLOAD_MODELS,
     AppendCommand,
+    LedgerIntegrityError,
     LedgerVerificationResult,
     PrivacyMode,
     ProjectEvent,
@@ -46,13 +49,55 @@ from power_framework.core.project_store import (
     ProjectEventStore,
     get_project_dir,
     get_projects_dir,
-    project_lock,
     recover_torn_tail,
     replay_events,
+    validate_vault_root,
     verify_event_ledger,
 )
 
 logger = logging.getLogger(__name__)
+
+RAW_DIALOGUE_KEYS: frozenset[str] = frozenset({
+    "raw_dialogue",
+    "dialogue_buffer",
+    "transcript",
+    "turns",
+    "prompt_text",
+    "completion_text",
+    "messages",
+    "reasoning",
+    "thinking",
+})
+
+
+def strip_raw_dialogue(data: Any) -> tuple[Any, dict[str, Any]]:
+    """Recursively strip raw dialogue and transcript keys from data structures.
+
+    Returns:
+        tuple[cleaned_data, extracted_dialogue]
+    """
+    extracted: dict[str, Any] = {}
+
+    def _traverse(item: Any, path: str = "") -> Any:
+        if isinstance(item, dict):
+            clean_dict: dict[str, Any] = {}
+            for k, v in item.items():
+                if k in RAW_DIALOGUE_KEYS:
+                    key_path = f"{path}.{k}" if path else k
+                    extracted[key_path] = v
+                else:
+                    sub_path = f"{path}.{k}" if path else k
+                    clean_dict[k] = _traverse(v, sub_path)
+            return clean_dict
+        if isinstance(item, list):
+            return [_traverse(elem, f"{path}[{i}]") for i, elem in enumerate(item)]
+        if isinstance(item, tuple):
+            return tuple(_traverse(elem, f"{path}[{i}]") for i, elem in enumerate(item))
+        return item
+
+    cleaned = _traverse(data)
+    return cleaned, extracted
+
 
 
 # ---------------------------------------------------------------------------
@@ -168,12 +213,38 @@ def redact_secrets(data: Any) -> tuple[Any, RedactionRecord]:
 
 def _get_raw_evidence_dir(vault_root: Path, project_id: str) -> Path:
     validate_project_id(project_id)
-    root = Path(vault_root).expanduser().resolve()
-    evidence_dir = root / ".power" / "raw-evidence" / project_id
+    resolved_root = validate_vault_root(vault_root)
+
+    power_dir = resolved_root / ".power"
+    if power_dir.is_symlink():
+        raise ValueError(f".power directory must not be a symlink: {power_dir}")
+    power_dir.mkdir(parents=True, exist_ok=True)
+    if power_dir.is_symlink():
+        raise ValueError(f".power directory must not be a symlink: {power_dir}")
+
+    raw_ev_base = power_dir / "raw-evidence"
+    if raw_ev_base.is_symlink():
+        raise ValueError(f"raw-evidence directory must not be a symlink: {raw_ev_base}")
+    raw_ev_base.mkdir(parents=True, exist_ok=True)
+    if raw_ev_base.is_symlink():
+        raise ValueError(f"raw-evidence directory must not be a symlink: {raw_ev_base}")
+
+    evidence_dir = raw_ev_base / project_id
+    if evidence_dir.is_symlink():
+        raise ValueError(f"Project raw evidence directory must not be a symlink: {evidence_dir}")
     evidence_dir.mkdir(parents=True, exist_ok=True)
+    if evidence_dir.is_symlink():
+        raise ValueError(f"Project raw evidence directory must not be a symlink: {evidence_dir}")
+
+    resolved = evidence_dir.resolve()
+    try:
+        resolved.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError(f"Evidence directory escapes vault boundary: {evidence_dir}") from exc
+
     with contextlib.suppress(OSError):
-        evidence_dir.chmod(0o700)
-    return evidence_dir
+        resolved.chmod(0o700)
+    return resolved
 
 
 def prune_raw_evidence(vault_root: Path, project_id: str, ttl_days: int = 14) -> int:
@@ -207,6 +278,13 @@ def store_raw_evidence(
     """Store local-only raw conversation / evidence under mode 0600 and return its SHA-256 digest."""
     evidence_dir = _get_raw_evidence_dir(vault_root, project_id)
     evidence_file = evidence_dir / f"{event_id}.json"
+    if evidence_file.is_symlink():
+        raise ValueError(f"Evidence file must not be a symlink: {evidence_file}")
+
+    try:
+        evidence_file.resolve().relative_to(evidence_dir.resolve())
+    except ValueError as exc:
+        raise ValueError(f"Evidence file escapes evidence directory: {evidence_file}") from exc
 
     # Redact before storing even in full-content mode for baseline hygiene
     scrubbed_content, _ = redact_secrets(raw_content)
@@ -243,6 +321,9 @@ def append_project_event(
     Enforces:
     - Privacy boundary filtering (metadata-only, structured-events, full-content)
     - Secret redaction
+    - Dialogue / transcript elimination from event payload across all privacy modes
+    - Local raw-evidence storage under full-content mode
+    - Mandatory saga payload contract validation
     - Level 3 project locking and atomic append
     """
     store = ProjectEventStore(command.project_id, vault_root)
@@ -250,7 +331,10 @@ def append_project_event(
     # 1. Apply Redaction Pipeline
     sanitized_payload, _redaction_record = redact_secrets(command.payload)
 
-    # 2. Apply Privacy Mode Boundaries
+    # 2. Recursively extract and strip raw dialogue keys across ALL privacy modes
+    cleaned_payload, extracted_dialogue = strip_raw_dialogue(sanitized_payload)
+
+    # 3. Apply Privacy Mode Boundaries
     final_payload: dict[str, Any]
     evidence_refs = list(command.evidence_refs)
 
@@ -258,29 +342,42 @@ def append_project_event(
         # Strip all content tokens, keep only structure / summary keys
         final_payload = {
             "_privacy_mode": PrivacyMode.METADATA_ONLY.value,
-            "keys": sorted(sanitized_payload.keys()),
+            "keys": sorted(cleaned_payload.keys()),
             "event_type": command.event_type,
         }
-    elif privacy_mode == PrivacyMode.STRUCTURED_EVENTS:
-        # Structured events: dialogue buffers are purged, only domain state retained
-        final_payload = sanitized_payload
-        # Remove any lingering raw dialogue fields if caller provided them
-        for raw_field in ["raw_dialogue", "dialogue_buffer", "transcript", "turns", "prompt_text"]:
-            final_payload.pop(raw_field, None)
-    elif privacy_mode == PrivacyMode.FULL_CONTENT:
-        # Full content: store evidence locally, reference by cryptographic digest
-        final_payload = sanitized_payload
+    elif privacy_mode == PrivacyMode.STRUCTURED_EVENTS or privacy_mode == PrivacyMode.FULL_CONTENT:
+        final_payload = cleaned_payload
+
     target_event_id = command.event_id
-    if privacy_mode == PrivacyMode.FULL_CONTENT and raw_content is not None:
-        target_event_id = target_event_id or f"evt_{command.project_id}_{uuid.uuid4().hex[:12]}"
-        evidence_ref = store_raw_evidence(
-            vault_root=vault_root,
-            project_id=command.project_id,
-            event_id=target_event_id,
-            raw_content=raw_content,
-            ttl_days=raw_evidence_ttl_days,
-        )
-        evidence_refs.append(evidence_ref)
+    if privacy_mode == PrivacyMode.FULL_CONTENT:
+        content_to_store = raw_content if raw_content is not None else (extracted_dialogue if extracted_dialogue else None)
+        if content_to_store is not None:
+            target_event_id = target_event_id or f"evt_{command.project_id}_{uuid.uuid4().hex[:12]}"
+            evidence_ref = store_raw_evidence(
+                vault_root=vault_root,
+                project_id=command.project_id,
+                event_id=target_event_id,
+                raw_content=content_to_store,
+                ttl_days=raw_evidence_ttl_days,
+            )
+            if evidence_ref not in evidence_refs:
+                evidence_refs.append(evidence_ref)
+
+    # 4. Mandatory saga payload contract validation
+    model_cls = SAGA_PAYLOAD_MODELS.get(command.event_type)
+    if model_cls is not None:
+        if not isinstance(final_payload, dict) or not final_payload:
+            raise ValueError(
+                f"Payload for saga event '{command.event_type}' must be a non-empty dictionary conforming to {model_cls.__name__}"
+            )
+        payload_data = dict(final_payload)
+        if "project_id" not in payload_data:
+            payload_data["project_id"] = command.project_id
+        if "correlation_id" not in payload_data and command.correlation_id:
+            payload_data["correlation_id"] = command.correlation_id
+        if "idempotency_key" not in payload_data and command.idempotency_key:
+            payload_data["idempotency_key"] = command.idempotency_key
+        model_cls.model_validate(payload_data)
 
     prepared_command = command.model_copy(
         update={
@@ -303,7 +400,6 @@ def import_project_events(
     vault_root: Path,
     project_id: str,
     events: list[ProjectEvent | dict[str, Any]],
-    verify_before_import: bool = True,
     timeout: float = 10.0,
 ) -> int:
     """Import an existing valid chain of events into the project ledger."""
@@ -323,17 +419,27 @@ def import_project_events(
     # Ensure events are ordered by sequence
     parsed_events.sort(key=lambda e: e.sequence)
 
-    with project_lock(project_id, vault_root, timeout=timeout):
+    with store.lock(timeout=timeout):
         if store.active_events_file.exists():
             recover_torn_tail(store.active_events_file)
 
         existing_events = list(store.replay(from_sequence=1))
+        seen_event_ids: set[str] = {ev.event_id for ev in existing_events}
         last_seq = existing_events[-1].sequence if existing_events else 0
         last_hash = existing_events[-1].event_hash if existing_events else ""
 
         count = 0
         with open(store.active_events_file, "a", encoding="utf-8") as f:
             for ev in parsed_events:
+                if ev.project_id != project_id:
+                    raise ValueError(
+                        f"Import project_id mismatch: expected '{project_id}', got '{ev.project_id}'"
+                    )
+
+                if ev.event_id in seen_event_ids:
+                    raise ValueError(f"Duplicate event_id in import: '{ev.event_id}'")
+                seen_event_ids.add(ev.event_id)
+
                 # Check sequence linkage
                 if ev.sequence != last_seq + 1:
                     raise ValueError(
@@ -346,14 +452,13 @@ def import_project_events(
                         f"Import hash gap: expected '{last_hash}', got '{ev.prev_event_hash}'"
                     )
 
-                # Verify integrity of the imported event
-                if verify_before_import:
-                    calc_payload_digest = compute_payload_digest(ev.payload)
-                    if ev.payload_digest != calc_payload_digest:
-                        raise ValueError(f"Payload digest mismatch in imported event {ev.event_id}")
-                    calc_event_hash = compute_event_hash(ev.model_dump())
-                    if ev.event_hash != calc_event_hash:
-                        raise ValueError(f"Event hash mismatch in imported event {ev.event_id}")
+                # Always verify integrity of the imported event
+                calc_payload_digest = compute_payload_digest(ev.payload)
+                if ev.payload_digest != calc_payload_digest:
+                    raise ValueError(f"Payload digest mismatch in imported event {ev.event_id}")
+                calc_event_hash = compute_event_hash(ev.model_dump())
+                if ev.event_hash != calc_event_hash:
+                    raise ValueError(f"Event hash mismatch in imported event {ev.event_id}")
 
                 line = canonical_json_dumps(ev.model_dump()) + "\n"
                 f.write(line)
@@ -387,10 +492,40 @@ def replay_project(
 # ---------------------------------------------------------------------------
 
 def _get_sqlite_path(vault_root: Path) -> Path:
-    root = Path(vault_root).expanduser().resolve()
-    indexes_dir = root / ".power" / "project-state" / "indexes"
+    resolved_root = validate_vault_root(vault_root)
+
+    power_dir = resolved_root / ".power"
+    if power_dir.is_symlink():
+        raise ValueError(f".power directory must not be a symlink: {power_dir}")
+    power_dir.mkdir(parents=True, exist_ok=True)
+    if power_dir.is_symlink():
+        raise ValueError(f".power directory must not be a symlink: {power_dir}")
+
+    state_dir = power_dir / "project-state"
+    if state_dir.is_symlink():
+        raise ValueError(f"project-state directory must not be a symlink: {state_dir}")
+    state_dir.mkdir(parents=True, exist_ok=True)
+    if state_dir.is_symlink():
+        raise ValueError(f"project-state directory must not be a symlink: {state_dir}")
+
+    indexes_dir = state_dir / "indexes"
+    if indexes_dir.is_symlink():
+        raise ValueError(f"indexes directory must not be a symlink: {indexes_dir}")
     indexes_dir.mkdir(parents=True, exist_ok=True)
-    return indexes_dir / "project_state.sqlite3"
+    if indexes_dir.is_symlink():
+        raise ValueError(f"indexes directory must not be a symlink: {indexes_dir}")
+
+    db_path = indexes_dir / "project_state.sqlite3"
+    if db_path.is_symlink():
+        raise ValueError(f"Database file must not be a symlink: {db_path}")
+
+    resolved_db = db_path.resolve()
+    try:
+        resolved_db.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError(f"Database path escapes vault boundary: {db_path}") from exc
+
+    return resolved_db
 
 
 def init_derived_database(db_path: Path) -> sqlite3.Connection:
@@ -655,10 +790,10 @@ def rebuild_derived_index(vault_root: Path, project_id: str | None = None) -> in
     """100% deterministic reconstruction of the secondary SQLite database and status markdown.
 
     If project_id is None, rebuilds all projects found in .power/projects.
+    Fails closed if any project ledger is corrupted or invalid.
     """
-    root = Path(vault_root).expanduser().resolve()
+    root = validate_vault_root(vault_root)
     db_path = _get_sqlite_path(root)
-    conn = init_derived_database(db_path)
 
     project_ids: list[str] = []
     if project_id:
@@ -670,6 +805,15 @@ def rebuild_derived_index(vault_root: Path, project_id: str | None = None) -> in
             if p.is_dir() and not p.is_symlink() and p.name.startswith("prj_"):
                 project_ids.append(p.name)
 
+    # Fail-closed verification before modifying or rebuilding anything
+    for pid in project_ids:
+        verify_res = verify_project_ledger(root, pid)
+        if not verify_res.valid:
+            raise LedgerIntegrityError(
+                f"Cannot rebuild derived index for project {pid}: ledger verification failed with errors: {'; '.join(verify_res.errors)}"
+            )
+
+    conn = init_derived_database(db_path)
     total_rebuilt_events = 0
     try:
         with conn:
@@ -716,13 +860,16 @@ def materialize_status_markdown(
     status_file = project_dir / "status.md"
 
     content = f"""<!-- GENERATED BY POWER PSE - DO NOT EDIT MANUALLY -->
-# Project Status: {project_id}
+# Diagnostic Ledger Summary: {project_id}
 
-- **Current Phase:** {last_event.event_type}
+> [!NOTE]
+> This is a low-level Phase 2 Diagnostic Ledger Summary. Semantic state projection and lifecycle phase evaluation are deferred to Phase 4 (State Engine).
+
+- **Last Event Type:** {last_event.event_type}
 - **Last Sequence:** {last_event.sequence}
 - **Last Event Hash:** `{last_event.event_hash}`
 - **Last Updated:** {last_event.timestamp}
-- **Actor:** {last_event.actor}
+- **Last Actor:** {last_event.actor}
 """
     with open(status_file, "w", encoding="utf-8") as f:
         f.write(content)
@@ -734,13 +881,25 @@ def materialize_status_markdown(
 # Cross-Subsystem Association Saga & Reconciliation (ADR-PSE-008)
 # ---------------------------------------------------------------------------
 
+_reconciliation_attempts: dict[str, int] = {}
+_reconciliation_attempts_guard = threading.Lock()
+
+
 def reconcile_project_subsystems(
     vault_root: Path,
     project_id: str,
     task_service: Any = None,
     decision_service: Any = None,
+    max_attempts: int = 3,
+    attempt_tracker: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Idempotently reconcile pending association sagas against TaskStore and DecisionService."""
+    """Idempotently reconcile pending association sagas against TaskStore and DecisionService.
+
+    Applies retry policy before marking an association as failed:
+    - attempt < max_attempts (default 3): saga remains pending, no failed event appended.
+    - entity exists: records .associated event and clears pending attempt.
+    - attempt >= max_attempts: records .association.failed event and clears pending attempt.
+    """
     validate_project_id(project_id)
     store = ProjectEventStore(project_id, vault_root)
 
@@ -764,99 +923,141 @@ def reconcile_project_subsystems(
 
     reconciled_tasks = 0
     failed_tasks = 0
+    pending_tasks = 0
     reconciled_decisions = 0
     failed_decisions = 0
+    pending_decisions = 0
 
-    # Resolve pending tasks
-    for corr_id, payload in pending_task_sagas.items():
-        task_id = payload.get("task_id", "")
-        relation = payload.get("relation", "contributes_to")
-        idempotency_key = f"rec_task_{task_id}_{corr_id}"
+    tracker = attempt_tracker if attempt_tracker is not None else _reconciliation_attempts
 
-        task_exists = False
-        if task_service is not None:
-            try:
-                task_exists = task_service.get_task(task_id) is not None
-            except Exception:
-                task_exists = False
+    with _reconciliation_attempts_guard:
+        # Resolve pending tasks
+        for corr_id, payload in pending_task_sagas.items():
+            task_id = payload.get("task_id", "")
+            relation = payload.get("relation", "contributes_to")
+            limit = payload.get("max_attempts", max_attempts)
+            current_attempt = tracker.get(corr_id, payload.get("attempt", 1))
 
-        if task_exists:
-            cmd = AppendCommand(
-                project_id=project_id,
-                event_type="task.associated",
-                payload={"project_id": project_id, "task_id": task_id, "relation": relation},
-                actor="system:reconciler",
-                source="reconciliation",
-                correlation_id=corr_id,
-                idempotency_key=idempotency_key,
-            )
-            store.append(cmd)
-            reconciled_tasks += 1
-        else:
-            cmd = AppendCommand(
-                project_id=project_id,
-                event_type="task.association.failed",
-                payload={
-                    "project_id": project_id,
-                    "task_id": task_id,
-                    "relation": relation,
-                    "reason": f"Task {task_id} not found in TaskStore during reconciliation",
-                },
-                actor="system:reconciler",
-                source="reconciliation",
-                correlation_id=corr_id,
-                idempotency_key=idempotency_key,
-            )
-            store.append(cmd)
-            failed_tasks += 1
+            task_exists = False
+            if task_service is not None:
+                try:
+                    task_exists = task_service.get_task(task_id) is not None
+                except Exception:
+                    task_exists = False
 
-    # Resolve pending decisions
-    for corr_id, payload in pending_decision_sagas.items():
-        decision_id = payload.get("decision_id", "")
-        relation = payload.get("relation", "governs")
-        idempotency_key = f"rec_dec_{decision_id}_{corr_id}"
+            if task_exists:
+                idempotency_key = f"rec_task_{task_id}_{corr_id}"
+                cmd = AppendCommand(
+                    project_id=project_id,
+                    event_type="task.associated",
+                    payload={
+                        "project_id": project_id,
+                        "task_id": task_id,
+                        "relation": relation,
+                        "correlation_id": corr_id,
+                        "idempotency_key": idempotency_key,
+                    },
+                    actor="system:reconciler",
+                    source="reconciliation",
+                    correlation_id=corr_id,
+                    idempotency_key=idempotency_key,
+                )
+                store.append(cmd)
+                reconciled_tasks += 1
+                tracker.pop(corr_id, None)
+            else:
+                if current_attempt < limit:
+                    tracker[corr_id] = current_attempt + 1
+                    pending_tasks += 1
+                else:
+                    idempotency_key = f"rec_task_fail_{task_id}_{corr_id}"
+                    cmd = AppendCommand(
+                        project_id=project_id,
+                        event_type="task.association.failed",
+                        payload={
+                            "project_id": project_id,
+                            "task_id": task_id,
+                            "relation": relation,
+                            "reason": f"Task {task_id} not found in TaskStore after {current_attempt} attempts",
+                            "correlation_id": corr_id,
+                            "idempotency_key": idempotency_key,
+                        },
+                        actor="system:reconciler",
+                        source="reconciliation",
+                        correlation_id=corr_id,
+                        idempotency_key=idempotency_key,
+                    )
+                    store.append(cmd)
+                    failed_tasks += 1
+                    tracker.pop(corr_id, None)
 
-        dec_exists = False
-        if decision_service is not None:
-            try:
-                dec_exists = decision_service.get_decision(decision_id) is not None
-            except Exception:
-                dec_exists = False
+        # Resolve pending decisions
+        for corr_id, payload in pending_decision_sagas.items():
+            decision_id = payload.get("decision_id", "")
+            relation = payload.get("relation", "governs")
+            limit = payload.get("max_attempts", max_attempts)
+            current_attempt = tracker.get(corr_id, payload.get("attempt", 1))
 
-        if dec_exists:
-            cmd = AppendCommand(
-                project_id=project_id,
-                event_type="decision.associated",
-                payload={"project_id": project_id, "decision_id": decision_id, "relation": relation},
-                actor="system:reconciler",
-                source="reconciliation",
-                correlation_id=corr_id,
-                idempotency_key=idempotency_key,
-            )
-            store.append(cmd)
-            reconciled_decisions += 1
-        else:
-            cmd = AppendCommand(
-                project_id=project_id,
-                event_type="decision.association.failed",
-                payload={
-                    "project_id": project_id,
-                    "decision_id": decision_id,
-                    "relation": relation,
-                    "reason": f"Decision {decision_id} not found in DecisionService during reconciliation",
-                },
-                actor="system:reconciler",
-                source="reconciliation",
-                correlation_id=corr_id,
-                idempotency_key=idempotency_key,
-            )
-            store.append(cmd)
-            failed_decisions += 1
+            dec_exists = False
+            if decision_service is not None:
+                try:
+                    dec_exists = decision_service.get_decision(decision_id) is not None
+                except Exception:
+                    dec_exists = False
+
+            if dec_exists:
+                idempotency_key = f"rec_dec_{decision_id}_{corr_id}"
+                cmd = AppendCommand(
+                    project_id=project_id,
+                    event_type="decision.associated",
+                    payload={
+                        "project_id": project_id,
+                        "decision_id": decision_id,
+                        "relation": relation,
+                        "correlation_id": corr_id,
+                        "idempotency_key": idempotency_key,
+                    },
+                    actor="system:reconciler",
+                    source="reconciliation",
+                    correlation_id=corr_id,
+                    idempotency_key=idempotency_key,
+                )
+                store.append(cmd)
+                reconciled_decisions += 1
+                tracker.pop(corr_id, None)
+            else:
+                if current_attempt < limit:
+                    tracker[corr_id] = current_attempt + 1
+                    pending_decisions += 1
+                else:
+                    idempotency_key = f"rec_dec_fail_{decision_id}_{corr_id}"
+                    cmd = AppendCommand(
+                        project_id=project_id,
+                        event_type="decision.association.failed",
+                        payload={
+                            "project_id": project_id,
+                            "decision_id": decision_id,
+                            "relation": relation,
+                            "reason": f"Decision {decision_id} not found in DecisionService after {current_attempt} attempts",
+                            "correlation_id": corr_id,
+                            "idempotency_key": idempotency_key,
+                        },
+                        actor="system:reconciler",
+                        source="reconciliation",
+                        correlation_id=corr_id,
+                        idempotency_key=idempotency_key,
+                    )
+                    store.append(cmd)
+                    failed_decisions += 1
+                    tracker.pop(corr_id, None)
 
     return {
         "project_id": project_id,
         "reconciled_tasks": reconciled_tasks,
         "failed_tasks": failed_tasks,
+        "pending_tasks": pending_tasks,
         "reconciled_decisions": reconciled_decisions,
         "failed_decisions": failed_decisions,
+        "pending_decisions": pending_decisions,
     }
+

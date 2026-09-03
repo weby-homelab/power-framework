@@ -71,3 +71,29 @@ def compute_event_hash(event: dict[str, Any]) -> str:
     """
     integrity_record = {k: v for k, v in event.items() if k != "event_hash"}
     return hashlib.sha256(canonical_json_bytes(integrity_record)).hexdigest()
+
+
+def compute_command_fingerprint(
+    *,
+    actor: str,
+    event_type: str,
+    payload: dict[str, Any],
+    artifact_refs: list[str] | None = None,
+    source: str | None = None,
+    session_id: str | None = None,
+    correlation_id: str | None = None,
+    causation_id: str | None = None,
+) -> str:
+    """Compute SHA-256 fingerprint for append command parameters."""
+    canonical_dict = {
+        "actor": actor,
+        "artifact_refs": sorted(artifact_refs or []),
+        "causation_id": causation_id or "",
+        "correlation_id": correlation_id or "",
+        "event_type": event_type,
+        "payload": payload,
+        "session_id": session_id or "",
+        "source": source or "",
+    }
+    return hashlib.sha256(canonical_json_bytes(canonical_dict)).hexdigest()
+

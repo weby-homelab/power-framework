@@ -14,7 +14,16 @@ import re
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class LedgerIntegrityError(Exception):
+    """Raised when ledger integrity verification fails due to corruption, schema mismatch, or tampering."""
+
+
+class IdempotencyConflictError(ValueError):
+    """Raised when an append command reuses an idempotency key with conflicting payload or parameters."""
+
 
 PROJECT_ID_REGEX = r"^prj_[a-z0-9][a-z0-9_-]{2,63}$"
 EVENT_ID_REGEX = r"^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
@@ -196,6 +205,24 @@ class AppendCommand(BaseModel):
             return validate_event_id(v)
         return v
 
+    @model_validator(mode="after")
+    def validate_saga_payload(self) -> AppendCommand:
+        model_cls = SAGA_PAYLOAD_MODELS.get(self.event_type)
+        if model_cls is not None:
+            if not isinstance(self.payload, dict) or not self.payload:
+                raise ValueError(
+                    f"Payload for saga event '{self.event_type}' must be a non-empty dictionary conforming to {model_cls.__name__}"
+                )
+            payload_data = dict(self.payload)
+            if "project_id" not in payload_data:
+                payload_data["project_id"] = self.project_id
+            if "correlation_id" not in payload_data and self.correlation_id:
+                payload_data["correlation_id"] = self.correlation_id
+            if "idempotency_key" not in payload_data and self.idempotency_key:
+                payload_data["idempotency_key"] = self.idempotency_key
+            model_cls.model_validate(payload_data)
+        return self
+
 
 class LedgerVerificationResult(BaseModel):
     """Cryptographic and schema verification result for a project event stream."""
@@ -219,8 +246,10 @@ class TaskAssociationRequestedPayload(BaseModel):
     project_id: str = Field(..., pattern=PROJECT_ID_REGEX)
     task_id: str = Field(..., min_length=1, max_length=128)
     relation: str = Field(default="contributes_to")
-    correlation_id: str = Field(..., min_length=1, max_length=128)
-    idempotency_key: str = Field(..., min_length=1, max_length=128)
+    correlation_id: str | None = Field(default=None, max_length=128)
+    idempotency_key: str | None = Field(default=None, max_length=128)
+    attempt: int = Field(default=1, ge=1)
+    max_attempts: int = Field(default=3, ge=1)
 
 
 class TaskAssociatedPayload(BaseModel):
@@ -229,8 +258,8 @@ class TaskAssociatedPayload(BaseModel):
     project_id: str = Field(..., pattern=PROJECT_ID_REGEX)
     task_id: str = Field(..., min_length=1, max_length=128)
     relation: str = Field(default="contributes_to")
-    correlation_id: str = Field(..., min_length=1, max_length=128)
-    idempotency_key: str = Field(..., min_length=1, max_length=128)
+    correlation_id: str | None = Field(default=None, max_length=128)
+    idempotency_key: str | None = Field(default=None, max_length=128)
 
 
 class TaskAssociationFailedPayload(BaseModel):
@@ -239,9 +268,9 @@ class TaskAssociationFailedPayload(BaseModel):
     project_id: str = Field(..., pattern=PROJECT_ID_REGEX)
     task_id: str = Field(..., min_length=1, max_length=128)
     relation: str = Field(default="contributes_to")
-    correlation_id: str = Field(..., min_length=1, max_length=128)
-    idempotency_key: str = Field(..., min_length=1, max_length=128)
     reason: str = Field(..., min_length=1, max_length=512)
+    correlation_id: str | None = Field(default=None, max_length=128)
+    idempotency_key: str | None = Field(default=None, max_length=128)
 
 
 class DecisionAssociationRequestedPayload(BaseModel):
@@ -250,8 +279,10 @@ class DecisionAssociationRequestedPayload(BaseModel):
     project_id: str = Field(..., pattern=PROJECT_ID_REGEX)
     decision_id: str = Field(..., min_length=1, max_length=128)
     relation: str = Field(default="governs")
-    correlation_id: str = Field(..., min_length=1, max_length=128)
-    idempotency_key: str = Field(..., min_length=1, max_length=128)
+    correlation_id: str | None = Field(default=None, max_length=128)
+    idempotency_key: str | None = Field(default=None, max_length=128)
+    attempt: int = Field(default=1, ge=1)
+    max_attempts: int = Field(default=3, ge=1)
 
 
 class DecisionAssociatedPayload(BaseModel):
@@ -260,8 +291,8 @@ class DecisionAssociatedPayload(BaseModel):
     project_id: str = Field(..., pattern=PROJECT_ID_REGEX)
     decision_id: str = Field(..., min_length=1, max_length=128)
     relation: str = Field(default="governs")
-    correlation_id: str = Field(..., min_length=1, max_length=128)
-    idempotency_key: str = Field(..., min_length=1, max_length=128)
+    correlation_id: str | None = Field(default=None, max_length=128)
+    idempotency_key: str | None = Field(default=None, max_length=128)
 
 
 class DecisionAssociationFailedPayload(BaseModel):
@@ -270,6 +301,17 @@ class DecisionAssociationFailedPayload(BaseModel):
     project_id: str = Field(..., pattern=PROJECT_ID_REGEX)
     decision_id: str = Field(..., min_length=1, max_length=128)
     relation: str = Field(default="governs")
-    correlation_id: str = Field(..., min_length=1, max_length=128)
-    idempotency_key: str = Field(..., min_length=1, max_length=128)
     reason: str = Field(..., min_length=1, max_length=512)
+    correlation_id: str | None = Field(default=None, max_length=128)
+    idempotency_key: str | None = Field(default=None, max_length=128)
+
+
+SAGA_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
+    "task.association.requested": TaskAssociationRequestedPayload,
+    "task.associated": TaskAssociatedPayload,
+    "task.association.failed": TaskAssociationFailedPayload,
+    "decision.association.requested": DecisionAssociationRequestedPayload,
+    "decision.associated": DecisionAssociatedPayload,
+    "decision.association.failed": DecisionAssociationFailedPayload,
+}
+

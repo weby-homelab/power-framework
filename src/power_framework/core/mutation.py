@@ -29,6 +29,8 @@ except ImportError:  # pragma: no cover - exercised on POSIX
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
+from power_framework.core.lock_tracker import LockHierarchyTracker
+
 from .utils import vault_control_dir
 
 _registry_guard = threading.Lock()
@@ -80,17 +82,18 @@ def vault_mutation(vault_dir: Path) -> Iterator[Path]:
     if not root.is_dir():
         raise NotADirectoryError(f"Vault path is not a directory: {root}")
 
-    lock_path = vault_control_dir(root, create=True) / "mutation.lock"
-    process_lock = _get_vault_lock(root)
-    with process_lock:
-        descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
-        try:
-            _lock_descriptor(descriptor)
-            yield root
-        finally:
-            with contextlib.suppress(OSError):
-                _unlock_descriptor(descriptor)
-            os.close(descriptor)
+    with LockHierarchyTracker.hold_level(LockHierarchyTracker.LEVEL_MUTATION):
+        lock_path = vault_control_dir(root, create=True) / "mutation.lock"
+        process_lock = _get_vault_lock(root)
+        with process_lock:
+            descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                _lock_descriptor(descriptor)
+                yield root
+            finally:
+                with contextlib.suppress(OSError):
+                    _unlock_descriptor(descriptor)
+                os.close(descriptor)
 
 
 def execute_vault_mutation[T](vault_dir: Path, operation: Callable[[], T]) -> T:
