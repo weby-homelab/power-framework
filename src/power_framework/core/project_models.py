@@ -10,6 +10,7 @@ Defines schemas and invariants for:
 
 from __future__ import annotations
 
+import hashlib
 import re
 from enum import StrEnum
 from typing import Any, Literal
@@ -53,6 +54,12 @@ def validate_event_id(event_id: str) -> str:
     if not _EVENT_ID_COMPILED.match(event_id):
         raise ValueError(f"Invalid event_id format: {event_id}. Must match {EVENT_ID_REGEX}")
     return event_id
+
+
+def generate_deterministic_event_id(project_id: str, idempotency_key: str) -> str:
+    """Generate a deterministic, regex-safe event ID from project_id and idempotency_key."""
+    digest = hashlib.sha256(f"{project_id}:{idempotency_key}".encode()).hexdigest()[:24]
+    return f"evt_{digest}"
 
 
 PROJECT_EVENT_TYPES: set[str] = {
@@ -177,7 +184,8 @@ class ProjectEvent(BaseModel):
                 payload_data["correlation_id"] = self.correlation_id
             if "idempotency_key" not in payload_data and self.idempotency_key:
                 payload_data["idempotency_key"] = self.idempotency_key
-            model_cls.model_validate(payload_data)
+            validated = model_cls.model_validate(payload_data)
+            self.payload = validated.model_dump()
         return self
 
 

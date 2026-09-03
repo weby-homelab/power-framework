@@ -17,6 +17,7 @@ Implements:
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import logging
 import os
 import re
@@ -46,6 +47,8 @@ from power_framework.core.project_models import (
     PrivacyMode,
     ProjectEvent,
     RedactionRecord,
+    generate_deterministic_event_id,
+    validate_event_id,
     validate_project_id,
 )
 from power_framework.core.project_store import (
@@ -375,7 +378,6 @@ def append_project_event(
 
     # 3. Apply Privacy Mode Boundaries
     final_payload: dict[str, Any]
-    evidence_refs = list(command.evidence_refs)
     is_saga_event = command.event_type in SAGA_PAYLOAD_MODELS
 
     if privacy_mode == PrivacyMode.METADATA_ONLY:
@@ -392,26 +394,7 @@ def append_project_event(
     elif privacy_mode == PrivacyMode.STRUCTURED_EVENTS or privacy_mode == PrivacyMode.FULL_CONTENT:
         final_payload = cleaned_payload
 
-    target_event_id = command.event_id
-    if privacy_mode == PrivacyMode.FULL_CONTENT:
-        content_to_store = raw_content if raw_content is not None else (extracted_dialogue if extracted_dialogue else None)
-        if content_to_store is not None:
-            if not target_event_id:
-                if command.idempotency_key:
-                    target_event_id = f"evt_{command.project_id}_{command.idempotency_key}"
-                else:
-                    target_event_id = f"evt_{command.project_id}_{uuid.uuid4().hex[:12]}"
-            evidence_ref = store_raw_evidence(
-                vault_root=vault_root,
-                project_id=command.project_id,
-                event_id=target_event_id,
-                raw_content=content_to_store,
-                ttl_days=raw_evidence_ttl_days,
-            )
-            if evidence_ref not in evidence_refs:
-                evidence_refs.append(evidence_ref)
-
-    # 4. Mandatory saga payload contract validation & normalization
+    # 4. Mandatory saga payload contract validation & normalization BEFORE creating any external evidence
     model_cls = SAGA_PAYLOAD_MODELS.get(command.event_type)
     if model_cls is not None:
         if not isinstance(final_payload, dict) or not final_payload:
@@ -427,6 +410,40 @@ def append_project_event(
             payload_data["idempotency_key"] = command.idempotency_key
         validated_saga = model_cls.model_validate(payload_data)
         final_payload = validated_saga.model_dump()
+
+    # 5. Deterministic, regex-safe event_id generation
+    target_event_id = command.event_id
+    if not target_event_id:
+        if command.idempotency_key:
+            target_event_id = generate_deterministic_event_id(command.project_id, command.idempotency_key)
+        else:
+            target_event_id = f"evt_{command.project_id}_{uuid.uuid4().hex[:12]}"
+    validate_event_id(target_event_id)
+
+    # 6. Pre-validate prepared command contract before creating raw evidence file (zero orphan files)
+    evidence_refs = list(command.evidence_refs)
+    test_command = command.model_copy(
+        update={
+            "event_id": target_event_id,
+            "payload": final_payload,
+            "evidence_refs": evidence_refs,
+        }
+    )
+    AppendCommand.model_validate(test_command.model_dump())
+
+    # 7. Store raw evidence ONLY after all command and payload validations have succeeded
+    if privacy_mode == PrivacyMode.FULL_CONTENT:
+        content_to_store = raw_content if raw_content is not None else (extracted_dialogue if extracted_dialogue else None)
+        if content_to_store is not None:
+            evidence_ref = store_raw_evidence(
+                vault_root=vault_root,
+                project_id=command.project_id,
+                event_id=target_event_id,
+                raw_content=content_to_store,
+                ttl_days=raw_evidence_ttl_days,
+            )
+            if evidence_ref not in evidence_refs:
+                evidence_refs.append(evidence_ref)
 
     prepared_command = command.model_copy(
         update={
@@ -451,7 +468,14 @@ def import_project_events(
     events: list[ProjectEvent | dict[str, Any]],
     timeout: float = 10.0,
 ) -> int:
-    """Import an existing valid chain of events into the project ledger."""
+    """Import an existing valid chain of events into the project ledger.
+
+    Atomicity Contract:
+    Provides complete batch pre-validation with zero canonical ledger mutation on
+    validation/contract failure, followed by ordered durable append and fsync;
+    torn-tail recovery protects interrupted physical writes.
+    Note: does not claim physical crash-atomic multi-record transaction.
+    """
     validate_project_id(project_id)
     store = ProjectEventStore(project_id, vault_root)
 
@@ -536,7 +560,7 @@ def import_project_events(
             curr_seq = ev.sequence
             curr_hash = ev.event_hash
 
-        # 4. Atomic all-or-nothing write
+        # 4. Ordered durable batch append with fsync
         if store.active_events_file.is_symlink():
             raise ValueError(f"Active event file must not be a symlink: {store.active_events_file}")
         try:
@@ -576,6 +600,14 @@ def replay_project(
 # ---------------------------------------------------------------------------
 
 def _get_sqlite_path(vault_root: Path) -> Path:
+    """Resolve and validate secondary SQLite database path.
+
+    Boundary & Symlink Defense:
+    Canonical event ledgers and raw evidence files strictly enforce race-free O_NOFOLLOW
+    atomic opens and boundary verification. Secondary SQLite index projections are
+    disposable derived caches and are protected by path resolution and symlink checks
+    without kernel-level O_NOFOLLOW TOCTOU guarantees at the SQLite core layer.
+    """
     resolved_root = validate_vault_root(vault_root)
 
     power_dir = resolved_root / ".power"
@@ -1090,8 +1122,7 @@ def reconcile_project_subsystems(
             relation = payload.get("relation", "contributes_to")
             limit = min(payload.get("max_attempts", max_attempts), max_attempts)
             history_attempts = requested_counts.get(key, 0)
-            base_attempt = max(history_attempts, payload.get("attempt", 1))
-            current_attempt = _get_reconcile_attempt(tracker, key, base_attempt)
+            past_attempts = max(history_attempts, payload.get("attempt", 1))
 
             task_exists = False
             if task_service is not None:
@@ -1102,6 +1133,8 @@ def reconcile_project_subsystems(
 
             if task_exists:
                 idempotency_key = f"rec_task_{task_id}_{corr_id}"
+                if len(idempotency_key) > 128:
+                    idempotency_key = f"rec_task_{hashlib.sha256(f'{task_id}:{corr_id}'.encode()).hexdigest()[:32]}"
                 cmd = AppendCommand(
                     project_id=project_id,
                     event_type="task.associated",
@@ -1121,11 +1154,35 @@ def reconcile_project_subsystems(
                 reconciled_tasks += 1
                 _pop_reconcile_attempt(tracker, key)
             else:
-                if current_attempt < limit:
-                    _set_reconcile_attempt(tracker, key, current_attempt + 1)
+                if past_attempts < limit:
+                    next_attempt = past_attempts + 1
+                    retry_idem = f"reconcile:{corr_id}:attempt:{next_attempt}"
+                    if len(retry_idem) > 128:
+                        retry_idem = f"reconcile:{hashlib.sha256(corr_id.encode()).hexdigest()[:24]}:attempt:{next_attempt}"
+                    cmd = AppendCommand(
+                        project_id=project_id,
+                        event_type="task.association.requested",
+                        payload={
+                            "project_id": project_id,
+                            "task_id": task_id,
+                            "relation": relation,
+                            "correlation_id": corr_id,
+                            "idempotency_key": retry_idem,
+                            "attempt": next_attempt,
+                            "max_attempts": limit,
+                        },
+                        actor="system:reconciler",
+                        source="reconciliation",
+                        correlation_id=corr_id,
+                        idempotency_key=retry_idem,
+                    )
+                    store.append(cmd)
+                    _set_reconcile_attempt(tracker, key, next_attempt)
                     pending_tasks += 1
                 else:
                     idempotency_key = f"rec_task_fail_{task_id}_{corr_id}"
+                    if len(idempotency_key) > 128:
+                        idempotency_key = f"rec_task_fail_{hashlib.sha256(f'{task_id}:{corr_id}'.encode()).hexdigest()[:32]}"
                     cmd = AppendCommand(
                         project_id=project_id,
                         event_type="task.association.failed",
@@ -1133,7 +1190,7 @@ def reconcile_project_subsystems(
                             "project_id": project_id,
                             "task_id": task_id,
                             "relation": relation,
-                            "reason": f"Task {task_id} not found in TaskStore after {current_attempt} attempts",
+                            "reason": f"Task {task_id} not found in TaskStore after {past_attempts} attempts",
                             "correlation_id": corr_id,
                             "idempotency_key": idempotency_key,
                         },
@@ -1152,8 +1209,7 @@ def reconcile_project_subsystems(
             relation = payload.get("relation", "governs")
             limit = min(payload.get("max_attempts", max_attempts), max_attempts)
             history_attempts = requested_counts.get(key, 0)
-            base_attempt = max(history_attempts, payload.get("attempt", 1))
-            current_attempt = _get_reconcile_attempt(tracker, key, base_attempt)
+            past_attempts = max(history_attempts, payload.get("attempt", 1))
 
             dec_exists = False
             if decision_service is not None:
@@ -1164,6 +1220,8 @@ def reconcile_project_subsystems(
 
             if dec_exists:
                 idempotency_key = f"rec_dec_{decision_id}_{corr_id}"
+                if len(idempotency_key) > 128:
+                    idempotency_key = f"rec_dec_{hashlib.sha256(f'{decision_id}:{corr_id}'.encode()).hexdigest()[:32]}"
                 cmd = AppendCommand(
                     project_id=project_id,
                     event_type="decision.associated",
@@ -1183,11 +1241,35 @@ def reconcile_project_subsystems(
                 reconciled_decisions += 1
                 _pop_reconcile_attempt(tracker, key)
             else:
-                if current_attempt < limit:
-                    _set_reconcile_attempt(tracker, key, current_attempt + 1)
+                if past_attempts < limit:
+                    next_attempt = past_attempts + 1
+                    retry_idem = f"reconcile:{corr_id}:attempt:{next_attempt}"
+                    if len(retry_idem) > 128:
+                        retry_idem = f"reconcile:{hashlib.sha256(corr_id.encode()).hexdigest()[:24]}:attempt:{next_attempt}"
+                    cmd = AppendCommand(
+                        project_id=project_id,
+                        event_type="decision.association.requested",
+                        payload={
+                            "project_id": project_id,
+                            "decision_id": decision_id,
+                            "relation": relation,
+                            "correlation_id": corr_id,
+                            "idempotency_key": retry_idem,
+                            "attempt": next_attempt,
+                            "max_attempts": limit,
+                        },
+                        actor="system:reconciler",
+                        source="reconciliation",
+                        correlation_id=corr_id,
+                        idempotency_key=retry_idem,
+                    )
+                    store.append(cmd)
+                    _set_reconcile_attempt(tracker, key, next_attempt)
                     pending_decisions += 1
                 else:
                     idempotency_key = f"rec_dec_fail_{decision_id}_{corr_id}"
+                    if len(idempotency_key) > 128:
+                        idempotency_key = f"rec_dec_fail_{hashlib.sha256(f'{decision_id}:{corr_id}'.encode()).hexdigest()[:32]}"
                     cmd = AppendCommand(
                         project_id=project_id,
                         event_type="decision.association.failed",
@@ -1195,7 +1277,7 @@ def reconcile_project_subsystems(
                             "project_id": project_id,
                             "decision_id": decision_id,
                             "relation": relation,
-                            "reason": f"Decision {decision_id} not found in DecisionService after {current_attempt} attempts",
+                            "reason": f"Decision {decision_id} not found in DecisionService after {past_attempts} attempts",
                             "correlation_id": corr_id,
                             "idempotency_key": idempotency_key,
                         },

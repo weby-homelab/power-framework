@@ -19,6 +19,7 @@ Validates all Phase 2 requirements and gates G2.1 - G2.7:
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import stat
 import threading
@@ -52,12 +53,15 @@ from power_framework.core.project_ingestion import (
     store_raw_evidence,
 )
 from power_framework.core.project_models import (
+    EVENT_ID_REGEX,
     AppendCommand,
     IdempotencyConflictError,
     LedgerIntegrityError,
     PrivacyMode,
     ProjectEvent,
     RedactionRecord,
+    generate_deterministic_event_id,
+    validate_event_id,
     validate_project_id,
 )
 from power_framework.core.project_store import (
@@ -1924,48 +1928,152 @@ def test_replay_enforces_strict_rotation_filename_pattern(vault_root: Path) -> N
 
 
 def test_reconciliation_retry_state_survives_process_restart(vault_root: Path) -> None:
-    """Reconciliation retry count must be recovered from ledger history when RAM cache is wiped."""
+    """True crash/restart scenario: each retry appends a new requested event to canonical ledger.
+
+    Reconciliation retry count must survive complete in-memory state wipes across multiple attempts.
+    """
     pid = "prj_recon_restart"
-    # Append attempt 1
+    # Initial task.association.requested (attempt=1)
     append_project_event(
         vault_root,
         AppendCommand(
             project_id=pid,
             event_type="task.association.requested",
-            payload={"project_id": pid, "task_id": "tsk_missing_restart", "relation": "contributes_to"},
+            payload={"project_id": pid, "task_id": "tsk_missing_restart", "relation": "contributes_to", "max_attempts": 3},
             actor="system:test",
             source="cli",
-            correlation_id="corr_restart_1",
-        ),
-    )
-    # Append attempt 2
-    append_project_event(
-        vault_root,
-        AppendCommand(
-            project_id=pid,
-            event_type="task.association.requested",
-            payload={"project_id": pid, "task_id": "tsk_missing_restart", "relation": "contributes_to"},
-            actor="system:test",
-            source="cli",
-            correlation_id="corr_restart_1",
+            correlation_id="corr_restart_task_1",
         ),
     )
 
-    # Simulate process crash / restart: wipe RAM tracker completely
-    _reconciliation_attempts.clear()
+    task_service = MockTaskService(existing_task_ids=set())
 
-    # Reconcile with max_attempts=2; since 2 requests exist in ledger, it should transition to failed
-    report = reconcile_project_subsystems(
+    # Run #1 -> returns pending and writes requested attempt=2 to canonical ledger
+    report_1 = reconcile_project_subsystems(
         vault_root=vault_root,
         project_id=pid,
-        task_service=MockTaskService(existing_task_ids=set()),
-        max_attempts=2,
+        task_service=task_service,
+        max_attempts=3,
     )
-    assert report["failed_tasks"] == 1
-    assert report["pending_tasks"] == 0
+    assert report_1["pending_tasks"] == 1
+    assert report_1["failed_tasks"] == 0
+    assert report_1["reconciled_tasks"] == 0
 
-    events = list(replay_project(vault_root, pid))
-    assert any(e.event_type == "task.association.failed" for e in events)
+    events_after_1 = list(replay_project(vault_root, pid))
+    assert len(events_after_1) == 2
+    assert events_after_1[1].event_type == "task.association.requested"
+    assert events_after_1[1].payload.get("attempt") == 2
+
+    # Simulate process crash / restart: wipe ALL in-memory tracker state
+    _reconciliation_attempts.clear()
+
+    # Run #2 -> reads 2 attempts from canonical ledger, returns pending, writes requested attempt=3
+    report_2 = reconcile_project_subsystems(
+        vault_root=vault_root,
+        project_id=pid,
+        task_service=task_service,
+        max_attempts=3,
+    )
+    assert report_2["pending_tasks"] == 1
+    assert report_2["failed_tasks"] == 0
+    assert report_2["reconciled_tasks"] == 0
+
+    events_after_2 = list(replay_project(vault_root, pid))
+    assert len(events_after_2) == 3
+    assert events_after_2[2].event_type == "task.association.requested"
+    assert events_after_2[2].payload.get("attempt") == 3
+
+    # Simulate process crash / restart again: wipe ALL in-memory tracker state
+    _reconciliation_attempts.clear()
+
+    # Run #3 -> attempts exhausted (3 >= 3), appends task.association.failed
+    report_3 = reconcile_project_subsystems(
+        vault_root=vault_root,
+        project_id=pid,
+        task_service=task_service,
+        max_attempts=3,
+    )
+    assert report_3["failed_tasks"] == 1
+    assert report_3["pending_tasks"] == 0
+    assert report_3["reconciled_tasks"] == 0
+
+    events_after_3 = list(replay_project(vault_root, pid))
+    assert len(events_after_3) == 4
+    assert events_after_3[3].event_type == "task.association.failed"
+    assert "after 3 attempts" in events_after_3[3].payload.get("reason", "")
+
+
+def test_reconciliation_decision_retry_state_survives_process_restart(vault_root: Path) -> None:
+    """Decision saga true crash/restart scenario surviving in-memory state wipes."""
+    pid = "prj_recon_restart_dec"
+    # Initial decision.association.requested (attempt=1)
+    append_project_event(
+        vault_root,
+        AppendCommand(
+            project_id=pid,
+            event_type="decision.association.requested",
+            payload={"project_id": pid, "decision_id": "dec_missing_restart", "relation": "governs", "max_attempts": 3},
+            actor="system:test",
+            source="cli",
+            correlation_id="corr_restart_dec_1",
+        ),
+    )
+
+    decision_service = MockDecisionService(existing_decision_ids=set())
+
+    # Run #1 -> returns pending and writes requested attempt=2 to canonical ledger
+    report_1 = reconcile_project_subsystems(
+        vault_root=vault_root,
+        project_id=pid,
+        decision_service=decision_service,
+        max_attempts=3,
+    )
+    assert report_1["pending_decisions"] == 1
+    assert report_1["failed_decisions"] == 0
+    assert report_1["reconciled_decisions"] == 0
+
+    events_after_1 = list(replay_project(vault_root, pid))
+    assert len(events_after_1) == 2
+    assert events_after_1[1].event_type == "decision.association.requested"
+    assert events_after_1[1].payload.get("attempt") == 2
+
+    # Simulate process crash / restart
+    _reconciliation_attempts.clear()
+
+    # Run #2 -> reads 2 attempts from ledger, returns pending, writes requested attempt=3
+    report_2 = reconcile_project_subsystems(
+        vault_root=vault_root,
+        project_id=pid,
+        decision_service=decision_service,
+        max_attempts=3,
+    )
+    assert report_2["pending_decisions"] == 1
+    assert report_2["failed_decisions"] == 0
+    assert report_2["reconciled_decisions"] == 0
+
+    events_after_2 = list(replay_project(vault_root, pid))
+    assert len(events_after_2) == 3
+    assert events_after_2[2].event_type == "decision.association.requested"
+    assert events_after_2[2].payload.get("attempt") == 3
+
+    # Simulate process crash / restart
+    _reconciliation_attempts.clear()
+
+    # Run #3 -> attempts exhausted (3 >= 3), appends decision.association.failed
+    report_3 = reconcile_project_subsystems(
+        vault_root=vault_root,
+        project_id=pid,
+        decision_service=decision_service,
+        max_attempts=3,
+    )
+    assert report_3["failed_decisions"] == 1
+    assert report_3["pending_decisions"] == 0
+    assert report_3["reconciled_decisions"] == 0
+
+    events_after_3 = list(replay_project(vault_root, pid))
+    assert len(events_after_3) == 4
+    assert events_after_3[3].event_type == "decision.association.failed"
+    assert "after 3 attempts" in events_after_3[3].payload.get("reason", "")
 
 
 def test_reconciliation_correlation_id_isolation_across_projects(vault_root: Path) -> None:
@@ -2115,3 +2223,61 @@ def test_symlink_escape_audit_across_all_phase2_writable_paths(vault_root: Path,
     with pytest.raises(ValueError, match="symlink"):
         _get_sqlite_path(vault_root)
     db_path.unlink()
+
+
+def test_deterministic_event_id_generation_and_regex_safety() -> None:
+    """Test deterministic event_id generation from arbitrary complex idempotency keys."""
+    pid = "prj_evt_id_test"
+    # Idempotency key with ':', '/', spaces, Unicode, and max length 128
+    complex_key_1 = "action:create/entity:тест 🚀 123 " + "x" * 80
+    assert len(complex_key_1) <= 128
+
+    complex_key_2 = "action:create/entity:тест 🚀 123 " + "y" * 80
+    assert len(complex_key_2) <= 128
+
+    # 1. Determinism: same key produces identical ID
+    id_1a = generate_deterministic_event_id(pid, complex_key_1)
+    id_1b = generate_deterministic_event_id(pid, complex_key_1)
+    assert id_1a == id_1b
+
+    # 2. Distinctness: two different keys produce different IDs
+    id_2 = generate_deterministic_event_id(pid, complex_key_2)
+    assert id_1a != id_2
+
+    # 3. Regex safety: matches ^evt_[a-z0-9_-]{8,64}$ and canonical EVENT_ID_REGEX
+    pattern = re.compile(r"^evt_[a-z0-9_-]{8,64}$")
+    assert pattern.match(id_1a)
+    assert pattern.match(id_2)
+    assert re.match(EVENT_ID_REGEX, id_1a)
+    assert re.match(EVENT_ID_REGEX, id_2)
+    validate_event_id(id_1a)
+    validate_event_id(id_2)
+
+
+def test_command_validation_failure_leaves_zero_orphan_raw_evidence(vault_root: Path) -> None:
+    """Failed command or saga validation must not create orphan raw evidence files."""
+    pid = "prj_no_orphan_evidence"
+    evidence_dir = vault_root / ".power" / "raw-evidence" / pid
+
+    # Invalid saga payload (missing mandatory task_id) with full-content privacy mode
+    cmd_invalid = AppendCommand.model_construct(
+        project_id=pid,
+        event_type="task.association.requested",
+        payload={"relation": "contributes_to"},  # missing task_id
+        actor="user:rekvizitor",
+        source="cli",
+        idempotency_key="idem_invalid_saga_key",
+    )
+
+    with pytest.raises((ValueError, ValidationError)):
+        append_project_event(
+            vault_root,
+            cmd_invalid,
+            privacy_mode=PrivacyMode.FULL_CONTENT,
+            raw_content={"transcript": "sensitive dialogue that should not leak as orphan"},
+        )
+
+    # Verify zero files created in raw evidence directory
+    if evidence_dir.exists():
+        files = list(evidence_dir.glob("*.json"))
+        assert len(files) == 0, f"Orphan evidence files were created: {files}"

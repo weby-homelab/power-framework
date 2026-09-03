@@ -45,6 +45,7 @@ from power_framework.core.project_models import (
     LedgerIntegrityError,
     LedgerVerificationResult,
     ProjectEvent,
+    generate_deterministic_event_id,
     validate_project_id,
 )
 
@@ -411,7 +412,12 @@ class ProjectEventStore:
 
             # 5. Build event
             timestamp = command.timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
-            event_id = command.event_id or f"evt_{self.project_id}_{new_sequence}_{uuid.uuid4().hex[:12]}"
+            if command.event_id:
+                event_id = command.event_id
+            elif command.idempotency_key:
+                event_id = generate_deterministic_event_id(self.project_id, command.idempotency_key)
+            else:
+                event_id = f"evt_{self.project_id}_{new_sequence}_{uuid.uuid4().hex[:12]}"
             payload_digest = compute_payload_digest(command.payload)
 
             raw_envelope: dict[str, Any] = {
