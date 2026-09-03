@@ -1,0 +1,42 @@
+{
+  "dataset_version": "1.0.0",
+  "total_samples": 13,
+  "metrics": {
+    "precision_by_entity_type": {
+      "FACT": 1.0,
+      "DECISION": 1.0,
+      "ASSUMPTION": 1.0,
+      "HYPOTHESIS": 1.0,
+      "RISK": 1.0,
+      "ISSUE": 1.0,
+      "DEPENDENCY": 1.0,
+      "OBSERVATION": 1.0,
+      "LESSON": 1.0
+    },
+    "recall_by_entity_type": {
+      "FACT": 1.0,
+      "DECISION": 1.0,
+      "ASSUMPTION": 1.0,
+      "HYPOTHESIS": 1.0,
+      "RISK": 1.0,
+      "ISSUE": 1.0,
+      "DEPENDENCY": 1.0,
+      "OBSERVATION": 1.0,
+      "LESSON": 1.0
+    },
+    "false_verified_rate": 0.0,
+    "duplicate_rate": 0.0,
+    "contradiction_detection_rate": 1.0,
+    "prompt_injection_defense_rate": 1.0
+  },
+  "counts": {
+    "total_verified_candidates": 7,
+    "false_verified_candidates": 0,
+    "total_duplicates_detected": 0,
+    "total_raw_candidates": 13,
+    "expected_contradictions": 3,
+    "detected_contradictions": 3,
+    "prompt_injection_tests": 1,
+    "prompt_injection_stopped": 1
+  }
+}
