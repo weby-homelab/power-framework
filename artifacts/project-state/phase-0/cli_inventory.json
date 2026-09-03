@@ -1,0 +1,3473 @@
+{
+  "schema_version": "power.pse.cli-inventory.v1",
+  "prog": "power",
+  "top_level_command_count": 26,
+  "top_level_commands": [
+    "archive",
+    "cache",
+    "connect",
+    "control-plane",
+    "cron",
+    "doctor",
+    "handoff",
+    "heal",
+    "import",
+    "index",
+    "ingest",
+    "init",
+    "integrations",
+    "lint",
+    "maintenance",
+    "markdown-check",
+    "memory",
+    "migrate-state",
+    "rename",
+    "rot",
+    "search",
+    "status",
+    "suggest-related",
+    "sync",
+    "synthesize",
+    "task"
+  ],
+  "tree": {
+    "prog": "power",
+    "description": "P.O.W.E.R. 3.7.11 — Hybrid Knowledge Management Framework",
+    "arguments": [
+      {
+        "option_strings": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "required": false,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit",
+        "type": null
+      },
+      {
+        "option_strings": [
+          "-v",
+          "--version"
+        ],
+        "dest": "version",
+        "required": false,
+        "default": "==SUPPRESS==",
+        "help": "show program's version number and exit",
+        "type": null
+      },
+      {
+        "option_strings": [
+          "--verbose"
+        ],
+        "dest": "verbose",
+        "required": false,
+        "default": "False",
+        "help": "Enable verbose logging (DEBUG level)",
+        "type": null
+      }
+    ],
+    "subcommands": {
+      "init": {
+        "prog": "power init",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "lint": {
+        "prog": "power lint",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "index": {
+        "prog": "power index",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--strict"
+            ],
+            "dest": "strict",
+            "required": false,
+            "default": "False",
+            "help": "Return non-zero when invalid notes were skipped (useful for CI)",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "ingest": {
+        "prog": "power ingest",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--type",
+              "-t"
+            ],
+            "dest": "type",
+            "required": true,
+            "default": null,
+            "help": "OKF note type",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--title"
+            ],
+            "dest": "title",
+            "required": true,
+            "default": null,
+            "help": "Note title",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--description"
+            ],
+            "dest": "description",
+            "required": true,
+            "default": null,
+            "help": "Short summary (max 150 chars)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--resource"
+            ],
+            "dest": "resource",
+            "required": false,
+            "default": null,
+            "help": "External URL (optional)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--tags"
+            ],
+            "dest": "tags",
+            "required": false,
+            "default": "[]",
+            "help": "Markdown tags",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--overwrite"
+            ],
+            "dest": "overwrite",
+            "required": false,
+            "default": "False",
+            "help": "Overwrite existing note",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--domain"
+            ],
+            "dest": "domain",
+            "required": false,
+            "default": null,
+            "help": "Domain slug; without it, configured domain rules route the note automatically",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "import": {
+        "prog": "power import",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "source",
+            "required": true,
+            "default": null,
+            "help": "Source directory containing Markdown notes",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--into"
+            ],
+            "dest": "into",
+            "required": true,
+            "default": null,
+            "help": "Vault-relative destination folder, for example 03_Resources",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--path"
+            ],
+            "dest": "path",
+            "required": false,
+            "default": null,
+            "help": "Target vault path (defaults to POWER_VAULT_DIR or the current directory)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--policy"
+            ],
+            "dest": "policy",
+            "required": false,
+            "default": "strict",
+            "help": "Foreign frontmatter policy (default: strict)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--dry-run"
+            ],
+            "dest": "dry_run",
+            "required": false,
+            "default": "False",
+            "help": "Only print the deterministic plan; do not write notes or indexes",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--allow-partial"
+            ],
+            "dest": "allow_partial",
+            "required": false,
+            "default": "False",
+            "help": "Import valid notes even when some source notes remain excluded",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "search": {
+        "prog": "power search",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "query",
+            "required": true,
+            "default": null,
+            "help": "Search query (supports multiple terms and \"quoted phrases\")",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--temporal-view"
+            ],
+            "dest": "temporal_view",
+            "required": false,
+            "default": "current",
+            "help": "Lifecycle projection: current (default), historical, or all including conflicts",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--as-of"
+            ],
+            "dest": "as_of",
+            "required": false,
+            "default": null,
+            "help": "Inclusive lifecycle boundary in ISO date format (YYYY-MM-DD)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--max-results"
+            ],
+            "dest": "max_results",
+            "required": false,
+            "default": "20",
+            "help": "Maximum number of results (default: 20)",
+            "type": "<class 'int'>"
+          },
+          {
+            "option_strings": [
+              "--mode"
+            ],
+            "dest": "mode",
+            "required": false,
+            "default": "auto",
+            "help": "Search mode: \"auto\" (default; verified dense or FTS), \"fts\" (BM25), \"vector\" (TF cosine), \"hybrid\" (RRF merged), or \"semantic\" (explicit dense embedding); \"reranked\" is an explicit opt-in. \"auto\" falls back to FTS when dense is not ready, and \"hybrid_reranked\" is a deprecated alias.",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--domain"
+            ],
+            "dest": "domain",
+            "required": false,
+            "default": null,
+            "help": "Optional domain slug to scope the search",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--json"
+            ],
+            "dest": "json",
+            "required": false,
+            "default": "False",
+            "help": "Emit retrieval data as versioned JSON",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--envelope"
+            ],
+            "dest": "envelope",
+            "required": false,
+            "default": "False",
+            "help": "Emit the full application envelope as JSON",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "cache": {
+        "prog": "power cache",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          }
+        ],
+        "subcommands": {
+          "list": {
+            "prog": "power cache list",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "prune": {
+            "prog": "power cache prune",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--no-dry-run"
+                ],
+                "dest": "dry_run",
+                "required": false,
+                "default": "True",
+                "help": "Actually delete; default is a preview only",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--include-unknown"
+                ],
+                "dest": "include_unknown",
+                "required": false,
+                "default": "False",
+                "help": "Also remove namespaces with no source record. These predate the back-reference and cannot be attributed to any vault",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          }
+        }
+      },
+      "doctor": {
+        "prog": "power doctor",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": false,
+            "default": null,
+            "help": "Optional vault path to inspect without creating cache or index state",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--json"
+            ],
+            "dest": "json",
+            "required": false,
+            "default": "False",
+            "help": "Emit the versioned machine-readable report to stdout",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--probe-provider"
+            ],
+            "dest": "probe_provider",
+            "required": false,
+            "default": "False",
+            "help": "Explicitly probe the configured provider without downloading a model",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "integrations": {
+        "prog": "power integrations",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          }
+        ],
+        "subcommands": {
+          "doctor": {
+            "prog": "power integrations doctor",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "mcp-config": {
+            "prog": "power integrations mcp-config",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": "Path to the POWER vault",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--client"
+                ],
+                "dest": "client",
+                "required": false,
+                "default": "auto",
+                "help": "Client to configure",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--config"
+                ],
+                "dest": "config",
+                "required": false,
+                "default": null,
+                "help": "Explicit client config path",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--executable"
+                ],
+                "dest": "executable",
+                "required": false,
+                "default": "/root/.local/bin/power-mcp",
+                "help": "Managed MCP launcher (default: ~/.local/bin/power-mcp)",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--remove"
+                ],
+                "dest": "remove",
+                "required": false,
+                "default": "False",
+                "help": "Plan removal",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--apply"
+                ],
+                "dest": "apply",
+                "required": false,
+                "default": "False",
+                "help": "Apply the plan",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": "Explicitly approve the config write",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--plan-output"
+                ],
+                "dest": "plan_output",
+                "required": false,
+                "default": null,
+                "help": "Write the plan to JSON",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "skill-check": {
+            "prog": "power integrations skill-check",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--target"
+                ],
+                "dest": "target",
+                "required": false,
+                "default": "/root/.agents/skills/power",
+                "help": "Skill target directory",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "skill-install": {
+            "prog": "power integrations skill-install",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--target"
+                ],
+                "dest": "target",
+                "required": false,
+                "default": "/root/.agents/skills/power",
+                "help": "Skill target directory",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--apply"
+                ],
+                "dest": "apply",
+                "required": false,
+                "default": "False",
+                "help": "Apply the plan",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": "Explicitly approve the Skill write",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "install": {
+            "prog": "power integrations install",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--home"
+                ],
+                "dest": "home",
+                "required": false,
+                "default": null,
+                "help": "Disposable HOME root for the managed profile",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--power-wheel"
+                ],
+                "dest": "power_wheel",
+                "required": true,
+                "default": null,
+                "help": "Exact POWER framework wheel",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--manifest"
+                ],
+                "dest": "manifest",
+                "required": true,
+                "default": null,
+                "help": "Content-addressed power.release.manifest.v1",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--dependency-lock"
+                ],
+                "dest": "dependency_lock",
+                "required": true,
+                "default": null,
+                "help": "Hash-pinned native dependency requirements artifact from the release",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--apply"
+                ],
+                "dest": "apply",
+                "required": false,
+                "default": "False",
+                "help": "Apply the plan",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": "Explicitly approve the native install",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          }
+        }
+      },
+      "connect": {
+        "prog": "power connect",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the POWER vault",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--client"
+            ],
+            "dest": "client",
+            "required": false,
+            "default": "auto",
+            "help": "Client to configure (default: detect an existing supported client config)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--config"
+            ],
+            "dest": "config",
+            "required": false,
+            "default": null,
+            "help": "Explicit client config path; required when the config does not exist yet",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--executable"
+            ],
+            "dest": "executable",
+            "required": false,
+            "default": "/root/.local/bin/power-mcp",
+            "help": "Managed power-mcp launcher used by the local stdio server command",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--remove"
+            ],
+            "dest": "remove",
+            "required": false,
+            "default": "False",
+            "help": "Plan removal of the POWER-owned entry",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--apply"
+            ],
+            "dest": "apply",
+            "required": false,
+            "default": "False",
+            "help": "Apply the plan after --approved",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--approved"
+            ],
+            "dest": "approved",
+            "required": false,
+            "default": "False",
+            "help": "Explicitly approve the requested config write",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--plan-file"
+            ],
+            "dest": "plan_file",
+            "required": false,
+            "default": null,
+            "help": "Read an exact previously generated plan from JSON",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--plan-output"
+            ],
+            "dest": "plan_output",
+            "required": false,
+            "default": null,
+            "help": "Write the content-free plan to this JSON path",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "memory": {
+        "prog": "power memory",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          }
+        ],
+        "subcommands": {
+          "context": {
+            "prog": "power memory context",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "query",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "propose": {
+            "prog": "power memory propose",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "note_path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "content",
+                "required": false,
+                "default": null,
+                "help": "Deprecated positional content is rejected to keep secrets out of argv",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--content-file"
+                ],
+                "dest": "content_file",
+                "required": false,
+                "default": null,
+                "help": "Read proposal content from a local file",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--content-stdin"
+                ],
+                "dest": "content_stdin",
+                "required": false,
+                "default": "False",
+                "help": "Read proposal content from stdin",
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "apply": {
+            "prog": "power memory apply",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "proposal",
+                "required": false,
+                "default": null,
+                "help": "Deprecated positional proposal JSON is rejected to keep secrets out of argv",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--proposal-file"
+                ],
+                "dest": "proposal_file",
+                "required": false,
+                "default": null,
+                "help": "Read durable proposal JSON from a local file",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--proposal-stdin"
+                ],
+                "dest": "proposal_stdin",
+                "required": false,
+                "default": "False",
+                "help": "Read durable proposal JSON from stdin",
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "validate": {
+            "prog": "power memory validate",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "history": {
+            "prog": "power memory history",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          }
+        }
+      },
+      "handoff": {
+        "prog": "power handoff",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          }
+        ],
+        "subcommands": {
+          "create": {
+            "prog": "power handoff create",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--objective"
+                ],
+                "dest": "objective",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--owner"
+                ],
+                "dest": "owner",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--scope"
+                ],
+                "dest": "scope",
+                "required": false,
+                "default": "[]",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--authority"
+                ],
+                "dest": "authority",
+                "required": false,
+                "default": "read-only",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--source-revision"
+                ],
+                "dest": "source_revision",
+                "required": false,
+                "default": "unknown",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": "inspect",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--profile"
+                ],
+                "dest": "profile",
+                "required": false,
+                "default": "standard",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--required-approval"
+                ],
+                "dest": "required_approval",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "list": {
+            "prog": "power handoff list",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "show": {
+            "prog": "power handoff show",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "resume": {
+            "prog": "power handoff resume",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--expected-revision"
+                ],
+                "dest": "expected_revision",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": "<class 'int'>"
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--blocker"
+                ],
+                "dest": "blocker",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--required-approval"
+                ],
+                "dest": "required_approval",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--receipt-id"
+                ],
+                "dest": "receipt_id",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-postcondition"
+                ],
+                "dest": "completion_postcondition",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--changed-artifacts"
+                ],
+                "dest": "changed_artifacts",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--phase"
+                ],
+                "dest": "phase",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "checkpoint": {
+            "prog": "power handoff checkpoint",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--expected-revision"
+                ],
+                "dest": "expected_revision",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": "<class 'int'>"
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--blocker"
+                ],
+                "dest": "blocker",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--required-approval"
+                ],
+                "dest": "required_approval",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--receipt-id"
+                ],
+                "dest": "receipt_id",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-postcondition"
+                ],
+                "dest": "completion_postcondition",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--changed-artifacts"
+                ],
+                "dest": "changed_artifacts",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--phase"
+                ],
+                "dest": "phase",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "input-required": {
+            "prog": "power handoff input-required",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--expected-revision"
+                ],
+                "dest": "expected_revision",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": "<class 'int'>"
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--blocker"
+                ],
+                "dest": "blocker",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--required-approval"
+                ],
+                "dest": "required_approval",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--receipt-id"
+                ],
+                "dest": "receipt_id",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-postcondition"
+                ],
+                "dest": "completion_postcondition",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--changed-artifacts"
+                ],
+                "dest": "changed_artifacts",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--phase"
+                ],
+                "dest": "phase",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "complete": {
+            "prog": "power handoff complete",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--expected-revision"
+                ],
+                "dest": "expected_revision",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": "<class 'int'>"
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--blocker"
+                ],
+                "dest": "blocker",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--required-approval"
+                ],
+                "dest": "required_approval",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--receipt-id"
+                ],
+                "dest": "receipt_id",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-postcondition"
+                ],
+                "dest": "completion_postcondition",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--changed-artifacts"
+                ],
+                "dest": "changed_artifacts",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--phase"
+                ],
+                "dest": "phase",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "fail": {
+            "prog": "power handoff fail",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--expected-revision"
+                ],
+                "dest": "expected_revision",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": "<class 'int'>"
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--blocker"
+                ],
+                "dest": "blocker",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--required-approval"
+                ],
+                "dest": "required_approval",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--receipt-id"
+                ],
+                "dest": "receipt_id",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-postcondition"
+                ],
+                "dest": "completion_postcondition",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--changed-artifacts"
+                ],
+                "dest": "changed_artifacts",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--phase"
+                ],
+                "dest": "phase",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "cancel": {
+            "prog": "power handoff cancel",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--expected-revision"
+                ],
+                "dest": "expected_revision",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": "<class 'int'>"
+              },
+              {
+                "option_strings": [
+                  "--approved"
+                ],
+                "dest": "approved",
+                "required": false,
+                "default": "False",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--blocker"
+                ],
+                "dest": "blocker",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--required-approval"
+                ],
+                "dest": "required_approval",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--receipt-id"
+                ],
+                "dest": "receipt_id",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-postcondition"
+                ],
+                "dest": "completion_postcondition",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--changed-artifacts"
+                ],
+                "dest": "changed_artifacts",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--phase"
+                ],
+                "dest": "phase",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          }
+        }
+      },
+      "task": {
+        "prog": "power task",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          }
+        ],
+        "subcommands": {
+          "list": {
+            "prog": "power task list",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--state"
+                ],
+                "dest": "state",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--owner"
+                ],
+                "dest": "owner",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--assignee"
+                ],
+                "dest": "assignee",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--limit"
+                ],
+                "dest": "limit",
+                "required": false,
+                "default": "100",
+                "help": null,
+                "type": "<function _positive_int at 0x71b38e4f3480>"
+              },
+              {
+                "option_strings": [
+                  "--offset"
+                ],
+                "dest": "offset",
+                "required": false,
+                "default": "0",
+                "help": null,
+                "type": "<function _non_negative_int at 0x71b38e4f33d0>"
+              }
+            ],
+            "subcommands": {}
+          },
+          "read": {
+            "prog": "power task read",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "create": {
+            "prog": "power task create",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--title"
+                ],
+                "dest": "title",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--objective"
+                ],
+                "dest": "objective",
+                "required": false,
+                "default": "",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--owner"
+                ],
+                "dest": "owner",
+                "required": false,
+                "default": "local",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--assignee"
+                ],
+                "dest": "assignee",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--state"
+                ],
+                "dest": "state",
+                "required": false,
+                "default": "backlog",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--priority"
+                ],
+                "dest": "priority",
+                "required": false,
+                "default": "normal",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--authority"
+                ],
+                "dest": "authority",
+                "required": false,
+                "default": "read-only",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--kind"
+                ],
+                "dest": "kind",
+                "required": false,
+                "default": "human",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--scope"
+                ],
+                "dest": "scope",
+                "required": false,
+                "default": "[]",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--dependencies"
+                ],
+                "dest": "dependencies",
+                "required": false,
+                "default": "[]",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--source-revision"
+                ],
+                "dest": "source_revision",
+                "required": false,
+                "default": "",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": "inspect",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": "[]",
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--due-at"
+                ],
+                "dest": "due_at",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "transition": {
+            "prog": "power task transition",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--state"
+                ],
+                "dest": "state",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--expected-revision"
+                ],
+                "dest": "expected_revision",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": "<function _positive_int at 0x71b38e4f3480>"
+              },
+              {
+                "option_strings": [
+                  "--actor"
+                ],
+                "dest": "actor",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--idempotency-key"
+                ],
+                "dest": "idempotency_key",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--receipt-id"
+                ],
+                "dest": "receipt_id",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--next-action"
+                ],
+                "dest": "next_action",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--assignee"
+                ],
+                "dest": "assignee",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--open-gates"
+                ],
+                "dest": "open_gates",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--error-ref"
+                ],
+                "dest": "error_ref",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-postcondition"
+                ],
+                "dest": "completion_postcondition",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--completion-artifacts"
+                ],
+                "dest": "completion_artifacts",
+                "required": false,
+                "default": null,
+                "help": null,
+                "type": null
+              }
+            ],
+            "subcommands": {}
+          },
+          "events": {
+            "prog": "power task events",
+            "description": null,
+            "arguments": [
+              {
+                "option_strings": [
+                  "-h",
+                  "--help"
+                ],
+                "dest": "help",
+                "required": false,
+                "default": "==SUPPRESS==",
+                "help": "show this help message and exit",
+                "type": null
+              },
+              {
+                "option_strings": [],
+                "dest": "path",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--task-id"
+                ],
+                "dest": "task_id",
+                "required": true,
+                "default": null,
+                "help": null,
+                "type": null
+              },
+              {
+                "option_strings": [
+                  "--since-sequence"
+                ],
+                "dest": "since_sequence",
+                "required": false,
+                "default": "0",
+                "help": null,
+                "type": "<function _non_negative_int at 0x71b38e4f33d0>"
+              }
+            ],
+            "subcommands": {}
+          }
+        }
+      },
+      "sync": {
+        "prog": "power sync",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--fts-only"
+            ],
+            "dest": "fts_only",
+            "required": false,
+            "default": "False",
+            "help": "Only build the lightweight FTS index (skip embedding generation)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--accept-dense-loss"
+            ],
+            "dest": "accept_dense_loss",
+            "required": false,
+            "default": "False",
+            "help": "Allow --fts-only to replace an existing dense index, discarding embeddings and disabling semantic/hybrid/reranked search",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--force"
+            ],
+            "dest": "force",
+            "required": false,
+            "default": "False",
+            "help": "Force a full rebuild of dense embeddings (required after changing the embedding model/dimension)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--strict"
+            ],
+            "dest": "strict",
+            "required": false,
+            "default": "False",
+            "help": "Fail when any note is excluded (the default coverage policy)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--allow-partial"
+            ],
+            "dest": "allow_partial",
+            "required": false,
+            "default": "False",
+            "help": "Accept excluded notes and exit zero with a complete exclusion receipt",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "rot": {
+        "prog": "power rot",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--extended"
+            ],
+            "dest": "extended",
+            "required": false,
+            "default": "False",
+            "help": "Enable extended A2 scoring (content dedup, link rot, freshness, usage)",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "archive": {
+        "prog": "power archive",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--dry-run"
+            ],
+            "dest": "dry_run",
+            "required": false,
+            "default": "True",
+            "help": "Simulate without moving (default: true)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--no-dry-run"
+            ],
+            "dest": "dry_run",
+            "required": false,
+            "default": "True",
+            "help": "Actually move files",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "status": {
+        "prog": "power status",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": false,
+            "default": null,
+            "help": "Path to the vault directory (optional)",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "control-plane": {
+        "prog": "power control-plane",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--apply"
+            ],
+            "dest": "apply",
+            "required": false,
+            "default": "False",
+            "help": "Write POWER_STATUS.md (default is read-only preview)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--obsidian-base"
+            ],
+            "dest": "obsidian_base",
+            "required": false,
+            "default": "False",
+            "help": "Preview or also write the optional POWER Control.base asset",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--remove-obsidian-base"
+            ],
+            "dest": "remove_obsidian_base",
+            "required": false,
+            "default": "False",
+            "help": "Remove only the generated POWER Control.base asset",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "maintenance": {
+        "prog": "power maintenance",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--apply"
+            ],
+            "dest": "apply",
+            "required": false,
+            "default": "False",
+            "help": "Apply safe_auto actions with explicit approval",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "migrate-state": {
+        "prog": "power migrate-state",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "cron": {
+        "prog": "power cron",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "heal": {
+        "prog": "power heal",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--no-dry-run"
+            ],
+            "dest": "no_dry_run",
+            "required": false,
+            "default": "False",
+            "help": "Actually apply fixes (default: dry run)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--limit"
+            ],
+            "dest": "limit",
+            "required": false,
+            "default": null,
+            "help": "Heal at most N notes then stop (useful for large vaults)",
+            "type": "<class 'int'>"
+          }
+        ],
+        "subcommands": {}
+      },
+      "markdown-check": {
+        "prog": "power markdown-check",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "suggest-related": {
+        "prog": "power suggest-related",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--target"
+            ],
+            "dest": "target",
+            "required": false,
+            "default": null,
+            "help": "Specific note path to find relations for (optional)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--max-results"
+            ],
+            "dest": "max_results",
+            "required": false,
+            "default": "5",
+            "help": "Max suggestions (default: 5)",
+            "type": "<class 'int'>"
+          },
+          {
+            "option_strings": [
+              "--v2"
+            ],
+            "dest": "v2",
+            "required": false,
+            "default": "False",
+            "help": "Use Graph RAG v2 (weighted, explicit-link-aware) suggester",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "synthesize": {
+        "prog": "power synthesize",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--name"
+            ],
+            "dest": "name",
+            "required": true,
+            "default": null,
+            "help": "Note filename (e.g. session_2026.md)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--title"
+            ],
+            "dest": "title",
+            "required": true,
+            "default": null,
+            "help": "Note title",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--description"
+            ],
+            "dest": "description",
+            "required": true,
+            "default": null,
+            "help": "Note description",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--content"
+            ],
+            "dest": "content",
+            "required": true,
+            "default": null,
+            "help": "Note body content",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--note-type"
+            ],
+            "dest": "note_type",
+            "required": false,
+            "default": "Daily Log",
+            "help": "OKF note type (default: Daily Log)",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--tags"
+            ],
+            "dest": "tags",
+            "required": false,
+            "default": "[]",
+            "help": "Space-separated tags",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--related"
+            ],
+            "dest": "related",
+            "required": false,
+            "default": "[]",
+            "help": "Space-separated related note paths",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--owner"
+            ],
+            "dest": "owner",
+            "required": false,
+            "default": null,
+            "help": "Note owner",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      },
+      "rename": {
+        "prog": "power rename",
+        "description": null,
+        "arguments": [
+          {
+            "option_strings": [
+              "-h",
+              "--help"
+            ],
+            "dest": "help",
+            "required": false,
+            "default": "==SUPPRESS==",
+            "help": "show this help message and exit",
+            "type": null
+          },
+          {
+            "option_strings": [],
+            "dest": "path",
+            "required": true,
+            "default": null,
+            "help": "Path to the vault directory",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--old"
+            ],
+            "dest": "old",
+            "required": true,
+            "default": null,
+            "help": "Old relative path of the note",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--new"
+            ],
+            "dest": "new",
+            "required": true,
+            "default": null,
+            "help": "New relative path of the note",
+            "type": null
+          },
+          {
+            "option_strings": [
+              "--no-dry-run"
+            ],
+            "dest": "no_dry_run",
+            "required": false,
+            "default": "False",
+            "help": "Actually apply changes (default: dry run)",
+            "type": null
+          }
+        ],
+        "subcommands": {}
+      }
+    }
+  }
+}
