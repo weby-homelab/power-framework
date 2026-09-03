@@ -59,6 +59,7 @@ ROTATION_FILE_PATTERN = re.compile(r"^events_[0-9]{6}\.jsonl$")
 
 _project_thread_locks: dict[str, threading.RLock] = {}
 _project_thread_locks_guard = threading.Lock()
+_local_project_locks = threading.local()
 
 
 def _get_project_thread_lock(project_dir: Path) -> threading.RLock:
@@ -134,8 +135,23 @@ def project_lock(
     timeout: float = 10.0,
 ) -> Iterator[Path]:
     """Level 3 fine-grained project lock context manager (ADR-PSE-007)."""
-    with LockHierarchyTracker.hold_level(LockHierarchyTracker.LEVEL_PROJECT):
+    with LockHierarchyTracker.hold_level(LockHierarchyTracker.LEVEL_PROJECT, project_id=project_id):
         project_dir = get_project_dir(project_id, vault_root)
+
+        if not hasattr(_local_project_locks, "held"):
+            _local_project_locks.held = {}
+
+        lock_key = (project_id, str(vault_root.resolve()))
+        if _local_project_locks.held.get(lock_key, 0) > 0:
+            _local_project_locks.held[lock_key] += 1
+            try:
+                yield project_dir
+            finally:
+                _local_project_locks.held[lock_key] -= 1
+                if _local_project_locks.held[lock_key] == 0:
+                    del _local_project_locks.held[lock_key]
+            return
+
         lock_file = project_dir / ".lock"
         if lock_file.is_symlink():
             raise ValueError(f"Project lock must not be a symlink: {lock_file}")
@@ -148,7 +164,10 @@ def project_lock(
             )
 
         try:
-            fd = os.open(lock_file, os.O_RDWR | os.O_CREAT, 0o600)
+            flags = os.O_RDWR | os.O_CREAT
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(lock_file, flags, 0o600)
             try:
                 deadline = time.monotonic() + timeout
                 locked = False
@@ -164,7 +183,11 @@ def project_lock(
                     raise LockAcquisitionTimeoutError(
                         f"Inter-process lock acquisition timed out after {timeout}s for project {project_id}"
                     )
-                yield project_dir
+                _local_project_locks.held[lock_key] = 1
+                try:
+                    yield project_dir
+                finally:
+                    _local_project_locks.held.pop(lock_key, None)
             finally:
                 with contextlib.suppress(OSError):
                     fcntl.flock(fd, fcntl.LOCK_UN)
@@ -193,7 +216,11 @@ def recover_torn_tail(file_path: Path) -> int:
     if file_path.is_symlink():
         raise ValueError(f"Ledger file must not be a symlink: {file_path}")
 
-    with open(file_path, "rb") as f:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(file_path, flags)
+    with open(fd, "rb", closefd=True) as f:
         content = f.read()
 
     if not content:
@@ -207,11 +234,15 @@ def recover_torn_tail(file_path: Path) -> int:
         logger.warning(
             f"Truncating unterminated torn tail in {file_path}: discarded {truncated_bytes} bytes from EOF"
         )
-        with open(file_path, "wb") as f_out:
+        flags_out = os.O_WRONLY | os.O_TRUNC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags_out |= os.O_NOFOLLOW
+        fd_out = os.open(file_path, flags_out)
+        with open(fd_out, "wb", closefd=True) as f_out:
             if valid_len > 0:
                 f_out.write(content[:valid_len])
             f_out.flush()
-            os.fsync(f_out.fileno())
+            os.fsync(fd_out)
         return truncated_bytes
 
     # 2. File ends with '\n': records are complete. Check for corruption.
@@ -280,12 +311,12 @@ class ProjectEventStore:
 
         rotated: list[Path] = []
         for p in self.project_dir.iterdir():
-            if p.is_file() and p.name.startswith("events_") and p.name.endswith(".jsonl"):
+            if p.is_file() and ROTATION_FILE_PATTERN.match(p.name):
                 if p.is_symlink():
                     raise ValueError(f"Rotated event file must not be a symlink: {p}")
                 rotated.append(p)
 
-        rotated.sort(key=lambda p: p.name)
+        rotated.sort(key=lambda p: int(p.name[7:13]))
         result = list(rotated)
         if self.active_events_file.exists():
             if self.active_events_file.is_symlink():
@@ -324,6 +355,7 @@ class ProjectEventStore:
                 event_type=command.event_type,
                 payload=command.payload,
                 artifact_refs=command.artifact_refs,
+                evidence_refs=command.evidence_refs,
                 source=command.source,
                 session_id=command.session_id,
                 correlation_id=command.correlation_id,
@@ -337,6 +369,7 @@ class ProjectEventStore:
                         event_type=event.event_type,
                         payload=event.payload,
                         artifact_refs=event.artifact_refs,
+                        evidence_refs=event.evidence_refs,
                         source=event.source,
                         session_id=event.session_id,
                         correlation_id=event.correlation_id,
@@ -357,6 +390,7 @@ class ProjectEventStore:
                         event_type=event.event_type,
                         payload=event.payload,
                         artifact_refs=event.artifact_refs,
+                        evidence_refs=event.evidence_refs,
                         source=event.source,
                         session_id=event.session_id,
                         correlation_id=event.correlation_id,
@@ -406,11 +440,22 @@ class ProjectEventStore:
             event = ProjectEvent.model_validate(raw_envelope)
 
             # 6. Durable write with atomic fsync
+            if self.active_events_file.is_symlink():
+                raise ValueError(f"Active event file must not be a symlink: {self.active_events_file}")
+            try:
+                self.active_events_file.resolve().relative_to(self.project_dir.resolve())
+            except ValueError as exc:
+                raise ValueError(f"Active event file escapes project directory: {self.active_events_file}") from exc
+
             line = canonical_json_dumps(event.model_dump()) + "\n"
-            with open(self.active_events_file, "a", encoding="utf-8") as f:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(self.active_events_file, flags, 0o600)
+            with open(fd, "a", encoding="utf-8", closefd=True) as f:
                 f.write(line)
                 f.flush()
-                os.fsync(f.fileno())
+                os.fsync(fd)
 
             return event
 
@@ -535,17 +580,39 @@ class ProjectEventStore:
             if not self.active_events_file.exists() or self.active_events_file.stat().st_size == 0:
                 return None
 
+            if archive_name is not None:
+                candidate_archive = self.project_dir / archive_name
+                if candidate_archive.is_symlink():
+                    raise ValueError(f"Archive path must not be a symlink: {candidate_archive}")
+
+            existing_indices: list[int] = []
+            for p in self.project_dir.iterdir():
+                if ROTATION_FILE_PATTERN.match(p.name):
+                    if p.is_symlink():
+                        raise ValueError(f"Partition file must not be a symlink: {p}")
+                    if p.is_file():
+                        existing_indices.append(int(p.name[7:13]))
+
+            sorted_indices = sorted(existing_indices)
+            for expected_idx, actual_idx in enumerate(sorted_indices, start=1):
+                if actual_idx != expected_idx:
+                    raise ValueError(
+                        f"Existing rotated partitions are gapped or non-sequential: found {actual_idx}, expected {expected_idx}"
+                    )
+
+            next_index = max(existing_indices, default=0) + 1
+            expected_archive_name = f"events_{next_index:06d}.jsonl"
+
             if archive_name is None:
-                existing_rotated = [
-                    p for p in self.project_dir.iterdir()
-                    if p.is_file() and p.name.startswith("events_") and p.name.endswith(".jsonl")
-                ]
-                next_index = len(existing_rotated) + 1
-                archive_name = f"events_{next_index:06d}.jsonl"
+                archive_name = expected_archive_name
             else:
                 if not ROTATION_FILE_PATTERN.match(archive_name):
                     raise ValueError(
                         f"Invalid archive_name '{archive_name}'. Only store-generated format 'events_XXXXXX.jsonl' is allowed."
+                    )
+                if archive_name != expected_archive_name:
+                    raise ValueError(
+                        f"Invalid archive_name '{archive_name}': partition index must be sequential without gaps. Expected '{expected_archive_name}'."
                     )
 
             archive_path = self.project_dir / archive_name
@@ -553,6 +620,8 @@ class ProjectEventStore:
                 raise ValueError(f"Archive path must not be a symlink: {archive_path}")
 
             try:
+                if archive_path.resolve().is_symlink():
+                    raise ValueError(f"Archive path must not be a symlink: {archive_path}")
                 archive_path.resolve().relative_to(self.project_dir.resolve())
             except ValueError as exc:
                 raise ValueError(f"Archive path escapes project directory: {archive_name}") from exc
@@ -560,9 +629,16 @@ class ProjectEventStore:
             if archive_path.exists():
                 raise FileExistsError(f"Target archive file already exists: {archive_path}")
 
+            if self.active_events_file.is_symlink():
+                raise ValueError(f"Active event file must not be a symlink: {self.active_events_file}")
+
             os.rename(self.active_events_file, archive_path)
-            # Create a new empty active ledger
-            self.active_events_file.touch(mode=0o600)
+            # Create a new empty active ledger with mode 0600
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(self.active_events_file, flags, 0o600)
+            os.close(fd)
             return archive_path
 
 

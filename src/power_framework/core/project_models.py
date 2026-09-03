@@ -162,6 +162,24 @@ class ProjectEvent(BaseModel):
     def validate_event_id_field(cls, v: str) -> str:
         return validate_event_id(v)
 
+    @model_validator(mode="after")
+    def validate_saga_payload(self) -> ProjectEvent:
+        model_cls = SAGA_PAYLOAD_MODELS.get(self.event_type)
+        if model_cls is not None:
+            if not isinstance(self.payload, dict) or not self.payload:
+                raise ValueError(
+                    f"Payload for saga event '{self.event_type}' must be a non-empty dictionary conforming to {model_cls.__name__}"
+                )
+            payload_data = dict(self.payload)
+            if "project_id" not in payload_data:
+                payload_data["project_id"] = self.project_id
+            if "correlation_id" not in payload_data and self.correlation_id:
+                payload_data["correlation_id"] = self.correlation_id
+            if "idempotency_key" not in payload_data and self.idempotency_key:
+                payload_data["idempotency_key"] = self.idempotency_key
+            model_cls.model_validate(payload_data)
+        return self
+
 
 class AppendCommand(BaseModel):
     """External client append command.
@@ -220,7 +238,8 @@ class AppendCommand(BaseModel):
                 payload_data["correlation_id"] = self.correlation_id
             if "idempotency_key" not in payload_data and self.idempotency_key:
                 payload_data["idempotency_key"] = self.idempotency_key
-            model_cls.model_validate(payload_data)
+            validated = model_cls.model_validate(payload_data)
+            self.payload = validated.model_dump()
         return self
 
 

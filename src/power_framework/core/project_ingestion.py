@@ -18,11 +18,13 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import re
 import sqlite3
 import threading
 import time
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -38,6 +40,7 @@ from power_framework.core.canonical_json import (
 from power_framework.core.project_models import (
     SAGA_PAYLOAD_MODELS,
     AppendCommand,
+    IdempotencyConflictError,
     LedgerIntegrityError,
     LedgerVerificationResult,
     PrivacyMode,
@@ -98,6 +101,20 @@ def strip_raw_dialogue(data: Any) -> tuple[Any, dict[str, Any]]:
     cleaned = _traverse(data)
     return cleaned, extracted
 
+
+def contains_raw_dialogue(data: Any) -> bool:
+    """Check whether data contains any raw dialogue / LLM transcript keys."""
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if k in RAW_DIALOGUE_KEYS:
+                return True
+            if contains_raw_dialogue(v):
+                return True
+    elif isinstance(data, (list, tuple)):
+        for elem in data:
+            if contains_raw_dialogue(elem):
+                return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -282,6 +299,8 @@ def store_raw_evidence(
         raise ValueError(f"Evidence file must not be a symlink: {evidence_file}")
 
     try:
+        if evidence_file.resolve().is_symlink():
+            raise ValueError(f"Evidence file must not be a symlink: {evidence_file}")
         evidence_file.resolve().relative_to(evidence_dir.resolve())
     except ValueError as exc:
         raise ValueError(f"Evidence file escapes evidence directory: {evidence_file}") from exc
@@ -291,12 +310,32 @@ def store_raw_evidence(
     raw_bytes = canonical_json_dumps(scrubbed_content).encode("utf-8")
     digest = compute_payload_digest(scrubbed_content)
 
-    with open(evidence_file, "wb") as f:
-        f.write(raw_bytes)
-        f.flush()
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
 
-    with contextlib.suppress(OSError):
-        evidence_file.chmod(0o600)
+    try:
+        fd = os.open(evidence_file, flags, 0o600)
+    except FileExistsError as err:
+        # Protect against overwrite on retry
+        with open(evidence_file, "rb") as f_existing:
+            existing_bytes = f_existing.read()
+        if existing_bytes != raw_bytes:
+            raise IdempotencyConflictError(
+                f"Evidence file '{evidence_file.name}' already exists with different content"
+            ) from err
+        return f"sha256:{digest}"
+
+    try:
+        os.fchmod(fd, 0o600)
+        with open(fd, "wb", closefd=True) as f:
+            f.write(raw_bytes)
+            f.flush()
+            os.fsync(fd)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        raise
 
     # Periodic pruning
     prune_raw_evidence(vault_root, project_id, ttl_days=ttl_days)
@@ -337,14 +376,19 @@ def append_project_event(
     # 3. Apply Privacy Mode Boundaries
     final_payload: dict[str, Any]
     evidence_refs = list(command.evidence_refs)
+    is_saga_event = command.event_type in SAGA_PAYLOAD_MODELS
 
     if privacy_mode == PrivacyMode.METADATA_ONLY:
-        # Strip all content tokens, keep only structure / summary keys
-        final_payload = {
-            "_privacy_mode": PrivacyMode.METADATA_ONLY.value,
-            "keys": sorted(cleaned_payload.keys()),
-            "event_type": command.event_type,
-        }
+        if is_saga_event:
+            # Saga events contain purely structural identifiers (task_id, decision_id, relation,
+            # correlation_id, idempotency_key), preserve structural fields to prevent contract breakage
+            final_payload = cleaned_payload
+        else:
+            final_payload = {
+                "_privacy_mode": PrivacyMode.METADATA_ONLY.value,
+                "keys": sorted(cleaned_payload.keys()),
+                "event_type": command.event_type,
+            }
     elif privacy_mode == PrivacyMode.STRUCTURED_EVENTS or privacy_mode == PrivacyMode.FULL_CONTENT:
         final_payload = cleaned_payload
 
@@ -352,7 +396,11 @@ def append_project_event(
     if privacy_mode == PrivacyMode.FULL_CONTENT:
         content_to_store = raw_content if raw_content is not None else (extracted_dialogue if extracted_dialogue else None)
         if content_to_store is not None:
-            target_event_id = target_event_id or f"evt_{command.project_id}_{uuid.uuid4().hex[:12]}"
+            if not target_event_id:
+                if command.idempotency_key:
+                    target_event_id = f"evt_{command.project_id}_{command.idempotency_key}"
+                else:
+                    target_event_id = f"evt_{command.project_id}_{uuid.uuid4().hex[:12]}"
             evidence_ref = store_raw_evidence(
                 vault_root=vault_root,
                 project_id=command.project_id,
@@ -363,7 +411,7 @@ def append_project_event(
             if evidence_ref not in evidence_refs:
                 evidence_refs.append(evidence_ref)
 
-    # 4. Mandatory saga payload contract validation
+    # 4. Mandatory saga payload contract validation & normalization
     model_cls = SAGA_PAYLOAD_MODELS.get(command.event_type)
     if model_cls is not None:
         if not isinstance(final_payload, dict) or not final_payload:
@@ -377,7 +425,8 @@ def append_project_event(
             payload_data["correlation_id"] = command.correlation_id
         if "idempotency_key" not in payload_data and command.idempotency_key:
             payload_data["idempotency_key"] = command.idempotency_key
-        model_cls.model_validate(payload_data)
+        validated_saga = model_cls.model_validate(payload_data)
+        final_payload = validated_saga.model_dump()
 
     prepared_command = command.model_copy(
         update={
@@ -406,71 +455,106 @@ def import_project_events(
     validate_project_id(project_id)
     store = ProjectEventStore(project_id, vault_root)
 
-    parsed_events: list[ProjectEvent] = []
-    for raw in events:
-        if isinstance(raw, ProjectEvent):
-            parsed_events.append(raw)
-        else:
-            parsed_events.append(ProjectEvent.model_validate(raw))
-
-    if not parsed_events:
+    if not events:
         return 0
 
-    # Ensure events are ordered by sequence
-    parsed_events.sort(key=lambda e: e.sequence)
-
     with store.lock(timeout=timeout):
+        # 1. Recover torn tail on existing active ledger if present
         if store.active_events_file.exists():
             recover_torn_tail(store.active_events_file)
+
+        # 2. Fail-closed verification of existing ledger before writing ANY byte
+        verify_res = store.verify()
+        if not verify_res.valid:
+            raise LedgerIntegrityError(
+                f"Ledger integrity verification failed before import for project '{project_id}': {'; '.join(verify_res.errors)}"
+            )
 
         existing_events = list(store.replay(from_sequence=1))
         seen_event_ids: set[str] = {ev.event_id for ev in existing_events}
         last_seq = existing_events[-1].sequence if existing_events else 0
         last_hash = existing_events[-1].event_hash if existing_events else ""
 
-        count = 0
-        with open(store.active_events_file, "a", encoding="utf-8") as f:
-            for ev in parsed_events:
-                if ev.project_id != project_id:
+        # 3. Pre-validate entire batch in memory before opening file or writing any byte
+        parsed_events: list[ProjectEvent] = []
+        for raw in events:
+            raw_dict = raw if isinstance(raw, dict) else raw.model_dump()
+            if contains_raw_dialogue(raw_dict):
+                raise ValueError("Import rejected: event payload contains prohibited raw dialogue / LLM transcript data")
+
+            ev = raw if isinstance(raw, ProjectEvent) else ProjectEvent.model_validate(raw)
+
+            # Validate saga payload schema
+            model_cls = SAGA_PAYLOAD_MODELS.get(ev.event_type)
+            if model_cls is not None:
+                if not isinstance(ev.payload, dict) or not ev.payload:
                     raise ValueError(
-                        f"Import project_id mismatch: expected '{project_id}', got '{ev.project_id}'"
+                        f"Payload for saga event '{ev.event_type}' must be a non-empty dictionary conforming to {model_cls.__name__}"
                     )
+                model_cls.model_validate(ev.payload)
 
-                if ev.event_id in seen_event_ids:
-                    raise ValueError(f"Duplicate event_id in import: '{ev.event_id}'")
-                seen_event_ids.add(ev.event_id)
+            parsed_events.append(ev)
 
-                # Check sequence linkage
-                if ev.sequence != last_seq + 1:
-                    raise ValueError(
-                        f"Import sequence gap: expected {last_seq + 1}, got {ev.sequence}"
-                    )
-                if last_seq == 0 and ev.prev_event_hash != "":
-                    raise ValueError("Genesis event must have empty prev_event_hash")
-                if last_seq > 0 and ev.prev_event_hash != last_hash:
-                    raise ValueError(
-                        f"Import hash gap: expected '{last_hash}', got '{ev.prev_event_hash}'"
-                    )
+        # Ensure events are ordered by sequence
+        parsed_events.sort(key=lambda e: e.sequence)
 
-                # Always verify integrity of the imported event
-                calc_payload_digest = compute_payload_digest(ev.payload)
-                if ev.payload_digest != calc_payload_digest:
-                    raise ValueError(f"Payload digest mismatch in imported event {ev.event_id}")
-                calc_event_hash = compute_event_hash(ev.model_dump())
-                if ev.event_hash != calc_event_hash:
-                    raise ValueError(f"Event hash mismatch in imported event {ev.event_id}")
+        lines_to_write: list[str] = []
+        curr_seq = last_seq
+        curr_hash = last_hash
 
-                line = canonical_json_dumps(ev.model_dump()) + "\n"
+        for ev in parsed_events:
+            if ev.project_id != project_id:
+                raise ValueError(
+                    f"Import project_id mismatch: expected '{project_id}', got '{ev.project_id}'"
+                )
+
+            if ev.event_id in seen_event_ids:
+                raise ValueError(f"Duplicate event_id in import: '{ev.event_id}'")
+            seen_event_ids.add(ev.event_id)
+
+            # Check sequence linkage
+            if ev.sequence != curr_seq + 1:
+                raise ValueError(
+                    f"Import sequence gap: expected {curr_seq + 1}, got {ev.sequence}"
+                )
+            if curr_seq == 0 and ev.prev_event_hash != "":
+                raise ValueError("Genesis event must have empty prev_event_hash")
+            if curr_seq > 0 and ev.prev_event_hash != curr_hash:
+                raise ValueError(
+                    f"Import hash gap: expected '{curr_hash}', got '{ev.prev_event_hash}'"
+                )
+
+            # Always verify integrity of the imported event
+            calc_payload_digest = compute_payload_digest(ev.payload)
+            if ev.payload_digest != calc_payload_digest:
+                raise ValueError(f"Payload digest mismatch in imported event {ev.event_id}")
+            calc_event_hash = compute_event_hash(ev.model_dump())
+            if ev.event_hash != calc_event_hash:
+                raise ValueError(f"Event hash mismatch in imported event {ev.event_id}")
+
+            lines_to_write.append(canonical_json_dumps(ev.model_dump()) + "\n")
+            curr_seq = ev.sequence
+            curr_hash = ev.event_hash
+
+        # 4. Atomic all-or-nothing write
+        if store.active_events_file.is_symlink():
+            raise ValueError(f"Active event file must not be a symlink: {store.active_events_file}")
+        try:
+            store.active_events_file.resolve().relative_to(store.project_dir.resolve())
+        except ValueError as exc:
+            raise ValueError(f"Active event file escapes project directory: {store.active_events_file}") from exc
+
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(store.active_events_file, flags, 0o600)
+        with open(fd, "a", encoding="utf-8", closefd=True) as f:
+            for line in lines_to_write:
                 f.write(line)
-                last_seq = ev.sequence
-                last_hash = ev.event_hash
-                count += 1
-
             f.flush()
-            import os
-            os.fsync(f.fileno())
+            os.fsync(fd)
 
-    return count
+    return len(lines_to_write)
 
 
 def verify_project_ledger(vault_root: Path, project_id: str) -> LedgerVerificationResult:
@@ -520,6 +604,8 @@ def _get_sqlite_path(vault_root: Path) -> Path:
         raise ValueError(f"Database file must not be a symlink: {db_path}")
 
     resolved_db = db_path.resolve()
+    if resolved_db.is_symlink():
+        raise ValueError(f"Database file must not be a symlink: {db_path}")
     try:
         resolved_db.relative_to(resolved_root)
     except ValueError as exc:
@@ -858,6 +944,15 @@ def materialize_status_markdown(
     """Materialize human-facing Markdown status summary under project directory or vault path."""
     project_dir = get_project_dir(project_id, vault_root)
     status_file = project_dir / "status.md"
+    if status_file.is_symlink():
+        raise ValueError(f"Status file must not be a symlink: {status_file}")
+
+    try:
+        if status_file.resolve().is_symlink():
+            raise ValueError(f"Status file must not be a symlink: {status_file}")
+        status_file.resolve().relative_to(project_dir.resolve())
+    except ValueError as exc:
+        raise ValueError(f"Status file escapes project directory: {status_file}") from exc
 
     content = f"""<!-- GENERATED BY POWER PSE - DO NOT EDIT MANUALLY -->
 # Diagnostic Ledger Summary: {project_id}
@@ -871,8 +966,14 @@ def materialize_status_markdown(
 - **Last Updated:** {last_event.timestamp}
 - **Last Actor:** {last_event.actor}
 """
-    with open(status_file, "w", encoding="utf-8") as f:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(status_file, flags, 0o600)
+    with open(fd, "w", encoding="utf-8", closefd=True) as f:
         f.write(content)
+        f.flush()
+        os.fsync(fd)
 
     return status_file
 
@@ -881,8 +982,44 @@ def materialize_status_markdown(
 # Cross-Subsystem Association Saga & Reconciliation (ADR-PSE-008)
 # ---------------------------------------------------------------------------
 
-_reconciliation_attempts: dict[str, int] = {}
+_reconciliation_attempts: dict[Any, int] = {}
 _reconciliation_attempts_guard = threading.Lock()
+
+
+def _get_reconcile_attempt(
+    tracker: dict[Any, int],
+    key: tuple[str, str, str, str],
+    base_attempt: int,
+) -> int:
+    if key in tracker:
+        return tracker[key]
+    str_key = f"{key[0]}:{key[1]}:{key[2]}:{key[3]}"
+    if str_key in tracker:
+        return tracker[str_key]
+    corr_id = key[3]
+    if corr_id in tracker:
+        return tracker[corr_id]
+    return base_attempt
+
+
+def _set_reconcile_attempt(
+    tracker: dict[Any, int],
+    key: tuple[str, str, str, str],
+    attempt: int,
+) -> None:
+    tracker[key] = attempt
+    str_key = f"{key[0]}:{key[1]}:{key[2]}:{key[3]}"
+    tracker[str_key] = attempt
+
+
+def _pop_reconcile_attempt(
+    tracker: dict[Any, int],
+    key: tuple[str, str, str, str],
+) -> None:
+    tracker.pop(key, None)
+    str_key = f"{key[0]}:{key[1]}:{key[2]}:{key[3]}"
+    tracker.pop(str_key, None)
+    tracker.pop(key[3], None)
 
 
 def reconcile_project_subsystems(
@@ -891,7 +1028,7 @@ def reconcile_project_subsystems(
     task_service: Any = None,
     decision_service: Any = None,
     max_attempts: int = 3,
-    attempt_tracker: dict[str, int] | None = None,
+    attempt_tracker: dict[str, int] | dict[Any, int] | None = None,
 ) -> dict[str, Any]:
     """Idempotently reconcile pending association sagas against TaskStore and DecisionService.
 
@@ -903,23 +1040,39 @@ def reconcile_project_subsystems(
     validate_project_id(project_id)
     store = ProjectEventStore(project_id, vault_root)
 
-    pending_task_sagas: dict[str, dict[str, Any]] = {}
-    pending_decision_sagas: dict[str, dict[str, Any]] = {}
+    requested_counts: dict[tuple[str, str, str, str], int] = defaultdict(int)
+    pending_task_sagas: dict[tuple[str, str, str, str], tuple[str, dict[str, Any]]] = {}
+    pending_decision_sagas: dict[tuple[str, str, str, str], tuple[str, dict[str, Any]]] = {}
 
     for event in store.replay(from_sequence=1):
-        corr_id = event.correlation_id or event.idempotency_key or event.event_id
+        corr_id = (
+            event.correlation_id
+            or (event.payload.get("correlation_id") if isinstance(event.payload, dict) else None)
+            or event.idempotency_key
+            or event.event_id
+        )
 
         # Track task sagas
         if event.event_type == "task.association.requested":
-            pending_task_sagas[corr_id] = event.payload
+            task_id = event.payload.get("task_id", "") if isinstance(event.payload, dict) else ""
+            key = (project_id, "task", task_id, corr_id)
+            requested_counts[key] += 1
+            pending_task_sagas[key] = (corr_id, event.payload)
         elif event.event_type in ("task.associated", "task.association.failed"):
-            pending_task_sagas.pop(corr_id, None)
+            task_id = event.payload.get("task_id", "") if isinstance(event.payload, dict) else ""
+            key = (project_id, "task", task_id, corr_id)
+            pending_task_sagas.pop(key, None)
 
         # Track decision sagas
         if event.event_type == "decision.association.requested":
-            pending_decision_sagas[corr_id] = event.payload
+            decision_id = event.payload.get("decision_id", "") if isinstance(event.payload, dict) else ""
+            key = (project_id, "decision", decision_id, corr_id)
+            requested_counts[key] += 1
+            pending_decision_sagas[key] = (corr_id, event.payload)
         elif event.event_type in ("decision.associated", "decision.association.failed"):
-            pending_decision_sagas.pop(corr_id, None)
+            decision_id = event.payload.get("decision_id", "") if isinstance(event.payload, dict) else ""
+            key = (project_id, "decision", decision_id, corr_id)
+            pending_decision_sagas.pop(key, None)
 
     reconciled_tasks = 0
     failed_tasks = 0
@@ -928,15 +1081,17 @@ def reconcile_project_subsystems(
     failed_decisions = 0
     pending_decisions = 0
 
-    tracker = attempt_tracker if attempt_tracker is not None else _reconciliation_attempts
+    tracker: dict[Any, int] = attempt_tracker if attempt_tracker is not None else _reconciliation_attempts
 
     with _reconciliation_attempts_guard:
         # Resolve pending tasks
-        for corr_id, payload in pending_task_sagas.items():
+        for key, (corr_id, payload) in list(pending_task_sagas.items()):
             task_id = payload.get("task_id", "")
             relation = payload.get("relation", "contributes_to")
-            limit = payload.get("max_attempts", max_attempts)
-            current_attempt = tracker.get(corr_id, payload.get("attempt", 1))
+            limit = min(payload.get("max_attempts", max_attempts), max_attempts)
+            history_attempts = requested_counts.get(key, 0)
+            base_attempt = max(history_attempts, payload.get("attempt", 1))
+            current_attempt = _get_reconcile_attempt(tracker, key, base_attempt)
 
             task_exists = False
             if task_service is not None:
@@ -964,10 +1119,10 @@ def reconcile_project_subsystems(
                 )
                 store.append(cmd)
                 reconciled_tasks += 1
-                tracker.pop(corr_id, None)
+                _pop_reconcile_attempt(tracker, key)
             else:
                 if current_attempt < limit:
-                    tracker[corr_id] = current_attempt + 1
+                    _set_reconcile_attempt(tracker, key, current_attempt + 1)
                     pending_tasks += 1
                 else:
                     idempotency_key = f"rec_task_fail_{task_id}_{corr_id}"
@@ -989,14 +1144,16 @@ def reconcile_project_subsystems(
                     )
                     store.append(cmd)
                     failed_tasks += 1
-                    tracker.pop(corr_id, None)
+                    _pop_reconcile_attempt(tracker, key)
 
         # Resolve pending decisions
-        for corr_id, payload in pending_decision_sagas.items():
+        for key, (corr_id, payload) in list(pending_decision_sagas.items()):
             decision_id = payload.get("decision_id", "")
             relation = payload.get("relation", "governs")
-            limit = payload.get("max_attempts", max_attempts)
-            current_attempt = tracker.get(corr_id, payload.get("attempt", 1))
+            limit = min(payload.get("max_attempts", max_attempts), max_attempts)
+            history_attempts = requested_counts.get(key, 0)
+            base_attempt = max(history_attempts, payload.get("attempt", 1))
+            current_attempt = _get_reconcile_attempt(tracker, key, base_attempt)
 
             dec_exists = False
             if decision_service is not None:
@@ -1024,10 +1181,10 @@ def reconcile_project_subsystems(
                 )
                 store.append(cmd)
                 reconciled_decisions += 1
-                tracker.pop(corr_id, None)
+                _pop_reconcile_attempt(tracker, key)
             else:
                 if current_attempt < limit:
-                    tracker[corr_id] = current_attempt + 1
+                    _set_reconcile_attempt(tracker, key, current_attempt + 1)
                     pending_decisions += 1
                 else:
                     idempotency_key = f"rec_dec_fail_{decision_id}_{corr_id}"
@@ -1049,7 +1206,7 @@ def reconcile_project_subsystems(
                     )
                     store.append(cmd)
                     failed_decisions += 1
-                    tracker.pop(corr_id, None)
+                    _pop_reconcile_attempt(tracker, key)
 
     return {
         "project_id": project_id,

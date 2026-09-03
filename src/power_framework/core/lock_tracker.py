@@ -43,13 +43,35 @@ class LockHierarchyTracker:
         return cast("list[int]", cls._local.levels)
 
     @classmethod
-    def push_level(cls, level: int) -> None:
+    def get_held_projects(cls) -> list[str | None]:
+        if not hasattr(cls._local, "projects"):
+            cls._local.projects = []
+        return cast("list[str | None]", cls._local.projects)
+
+    @classmethod
+    def get_current_project_id(cls) -> str | None:
+        held_projs = cls.get_held_projects()
+        active_pids = [p for p in held_projs if p is not None]
+        return active_pids[-1] if active_pids else None
+
+    @classmethod
+    def push_level(cls, level: int, project_id: str | None = None) -> None:
         held = cls.get_held_levels()
         if held and max(held) > level:
             raise LockHierarchyViolationError(
                 f"Lock hierarchy violation: cannot acquire Level {level} while holding Level {max(held)}. "
                 "Locks must strictly be acquired in ascending order (Level 1: Mutation -> Level 2: Task -> Level 3: Project)."
             )
+        if level == cls.LEVEL_PROJECT:
+            held_projs = cls.get_held_projects()
+            active_pids = [p for p in held_projs if p is not None]
+            if active_pids and project_id is not None and active_pids[-1] != project_id:
+                raise LockHierarchyViolationError(
+                    f"Lock hierarchy violation: cannot acquire Level 3 project lock for '{project_id}' "
+                    f"while holding Level 3 project lock for '{active_pids[-1]}'. "
+                    "Cross-project nested locks are forbidden to prevent deadlock."
+                )
+            held_projs.append(project_id)
         held.append(level)
 
     @classmethod
@@ -59,11 +81,15 @@ class LockHierarchyTracker:
             held.pop()
         elif level in held:
             held.remove(level)
+        if level == cls.LEVEL_PROJECT:
+            held_projs = cls.get_held_projects()
+            if held_projs:
+                held_projs.pop()
 
     @classmethod
     @contextlib.contextmanager
-    def hold_level(cls, level: int) -> Iterator[None]:
-        cls.push_level(level)
+    def hold_level(cls, level: int, project_id: str | None = None) -> Iterator[None]:
+        cls.push_level(level, project_id=project_id)
         try:
             yield
         finally:
@@ -71,7 +97,7 @@ class LockHierarchyTracker:
 
 
 @contextlib.contextmanager
-def hold_level(level: int) -> Iterator[None]:
+def hold_level(level: int, project_id: str | None = None) -> Iterator[None]:
     """Convenience context manager for LockHierarchyTracker.hold_level."""
-    with LockHierarchyTracker.hold_level(level):
+    with LockHierarchyTracker.hold_level(level, project_id=project_id):
         yield

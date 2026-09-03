@@ -20,6 +20,7 @@ Validates all Phase 2 requirements and gates G2.1 - G2.7:
 from __future__ import annotations
 
 import sqlite3
+import stat
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
@@ -38,12 +39,17 @@ from power_framework.core.canonical_json import (
 from power_framework.core.lock_tracker import LockHierarchyViolationError
 from power_framework.core.mutation import vault_mutation
 from power_framework.core.project_ingestion import (
+    _get_raw_evidence_dir,
+    _get_sqlite_path,
+    _reconciliation_attempts,
     append_project_event,
+    import_project_events,
     materialize_status_markdown,
     rebuild_derived_index,
     reconcile_project_subsystems,
     redact_secrets,
     replay_project,
+    store_raw_evidence,
 )
 from power_framework.core.project_models import (
     AppendCommand,
@@ -1605,3 +1611,507 @@ def test_materialize_status_markdown_diagnostic_summary(vault_root: Path) -> Non
     assert "Current Phase:" not in content
     assert f"Last Event Type:** {ev.event_type}" in content
     assert f"Last Sequence:** {ev.sequence}" in content
+
+
+# ==============================================================================
+# 15. Phase 2 Closure Correction Round 2 Regression Tests
+# ==============================================================================
+
+def test_import_refuses_corrupted_existing_ledger_with_zero_mutation(vault_root: Path) -> None:
+    """import_project_events must call verify() fail-closed and leave disk 100% untouched if ledger is corrupted."""
+    pid = "prj_import_corrupt"
+    store = ProjectEventStore(pid, vault_root)
+    cmd = AppendCommand(
+        project_id=pid,
+        event_type="project.created",
+        payload={"name": "Corrupt Import Test"},
+        actor="user:rekvizitor",
+        source="cli",
+    )
+    store.append(cmd)
+
+    # Tamper with ledger by appending corrupted JSON
+    with open(store.active_events_file, "a", encoding="utf-8") as f:
+        f.write('{"broken_json": true\n')
+
+    corrupted_bytes = store.active_events_file.read_bytes()
+
+    next_event = {
+        "event_id": f"evt_{pid}_2_1234567890ab",
+        "schema_version": "power.project-event.v1",
+        "project_id": pid,
+        "sequence": 2,
+        "timestamp": "2026-09-03T12:00:00Z",
+        "actor": "user:rekvizitor",
+        "source": "cli",
+        "event_type": "project.updated",
+        "payload": {"name": "Should Not Import"},
+        "payload_digest": compute_payload_digest({"name": "Should Not Import"}),
+        "prev_event_hash": "a" * 64,
+        "event_hash": "b" * 64,
+    }
+
+    with pytest.raises(LedgerIntegrityError):
+        import_project_events(vault_root, pid, [next_event])
+
+    # Zero mutation on disk
+    assert store.active_events_file.read_bytes() == corrupted_bytes
+
+
+def test_import_all_or_nothing_batch_rejection(vault_root: Path) -> None:
+    """If any event in import batch is invalid, reject all with zero disk mutation."""
+    pid = "prj_import_batch"
+    store = ProjectEventStore(pid, vault_root)
+    ev1 = store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="project.created",
+            payload={"name": "Batch Test"},
+            actor="user:rekvizitor",
+            source="cli",
+        )
+    )
+    initial_bytes = store.active_events_file.read_bytes()
+
+    # Valid next event 2
+    raw2_cmd = {
+        "event_id": f"evt_{pid}_2_000000000002",
+        "schema_version": "power.project-event.v1",
+        "project_id": pid,
+        "sequence": 2,
+        "timestamp": "2026-09-03T12:00:01Z",
+        "actor": "user:rekvizitor",
+        "source": "cli",
+        "event_type": "project.updated",
+        "payload": {"update": 2},
+        "payload_digest": compute_payload_digest({"update": 2}),
+        "prev_event_hash": ev1.event_hash,
+        "event_hash": "0" * 64,
+    }
+    ev2_obj = ProjectEvent.model_validate(raw2_cmd)
+    raw2 = ev2_obj.model_dump()
+    raw2["event_hash"] = compute_event_hash(raw2)
+
+    # Invalid event 3 (sequence gap: sequence 4 instead of 3)
+    raw3_cmd = {
+        "event_id": f"evt_{pid}_4_000000000004",
+        "schema_version": "power.project-event.v1",
+        "project_id": pid,
+        "sequence": 4,
+        "timestamp": "2026-09-03T12:00:02Z",
+        "actor": "user:rekvizitor",
+        "source": "cli",
+        "event_type": "project.updated",
+        "payload": {"update": 4},
+        "payload_digest": compute_payload_digest({"update": 4}),
+        "prev_event_hash": raw2["event_hash"],
+        "event_hash": "0" * 64,
+    }
+    ev3_obj = ProjectEvent.model_validate(raw3_cmd)
+    raw3 = ev3_obj.model_dump()
+    raw3["event_hash"] = compute_event_hash(raw3)
+
+    with pytest.raises(ValueError, match="Import sequence gap"):
+        import_project_events(vault_root, pid, [raw2, raw3])
+
+    # Assert ev2 was NOT written: zero disk mutation
+    assert store.active_events_file.read_bytes() == initial_bytes
+    assert list(store.replay()) == [ev1]
+
+
+def test_import_rejects_raw_dialogue_payload(vault_root: Path) -> None:
+    """import_project_events must reject any event containing raw dialogue or LLM transcript data."""
+    pid = "prj_import_dialogue"
+    store = ProjectEventStore(pid, vault_root)
+
+    forbidden_keys = [
+        "raw_dialogue", "dialogue_buffer", "transcript", "turns",
+        "prompt_text", "completion_text", "messages", "reasoning", "thinking"
+    ]
+    for key in forbidden_keys:
+        bad_event = {
+            "event_id": f"evt_{pid}_1_{key}",
+            "schema_version": "power.project-event.v1",
+            "project_id": pid,
+            "sequence": 1,
+            "timestamp": "2026-09-03T12:00:00Z",
+            "actor": "user:rekvizitor",
+            "source": "cli",
+            "event_type": "project.created",
+            "payload": {key: "leaked conversation transcript"},
+            "payload_digest": compute_payload_digest({key: "leaked conversation transcript"}),
+            "prev_event_hash": "",
+        }
+        bad_event["event_hash"] = compute_event_hash(bad_event)
+
+        with pytest.raises(ValueError, match="prohibited raw dialogue"):
+            import_project_events(vault_root, pid, [bad_event])
+
+    assert not store.active_events_file.exists() or store.active_events_file.stat().st_size == 0
+
+
+def test_import_rejects_invalid_saga_payload(vault_root: Path) -> None:
+    """import_project_events must validate saga event payloads against SAGA_PAYLOAD_MODELS."""
+    pid = "prj_import_saga"
+    store = ProjectEventStore(pid, vault_root)
+
+    invalid_saga_event = {
+        "event_id": f"evt_{pid}_1_saga",
+        "schema_version": "power.project-event.v1",
+        "project_id": pid,
+        "sequence": 1,
+        "timestamp": "2026-09-03T12:00:00Z",
+        "actor": "user:rekvizitor",
+        "source": "cli",
+        "event_type": "task.association.requested",
+        "payload": {"project_id": pid},  # missing required task_id!
+        "payload_digest": compute_payload_digest({"project_id": pid}),
+        "prev_event_hash": "",
+    }
+    invalid_saga_event["event_hash"] = compute_event_hash(invalid_saga_event)
+
+    with pytest.raises((ValueError, ValidationError)):
+        import_project_events(vault_root, pid, [invalid_saga_event])
+
+    assert not store.active_events_file.exists() or store.active_events_file.stat().st_size == 0
+
+
+def test_evidence_retry_with_changed_content_raises_idempotency_conflict(vault_root: Path) -> None:
+    """If a retry comes in with the same idempotency_key but different raw content/evidence, raise IdempotencyConflictError."""
+    pid = "prj_ev_retry"
+    cmd1 = AppendCommand(
+        project_id=pid,
+        event_type="project.created",
+        payload={"name": "Evidence Test"},
+        actor="user:rekvizitor",
+        source="cli",
+        idempotency_key="key_ev_retry",
+    )
+    ev1 = append_project_event(
+        vault_root,
+        cmd1,
+        privacy_mode=PrivacyMode.FULL_CONTENT,
+        raw_content={"chat": "original content"},
+    )
+    assert ev1.idempotency_key == "key_ev_retry"
+    assert len(ev1.evidence_refs) == 1
+
+    # Retry with identical content succeeds idempotently
+    ev1_retry = append_project_event(
+        vault_root,
+        cmd1,
+        privacy_mode=PrivacyMode.FULL_CONTENT,
+        raw_content={"chat": "original content"},
+    )
+    assert ev1_retry.event_id == ev1.event_id
+
+    # Retry with same idempotency_key but CHANGED raw content raises IdempotencyConflictError
+    with pytest.raises(IdempotencyConflictError):
+        append_project_event(
+            vault_root,
+            cmd1,
+            privacy_mode=PrivacyMode.FULL_CONTENT,
+            raw_content={"chat": "MODIFIED content"},
+        )
+
+
+def test_evidence_atomic_0600_permissions_and_durability(vault_root: Path) -> None:
+    """store_raw_evidence creates files with 0600 mode and protects against overwrite."""
+    pid = "prj_ev_perm"
+    ref = store_raw_evidence(vault_root, pid, "evt_perm_1", {"unredacted_field": "data"})
+    assert ref.startswith("sha256:")
+
+    ev_dir = _get_raw_evidence_dir(vault_root, pid)
+    ev_file = ev_dir / "evt_perm_1.json"
+    assert ev_file.exists()
+    assert stat.S_IMODE(ev_file.stat().st_mode) == 0o600
+
+    # Idempotent re-store with same content succeeds
+    ref2 = store_raw_evidence(vault_root, pid, "evt_perm_1", {"unredacted_field": "data"})
+    assert ref2 == ref
+
+    # Attempt to re-store with different content raises IdempotencyConflictError
+    with pytest.raises(IdempotencyConflictError):
+        store_raw_evidence(vault_root, pid, "evt_perm_1", {"unredacted_field": "tampered"})
+
+
+def test_rotation_rejects_gapped_or_invalid_partition_numbers(vault_root: Path) -> None:
+    """rotate() must reject gapped archive names and enforce monotonic partition numbering."""
+    pid = "prj_rot_gaps"
+    store = ProjectEventStore(pid, vault_root)
+    store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="project.created",
+            payload={"name": "Rot Gaps"},
+            actor="user:rekvizitor",
+            source="cli",
+        )
+    )
+
+    # Attempt gapped archive name
+    with pytest.raises(ValueError, match="sequential without gaps"):
+        store.rotate(archive_name="events_000003.jsonl")
+
+    # Attempt non-conforming or huge gap
+    with pytest.raises(ValueError, match="sequential without gaps"):
+        store.rotate(archive_name="events_999999.jsonl")
+
+    # Valid rotation
+    p1 = store.rotate()
+    assert p1 is not None
+    assert p1.name == "events_000001.jsonl"
+
+    store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="project.updated",
+            payload={"step": 2},
+            actor="user:rekvizitor",
+            source="cli",
+        )
+    )
+
+    # Attempt gap at partition 2
+    with pytest.raises(ValueError, match="sequential without gaps"):
+        store.rotate(archive_name="events_000003.jsonl")
+
+    # Explicit matching name succeeds
+    p2 = store.rotate(archive_name="events_000002.jsonl")
+    assert p2 is not None
+    assert p2.name == "events_000002.jsonl"
+
+
+def test_replay_enforces_strict_rotation_filename_pattern(vault_root: Path) -> None:
+    """list_event_files and replay must match strict ^events_[0-9]{6}\\.jsonl$ pattern and ignore foreign files."""
+    pid = "prj_rot_pattern"
+    store = ProjectEventStore(pid, vault_root)
+
+    store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="project.created",
+            payload={"name": "Replay Pattern"},
+            actor="user:rekvizitor",
+            source="cli",
+        )
+    )
+    store.rotate()
+    store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="project.updated",
+            payload={"step": 2},
+            actor="user:rekvizitor",
+            source="cli",
+        )
+    )
+
+    # Drop foreign files into project directory
+    (store.project_dir / "events_fake.jsonl").write_text("invalid json\n", encoding="utf-8")
+    (store.project_dir / "events_999999_backup.jsonl").write_text("invalid json\n", encoding="utf-8")
+    (store.project_dir / "events_12.jsonl").write_text("invalid json\n", encoding="utf-8")
+    (store.project_dir / "random_notes.txt").write_text("notes\n", encoding="utf-8")
+
+    files = store.list_event_files()
+    assert len(files) == 2
+    assert files[0].name == "events_000001.jsonl"
+    assert files[1].name == "events.jsonl"
+
+    events = list(store.replay())
+    assert len(events) == 2
+    assert [e.sequence for e in events] == [1, 2]
+
+
+def test_reconciliation_retry_state_survives_process_restart(vault_root: Path) -> None:
+    """Reconciliation retry count must be recovered from ledger history when RAM cache is wiped."""
+    pid = "prj_recon_restart"
+    # Append attempt 1
+    append_project_event(
+        vault_root,
+        AppendCommand(
+            project_id=pid,
+            event_type="task.association.requested",
+            payload={"project_id": pid, "task_id": "tsk_missing_restart", "relation": "contributes_to"},
+            actor="system:test",
+            source="cli",
+            correlation_id="corr_restart_1",
+        ),
+    )
+    # Append attempt 2
+    append_project_event(
+        vault_root,
+        AppendCommand(
+            project_id=pid,
+            event_type="task.association.requested",
+            payload={"project_id": pid, "task_id": "tsk_missing_restart", "relation": "contributes_to"},
+            actor="system:test",
+            source="cli",
+            correlation_id="corr_restart_1",
+        ),
+    )
+
+    # Simulate process crash / restart: wipe RAM tracker completely
+    _reconciliation_attempts.clear()
+
+    # Reconcile with max_attempts=2; since 2 requests exist in ledger, it should transition to failed
+    report = reconcile_project_subsystems(
+        vault_root=vault_root,
+        project_id=pid,
+        task_service=MockTaskService(existing_task_ids=set()),
+        max_attempts=2,
+    )
+    assert report["failed_tasks"] == 1
+    assert report["pending_tasks"] == 0
+
+    events = list(replay_project(vault_root, pid))
+    assert any(e.event_type == "task.association.failed" for e in events)
+
+
+def test_reconciliation_correlation_id_isolation_across_projects(vault_root: Path) -> None:
+    """Reconciliation retry tracking must isolate (project_id, kind, entity_id, correlation_id)."""
+    pid_a = "prj_iso_a"
+    pid_b = "prj_iso_b"
+
+    append_project_event(
+        vault_root,
+        AppendCommand(
+            project_id=pid_a,
+            event_type="task.association.requested",
+            payload={"project_id": pid_a, "task_id": "tsk_a", "relation": "contributes_to"},
+            actor="user:rekvizitor",
+            source="cli",
+            correlation_id="corr_shared",
+        ),
+    )
+    append_project_event(
+        vault_root,
+        AppendCommand(
+            project_id=pid_b,
+            event_type="task.association.requested",
+            payload={"project_id": pid_b, "task_id": "tsk_b", "relation": "contributes_to"},
+            actor="user:rekvizitor",
+            source="cli",
+            correlation_id="corr_shared",
+        ),
+    )
+
+    task_service = MockTaskService(existing_task_ids={"tsk_a"})
+
+    rep_a = reconcile_project_subsystems(vault_root, pid_a, task_service=task_service, max_attempts=3)
+    assert rep_a["reconciled_tasks"] == 1
+
+    rep_b = reconcile_project_subsystems(vault_root, pid_b, task_service=task_service, max_attempts=3)
+    assert rep_b["pending_tasks"] == 1
+    assert rep_b["reconciled_tasks"] == 0
+
+
+def test_nested_distinct_level3_project_locks_rejected(vault_root: Path) -> None:
+    """Acquiring a Level 3 lock for project_B while holding project_A must raise LockHierarchyViolationError."""
+    with project_lock("prj_lock_a", vault_root):
+        # Reentrancy for same project succeeds
+        with project_lock("prj_lock_a", vault_root):
+            pass
+
+        # Acquiring distinct Level 3 project lock is rejected to prevent cross-project deadlocks
+        with (
+            pytest.raises(LockHierarchyViolationError, match="Cross-project nested locks are forbidden"),
+            project_lock("prj_lock_b", vault_root),
+        ):
+            pass
+
+
+def test_metadata_only_saga_preserves_structural_contracts(vault_root: Path) -> None:
+    """Saga events under metadata-only privacy mode must preserve structural identifiers."""
+    pid = "prj_meta_saga"
+    cmd = AppendCommand(
+        project_id=pid,
+        event_type="task.association.requested",
+        payload={"project_id": pid, "task_id": "tsk_meta_1", "relation": "contributes_to"},
+        actor="user:rekvizitor",
+        source="cli",
+    )
+    ev = append_project_event(vault_root, cmd, privacy_mode=PrivacyMode.METADATA_ONLY)
+    assert ev.payload["task_id"] == "tsk_meta_1"
+    assert ev.payload["relation"] == "contributes_to"
+
+    # Ledger integrity passes without contract failure
+    store = ProjectEventStore(pid, vault_root)
+    assert store.verify().valid is True
+
+
+def test_symlink_escape_audit_across_all_phase2_writable_paths(vault_root: Path, tmp_path: Path) -> None:
+    """Verify symlink defenses across all Phase 2 writable paths and files."""
+    outside_dir = tmp_path / "outside_dir"
+    outside_dir.mkdir(parents=True, exist_ok=True)
+    outside_file = outside_dir / "target.txt"
+    outside_file.touch()
+
+    pid = "prj_symlink_audit"
+    store = ProjectEventStore(pid, vault_root)
+    store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="project.created",
+            payload={"name": "Symlink Audit"},
+            actor="user:rekvizitor",
+            source="cli",
+        )
+    )
+
+    # 1. Active events file as symlink
+    active_file = store.active_events_file
+    active_file.unlink()
+    active_file.symlink_to(outside_file)
+    with pytest.raises(ValueError, match="symlink"):
+        store.append(
+            AppendCommand(
+                project_id=pid,
+                event_type="project.updated",
+                payload={"update": 1},
+                actor="user:rekvizitor",
+                source="cli",
+            )
+        )
+    active_file.unlink()
+    store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="project.updated",
+            payload={"update": 1},
+            actor="user:rekvizitor",
+            source="cli",
+        )
+    )
+
+    # 2. Rotated archive path as symlink
+    symlink_archive = store.project_dir / "events_000001.jsonl"
+    symlink_archive.symlink_to(outside_file)
+    with pytest.raises(ValueError, match="symlink"):
+        store.rotate(archive_name="events_000001.jsonl")
+    symlink_archive.unlink()
+
+    # 3. Raw evidence file as symlink
+    ev_dir = _get_raw_evidence_dir(vault_root, pid)
+    symlink_ev = ev_dir / "evt_symlink.json"
+    symlink_ev.symlink_to(outside_file)
+    with pytest.raises(ValueError, match="symlink"):
+        store_raw_evidence(vault_root, pid, "evt_symlink", {"data": "test"})
+    symlink_ev.unlink()
+
+    # 4. Status markdown as symlink
+    status_file = store.project_dir / "status.md"
+    status_file.symlink_to(outside_file)
+    ev = next(iter(store.replay()))
+    with pytest.raises(ValueError, match="symlink"):
+        materialize_status_markdown(vault_root, pid, ev)
+    status_file.unlink()
+
+    # 5. SQLite database file as symlink
+    db_path = _get_sqlite_path(vault_root)
+    if db_path.exists():
+        db_path.unlink()
+    db_path.symlink_to(outside_file)
+    with pytest.raises(ValueError, match="symlink"):
+        _get_sqlite_path(vault_root)
+    db_path.unlink()
