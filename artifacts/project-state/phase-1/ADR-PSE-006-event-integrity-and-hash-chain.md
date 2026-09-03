@@ -24,23 +24,32 @@ Chosen Solution: **Two-Tier Envelope-Binding Cryptographic SHA-256 Hash Chain**.
    payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
    ```
 2. **Tier 2 — Envelope Hash (`event_hash`):**
-   The `event_hash` seals the entire envelope, guaranteeing that sequence, timestamps, actor, and payload cannot be altered:
+   The `event_hash` cryptographically seals the entire envelope and metadata, ensuring no field (including `artifact_refs`, `evidence_refs`, `correlation_id`, `causation_id`, `idempotency_key`, `session_id`) can be altered or omitted without invalidating the chain:
    ```python
-   header_manifest = {
-       "actor": event.actor,
-       "event_id": event.event_id,
-       "event_type": event.event_type,
+   # integrity_record is the canonical ProjectEvent dictionary excluding ONLY event_hash
+   integrity_record = {
+       "actor": event["actor"],
+       "artifact_refs": event["artifact_refs"],
+       "causation_id": event["causation_id"],
+       "correlation_id": event["correlation_id"],
+       "event_id": event["event_id"],
+       "event_type": event["event_type"],
+       "evidence_refs": event["evidence_refs"],
+       "idempotency_key": event["idempotency_key"],
+       "payload": event["payload"],
        "payload_digest": payload_digest,
-       "prev_event_hash": event.prev_event_hash,
-       "project_id": event.project_id,
-       "schema_version": event.schema_version,
-       "sequence": event.sequence,
-       "source": event.source,
-       "timestamp": event.timestamp,
+       "prev_event_hash": event["prev_event_hash"],
+       "project_id": event["project_id"],
+       "schema_version": event["schema_version"],  # canonical: "power.project-event.v1"
+       "sequence": event["sequence"],
+       "session_id": event["session_id"],
+       "source": event["source"],
+       "timestamp": event["timestamp"],
    }
-   header_bytes = json.dumps(header_manifest, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-   event_hash = hashlib.sha256(header_bytes).hexdigest()
+   canonical_integrity_bytes = canonical_json_dumps(integrity_record).encode("utf-8")
+   event_hash = hashlib.sha256(canonical_integrity_bytes).hexdigest()
    ```
+   *Note:* `payload_digest` is additionally verified separately to guarantee inner payload integrity independently of the envelope envelope-binding.
 3. **Chain Genesis and Linkage Rules:**
    - **Genesis Event (`sequence == 1`):** `prev_event_hash` must be the empty string `""`.
    - **Subsequent Events (`sequence > 1`):** `prev_event_hash` must strictly equal the `event_hash` of the immediately preceding event (`sequence - 1`).

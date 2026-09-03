@@ -18,13 +18,15 @@ PSE directly inherits the authority boundaries established in Phase 0 (`artifact
 | Domain Entity | Canonical Authoritative Subsystem | Canonical Storage Location |
 | :--- | :--- | :--- |
 | **Markdown Notes & Docs** | `Vault Mutation Boundary` (`mutation.py`) | Obsidian root (`01_Projects/`, etc.) |
-| **Tasks (`PowerTask v2`)** | `TaskService` / `TaskStore` (`task_store.py`) | `.power/tasks/<task_id>.json` & `.power/tasks/events.jsonl` |
-| **Decisions (`Decision v1`)** | `DecisionService` (`decision_service.py`) | `.power/decisions/<decision_id>.json` |
+| **Tasks (`PowerTask v2`)** | `TaskService` / `TaskStore` (`task_store.py`) | `.power/tasks/<task_id>.json` & `.power/tasks/events/<task_id>.jsonl` |
+| **Decisions (`Decision v1`)** | `DecisionService` (`decision_service.py`) | `.power/tasks/decisions/<decision_id>.json` & receipts in `.power/tasks/decisions/receipts/` |
 | **Project State & Events** | **Project State Engine (PSE)** | `.power/projects/<project_id>/events.jsonl` |
 | **RAID & RACI Entities** | **Project State Engine (PSE)** | Projected from `.power/projects/<project_id>/events.jsonl` |
+| **Semantic Entities (Fact, Hypo, Obs, Lesson)** | **Project State Engine (PSE)** | Projected from `.power/projects/<project_id>/events.jsonl` |
 | **Quality Gates (DoR/DoD)** | **Project State Engine (PSE)** | Evaluated from live subsystem state, logged to PSE ledger |
 
-**Non-Ambiguity Invariant:** PSE NEVER acts as a shadow authority for tasks or decisions. Tasks are owned exclusively by `TaskStore`; decisions are owned exclusively by `DecisionService`.
+**Non-Ambiguity & Federated Composed State Invariant:**
+`.power/projects/<project_id>/events.jsonl` is the single canonical authority for domains owned by PSE (lifecycle state, RAID logs, RACI assignments, DoR/DoD quality gates, project relations, semantic entities). Task state remains authoritative in `TaskStore`. Decision approval state remains authoritative in `DecisionService`. The **Composed Project State** is a federated deterministic representation over these authoritative sources.
 
 ---
 
@@ -65,20 +67,19 @@ PSE coordinates with tasks and decisions through typed relational bindings, stri
    - A project references decisions via foreign keys (`decision_id`) in `decision_refs` and `dependencies`.
 2. **No Model Duplication:**
    - PSE does not duplicate `title`, `state`, `lease_owner`, or `execution_state` inside canonical project records.
-3. **Event-Driven Linking:**
-   - When an existing task is bound to a project, PSE emits:
-     ```json
-     {
-       "event_type": "task.associated",
-       "payload": {
-         "task_id": "tsk_build_core_engine",
-         "relation": "milestone_deliverable"
-       }
-     }
-     ```
-4. **Dynamic Status Resolution:**
+   - `PowerTask` has no `metadata` container; PSE does not assume any `metadata.project_id` in tasks.
+3. **Association-Intent Saga Coordination (Zero 2PC):**
+   - Associating a task:
+     PSE emits `task.association.requested` (`project_id`, `task_id`, `relation`, `correlation_id`, `idempotency_key`).
+     Upon validation with `TaskStore`, PSE records `task.associated` (or `task.association.failed`).
+   - Associating a decision:
+     PSE emits `decision.association.requested` (`project_id`, `decision_id`, `relation`, `correlation_id`, `idempotency_key`).
+     Upon validation with `DecisionService`, PSE records `decision.associated` (or `decision.association.failed`).
+4. **Dynamic Status Resolution & Observation:**
    - To check whether all tasks for a milestone or project phase are completed, PSE queries `TaskStore` directly using `TaskStore.get_task(task_id)` or joins against the synchronized SQLite task projection.
+   - External state changes may be noted via `task.lifecycle.observed` and `decision.lifecycle.observed`.
 5. **Disassociation & Deletion:**
+   - When a link is severed, PSE emits `task.disassociated` or `decision.disassociated`.
    - Deleting or canceling a task in `TaskStore` leaves the PSE historical reference intact. The state machine interprets missing or cancelled tasks according to DoD validation rules.
 
 ---
@@ -86,43 +87,50 @@ PSE coordinates with tasks and decisions through typed relational bindings, stri
 ## 4. ProjectEvent v1 Canonical Serialization Contract
 To guarantee deterministic cryptographic hashing and byte-for-byte reproducibility across languages and operating systems, all `ProjectEvent` records must follow strict canonical serialization rules.
 
-1. **JSON Encoding:**
-   - UTF-8 encoding without Byte Order Mark (BOM).
-   - Keys sorted lexicographically at all nesting levels (`sort_keys=True`).
-   - Minimal compact whitespace separators: `(',', ':')` without trailing spaces.
-   - Non-ASCII characters preserved without escaping (`ensure_ascii=False`).
-2. **Timestamp Formatting:**
+1. **Exact Schema Version Token:**
+   - The canonical stored version identifier is strictly `"power.project-event.v1"`.
+   - Dual serialized formats are prohibited in stored events. Legacy aliases (such as `"1.0"`) are accepted only at the ingress/upcaster boundary and normalized prior to storage.
+2. **Authoritative Canonical JSON & Server-Side Hashing:**
+   - All hashes (`event_hash`, `payload_digest`), monotonic sequences, and `prev_event_hash` pointers are generated by POWER under project lock, never chosen by clients. CLI and MCP clients submit Append Commands or Proposals.
+   - The canonicalizer strictly implements RFC 8785 / JCS (JSON Canonicalization Scheme).
+   - UTF-8 encoding without BOM, keys sorted lexicographically at all nesting levels (`sort_keys=True`), compact separators `(',', ':')`, non-ASCII preserved without escaping (`ensure_ascii=False`).
+   - Floats are forbidden in envelope metadata; `NaN`, `Infinity`, and `-Infinity` are rejected fail-closed.
+3. **Timestamp Formatting:**
    - Strict RFC 3339 / ISO 8601 representation in UTC.
    - Format: `YYYY-MM-DDTHH:MM:SSZ` or `YYYY-MM-DDTHH:MM:SS.ffffffZ`.
    - Local offsets (e.g. `+03:00`) must be converted to UTC before serialization.
-3. **Numeric and String Values:**
-   - Sequences and counters must be integers.
-   - Floating-point numbers are strictly forbidden in cryptographic header manifests to eliminate cross-platform precision drift.
-   - `NaN`, `Infinity`, and `-Infinity` are rejected as invalid JSON.
 4. **File Serialization:**
    - Each event is serialized as exactly one single line in `events.jsonl` terminated by an ASCII newline `\n` (`0x0A`).
 
 ---
 
 ## 5. ProjectEvent Integrity & Cryptographic Hash-Chain
-As decided in `ADR-PSE-006`, PSE implements an envelope-binding cryptographic SHA-256 hash chain:
+As codified in `ADR-PSE-006`, PSE implements a full envelope-binding cryptographic SHA-256 hash chain:
 
 ```text
 Event 1 (Genesis, seq=1):
   prev_event_hash = ""
   payload_digest = SHA256(canonical_json(payload))
-  event_hash = SHA256(canonical_json(header_manifest_1))
+  event_hash = SHA256(canonical_json(integrity_record_1))
 
 Event 2 (seq=2):
   prev_event_hash = Event 1.event_hash
   payload_digest = SHA256(canonical_json(payload))
-  event_hash = SHA256(canonical_json(header_manifest_2))
+  event_hash = SHA256(canonical_json(integrity_record_2))
 ```
 
-- **Header Manifest Fields Included in `event_hash`:**
-  `actor`, `event_id`, `event_type`, `payload_digest`, `prev_event_hash`, `project_id`, `schema_version`, `sequence`, `source`, `timestamp`.
-- **Integrity Verification:**
-  Replaying the event log recalculates `payload_digest` and `event_hash` for each line and confirms that `prev_event_hash == last_event_hash`. Any deviation signals data corruption or tampering.
+- **Full Envelope `integrity_record` Definition:**
+  `integrity_record` is the canonical ProjectEvent dictionary excluding ONLY `event_hash`:
+  ```python
+  integrity_record = {k: v for k, v in event.items() if k != "event_hash"}
+  event_hash = hashlib.sha256(canonical_json_dumps(integrity_record).encode("utf-8")).hexdigest()
+  ```
+  This seals all envelope fields: `actor`, `artifact_refs`, `causation_id`, `correlation_id`, `event_id`, `event_type`, `evidence_refs`, `idempotency_key`, `payload`, `payload_digest`, `prev_event_hash`, `project_id`, `schema_version`, `sequence`, `session_id`, `source`, and `timestamp`.
+  Neither `evidence_refs` nor `artifact_refs` may be omitted from cryptographic sealing.
+- **Two-Tier Verification:**
+  1. `payload_digest == SHA256(canonical_json(payload))` verifies inner payload authenticity.
+  2. `event_hash == SHA256(canonical_json(integrity_record))` verifies envelope immutability.
+  3. Linear linkage: `event.prev_event_hash == predecessor.event_hash` (or `""` for genesis). Any mismatch signals tampering or corruption.
 
 ---
 
@@ -168,15 +176,19 @@ As established in `ADR-PSE-008`:
 1. **Ledger Truncation Recovery:**
    - On boot, PSE inspects the tail of `events.jsonl`.
    - If an incomplete line or un-hashed fragment exists due to an abrupt shutdown, it is safely truncated to the last complete hashed record.
-2. **Subsystem Reconciliation Engine:**
-   - `reconcile_project_subsystems(project_id)` queries `TaskStore` and `DecisionService` to discover any unlinked items or resolve status drift.
-   - Missing links are appended as synthetic idempotent events (`source: "reconciliation"`).
-3. **Secondary Index Rebuild:**
-   - If SQLite indexes or `snapshot.json` files are deleted or corrupted, `rebuild_from_events(project_id)` re-creates them from `events.jsonl` in seconds.
+2. **Subsystem Reconciliation Engine (`reconcile_project_subsystems`):**
+   - Eliminates reliance on non-existent `PowerTask.metadata`.
+   - Scans the project ledger for unresolved `task.association.requested` and `decision.association.requested` saga intents.
+   - Queries `TaskStore.get_task(task_id)` and `DecisionService.get_decision(decision_id)`.
+   - If the entity exists, appends idempotent `task.associated` or `decision.associated` (`source: "reconciliation"`, `actor: "system:reconciler"`).
+   - If missing after retry policy timeout, appends `task.association.failed` or `decision.association.failed`.
+3. **Secondary Index Rebuild Semantics:**
+   - If `project_state.sqlite3` contains purely PSE-owned state, rebuilding from `events.jsonl` is valid and complete.
+   - If the global index also projects tasks and decisions, the rebuild routine is strictly required to read from all three authoritative sources: PSE `events.jsonl` + TaskStore (`.power/tasks/`) + DecisionService (`.power/tasks/decisions/`).
 
 ---
 
-## 10. Temporal Truth Semantics
+## 10. Temporal & Epistemic Truth Semantics
 To eliminate ambiguity when processing asynchronous agent and human events, PSE distinguishes multiple temporal dimensions:
 
 | Field | Meaning & Semantics |
@@ -187,8 +199,11 @@ To eliminate ambiguity when processing asynchronous agent and human events, PSE 
 | `valid_to` | Domain-effective expiration timestamp (null if currently active). |
 | `supersedes` | Entity ID or Decision ID that this current record legally replaces. |
 | `invalidates` | Entity ID or Assumption ID that this current record disproves or renders void. |
-| `confidence` | Numeric float from `0.0` to `1.0` indicating certainty (especially for agent-derived observations). |
-| `verification_status` | Discrete epistemic status: `unverified`, `verified`, `refuted`, `quarantined`. |
+| `confidence` | Numeric float from `0.0` to `1.0` indicating certainty (for probabilistic knowledge like Hypotheses and Observations). |
+| `verification_status` | Epistemic status: `unverified`, `verified`, `refuted`, `quarantined`. |
+
+**Multi-Event Provenance Contract:**
+All semantic entities feature a mandatory `provenance` record tracking `source_event_ids: [event_id, ...]` (at least 1, unique), optional `primary_source_event_id`, `actor`, `timestamp`, `source_type`, optional `correlation_id`, and `evidence_refs`. Confidence is never forced onto deterministic entities.
 
 ---
 
@@ -196,73 +211,57 @@ To eliminate ambiguity when processing asynchronous agent and human events, PSE 
 The project lifecycle comprises six formal states defined in `lifecycle-v1.json`:
 `DISCOVERY` -> `PLANNING` -> `EXECUTION` -> `MONITORING` -> `CLOSING` -> `CLOSED`.
 
-### Transition Matrix Summary:
-- **`DISCOVERY -> PLANNING`**: Charter and objectives documented; owner assigned.
-- **`PLANNING -> EXECUTION`**: Scope defined; initial tasks queued; **Definition of Ready (DoR)** passed or overridden.
-- **`EXECUTION <-> MONITORING`**: Bidirectional active work and health assessment loop.
-- **`EXECUTION / MONITORING -> CLOSING`**: Deliverables completed; all tasks terminal; no blocking issues.
-- **`CLOSING -> CLOSED`**: **Definition of Done (DoD)** passed; final completion receipts verified; approval signed.
-- **Rollback Transitions (`is_rollback = true`)**:
-  - `PLANNING -> DISCOVERY`, `EXECUTION -> PLANNING`, `MONITORING -> PLANNING`, `CLOSING -> EXECUTION`.
-  - Require formal justification metadata.
-- **Reopening (`CLOSED -> PLANNING / EXECUTION`)**:
-  - Requires executive accountable actor sign-off and logged justification.
+### Transition Invariants (Exactly 17 Legal Transitions):
+The state machine strictly validates transitions against the 17 directed transitions declared in `lifecycle-v1.json`:
+- **Forward Progression**: `DISCOVERY -> PLANNING`, `PLANNING -> EXECUTION`, `EXECUTION -> MONITORING`, `MONITORING -> EXECUTION`, `EXECUTION -> CLOSING`, `MONITORING -> CLOSING`, `CLOSING -> CLOSED`.
+- **Cancellations & Terminations**: `DISCOVERY -> CLOSED`, `PLANNING -> CLOSED`, `EXECUTION -> CLOSED`, `MONITORING -> CLOSED`.
+- **Rollbacks (`is_rollback = true`)**: `PLANNING -> DISCOVERY`, `EXECUTION -> PLANNING`, `MONITORING -> PLANNING`, `CLOSING -> EXECUTION`. Require recorded justification metadata.
+- **Reopening (`CLOSED -> PLANNING`, `CLOSED -> EXECUTION`)**: Require accountable executive approval and logged justification.
+
+### CLOSED State Semantics (Resolving Terminal Duality):
+Rather than declaring `CLOSED` as an absorbing terminal state while permitting reopenings, the contract formalizes:
+- `"is_closed": true`
+- `"normal_mutations_blocked": true` (direct RAID, RACI, and task association mutations are rejected)
+- `"requires_explicit_reopen": true` (only explicit `project.reopened` transitions to `PLANNING` or `EXECUTION` are allowed).
 
 ---
 
-## 12. RAID Entity Contracts
-RAID items are managed as first-class typed domain entities:
+## 12. Semantic Domain Entities
+Entities are versioned and validated against `semantic-entity-schema-v1.json`:
 
-1. **Risk (`rsk_...`):**
-   - Probability: `low` | `medium` | `high`
-   - Impact: `low` | `medium` | `high` | `critical`
-   - Status: `identified` | `mitigated` | `materialized` | `retired`
-   - Mandatory mitigation plan and assigned owner.
-2. **Assumption (`asm_...`):**
-   - Statement and rationale.
-   - Confidence score (`0.0` to `1.0`).
-   - Status: `valid` | `invalidated` | `confirmed`.
-   - Invalidation records `invalidated_at` and `invalidated_by`.
-3. **Issue (`iss_...`):**
-   - Severity: `minor` | `major` | `critical` | `blocker`
-   - Status: `open` | `investigating` | `resolved` | `closed`
-   - Tracks `blocking_task_ids`. Blocker issues halt phase progression.
-4. **Dependency (`dep_...`):**
-   - Links `source_id` to `target_id`.
-   - `target_type`: `task` | `decision` | `artifact` | `project` | `external`
-   - `dependency_kind`: `blocks` | `blocked_by` | `relates_to` | `requires`
-   - Status: `pending` | `satisfied` | `broken`.
+1. **RAID Entities:**
+   - **Risk (`rsk_...`):** Probability (`low`/`medium`/`high`), Impact (`low`/`medium`/`high`/`critical`), Status (`identified`/`mitigated`/`materialized`/`retired`), mitigation plan, owner.
+   - **Assumption (`asm_...`):** Statement, rationale, confidence (`0.0`-`1.0`), Status (`valid`/`invalidated`/`confirmed`).
+   - **Issue (`iss_...`):** Severity (`minor`/`major`/`critical`/`blocker`), Status (`open`/`investigating`/`resolved`/`closed`). Blocker issues with status `open` or `investigating` are UNRESOLVED and halt phase progression.
+   - **Dependency (`dep_...`):** Source and target links, target type (`task`/`decision`/`artifact`/`project`/`external`), kind (`blocks`/`blocked_by`/`relates_to`/`requires`), status (`pending`/`satisfied`/`broken`).
+2. **Knowledge & Epistemic Entities:**
+   - **Fact (`fct_...`):** Verified empirical assertion with verification method and timestamp.
+   - **Hypothesis (`hyp_...`):** Testable proposition with confidence score, validation criteria, and status (`proposed`/`testing`/`validated`/`refuted`/`abandoned`).
+   - **Observation (`obs_...`):** Contextual finding or sensor/agent observation with `observed_at`.
+   - **Lesson (`lsn_...`):** Retrospective takeaway and actionable recommendation.
+3. **Decision Reference Projection:**
+   - **DecisionReference (`dref_...`):** References canonical `decision_id` from `DecisionService`, capturing project relation and synchronized status (`proposed`/`pending`/`accepted`/`rejected`/`superseded`). Never duplicates Decision models.
 
 ---
 
 ## 13. RACI Semantics for Hybrid Human/Agent Fleets
-1. **Responsible (R):** One or more actors (human `user:...` or agent `agent:...`) executing the deliverable.
-2. **Accountable (A):** **Strictly exactly ONE actor.** Accountability cannot be shared. If an agent is designated as Accountable, it must be an executive or autonomous orchestrator agent, with ultimate liability resting on the vault owner.
+1. **Responsible (R):** One or more actors (human `user:...` or agent `agent:...`) executing deliverables.
+2. **Accountable (A):** **Strictly exactly ONE actor.** Accountability cannot be shared.
 3. **Consulted (C):** Subject matter experts or reviewer agents consulted prior to decisions.
 4. **Informed (I):** Stakeholders notified upon milestone completion or phase change.
 
 ---
 
 ## 14. Definition of Ready (DoR) & Definition of Done (DoD) Rule Model
-DoR and DoD are not informal text checklists; they are machine-evaluable rulesets:
-
-1. **Rule Representation:**
-   ```json
-   {
-     "rule_id": "dod_no_blocking_issues",
-     "category": "dod",
-     "phase": "CLOSING",
-     "predicate_kind": "no_open_blockers",
-     "predicate_params": {},
-     "severity": "blocking"
-   }
-   ```
-2. **Evaluation Protocol:**
-   - Evaluator evaluates every rule in the gate suite against the live domain state.
-   - Produces a `GateEvaluation` entity with overall status `passed` or `failed`.
-3. **Override Semantics:**
-   - If a blocking rule fails, an authorized actor may register an override with `overridden_by`, `justification`, and `approved_by`.
-   - The override is permanently committed to the event ledger (`gate.overridden`).
+Quality gates are machine-evaluable rulesets:
+1. **Evaluation Rules:**
+   - `all_tasks_terminal`: checks all associated tasks against Task v2 canonical terminal states: `completed`, `failed`, `canceled`, `rejected`.
+   - `no_open_blockers`: checks that zero issues with severity `blocker` have status not in `{"resolved", "closed"}` (investigating issues are blocked).
+   - `receipt_present`, `assumption_validated`, `file_exists`, `metric_threshold`, `registered_policy`.
+   - **Prohibition of Custom Scripts:** Arbitrary execution (`custom_script`) is strictly eliminated to prevent remote execution hazards. Dynamic rules must use `registered_policy`.
+2. **Evaluation Protocol & Override:**
+   - Produces a `GateEvaluation` entity with overall status `passed`, `failed`, or `overridden`.
+   - Overrides require formal `overridden_by`, `justification`, and `approved_by` metadata, permanently committed to the ledger (`gate.overridden`).
 
 ---
 
@@ -274,5 +273,15 @@ DoR and DoD are not informal text checklists; they are machine-evaluable ruleset
 2. **Derived Cache Storage:**
    - Snapshot: `.power/projects/<project_id>/snapshot.json`
    - Relational Index: `.power/project-state/indexes/project_state.sqlite3`
-   - Obsidian Views: `01_Projects/<project>/status.md`
-   - Rebuildability: 100% regenerable from `events.jsonl` at any time with zero data loss.
+   - Vault Views: `<project.vault_path>/status.md` (contract-driven vault path, annotated with generation marker).
+   - Rebuildability: 100% regenerable from canonical ledgers and subsystem stores.
+
+---
+
+## 16. Operational Privacy Profiles & Secret Sanitization
+Codified in `ADR-PSE-005`:
+1. **Three Explicit Privacy Modes:**
+   - `metadata-only`: captures strictly operational envelopes and tool manifests.
+   - `structured-events` (DEFAULT): agent dialogue is distilled in-memory into structured domain events; conversation buffer is purged immediately upon append. Raw dialogue is prohibited in `payload`.
+   - `full-content` (Explicit Opt-In Only): sanitized conversation turns retained in a local-only raw-evidence store (`.power/raw-evidence/` with mode `0600`/`0700` and 14-day retention). NEVER stored in event payloads, NEVER committed to Git, and NEVER synced across fleet nodes by default.
+2. **Defense-in-Depth Sanitization:** Automated scrubbing filters redact tokens, passwords, and `.env` credentials before disk append as defense-in-depth. Evidence is recorded via content-free SHA-256 digests in `evidence_refs`.

@@ -32,14 +32,19 @@ Chosen Solution: **Formal 6-State FSM with Gate Enforcement and Explicit Reversa
 
 ### Invariants and Transition Rules:
 1. **Event-Driven Transition:** Project phase can NEVER be altered by directly modifying a state field. A phase change requires emitting a validated `project.phase.changed` event.
-2. **Transition Validation Table:** All transitions are strictly validated against `lifecycle-v1.json`. Any transition not explicitly listed in the transition table raises `IllegalStateTransitionError`.
+2. **Transition Validation Table (Exactly 17 Legal Transitions):**
+   All transitions are strictly validated against `lifecycle-v1.json` (which defines exactly 17 legal directed transitions). Any transition not explicitly listed in the transition table raises `IllegalStateTransitionError`.
 3. **Precondition and Quality Gate Enforcement:**
    - Advancement from `PLANNING` to `EXECUTION` requires passing the **Definition of Ready (DoR)** gate or registering a formally approved override.
    - Advancement from `CLOSING` to `CLOSED` requires 100% passage of the **Definition of Done (DoD)** gate, terminal status on all related tasks, and recorded completion receipts.
 4. **Rollback & Reopen Semantics:**
-   - Transitions marked `is_rollback: true` (e.g. `EXECUTION -> PLANNING` for replanning) require mandatory justification metadata in the event payload.
+   - Transitions marked `is_rollback: true` (e.g. `EXECUTION -> PLANNING` for replanning, `CLOSING -> EXECUTION` for rejected deliverables) require mandatory justification metadata in the event payload.
    - Reopening a `CLOSED` project requires an explicit `project.reopened` event accompanied by accountable human or executive agent approval evidence.
-5. **No Terminal Mutation:** When a project is `CLOSED`, no RAID items, RACI mappings, or task associations may be modified without formally reopening the project.
+5. **CLOSED State Semantics (Resolving Terminal Duality):**
+   Rather than treating `CLOSED` as an irreversible absorbing sink while simultaneously permitting reopening, the contract explicitly defines `CLOSED` with:
+   - `is_closed: true`
+   - `normal_mutations_blocked: true` (all standard RAID, RACI, and task association mutations are blocked)
+   - `requires_explicit_reopen: true` (state transitions out of `CLOSED` are restricted to explicit `project.reopened` commands targeting `PLANNING` or `EXECUTION` with executive sign-off).
 
 ## Consequences
 ### Positive

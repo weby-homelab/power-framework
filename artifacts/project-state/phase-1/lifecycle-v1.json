@@ -29,8 +29,10 @@
     },
     {
       "name": "CLOSED",
-      "description": "Durable terminal state; deliverables archived and project state sealed.",
-      "is_terminal": true
+      "description": "Sealed closed state; normal mutations blocked, requires explicit reopen to transition to PLANNING or EXECUTION.",
+      "is_closed": true,
+      "normal_mutations_blocked": true,
+      "requires_explicit_reopen": true
     }
   ],
   "transitions": [

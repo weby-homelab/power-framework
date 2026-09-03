@@ -6,10 +6,24 @@
   "$defs": {
     "Provenance": {
       "type": "object",
-      "description": "Mandatory audit and origin metadata for every semantic entity",
+      "description": "Mandatory audit and origin metadata for semantic entities, supporting multi-event derivation and epistemic tracking",
       "properties": {
-        "source_event_id": {
-          "type": "string",
+        "source_event_ids": {
+          "type": "array",
+          "description": "List of source event IDs from which this entity was derived",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          }
+        },
+        "primary_source_event_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional primary origin event ID",
           "pattern": "^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
         },
         "actor": {
@@ -27,7 +41,9 @@
             "event_replay",
             "direct_mutation",
             "reconciliation",
-            "agent_inference"
+            "agent_inference",
+            "human_entry",
+            "automated_test"
           ]
         },
         "correlation_id": {
@@ -36,10 +52,68 @@
             "null"
           ],
           "maxLength": 128
+        },
+        "evidence_refs": {
+          "type": "array",
+          "description": "Cryptographic digests or receipts supporting this entity",
+          "items": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Epistemic confidence for probabilistic knowledge (0.0 to 1.0)",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "verification_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "unverified",
+            "verified",
+            "refuted",
+            "quarantined",
+            null
+          ]
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "supersedes": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "invalidates": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
         }
       },
       "required": [
-        "source_event_id",
+        "source_event_ids",
         "actor",
         "timestamp",
         "source_type"
@@ -557,7 +631,7 @@
             "assumption_validated",
             "file_exists",
             "metric_threshold",
-            "custom_script"
+            "registered_policy"
           ]
         },
         "predicate_params": {
@@ -701,6 +775,327 @@
         "evaluated_at"
       ],
       "additionalProperties": false
+    },
+    "Fact": {
+      "type": "object",
+      "description": "Verified domain fact or empirical finding associated with a project",
+      "properties": {
+        "fact_id": {
+          "type": "string",
+          "pattern": "^fct_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "domain",
+            "technical",
+            "organizational",
+            "environmental",
+            "historical"
+          ]
+        },
+        "verified_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "verification_method": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "fact_id",
+        "project_id",
+        "statement",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Hypothesis": {
+      "type": "object",
+      "description": "Testable hypothesis or proposition requiring empirical validation",
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "pattern": "^hyp_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "validation_criteria": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "proposed",
+            "testing",
+            "validated",
+            "refuted",
+            "abandoned"
+          ]
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "hypothesis_id",
+        "project_id",
+        "statement",
+        "confidence",
+        "status",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Observation": {
+      "type": "object",
+      "description": "Direct observation recorded by an agent, sensor, or human during project execution",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "pattern": "^obs_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "context": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "observer": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "observation_id",
+        "project_id",
+        "content",
+        "observed_at",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Lesson": {
+      "type": "object",
+      "description": "Structured lesson learned, retrospective takeaway, or process optimization insight",
+      "properties": {
+        "lesson_id": {
+          "type": "string",
+          "pattern": "^lsn_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "process",
+            "technical",
+            "architecture",
+            "coordination",
+            "quality",
+            "security"
+          ]
+        },
+        "applies_to": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "recommendation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "lesson_id",
+        "project_id",
+        "title",
+        "summary",
+        "recommendation",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "DecisionReference": {
+      "type": "object",
+      "description": "Referential projection linking a canonical Decision from DecisionService into project state",
+      "properties": {
+        "decision_ref_id": {
+          "type": "string",
+          "pattern": "^dref_[A-Za-z0-9._-]{2,64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$"
+        },
+        "decision_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{2,128}$"
+        },
+        "relation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "proposed",
+            "pending",
+            "accepted",
+            "rejected",
+            "superseded"
+          ]
+        },
+        "task_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "receipt_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "decision_ref_id",
+        "project_id",
+        "decision_id",
+        "relation",
+        "status",
+        "provenance",
+        "created_at"
+      ],
+      "additionalProperties": false
     }
   },
   "oneOf": [
@@ -727,6 +1122,21 @@
     },
     {
       "$ref": "#/$defs/GateEvaluation"
+    },
+    {
+      "$ref": "#/$defs/Fact"
+    },
+    {
+      "$ref": "#/$defs/Hypothesis"
+    },
+    {
+      "$ref": "#/$defs/Observation"
+    },
+    {
+      "$ref": "#/$defs/Lesson"
+    },
+    {
+      "$ref": "#/$defs/DecisionReference"
     }
   ]
 }

@@ -21,15 +21,23 @@ Chosen Solution: **Event-Driven Outbox / Reactive Linking with Idempotent Period
 1. **No Synchronous Two-Phase Commit (2PC):**
    - We explicitly prohibit distributed synchronous transactions requiring atomic dual-writes across `TaskStore` and `PSE`.
    - Operations in `TaskService` and `DecisionService` commit directly to their authoritative stores under their own locks.
-2. **Asynchronous / Reactive Association:**
-   - When a task or decision is created or resolved in the context of a project, the calling agent or workflow coordinator emits a linking event to the PSE ledger (`task.associated`, `decision.associated`, or `evidence.attached`).
-   - If the PSE event append fails or the process is killed before PSE can record the link, the primary task or decision remains safe and fully committed.
+2. **Durable Association-Intent Saga (No 2PC):**
+   - We eliminate any assumption that `PowerTask` possesses a `metadata.project_id` or text scope field (`PowerTask` has no `metadata` container).
+   - Cross-subsystem association is driven exclusively via a durable, PSE-managed association-intent Saga:
+     - **Task Association Saga:**
+       `task.association.requested` -> operation / validation against `TaskService` -> `task.associated` (or `task.association.failed` on terminal failure).
+       *Mandatory fields for `task.association.requested` payload:* `project_id`, `task_id`, `relation`, `correlation_id`, `idempotency_key`.
+     - **Decision Association Saga:**
+       `decision.association.requested` -> operation / validation against `DecisionService` -> `decision.associated` (or `decision.association.failed` on terminal failure).
+       *Mandatory fields for `decision.association.requested` payload:* `project_id`, `decision_id`, `relation`, `correlation_id`, `idempotency_key`.
 3. **Idempotent Reconciliation Protocol (`reconcile_project_subsystems`):**
-   - PSE includes an idempotent reconciliation engine that can run on startup, periodic cron, or on-demand:
-     1. **TaskStore Inspection:** Queries `TaskStore` for all tasks carrying `project_id == target_project_id` in their scope or metadata.
-     2. **Reference Validation:** Compares discovered tasks against the project's recorded `task_refs` and dependencies.
-     3. **Missing Association Healing:** If an authoritative task exists but is not yet indexed in PSE, the engine appends a synthetic idempotent `task.associated` event with `source: "reconciliation"` and `actor: "system:reconciler"`.
-     4. **Terminal Status Synchronization:** When evaluating DoR/DoD gates, PSE always queries the live authoritative state of tasks directly from `TaskStore`, never relying on potentially stale cached mirror fields.
+   - PSE includes an idempotent reconciliation engine running on startup, periodic cron, or on-demand:
+     1. **Saga Intent Recovery:** Scans the project event ledger for pending `*.association.requested` events that lack a corresponding terminal event (`*.associated` or `*.association.failed`) matching their `correlation_id` / `idempotency_key`.
+     2. **Subsystem Inquiry:** Queries `TaskStore.get_task(task_id)` or `DecisionService.get_decision(decision_id)`.
+     3. **Deterministic Resolution:**
+        - If the authoritative entity exists in `TaskStore` or `DecisionService`, PSE appends an idempotent `task.associated` or `decision.associated` event (`source: "reconciliation"`, `actor: "system:reconciler"`).
+        - If the entity does not exist and retry timeout policy has elapsed, PSE appends a `task.association.failed` or `decision.association.failed` event recording the failure reason.
+     4. **Terminal Status Observation:** When evaluating DoR/DoD gates, PSE queries the live authoritative state directly from `TaskStore` and `DecisionService`, optionally recording a `task.lifecycle.observed` or `decision.lifecycle.observed` event if status auditing is configured.
 4. **Crash Recovery for Event Stream (`events.jsonl`):**
    - On startup, the ledger reader validates the cryptographic hash chain of `.power/projects/<project_id>/events.jsonl`.
    - If a partial line or unclosed JSON object is detected at the tail (caused by a crash during disk write), the recovery procedure truncates the file back to the last valid newline with a matching `event_hash`.

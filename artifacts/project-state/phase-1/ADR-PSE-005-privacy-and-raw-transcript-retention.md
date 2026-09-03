@@ -15,24 +15,39 @@ LLM interactions generate large quantities of verbose conversation transcripts, 
 - Clear boundary between high-level project domain state and low-level agent operational logs.
 
 ## Decision Outcome
-Chosen Solution: **Strict Payload Privacy Perimeter with Content-Free Digest Evidence**.
+Chosen Solution: **Three-Tier Privacy Profiles with Strict Payload Perimeter and Defense-in-Depth Sanitization**.
 
-### Privacy & Retention Rules:
-1. **No Raw LLM Transcripts in Event Payloads:**
-   - Raw multi-megabyte LLM conversation turns, prompt completions, and system messages are strictly prohibited in `ProjectEvent.payload`.
-   - Only concise, structured summaries, validated semantic extractions (e.g. newly discovered risks, updated deliverables), and phase recommendations may be emitted as events.
-2. **Mandatory Credential & Secret Scrubbing:**
-   - Before any event is serialized to the canonical ledger, all payload fields pass through an automated credential scrubbing filter that redacts API keys, tokens, SSH keys, and `.env` variable values matching known secret patterns.
-3. **Content-Free Evidence Hashes:**
-   - Where proof of an external activity is required (e.g. test runs, security scans, agent receipts), PSE records the cryptographic SHA-256 digest of the artifact in `evidence_refs` or `artifact_digests`, rather than embedding the raw log data into the event stream.
-4. **Separation of Raw Logs:**
-   - Raw execution transcripts are kept in ephemeral, local-only directories (e.g. `.system_generated/logs/` or `/tmp/power/`) subject to local retention and rotation policies (e.g. 14 days), completely detached from the project's immutable event ledger.
+### Privacy & Retention Profiles:
+PSE establishes three explicit operational privacy modes:
+1. **`metadata-only`**:
+   - Captures strictly session boundaries, tool invocation manifests, and operational metadata.
+   - Zero content or reasoning tokens are analyzed or retained.
+2. **`structured-events` (DEFAULT)**:
+   - Evaluates agent dialogue and tool outputs in-memory into concise, structured PSE domain events (`ProjectEvent`, RAID items, RACI assignments, gate evaluations).
+   - Once structured events are appended to the ledger, the in-memory dialogue buffer is immediately and permanently discarded.
+   - Raw multi-turn prompts, completions, and thinking blocks are strictly prohibited in `ProjectEvent.payload`.
+3. **`full-content` (Explicit Opt-In Only)**:
+   - Available strictly via explicit opt-in configuration for deep offline debugging and auditing.
+   - Stores sanitized conversation turns in an isolated, local-only raw-evidence store (e.g. `.power/raw-evidence/` or `.system_generated/logs/`).
+   - **Absolute Boundaries:**
+     - NEVER stored inside `ProjectEvent.payload`.
+     - NEVER committed to Git repositories.
+     - NEVER synchronized across fleet nodes by default.
+     - Enforces strict POSIX local permissions (mode `0600` / `0700`) and a strict time-to-live retention window (e.g. 14 days) with automatic pruning.
+
+### Defense-in-Depth Secret Sanitization:
+- **Pragmatic Defense-in-Depth:**
+  Credential and secret scrubbing is treated as an automated defense-in-depth hygiene layer rather than an absolute panacea. We acknowledge that no heuristic regex filter can claim "zero leak" or "100% compliance" against novel secret encodings.
+- **Scrubbing Pipeline:**
+  Before any event is serialized to the canonical ledger, all payload fields pass through multi-pattern scrubbing filters targeting API tokens, bearer keys, private certificates, and `.env` patterns, redacting detected secrets with `[REDACTED]`.
+- **Content-Free Evidence Hashes:**
+  Where verification of an external artifact or test output is needed, PSE records the cryptographic SHA-256 digest in `evidence_refs` rather than embedding large or sensitive raw blobs into the event stream.
 
 ## Consequences
 ### Positive
-- Event ledgers remain lightweight, deterministic, and safe for fleet-wide replication and long-term storage.
-- Accidental exposure of API tokens or personal credentials in project history is systematically prevented.
-- Complete regulatory and privacy compliance across multi-user or agentic environments.
+- Clear privacy boundaries with a sensible `structured-events` default for autonomous agents.
+- Lean, deterministic event ledgers safe for long-term storage and fleet replication.
+- Defense-in-depth sanitization minimizes credential leakage surface area.
 
 ### Negative
-- Post-mortem debugging of subtle agent reasoning failures requires correlating the event ledger with separate ephemeral transcript logs.
+- Post-mortem investigation in default mode depends on structured event summaries unless `full-content` local evidence retention is explicitly enabled.
