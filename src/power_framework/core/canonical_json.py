@@ -98,4 +98,3 @@ def compute_command_fingerprint(
         "source": source or "",
     }
     return hashlib.sha256(canonical_json_bytes(canonical_dict)).hexdigest()
-

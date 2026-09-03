@@ -86,6 +86,7 @@ def vault_root(tmp_path: Path) -> Path:
 # 1. Append / Read Tests
 # ==============================================================================
 
+
 def test_append_and_read_event(vault_root: Path) -> None:
     store = ProjectEventStore("prj_alpha", vault_root)
     cmd = AppendCommand(
@@ -112,6 +113,7 @@ def test_append_and_read_event(vault_root: Path) -> None:
 # ==============================================================================
 # 2. Deterministic Replay Tests (Gate G2.1)
 # ==============================================================================
+
 
 def test_deterministic_replay(vault_root: Path) -> None:
     store = ProjectEventStore("prj_deterministic", vault_root)
@@ -151,6 +153,7 @@ def test_deterministic_replay(vault_root: Path) -> None:
 # ==============================================================================
 # 3. Duplicate Delivery & Idempotency Tests (Gate G2.2)
 # ==============================================================================
+
 
 def test_duplicate_delivery_idempotency(vault_root: Path) -> None:
     store = ProjectEventStore("prj_idempotent", vault_root)
@@ -198,6 +201,7 @@ def test_duplicate_delivery_idempotency(vault_root: Path) -> None:
 # ==============================================================================
 # 4. Concurrent Append Under Project Lock Tests (Gate G2.3)
 # ==============================================================================
+
 
 def test_concurrent_append_under_project_lock(vault_root: Path) -> None:
     store = ProjectEventStore("prj_concurrent", vault_root)
@@ -338,6 +342,7 @@ def test_complete_last_record_hash_tamper_is_not_truncated(vault_root: Path) -> 
     lines = store.active_events_file.read_text(encoding="utf-8").splitlines(keepends=True)
     assert len(lines) == 2
     import json
+
     rec2 = json.loads(lines[1])
     rec2["event_hash"] = "deadbeef" * 8
     lines[1] = json.dumps(rec2) + "\n"
@@ -375,6 +380,7 @@ def test_complete_last_record_payload_tamper_is_not_truncated(vault_root: Path) 
 
     lines = store.active_events_file.read_text(encoding="utf-8").splitlines(keepends=True)
     import json
+
     rec2 = json.loads(lines[1])
     rec2["payload"]["step"] = 999
     lines[1] = json.dumps(rec2) + "\n"
@@ -453,6 +459,7 @@ def test_append_refuses_corrupted_middle_record(vault_root: Path) -> None:
 
     lines = store.active_events_file.read_text(encoding="utf-8").splitlines(keepends=True)
     import json
+
     rec2 = json.loads(lines[1])
     rec2["payload"]["step"] = 999
     lines[1] = json.dumps(rec2) + "\n"
@@ -493,6 +500,7 @@ def test_append_refuses_corrupted_last_complete_record(vault_root: Path) -> None
 
     lines = store.active_events_file.read_text(encoding="utf-8").splitlines(keepends=True)
     import json
+
     rec2 = json.loads(lines[1])
     rec2["event_hash"] = "00" * 32
     lines[1] = json.dumps(rec2) + "\n"
@@ -555,7 +563,10 @@ def test_lock_timeout_raises_exception(vault_root: Path) -> None:
     assert lock_acquired_event.wait(timeout=2.0)
 
     try:
-        with pytest.raises(LockAcquisitionTimeoutError), project_lock(project_id, vault_root, timeout=0.2):
+        with (
+            pytest.raises(LockAcquisitionTimeoutError),
+            project_lock(project_id, vault_root, timeout=0.2),
+        ):
             pass
     finally:
         release_lock_event.set()
@@ -565,6 +576,7 @@ def test_lock_timeout_raises_exception(vault_root: Path) -> None:
 # ==============================================================================
 # 5. Torn-Tail Crash Recovery Tests (Gate G2.4)
 # ==============================================================================
+
 
 def test_interrupted_append_torn_tail_recovery(vault_root: Path) -> None:
     store = ProjectEventStore("prj_torn_tail", vault_root)
@@ -586,7 +598,9 @@ def test_interrupted_append_torn_tail_recovery(vault_root: Path) -> None:
 
     # Simulate an abrupt crash / torn write (kill -9 mid-write)
     with open(store.active_events_file, "a", encoding="utf-8") as f:
-        f.write('{"event_id":"evt_prj_torn_tail_4_corrupted","sequence":4,"payload":{"partial":"corrupt')
+        f.write(
+            '{"event_id":"evt_prj_torn_tail_4_corrupted","sequence":4,"payload":{"partial":"corrupt'
+        )
 
     # Verify file is larger
     assert store.active_events_file.stat().st_size > valid_size
@@ -620,6 +634,7 @@ def test_interrupted_append_torn_tail_recovery(vault_root: Path) -> None:
 # 6. Malformed Record Detection (Gate G2.4)
 # ==============================================================================
 
+
 def test_malformed_record_detection(vault_root: Path) -> None:
     store = ProjectEventStore("prj_malformed", vault_root)
     store.append(
@@ -644,6 +659,7 @@ def test_malformed_record_detection(vault_root: Path) -> None:
 # ==============================================================================
 # 7. Unsupported Schema Version Rejection
 # ==============================================================================
+
 
 def test_unsupported_schema_version_rejection(vault_root: Path) -> None:
     store = ProjectEventStore("prj_bad_schema", vault_root)
@@ -676,6 +692,7 @@ def test_unsupported_schema_version_rejection(vault_root: Path) -> None:
 # ==============================================================================
 # 8. Cryptographic Integrity Failure Tests (Gate G2.4)
 # ==============================================================================
+
 
 def test_integrity_failure_payload_tampering(vault_root: Path) -> None:
     store = ProjectEventStore("prj_tamper_payload", vault_root)
@@ -828,6 +845,7 @@ def test_integrity_failure_prev_event_hash_break(vault_root: Path) -> None:
 # 9. Project Isolation, Path Traversal & Symlink Escape Tests (Gate G2.5)
 # ==============================================================================
 
+
 def test_path_traversal_rejection(vault_root: Path) -> None:
     bad_project_ids = [
         "../escape",
@@ -921,6 +939,7 @@ def test_rotation_rejects_path_traversal_and_invalid_names(vault_root: Path) -> 
 # 10. Rotation Tests
 # ==============================================================================
 
+
 def test_ledger_rotation_and_seamless_replay(vault_root: Path) -> None:
     store = ProjectEventStore("prj_rotation", vault_root)
 
@@ -971,6 +990,7 @@ def test_ledger_rotation_and_seamless_replay(vault_root: Path) -> None:
 # ==============================================================================
 # 11. Disposable Derived Index Rebuild Tests (Gate G2.6)
 # ==============================================================================
+
 
 def test_derived_index_rebuild_from_canonical_ledger(vault_root: Path) -> None:
     pid = "prj_rebuild"
@@ -1026,7 +1046,10 @@ def test_derived_index_rebuild_from_canonical_ledger(vault_root: Path) -> None:
     conn = sqlite3.connect(str(db_path))
     try:
         cur = conn.cursor()
-        cur.execute("SELECT project_id, name, current_phase, last_sequence FROM projects WHERE project_id = ?", (pid,))
+        cur.execute(
+            "SELECT project_id, name, current_phase, last_sequence FROM projects WHERE project_id = ?",
+            (pid,),
+        )
         row = cur.fetchone()
         assert row is not None
         assert row[0] == pid
@@ -1056,6 +1079,7 @@ def test_derived_index_rebuild_from_canonical_ledger(vault_root: Path) -> None:
 # ==============================================================================
 # 12. Secret Redaction Pipeline Fixtures & RedactionRecord
 # ==============================================================================
+
 
 def test_secret_redaction_pipeline_fixtures() -> None:
     raw_payload = {
@@ -1094,6 +1118,7 @@ def test_secret_redaction_pipeline_fixtures() -> None:
 # 13. Privacy Modes Verification (Gate G2.7)
 # ==============================================================================
 
+
 def test_privacy_modes_verification(vault_root: Path) -> None:
     pid = "prj_privacy"
 
@@ -1126,7 +1151,9 @@ def test_privacy_modes_verification(vault_root: Path) -> None:
         actor="agent:agy",
         source="internal_engine",
     )
-    ev_struct = append_project_event(vault_root, cmd_struct, privacy_mode=PrivacyMode.STRUCTURED_EVENTS)
+    ev_struct = append_project_event(
+        vault_root, cmd_struct, privacy_mode=PrivacyMode.STRUCTURED_EVENTS
+    )
     assert ev_struct.payload["summary"] == "Phase milestone achieved"
     assert "raw_dialogue" not in ev_struct.payload
     assert "transcript" not in ev_struct.payload
@@ -1161,6 +1188,7 @@ def test_privacy_modes_verification(vault_root: Path) -> None:
 # ==============================================================================
 # 14. Cross-Subsystem Association Sagas and Reconciliation (ADR-PSE-008)
 # ==============================================================================
+
 
 class MockTaskService:
     def __init__(self, existing_task_ids: set[str]) -> None:
@@ -1321,7 +1349,9 @@ def test_raw_dialogue_prohibited_across_all_privacy_modes(vault_root: Path) -> N
         actor="user:rekvizitor",
         source="cli",
     )
-    ev_struct = append_project_event(vault_root, cmd_struct, privacy_mode=PrivacyMode.STRUCTURED_EVENTS)
+    ev_struct = append_project_event(
+        vault_root, cmd_struct, privacy_mode=PrivacyMode.STRUCTURED_EVENTS
+    )
     assert "transcript" not in ev_struct.payload
     assert ev_struct.payload["title"] == "Discussion notes"
     assert ev_struct.payload["nested"] == {"safe_field": "ok_value"}
@@ -1430,7 +1460,12 @@ def test_reconciliation_retry_policy_semantics(vault_root: Path) -> None:
         AppendCommand(
             project_id=pid,
             event_type="task.association.requested",
-            payload={"project_id": pid, "task_id": "tsk_retry_missing", "relation": "contributes_to", "max_attempts": 3},
+            payload={
+                "project_id": pid,
+                "task_id": "tsk_retry_missing",
+                "relation": "contributes_to",
+                "max_attempts": 3,
+            },
             actor="user:rekvizitor",
             source="cli",
             correlation_id="corr_retry_task_1",
@@ -1470,7 +1505,9 @@ def test_reconciliation_retry_policy_semantics(vault_root: Path) -> None:
     )
     assert rep2["pending_tasks"] == 1
     assert rep2["failed_tasks"] == 0
-    assert not any(e.event_type == "task.association.failed" for e in replay_project(vault_root, pid))
+    assert not any(
+        e.event_type == "task.association.failed" for e in replay_project(vault_root, pid)
+    )
 
     # Case 3: Third reconciliation run - attempt limit reached -> appends task.association.failed!
     rep3 = reconcile_project_subsystems(
@@ -1494,7 +1531,12 @@ def test_reconciliation_retry_policy_semantics(vault_root: Path) -> None:
         AppendCommand(
             project_id=pid2,
             event_type="task.association.requested",
-            payload={"project_id": pid2, "task_id": "tsk_late_arrival", "relation": "contributes_to", "max_attempts": 3},
+            payload={
+                "project_id": pid2,
+                "task_id": "tsk_late_arrival",
+                "relation": "contributes_to",
+                "max_attempts": 3,
+            },
             actor="user:rekvizitor",
             source="cli",
             correlation_id="corr_late_task",
@@ -1558,6 +1600,7 @@ def test_rebuild_derived_index_fails_closed_on_corrupted_ledger(vault_root: Path
     # Tamper event in ledger
     lines = store.active_events_file.read_text(encoding="utf-8").splitlines(keepends=True)
     import json
+
     rec2 = json.loads(lines[1])
     rec2["event_hash"] = "deadbeef" * 8
     lines[1] = json.dumps(rec2) + "\n"
@@ -1620,6 +1663,7 @@ def test_materialize_status_markdown_diagnostic_summary(vault_root: Path) -> Non
 # ==============================================================================
 # 15. Phase 2 Closure Correction Round 2 Regression Tests
 # ==============================================================================
+
 
 def test_import_refuses_corrupted_existing_ledger_with_zero_mutation(vault_root: Path) -> None:
     """import_project_events must call verify() fail-closed and leave disk 100% untouched if ledger is corrupted."""
@@ -1729,8 +1773,15 @@ def test_import_rejects_raw_dialogue_payload(vault_root: Path) -> None:
     store = ProjectEventStore(pid, vault_root)
 
     forbidden_keys = [
-        "raw_dialogue", "dialogue_buffer", "transcript", "turns",
-        "prompt_text", "completion_text", "messages", "reasoning", "thinking"
+        "raw_dialogue",
+        "dialogue_buffer",
+        "transcript",
+        "turns",
+        "prompt_text",
+        "completion_text",
+        "messages",
+        "reasoning",
+        "thinking",
     ]
     for key in forbidden_keys:
         bad_event = {
@@ -1913,7 +1964,9 @@ def test_replay_enforces_strict_rotation_filename_pattern(vault_root: Path) -> N
 
     # Drop foreign files into project directory
     (store.project_dir / "events_fake.jsonl").write_text("invalid json\n", encoding="utf-8")
-    (store.project_dir / "events_999999_backup.jsonl").write_text("invalid json\n", encoding="utf-8")
+    (store.project_dir / "events_999999_backup.jsonl").write_text(
+        "invalid json\n", encoding="utf-8"
+    )
     (store.project_dir / "events_12.jsonl").write_text("invalid json\n", encoding="utf-8")
     (store.project_dir / "random_notes.txt").write_text("notes\n", encoding="utf-8")
 
@@ -1939,7 +1992,12 @@ def test_reconciliation_retry_state_survives_process_restart(vault_root: Path) -
         AppendCommand(
             project_id=pid,
             event_type="task.association.requested",
-            payload={"project_id": pid, "task_id": "tsk_missing_restart", "relation": "contributes_to", "max_attempts": 3},
+            payload={
+                "project_id": pid,
+                "task_id": "tsk_missing_restart",
+                "relation": "contributes_to",
+                "max_attempts": 3,
+            },
             actor="system:test",
             source="cli",
             correlation_id="corr_restart_task_1",
@@ -2012,7 +2070,12 @@ def test_reconciliation_decision_retry_state_survives_process_restart(vault_root
         AppendCommand(
             project_id=pid,
             event_type="decision.association.requested",
-            payload={"project_id": pid, "decision_id": "dec_missing_restart", "relation": "governs", "max_attempts": 3},
+            payload={
+                "project_id": pid,
+                "decision_id": "dec_missing_restart",
+                "relation": "governs",
+                "max_attempts": 3,
+            },
             actor="system:test",
             source="cli",
             correlation_id="corr_restart_dec_1",
@@ -2106,10 +2169,14 @@ def test_reconciliation_correlation_id_isolation_across_projects(vault_root: Pat
 
     task_service = MockTaskService(existing_task_ids={"tsk_a"})
 
-    rep_a = reconcile_project_subsystems(vault_root, pid_a, task_service=task_service, max_attempts=3)
+    rep_a = reconcile_project_subsystems(
+        vault_root, pid_a, task_service=task_service, max_attempts=3
+    )
     assert rep_a["reconciled_tasks"] == 1
 
-    rep_b = reconcile_project_subsystems(vault_root, pid_b, task_service=task_service, max_attempts=3)
+    rep_b = reconcile_project_subsystems(
+        vault_root, pid_b, task_service=task_service, max_attempts=3
+    )
     assert rep_b["pending_tasks"] == 1
     assert rep_b["reconciled_tasks"] == 0
 
@@ -2123,7 +2190,9 @@ def test_nested_distinct_level3_project_locks_rejected(vault_root: Path) -> None
 
         # Acquiring distinct Level 3 project lock is rejected to prevent cross-project deadlocks
         with (
-            pytest.raises(LockHierarchyViolationError, match="Cross-project nested locks are forbidden"),
+            pytest.raises(
+                LockHierarchyViolationError, match="Cross-project nested locks are forbidden"
+            ),
             project_lock("prj_lock_b", vault_root),
         ):
             pass
@@ -2148,7 +2217,9 @@ def test_metadata_only_saga_preserves_structural_contracts(vault_root: Path) -> 
     assert store.verify().valid is True
 
 
-def test_symlink_escape_audit_across_all_phase2_writable_paths(vault_root: Path, tmp_path: Path) -> None:
+def test_symlink_escape_audit_across_all_phase2_writable_paths(
+    vault_root: Path, tmp_path: Path
+) -> None:
     """Verify symlink defenses across all Phase 2 writable paths and files."""
     outside_dir = tmp_path / "outside_dir"
     outside_dir.mkdir(parents=True, exist_ok=True)

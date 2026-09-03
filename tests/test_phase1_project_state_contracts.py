@@ -51,8 +51,6 @@ def lifecycle_contract() -> dict[str, Any]:
         return json.load(f)
 
 
-
-
 def make_valid_event(
     *,
     sequence: int = 1,
@@ -88,7 +86,9 @@ def make_valid_event(
     return event
 
 
-def validate_semantic_entity(entity: dict[str, Any], entity_type: str, schema: dict[str, Any]) -> None:
+def validate_semantic_entity(
+    entity: dict[str, Any], entity_type: str, schema: dict[str, Any]
+) -> None:
     """Validate a semantic entity against a specific definition within the root schema."""
     subschema = {
         "$schema": schema.get("$schema", "https://json-schema.org/draft/2020-12/schema"),
@@ -153,7 +153,9 @@ def test_event_schema_rejects_unknown_event_type_enum(event_schema: dict[str, An
         jsonschema.validate(instance=event, schema=event_schema)
 
 
-def test_event_schema_accepts_saga_events_and_rejects_deprecated_events(event_schema: dict[str, Any]) -> None:
+def test_event_schema_accepts_saga_events_and_rejects_deprecated_events(
+    event_schema: dict[str, Any],
+) -> None:
     valid_saga_types = [
         "task.association.requested",
         "task.associated",
@@ -293,7 +295,9 @@ def test_full_envelope_tampering_fails_verification() -> None:
         mutated = dict(base_event)
         mutated[field] = tampered_val
         tampered_hash = compute_event_hash(mutated)
-        assert tampered_hash != original_hash, f"Tampering field '{field}' failed to invalidate hash!"
+        assert tampered_hash != original_hash, (
+            f"Tampering field '{field}' failed to invalidate hash!"
+        )
 
 
 # ==============================================================================
@@ -655,7 +659,11 @@ class QualityGateEvaluator:
             tasks = context.get("tasks", [])
             non_terminal = [t for t in tasks if t.get("state") not in TERMINAL_STATES]
             passed = len(non_terminal) == 0
-            msg = "All tasks are terminal" if passed else f"{len(non_terminal)} tasks still non-terminal"
+            msg = (
+                "All tasks are terminal"
+                if passed
+                else f"{len(non_terminal)} tasks still non-terminal"
+            )
             return {"rule_id": rule_id, "passed": passed, "message": msg, "evidence_ref": None}
 
         if predicate == "no_open_blockers":
@@ -663,33 +671,54 @@ class QualityGateEvaluator:
             unresolved_blockers = [
                 i
                 for i in issues
-                if i.get("severity") == "blocker"
-                and i.get("status") not in {"resolved", "closed"}
+                if i.get("severity") == "blocker" and i.get("status") not in {"resolved", "closed"}
             ]
             passed = len(unresolved_blockers) == 0
-            msg = "No unresolved blockers" if passed else f"{len(unresolved_blockers)} unresolved blocker issues detected"
+            msg = (
+                "No unresolved blockers"
+                if passed
+                else f"{len(unresolved_blockers)} unresolved blocker issues detected"
+            )
             return {"rule_id": rule_id, "passed": passed, "message": msg, "evidence_ref": None}
 
         if predicate == "receipt_present":
             receipts = context.get("receipts", [])
             passed = len(receipts) > 0
             msg = "Completion receipt present" if passed else "No completion receipt found"
-            return {"rule_id": rule_id, "passed": passed, "message": msg, "evidence_ref": receipts[0] if receipts else None}
+            return {
+                "rule_id": rule_id,
+                "passed": passed,
+                "message": msg,
+                "evidence_ref": receipts[0] if receipts else None,
+            }
 
         if predicate == "assumption_validated":
             assumptions = context.get("assumptions", [])
-            unvalidated = [a for a in assumptions if a.get("status") != "valid" and a.get("status") != "confirmed"]
+            unvalidated = [
+                a
+                for a in assumptions
+                if a.get("status") != "valid" and a.get("status") != "confirmed"
+            ]
             passed = len(unvalidated) == 0
-            msg = "All assumptions valid" if passed else f"{len(unvalidated)} assumptions unvalidated"
+            msg = (
+                "All assumptions valid" if passed else f"{len(unvalidated)} assumptions unvalidated"
+            )
             return {"rule_id": rule_id, "passed": passed, "message": msg, "evidence_ref": None}
 
         if predicate == "registered_policy":
             policy_fn = context.get("policies", {}).get(rule_id)
             passed = bool(policy_fn(context)) if policy_fn else False
-            return {"rule_id": rule_id, "passed": passed, "message": f"Policy {rule_id}: {passed}", "evidence_ref": None}
+            return {
+                "rule_id": rule_id,
+                "passed": passed,
+                "message": f"Policy {rule_id}: {passed}",
+                "evidence_ref": None,
+            }
 
         if predicate == "custom_script":
-            raise PermissionError("Arbitrary custom_script execution is prohibited in DoR/DoD quality gates")
+            raise PermissionError(
+                "Arbitrary custom_script execution is prohibited in DoR/DoD quality gates"
+            )
 
         raise ValueError(f"Unknown predicate: {predicate}")
 
@@ -852,7 +881,9 @@ def test_blocker_issue_investigating_is_not_resolved() -> None:
     }
 
     # Investigating blocker MUST NOT be considered resolved
-    ctx_investigating = {"issues": [{"issue_id": "i_inv", "severity": "blocker", "status": "investigating"}]}
+    ctx_investigating = {
+        "issues": [{"issue_id": "i_inv", "severity": "blocker", "status": "investigating"}]
+    }
     res_inv = QualityGateEvaluator.evaluate_rule(rule, ctx_investigating)
     assert res_inv["passed"] is False
     assert "1 unresolved blocker issues detected" in res_inv["message"]
@@ -873,7 +904,9 @@ def test_blocker_issue_investigating_is_not_resolved() -> None:
     assert res_closed["passed"] is True
 
 
-def test_dor_dod_prohibits_custom_script_and_accepts_registered_policy(semantic_schema: dict[str, Any]) -> None:
+def test_dor_dod_prohibits_custom_script_and_accepts_registered_policy(
+    semantic_schema: dict[str, Any],
+) -> None:
     # 1. Schema prohibits custom_script
     bad_rule = {
         "rule_id": "rule_arbitrary_eval",

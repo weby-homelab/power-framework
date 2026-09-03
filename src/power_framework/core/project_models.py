@@ -28,7 +28,9 @@ class IdempotencyConflictError(ValueError):
 
 PROJECT_ID_REGEX = r"^prj_[a-z0-9][a-z0-9_-]{2,63}$"
 EVENT_ID_REGEX = r"^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-TIMESTAMP_REGEX = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|\+00:00)$"
+TIMESTAMP_REGEX = (
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|\+00:00)$"
+)
 HASH_REGEX = r"^[0-9a-f]{64}$"
 PREV_HASH_REGEX = r"^([0-9a-f]{64})?$"
 
@@ -267,6 +269,7 @@ class LedgerVerificationResult(BaseModel):
 # Cross-Subsystem Association Saga Payloads (ADR-PSE-008)
 # ---------------------------------------------------------------------------
 
+
 class TaskAssociationRequestedPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -341,4 +344,3 @@ SAGA_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "decision.associated": DecisionAssociatedPayload,
     "decision.association.failed": DecisionAssociationFailedPayload,
 }
-

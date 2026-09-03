@@ -255,12 +255,16 @@ def recover_torn_tail(file_path: Path) -> int:
     try:
         data = json.loads(last_line)
     except Exception as exc:
-        raise LedgerIntegrityError(f"Corruption detected in complete record (malformed JSON): {exc}") from exc
+        raise LedgerIntegrityError(
+            f"Corruption detected in complete record (malformed JSON): {exc}"
+        ) from exc
 
     try:
         event = ProjectEvent.model_validate(data)
     except Exception as exc:
-        raise LedgerIntegrityError(f"Corruption detected in complete record (schema violation): {exc}") from exc
+        raise LedgerIntegrityError(
+            f"Corruption detected in complete record (schema violation): {exc}"
+        ) from exc
 
     calc_payload_digest = compute_payload_digest(event.payload)
     if event.payload_digest != calc_payload_digest:
@@ -290,10 +294,11 @@ def recover_torn_tail(file_path: Path) -> int:
         except LedgerIntegrityError:
             raise
         except Exception as exc:
-            raise LedgerIntegrityError(f"Corruption detected in preceding complete record: {exc}") from exc
+            raise LedgerIntegrityError(
+                f"Corruption detected in preceding complete record: {exc}"
+            ) from exc
 
     return 0
-
 
 
 class ProjectEventStore:
@@ -321,7 +326,9 @@ class ProjectEventStore:
         result = list(rotated)
         if self.active_events_file.exists():
             if self.active_events_file.is_symlink():
-                raise ValueError(f"Active event file must not be a symlink: {self.active_events_file}")
+                raise ValueError(
+                    f"Active event file must not be a symlink: {self.active_events_file}"
+                )
             result.append(self.active_events_file)
         return result
 
@@ -447,11 +454,15 @@ class ProjectEventStore:
 
             # 6. Durable write with atomic fsync
             if self.active_events_file.is_symlink():
-                raise ValueError(f"Active event file must not be a symlink: {self.active_events_file}")
+                raise ValueError(
+                    f"Active event file must not be a symlink: {self.active_events_file}"
+                )
             try:
                 self.active_events_file.resolve().relative_to(self.project_dir.resolve())
             except ValueError as exc:
-                raise ValueError(f"Active event file escapes project directory: {self.active_events_file}") from exc
+                raise ValueError(
+                    f"Active event file escapes project directory: {self.active_events_file}"
+                ) from exc
 
             line = canonical_json_dumps(event.model_dump()) + "\n"
             flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
@@ -513,9 +524,7 @@ class ProjectEventStore:
                     try:
                         data = json.loads(raw)
                     except Exception as exc:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Malformed JSON: {exc}"
-                        )
+                        errors.append(f"{file_path.name}:{line_num}: Malformed JSON: {exc}")
                         continue
 
                     # 2. Schema validation
@@ -636,7 +645,9 @@ class ProjectEventStore:
                 raise FileExistsError(f"Target archive file already exists: {archive_path}")
 
             if self.active_events_file.is_symlink():
-                raise ValueError(f"Active event file must not be a symlink: {self.active_events_file}")
+                raise ValueError(
+                    f"Active event file must not be a symlink: {self.active_events_file}"
+                )
 
             os.rename(self.active_events_file, archive_path)
             # Create a new empty active ledger with mode 0600
@@ -673,4 +684,3 @@ def replay_events(
     """Convenience generator to replay events from a project ledger."""
     store = ProjectEventStore(project_id, vault_root)
     yield from store.replay(from_sequence=from_sequence)
-

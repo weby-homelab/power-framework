@@ -63,17 +63,19 @@ from power_framework.core.project_store import (
 
 logger = logging.getLogger(__name__)
 
-RAW_DIALOGUE_KEYS: frozenset[str] = frozenset({
-    "raw_dialogue",
-    "dialogue_buffer",
-    "transcript",
-    "turns",
-    "prompt_text",
-    "completion_text",
-    "messages",
-    "reasoning",
-    "thinking",
-})
+RAW_DIALOGUE_KEYS: frozenset[str] = frozenset(
+    {
+        "raw_dialogue",
+        "dialogue_buffer",
+        "transcript",
+        "turns",
+        "prompt_text",
+        "completion_text",
+        "messages",
+        "reasoning",
+        "thinking",
+    }
+)
 
 
 def strip_raw_dialogue(data: Any) -> tuple[Any, dict[str, Any]]:
@@ -127,9 +129,7 @@ def contains_raw_dialogue(data: Any) -> bool:
 REDACTION_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "private_key",
-        re.compile(
-            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"
-        ),
+        re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"),
         "[REDACTED_PRIVATE_KEY]",
     ),
     (
@@ -204,7 +204,11 @@ def redact_secrets(data: Any) -> tuple[Any, RedactionRecord]:
                         res[k] = "[REDACTED]"
                     else:
                         res[k] = scrubbed_v
-                elif isinstance(k, str) and SENSITIVE_KEY_PATTERN.match(k) and isinstance(v, (int, float, bool)):
+                elif (
+                    isinstance(k, str)
+                    and SENSITIVE_KEY_PATTERN.match(k)
+                    and isinstance(v, (int, float, bool))
+                ):
                     replacements += 1
                     detected_classes.add("credential_pair")
                     res[k] = "[REDACTED]"
@@ -230,6 +234,7 @@ def redact_secrets(data: Any) -> tuple[Any, RedactionRecord]:
 # ---------------------------------------------------------------------------
 # Raw Evidence Management (Privacy Mode: full-content)
 # ---------------------------------------------------------------------------
+
 
 def _get_raw_evidence_dir(vault_root: Path, project_id: str) -> Path:
     validate_project_id(project_id)
@@ -350,6 +355,7 @@ def store_raw_evidence(
 # High-Level Ingestion API
 # ---------------------------------------------------------------------------
 
+
 def append_project_event(
     vault_root: Path,
     command: AppendCommand,
@@ -415,7 +421,9 @@ def append_project_event(
     target_event_id = command.event_id
     if not target_event_id:
         if command.idempotency_key:
-            target_event_id = generate_deterministic_event_id(command.project_id, command.idempotency_key)
+            target_event_id = generate_deterministic_event_id(
+                command.project_id, command.idempotency_key
+            )
         else:
             target_event_id = f"evt_{command.project_id}_{uuid.uuid4().hex[:12]}"
     validate_event_id(target_event_id)
@@ -433,7 +441,11 @@ def append_project_event(
 
     # 7. Store raw evidence ONLY after all command and payload validations have succeeded
     if privacy_mode == PrivacyMode.FULL_CONTENT:
-        content_to_store = raw_content if raw_content is not None else (extracted_dialogue if extracted_dialogue else None)
+        content_to_store = (
+            raw_content
+            if raw_content is not None
+            else (extracted_dialogue if extracted_dialogue else None)
+        )
         if content_to_store is not None:
             evidence_ref = store_raw_evidence(
                 vault_root=vault_root,
@@ -504,7 +516,9 @@ def import_project_events(
         for raw in events:
             raw_dict = raw if isinstance(raw, dict) else raw.model_dump()
             if contains_raw_dialogue(raw_dict):
-                raise ValueError("Import rejected: event payload contains prohibited raw dialogue / LLM transcript data")
+                raise ValueError(
+                    "Import rejected: event payload contains prohibited raw dialogue / LLM transcript data"
+                )
 
             ev = raw if isinstance(raw, ProjectEvent) else ProjectEvent.model_validate(raw)
 
@@ -538,9 +552,7 @@ def import_project_events(
 
             # Check sequence linkage
             if ev.sequence != curr_seq + 1:
-                raise ValueError(
-                    f"Import sequence gap: expected {curr_seq + 1}, got {ev.sequence}"
-                )
+                raise ValueError(f"Import sequence gap: expected {curr_seq + 1}, got {ev.sequence}")
             if curr_seq == 0 and ev.prev_event_hash != "":
                 raise ValueError("Genesis event must have empty prev_event_hash")
             if curr_seq > 0 and ev.prev_event_hash != curr_hash:
@@ -566,7 +578,9 @@ def import_project_events(
         try:
             store.active_events_file.resolve().relative_to(store.project_dir.resolve())
         except ValueError as exc:
-            raise ValueError(f"Active event file escapes project directory: {store.active_events_file}") from exc
+            raise ValueError(
+                f"Active event file escapes project directory: {store.active_events_file}"
+            ) from exc
 
         flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
         if hasattr(os, "O_NOFOLLOW"):
@@ -598,6 +612,7 @@ def replay_project(
 # ---------------------------------------------------------------------------
 # Derived Index Projection (SQLite + Markdown Status)
 # ---------------------------------------------------------------------------
+
 
 def _get_sqlite_path(vault_root: Path) -> Path:
     """Resolve and validate secondary SQLite database path.
@@ -822,11 +837,19 @@ def update_derived_index_for_event(vault_root: Path, event: ProjectEvent) -> Non
             )
 
             # 3. Handle specific domain projections
-            if event.event_type in ("task.associated", "task.association.failed", "task.association.requested"):
+            if event.event_type in (
+                "task.associated",
+                "task.association.failed",
+                "task.association.requested",
+            ):
                 task_id = event.payload.get("task_id", "")
                 relation = event.payload.get("relation", "contributes_to")
-                status = "associated" if event.event_type == "task.associated" else (
-                    "failed" if event.event_type == "task.association.failed" else "requested"
+                status = (
+                    "associated"
+                    if event.event_type == "task.associated"
+                    else (
+                        "failed" if event.event_type == "task.association.failed" else "requested"
+                    )
                 )
                 if task_id:
                     conn.execute(
@@ -846,11 +869,21 @@ def update_derived_index_for_event(vault_root: Path, event: ProjectEvent) -> Non
                         ),
                     )
 
-            if event.event_type in ("decision.associated", "decision.association.failed", "decision.association.requested"):
+            if event.event_type in (
+                "decision.associated",
+                "decision.association.failed",
+                "decision.association.requested",
+            ):
                 decision_id = event.payload.get("decision_id", "")
                 relation = event.payload.get("relation", "governs")
-                status = "associated" if event.event_type == "decision.associated" else (
-                    "failed" if event.event_type == "decision.association.failed" else "requested"
+                status = (
+                    "associated"
+                    if event.event_type == "decision.associated"
+                    else (
+                        "failed"
+                        if event.event_type == "decision.association.failed"
+                        else "requested"
+                    )
                 )
                 if decision_id:
                     conn.execute(
@@ -1097,12 +1130,16 @@ def reconcile_project_subsystems(
 
         # Track decision sagas
         if event.event_type == "decision.association.requested":
-            decision_id = event.payload.get("decision_id", "") if isinstance(event.payload, dict) else ""
+            decision_id = (
+                event.payload.get("decision_id", "") if isinstance(event.payload, dict) else ""
+            )
             key = (project_id, "decision", decision_id, corr_id)
             requested_counts[key] += 1
             pending_decision_sagas[key] = (corr_id, event.payload)
         elif event.event_type in ("decision.associated", "decision.association.failed"):
-            decision_id = event.payload.get("decision_id", "") if isinstance(event.payload, dict) else ""
+            decision_id = (
+                event.payload.get("decision_id", "") if isinstance(event.payload, dict) else ""
+            )
             key = (project_id, "decision", decision_id, corr_id)
             pending_decision_sagas.pop(key, None)
 
@@ -1113,7 +1150,9 @@ def reconcile_project_subsystems(
     failed_decisions = 0
     pending_decisions = 0
 
-    tracker: dict[Any, int] = attempt_tracker if attempt_tracker is not None else _reconciliation_attempts
+    tracker: dict[Any, int] = (
+        attempt_tracker if attempt_tracker is not None else _reconciliation_attempts
+    )
 
     with _reconciliation_attempts_guard:
         # Resolve pending tasks
@@ -1299,4 +1338,3 @@ def reconcile_project_subsystems(
         "failed_decisions": failed_decisions,
         "pending_decisions": pending_decisions,
     }
-
