@@ -20,36 +20,16 @@ Chosen Solution: **Two-Tier Envelope-Binding Cryptographic SHA-256 Hash Chain**.
 ### Specification:
 1. **Tier 1 — Payload Digest (`payload_digest`):**
    ```python
-   canonical_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-   payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+   payload_digest = SHA256(POWER_CANONICAL_JSON_V1(payload))
    ```
 2. **Tier 2 — Envelope Hash (`event_hash`):**
    The `event_hash` cryptographically seals the entire envelope and metadata, ensuring no field (including `artifact_refs`, `evidence_refs`, `correlation_id`, `causation_id`, `idempotency_key`, `session_id`) can be altered or omitted without invalidating the chain:
    ```python
-   # integrity_record is the canonical ProjectEvent dictionary excluding ONLY event_hash
-   integrity_record = {
-       "actor": event["actor"],
-       "artifact_refs": event["artifact_refs"],
-       "causation_id": event["causation_id"],
-       "correlation_id": event["correlation_id"],
-       "event_id": event["event_id"],
-       "event_type": event["event_type"],
-       "evidence_refs": event["evidence_refs"],
-       "idempotency_key": event["idempotency_key"],
-       "payload": event["payload"],
-       "payload_digest": payload_digest,
-       "prev_event_hash": event["prev_event_hash"],
-       "project_id": event["project_id"],
-       "schema_version": event["schema_version"],  # canonical: "power.project-event.v1"
-       "sequence": event["sequence"],
-       "session_id": event["session_id"],
-       "source": event["source"],
-       "timestamp": event["timestamp"],
-   }
-   canonical_integrity_bytes = canonical_json_dumps(integrity_record).encode("utf-8")
-   event_hash = hashlib.sha256(canonical_integrity_bytes).hexdigest()
+   payload_digest = SHA256(POWER_CANONICAL_JSON_V1(payload))
+   integrity_record = {k: v for k, v in event.items() if k != "event_hash"}
+   event_hash = SHA256(POWER_CANONICAL_JSON_V1(integrity_record))
    ```
-   *Note:* `payload_digest` is additionally verified separately to guarantee inner payload integrity independently of the envelope envelope-binding.
+   *Note:* The hash seals all fields of the envelope (`integrity_record`). `payload_digest` is additionally verified separately to guarantee inner payload integrity independently of the envelope-binding.
 3. **Chain Genesis and Linkage Rules:**
    - **Genesis Event (`sequence == 1`):** `prev_event_hash` must be the empty string `""`.
    - **Subsequent Events (`sequence > 1`):** `prev_event_hash` must strictly equal the `event_hash` of the immediately preceding event (`sequence - 1`).

@@ -47,8 +47,26 @@ def lifecycle_contract() -> dict[str, Any]:
         return json.load(f)
 
 
+# NOTE: In Phase 2, the POWER Canonical JSON v1 serializer will be implemented in a single
+# authoritative production core module (e.g. core/canonical_json.py), from which all tests
+# and runtime services will import it.
 def canonical_json_dumps(data: Any) -> str:
-    """Canonical JSON serialization conforming to RFC 8785 / JCS fail-closed contract."""
+    """POWER Canonical JSON v1 authoritative serialization contract for ProjectEvent v1.
+
+    POWER Canonical JSON v1 is the authoritative serialization contract for ProjectEvent v1.
+    It is intentionally defined by POWER and does NOT claim full RFC 8785 / JCS compliance.
+    All ProjectEvent hashes in schema v1 MUST use exactly this canonicalization algorithm.
+
+    Contract:
+        json.dumps(
+            value,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    Encoding: UTF-8 without BOM. Non-finite numbers (NaN, Infinity, -Infinity) are rejected fail-closed.
+    """
 
     def _check_floats(obj: Any) -> None:
         if isinstance(obj, float):
@@ -208,11 +226,11 @@ def test_event_schema_accepts_saga_events_and_rejects_deprecated_events(event_sc
 
 
 # ==============================================================================
-# 2. Deterministic Serialization & Round-Trip Tests
+# 2. Deterministic Serialization & POWER Canonical JSON v1 Tests
 # ==============================================================================
 
 
-def test_canonical_serialization_round_trip() -> None:
+def test_power_canonical_json_v1_round_trip() -> None:
     original_dict = {
         "z_field": 100,
         "a_field": "test value with unicode: українська мова 🚀",
@@ -233,10 +251,32 @@ def test_canonical_serialization_round_trip() -> None:
     assert "українська мова 🚀" in serialized_1
 
 
-def test_canonical_serialization_rejects_nan_and_infinity() -> None:
+def test_power_canonical_json_v1_rejects_nan_and_infinity() -> None:
     for bad_val in [float("nan"), float("inf"), float("-inf")]:
         with pytest.raises(ValueError, match="NaN and Infinity values"):
             canonical_json_dumps({"metric": bad_val})
+
+
+def test_power_canonical_json_v1_frozen_byte_vector() -> None:
+    """Validate POWER Canonical JSON v1 exact byte sequence and frozen SHA-256 digest vector.
+
+    In Phase 2, the canonicalizer will be implemented in a single authoritative production core module,
+    from which all tests and runtime services will import it.
+    """
+    input_data = {"z": 1, "a": "Україна", "nested": {"b": False, "a": None}}
+
+    expected_text = '{"a":"Україна","nested":{"a":null,"b":false},"z":1}'
+    expected_bytes = b'{"a":"\xd0\xa3\xd0\xba\xd1\x80\xd0\xb0\xd1\x97\xd0\xbd\xd0\xb0","nested":{"a":null,"b":false},"z":1}'
+    expected_sha256 = "9cfb88b8b7087e11cd405596bc4b988dc2c49164d1ccbe21a35e25c0bd971a98"
+
+    serialized_text = canonical_json_dumps(input_data)
+    assert serialized_text == expected_text
+
+    serialized_bytes = serialized_text.encode("utf-8")
+    assert serialized_bytes == expected_bytes
+
+    digest = hashlib.sha256(serialized_bytes).hexdigest()
+    assert digest == expected_sha256
 
 
 def test_hash_chain_verification() -> None:

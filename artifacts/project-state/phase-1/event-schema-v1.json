@@ -122,7 +122,7 @@
     },
     "event_hash": {
       "type": "string",
-      "description": "SHA-256 cryptographic digest binding header, sequence, prev_hash, and payload_digest",
+      "description": "SHA-256 digest of POWER Canonical JSON v1 encoding of the complete stored ProjectEvent envelope excluding only the event_hash field itself.",
       "pattern": "^[0-9a-f]{64}$"
     },
     "artifact_refs": {

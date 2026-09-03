@@ -21,16 +21,16 @@ All required Phase 1 deliverables have been authored, validated, and placed in `
 | `event-schema-v1.json` | JSON Schema (Draft 2020-12) for canonical `ProjectEvent v1` append-only ledger entries (schema token `power.project-event.v1`, association sagas). |
 | `semantic-entity-schema-v1.json` | JSON Schema (Draft 2020-12) for RAID entities, RACI, DoR/DoD rules, plus `Fact`, `Hypothesis`, `Observation`, `Lesson`, and `DecisionReference` with multi-event provenance. |
 | `lifecycle-v1.json` | Machine-readable definition of 6 project states, exactly 17 legal transitions, preconditions, gates, rollback flags, and explicit CLOSED state semantics. |
-| `architecture-contract.md` | Comprehensive 16-point architecture contract defining project identity, canonical paths, association sagas, RFC 8785 JCS, full envelope hashing, and privacy profiles. |
-| `ADR-PSE-001-canonical-event-ledger.md` | ADR defining the `.power/projects/<id>/events.jsonl` append-only ledger as sole canonical truth, federated state, and server-side RFC 8785 hashing. |
+| `architecture-contract.md` | Comprehensive 16-point architecture contract defining project identity, canonical paths, association sagas, POWER Canonical JSON v1, full envelope hashing, and privacy profiles. |
+| `ADR-PSE-001-canonical-event-ledger.md` | ADR defining the `.power/projects/<id>/events.jsonl` append-only ledger as sole canonical truth, federated state, and server-side POWER Canonical JSON v1 hashing. |
 | `ADR-PSE-002-derived-indexes.md` | ADR defining SQLite and snapshot projections as rebuildable, contract-driven vault path `<project.vault_path>/status.md`, and multi-subsystem rebuild. |
 | `ADR-PSE-003-state-machine-boundary.md` | ADR governing the 6-state FSM boundary, 17 legal transitions, quality gates, and resolving CLOSED state duality. |
 | `ADR-PSE-004-existing-task-decision-integration.md` | ADR preserving TaskStore (`.power/tasks/`) and DecisionService (`.power/tasks/decisions/`) as sole authorities and defining association sagas. |
-| `ADR-PSE-005-privacy-and-raw-transcript-retention.md` | ADR enforcing 3 explicit privacy profiles (`metadata-only`, `structured-events`, `full-content`), defense-in-depth sanitization, and 14-day local retention. |
+| `ADR-PSE-005-privacy-and-raw-transcript-retention.md` | ADR enforcing 3 explicit privacy profiles (`metadata-only`, `structured-events`, `full-content`), defense-in-depth sanitization, and configurable local retention. |
 | `ADR-PSE-006-event-integrity-and-hash-chain.md` | ADR establishing the full envelope-binding SHA-256 cryptographic hash chain over `integrity_record` for tamper evidence. |
 | `ADR-PSE-007-lock-hierarchy.md` | ADR establishing the strict 3-level lock acquisition order (Mutation -> TaskStore -> Project Lock). |
 | `ADR-PSE-008-cross-subsystem-transactions-and-reconciliation.md` | ADR defining durable association-intent Sagas, multi-subsystem reconciliation, and crash recovery without 2PC or task metadata assumptions. |
-| `tests/test_phase1_project_state_contracts.py` | Comprehensive test suite (21 contract tests) validating schemas, round-trips, provenance, 17 transitions, DoR/DoD evaluation, and envelope tampering. |
+| `tests/test_phase1_project_state_contracts.py` | Comprehensive test suite (22 contract tests) validating schemas, round-trips, POWER Canonical JSON v1 frozen vectors, provenance, 17 transitions, DoR/DoD evaluation, and envelope tampering. |
 
 ---
 
@@ -48,9 +48,17 @@ All required Phase 1 deliverables have been authored, validated, and placed in `
 ### Gate G1.2: Round-trip serialization is deterministic
 - **Requirement:** Event serialization must produce identical byte sequences under round-trip parsing and serialization.
 - **Evidence:**
-  - Standardized `canonical_json_dumps` strictly conforming to RFC 8785 / JCS: UTF-8, `sort_keys=True`, `ensure_ascii=False`, compact separators `(',', ':')`, strict RFC 3339 UTC ISO timestamps, and fail-closed rejection of `NaN`, `Infinity`, and `-Infinity`.
-  - Verified by `test_canonical_serialization_round_trip` (PASSED).
-  - Verified by `test_canonical_serialization_rejects_nan_and_infinity` (PASSED).
+  - Standardized `canonical_json_dumps` strictly conforming to **POWER Canonical JSON v1**:
+    "POWER Canonical JSON v1 is the authoritative serialization contract for ProjectEvent v1. It is intentionally defined by POWER and does NOT claim full RFC 8785 / JCS compliance. All ProjectEvent hashes in schema v1 MUST use exactly this canonicalization algorithm."
+    Contract: UTF-8 without BOM, `sort_keys=True`, `ensure_ascii=False`, compact separators `(',', ':')`, strict RFC 3339 UTC ISO timestamps, and fail-closed rejection of `NaN`, `Infinity`, and `-Infinity`.
+  - Frozen canonical byte and digest vector verified:
+    - Input: `{"z": 1, "a": "Україна", "nested": {"b": False, "a": None}}`
+    - Exact UTF-8 text: `{"a":"Україна","nested":{"a":null,"b":false},"z":1}`
+    - Exact bytes: `b'{"a":"\xd0\xa3\xd0\xba\xd1\x80\xd0\xb0\xd1\x97\xd0\xbd\xd0\xb0","nested":{"a":null,"b":false},"z":1}'`
+    - Frozen SHA-256 digest: `9cfb88b8b7087e11cd405596bc4b988dc2c49164d1ccbe21a35e25c0bd971a98`
+  - Verified by `test_power_canonical_json_v1_round_trip` (PASSED).
+  - Verified by `test_power_canonical_json_v1_rejects_nan_and_infinity` (PASSED).
+  - Verified by `test_power_canonical_json_v1_frozen_byte_vector` (PASSED).
   - Verified by `test_hash_chain_verification` and `test_full_envelope_tampering_fails_verification` (PASSED).
 - **Status:** **PASS**
 
@@ -164,13 +172,39 @@ Summary of the 16 Phase 1 architectural contract closure corrections implemented
 4. **Rebuild Semantics & Vault Path:** Specified multi-subsystem rebuild requirement; replaced hardcoded Markdown path with `<project.vault_path>/status.md`.
 5. **Full Envelope-Bound ProjectEvent v1 Integrity:** Defined `integrity_record` sealing all fields except `event_hash` (including `artifact_refs`, `evidence_refs`, `session_id`, `correlation_id`, `causation_id`, `idempotency_key`).
 6. **Canonical Schema Version Token:** Locked strictly to `"power.project-event.v1"`.
-7. **Strengthened Canonical JSON Contract:** Mandated RFC 8785 / JCS, server-side hashing, and fail-closed rejection of `NaN`/`Infinity`.
+7. **Strengthened Canonical JSON Contract (POWER Canonical JSON v1):** Established authoritative POWER Canonical JSON v1 specification (disclaimed RFC 8785 / JCS compliance claims), server-side full envelope hashing, fail-closed rejection of `NaN`/`Infinity`, and frozen canonical byte/digest vectors.
 8. **Semantic Entities Added:** Added JSON Schemas for `Fact`, `Hypothesis`, `Observation`, `Lesson`, and `DecisionReference` to `$defs` and root `oneOf`.
 9. **Multi-Event Provenance:** Provenance requires `source_event_ids: [event_id, ...]` (at least 1, unique), optional primary, and epistemic attributes.
-10. **Three Explicit Privacy Modes:** Codified `metadata-only`, `structured-events` (default), and `full-content` (opt-in, local-only 14-day store).
+10. **Three Explicit Privacy Modes & Configurable Retention:** Codified `metadata-only`, `structured-events` (default), and `full-content` (opt-in, local-only store with configurable retention: default 14-day TTL where 0 = disabled, not an immutable format invariant).
 11. **Lifecycle State Machine (17 Transitions & CLOSED Semantics):** Formally codified 17 legal transitions and explicit CLOSED state attributes (`is_closed: true`, `normal_mutations_blocked: true`, `requires_explicit_reopen: true`).
 12. **Task v2 Canonical Terminal States & Blocker Issue Semantics:** Inherited `TERMINAL_STATES` from `task_models.py` (`completed`, `failed`, `canceled`, `rejected`); ensured Issue severity `blocker` with status `investigating` blocks completion.
 13. **Elimination of custom_script:** Replaced arbitrary execution with `registered_policy`.
 14. **Aligned PSE Event Taxonomy:** Removed shadow mutation events (`task.created`, `decision.proposed`, etc.); added association saga and lifecycle observation events.
-15. **Expanded Contract Tests:** Added 9 new test cases in `tests/test_phase1_project_state_contracts.py` bringing the suite to 21 comprehensive contract tests.
+15. **Expanded Contract Tests:** Added test cases in `tests/test_phase1_project_state_contracts.py` bringing the suite to 22 comprehensive contract tests including frozen byte vector assertions and full envelope tamper tests.
 16. **Phase 1 Closure Report & Zero Production Code Changes:** All changes confined to `artifacts/project-state/phase-1/` and `tests/test_phase1_project_state_contracts.py`. Production code changes: strictly 0.
+
+---
+
+## 7. Phase 1 Final Canonicalization Closure
+1. **POWER Canonical JSON v1 Formal Contract:**
+   - Formalized official canonical serialization name as **POWER Canonical JSON v1**.
+   - Removed legacy claims of RFC 8785 / JCS compliance. Authoritative statement adopted:
+     > "POWER Canonical JSON v1 is the authoritative serialization contract for ProjectEvent v1. It is intentionally defined by POWER and does NOT claim full RFC 8785 / JCS compliance. All ProjectEvent hashes in schema v1 MUST use exactly this canonicalization algorithm."
+2. **Full-Envelope Hashing Equation:**
+   - Explicitly confirmed two-tier hashing contract across ADR-PSE-006, `architecture-contract.md`, and tests:
+     ```python
+     payload_digest = SHA256(POWER_CANONICAL_JSON_V1(payload))
+     integrity_record = {k: v for k, v in event.items() if k != "event_hash"}
+     event_hash = SHA256(POWER_CANONICAL_JSON_V1(integrity_record))
+     ```
+   - Event schema description for `event_hash` updated to: `"SHA-256 digest of POWER Canonical JSON v1 encoding of the complete stored ProjectEvent envelope excluding only the event_hash field itself."`
+3. **Frozen Canonical Byte & Digest Vector:**
+   - Input: `{"z": 1, "a": "Україна", "nested": {"b": False, "a": None}}`
+   - Exact text: `{"a":"Україна","nested":{"a":null,"b":false},"z":1}`
+   - Exact bytes: `b'{"a":"\xd0\xa3\xd0\xba\xd1\x80\xd0\xb0\xd1\x97\xd0\xbd\xd0\xb0","nested":{"a":null,"b":false},"z":1}'`
+   - Frozen SHA-256: `9cfb88b8b7087e11cd405596bc4b988dc2c49164d1ccbe21a35e25c0bd971a98`
+   - Verified 100% via unit tests.
+4. **Full-Content TTL Configurable Policy:**
+   - Clarified that `full-content` mode retention (default 14 days) is user/administrator configurable (0 = disabled / indefinite), not an immutable format invariant.
+5. **Zero Production Code Changes:**
+   - Production code changes: strictly 0 (no edits under `src/`).

@@ -33,7 +33,7 @@ PSE establishes three explicit operational privacy modes:
      - NEVER stored inside `ProjectEvent.payload`.
      - NEVER committed to Git repositories.
      - NEVER synchronized across fleet nodes by default.
-     - Enforces strict POSIX local permissions (mode `0600` / `0700`) and a strict time-to-live retention window (e.g. 14 days) with automatic pruning.
+     - Enforces strict POSIX local permissions (mode `0600` / `0700`) and a configurable time-to-live (TTL) retention window: 14 days by default, configurable by the user/administrator (0 = disabled / indefinite retention), and is NOT an immutable format invariant. Automatic pruning runs against this policy.
 
 ### Defense-in-Depth Secret Sanitization:
 - **Pragmatic Defense-in-Depth:**
