@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from power_framework.core.project_models import PROJECT_ID_REGEX, validate_project_id
 
 EVENT_ID_REGEX = r"^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-_EVENT_ID_COMPILED = re.compile(EVENT_ID_REGEX)
+EVENT_ID_COMPILED = re.compile(EVENT_ID_REGEX)
 
 # Entity ID regex patterns matching semantic-entity-schema-v1.json
 FACT_ID_REGEX = r"^fct_[A-Za-z0-9._-]{2,64}$"
@@ -33,15 +33,15 @@ DEPENDENCY_ID_REGEX = r"^dep_[A-Za-z0-9._-]{2,64}$"
 OBSERVATION_ID_REGEX = r"^obs_[A-Za-z0-9._-]{2,64}$"
 LESSON_ID_REGEX = r"^lsn_[A-Za-z0-9._-]{2,64}$"
 
-_FACT_ID_COMPILED = re.compile(FACT_ID_REGEX)
-_DECISION_REF_ID_COMPILED = re.compile(DECISION_REF_ID_REGEX)
-_ASSUMPTION_ID_COMPILED = re.compile(ASSUMPTION_ID_REGEX)
-_HYPOTHESIS_ID_COMPILED = re.compile(HYPOTHESIS_ID_REGEX)
-_RISK_ID_COMPILED = re.compile(RISK_ID_REGEX)
-_ISSUE_ID_COMPILED = re.compile(ISSUE_ID_REGEX)
-_DEPENDENCY_ID_COMPILED = re.compile(DEPENDENCY_ID_REGEX)
-_OBSERVATION_ID_COMPILED = re.compile(OBSERVATION_ID_REGEX)
-_LESSON_ID_COMPILED = re.compile(LESSON_ID_REGEX)
+FACT_ID_COMPILED = re.compile(FACT_ID_REGEX)
+DECISION_REF_ID_COMPILED = re.compile(DECISION_REF_ID_REGEX)
+ASSUMPTION_ID_COMPILED = re.compile(ASSUMPTION_ID_REGEX)
+HYPOTHESIS_ID_COMPILED = re.compile(HYPOTHESIS_ID_REGEX)
+RISK_ID_COMPILED = re.compile(RISK_ID_REGEX)
+ISSUE_ID_COMPILED = re.compile(ISSUE_ID_REGEX)
+DEPENDENCY_ID_COMPILED = re.compile(DEPENDENCY_ID_REGEX)
+OBSERVATION_ID_COMPILED = re.compile(OBSERVATION_ID_REGEX)
+LESSON_ID_COMPILED = re.compile(LESSON_ID_REGEX)
 
 
 class VerificationStatus(StrEnum):
@@ -114,7 +114,7 @@ class Provenance(BaseModel):
         seen: set[str] = set()
         deduped: list[str] = []
         for eid in v:
-            if not _EVENT_ID_COMPILED.match(eid):
+            if not EVENT_ID_COMPILED.match(eid):
                 raise ValueError(f"Invalid event ID in source_event_ids: {eid}")
             if eid not in seen:
                 seen.add(eid)
@@ -432,16 +432,57 @@ class SemanticEntityCandidate(BaseModel):
         """Enforce Gate G3.2: Model-extracted candidates CANNOT bypass verification policy.
 
         They are unconditionally assigned status 'proposed' and their underlying
-        provenance is forced to 'unverified'.
+        provenance is forced to 'unverified' or 'quarantined'.
         """
         if self.source == "model_extraction":
-            if self.verification_status == VerificationStatus.VERIFIED:
-                self.verification_status = VerificationStatus.PROPOSED
+            self.verification_status = VerificationStatus.PROPOSED
             if isinstance(self.entity, dict) and "provenance" in self.entity:
                 prov = self.entity["provenance"]
                 if isinstance(prov, dict):
-                    if prov.get("verification_status") == "verified":
+                    if prov.get("verification_status") not in ("unverified", "quarantined"):
                         prov["verification_status"] = "unverified"
                     if prov.get("source_type") != "agent_inference":
                         prov["source_type"] = "agent_inference"
         return self
+
+
+__all__ = [
+    "ASSUMPTION_ID_COMPILED",
+    "ASSUMPTION_ID_REGEX",
+    "DECISION_REF_ID_COMPILED",
+    "DECISION_REF_ID_REGEX",
+    "DEPENDENCY_ID_COMPILED",
+    "DEPENDENCY_ID_REGEX",
+    "ENTITY_TYPE_PREFIX",
+    "ENTITY_TYPE_TO_MODEL",
+    "EVENT_ID_COMPILED",
+    "EVENT_ID_REGEX",
+    "FACT_ID_COMPILED",
+    "FACT_ID_REGEX",
+    "HYPOTHESIS_ID_COMPILED",
+    "HYPOTHESIS_ID_REGEX",
+    "ISSUE_ID_COMPILED",
+    "ISSUE_ID_REGEX",
+    "LESSON_ID_COMPILED",
+    "LESSON_ID_REGEX",
+    "OBSERVATION_ID_COMPILED",
+    "OBSERVATION_ID_REGEX",
+    "RISK_ID_COMPILED",
+    "RISK_ID_REGEX",
+    "Assumption",
+    "ContradictionKind",
+    "ContradictionProposal",
+    "DecisionReference",
+    "Dependency",
+    "Fact",
+    "Hypothesis",
+    "Issue",
+    "Lesson",
+    "Observation",
+    "Provenance",
+    "Risk",
+    "SemanticEntityCandidate",
+    "SemanticEntityType",
+    "VerificationStatus",
+    "generate_deterministic_entity_id",
+]

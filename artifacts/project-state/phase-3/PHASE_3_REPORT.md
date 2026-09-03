@@ -35,11 +35,41 @@ All seven Phase 3 Gates (G3.1 – G3.7) have been empirically verified and passe
 | **G3.4** | **Reprocessing is Deterministic & Idempotent** | **PASSED** | `tests/test_phase3_semantic_compiler.py::test_g3_4_reprocessing_is_deterministic_and_idempotent`<br>Repeated compilations of the same event produce identical `entity_id` and payload dumps. Batching duplicate events merges provenance and increments `duplicate_count` with 0 duplicate candidate objects emitted. |
 | **G3.5** | **Supersession Preserves History** | **PASSED** | `tests/test_phase3_semantic_compiler.py::test_g3_5_supersession_preserves_history`<br>When a new decision supersedes an earlier decision, the predecessor record remains in the knowledge set. A structured `ContradictionProposal` of kind `superseding_decision` is generated with proposed action `supersede`. |
 | **G3.6** | **Prompt Injection Isolation & Containment** | **PASSED** | `tests/test_phase3_semantic_compiler.py::test_g3_6_prompt_injection_containment_and_isolation`<br>`tests/test_phase3_semantic_compiler.py::test_secret_scrubbing_in_unstructured_text`<br>Adversarial payloads attempting instruction bypass, privilege escalation, or verification override are detected and quarantined (`confidence=0.0`, `status="quarantined"`). Embedded API tokens and keys are scrubbed to `[REDACTED_*]`. Detailed receipts in `prompt_injection_results.txt`. |
-| **G3.7** | **Evaluation Metrics Reported Honestly** | **PASSED** | `tests/test_phase3_semantic_compiler.py::test_g3_7_evaluation_metrics_and_zero_false_verified`<br>Full dataset benchmark evaluated across 13 samples in `tests/fixtures/semantic_eval_dataset.json`. Measured False Verified Rate = **0.00%**, Contradiction Detection Rate = **100.00%**, Prompt Injection Defense Rate = **100.00%**, Average Precision/Recall = **100.00%**. Recorded in `eval_results.json`. |
+| **G3.7** | **Evaluation Metrics Reported Honestly** | **PASSED** | `tests/test_phase3_semantic_compiler.py::test_g3_7_evaluation_metrics_and_zero_false_verified`<br>Full dataset benchmark evaluated across 17 samples in `tests/fixtures/semantic_eval_dataset.json` (v1.1.0). All 9 semantic entity types (`FACT`, `DECISION`, `ASSUMPTION`, `HYPOTHESIS`, `RISK`, `ISSUE`, `DEPENDENCY`, `OBSERVATION`, `LESSON`) have non-zero support (`expected_count >= 1`, `predicted_count >= 1`, `tp >= 1`). Measured False Verified Rate = **0.00%**, Contradiction Detection Rate = **100.00%**, Prompt Injection Defense Rate = **100.00%**, Macro Precision = **100.00%**, Macro Recall = **100.00%**. Recorded in `eval_results.json`. |
 
 ---
 
-## 3. Architecture & Delivered Components
+## 3. Phase 3 Closure Correction Round 1 Enhancements
+
+The following architectural and security closures were implemented and verified during Round 1:
+1. **P0 Cryptographic Trust Boundary Gate:**
+   - Pre-validation of `schema_version == "power.project-event.v1"`.
+   - Canonical SHA-256 validation of `payload_digest` and envelope `event_hash`.
+   - Strict batch validation for uniform `project_id`, sequence monotonicity ($\text{seq}_i = \text{seq}_{i-1} + 1$), and unbroken hash chain continuity.
+   - Tampered, corrupted, or mixed-tenant events fail closed and emit **0 verified entities**.
+2. **P0 Zero Fabricated Knowledge Mandate:**
+   - Elimination of synthetic/fabricated domain defaults. Events missing required attributes (`risk` without probability/impact, `issue` without severity, `dependency` without target_id, `decision` without decision_id, `assumption` without statement) fail closed with explicit validation errors and produce 0 false verified candidates.
+3. **P0 Prompt Injection Containment for Structured Observations:**
+   - Both `content` and `context` fields in structured `observation.recorded` are evaluated against prompt injection heuristics. Detected injections are quarantined (`PROPOSED`, `confidence=0.0`, provenance status `quarantined`, 0 parallel verified candidates).
+4. **G3.1 Deterministic 44-Event Classification Registry:**
+   - Implementation of `EventSemanticDisposition` and `PROJECT_EVENT_DISPATCH_REGISTRY` covering all 44 canonical events (`Category A: DIRECT_DOMAIN_KNOWLEDGE` (17), `Category B: RELATIONSHIP_SAGA` (5), `Category C: LIFECYCLE_METADATA_NOOP` (22), `Category D: REJECTED`).
+   - Verified with invariant `assert set(PROJECT_EVENT_DISPATCH_REGISTRY.keys()) == PROJECT_EVENT_TYPES`.
+5. **G3.2 / G3.4 Zero Model Identity Control & Model Candidate Invariant:**
+   - The compiler unconditionally discards provider-supplied `entity_id` values, enforcing deterministic hash IDs.
+   - Direct `SemanticEntityCandidate` initialization validator unconditionally forces `verification_status="proposed"` and provenance `verification_status="unverified"` for all model extractions.
+6. **G3.4 Mixed-Source Deduplication Priority:**
+   - When merging duplicate entity candidates across structured and model sources, structured fields hold absolute priority. Model fields cannot overwrite domain fields or elevate verification status.
+7. **G3.4 Wall-Clock Time Removal & Temporal Replay Determinism:**
+   - Eliminated all wall-clock `datetime.now()` calls in the compiler pipeline. Timestamps are deterministically anchored to the event stream (`as_of`), guaranteeing byte-exact replay determinism across runs.
+8. **G3.7 Honest Evaluation Metrics with 9-Type Non-Zero Support:**
+   - Dataset expanded to v1.1.0 (17 samples) covering all 9 semantic entity types + structured adversarial injection.
+   - Evaluation harness reports explicit per-type support counts (`expected_count`, `predicted_count`, `tp`, `fp`, `fn`), returns `None` on zero-support to avoid misleading scores, and excludes zero-support types from macro averages.
+9. **CodeQL Review Findings Resolved:**
+   - Cleaned up protocols, renamed regex constants to public `..._COMPILED`, exported in `__all__`, and guaranteed safe `os.close(fd)` cleanup in `try/finally` blocks.
+
+---
+
+## 4. Architecture & Delivered Components
 
 1. **`power_framework.core.semantic_models`**:
    - Pydantic v2 schemas (`extra="forbid"`) for all 9 semantic entity types:
@@ -57,19 +87,19 @@ All seven Phase 3 Gates (G3.1 – G3.7) have been empirically verified and passe
    - Deterministic ID generator `generate_deterministic_entity_id(project_id, entity_type, content)`.
 
 2. **`power_framework.core.semantic_compiler`**:
-   - High-throughput, fail-safe compiler pipeline:
-     `event -> normalization -> structured parser -> optional model extraction -> candidates -> deduplication -> provenance linking -> contradiction proposal -> validation -> candidate entities`.
+   - Cryptographically guarded, fail-safe compiler pipeline:
+     `trust boundary -> normalization -> structured 44-event registry dispatch -> optional model extraction -> candidates -> deduplication -> provenance linking -> contradiction proposal -> validation -> candidate entities`.
    - `ExtractionProviderProtocol` defining abstract contract for unstructured model extraction with zero hardcoded model lock-in.
    - Comprehensive heuristic contradiction engine distinguishing 5 classes (G3.5).
    - Defensive prompt injection scanner and regex secret scrubber.
-   - `evaluate_dataset(dataset_path)` evaluation harness.
+   - `evaluate_dataset(dataset_path)` evaluation harness with honest per-type support metrics.
 
 3. **`tests/fixtures/semantic_eval_dataset.json`**:
-   - 13 curated, versioned (v1.0.0) benchmark samples covering all 12 required test categories.
+   - 17 curated, versioned (v1.1.0) benchmark samples with authentic SHA-256 cryptographic digests covering all 9 entity types, contradictions, chat, secrets, and adversarial prompt injections.
 
 4. **Deliverables in `artifacts/project-state/phase-3/`**:
-   - `compiler_contract.md`: Authoritative contract and architectural specification.
-   - `eval_dataset_version.txt`: Current dataset version (`1.0.0`).
+   - `compiler_contract.md`: Authoritative contract and architectural specification including 44-event taxonomy table and trust boundary.
+   - `eval_dataset_version.txt`: Current dataset version (`1.1.0`).
    - `eval_results.json`: Machine-readable evaluation report and metrics.
    - `false_positive_review.md`: In-depth analysis of false verification defense and precision/recall trade-offs.
    - `prompt_injection_results.txt`: Empirical verification logs under adversarial prompt injection attack vectors.
@@ -77,18 +107,24 @@ All seven Phase 3 Gates (G3.1 – G3.7) have been empirically verified and passe
 
 ---
 
-## 4. Verification Suite Results
+## 5. Verification Suite Results
 
-Targeted and full PSE regression test suite executed via pytest:
+Targeted PSE regression test suite executed via pytest:
 ```bash
-.venv/bin/pytest --no-cov -v tests/test_phase1_project_state_contracts.py tests/test_phase2_event_ledger.py tests/test_phase3_semantic_compiler.py
+.venv/bin/pytest --no-cov -v tests/test_phase1_project_state_contracts.py tests/test_phase2_event_ledger.py tests/test_phase3_semantic_compiler.py tests/test_task_service.py tests/test_decision_service.py
 ```
-**Result: 82 passed in 3.13s (100% PASS)**
+**Result: 130 passed in 3.38s (100% PASS)**
+
+Phase 3 compiler specific suite:
+```bash
+.venv/bin/pytest --no-cov -v tests/test_phase3_semantic_compiler.py
+```
+**Result: 17 passed in 0.84s (100% PASS)**
 
 Static analysis and linting:
 ```bash
-.venv/bin/ruff check src/power_framework/core/semantic_models.py src/power_framework/core/semantic_compiler.py tests/test_phase3_semantic_compiler.py
-.venv/bin/ruff format --check src/power_framework/core/semantic_models.py src/power_framework/core/semantic_compiler.py tests/test_phase3_semantic_compiler.py
-.venv/bin/mypy src/power_framework/core/semantic_models.py src/power_framework/core/semantic_compiler.py tests/test_phase3_semantic_compiler.py
+.venv/bin/ruff check src/ tests/
+.venv/bin/ruff format --check src/ tests/
+.venv/bin/mypy src/power_framework/core/ tests/test_phase3_semantic_compiler.py
 ```
 **Result: 0 errors, 100% clean formatting and strict type safety.**

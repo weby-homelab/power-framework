@@ -122,4 +122,44 @@ Re-running compilation over the same event stream or duplicate events produces i
    - Provenance status set to `quarantined`.
    - Verification status restricted to `proposed`.
    - Zero alteration of project policies, file systems, or execution capabilities.
-3. **Credential Scrubbing:** GitHub PATs, AWS access keys, Bearer tokens, and private keys are scrubbed before entity generation.
+3. **Structured Observation Containment (P0):** Injection patterns inside structured `observation.recorded` (in `content` or `context`) are immediately quarantined with `0.0` confidence and zero verified candidates.
+4. **Credential Scrubbing:** GitHub PATs, AWS access keys, Bearer tokens, and private keys are scrubbed before entity generation.
+
+---
+
+## 8. Cryptographic Trust Boundary Verification (P0 Zero-Bypass Gate)
+
+Before accepting any ledger event, the compiler enforces non-bypassable cryptographic validation:
+1. **Schema Envelope Enforcement:** Every event must declare `schema_version == "power.project-event.v1"`.
+2. **Canonical Payload Integrity:** Recomputes `SHA-256(canonical_json(payload))` and requires byte-exact match with `payload_digest`.
+3. **Canonical Event Envelope Integrity:** Recomputes `SHA-256(canonical_json(envelope \ {"event_hash"}))` and requires byte-exact match with `event_hash`.
+4. **Sequence Monotonicity & Chain Continuity:** For multi-event batches:
+   - All events must share the identical `project_id`.
+   - Sequence must be strictly monotonic without gaps: $\text{sequence}_i = \text{sequence}_{i-1} + 1$.
+   - Hash chain must be unbroken: $\text{prev\_event\_hash}_i = \text{event\_hash}_{i-1}$.
+5. **Fail-Closed Disposition:** Any cryptographic or structural mismatch records an error, halts compilation of that item, and produces **0 false verified entities**.
+
+---
+
+## 9. 44-Event Deterministic Classification Taxonomy (G3.1)
+
+All 44 canonical events in `PROJECT_EVENT_TYPES` map to deterministic dispositions:
+
+| Category | Disposition | Canonical Event Types | Semantic Compiler Action |
+| :--- | :--- | :--- | :--- |
+| **Category A** | `DIRECT_DOMAIN_KNOWLEDGE` (17) | `risk.opened`, `risk.updated`, `risk.mitigated`, `risk.retired`, `assumption.created`, `assumption.invalidated`, `assumption.confirmed`, `issue.opened`, `issue.updated`, `issue.resolved`, `dependency.created`, `dependency.broken`, `dependency.satisfied`, `decision.associated`, `decision.disassociated`, `decision.lifecycle.observed`, `lesson.recorded`, `observation.recorded` | Compiles into typed candidate entities (`Risk`, `Assumption`, `Issue`, `Dependency`, `DecisionReference`, `Observation`, `Lesson`, `Fact`, `Hypothesis`) with provenance |
+| **Category B** | `RELATIONSHIP_SAGA` (5) | `task.associated`, `task.disassociated`, `policy.associated`, `policy.disassociated`, `source.associated`, `source.disassociated` | Tracks semantic cross-references or relationship proposals; 0 standalone RAID entities |
+| **Category C** | `LIFECYCLE_METADATA_NOOP` (22) | `project.created`, `project.activated`, `project.completed`, `project.archived`, `project.reactivated`, `project.lifecycle.observed`, `project.policy.updated`, `project.metadata.updated`, `task.lifecycle.observed`, `evidence.recorded`, `dor.evaluated`, `dod.evaluated`, `checkpoint.created`, `ledger.rotated`, `session.started`, `session.ended`, `prompt.recorded`, `work_packet.migrated`, `reconciliation.started`, `reconciliation.succeeded`, `reconciliation.failed`, `reconciliation.skipped` | Validated at trust boundary; deterministic no-op in semantic compiler (0 candidates, 0 errors) |
+| **Category D** | `REJECTED` | Any unknown or deprecated event string | Strict validation rejection; error recorded, 0 candidates |
+
+---
+
+## 10. Zero Fabricated Knowledge Mandate
+
+The semantic compiler never manufactures placeholder or synthetic domain values:
+1. **Mandatory Domain Attributes:** Missing required fields (`risk` without probability/impact; `issue` without severity; `dependency` without target_id; `decision` without decision_id; `assumption` without statement) immediately fail validation and produce 0 candidates.
+2. **Provider Identity Override Defense:** A model provider cannot supply custom or hijacked `entity_id` values. The compiler unconditionally discards provider-supplied IDs and enforces deterministic canonical hash IDs.
+3. **Candidate Model Invariant:** `SemanticEntityCandidate` validators unconditionally enforce `verification_status="proposed"` and provenance `verification_status="unverified"` whenever `source="model_extraction"`.
+4. **Mixed-Source Deduplication Priority:** When merging candidates with identical entity IDs, structured event fields hold absolute precedence over model-extracted fields. Model candidates can never overwrite domain fields or elevate verification status.
+5. **Temporal Replay Determinism:** Compiler pipeline avoids wall-clock `datetime.now()` calls; time anchors are derived deterministically from the canonical event timestamps (`as_of`).
+

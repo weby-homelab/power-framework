@@ -288,6 +288,7 @@ def prune_raw_evidence(vault_root: Path, project_id: str, ttl_days: int = 14) ->
                     path.unlink()
                     pruned += 1
             except OSError:
+                # Expected error on path traversal check
                 pass
 
     return pruned
@@ -383,11 +384,9 @@ def append_project_event(
     cleaned_payload, extracted_dialogue = strip_raw_dialogue(sanitized_payload)
 
     # 3. Apply Privacy Mode Boundaries
-    final_payload: dict[str, Any]
-    is_saga_event = command.event_type in SAGA_PAYLOAD_MODELS
-
+    final_payload: dict[str, Any] = cleaned_payload
     if privacy_mode == PrivacyMode.METADATA_ONLY:
-        if is_saga_event:
+        if command.event_type in SAGA_PAYLOAD_MODELS:
             # Saga events contain purely structural identifiers (task_id, decision_id, relation,
             # correlation_id, idempotency_key), preserve structural fields to prevent contract breakage
             final_payload = cleaned_payload
@@ -397,8 +396,6 @@ def append_project_event(
                 "keys": sorted(cleaned_payload.keys()),
                 "event_type": command.event_type,
             }
-    elif privacy_mode == PrivacyMode.STRUCTURED_EVENTS or privacy_mode == PrivacyMode.FULL_CONTENT:
-        final_payload = cleaned_payload
 
     # 4. Mandatory saga payload contract validation & normalization BEFORE creating any external evidence
     model_cls = SAGA_PAYLOAD_MODELS.get(command.event_type)
@@ -586,11 +583,11 @@ def import_project_events(
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         fd = os.open(store.active_events_file, flags, 0o600)
-        with open(fd, "a", encoding="utf-8", closefd=True) as f:
+        with open(fd, "a", encoding="utf-8") as f:
             for line in lines_to_write:
                 f.write(line)
             f.flush()
-            os.fsync(fd)
+            os.fsync(f.fileno())
 
     return len(lines_to_write)
 
@@ -1035,10 +1032,10 @@ def materialize_status_markdown(
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     fd = os.open(status_file, flags, 0o600)
-    with open(fd, "w", encoding="utf-8", closefd=True) as f:
+    with open(fd, "w", encoding="utf-8") as f:
         f.write(content)
         f.flush()
-        os.fsync(fd)
+        os.fsync(f.fileno())
 
     return status_file
 

@@ -20,11 +20,11 @@ Strict Gating Guarantees:
 
 from __future__ import annotations
 
-import datetime
 import hashlib
 import json
 import logging
 import re
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -33,26 +33,31 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from power_framework.core.canonical_json import (
+    compute_event_hash,
+    compute_payload_digest,
+)
 from power_framework.core.project_models import (
+    PROJECT_EVENT_TYPES,
     ProjectEvent,
     validate_project_id,
 )
 from power_framework.core.semantic_models import (
-    _ASSUMPTION_ID_COMPILED,
-    _DECISION_REF_ID_COMPILED,
-    _DEPENDENCY_ID_COMPILED,
-    _ISSUE_ID_COMPILED,
-    _LESSON_ID_COMPILED,
-    _OBSERVATION_ID_COMPILED,
-    _RISK_ID_COMPILED,
-    ENTITY_TYPE_PREFIX,
+    ASSUMPTION_ID_COMPILED,
+    DECISION_REF_ID_COMPILED,
+    DEPENDENCY_ID_COMPILED,
     ENTITY_TYPE_TO_MODEL,
+    ISSUE_ID_COMPILED,
+    LESSON_ID_COMPILED,
+    OBSERVATION_ID_COMPILED,
+    RISK_ID_COMPILED,
     Assumption,
     ContradictionKind,
     ContradictionProposal,
     DecisionReference,
     Dependency,
     Fact,
+    Hypothesis,
     Issue,
     Lesson,
     Observation,
@@ -114,7 +119,82 @@ class ExtractionProviderProtocol(Protocol):
         context: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Extract typed candidate entities from passive unstructured text."""
-        ...
+        pass
+
+
+class EventSemanticDisposition(StrEnum):
+    """Deterministic classification of all 44 canonical project event types (Phase 3)."""
+
+    A_SEMANTIC_ENTITY = "A_semantic_entity"
+    B_RELATIONSHIP_PROPOSAL = "B_relationship_proposal"
+    C_LIFECYCLE_METADATA_NOOP = "C_lifecycle_metadata_noop"
+    D_EXPLICITLY_REJECTED = "D_explicitly_rejected"
+
+
+PROJECT_EVENT_DISPATCH_REGISTRY: dict[str, EventSemanticDisposition] = {
+    # Category A: Semantic entity producer (RAID, Decision, Fact, Observation, Lesson)
+    "risk.opened": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "risk.updated": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "risk.closed": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "assumption.created": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "assumption.updated": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "assumption.invalidated": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "assumption.confirmed": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "issue.opened": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "issue.updated": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "issue.resolved": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "issue.closed": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "dependency.created": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "dependency.updated": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "dependency.resolved": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "decision.association.requested": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "decision.associated": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "decision.disassociated": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "decision.association.failed": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "decision.lifecycle.observed": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "observation.recorded": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    "lesson.recorded": EventSemanticDisposition.A_SEMANTIC_ENTITY,
+    # Category B: Semantic relationship/proposal producer (association sagas, supersession)
+    "task.association.requested": EventSemanticDisposition.B_RELATIONSHIP_PROPOSAL,
+    "task.associated": EventSemanticDisposition.B_RELATIONSHIP_PROPOSAL,
+    "task.disassociated": EventSemanticDisposition.B_RELATIONSHIP_PROPOSAL,
+    "task.association.failed": EventSemanticDisposition.B_RELATIONSHIP_PROPOSAL,
+    "task.lifecycle.observed": EventSemanticDisposition.B_RELATIONSHIP_PROPOSAL,
+    # Category C: Deterministic metadata / lifecycle / no-op for Phase 3
+    "project.created": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "project.updated": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "project.renamed": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "project.relocated": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "project.phase.proposed": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "project.phase.changed": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "project.archived": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "project.reopened": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "session.started": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "session.ended": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "raci.assigned": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "raci.revoked": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "dor.evaluated": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "dod.evaluated": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "gate.overridden": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "artifact.created": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "artifact.updated": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+    "evidence.attached": EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP,
+}
+
+# Invariant: The dispatch registry must cover all 44 canonical project event types
+assert set(PROJECT_EVENT_DISPATCH_REGISTRY.keys()) == PROJECT_EVENT_TYPES, (
+    "PROJECT_EVENT_DISPATCH_REGISTRY must contain exactly all 44 PROJECT_EVENT_TYPES"
+)
+
+
+class VerifiedEventBatch(BaseModel):
+    """Container for cryptographically verified authoritative project events."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str
+    events: list[ProjectEvent] = Field(default_factory=list)
+    is_authoritative: bool = True
 
 
 class CompilationResult(BaseModel):
@@ -151,6 +231,7 @@ class SemanticCompiler:
         self,
         events: Sequence[ProjectEvent | dict[str, Any]],
         existing_candidates: Sequence[SemanticEntityCandidate] | None = None,
+        as_of: str | None = None,
     ) -> CompilationResult:
         """Execute the full compiler pipeline over a batch of canonical project events."""
         if not events:
@@ -169,10 +250,20 @@ class SemanticCompiler:
         )
         validate_project_id(project_id)
 
+        # Deterministic timestamp anchor (G3.4)
+        if as_of is None:
+            last_evt = events[-1]
+            as_of = (
+                last_evt.timestamp
+                if isinstance(last_evt, ProjectEvent)
+                else last_evt.get("timestamp", "1970-01-01T00:00:00Z")
+            )
+
         all_candidates: list[SemanticEntityCandidate] = []
         contradiction_proposals: list[ContradictionProposal] = []
         errors: list[str] = []
         prompt_injection_count = 0
+        prev_event_dict: dict[str, Any] | None = None
 
         # Step 1 & 2: Normalize and parse structured events deterministically
         for evt in events:
@@ -182,12 +273,91 @@ class SemanticCompiler:
                 errors.append(f"Event missing event_id: {event_dict}")
                 continue
 
+            # P0: Trust Boundary Validation
+            # 1. Reject mixed project_id across single batch
+            evt_proj = event_dict.get("project_id")
+            if evt_proj != project_id:
+                errors.append(
+                    f"Untrusted batch: mixed project_id '{evt_proj}' != '{project_id}' for event {event_id}"
+                )
+                continue
+
+            # 2. Cryptographic ProjectEvent schema compliance
+            try:
+                if not isinstance(evt, ProjectEvent):
+                    ProjectEvent.model_validate(event_dict)
+            except Exception as exc:
+                errors.append(f"Event {event_id} failed ProjectEvent schema validation: {exc}")
+                continue
+
+            # 3. Cryptographic envelope & payload digests
+            if event_dict.get("schema_version") != "power.project-event.v1":
+                errors.append(
+                    f"Untrusted event {event_id}: schema_version must be 'power.project-event.v1'"
+                )
+                continue
+
+            calc_payload_digest = compute_payload_digest(event_dict.get("payload", {}))
+            if event_dict.get("payload_digest") != calc_payload_digest:
+                errors.append(
+                    f"Untrusted event {event_id}: payload_digest mismatch ({event_dict.get('payload_digest')} != {calc_payload_digest})"
+                )
+                continue
+
+            calc_event_hash = compute_event_hash(event_dict)
+            if event_dict.get("event_hash") != calc_event_hash:
+                errors.append(
+                    f"Untrusted event {event_id}: event_hash mismatch ({event_dict.get('event_hash')} != {calc_event_hash})"
+                )
+                continue
+
+            # 4. Batch sequence monotonicity and hash chain continuity
+            if prev_event_dict is not None:
+                current_seq = event_dict.get("sequence", 0)
+                prev_seq = prev_event_dict.get("sequence", 0)
+                if current_seq <= prev_seq:
+                    errors.append(
+                        f"Untrusted batch: non-monotonic sequence ({prev_seq} -> {current_seq}) for event {event_id}"
+                    )
+                    continue
+                if current_seq != prev_seq + 1:
+                    errors.append(
+                        f"Untrusted batch: sequence gap ({prev_seq} -> {current_seq}) for event {event_id}"
+                    )
+                    continue
+                if event_dict.get("prev_event_hash") != prev_event_dict.get("event_hash"):
+                    errors.append(
+                        f"Untrusted batch: broken prev_event_hash chain ({event_dict.get('prev_event_hash')} != {prev_event_dict.get('event_hash')}) for event {event_id}"
+                    )
+                    continue
+
+            prev_event_dict = event_dict
+
+            # 5. Dispatch classification against the 44-event taxonomy (G3.1)
+            event_type = event_dict.get("event_type", "")
+            disposition = PROJECT_EVENT_DISPATCH_REGISTRY.get(event_type)
+            if disposition is None or disposition == EventSemanticDisposition.D_EXPLICITLY_REJECTED:
+                errors.append(
+                    f"Event {event_id}: unrecognized or rejected event_type '{event_type}'"
+                )
+                continue
+
+            if disposition == EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP:
+                # Deterministic lifecycle/metadata no-op for Phase 3 semantic extraction
+                continue
+
+            if disposition == EventSemanticDisposition.B_RELATIONSHIP_PROPOSAL:
+                # Deterministic relationship / saga handling
+                continue
+
             try:
                 # 1. Deterministic Normalization
                 normalized_evt = self._normalize_event(event_dict)
 
                 # 2. Structured Parser (Deterministic-First, no LLM, G3.1)
-                structured_candidates = self._parse_structured_event(normalized_evt)
+                structured_candidates, inj_in_struct = self._parse_structured_event(normalized_evt)
+                if inj_in_struct:
+                    prompt_injection_count += 1
                 all_candidates.extend(structured_candidates)
 
                 # 3. Optional Unstructured Extraction if event contains unstructured text and provider is configured
@@ -195,7 +365,7 @@ class SemanticCompiler:
                     normalized_evt
                 ):
                     unstructured_candidates, inj_detected = self._extract_from_event_unstructured(
-                        normalized_evt
+                        normalized_evt, as_of=as_of
                     )
                     if inj_detected:
                         prompt_injection_count += 1
@@ -214,6 +384,7 @@ class SemanticCompiler:
         detected_proposals = self._detect_contradictions_and_supersessions(
             new_candidates=deduped_candidates,
             existing_candidates=existing_candidates or [],
+            as_of=as_of,
         )
         contradiction_proposals.extend(detected_proposals)
 
@@ -244,9 +415,10 @@ class SemanticCompiler:
         self,
         event: ProjectEvent | dict[str, Any],
         existing_candidates: Sequence[SemanticEntityCandidate] | None = None,
+        as_of: str | None = None,
     ) -> CompilationResult:
         """Compile a single project event."""
-        return self.compile_events([event], existing_candidates=existing_candidates)
+        return self.compile_events([event], existing_candidates=existing_candidates, as_of=as_of)
 
     def compile_unstructured(
         self,
@@ -257,6 +429,8 @@ class SemanticCompiler:
         session_id: str | None = None,
         correlation_id: str | None = None,
         existing_candidates: Sequence[SemanticEntityCandidate] | None = None,
+        as_of: str | None = None,
+        model_provider: ExtractionProviderProtocol | None = None,
     ) -> CompilationResult:
         """Compile unstructured text (meeting notes, transcripts, documents) via model extraction.
 
@@ -271,13 +445,15 @@ class SemanticCompiler:
 
         candidates: list[SemanticEntityCandidate] = []
         errors: list[str] = []
-        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+        timestamp = as_of or "1970-01-01T00:00:00Z"
         evt_id = (
             source_event_id
             or f"evt_unstructured_{hashlib.sha256(scrubbed_text.encode()).hexdigest()[:16]}"
         )
 
-        if self.model_provider is None:
+        effective_provider = model_provider if model_provider is not None else self.model_provider
+
+        if effective_provider is None:
             # When no model provider is given, unstructured text is safely preserved as an Observation candidate
             obs_id = generate_deterministic_entity_id(
                 project_id, SemanticEntityType.OBSERVATION, scrubbed_text
@@ -327,7 +503,7 @@ class SemanticCompiler:
                     "timestamp": timestamp,
                     "prompt_boundary": "UNTRUSTED_CONTENT_DATA_ONLY",
                 }
-                raw_extracted = self.model_provider.extract_unstructured(
+                raw_extracted = effective_provider.extract_unstructured(
                     text=f"<<<UNTRUSTED_PROJECT_DATA>>>\n{scrubbed_text}\n<<<END_UNTRUSTED_PROJECT_DATA>>>",
                     context=isolated_context,
                 )
@@ -352,6 +528,7 @@ class SemanticCompiler:
         proposals = self._detect_contradictions_and_supersessions(
             new_candidates=deduped,
             existing_candidates=existing_candidates or [],
+            as_of=timestamp,
         )
         valid_candidates, val_errors = self._validate_candidates(deduped)
         errors.extend(val_errors)
@@ -405,7 +582,7 @@ class SemanticCompiler:
         return any(k in payload for k in ("text", "raw_content", "notes", "dialogue", "transcript"))
 
     def _extract_from_event_unstructured(
-        self, event_dict: dict[str, Any]
+        self, event_dict: dict[str, Any], as_of: str | None = None
     ) -> tuple[list[SemanticEntityCandidate], bool]:
         """Extract candidate entities from an event's unstructured text using the model provider."""
         assert self.model_provider is not None
@@ -448,9 +625,7 @@ class SemanticCompiler:
                 extracted=item,
                 source_event_id=event_dict["event_id"],
                 actor=event_dict.get("actor", "agent:model"),
-                timestamp=event_dict.get(
-                    "timestamp", datetime.datetime.now(datetime.UTC).isoformat()
-                ),
+                timestamp=event_dict.get("timestamp") or as_of or "1970-01-01T00:00:00Z",
                 correlation_id=event_dict.get("correlation_id"),
                 injection_detected=injection_detected,
             )
@@ -508,11 +683,8 @@ class SemanticCompiler:
         # Scrub secrets
         content_str, _ = scrub_secrets(content_str)
 
-        # Generate deterministic entity ID (G3.4)
-        entity_id = extracted.get("entity_id")
-        expected_prefix = ENTITY_TYPE_PREFIX[entity_type]
-        if not entity_id or not re.match(rf"^{expected_prefix}_[A-Za-z0-9._-]{{2,64}}$", entity_id):
-            entity_id = generate_deterministic_entity_id(project_id, entity_type, content_str)
+        # Generate deterministic entity ID (G3.4) - strictly ignore provider-supplied entity_id (G3.2/G3.4)
+        entity_id = generate_deterministic_entity_id(project_id, entity_type, content_str)
 
         confidence_val = float(extracted.get("confidence", 0.75))
         confidence_val = max(0.0, min(1.0, confidence_val))
@@ -684,7 +856,9 @@ class SemanticCompiler:
             metadata={"prompt_injection": injection_detected},
         )
 
-    def _parse_structured_event(self, event_dict: dict[str, Any]) -> list[SemanticEntityCandidate]:
+    def _parse_structured_event(
+        self, event_dict: dict[str, Any]
+    ) -> tuple[list[SemanticEntityCandidate], bool]:
         """Deterministic structured parser for canonical project events (G3.1: Zero LLM)."""
         event_type = event_dict.get("event_type", "")
         project_id = event_dict["project_id"]
@@ -709,12 +883,30 @@ class SemanticCompiler:
         )
 
         candidates: list[SemanticEntityCandidate] = []
+        injection_detected = False
 
         # 1. RAID: Risk
         if event_type in ("risk.opened", "risk.updated", "risk.closed"):
-            title = payload.get("title", f"Risk from {event_id}")
+            title = payload.get("title")
+            if not title or not isinstance(title, str) or not title.strip():
+                raise ValueError(
+                    f"Event {event_id} ({event_type}) missing required non-empty 'title'"
+                )
+
+            prob = payload.get("probability")
+            if prob not in ("low", "medium", "high"):
+                raise ValueError(
+                    f"Event {event_id} ({event_type}) missing or invalid 'probability' (expected low/medium/high, got {prob!r})"
+                )
+
+            imp = payload.get("impact")
+            if imp not in ("low", "medium", "high", "critical"):
+                raise ValueError(
+                    f"Event {event_id} ({event_type}) missing or invalid 'impact' (expected low/medium/high/critical, got {imp!r})"
+                )
+
             risk_id = payload.get("risk_id")
-            if not risk_id or not _RISK_ID_COMPILED.match(risk_id):
+            if not risk_id or not RISK_ID_COMPILED.match(risk_id):
                 risk_id = generate_deterministic_entity_id(
                     project_id, SemanticEntityType.RISK, title
                 )
@@ -727,13 +919,6 @@ class SemanticCompiler:
             status = status_map[event_type]
             if status not in ("identified", "mitigated", "materialized", "retired"):
                 status = "identified"
-
-            prob = payload.get("probability", "medium")
-            if prob not in ("low", "medium", "high"):
-                prob = "medium"
-            imp = payload.get("impact", "medium")
-            if imp not in ("low", "medium", "high", "critical"):
-                imp = "medium"
 
             risk = Risk(
                 risk_id=risk_id,
@@ -768,9 +953,14 @@ class SemanticCompiler:
             "assumption.invalidated",
             "assumption.confirmed",
         ):
-            statement = payload.get("statement", f"Assumption from {event_id}")
+            statement = payload.get("statement")
+            if not statement or not isinstance(statement, str) or not statement.strip():
+                raise ValueError(
+                    f"Event {event_id} ({event_type}) missing required non-empty 'statement'"
+                )
+
             asm_id = payload.get("assumption_id")
-            if not asm_id or not _ASSUMPTION_ID_COMPILED.match(asm_id):
+            if not asm_id or not ASSUMPTION_ID_COMPILED.match(asm_id):
                 asm_id = generate_deterministic_entity_id(
                     project_id, SemanticEntityType.ASSUMPTION, statement
                 )
@@ -785,7 +975,6 @@ class SemanticCompiler:
             if status not in ("valid", "invalidated", "confirmed"):
                 status = "valid"
 
-            # If invalidated, record invalidates/invalidated_by
             invalidated_by = payload.get("invalidated_by")
             if event_type == "assumption.invalidated" and not invalidated_by:
                 invalidated_by = actor
@@ -817,9 +1006,20 @@ class SemanticCompiler:
 
         # 3. RAID: Issue
         elif event_type in ("issue.opened", "issue.updated", "issue.resolved", "issue.closed"):
-            title = payload.get("title", f"Issue from {event_id}")
+            title = payload.get("title")
+            if not title or not isinstance(title, str) or not title.strip():
+                raise ValueError(
+                    f"Event {event_id} ({event_type}) missing required non-empty 'title'"
+                )
+
+            sev = payload.get("severity")
+            if sev not in ("minor", "major", "critical", "blocker"):
+                raise ValueError(
+                    f"Event {event_id} ({event_type}) missing or invalid 'severity' (expected minor/major/critical/blocker, got {sev!r})"
+                )
+
             issue_id = payload.get("issue_id")
-            if not issue_id or not _ISSUE_ID_COMPILED.match(issue_id):
+            if not issue_id or not ISSUE_ID_COMPILED.match(issue_id):
                 issue_id = generate_deterministic_entity_id(
                     project_id, SemanticEntityType.ISSUE, title
                 )
@@ -833,10 +1033,6 @@ class SemanticCompiler:
             status = status_map[event_type]
             if status not in ("open", "investigating", "resolved", "closed"):
                 status = "open"
-
-            sev = payload.get("severity", "major")
-            if sev not in ("minor", "major", "critical", "blocker"):
-                sev = "major"
 
             issue = Issue(
                 issue_id=issue_id,
@@ -866,14 +1062,22 @@ class SemanticCompiler:
 
         # 4. RAID: Dependency
         elif event_type in ("dependency.created", "dependency.updated", "dependency.resolved"):
-            source_id = payload.get("source_id", project_id)
-            target_id = payload.get("target_id", "target_deliverable")
-            dep_kind = payload.get("dependency_kind", "requires")
+            source_id = payload.get("source_id") or payload.get("source")
+            if not source_id or not isinstance(source_id, str) or not source_id.strip():
+                raise ValueError(f"Event {event_id} ({event_type}) missing required 'source_id'")
+
+            target_id = payload.get("target_id") or payload.get("target")
+            if not target_id or not isinstance(target_id, str) or not target_id.strip():
+                raise ValueError(f"Event {event_id} ({event_type}) missing required 'target_id'")
+
+            dep_kind = payload.get("dependency_kind")
             if dep_kind not in ("blocks", "blocked_by", "relates_to", "requires"):
-                dep_kind = "requires"
+                raise ValueError(
+                    f"Event {event_id} ({event_type}) missing or invalid 'dependency_kind' (expected blocks/blocked_by/relates_to/requires, got {dep_kind!r})"
+                )
 
             dep_id = payload.get("dependency_id")
-            if not dep_id or not _DEPENDENCY_ID_COMPILED.match(dep_id):
+            if not dep_id or not DEPENDENCY_ID_COMPILED.match(dep_id):
                 dep_id = generate_deterministic_entity_id(
                     project_id, SemanticEntityType.DEPENDENCY, f"{source_id}:{target_id}:{dep_kind}"
                 )
@@ -921,10 +1125,13 @@ class SemanticCompiler:
             "decision.association.failed",
             "decision.lifecycle.observed",
         ):
-            decision_id = payload.get("decision_id", f"dec_{event_id[4:]}")
+            decision_id = payload.get("decision_id")
+            if not decision_id or not isinstance(decision_id, str) or not decision_id.strip():
+                raise ValueError(f"Event {event_id} ({event_type}) missing required 'decision_id'")
+
             relation = payload.get("relation", "governs")
             dref_id = payload.get("decision_ref_id")
-            if not dref_id or not _DECISION_REF_ID_COMPILED.match(dref_id):
+            if not dref_id or not DECISION_REF_ID_COMPILED.match(dref_id):
                 dref_id = generate_deterministic_entity_id(
                     project_id, SemanticEntityType.DECISION, decision_id
                 )
@@ -974,43 +1181,155 @@ class SemanticCompiler:
                 )
             )
 
-        # 6. Observation
+        # 6. Observation, Fact, or Hypothesis (observation.recorded)
         elif event_type == "observation.recorded":
-            content = payload.get("content", f"Observation from {event_id}")
-            obs_id = payload.get("observation_id")
-            if not obs_id or not _OBSERVATION_ID_COMPILED.match(obs_id):
-                obs_id = generate_deterministic_entity_id(
-                    project_id, SemanticEntityType.OBSERVATION, content
+            target_entity_type = str(payload.get("entity_type", "OBSERVATION")).upper()
+            if target_entity_type == "FACT":
+                stmt = payload.get("statement") or payload.get("content")
+                if not stmt or not isinstance(stmt, str) or not stmt.strip():
+                    raise ValueError(
+                        f"Event {event_id} fact missing required non-empty 'statement'"
+                    )
+
+                fct_id = payload.get("fact_id") or generate_deterministic_entity_id(
+                    project_id, SemanticEntityType.FACT, stmt
+                )
+                cat = payload.get("category", "technical")
+                if cat not in (
+                    "domain",
+                    "technical",
+                    "organizational",
+                    "environmental",
+                    "historical",
+                ):
+                    cat = "technical"
+                fact = Fact(
+                    fact_id=fct_id,
+                    project_id=project_id,
+                    statement=stmt,
+                    category=cat,
+                    verified_at=payload.get("verified_at", timestamp),
+                    verification_method=payload.get("verification_method", "canonical_event"),
+                    provenance=provenance,
+                    created_at=timestamp,
+                )
+                candidates.append(
+                    SemanticEntityCandidate(
+                        entity_type=SemanticEntityType.FACT,
+                        entity_id=fct_id,
+                        entity=fact.model_dump(exclude_none=True),
+                        verification_status=VerificationStatus.VERIFIED,
+                        source="structured_event",
+                        confidence=1.0,
+                    )
+                )
+            elif target_entity_type == "HYPOTHESIS":
+                stmt = payload.get("statement") or payload.get("content")
+                if not stmt or not isinstance(stmt, str) or not stmt.strip():
+                    raise ValueError(
+                        f"Event {event_id} hypothesis missing required non-empty 'statement'"
+                    )
+
+                hyp_id = payload.get("hypothesis_id") or generate_deterministic_entity_id(
+                    project_id, SemanticEntityType.HYPOTHESIS, stmt
+                )
+                hypothesis = Hypothesis(
+                    hypothesis_id=hyp_id,
+                    project_id=project_id,
+                    statement=stmt,
+                    rationale=payload.get("rationale", ""),
+                    validation_criteria=payload.get("validation_criteria", ""),
+                    confidence=float(payload.get("confidence", 0.8)),
+                    status=payload.get("status", "proposed"),
+                    provenance=provenance,
+                    created_at=timestamp,
+                )
+                candidates.append(
+                    SemanticEntityCandidate(
+                        entity_type=SemanticEntityType.HYPOTHESIS,
+                        entity_id=hyp_id,
+                        entity=hypothesis.model_dump(exclude_none=True),
+                        verification_status=VerificationStatus.PROPOSED,
+                        source="structured_event",
+                        confidence=float(payload.get("confidence", 0.8)),
+                    )
+                )
+            else:
+                content = payload.get("content")
+                if not content or not isinstance(content, str) or not content.strip():
+                    raise ValueError(
+                        f"Event {event_id} (observation.recorded) missing required non-empty 'content'"
+                    )
+
+                obs_id = payload.get("observation_id")
+                if not obs_id or not OBSERVATION_ID_COMPILED.match(obs_id):
+                    obs_id = generate_deterministic_entity_id(
+                        project_id, SemanticEntityType.OBSERVATION, content
+                    )
+
+                context_str = str(payload.get("context", ""))
+                injection_detected = detect_prompt_injection(content) or detect_prompt_injection(
+                    context_str
                 )
 
-            obs = Observation(
-                observation_id=obs_id,
-                project_id=project_id,
-                content=content,
-                context=payload.get("context", ""),
-                observer=payload.get("observer", actor),
-                confidence=float(payload.get("confidence", 1.0)),
-                observed_at=payload.get("observed_at", timestamp),
-                provenance=provenance,
-                created_at=timestamp,
-            )
-            candidates.append(
-                SemanticEntityCandidate(
-                    entity_type=SemanticEntityType.OBSERVATION,
-                    entity_id=obs_id,
-                    entity=obs.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED,
-                    source="structured_event",
-                    confidence=1.0,
+                if injection_detected:
+                    verification_status = VerificationStatus.PROPOSED
+                    confidence_val = 0.0
+                    obs_prov = provenance.model_copy(
+                        update={
+                            "verification_status": "quarantined",
+                            "confidence": 0.0,
+                        }
+                    )
+                else:
+                    verification_status = VerificationStatus.VERIFIED
+                    confidence_val = float(payload.get("confidence", 1.0))
+                    obs_prov = provenance.model_copy(
+                        update={
+                            "verification_status": "verified",
+                            "confidence": confidence_val,
+                        }
+                    )
+
+                obs = Observation(
+                    observation_id=obs_id,
+                    project_id=project_id,
+                    content=content,
+                    context=context_str,
+                    observer=payload.get("observer", actor),
+                    confidence=confidence_val,
+                    observed_at=payload.get("observed_at", timestamp),
+                    provenance=obs_prov,
+                    created_at=timestamp,
                 )
-            )
+                candidates.append(
+                    SemanticEntityCandidate(
+                        entity_type=SemanticEntityType.OBSERVATION,
+                        entity_id=obs_id,
+                        entity=obs.model_dump(exclude_none=True),
+                        verification_status=verification_status,
+                        source="structured_event",
+                        confidence=confidence_val,
+                        metadata={"prompt_injection": injection_detected},
+                    )
+                )
 
         # 7. Lesson
         elif event_type == "lesson.recorded":
-            title = payload.get("title", f"Lesson from {event_id}")
-            summary = payload.get("summary", title)
+            title = payload.get("title")
+            if not title or not isinstance(title, str) or not title.strip():
+                raise ValueError(
+                    f"Event {event_id} (lesson.recorded) missing required non-empty 'title'"
+                )
+
+            summary = payload.get("summary")
+            if not summary or not isinstance(summary, str) or not summary.strip():
+                raise ValueError(
+                    f"Event {event_id} (lesson.recorded) missing required non-empty 'summary'"
+                )
+
             lsn_id = payload.get("lesson_id")
-            if not lsn_id or not _LESSON_ID_COMPILED.match(lsn_id):
+            if not lsn_id or not LESSON_ID_COMPILED.match(lsn_id):
                 lsn_id = generate_deterministic_entity_id(
                     project_id, SemanticEntityType.LESSON, title
                 )
@@ -1048,9 +1367,12 @@ class SemanticCompiler:
                 )
             )
 
-        # 8. Fact / Empirical finding in payload
+        # 8. Fact in payload
         elif "statement" in payload and payload.get("entity_type", "").upper() == "FACT":
-            stmt = payload["statement"]
+            stmt = payload.get("statement")
+            if not stmt or not isinstance(stmt, str) or not stmt.strip():
+                raise ValueError(f"Event {event_id} fact missing required non-empty 'statement'")
+
             fct_id = payload.get("fact_id") or generate_deterministic_entity_id(
                 project_id, SemanticEntityType.FACT, stmt
             )
@@ -1078,7 +1400,40 @@ class SemanticCompiler:
                 )
             )
 
-        return candidates
+        # 9. Hypothesis in payload
+        elif "statement" in payload and payload.get("entity_type", "").upper() == "HYPOTHESIS":
+            stmt = payload.get("statement")
+            if not stmt or not isinstance(stmt, str) or not stmt.strip():
+                raise ValueError(
+                    f"Event {event_id} hypothesis missing required non-empty 'statement'"
+                )
+
+            hyp_id = payload.get("hypothesis_id") or generate_deterministic_entity_id(
+                project_id, SemanticEntityType.HYPOTHESIS, stmt
+            )
+            hypothesis = Hypothesis(
+                hypothesis_id=hyp_id,
+                project_id=project_id,
+                statement=stmt,
+                rationale=payload.get("rationale", ""),
+                validation_criteria=payload.get("validation_criteria", ""),
+                confidence=float(payload.get("confidence", 0.8)),
+                status=payload.get("status", "proposed"),
+                provenance=provenance,
+                created_at=timestamp,
+            )
+            candidates.append(
+                SemanticEntityCandidate(
+                    entity_type=SemanticEntityType.HYPOTHESIS,
+                    entity_id=hyp_id,
+                    entity=hypothesis.model_dump(exclude_none=True),
+                    verification_status=VerificationStatus.PROPOSED,
+                    source="structured_event",
+                    confidence=float(payload.get("confidence", 0.8)),
+                )
+            )
+
+        return candidates, injection_detected
 
     def _deduplicate_candidates(
         self,
@@ -1112,7 +1467,52 @@ class SemanticCompiler:
         first: SemanticEntityCandidate,
         second: SemanticEntityCandidate,
     ) -> SemanticEntityCandidate:
-        """Merge two candidates with the same ID, preserving provenance and highest verification level."""
+        """Merge two candidates with the same ID, ensuring structured fields have absolute priority (G3.4)."""
+        # Determine if there is a structured vs model extraction mix
+        if first.source == "structured_event" and second.source == "model_extraction":
+            structured_cand: SemanticEntityCandidate | None = first
+            model_cand: SemanticEntityCandidate | None = second
+        elif first.source == "model_extraction" and second.source == "structured_event":
+            structured_cand = second
+            model_cand = first
+        else:
+            structured_cand = None
+            model_cand = None
+
+        if structured_cand is not None and model_cand is not None:
+            # G3.4 / Point 7: Structured entity fields have absolute priority
+            # Model arbitrary fields CANNOT overwrite structured fields or become VERIFIED
+            merged_dict = dict(structured_cand.entity)
+            struct_prov = structured_cand.entity.get("provenance", {})
+            model_prov = model_cand.entity.get("provenance", {})
+
+            # Safely merge only provenance source_event_ids and evidence_refs
+            combined_events = list(
+                dict.fromkeys(
+                    struct_prov.get("source_event_ids", []) + model_prov.get("source_event_ids", [])
+                )
+            )
+            combined_evidence = list(
+                dict.fromkeys(
+                    struct_prov.get("evidence_refs", []) + model_prov.get("evidence_refs", [])
+                )
+            )
+            merged_prov = dict(struct_prov)
+            merged_prov["source_event_ids"] = combined_events
+            merged_prov["evidence_refs"] = combined_evidence
+            merged_dict["provenance"] = merged_prov
+
+            return SemanticEntityCandidate(
+                entity_type=structured_cand.entity_type,
+                entity_id=structured_cand.entity_id,
+                entity=merged_dict,
+                verification_status=structured_cand.verification_status,
+                source="structured_event",
+                confidence=structured_cand.confidence,
+                metadata={**model_cand.metadata, **structured_cand.metadata},
+            )
+
+        # Same-source deduplication
         merged_dict = dict(first.entity)
         first_prov = first.entity.get("provenance", {})
         second_prov = second.entity.get("provenance", {})
@@ -1156,12 +1556,8 @@ class SemanticCompiler:
             else second.verification_status
         )
 
-        # Gate G3.2 rule: If neither candidate is structured_event, it CANNOT be VERIFIED!
-        if (
-            first.source == "model_extraction"
-            and second.source == "model_extraction"
-            and status_chosen == VerificationStatus.VERIFIED
-        ):
+        # Gate G3.2 rule: If both candidates are model_extraction, it CANNOT be VERIFIED!
+        if first.source == "model_extraction" and second.source == "model_extraction":
             status_chosen = VerificationStatus.PROPOSED
 
         return SemanticEntityCandidate(
@@ -1169,9 +1565,7 @@ class SemanticCompiler:
             entity_id=first.entity_id,
             entity=merged_dict,
             verification_status=status_chosen,
-            source="structured_event"
-            if "structured_event" in (first.source, second.source)
-            else "model_extraction",
+            source=first.source,
             confidence=max(first.confidence, second.confidence),
             metadata={**first.metadata, **second.metadata},
         )
@@ -1180,6 +1574,7 @@ class SemanticCompiler:
         self,
         new_candidates: Sequence[SemanticEntityCandidate],
         existing_candidates: Sequence[SemanticEntityCandidate],
+        as_of: str = "1970-01-01T00:00:00Z",
     ) -> list[ContradictionProposal]:
         """Distinguish the 5 contradiction/supersession categories required by Phase 3 (G3.5).
 
@@ -1193,7 +1588,7 @@ class SemanticCompiler:
         """
         proposals: list[ContradictionProposal] = []
         all_candidates = list(existing_candidates) + list(new_candidates)
-        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
+        now_iso = as_of
 
         for new_cand in new_candidates:
             new_ent = new_cand.entity
@@ -1415,10 +1810,26 @@ class SemanticCompiler:
                 comp_result = self.compile_event(evt_dict, existing_candidates=existing_knowledge)
             elif input_type == "unstructured_text":
                 text = sample["input"]
+                mock_out = sample.get("mock_model_output")
+                provider: ExtractionProviderProtocol | None = None
+                if mock_out is not None:
+
+                    class _MockEvalProvider:
+                        def __init__(self, output_items: list[dict[str, Any]]) -> None:
+                            self._output = output_items
+
+                        def extract_unstructured(
+                            self, text: str, context: dict[str, Any] | None = None
+                        ) -> list[dict[str, Any]]:
+                            return self._output
+
+                    provider = _MockEvalProvider(mock_out)
+
                 comp_result = self.compile_unstructured(
                     project_id=sample.get("project_id", "prj_eval_test"),
                     text=text,
                     existing_candidates=existing_knowledge,
+                    model_provider=provider,
                 )
             else:
                 continue
@@ -1471,15 +1882,44 @@ class SemanticCompiler:
             # Add to rolling knowledge for subsequent contradiction checks
             existing_knowledge.extend(comp_result.candidates)
 
-        # Compute metric percentages
-        precision_by_type: dict[str, float] = {}
-        recall_by_type: dict[str, float] = {}
+        # Compute metric percentages with honest zero-support reporting (G3.7)
+        precision_by_type: dict[str, float | None] = {}
+        recall_by_type: dict[str, float | None] = {}
+        by_entity_type_counts: dict[str, dict[str, int]] = {}
+
         for t in SemanticEntityType:
             tp = tp_by_type[t.value]
             fp = fp_by_type[t.value]
             fn = fn_by_type[t.value]
-            precision_by_type[t.value] = round(tp / (tp + fp), 4) if (tp + fp) > 0 else 1.0
-            recall_by_type[t.value] = round(tp / (tp + fn), 4) if (tp + fn) > 0 else 1.0
+            expected_count = tp + fn
+            predicted_count = tp + fp
+            by_entity_type_counts[t.value] = {
+                "expected_count": expected_count,
+                "predicted_count": predicted_count,
+                "tp": tp,
+                "fp": fp,
+                "fn": fn,
+            }
+
+            if expected_count == 0 and predicted_count == 0:
+                precision_by_type[t.value] = None
+                recall_by_type[t.value] = None
+            elif predicted_count == 0:
+                precision_by_type[t.value] = None
+                recall_by_type[t.value] = 0.0
+            elif expected_count == 0:
+                precision_by_type[t.value] = 0.0
+                recall_by_type[t.value] = None
+            else:
+                precision_by_type[t.value] = round(tp / predicted_count, 4)
+                recall_by_type[t.value] = round(tp / expected_count, 4)
+
+        valid_precisions = [p for p in precision_by_type.values() if p is not None]
+        valid_recalls = [r for r in recall_by_type.values() if r is not None]
+        macro_precision = (
+            round(sum(valid_precisions) / len(valid_precisions), 4) if valid_precisions else None
+        )
+        macro_recall = round(sum(valid_recalls) / len(valid_recalls), 4) if valid_recalls else None
 
         false_verified_rate = (
             round(false_verified_candidates / total_verified_candidates, 4)
@@ -1508,12 +1948,15 @@ class SemanticCompiler:
             "metrics": {
                 "precision_by_entity_type": precision_by_type,
                 "recall_by_entity_type": recall_by_type,
+                "macro_precision": macro_precision,
+                "macro_recall": macro_recall,
                 "false_verified_rate": false_verified_rate,
                 "duplicate_rate": duplicate_rate,
                 "contradiction_detection_rate": contradiction_detection_rate,
                 "prompt_injection_defense_rate": prompt_injection_defense_rate,
             },
             "counts": {
+                "by_entity_type": by_entity_type_counts,
                 "total_verified_candidates": total_verified_candidates,
                 "false_verified_candidates": false_verified_candidates,
                 "total_duplicates_detected": total_duplicates_detected,
@@ -1524,3 +1967,15 @@ class SemanticCompiler:
                 "prompt_injection_stopped": prompt_injection_stopped_count,
             },
         }
+
+
+__all__ = [
+    "PROJECT_EVENT_DISPATCH_REGISTRY",
+    "CompilationResult",
+    "EventSemanticDisposition",
+    "ExtractionProviderProtocol",
+    "SemanticCompiler",
+    "VerifiedEventBatch",
+    "detect_prompt_injection",
+    "scrub_secrets",
+]

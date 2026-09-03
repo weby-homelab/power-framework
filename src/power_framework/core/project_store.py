@@ -192,7 +192,8 @@ def project_lock(
             finally:
                 with contextlib.suppress(OSError):
                     fcntl.flock(fd, fcntl.LOCK_UN)
-                os.close(fd)
+                with contextlib.suppress(OSError):
+                    os.close(fd)
         finally:
             thread_lock.release()
 
@@ -221,7 +222,7 @@ def recover_torn_tail(file_path: Path) -> int:
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     fd = os.open(file_path, flags)
-    with open(fd, "rb", closefd=True) as f:
+    with open(fd, "rb") as f:
         content = f.read()
 
     if not content:
@@ -239,11 +240,11 @@ def recover_torn_tail(file_path: Path) -> int:
         if hasattr(os, "O_NOFOLLOW"):
             flags_out |= os.O_NOFOLLOW
         fd_out = os.open(file_path, flags_out)
-        with open(fd_out, "wb", closefd=True) as f_out:
+        with open(fd_out, "wb") as f_out:
             if valid_len > 0:
                 f_out.write(content[:valid_len])
             f_out.flush()
-            os.fsync(fd_out)
+            os.fsync(f_out.fileno())
         return truncated_bytes
 
     # 2. File ends with '\n': records are complete. Check for corruption.
@@ -469,10 +470,10 @@ class ProjectEventStore:
             if hasattr(os, "O_NOFOLLOW"):
                 flags |= os.O_NOFOLLOW
             fd = os.open(self.active_events_file, flags, 0o600)
-            with open(fd, "a", encoding="utf-8", closefd=True) as f:
+            with open(fd, "a", encoding="utf-8") as f:
                 f.write(line)
                 f.flush()
-                os.fsync(fd)
+                os.fsync(f.fileno())
 
             return event
 
