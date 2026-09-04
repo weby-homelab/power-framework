@@ -32,7 +32,7 @@ jsonschema-specifications==2025.9.1
 loguru==0.7.3
 markdown==3.10.3
 markupsafe==3.0.3
-mcp==2.1.0
+mcp==2.1.1
 mcp-types==2.1.0
 mmh3==5.2.1
 numpy==2.4.6
