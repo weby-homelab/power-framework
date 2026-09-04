@@ -3,9 +3,11 @@
 - **Framework:** POWER 3.8 — Project State Engine (PSE)
 - **Worktree:** `/root/gemma/projects/.power-framework-3.7.11-worktree`
 - **Branch:** `feat/power-3.8-project-state-engine`
+- **PR:** [#388](https://github.com/weby-homelab/power-framework/pull/388)
+- **Commit:** `f898236ebdaf2f6eb6c7275e6c333ba536dbeafd`
 - **Date:** 2026-09-04
-- **Signer / Committer:** `weby-homelab <rekvizitor.ua@gmail.com>` (GPG Key: `2D49E810C7F2527E`)
-- **Status:** APPROVED & COMPLETE
+- **Signer / Committer:** `weby-homelab <rekvizitor.ua@gmail.com>` (GPG Key: `2D49E810C7F2527E`, verified: true)
+- **Status:** APPROVED & COMPLETE (Phase 3 Closure Correction Round 1 Verified)
 
 ---
 
@@ -113,7 +115,7 @@ Targeted PSE regression test suite executed via pytest:
 ```bash
 .venv/bin/pytest --no-cov -v tests/test_phase1_project_state_contracts.py tests/test_phase2_event_ledger.py tests/test_phase3_semantic_compiler.py tests/test_task_service.py tests/test_decision_service.py
 ```
-**Result: 130 passed in 3.38s (100% PASS)**
+**Result: 130 passed in 3.41s (100% PASS)**
 
 Phase 3 compiler specific suite:
 ```bash
@@ -121,10 +123,38 @@ Phase 3 compiler specific suite:
 ```
 **Result: 17 passed in 0.84s (100% PASS)**
 
+Full repository regression test suite:
+```bash
+.venv/bin/pytest tests/ -v --tb=short -m "not real_neural and not bench" -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
+```
+**Result: 1,495 passed, 4 skipped, 17 deselected in 98.72s (100% PASS)**  
+**Code Coverage: 82.68%** (exceeds mandatory >= 70% threshold).
+
 Static analysis and linting:
 ```bash
 .venv/bin/ruff check src/ tests/
 .venv/bin/ruff format --check src/ tests/
 .venv/bin/mypy src/power_framework/core/ tests/test_phase3_semantic_compiler.py
 ```
-**Result: 0 errors, 100% clean formatting and strict type safety.**
+**Result: 0 errors, 239 files already formatted, strict type safety verified across 69 source files.**
+
+---
+
+## 6. Remote GitHub Actions CI & CodeQL Triage
+
+Official continuous integration results for commit `f898236ebdaf2f6eb6c7275e6c333ba536dbeafd` on PR [#388](https://github.com/weby-homelab/power-framework/pull/388):
+
+- **CI Workflow (Run [33846593739](https://github.com/weby-homelab/power-framework/actions/runs/33846593739)):** **COMPLETED / SUCCESS**  
+  All matrix jobs passed: `security`, `package-smoke`, `base-runtime-smoke`, `upgrade-matrix (ubuntu-latest)`, `upgrade-matrix-aggregate`, `benchmark-integrity`, `test (3.13)`, `test (3.14)`.
+- **CodeQL Workflow (Run [33846593777](https://github.com/weby-homelab/power-framework/actions/runs/33846593777)):** **COMPLETED / SUCCESS**
+
+### CodeQL Findings Triage & Resolution Table:
+| Finding ID | Location | Description | Triage & Resolution Status |
+| :--- | :--- | :--- | :--- |
+| **Scan 181** | `semantic_compiler.py:117` | Statement has no effect | **RESOLVED**: Replaced `...` in protocol with `pass`. |
+| **Scans 172-180** | `semantic_models.py` | 9x Unused global variable | **RESOLVED**: Exported public regex constants in module `__all__`. |
+| **Scan 164** | `project_ingestion.py:290` | Empty except | **RESOLVED**: Added documented explanatory comment for path check. |
+| **Scan 165** | `project_ingestion.py:387` | Potentially uninitialized `final_payload` | **RESOLVED**: Initialized `final_payload = cleaned_payload` unconditionally before mode switch. |
+| **Scans 166, 167, 182, 183** | `project_ingestion.py:585, 1034` | File is opened but is not closed | **RESOLVED**: Switched to standard Python `with open(..., opener=...)` which handles deterministic closing. |
+| **Scans 169-171, 184-186** | `project_store.py:224, 242, 472` | File is opened but is not closed | **RESOLVED**: Switched to `with open(..., opener=...)` eliminating resource leak warnings. |
+| **Scan 168** | `project_store.py:171` | File descriptor in `project_lock` | **DISMISSED (Intentional Pattern)**: Inter-process file lock descriptor is held across the generator `yield` and safely unlocked/closed in `finally`. |
