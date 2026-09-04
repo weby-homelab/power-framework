@@ -24,6 +24,7 @@ import hashlib
 import json
 import logging
 import re
+from copy import deepcopy
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
@@ -254,6 +255,14 @@ class SemanticCompiler:
         else:
             receipt = replay_receipt
             event_list = events
+
+        # Snapshot caller-owned sequences and mutable payloads before authority
+        # verification. The exact snapshot checked against the ledger must also
+        # be the snapshot compiled below.
+        event_list = tuple(
+            event.model_copy(deep=True) if isinstance(event, ProjectEvent) else deepcopy(event)
+            for event in event_list
+        )
 
         if not event_list:
             return CompilationResult(
