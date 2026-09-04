@@ -1,0 +1,109 @@
+{
+  "dataset_version": "1.1.0",
+  "total_samples": 17,
+  "metrics": {
+    "precision_by_entity_type": {
+      "FACT": 1.0,
+      "DECISION": 1.0,
+      "ASSUMPTION": 1.0,
+      "HYPOTHESIS": 1.0,
+      "RISK": 1.0,
+      "ISSUE": 1.0,
+      "DEPENDENCY": 1.0,
+      "OBSERVATION": 1.0,
+      "LESSON": 1.0
+    },
+    "recall_by_entity_type": {
+      "FACT": 1.0,
+      "DECISION": 1.0,
+      "ASSUMPTION": 1.0,
+      "HYPOTHESIS": 1.0,
+      "RISK": 1.0,
+      "ISSUE": 1.0,
+      "DEPENDENCY": 1.0,
+      "OBSERVATION": 1.0,
+      "LESSON": 1.0
+    },
+    "macro_precision": 1.0,
+    "macro_recall": 1.0,
+    "false_verified_rate": 0.0,
+    "duplicate_rate": 0.0,
+    "contradiction_detection_rate": 1.0,
+    "prompt_injection_defense_rate": 1.0
+  },
+  "counts": {
+    "by_entity_type": {
+      "FACT": {
+        "expected_count": 1,
+        "predicted_count": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "DECISION": {
+        "expected_count": 3,
+        "predicted_count": 3,
+        "tp": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      "ASSUMPTION": {
+        "expected_count": 2,
+        "predicted_count": 2,
+        "tp": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "HYPOTHESIS": {
+        "expected_count": 1,
+        "predicted_count": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "RISK": {
+        "expected_count": 1,
+        "predicted_count": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "ISSUE": {
+        "expected_count": 1,
+        "predicted_count": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "DEPENDENCY": {
+        "expected_count": 1,
+        "predicted_count": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "OBSERVATION": {
+        "expected_count": 6,
+        "predicted_count": 6,
+        "tp": 6,
+        "fp": 0,
+        "fn": 0
+      },
+      "LESSON": {
+        "expected_count": 1,
+        "predicted_count": 1,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "total_verified_candidates": 0,
+    "false_verified_candidates": 0,
+    "total_duplicates_detected": 0,
+    "total_raw_candidates": 17,
+    "expected_contradictions": 3,
+    "detected_contradictions": 3,
+    "prompt_injection_tests": 2,
+    "prompt_injection_stopped": 2
+  }
+}

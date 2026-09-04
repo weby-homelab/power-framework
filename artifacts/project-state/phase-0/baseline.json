@@ -1,0 +1,98 @@
+{
+  "schema_version": "power.pse.baseline.v1",
+  "timestamp": "2026-09-03T16:08:07+03:00",
+  "repository": {
+    "url": "https://github.com/weby-homelab/power-framework.git",
+    "branch": "feat/power-3.8-project-state-engine",
+    "head_sha": "af2e3022422b2ee3f249e0b2e0aa08b6ce09450c",
+    "latest_tag": "v3.7.11",
+    "worktree_clean": false,
+    "worktree_untracked": [
+      "?? artifacts/"
+    ]
+  },
+  "environment": {
+    "python_version": "3.14.6 (main, Jun 23 2026, 15:18:23) [Clang 22.1.3 ]",
+    "python_executable": "/root/gemma/projects/.power-framework-3.7.11-worktree/.venv/bin/python",
+    "os": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "uname": [
+      "Linux",
+      "ws",
+      "7.0.0-30-generic",
+      "#30-Ubuntu SMP PREEMPT_DYNAMIC Fri Jul 31 18:22:54 UTC 2026",
+      "x86_64"
+    ],
+    "dependency_lock": {
+      "uv_lock_exists": true,
+      "pyproject_version": "3.7.11"
+    }
+  },
+  "contracts": {
+    "cli_top_level_commands_count": 26,
+    "cli_top_level_commands": [
+      "archive",
+      "cache",
+      "connect",
+      "control-plane",
+      "cron",
+      "doctor",
+      "handoff",
+      "heal",
+      "import",
+      "index",
+      "ingest",
+      "init",
+      "integrations",
+      "lint",
+      "maintenance",
+      "markdown-check",
+      "memory",
+      "migrate-state",
+      "rename",
+      "rot",
+      "search",
+      "status",
+      "suggest-related",
+      "sync",
+      "synthesize",
+      "task"
+    ],
+    "mcp_tools_count": 20,
+    "mcp_tools": [
+      "get_server_info",
+      "lint_vault",
+      "generate_index",
+      "sync_vault",
+      "read_sub_index",
+      "ensure_sub_index",
+      "ingest_note",
+      "get_memory_context",
+      "propose_memory_change",
+      "apply_memory_change",
+      "validate_memory_state",
+      "read_memory_history",
+      "handoff_work",
+      "search_vault_tool",
+      "synthesize_session",
+      "rot_audit",
+      "archive_notes",
+      "suggest_related_tool",
+      "heal_frontmatter_tool",
+      "check_markdown_tool"
+    ]
+  },
+  "test_baseline": {
+    "total_collected": 1426,
+    "passed": 1405,
+    "skipped": 4,
+    "deselected": 17,
+    "failed": 0,
+    "errors": 0,
+    "coverage_percent": 82.13,
+    "coverage_threshold_percent": 70.0,
+    "coverage_gate_passed": true,
+    "duration_seconds": 96.43,
+    "evidence_file": "test_baseline.txt",
+    "status": "PASS"
+  }
+}

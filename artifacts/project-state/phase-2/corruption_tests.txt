@@ -1,0 +1,26 @@
+=== POWER PSE PHASE 2 CORRUPTION & INTEGRITY TEST LOG ===
+Timestamp: 2026-09-03T21:05:00Z
+
+[TEST 1] Interrupted Append / Torn-Tail Crash Recovery
+  - Appended 3 valid events. Initial file size: 1829 bytes
+  - Simulated crash mid-write. Corrupted file size: 1903 bytes
+  - recover_torn_tail() executed: truncated 74 bytes. Restored size: 1829 bytes (matches initial: True)
+  - Replayed valid events count: 3 (expected 3)
+  - Subsequent append successful: sequence 4, prev_event_hash linked: True
+  - Verification result: valid=True
+
+[TEST 2] Malformed JSON in Middle of Ledger
+  - Injected non-JSON string in line 2.
+  - verify() valid: False (expected False)
+  - Detected errors: ['events.jsonl:2: Malformed JSON: Expecting value: line 1 column 1 (char 0)']
+
+[TEST 3] Cryptographic Tampering Detection
+  - Tampered payload balance: 100 -> 999999
+  - verify() valid: False (expected False)
+  - Errors caught: ["events.jsonl:1: Payload digest mismatch for evt_prj_tamper_1_ca1542ea362f: expected '37b2a82306805f6262efe1c7cbb419bd514463f8a4d6a9a91cda777462fc8162', got 'a7a3b046532ad30415ec38f11e6c0715169b18a7440b8139e587b659c5c77b8f'"]
+
+[TEST 4] Project Boundary and Symlink Escape Rejection
+  - Correctly rejected ../escape: Path traversal characters forbidden in project_id: ../escape
+  - Correctly rejected prj_../../escape: Path traversal characters forbidden in project_id: prj_../../escape
+  - Correctly rejected prj_nested/path: Path traversal characters forbidden in project_id: prj_nested/path
+  - Correctly rejected prj_INVALID: Invalid project_id format: prj_INVALID. Must match ^prj_[a-z0-9][a-z0-9_-]{2,63}$

@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
+from power_framework.core.lock_tracker import LockHierarchyTracker
+
 from .fault_injection import fault_injector
 from .task_models import (
     PowerTask,
@@ -72,7 +74,10 @@ class TaskStore:
     @contextmanager
     def lock(self) -> Generator[None]:
         """Acquire a per-vault writer lock with thread reentrancy."""
-        with self._thread_lock:
+        with (
+            LockHierarchyTracker.hold_level(LockHierarchyTracker.LEVEL_TASK),
+            self._thread_lock,
+        ):
             self._ensure_dirs()
             lock_file = self.tasks_dir / ".lock"
             if lock_file.is_symlink():
