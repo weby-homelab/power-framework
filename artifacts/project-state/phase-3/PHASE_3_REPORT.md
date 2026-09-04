@@ -5,9 +5,10 @@
 - **Branch:** `feat/power-3.8-project-state-engine`
 - **PR:** [#388](https://github.com/weby-homelab/power-framework/pull/388)
 - **Baseline Commit:** `78d793eb8a314b436cb95d33a5af7c9feb94fb3c`
+- **Local Correction Commits:** `9c27abc`, `6f0a26c`
 - **Date:** 2026-09-04
 - **Signer / Committer:** `weby-homelab <rekvizitor.ua@gmail.com>` (GPG Key: `2D49E810C7F2527E`, verified: true)
-- **Status:** Phase 3 Closure Correction Round 2 — P0 authority revalidation
+- **Status:** Local P0 validation PASS; exact-head remote closure pending
 
 ---
 
@@ -150,11 +151,9 @@ Static analysis and linting:
 
 ## 6. Remote GitHub Actions CI & CodeQL Triage
 
-Official continuous integration results for commit `f898236ebdaf2f6eb6c7275e6c333ba536dbeafd` on PR [#388](https://github.com/weby-homelab/power-framework/pull/388):
+The earlier CI and CodeQL receipts for `f898236ebdaf2f6eb6c7275e6c333ba536dbeafd` are historical and do not validate this correction. The correction was committed locally as `9c27abc` plus the input-snapshot follow-up `6f0a26c`; exact-head remote CI/CodeQL readback is still required before final PR closure.
 
-- **CI Workflow (Run [33846593739](https://github.com/weby-homelab/power-framework/actions/runs/33846593739)):** **COMPLETED / SUCCESS**  
-  All matrix jobs passed: `security`, `package-smoke`, `base-runtime-smoke`, `upgrade-matrix (ubuntu-latest)`, `upgrade-matrix-aggregate`, `benchmark-integrity`, `test (3.13)`, `test (3.14)`.
-- **CodeQL Workflow (Run [33846593777](https://github.com/weby-homelab/power-framework/actions/runs/33846593777)):** **COMPLETED / SUCCESS**
+The current session could not publish the branch or obtain new exact-head checks because the configured GitHub authentication was rejected. No remote success is claimed here.
 
 ### CodeQL Findings Triage & Resolution Table:
 | Finding ID | Location | Description | Triage & Resolution Status |
