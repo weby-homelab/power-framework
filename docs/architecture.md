@@ -102,6 +102,16 @@ tests/
   generated file and cannot remove user notes.
 - **No circular dependencies** — Core never imports from `mcp`. MCP imports only from core.
 
+## Project State Engine replay authority
+
+Phase 3 semantic candidates are not authoritative merely because an event has a
+valid hash chain or a caller supplies a `TrustedReplayReceipt` or
+`VerifiedReplayBatch`. `compile_events()` treats caller-provided streams as
+untrusted unless an explicit vault root is used to independently verify exact
+ordered membership in the canonical Phase 2 ledger. The receipt is audit
+evidence of that verification, not a bearer credential; `compile_ledger_replay()`
+is the preferred authoritative entry point.
+
 ## Canonical retrieval registry
 
 `SEARCH_MODE_REGISTRY` in `core/searcher.py` is the executable retrieval
