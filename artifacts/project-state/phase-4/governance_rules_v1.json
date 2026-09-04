@@ -1,0 +1,277 @@
+{
+  "schema_version": "power.governance-rules.v1",
+  "rules_version": "1.0.0",
+  "name": "POWER Project State Engine Governance Rules v1",
+  "description": "Deterministic declarative governance and quality gate rules for POWER 3.8 PSE Phase 4.",
+  "fsm": {
+    "states": [
+      "DISCOVERY",
+      "PLANNING",
+      "EXECUTION",
+      "MONITORING",
+      "CLOSING",
+      "CLOSED"
+    ],
+    "transitions_count": 17,
+    "transitions": [
+      {
+        "name": "advance_to_planning",
+        "from_phase": "DISCOVERY",
+        "to_phase": "PLANNING",
+        "preconditions": [
+          "charter_present",
+          "owner_assigned"
+        ],
+        "required_gate": "dor_discovery_to_planning",
+        "approval_required": false,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "cancel_during_discovery",
+        "from_phase": "DISCOVERY",
+        "to_phase": "CLOSED",
+        "preconditions": [
+          "cancellation_reason_provided"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "start_execution",
+        "from_phase": "PLANNING",
+        "to_phase": "EXECUTION",
+        "preconditions": [
+          "dor_passed_or_overridden",
+          "raci_accountable_assigned",
+          "initial_tasks_registered"
+        ],
+        "required_gate": "dor_planning_to_execution",
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "revert_to_discovery",
+        "from_phase": "PLANNING",
+        "to_phase": "DISCOVERY",
+        "preconditions": [
+          "reversion_justification_recorded"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": true
+      },
+      {
+        "name": "cancel_during_planning",
+        "from_phase": "PLANNING",
+        "to_phase": "CLOSED",
+        "preconditions": [
+          "cancellation_reason_provided"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "enter_monitoring",
+        "from_phase": "EXECUTION",
+        "to_phase": "MONITORING",
+        "preconditions": [],
+        "required_gate": null,
+        "approval_required": false,
+        "evidence_required": false,
+        "is_rollback": false
+      },
+      {
+        "name": "replanning_from_execution",
+        "from_phase": "EXECUTION",
+        "to_phase": "PLANNING",
+        "preconditions": [
+          "replanning_justification_recorded"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": true
+      },
+      {
+        "name": "begin_closing",
+        "from_phase": "EXECUTION",
+        "to_phase": "CLOSING",
+        "preconditions": [
+          "all_tasks_terminal",
+          "no_blocking_issues"
+        ],
+        "required_gate": "dod_execution_to_closing",
+        "approval_required": false,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "abort_execution",
+        "from_phase": "EXECUTION",
+        "to_phase": "CLOSED",
+        "preconditions": [
+          "termination_reason_recorded"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "resume_active_execution",
+        "from_phase": "MONITORING",
+        "to_phase": "EXECUTION",
+        "preconditions": [],
+        "required_gate": null,
+        "approval_required": false,
+        "evidence_required": false,
+        "is_rollback": false
+      },
+      {
+        "name": "replanning_from_monitoring",
+        "from_phase": "MONITORING",
+        "to_phase": "PLANNING",
+        "preconditions": [
+          "replanning_justification_recorded"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": true
+      },
+      {
+        "name": "conclude_from_monitoring",
+        "from_phase": "MONITORING",
+        "to_phase": "CLOSING",
+        "preconditions": [
+          "all_tasks_terminal",
+          "no_blocking_issues"
+        ],
+        "required_gate": "dod_execution_to_closing",
+        "approval_required": false,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "terminate_from_monitoring",
+        "from_phase": "MONITORING",
+        "to_phase": "CLOSED",
+        "preconditions": [
+          "termination_reason_recorded"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "reject_closing_to_execution",
+        "from_phase": "CLOSING",
+        "to_phase": "EXECUTION",
+        "preconditions": [
+          "closing_failure_reason_recorded"
+        ],
+        "required_gate": null,
+        "approval_required": false,
+        "evidence_required": true,
+        "is_rollback": true
+      },
+      {
+        "name": "finalize_close",
+        "from_phase": "CLOSING",
+        "to_phase": "CLOSED",
+        "preconditions": [
+          "dod_passed_or_overridden",
+          "all_tasks_terminal",
+          "all_decisions_resolved",
+          "all_issues_resolved_or_waived"
+        ],
+        "required_gate": "dod_final_closing",
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": false
+      },
+      {
+        "name": "reopen_to_planning",
+        "from_phase": "CLOSED",
+        "to_phase": "PLANNING",
+        "preconditions": [
+          "reopen_justification_recorded",
+          "accountable_approval"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": true
+      },
+      {
+        "name": "reopen_to_execution",
+        "from_phase": "CLOSED",
+        "to_phase": "EXECUTION",
+        "preconditions": [
+          "reopen_justification_recorded",
+          "accountable_approval"
+        ],
+        "required_gate": null,
+        "approval_required": true,
+        "evidence_required": true,
+        "is_rollback": true
+      }
+    ]
+  },
+  "dor_rules": {
+    "require_initial_tasks": true,
+    "require_no_circular_dependencies": true,
+    "blocking_issue_severities": [
+      "blocker",
+      "critical"
+    ]
+  },
+  "dod_rules": {
+    "require_all_tasks_terminal": true,
+    "require_all_decisions_resolved": true,
+    "require_no_blocking_issues": true,
+    "require_canonical_completion_evidence": true,
+    "untrusted_model_statements_strictly_disallowed": true
+  },
+  "override_policy": {
+    "authorized_roles": [
+      "admin",
+      "architect",
+      "lead",
+      "accountable"
+    ],
+    "require_reason": true,
+    "require_evidence": true,
+    "allow_model_override": false
+  },
+  "health_rules": {
+    "BLOCKING_ISSUES_PRESENT": {
+      "condition": "open_issues contains severity in [blocker, critical]",
+      "severity": "CRITICAL"
+    },
+    "HIGH_RISKS_OPEN": {
+      "condition": "open_risks contains impact in [critical, high] with status == identified",
+      "severity": "HIGH"
+    },
+    "CIRCULAR_DEPENDENCY_DETECTED": {
+      "condition": "directed cycle detected in task or project dependency graph",
+      "severity": "CRITICAL"
+    },
+    "BLOCKED_TASKS_PRESENT": {
+      "condition": "count(blocked_tasks) > 0",
+      "severity": "MEDIUM"
+    },
+    "UNRESOLVED_GOVERNANCE_REQUIREMENTS": {
+      "condition": "count(required_approvals) > 0",
+      "severity": "HIGH"
+    }
+  }
+}
