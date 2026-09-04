@@ -4,9 +4,15 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - dependencies
+    groups:
+      maintenance:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "huggingface-hub*"
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -15,3 +21,7 @@ updates:
     open-pull-requests-limit: 3
     labels:
       - dependencies
+    groups:
+      actions:
+        patterns:
+          - "*"

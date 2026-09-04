@@ -8,7 +8,7 @@
 - **Local Correction Commits:** `9c27abc`, `6f0a26c`
 - **Date:** 2026-09-04
 - **Signer / Committer:** `weby-homelab <rekvizitor.ua@gmail.com>` (GPG Key: `2D49E810C7F2527E`, verified: true)
-- **Status:** Local P0 validation PASS; exact-head remote closure pending
+- **Status:** CLOSED / FROZEN (PR #388 MERGED, final main commit: `d14a851e459eb5166d25df5764c3304bcd8c30e2`)
 
 ---
 
@@ -149,11 +149,14 @@ Static analysis and linting:
 
 ---
 
-## 6. Remote GitHub Actions CI & CodeQL Triage
+## 6. Remote GitHub Actions CI, CodeQL & Final Remote Closure Truth
 
-The earlier CI and CodeQL receipts for `f898236ebdaf2f6eb6c7275e6c333ba536dbeafd` are historical and do not validate this correction. The correction was committed locally as `9c27abc` plus the input-snapshot follow-up `6f0a26c`; exact-head remote CI/CodeQL readback is still required before final PR closure.
+PR #388 has been successfully merged into `main` after passing all mandatory verification gates and reviews. Phase 3 is officially **CLOSED / FROZEN**.
 
-The current session could not publish the branch or obtain new exact-head checks because the configured GitHub authentication was rejected. No remote success is claimed here.
+- **PR Branch Head:** `6d4c88568ef3a9d0205ac17c2df42ef8c77ec2ec` (`feat/power-3.8-project-state-engine`)
+- **Squash Merge Commit:** `d14a851e459eb5166d25df5764c3304bcd8c30e2`
+- **Exact-Head CI & CodeQL:** All 11 required checks passed on GitHub Actions (Python 3.13/3.14, security, package smoke, upgrade matrix, CodeQL, build).
+- **Post-Merge Main Identity:** `d14a851e459eb5166d25df5764c3304bcd8c30e2` (verified and in sync with `origin/main`).
 
 ### CodeQL Findings Triage & Resolution Table:
 | Finding ID | Location | Description | Triage & Resolution Status |

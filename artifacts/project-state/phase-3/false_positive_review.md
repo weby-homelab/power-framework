@@ -22,16 +22,20 @@ $$\text{False Verified Rate} = \frac{\text{False Positive Verified Entities}}{\t
 
 ## 2. Empirical Benchmark Results
 
-Evaluated against the checked-in dataset (`tests/fixtures/semantic_eval_dataset.json`, 13 samples, 9 entity types):
+Evaluated against the checked-in dataset (`tests/fixtures/semantic_eval_dataset.json`, version **1.1.0**, **17 samples**, covering all 9 entity types with non-zero support):
 
 | Metric | Measured Value | Release Gate Requirement | Status |
 | :--- | :--- | :--- | :--- |
-| **False Verified Rate** | **0.00%** (0 / 7) | $\le 0.00\%$ (Zero-Tolerance) | **PASSED** |
-| **Duplicate Rate** | **0.00%** (0 / 13) | $\le 5.00\%$ | **PASSED** |
-| **Contradiction Detection Rate** | **100.00%** (3 / 3) | $\ge 90.00\%$ | **PASSED** |
-| **Prompt Injection Defense Rate** | **100.00%** (1 / 1) | $100.00\%$ | **PASSED** |
-| **Average Precision across Entities** | **100.00%** | $\ge 95.00\%$ | **PASSED** |
-| **Average Recall across Entities** | **100.00%** | $\ge 90.00\%$ | **PASSED** |
+| **False Verified Rate** | **0.00%** (`false_verified_candidates = 0`, zero-denominator semantics*) | $\le 0.00\%$ (Zero-Tolerance) | **PASSED** |
+| **Duplicate Rate** | **0.00%** (0 / 17 raw candidates) | $\le 5.00\%$ | **PASSED** |
+| **Contradiction Detection Rate** | **100.00%** (3 / 3 detected) | $\ge 90.00\%$ | **PASSED** |
+| **Prompt Injection Defense Rate** | **100.00%** (2 / 2 stopped) | $100.00\%$ | **PASSED** |
+| **Macro Precision across 9 Entity Types** | **100.00%** (all 9 types non-zero support) | $\ge 95.00\%$ | **PASSED** |
+| **Macro Recall across 9 Entity Types** | **100.00%** (all 9 types non-zero support) | $\ge 90.00\%$ | **PASSED** |
+
+> \* **Zero-Denominator Semantics & Positive-Control Reference:**  
+> In evaluation dataset v1.1.0, all samples originate from untrusted sources (model extractions and unverified input text), yielding `total_verified_candidates = 0` by design (satisfying invariant G3.2). Rather than assuming a synthetic non-zero denominator (such as the legacy historical "0 / 7"), the metric is reported as `false_verified_candidates = 0` with an authoritative `false_verified_rate = 0.00%`.  
+> Authoritative `VERIFIED` candidate production is independently validated by canonical-ledger positive-control tests (`tests/test_phase3_semantic_compiler.py::test_replaying_canonical_events_produces_verified_entities` and `test_replay_receipt_integrity_and_authority`), proving that authentic ledger-backed events re-read under a canonical vault root reach authoritative `verification_status="verified"`.
 
 ---
 

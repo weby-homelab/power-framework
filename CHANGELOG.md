@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- **Project State Engine (PSE) Phase 1 Domain Contracts:** Defined `power.project-event.v1` and `semantic-entity-schema-v1.json` schemas, canonical 44-event taxonomy, and 9 core semantic entity types (`Fact`, `DecisionReference`, `Assumption`, `Hypothesis`, `Risk`, `Issue`, `Dependency`, `Observation`, `Lesson`).
+- **PSE Phase 2 Cryptographic Event Ledger:** Append-only SQLite event ledger with WAL mode, SHA-256 event hash chain, monotonic sequence enforcement, strict single-tenant batch validation, and fail-closed transaction guarantees.
+- **PSE Phase 3 Project Semantic Compiler:** Deterministic 44-event dispatch registry, zero-false-verification epistemic invariant constraining model extractions to `proposed`/`unverified`, prompt injection scanning with passive delimiters, regex secret scrubbing, and 5-class contradiction taxonomy.
+- **Authoritative Replay Boundary:** Enforced canonical-ledger verification boundary where only authentic, ordered event streams re-read under a canonical vault root can achieve authoritative `VERIFIED` entity status; untrusted, in-memory, or forged receipt inputs unconditionally fail closed.
 
 ## [3.7.11] - 2026-09-02
 
