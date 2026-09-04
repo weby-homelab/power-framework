@@ -45,6 +45,8 @@ from power_framework.core.project_models import (
     LedgerIntegrityError,
     LedgerVerificationResult,
     ProjectEvent,
+    TrustedReplayReceipt,
+    VerifiedReplayBatch,
     generate_deterministic_event_id,
     validate_project_id,
 )
@@ -492,6 +494,26 @@ class ProjectEventStore:
                     if event.sequence >= from_sequence:
                         yield event
 
+    def read_verified_replay(self, from_sequence: int = 1) -> VerifiedReplayBatch:
+        """Read and verify events from the authoritative Phase-2 ledger, returning a verified replay batch."""
+        res = self.verify()
+        if not res.valid:
+            raise LedgerIntegrityError(f"Ledger verification failed: {res.errors}")
+        events = list(self.replay(from_sequence=from_sequence))
+        head_hash = events[-1].event_hash if events else ""
+        to_seq = events[-1].sequence if events else from_sequence
+        receipt = TrustedReplayReceipt(
+            project_id=self.project_id,
+            ledger_path=str(self.active_events_file.resolve()),
+            from_sequence=from_sequence,
+            to_sequence=max(to_seq, from_sequence),
+            event_count=len(events),
+            head_event_hash=head_hash,
+            verified=True,
+            replayed_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        )
+        return VerifiedReplayBatch(receipt=receipt, events=events)
+
     def verify(self) -> LedgerVerificationResult:
         """Verify the full cryptographic hash chain and schema compliance across all event files."""
         errors: list[str] = []
@@ -685,3 +707,13 @@ def replay_events(
     """Convenience generator to replay events from a project ledger."""
     store = ProjectEventStore(project_id, vault_root)
     yield from store.replay(from_sequence=from_sequence)
+
+
+def replay_verified_events(
+    project_id: str,
+    vault_root: Path,
+    from_sequence: int = 1,
+) -> VerifiedReplayBatch:
+    """Convenience function to read and verify events from an authoritative project ledger."""
+    store = ProjectEventStore(project_id, vault_root)
+    return store.read_verified_replay(from_sequence=from_sequence)

@@ -47,6 +47,7 @@ from power_framework.core.project_models import (
     PrivacyMode,
     ProjectEvent,
     RedactionRecord,
+    VerifiedReplayBatch,
     generate_deterministic_event_id,
     validate_event_id,
     validate_project_id,
@@ -57,6 +58,7 @@ from power_framework.core.project_store import (
     get_projects_dir,
     recover_torn_tail,
     replay_events,
+    replay_verified_events,
     validate_vault_root,
     verify_event_ledger,
 )
@@ -604,6 +606,15 @@ def replay_project(
 ) -> Iterator[ProjectEvent]:
     """Replay project events in deterministic sequence."""
     yield from replay_events(project_id, vault_root, from_sequence=from_sequence)
+
+
+def replay_project_verified(
+    vault_root: Path,
+    project_id: str,
+    from_sequence: int = 1,
+) -> VerifiedReplayBatch:
+    """Read and verify project events from the authoritative Phase-2 ledger."""
+    return replay_verified_events(project_id, vault_root, from_sequence=from_sequence)
 
 
 # ---------------------------------------------------------------------------

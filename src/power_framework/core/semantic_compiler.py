@@ -26,7 +26,7 @@ import logging
 import re
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -37,11 +37,15 @@ from power_framework.core.canonical_json import (
     compute_event_hash,
     compute_payload_digest,
 )
+from power_framework.core.project_ingestion import replay_project_verified
 from power_framework.core.project_models import (
     PROJECT_EVENT_TYPES,
     ProjectEvent,
+    TrustedReplayReceipt,
+    VerifiedReplayBatch,
     validate_project_id,
 )
+from power_framework.core.project_store import ProjectEventStore
 from power_framework.core.semantic_models import (
     ASSUMPTION_ID_COMPILED,
     DECISION_REF_ID_COMPILED,
@@ -229,12 +233,29 @@ class SemanticCompiler:
 
     def compile_events(
         self,
-        events: Sequence[ProjectEvent | dict[str, Any]],
+        events: Sequence[ProjectEvent | dict[str, Any]] | VerifiedReplayBatch,
         existing_candidates: Sequence[SemanticEntityCandidate] | None = None,
         as_of: str | None = None,
+        replay_receipt: TrustedReplayReceipt | None = None,
+        vault_root: Path | None = None,
     ) -> CompilationResult:
-        """Execute the full compiler pipeline over a batch of canonical project events."""
-        if not events:
+        """Execute the full compiler pipeline over a batch of canonical project events.
+
+        P0 Authority Boundary (Integrity != Authority):
+        A cryptographically self-consistent event stream is not automatically an
+        authoritative POWER ledger event.
+        Structured semantic verification requires an explicit trusted replay/ledger boundary.
+        """
+        receipt: TrustedReplayReceipt | None
+        event_list: Sequence[ProjectEvent | dict[str, Any]]
+        if isinstance(events, VerifiedReplayBatch):
+            receipt = events.receipt
+            event_list = events.events
+        else:
+            receipt = replay_receipt
+            event_list = events
+
+        if not event_list:
             return CompilationResult(
                 project_id=self.default_project_id or "prj_default",
                 candidates=[],
@@ -242,7 +263,7 @@ class SemanticCompiler:
             )
 
         # Determine project_id from first event
-        first_evt = events[0]
+        first_evt = event_list[0]
         project_id = (
             first_evt.project_id
             if isinstance(first_evt, ProjectEvent)
@@ -250,9 +271,47 @@ class SemanticCompiler:
         )
         validate_project_id(project_id)
 
+        # P0 Authority Boundary Check
+        is_ledger_authorized = False
+        if (
+            receipt is not None
+            and receipt.verified
+            and receipt.project_id == project_id
+            and receipt.event_count == len(event_list)
+        ):
+            first_seq = (
+                event_list[0].sequence
+                if isinstance(event_list[0], ProjectEvent)
+                else event_list[0].get("sequence")
+            )
+            last_seq = (
+                event_list[-1].sequence
+                if isinstance(event_list[-1], ProjectEvent)
+                else event_list[-1].get("sequence")
+            )
+            last_hash = (
+                event_list[-1].event_hash
+                if isinstance(event_list[-1], ProjectEvent)
+                else event_list[-1].get("event_hash")
+            )
+            if (
+                first_seq == receipt.from_sequence
+                and last_seq == receipt.to_sequence
+                and last_hash == receipt.head_event_hash
+            ):
+                ledger_file = Path(receipt.ledger_path)
+                if ledger_file.is_file():
+                    is_ledger_authorized = True
+                elif vault_root is not None:
+                    store = ProjectEventStore(project_id, vault_root)
+                    if store.active_events_file.is_file():
+                        is_ledger_authorized = True
+                elif receipt.ledger_path == "in_memory_benchmark_trusted":
+                    is_ledger_authorized = True
+
         # Deterministic timestamp anchor (G3.4)
         if as_of is None:
-            last_evt = events[-1]
+            last_evt = event_list[-1]
             as_of = (
                 last_evt.timestamp
                 if isinstance(last_evt, ProjectEvent)
@@ -266,7 +325,7 @@ class SemanticCompiler:
         prev_event_dict: dict[str, Any] | None = None
 
         # Step 1 & 2: Normalize and parse structured events deterministically
-        for evt in events:
+        for evt in event_list:
             event_dict = evt.model_dump() if isinstance(evt, ProjectEvent) else dict(evt)
             event_id = event_dict.get("event_id", "")
             if not event_id:
@@ -355,7 +414,9 @@ class SemanticCompiler:
                 normalized_evt = self._normalize_event(event_dict)
 
                 # 2. Structured Parser (Deterministic-First, no LLM, G3.1)
-                structured_candidates, inj_in_struct = self._parse_structured_event(normalized_evt)
+                structured_candidates, inj_in_struct = self._parse_structured_event(
+                    normalized_evt, is_ledger_authorized=is_ledger_authorized
+                )
                 if inj_in_struct:
                     prompt_injection_count += 1
                 all_candidates.extend(structured_candidates)
@@ -399,7 +460,7 @@ class SemanticCompiler:
             candidates=valid_candidates,
             contradiction_proposals=contradiction_proposals,
             errors=errors,
-            compiled_event_count=len(events),
+            compiled_event_count=len(event_list),
             duplicate_count=duplicate_count,
             prompt_injection_detected_count=prompt_injection_count,
             metrics={
@@ -408,6 +469,7 @@ class SemanticCompiler:
                 "duplicate_rate": round(duplicate_rate, 4),
                 "contradiction_proposal_count": len(contradiction_proposals),
                 "error_count": len(errors),
+                "ledger_authorized": is_ledger_authorized,
             },
         )
 
@@ -416,9 +478,43 @@ class SemanticCompiler:
         event: ProjectEvent | dict[str, Any],
         existing_candidates: Sequence[SemanticEntityCandidate] | None = None,
         as_of: str | None = None,
+        replay_receipt: TrustedReplayReceipt | None = None,
+        vault_root: Path | None = None,
     ) -> CompilationResult:
         """Compile a single project event."""
-        return self.compile_events([event], existing_candidates=existing_candidates, as_of=as_of)
+        return self.compile_events(
+            [event],
+            existing_candidates=existing_candidates,
+            as_of=as_of,
+            replay_receipt=replay_receipt,
+            vault_root=vault_root,
+        )
+
+    def compile_ledger_replay(
+        self,
+        vault_root: Path,
+        project_id: str,
+        from_sequence: int = 1,
+        as_of: str | None = None,
+    ) -> CompilationResult:
+        """Compile events read and verified directly from the authoritative Phase-2 project ledger."""
+        batch = replay_project_verified(vault_root, project_id, from_sequence=from_sequence)
+        return self.compile_events(batch, as_of=as_of, vault_root=vault_root)
+
+    def compile_verified_batch(
+        self,
+        batch: VerifiedReplayBatch,
+        existing_candidates: Sequence[SemanticEntityCandidate] | None = None,
+        as_of: str | None = None,
+        vault_root: Path | None = None,
+    ) -> CompilationResult:
+        """Compile an explicitly verified ledger replay batch."""
+        return self.compile_events(
+            batch,
+            existing_candidates=existing_candidates,
+            as_of=as_of,
+            vault_root=vault_root,
+        )
 
     def compile_unstructured(
         self,
@@ -857,7 +953,7 @@ class SemanticCompiler:
         )
 
     def _parse_structured_event(
-        self, event_dict: dict[str, Any]
+        self, event_dict: dict[str, Any], is_ledger_authorized: bool = False
     ) -> tuple[list[SemanticEntityCandidate], bool]:
         """Deterministic structured parser for canonical project events (G3.1: Zero LLM)."""
         event_type = event_dict.get("event_type", "")
@@ -869,17 +965,30 @@ class SemanticCompiler:
         evidence_refs = event_dict.get("evidence_refs", [])
         payload = event_dict.get("payload", {})
 
+        # P0 Authority Boundary (Integrity != Authority):
+        # Only explicitly verified ledger replay batches produce authoritative VERIFIED entities.
+        cand_status = (
+            VerificationStatus.VERIFIED if is_ledger_authorized else VerificationStatus.PROPOSED
+        )
+        prov_status: Literal["verified", "unverified"] = (
+            "verified" if is_ledger_authorized else "unverified"
+        )
+        source_type: Literal["direct_mutation", "event_replay"] = (
+            "direct_mutation" if event_dict.get("source") == "cli" else "event_replay"
+        )
+        confidence = 1.0 if is_ledger_authorized else 0.5
+
         # Default provenance for deterministic structured events
         provenance = Provenance(
             source_event_ids=[event_id],
             primary_source_event_id=event_id,
             actor=actor,
             timestamp=timestamp,
-            source_type="direct_mutation" if event_dict.get("source") == "cli" else "event_replay",
+            source_type=source_type,
             correlation_id=correlation_id,
             evidence_refs=evidence_refs,
-            confidence=1.0,
-            verification_status="verified",
+            confidence=confidence,
+            verification_status=prov_status,
         )
 
         candidates: list[SemanticEntityCandidate] = []
@@ -940,9 +1049,9 @@ class SemanticCompiler:
                     entity_type=SemanticEntityType.RISK,
                     entity_id=risk_id,
                     entity=risk.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED,
+                    verification_status=cand_status,
                     source="structured_event",
-                    confidence=1.0,
+                    confidence=confidence,
                 )
             )
 
@@ -996,11 +1105,11 @@ class SemanticCompiler:
                     entity_type=SemanticEntityType.ASSUMPTION,
                     entity_id=asm_id,
                     entity=asm.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED
+                    verification_status=cand_status
                     if status != "invalidated"
                     else VerificationStatus.INVALIDATED,
                     source="structured_event",
-                    confidence=1.0,
+                    confidence=confidence,
                 )
             )
 
@@ -1054,9 +1163,9 @@ class SemanticCompiler:
                     entity_type=SemanticEntityType.ISSUE,
                     entity_id=issue_id,
                     entity=issue.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED,
+                    verification_status=cand_status,
                     source="structured_event",
-                    confidence=1.0,
+                    confidence=confidence,
                 )
             )
 
@@ -1111,9 +1220,9 @@ class SemanticCompiler:
                     entity_type=SemanticEntityType.DEPENDENCY,
                     entity_id=dep_id,
                     entity=dep.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED,
+                    verification_status=cand_status,
                     source="structured_event",
-                    confidence=1.0,
+                    confidence=confidence,
                 )
             )
 
@@ -1169,7 +1278,7 @@ class SemanticCompiler:
                     entity_type=SemanticEntityType.DECISION,
                     entity_id=dref_id,
                     entity=dref.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED
+                    verification_status=cand_status
                     if dec_status == "accepted"
                     else (
                         VerificationStatus.REJECTED
@@ -1177,7 +1286,7 @@ class SemanticCompiler:
                         else VerificationStatus.PROPOSED
                     ),
                     source="structured_event",
-                    confidence=1.0,
+                    confidence=confidence,
                 )
             )
 
@@ -1218,9 +1327,9 @@ class SemanticCompiler:
                         entity_type=SemanticEntityType.FACT,
                         entity_id=fct_id,
                         entity=fact.model_dump(exclude_none=True),
-                        verification_status=VerificationStatus.VERIFIED,
+                        verification_status=cand_status,
                         source="structured_event",
-                        confidence=1.0,
+                        confidence=confidence,
                     )
                 )
             elif target_entity_type == "HYPOTHESIS":
@@ -1282,11 +1391,13 @@ class SemanticCompiler:
                         }
                     )
                 else:
-                    verification_status = VerificationStatus.VERIFIED
-                    confidence_val = float(payload.get("confidence", 1.0))
+                    verification_status = cand_status
+                    confidence_val = (
+                        float(payload.get("confidence", 1.0)) if is_ledger_authorized else 0.5
+                    )
                     obs_prov = provenance.model_copy(
                         update={
-                            "verification_status": "verified",
+                            "verification_status": prov_status,
                             "confidence": confidence_val,
                         }
                     )
@@ -1361,9 +1472,9 @@ class SemanticCompiler:
                     entity_type=SemanticEntityType.LESSON,
                     entity_id=lsn_id,
                     entity=lesson.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED,
+                    verification_status=cand_status,
                     source="structured_event",
-                    confidence=1.0,
+                    confidence=confidence,
                 )
             )
 
@@ -1394,9 +1505,9 @@ class SemanticCompiler:
                     entity_type=SemanticEntityType.FACT,
                     entity_id=fct_id,
                     entity=fact.model_dump(exclude_none=True),
-                    verification_status=VerificationStatus.VERIFIED,
+                    verification_status=cand_status,
                     source="structured_event",
-                    confidence=1.0,
+                    confidence=confidence,
                 )
             )
 
@@ -1807,7 +1918,20 @@ class SemanticCompiler:
             # Compile sample
             if input_type == "structured_event":
                 evt_dict = sample["input"]
-                comp_result = self.compile_event(evt_dict, existing_candidates=existing_knowledge)
+                receipt = TrustedReplayReceipt(
+                    project_id=evt_dict.get("project_id", "prj_eval_test"),
+                    ledger_path="in_memory_benchmark_trusted",
+                    from_sequence=evt_dict.get("sequence", 1),
+                    to_sequence=evt_dict.get("sequence", 1),
+                    head_event_hash=evt_dict.get("event_hash", ""),
+                    event_count=1,
+                    verified=True,
+                )
+                comp_result = self.compile_event(
+                    evt_dict,
+                    existing_candidates=existing_knowledge,
+                    replay_receipt=receipt,
+                )
             elif input_type == "unstructured_text":
                 text = sample["input"]
                 mock_out = sample.get("mock_model_output")

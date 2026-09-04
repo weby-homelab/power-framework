@@ -54,7 +54,8 @@ The following architectural and security closures were implemented and verified 
 3. **P0 Prompt Injection Containment for Structured Observations:**
    - Both `content` and `context` fields in structured `observation.recorded` are evaluated against prompt injection heuristics. Detected injections are quarantined (`PROPOSED`, `confidence=0.0`, provenance status `quarantined`, 0 parallel verified candidates).
 4. **G3.1 Deterministic 44-Event Classification Registry:**
-   - Implementation of `EventSemanticDisposition` and `PROJECT_EVENT_DISPATCH_REGISTRY` covering all 44 canonical events (`Category A: DIRECT_DOMAIN_KNOWLEDGE` (17), `Category B: RELATIONSHIP_SAGA` (5), `Category C: LIFECYCLE_METADATA_NOOP` (22), `Category D: REJECTED`).
+   - Implementation of `EventSemanticDisposition` and `PROJECT_EVENT_DISPATCH_REGISTRY` covering all 44 canonical events (`Category A: A_SEMANTIC_ENTITY` (21), `Category B: B_RELATIONSHIP_PROPOSAL` (5), `Category C: C_LIFECYCLE_METADATA_NOOP` (18), `Category D: D_EXPLICITLY_REJECTED` (0)).
+   - Fully synchronized with Phase 1 event taxonomy and protected against documentation drift by regression test `test_a2_taxonomy_registry_contract_synchronization`.
    - Verified with invariant `assert set(PROJECT_EVENT_DISPATCH_REGISTRY.keys()) == PROJECT_EVENT_TYPES`.
 5. **G3.2 / G3.4 Zero Model Identity Control & Model Candidate Invariant:**
    - The compiler unconditionally discards provider-supplied `entity_id` values, enforcing deterministic hash IDs.
@@ -68,6 +69,11 @@ The following architectural and security closures were implemented and verified 
    - Evaluation harness reports explicit per-type support counts (`expected_count`, `predicted_count`, `tp`, `fp`, `fn`), returns `None` on zero-support to avoid misleading scores, and excludes zero-support types from macro averages.
 9. **CodeQL Review Findings Resolved:**
    - Cleaned up protocols, renamed regex constants to public `..._COMPILED`, exported in `__all__`, and guaranteed safe `os.close(fd)` cleanup in `try/finally` blocks.
+10. **P0 Authority Boundary (Integrity $\neq$ Authority):**
+    - Established strict boundary separating cryptographic integrity from ledger authority.
+    - Arbitrary in-memory event streams (even cryptographically continuous and valid) cannot self-certify authority and produce **0 VERIFIED candidates** (all candidates receive `PROPOSED`, `provenance.verification_status="unverified"`, `confidence <= 0.5`).
+    - Authoritative `VERIFIED` status requires explicit Phase-2 ledger replay via `VerifiedReplayBatch`, `TrustedReplayReceipt`, or `compile_ledger_replay()`.
+    - Protected by mandatory regression test `test_a1_untrusted_event_stream_cannot_produce_verified_candidates`.
 
 ---
 
@@ -121,7 +127,7 @@ Phase 3 compiler specific suite:
 ```bash
 .venv/bin/pytest --no-cov -v tests/test_phase3_semantic_compiler.py
 ```
-**Result: 17 passed in 0.84s (100% PASS)**
+**Result: 19 passed in 1.09s (100% PASS)**
 
 Full repository regression test suite:
 ```bash

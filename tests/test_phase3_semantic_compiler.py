@@ -25,9 +25,12 @@ from power_framework.core.canonical_json import (
 )
 from power_framework.core.project_models import (
     PROJECT_EVENT_TYPES,
+    AppendCommand,
 )
+from power_framework.core.project_store import ProjectEventStore
 from power_framework.core.semantic_compiler import (
     PROJECT_EVENT_DISPATCH_REGISTRY,
+    EventSemanticDisposition,
     SemanticCompiler,
 )
 from power_framework.core.semantic_models import (
@@ -1072,3 +1075,213 @@ def test_g3_4_temporal_replay_determinism() -> None:
     res2 = compiler.compile_events(events, as_of=fixed_as_of)
 
     assert res1.model_dump() == res2.model_dump()
+
+
+def test_a1_untrusted_event_stream_cannot_produce_verified_candidates(
+    tmp_path: Path, semantic_schema: dict[str, Any]
+) -> None:
+    """P0 Authority Boundary (Integrity != Authority):
+
+    Arbitrary in-memory event streams (even cryptographically valid and continuous)
+    MUST NOT produce authoritative VERIFIED candidates (0 VERIFIED candidates).
+    Authoritative verification requires explicit Phase-2 ledger replay.
+    """
+    project_id = "prj_power_3_8"
+    compiler = SemanticCompiler(model_provider=ExplodingMockModelProvider())
+
+    raw_events: list[dict[str, Any]] = [
+        {
+            "event_id": "evt_a1_risk_01",
+            "schema_version": "power.project-event.v1",
+            "project_id": project_id,
+            "sequence": 1,
+            "timestamp": "2026-09-04T05:00:00Z",
+            "actor": "user:rekvizitor",
+            "source": "cli",
+            "event_type": "risk.opened",
+            "payload": {
+                "title": "Untrusted in-memory injection risk",
+                "probability": "medium",
+                "impact": "critical",
+                "owner": "agent:ws",
+            },
+        },
+        {
+            "event_id": "evt_a1_asm_02",
+            "schema_version": "power.project-event.v1",
+            "project_id": project_id,
+            "sequence": 2,
+            "timestamp": "2026-09-04T05:01:00Z",
+            "actor": "user:rekvizitor",
+            "source": "cli",
+            "event_type": "assumption.created",
+            "payload": {
+                "statement": "Integrity does not equal authority boundary",
+                "confidence": 0.9,
+            },
+        },
+    ]
+
+    signed_events: list[dict[str, Any]] = []
+    prev_h = ""
+    for raw in raw_events:
+        signed = sign_event(raw, prev_event_hash=prev_h)
+        signed_events.append(signed)
+        prev_h = signed["event_hash"]
+
+    # 1. Untrusted in-memory compilation without replay receipt
+    res_untrusted = compiler.compile_events(signed_events)
+    assert res_untrusted.compiled_event_count == 2
+    assert len(res_untrusted.candidates) == 2
+    assert res_untrusted.metrics["ledger_authorized"] is False
+
+    # P0 INVARIANT: Zero VERIFIED candidates from untrusted stream
+    verified_candidates = [
+        c for c in res_untrusted.candidates if c.verification_status == VerificationStatus.VERIFIED
+    ]
+    assert len(verified_candidates) == 0
+
+    for cand in res_untrusted.candidates:
+        assert cand.verification_status == VerificationStatus.PROPOSED
+        assert cand.entity["provenance"]["verification_status"] == "unverified"
+        assert cand.entity["provenance"]["confidence"] <= 0.5
+        assert cand.confidence <= 0.5
+
+    # 2. Authoritative Phase-2 ledger write and replay
+    store = ProjectEventStore(project_id, tmp_path)
+    cmd1 = AppendCommand(
+        project_id=project_id,
+        event_type=raw_events[0]["event_type"],
+        actor=raw_events[0]["actor"],
+        source=raw_events[0]["source"],
+        session_id="ses_auth_test_01",
+        payload=raw_events[0]["payload"],
+    )
+    cmd2 = AppendCommand(
+        project_id=project_id,
+        event_type=raw_events[1]["event_type"],
+        actor=raw_events[1]["actor"],
+        source=raw_events[1]["source"],
+        session_id="ses_auth_test_01",
+        payload=raw_events[1]["payload"],
+    )
+    store.append(cmd1)
+    store.append(cmd2)
+
+    # Compile via explicit compile_ledger_replay
+    res_verified = compiler.compile_ledger_replay(tmp_path, project_id)
+    assert res_verified.compiled_event_count == 2
+    assert len(res_verified.candidates) == 2
+    assert res_verified.metrics["ledger_authorized"] is True
+
+    # P0 INVARIANT: Authoritative ledger replay yields VERIFIED candidates
+    verified_ledger_candidates = [
+        c for c in res_verified.candidates if c.verification_status == VerificationStatus.VERIFIED
+    ]
+    assert len(verified_ledger_candidates) == 2
+    for cand in verified_ledger_candidates:
+        assert cand.entity["provenance"]["verification_status"] == "verified"
+        assert cand.entity["provenance"]["confidence"] == 1.0
+        assert cand.confidence == 1.0
+        schema_name = "Risk" if cand.entity_type == SemanticEntityType.RISK else "Assumption"
+        validate_against_schema(cand.entity, schema_name, semantic_schema)
+
+    # Determinism across multiple replay passes
+    res_verified_replay = compiler.compile_ledger_replay(tmp_path, project_id)
+    assert res_verified.model_dump() == res_verified_replay.model_dump()
+
+
+def test_a2_taxonomy_registry_contract_synchronization() -> None:
+    """Verify exact 44-event taxonomy alignment between runtime registry and Phase 1 contract.
+
+    Category counts:
+    - 21 Category A (semantic_entity)
+    - 5 Category B (relationship_proposal)
+    - 18 Category C (lifecycle_metadata_noop)
+    - 0 Category D (explicitly_rejected)
+    Total: 44 events
+    """
+    assert len(PROJECT_EVENT_DISPATCH_REGISTRY) == 44
+    assert set(PROJECT_EVENT_DISPATCH_REGISTRY.keys()) == PROJECT_EVENT_TYPES
+
+    category_a = {
+        k: v
+        for k, v in PROJECT_EVENT_DISPATCH_REGISTRY.items()
+        if v == EventSemanticDisposition.A_SEMANTIC_ENTITY
+    }
+    category_b = {
+        k: v
+        for k, v in PROJECT_EVENT_DISPATCH_REGISTRY.items()
+        if v == EventSemanticDisposition.B_RELATIONSHIP_PROPOSAL
+    }
+    category_c = {
+        k: v
+        for k, v in PROJECT_EVENT_DISPATCH_REGISTRY.items()
+        if v == EventSemanticDisposition.C_LIFECYCLE_METADATA_NOOP
+    }
+    category_d = {
+        k: v
+        for k, v in PROJECT_EVENT_DISPATCH_REGISTRY.items()
+        if v == EventSemanticDisposition.D_EXPLICITLY_REJECTED
+    }
+
+    assert len(category_a) == 21, f"Expected 21 Category A events, got {len(category_a)}"
+    assert len(category_b) == 5, f"Expected 5 Category B events, got {len(category_b)}"
+    assert len(category_c) == 18, f"Expected 18 Category C events, got {len(category_c)}"
+    assert len(category_d) == 0, f"Expected 0 Category D events, got {len(category_d)}"
+
+    expected_cat_a = {
+        "risk.opened",
+        "risk.updated",
+        "risk.closed",
+        "assumption.created",
+        "assumption.updated",
+        "assumption.invalidated",
+        "assumption.confirmed",
+        "issue.opened",
+        "issue.updated",
+        "issue.resolved",
+        "issue.closed",
+        "dependency.created",
+        "dependency.updated",
+        "dependency.resolved",
+        "decision.associated",
+        "decision.association.requested",
+        "decision.disassociated",
+        "decision.association.failed",
+        "decision.lifecycle.observed",
+        "observation.recorded",
+        "lesson.recorded",
+    }
+    assert set(category_a.keys()) == expected_cat_a
+
+    expected_cat_b = {
+        "task.associated",
+        "task.association.requested",
+        "task.disassociated",
+        "task.association.failed",
+        "task.lifecycle.observed",
+    }
+    assert set(category_b.keys()) == expected_cat_b
+
+    expected_cat_c = {
+        "project.created",
+        "project.updated",
+        "project.phase.proposed",
+        "project.phase.changed",
+        "project.archived",
+        "project.reopened",
+        "project.renamed",
+        "project.relocated",
+        "session.started",
+        "session.ended",
+        "raci.assigned",
+        "raci.revoked",
+        "dor.evaluated",
+        "dod.evaluated",
+        "gate.overridden",
+        "artifact.created",
+        "artifact.updated",
+        "evidence.attached",
+    }
+    assert set(category_c.keys()) == expected_cat_c

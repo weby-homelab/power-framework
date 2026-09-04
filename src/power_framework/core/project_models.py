@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -263,6 +264,34 @@ class LedgerVerificationResult(BaseModel):
     last_sequence: int = Field(default=0, ge=0)
     last_event_hash: str = Field(default="")
     errors: list[str] = Field(default_factory=list)
+
+
+def _default_replayed_at() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class TrustedReplayReceipt(BaseModel):
+    """Authority receipt proving events were sourced from and verified by the canonical Phase 2 ledger."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = Field(..., pattern=PROJECT_ID_REGEX)
+    ledger_path: str = Field(..., min_length=1)
+    from_sequence: int = Field(default=1, ge=1)
+    to_sequence: int = Field(default=1, ge=1)
+    event_count: int = Field(default=0, ge=0)
+    head_event_hash: str = Field(default="", pattern=PREV_HASH_REGEX)
+    verified: bool = Field(default=True)
+    replayed_at: str = Field(default_factory=_default_replayed_at, pattern=TIMESTAMP_REGEX)
+
+
+class VerifiedReplayBatch(BaseModel):
+    """A batch of events read directly from an authoritative Phase-2 ledger with cryptographic verification."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    receipt: TrustedReplayReceipt
+    events: list[ProjectEvent]
 
 
 # ---------------------------------------------------------------------------

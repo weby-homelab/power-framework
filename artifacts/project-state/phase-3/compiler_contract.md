@@ -143,14 +143,14 @@ Before accepting any ledger event, the compiler enforces non-bypassable cryptogr
 
 ## 9. 44-Event Deterministic Classification Taxonomy (G3.1)
 
-All 44 canonical events in `PROJECT_EVENT_TYPES` map to deterministic dispositions:
+All 44 canonical events in `PROJECT_EVENT_TYPES` map to deterministic dispositions in `PROJECT_EVENT_DISPATCH_REGISTRY`:
 
-| Category | Disposition | Canonical Event Types | Semantic Compiler Action |
-| :--- | :--- | :--- | :--- |
-| **Category A** | `DIRECT_DOMAIN_KNOWLEDGE` (17) | `risk.opened`, `risk.updated`, `risk.mitigated`, `risk.retired`, `assumption.created`, `assumption.invalidated`, `assumption.confirmed`, `issue.opened`, `issue.updated`, `issue.resolved`, `dependency.created`, `dependency.broken`, `dependency.satisfied`, `decision.associated`, `decision.disassociated`, `decision.lifecycle.observed`, `lesson.recorded`, `observation.recorded` | Compiles into typed candidate entities (`Risk`, `Assumption`, `Issue`, `Dependency`, `DecisionReference`, `Observation`, `Lesson`, `Fact`, `Hypothesis`) with provenance |
-| **Category B** | `RELATIONSHIP_SAGA` (5) | `task.associated`, `task.disassociated`, `policy.associated`, `policy.disassociated`, `source.associated`, `source.disassociated` | Tracks semantic cross-references or relationship proposals; 0 standalone RAID entities |
-| **Category C** | `LIFECYCLE_METADATA_NOOP` (22) | `project.created`, `project.activated`, `project.completed`, `project.archived`, `project.reactivated`, `project.lifecycle.observed`, `project.policy.updated`, `project.metadata.updated`, `task.lifecycle.observed`, `evidence.recorded`, `dor.evaluated`, `dod.evaluated`, `checkpoint.created`, `ledger.rotated`, `session.started`, `session.ended`, `prompt.recorded`, `work_packet.migrated`, `reconciliation.started`, `reconciliation.succeeded`, `reconciliation.failed`, `reconciliation.skipped` | Validated at trust boundary; deterministic no-op in semantic compiler (0 candidates, 0 errors) |
-| **Category D** | `REJECTED` | Any unknown or deprecated event string | Strict validation rejection; error recorded, 0 candidates |
+| Category | Disposition | Count | Canonical Event Types | Semantic Compiler Action |
+| :--- | :--- | :--- | :--- | :--- |
+| **Category A** | `A_SEMANTIC_ENTITY` | 21 | `risk.opened`, `risk.updated`, `risk.closed`, `assumption.created`, `assumption.updated`, `assumption.invalidated`, `assumption.confirmed`, `issue.opened`, `issue.updated`, `issue.resolved`, `issue.closed`, `dependency.created`, `dependency.updated`, `dependency.resolved`, `decision.associated`, `decision.association.requested`, `decision.disassociated`, `decision.association.failed`, `decision.lifecycle.observed`, `observation.recorded`, `lesson.recorded` | Compiles deterministically into typed candidate entities (`Risk`, `Assumption`, `Issue`, `Dependency`, `DecisionReference`, `Observation`, `Lesson`, `Fact`, `Hypothesis`) with provenance |
+| **Category B** | `B_RELATIONSHIP_PROPOSAL` | 5 | `task.associated`, `task.association.requested`, `task.disassociated`, `task.association.failed`, `task.lifecycle.observed` | Evaluates relationship sagas and cross-subsystem task linkages; tracks state without duplicating canonical TaskStore state |
+| **Category C** | `C_LIFECYCLE_METADATA_NOOP` | 18 | `project.created`, `project.updated`, `project.renamed`, `project.relocated`, `project.phase.proposed`, `project.phase.changed`, `project.archived`, `project.reopened`, `session.started`, `session.ended`, `raci.assigned`, `raci.revoked`, `dor.evaluated`, `dod.evaluated`, `gate.overridden`, `artifact.created`, `artifact.updated`, `evidence.attached` | Validated at envelope trust boundary; deterministic no-op in semantic compiler (0 candidate entities, 0 errors) |
+| **Category D** | `D_EXPLICITLY_REJECTED` | 0 | Any unknown or non-canonical event string | Strict validation rejection; error recorded fail-closed, 0 candidates |
 
 ---
 
@@ -162,4 +162,24 @@ The semantic compiler never manufactures placeholder or synthetic domain values:
 3. **Candidate Model Invariant:** `SemanticEntityCandidate` validators unconditionally enforce `verification_status="proposed"` and provenance `verification_status="unverified"` whenever `source="model_extraction"`.
 4. **Mixed-Source Deduplication Priority:** When merging candidates with identical entity IDs, structured event fields hold absolute precedence over model-extracted fields. Model candidates can never overwrite domain fields or elevate verification status.
 5. **Temporal Replay Determinism:** Compiler pipeline avoids wall-clock `datetime.now()` calls; time anchors are derived deterministically from the canonical event timestamps (`as_of`).
+
+---
+
+## 11. P0 Authority Boundary: Cryptographic Integrity vs. Ledger Authority
+
+1. **Integrity $\neq$ Authority Invariant:**
+   - Cryptographic validity (valid `payload_digest`, valid `event_hash`, unbroken monotonic `sequence`, valid JSON schema) proves internal structural tamper-evidence, but does NOT grant ledger authority.
+   - An arbitrary in-memory event stream or raw event dictionary cannot self-attest to being part of the authoritative project ledger.
+2. **Authoritative Replay Boundary (`VerifiedReplayBatch` / `TrustedReplayReceipt`):**
+   - Authoritative `VERIFIED` semantic candidates are produced ONLY when events are replayed through the explicit Phase-2 ledger boundary (`ProjectEventStore.read_verified_replay()`, `replay_project_verified()`, or `SemanticCompiler.compile_ledger_replay()`).
+   - The ledger receipt proves:
+     - The event stream was read directly from `.power/projects/<project_id>/events.jsonl` under project file locking.
+     - Full ledger cryptographic verification succeeded without corruption or gaps.
+     - Exact sequence range (`from_sequence` to `to_sequence`), event count, and head event hash match the replayed batch.
+3. **Fail-Closed Unverified Fallback:**
+   - Any event stream passed without verified ledger receipt is treated as untrusted external observation:
+     - `candidates[i].verification_status = VerificationStatus.PROPOSED`
+     - `provenance.verification_status = "unverified"`
+     - `confidence <= 0.5`
+     - Total `VERIFIED` candidate count from untrusted streams is strictly **0**.
 
