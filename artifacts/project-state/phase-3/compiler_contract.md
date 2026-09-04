@@ -103,7 +103,7 @@ The compiler distinguishes exactly 5 classes of contradiction and supersession:
 1. **`conflicting_observation`**: Opposing direct observations regarding the same target subject.
 2. **`explicit_correction`**: An event or update explicitly referencing an entity with an `invalidates` or `invalidated_by` link.
 3. **`superseding_decision`**: An authoritative decision event that explicitly supersedes an existing decision reference (`supersedes: <id>`).
-4. **`stale_fact`**: A verified fact whose temporal validity period (`provenance.valid_to`) has expired relative to current wall-clock time.
+4. **`stale_fact`**: A verified fact whose temporal validity period (`provenance.valid_to`) has expired relative to the deterministic evaluation/replay temporal anchor (`as_of`). No authoritative PSE replay or compilation may depend on uncontrolled wall-clock time.
 5. **`unresolved_contradiction`**: Incompatible factual or assumption claims lacking authoritative resolution or explicit supersession metadata.
 
 **Non-Destructive Invariant:** Prior entities are **NEVER deleted or overwritten**. Both predecessor and successor entities remain in the candidate set, bound together by a `ContradictionProposal`.

@@ -1,0 +1,70 @@
+{
+  "created_at": "2026-09-04T23:22:00+03:00",
+  "base_main_commit": "d14a851e459eb5166d25df5764c3304bcd8c30e2",
+  "entries": [
+    {
+      "pr_number": 389,
+      "package": "filelock",
+      "target_version": "3.32.5",
+      "branch": "dependabot/pip/filelock-3.32.5",
+      "merge_base": "af2e3022422b2ee3f249e0b2e0aa08b6ce09450c",
+      "classification": "ORDINARY_MAINTENANCE",
+      "changed_files": [
+        "release/power-suite-3.7.1-gui-0.7.7.constraints.txt",
+        "release/web-runtime.requirements.txt"
+      ],
+      "disposition": "Close stale PR; re-evaluate in controlled dependency refresh on current main."
+    },
+    {
+      "pr_number": 390,
+      "package": "pygments",
+      "target_version": "2.21.0",
+      "branch": "dependabot/pip/pygments-2.21.0",
+      "merge_base": "af2e3022422b2ee3f249e0b2e0aa08b6ce09450c",
+      "classification": "ORDINARY_MAINTENANCE",
+      "changed_files": [
+        "release/web-runtime.requirements.txt"
+      ],
+      "disposition": "Close stale PR; re-evaluate in controlled dependency refresh on current main."
+    },
+    {
+      "pr_number": 391,
+      "package": "mcp",
+      "target_version": "2.1.1",
+      "branch": "dependabot/pip/mcp-2.1.1",
+      "merge_base": "af2e3022422b2ee3f249e0b2e0aa08b6ce09450c",
+      "classification": "COMPATIBILITY_RELEVANT",
+      "changed_files": [
+        "release/power-suite-3.7.1-gui-0.7.7.constraints.txt"
+      ],
+      "disposition": "Re-evaluate against the final Phase-5 Context/MCP implementation. No 3.8 release may use an MCP SDK version that has not passed the full stdio/client compatibility suite."
+    },
+    {
+      "pr_number": 392,
+      "package": "numpy",
+      "target_version": "2.5.2",
+      "branch": "dependabot/pip/numpy-2.5.2",
+      "merge_base": "af2e3022422b2ee3f249e0b2e0aa08b6ce09450c",
+      "classification": "COMPATIBILITY_RELEVANT",
+      "changed_files": [
+        "pyproject.toml",
+        "release/power-suite-3.7.1-gui-0.7.7.constraints.txt",
+        "release/web-runtime.requirements.txt"
+      ],
+      "disposition": "Do not automatically widen the supported NumPy range. Adopting NumPy 2.5.x requires semantic tests, reranking tests, ONNX runtime tests, Profile B tests, lock reproducibility, and performance comparison."
+    },
+    {
+      "pr_number": 393,
+      "package": "huggingface-hub",
+      "target_version": "1.29.0",
+      "branch": "dependabot/pip/huggingface-hub-1.29.0",
+      "merge_base": "af2e3022422b2ee3f249e0b2e0aa08b6ce09450c",
+      "classification": "SECURITY_RELEVANT",
+      "changed_files": [
+        "release/power-suite-3.7.1-gui-0.7.7.constraints.txt",
+        "release/web-runtime.requirements.txt"
+      ],
+      "disposition": "MANDATORY SECURITY RE-EVALUATION BEFORE v3.8.0. Contains security-relevant upstream fixes. Must not disappear from release plan."
+    }
+  ]
+}
