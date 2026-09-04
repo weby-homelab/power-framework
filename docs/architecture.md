@@ -24,6 +24,11 @@ src/power_framework/
 │   ├── lifecycle.py    # Portable read-only session lifecycle adapters
 │   ├── health_loop.py  # Cheap deduplicated health observations/backoff
 │   ├── provenance.py   # Opt-in exact-byte evidence capture and verification
+│   ├── project_models.py # Project State Engine domain contracts and schemas
+│   ├── project_store.py  # Cryptographic append-only event ledger and SQLite store
+│   ├── project_ingestion.py # Fail-closed event ledger ingestion and batch verification
+│   ├── semantic_models.py # Typed provenance-bound semantic knowledge entities
+│   ├── semantic_compiler.py # Deterministic semantic compilation and contradiction taxonomy
 │   └── utils.py        # Path safety, atomic writes, version, rate limiter
 ├── experimental/       # Optional adapters, never imported by core startup
 │   ├── embeddings.py    # Dense embedding managers
