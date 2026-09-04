@@ -34,9 +34,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING, Literal
 
-from power_framework.core.canonical_json import compute_event_hash
+from power_framework.core.canonical_json import compute_event_hash, compute_payload_digest
 from power_framework.core.governance_engine import (
     LEGAL_TRANSITIONS,
+    RULES_DIGEST,
+    AuthorityContext,
     GovernanceEngine,
     detect_dependency_cycles,
     is_untrusted_event,
@@ -74,7 +76,18 @@ if TYPE_CHECKING:
 
 
 class ProjectStateReducer:
-    """Deterministic, pure state reducer for POWER Project State Engine."""
+    """Deterministic, pure state reducer for POWER Project State Engine.
+
+    NON-AUTHORITATIVE BOUNDARY: reduce()/reduce_internal() perform a pure,
+    deterministic replay of caller-supplied events for unit testing only.
+    Integrity != authority: a self-consistent event chain is NOT proof of
+    canonical ledger membership. Authoritative ProjectState must be built
+    only via ProjectStateService.rebuild_project_state(vault_root,
+    project_id), which verifies the canonical Phase-2 ledger, re-reads the
+    authoritative event sequence from that store, resolves federated Task and
+    Decision authority from their canonical services, and only then executes
+    this pure reduction. Never present reduce() output as canonical state.
+    """
 
     def __init__(
         self,
@@ -93,11 +106,39 @@ class ProjectStateReducer:
         tasks: Sequence[TaskAuthorityView] | None = None,
         decisions: Sequence[DecisionAuthorityView] | None = None,
         project_id: str | None = None,
+        authority: AuthorityContext | None = None,
     ) -> ProjectState:
-        """Deterministically reduce an ordered canonical event stream into ProjectState.
+        """Deterministically reduce an ordered event stream into ProjectState.
+
+        NON-AUTHORITATIVE unless ``authority`` carries a trusted canonical
+        bundle assembled by ProjectStateService: without it this method only
+        replays caller-supplied events for determinism testing and MUST NOT
+        masquerade as canonical state. With ``authority``, federated Task /
+        Decision views from the owning subsystems win over ledger
+        observations, evidence/approvals resolve canonically, and declared
+        preconditions are enforced.
 
         Zero side effects: does not mutate external stores, invoke LLMs, or make network calls.
         """
+        return self.reduce_internal(
+            events,
+            initial_state=initial_state,
+            tasks=tasks,
+            decisions=decisions,
+            project_id=project_id,
+            authority=authority,
+        )
+
+    def reduce_internal(
+        self,
+        events: Sequence[ProjectEvent],
+        initial_state: ProjectState | None = None,
+        tasks: Sequence[TaskAuthorityView] | None = None,
+        decisions: Sequence[DecisionAuthorityView] | None = None,
+        project_id: str | None = None,
+        authority: AuthorityContext | None = None,
+    ) -> ProjectState:
+        """Internal pure reduction engine (see reduce() authority warning)."""
         if not events and initial_state is None and project_id is None:
             raise StateEngineIntegrityError("Cannot reduce empty event stream without project_id")
 
@@ -117,29 +158,66 @@ class ProjectStateReducer:
                 current_phase=ProjectPhase.DISCOVERY,
                 schema_version=self.schema_version,
                 rules_version=self.rules_version,
+                rules_digest=RULES_DIGEST,
                 state_revision="0" * 64,
             )
+        if not state.rules_digest:
+            state.rules_digest = RULES_DIGEST
 
-        # Merge authoritative task views (Option A adapter)
+        # Merge task views: in authoritative mode these are live views already
+        # resolved from TaskStore by the trusted service (live wins); caller
+        # views are never trusted as canonical proof on their own.
         if tasks:
             for t_view in tasks:
+                if authority is not None:
+                    expected = TaskAuthorityView.compute_digest(
+                        task_id=t_view.task_id,
+                        state=t_view.state,
+                        revision=t_view.revision,
+                        dependencies=list(t_view.dependencies),
+                        open_gates=list(t_view.open_gates),
+                        receipt_ids=list(t_view.receipt_ids),
+                    )
+                    if expected != t_view.digest:
+                        raise StateEngineIntegrityError(
+                            f"Task view digest mismatch for '{t_view.task_id}': "
+                            "view integrity check failed"
+                        )
                 state.tasks[t_view.task_id] = deepcopy(t_view)
 
-        # Merge authoritative decision views (Option A adapter)
+        # Merge decision views (same authority rule as tasks)
         if decisions:
             for d_view in decisions:
+                if authority is not None:
+                    expected_d = DecisionAuthorityView.compute_digest(
+                        decision_id=d_view.decision_id,
+                        status=d_view.status,
+                        task_id=d_view.task_id,
+                        task_revision=d_view.task_revision,
+                        revision=d_view.revision,
+                        receipt_id=d_view.receipt_id,
+                    )
+                    if expected_d != d_view.digest:
+                        raise StateEngineIntegrityError(
+                            f"Decision view digest mismatch for '{d_view.decision_id}'"
+                        )
                 state.decisions[d_view.decision_id] = deepcopy(d_view)
 
         # Replay event stream sequentially with full integrity verification
         for event in events:
-            self._apply_event(state, event)
+            self._apply_event(state, event, authority)
 
         # Compute post-replay projections (task readiness, decisions, health flags, state_revision)
-        self._compute_projections(state)
+        self._compute_projections(state, authority)
 
         return state
 
-    def _apply_event(self, state: ProjectState, event: ProjectEvent) -> None:
+    def _apply_event(
+        self,
+        state: ProjectState,
+        event: ProjectEvent,
+        authority: AuthorityContext | None = None,
+    ) -> None:
         """Apply a single canonical event to the working state with strict integrity checks."""
         # 1. Project ID integrity (cross-project contamination check)
         if event.project_id != state.project_id:
@@ -165,7 +243,14 @@ class ProjectStateReducer:
                 f"Initial event sequence must be 1, got {event.sequence} (event {event.event_id})"
             )
 
-        # 3. Cryptographic hash integrity
+        # 3. Cryptographic hash integrity (defense-in-depth: payload digest
+        # is verified explicitly before trusting ProjectEvent content; the
+        # outer event hash alone is not sufficient).
+        expected_payload_digest = compute_payload_digest(event.payload or {})
+        if expected_payload_digest != event.payload_digest:
+            raise StateEngineIntegrityError(
+                f"Tampered event payload: payload digest mismatch on event {event.event_id}"
+            )
         computed_hash = compute_event_hash(event.model_dump())
         if computed_hash != event.event_hash:
             raise StateEngineIntegrityError(
@@ -180,10 +265,22 @@ class ProjectStateReducer:
             state.current_phase = ProjectPhase.DISCOVERY
 
         elif event_type in ("project.phase.changed", "project.reopened"):
-            self._handle_phase_transition(state, event)
+            self._handle_phase_transition(state, event, authority)
 
         elif event_type == "gate.overridden":
-            self._handle_gate_override(state, event)
+            self._handle_gate_override(state, event, authority)
+
+        elif event_type == "raci.assigned":
+            self._handle_raci_assigned(state, event)
+
+        elif event_type == "raci.revoked":
+            self._handle_raci_revoked(state, event)
+
+        elif event_type == "evidence.attached":
+            self._handle_evidence_attached(state, event)
+
+        elif event_type in ("artifact.created", "artifact.updated"):
+            self._handle_artifact_event(state, event)
 
         elif event_type == "task.associated":
             task_id = payload.get("task_id")
@@ -203,32 +300,45 @@ class ProjectStateReducer:
                 state.tasks.pop(task_id, None)
 
         elif event_type == "task.lifecycle.observed":
-            # Option B authoritative lifecycle observation
+            # Lifecycle observation is an audit/reconciliation signal, never
+            # TaskStore authority. In authoritative mode the live TaskStore
+            # view wins; the observation is recorded only as drift signal.
             task_id = payload.get("task_id")
             new_state = payload.get("state")
             if task_id and new_state:
-                rev = int(payload.get("revision", 1))
-                receipt_ids = payload.get("receipt_ids", [])
-                deps = payload.get("dependencies", [])
-                open_gates = payload.get("open_gates", [])
-                digest = TaskAuthorityView.compute_digest(
-                    task_id=task_id,
-                    state=new_state,
-                    revision=rev,
-                    dependencies=deps,
-                    open_gates=open_gates,
-                    receipt_ids=receipt_ids,
-                )
-                state.tasks[task_id] = TaskAuthorityView(
-                    task_id=task_id,
-                    state=new_state,
-                    revision=rev,
-                    digest=digest,
-                    source_identity=event.event_id,
-                    dependencies=sorted(deps),
-                    open_gates=sorted(open_gates),
-                    receipt_ids=sorted(receipt_ids),
-                )
+                if authority is not None:
+                    # Authoritative mode: live TaskStore view already merged;
+                    # observations never create or overwrite authority.
+                    if (
+                        task_id in state.tasks
+                        and state.tasks[task_id].state != new_state
+                        and "STALE_TASK_OBSERVATION" not in list(state.health_flags)
+                    ):
+                        state.health_flags.append("STALE_TASK_OBSERVATION")
+                        state.health_flags.append("TASK_AUTHORITY_DRIFT")
+                else:
+                    rev = int(payload.get("revision", 1))
+                    receipt_ids = payload.get("receipt_ids", [])
+                    deps = payload.get("dependencies", [])
+                    open_gates = payload.get("open_gates", [])
+                    digest = TaskAuthorityView.compute_digest(
+                        task_id=task_id,
+                        state=new_state,
+                        revision=rev,
+                        dependencies=deps,
+                        open_gates=open_gates,
+                        receipt_ids=receipt_ids,
+                    )
+                    state.tasks[task_id] = TaskAuthorityView(
+                        task_id=task_id,
+                        state=new_state,
+                        revision=rev,
+                        digest=digest,
+                        source_identity=event.event_id,
+                        dependencies=sorted(deps),
+                        open_gates=sorted(open_gates),
+                        receipt_ids=sorted(receipt_ids),
+                    )
 
         elif event_type == "decision.associated":
             decision_id = payload.get("decision_id")
@@ -248,29 +358,40 @@ class ProjectStateReducer:
                 state.decisions.pop(decision_id, None)
 
         elif event_type == "decision.lifecycle.observed":
-            # Option B authoritative decision lifecycle observation
+            # Decision observation is audit signal only; DecisionService wins.
             decision_id = payload.get("decision_id")
             new_status = payload.get("status")
             if decision_id and new_status:
-                rev = int(payload.get("revision", 1))
-                task_id = payload.get("task_id")
-                receipt_id = payload.get("receipt_id")
-                digest = DecisionAuthorityView.compute_digest(
-                    decision_id=decision_id,
-                    status=new_status,
-                    task_id=task_id,
-                    revision=rev,
-                    receipt_id=receipt_id,
-                )
-                state.decisions[decision_id] = DecisionAuthorityView(
-                    decision_id=decision_id,
-                    status=new_status,
-                    task_id=task_id,
-                    revision=rev,
-                    digest=digest,
-                    source_identity=event.event_id,
-                    receipt_id=receipt_id,
-                )
+                if authority is not None:
+                    # Authoritative mode: live DecisionService view already
+                    # merged; observations never create or overwrite authority.
+                    if (
+                        decision_id in state.decisions
+                        and state.decisions[decision_id].status != new_status
+                        and "STALE_DECISION_OBSERVATION" not in state.health_flags
+                    ):
+                        state.health_flags.append("STALE_DECISION_OBSERVATION")
+                        state.health_flags.append("DECISION_AUTHORITY_DRIFT")
+                else:
+                    rev = int(payload.get("revision", 1))
+                    task_id = payload.get("task_id")
+                    receipt_id = payload.get("receipt_id")
+                    digest = DecisionAuthorityView.compute_digest(
+                        decision_id=decision_id,
+                        status=new_status,
+                        task_id=task_id,
+                        revision=rev,
+                        receipt_id=receipt_id,
+                    )
+                    state.decisions[decision_id] = DecisionAuthorityView(
+                        decision_id=decision_id,
+                        status=new_status,
+                        task_id=task_id,
+                        revision=rev,
+                        digest=digest,
+                        source_identity=event.event_id,
+                        receipt_id=receipt_id,
+                    )
 
         # RAID Events (Risks, Assumptions, Issues, Dependencies)
         elif event_type == "risk.opened":
@@ -314,7 +435,12 @@ class ProjectStateReducer:
         state.last_event_hash = event.event_hash
         state.contributing_events.append(event.event_id)
 
-    def _handle_phase_transition(self, state: ProjectState, event: ProjectEvent) -> None:
+    def _handle_phase_transition(
+        self,
+        state: ProjectState,
+        event: ProjectEvent,
+        authority: AuthorityContext | None = None,
+    ) -> None:
         """Process project.phase.changed and project.reopened events."""
         payload = event.payload or {}
         raw_to_phase = (
@@ -332,7 +458,9 @@ class ProjectStateReducer:
                 f"Unknown project phase '{raw_to_phase}' in event {event.event_id}"
             ) from err
 
-        eval_result = self.governance_engine.evaluate_transition(state, to_phase, event)
+        eval_result = self.governance_engine.evaluate_transition(
+            state, to_phase, event, self._effective_authority(state, authority)
+        )
 
         if eval_result.decision != GovernanceDecision.ALLOW:
             reasons = ", ".join(eval_result.reason_codes)
@@ -368,9 +496,100 @@ class ProjectStateReducer:
         state.phase_history.append(transition_record)
         state.current_phase = to_phase
 
-    def _handle_gate_override(self, state: ProjectState, event: ProjectEvent) -> None:
+    def _effective_authority(
+        self, state: ProjectState, authority: AuthorityContext | None
+    ) -> AuthorityContext | None:
+        """Restrict canonical authority to ledger history strictly before now.
+
+        Prevents self-justification (transition referencing evidence attached
+        in its own event) and future-justification: evidence/RACI seen by the
+        governance check are only those accumulated from prior sequences.
+        """
+        if authority is None:
+            return None
+        prior_raci: dict[str, list[str]] = {
+            role: sorted(actors) for role, actors in state.raci.items() if actors
+        }
+        accountable: str | None = None
+        for key in ("Accountable", "accountable", "A"):
+            actors = prior_raci.get(key)
+            if actors:
+                accountable = actors[0]
+                break
+        return AuthorityContext(
+            attached_evidence=set(state.attached_evidence),
+            approved_decision_ids=set(authority.approved_decision_ids),
+            raci=prior_raci,
+            accountable_actor=accountable,
+            verified_task_receipts=set(authority.verified_task_receipts),
+            permit_accountable_approval=authority.permit_accountable_approval,
+        )
+
+    def _handle_raci_assigned(self, state: ProjectState, event: ProjectEvent) -> None:
+        """Record canonical raci.assigned into the deterministic RACI projection."""
+        payload = event.payload or {}
+        role = payload.get("role")
+        actor = payload.get("actor")
+        if not isinstance(role, str) or not role.strip():
+            return
+        if not isinstance(actor, str) or not actor.strip():
+            return
+        actors = set(state.raci.get(role.strip(), []))
+        actors.add(actor.strip())
+        state.raci[role.strip()] = sorted(actors)
+
+    def _handle_raci_revoked(self, state: ProjectState, event: ProjectEvent) -> None:
+        """Record canonical raci.revoked; Accountable must remain exactly one actor."""
+        payload = event.payload or {}
+        role = payload.get("role")
+        actor = payload.get("actor")
+        if not isinstance(role, str) or not role.strip():
+            return
+        current = set(state.raci.get(role.strip(), []))
+        if isinstance(actor, str) and actor.strip():
+            current.discard(actor.strip())
+        else:
+            current.clear()
+        if current:
+            state.raci[role.strip()] = sorted(current)
+        else:
+            state.raci.pop(role.strip(), None)
+
+    @staticmethod
+    def _collect_evidence_refs(event: ProjectEvent) -> list[str]:
+        """Collect canonical evidence refs carried by one ledger event."""
+        refs: list[str] = []
+        refs.extend(event.evidence_refs or [])
+        refs.extend(event.artifact_refs or [])
+        payload = event.payload or {}
+        for key in ("evidence_id", "evidence_ref", "ref", "artifact_id", "artifact_ref"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                refs.append(value.strip())
+        for key in ("evidence_refs", "evidence_ids", "artifact_refs"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                refs.extend([v for v in value if isinstance(v, str) and v.strip()])
+        return sorted(set(refs))
+
+    def _handle_evidence_attached(self, state: ProjectState, event: ProjectEvent) -> None:
+        """Index canonically attached evidence refs (deterministic sorted set)."""
+        for ref in self._collect_evidence_refs(event):
+            if ref not in state.attached_evidence:
+                state.attached_evidence.append(ref)
+        state.attached_evidence = sorted(set(state.attached_evidence))
+
+    def _handle_artifact_event(self, state: ProjectState, event: ProjectEvent) -> None:
+        """Index artifact refs as canonical evidence (same index as evidence)."""
+        self._handle_evidence_attached(state, event)
+
+    def _handle_gate_override(
+        self, state: ProjectState, event: ProjectEvent, authority: AuthorityContext | None = None
+    ) -> None:
         """Process gate.overridden events with strict trust checking."""
-        eval_result = self.governance_engine.evaluate_gate_override(event)
+        eval_result = self.governance_engine.evaluate_gate_override(
+            event, self._effective_authority(state, authority)
+        )
         if eval_result.decision == GovernanceDecision.ALLOW:
             payload = event.payload or {}
             gate_name = str(payload.get("gate") or payload.get("gate_name"))
@@ -697,7 +916,9 @@ class ProjectStateReducer:
         if dep_id in state.active_dependencies:
             state.active_dependencies.remove(dep_id)
 
-    def _compute_projections(self, state: ProjectState) -> None:
+    def _compute_projections(
+        self, state: ProjectState, authority: AuthorityContext | None = None
+    ) -> None:
         """Compute all post-reduction projections deterministically."""
         # 1. Dependency cycle analysis
         explicit_deps = [dep.model_dump() for dep in state.dependencies.values()]
@@ -731,14 +952,16 @@ class ProjectStateReducer:
         state.ready_tasks = sorted(ready)
         state.blocked_tasks = sorted(blocked)
 
-        # 3. Decision projections
+        # 3. Decision projections: valid_decisions = approved canonical
+        # decisions; required_approvals = pending decisions. Pending is never
+        # reported as valid/approved.
         valid_decs: list[str] = []
         super_decs: list[str] = []
         req_approvals: list[str] = []
 
         for dec_id in sorted(state.decisions):
             d_view = state.decisions[dec_id]
-            if d_view.status in ("pending", "approved"):
+            if d_view.status == "approved":
                 valid_decs.append(dec_id)
             elif d_view.status == "superseded":
                 super_decs.append(dec_id)
@@ -750,18 +973,34 @@ class ProjectStateReducer:
         state.superseded_decisions = sorted(super_decs)
         state.required_approvals = sorted(req_approvals)
 
-        # 4. RAID projections sorting
+        # 4. RAID projections sorting (+ canonical governance projections)
         state.open_risks = sorted(set(state.open_risks))
         state.open_issues = sorted(set(state.open_issues))
         state.active_assumptions = sorted(set(state.active_assumptions))
         state.active_dependencies = sorted(set(state.active_dependencies))
         state.overridden_gates = sorted(set(state.overridden_gates))
+        state.attached_evidence = sorted(set(state.attached_evidence))
+        state.raci = {role: sorted(set(actors)) for role, actors in sorted(state.raci.items())}
+        if not state.rules_digest:
+            state.rules_digest = RULES_DIGEST
 
         # 5. Recent changes: deterministic last 10 event IDs
         state.recent_changes = state.contributing_events[-10:] if state.contributing_events else []
 
-        # 6. Health flags
-        state.health_flags = self.governance_engine.evaluate_health_flags(state, cycles)
+        # 6. Health flags (preserve drift diagnostics recorded during replay)
+        drift_flags = [
+            f
+            for f in state.health_flags
+            if f
+            in (
+                "STALE_TASK_OBSERVATION",
+                "TASK_AUTHORITY_DRIFT",
+                "STALE_DECISION_OBSERVATION",
+                "DECISION_AUTHORITY_DRIFT",
+            )
+        ]
+        computed_flags = self.governance_engine.evaluate_health_flags(state, cycles)
+        state.health_flags = sorted(set(computed_flags) | set(drift_flags))
 
         # 7. Deterministic state_revision
         state.state_revision = compute_state_revision(state.model_dump())
@@ -879,7 +1118,7 @@ class ProjectStateReducer:
                 state_revision=state.state_revision,
                 value=state.valid_decisions,
                 contributing_event_ids=sorted(set(contributing)),
-                applicable_rules=["DECISION_STATUS_PENDING_OR_APPROVED"],
+                applicable_rules=["DECISION_STATUS_APPROVED"],
                 decision_references=state.valid_decisions,
                 evidence_references=sorted(set(receipts)),
                 authority_references=["DecisionService:v1"],
@@ -944,11 +1183,17 @@ class ProjectStateReducer:
         self,
         snapshot: ProjectStateSnapshot,
         tail_events: Sequence[ProjectEvent] = (),
+        authority: AuthorityContext | None = None,
     ) -> ProjectState:
         """Restore project state from a validated snapshot and replay tail events.
 
         Guarantees that snapshot + tail replay is byte-equivalent to full replay (G4.1).
         Any snapshot tampering causes immediate SnapshotIntegrityError.
+
+        Integrity != authority: this checks internal self-consistency only.
+        Authoritative restore must additionally verify ledger lineage and
+        re-resolve federated authority via
+        ProjectStateService.restore_snapshot_authoritative.
         """
         if not snapshot.verify_integrity():
             raise SnapshotIntegrityError(
@@ -963,6 +1208,11 @@ class ProjectStateReducer:
         if snapshot.rules_version != self.rules_version:
             raise SnapshotIntegrityError(
                 f"Snapshot rules version '{snapshot.rules_version}' != current '{self.rules_version}'"
+            )
+
+        if snapshot.state.rules_digest and snapshot.state.rules_digest != RULES_DIGEST:
+            raise SnapshotIntegrityError(
+                "Snapshot ruleset digest mismatch: effective governance rules changed"
             )
 
         working_state = deepcopy(snapshot.state)
@@ -983,11 +1233,28 @@ class ProjectStateReducer:
                 )
 
             for event in tail_events:
-                self._apply_event(working_state, event)
+                self._apply_event(working_state, event, authority)
 
-            self._compute_projections(working_state)
+            self._compute_projections(working_state, authority)
 
         return working_state
+
+    def verify_snapshot_lineage(
+        self,
+        snapshot: ProjectStateSnapshot,
+        ledger_sequence: int,
+        ledger_head_hash: str,
+    ) -> bool:
+        """Verify snapshot lineage against a trusted re-read of the canonical ledger.
+
+        Returns True only when snapshot.project_id's last_event_sequence and
+        last_event_hash exactly match the canonical ledger head. Integrity of
+        the snapshot itself must be verified separately.
+        """
+        return (
+            snapshot.last_event_sequence == ledger_sequence
+            and snapshot.last_event_hash == ledger_head_hash
+        )
 
 
 __all__ = [

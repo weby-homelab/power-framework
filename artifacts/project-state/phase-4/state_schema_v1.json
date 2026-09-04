@@ -896,6 +896,29 @@
       "title": "Rules Version",
       "type": "string"
     },
+    "rules_digest": {
+      "default": "",
+      "pattern": "^([0-9a-f]{64})?$",
+      "title": "Rules Digest",
+      "type": "string"
+    },
+    "raci": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Raci",
+      "type": "object"
+    },
+    "attached_evidence": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attached Evidence",
+      "type": "array"
+    },
     "last_event_sequence": {
       "default": 0,
       "minimum": 0,

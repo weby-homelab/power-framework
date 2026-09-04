@@ -11,9 +11,11 @@ Implements deterministic evaluation of:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from power_framework.core.canonical_json import canonical_json_bytes
 from power_framework.core.state_models import (
     GOVERNANCE_RULES_VERSION,
     DoDEvaluation,
@@ -232,6 +234,79 @@ LEGAL_TRANSITIONS: dict[tuple[ProjectPhase, ProjectPhase], TransitionSpec] = {
 AUTHORIZED_OVERRIDE_ROLES: set[str] = {"admin", "architect", "lead", "accountable"}
 
 
+def compute_rules_digest() -> str:
+    """Compute the immutable digest of the effective governance ruleset.
+
+    Binds rules_version to exactly one normalized rules manifest: the sorted
+    FSM transition specs, authorized override roles and DoR/DoD policy flags.
+    A modified ruleset with an unchanged version string is detectable because
+    this digest changes (see test_ruleset_binding).
+    """
+    manifest = {
+        "dor_rules": {
+            "blocking_issue_severities": ["blocker", "critical"],
+            "require_initial_tasks": True,
+            "require_no_circular_dependencies": True,
+        },
+        "dod_rules": {
+            "require_all_decisions_resolved": True,
+            "require_all_tasks_terminal": True,
+            "require_canonical_completion_evidence": True,
+            "require_no_blocking_issues": True,
+            "untrusted_model_statements_strictly_disallowed": True,
+        },
+        "override_roles": sorted(AUTHORIZED_OVERRIDE_ROLES),
+        "rules_version": GOVERNANCE_RULES_VERSION,
+        "transitions": sorted(
+            [
+                {
+                    "approval_required": spec.approval_required,
+                    "evidence_required": spec.evidence_required,
+                    "from_phase": spec.from_phase.value,
+                    "is_rollback": spec.is_rollback,
+                    "name": spec.name,
+                    "preconditions": sorted(spec.preconditions),
+                    "required_gate": spec.required_gate,
+                    "to_phase": spec.to_phase.value,
+                }
+                for spec in LEGAL_TRANSITIONS.values()
+            ],
+            key=lambda t: (t["from_phase"], t["to_phase"]),
+        ),
+    }
+    return hashlib.sha256(canonical_json_bytes(manifest)).hexdigest()
+
+
+RULES_DIGEST: str = compute_rules_digest()
+
+
+@dataclass
+class AuthorityContext:
+    """Trusted canonical authority resolved by ProjectStateService.
+
+    Canonical authority is established by independent resolution against the
+    owning authoritative subsystem. Digests/receipts record or protect the
+    result; they are not bearer credentials.
+
+    - attached_evidence: refs attached via canonical evidence.attached /
+      artifact.created events at sequences strictly before the evaluated event.
+    - approved_decision_ids: decision IDs with a canonical approved
+      DecisionService object carrying a valid DecisionReceipt.
+    - raci: canonical role -> sorted actor list from raci.assigned/revoked.
+    - accountable_actor: the single canonical Accountable actor (if any).
+    - verified_task_receipts: tcr_* IDs verified via TaskStore receipts.
+    - permit_accountable_approval: True only for transitions whose contract
+      explicitly lists the accountable_approval precondition.
+    """
+
+    attached_evidence: set[str] = field(default_factory=set)
+    approved_decision_ids: set[str] = field(default_factory=set)
+    raci: dict[str, list[str]] = field(default_factory=dict)
+    accountable_actor: str | None = None
+    verified_task_receipts: set[str] = field(default_factory=set)
+    permit_accountable_approval: bool = False
+
+
 def is_untrusted_event(event: ProjectEvent | None) -> bool:
     """Detect if an event comes from an unverified or model extraction source."""
     if event is None:
@@ -315,6 +390,7 @@ class GovernanceEngine:
         state: ProjectState,
         to_phase: ProjectPhase,
         event: ProjectEvent,
+        authority: AuthorityContext | None = None,
     ) -> GovernanceEvaluation:
         """Evaluate legality and prerequisites for an attempted lifecycle transition.
 
@@ -323,6 +399,17 @@ class GovernanceEngine:
         - P0-1: Zero model-derived or unverified state advances
         - Rollback justifications
         - Evidence and approval gates
+        - Declared TransitionSpec.preconditions via deterministic evaluators;
+          unknown precondition tokens fail closed.
+
+        When ``authority`` is provided (authoritative path), approval strings,
+        evidence strings and role strings are resolved against canonical
+        subsystems: approvals require a canonical approved decision with valid
+        receipt (or canonical RACI Accountable where the contract explicitly
+        permits it); evidence refs must each resolve to canonically attached
+        evidence; every declared precondition must pass its evaluator.
+        Without ``authority`` the legacy non-authoritative checks apply
+        (pure-reducer determinism only; never canonical evidence).
         """
         from_phase = state.current_phase
         event_ids = [event.event_id]
@@ -388,16 +475,29 @@ class GovernanceEngine:
                     policy_version=self.policy_version,
                     relevant_event_ids=event_ids,
                 )
+            if authority is not None:
+                unresolved = [r for r in evidence if r not in authority.attached_evidence]
+                if unresolved:
+                    return GovernanceEvaluation(
+                        decision=GovernanceDecision.REQUIRE_EVIDENCE,
+                        reason_codes=["EVIDENCE_REF_NOT_CANONICALLY_ATTACHED"],
+                        policy_version=self.policy_version,
+                        relevant_event_ids=event_ids,
+                        required_evidence_refs=sorted(set(unresolved)),
+                    )
 
         # Approval requirement
         if spec.approval_required:
-            has_approval = (
-                payload.get("approval_ref")
-                or payload.get("approval_refs")
-                or payload.get("approved_by")
-                or payload.get("accountable_approval")
-                or any(dec.status == "approved" for dec in state.decisions.values())
-            )
+            if authority is not None:
+                has_approval = self._resolve_canonical_approval(payload, state, authority, spec)
+            else:
+                has_approval = (
+                    payload.get("approval_ref")
+                    or payload.get("approval_refs")
+                    or payload.get("approved_by")
+                    or payload.get("accountable_approval")
+                    or any(dec.status == "approved" for dec in state.decisions.values())
+                )
             if not has_approval:
                 return GovernanceEvaluation(
                     decision=GovernanceDecision.REQUIRE_APPROVAL,
@@ -406,6 +506,16 @@ class GovernanceEngine:
                     relevant_event_ids=event_ids,
                 )
 
+        # Declared preconditions: every token must map to an evaluator; unknown fails closed.
+        if authority is not None:
+            for precondition in spec.preconditions:
+                if not self._evaluate_precondition(precondition, state, event, authority):
+                    return GovernanceEvaluation(
+                        decision=GovernanceDecision.DENY,
+                        reason_codes=[f"PRECONDITION_FAILED:{precondition}"],
+                        policy_version=self.policy_version,
+                        relevant_event_ids=event_ids,
+                    )
         # Quality Gates (DoR / DoD)
         if spec.required_gate:
             if spec.required_gate in state.overridden_gates:
@@ -423,7 +533,7 @@ class GovernanceEngine:
                             relevant_event_ids=event_ids,
                         )
                 elif "dod" in spec.required_gate:
-                    dod_eval = self.evaluate_dod(state, to_phase, event)
+                    dod_eval = self.evaluate_dod(state, to_phase, event, authority)
                     if not dod_eval.passed:
                         return GovernanceEvaluation(
                             decision=GovernanceDecision.DENY,
@@ -442,14 +552,146 @@ class GovernanceEngine:
             relevant_event_ids=event_ids,
         )
 
+    @staticmethod
+    def _resolve_canonical_approval(
+        payload: dict[str, object],
+        state: ProjectState,
+        authority: AuthorityContext,
+        spec: TransitionSpec,
+    ) -> bool:
+        """Resolve approval strictly against canonical subsystems (fail-closed).
+
+        Satisfied only by: (1) a canonically approved DecisionService object
+        with valid receipt whose ID is referenced; or (2) canonical RACI
+        Accountable authority where the transition contract explicitly permits
+        accountable approval. Bare ID/string presence never satisfies.
+        """
+        refs: list[str] = []
+        single = payload.get("approval_ref")
+        if isinstance(single, str) and single.strip():
+            refs.append(single.strip())
+        multi = payload.get("approval_refs")
+        if isinstance(multi, list):
+            refs.extend([r for r in multi if isinstance(r, str) and r.strip()])
+        if any(r in authority.approved_decision_ids for r in refs):
+            return True
+        # Live-state fallback: approved views already resolved from DecisionService.
+        live_approved = {did for did, dv in state.decisions.items() if dv.status == "approved"}
+        if any(r in live_approved and r in authority.approved_decision_ids for r in refs):
+            return True
+        if "accountable_approval" in spec.preconditions or spec.approval_required:
+            claimed = payload.get("accountable_approval") or payload.get("approved_by")
+            if (
+                isinstance(claimed, str)
+                and authority.accountable_actor is not None
+                and claimed.strip() == authority.accountable_actor
+                and "accountable_approval" in spec.preconditions
+            ):
+                return True
+        return False
+
+    def _evaluate_precondition(
+        self,
+        precondition: str,
+        state: ProjectState,
+        event: ProjectEvent,
+        authority: AuthorityContext,
+    ) -> bool:
+        """Deterministically evaluate one declared precondition.
+
+        Unknown tokens fail closed (return False).
+        """
+        payload = event.payload or {}
+        text_fields = (
+            payload.get("reason"),
+            payload.get("justification"),
+            payload.get("reopen_justification"),
+            payload.get("replanning_justification"),
+            payload.get("closing_failure_reason"),
+            payload.get("cancellation_reason"),
+            payload.get("termination_reason"),
+            payload.get("reversion_justification"),
+        )
+        has_reason_text = any(isinstance(v, str) and v.strip() for v in text_fields)
+
+        if precondition == "charter_present":
+            if any("charter" in ref.lower() for ref in authority.attached_evidence):
+                return True
+            charter_keys = ("charter", "charter_present", "charter_ref")
+            return any(
+                isinstance(payload.get(k), str) and str(payload.get(k)).strip()
+                for k in charter_keys
+            ) and any("charter" in str(v).lower() for v in payload.values() if isinstance(v, str))
+        if precondition == "owner_assigned":
+            owner = payload.get("owner") or payload.get("owner_assigned")
+            if isinstance(owner, str) and owner.strip():
+                return True
+            return any(len(actors) > 0 for actors in authority.raci.values())
+        if precondition in (
+            "cancellation_reason_provided",
+            "termination_reason_recorded",
+            "reversion_justification_recorded",
+            "replanning_justification_recorded",
+            "reopen_justification_recorded",
+            "closing_failure_reason_recorded",
+        ):
+            return has_reason_text
+        if precondition == "dor_passed_or_overridden":
+            if "dor_planning_to_execution" in state.overridden_gates:
+                return True
+            dor = self.evaluate_dor(state, ProjectPhase.EXECUTION)
+            return dor.passed
+        if precondition == "raci_accountable_assigned":
+            return authority.accountable_actor is not None
+        if precondition == "initial_tasks_registered":
+            return len(state.tasks) > 0
+        if precondition == "all_tasks_terminal":
+            return (
+                all(t.state in TERMINAL_STATES for t in state.tasks.values())
+                and len(state.tasks) > 0
+            )
+        if precondition == "no_blocking_issues":
+            for iid in state.open_issues:
+                issue = state.issues.get(iid)
+                if issue is not None and issue.severity in ("blocker", "critical"):
+                    return False
+            return True
+        if precondition == "dod_passed_or_overridden":
+            if (
+                "dod_execution_to_closing" in state.overridden_gates
+                or "dod_final_closing" in state.overridden_gates
+            ):
+                return True
+            dod = self.evaluate_dod(state, ProjectPhase.CLOSED, event, authority)
+            return dod.passed
+        if precondition == "all_decisions_resolved":
+            return all(d.status != "pending" for d in state.decisions.values())
+        if precondition == "all_issues_resolved_or_waived":
+            return len(state.open_issues) == 0
+        if precondition == "accountable_approval":
+            claimed = payload.get("accountable_approval") or payload.get("approved_by")
+            return (
+                isinstance(claimed, str)
+                and authority.accountable_actor is not None
+                and claimed.strip() == authority.accountable_actor
+            )
+        return False
+
     def evaluate_gate_override(
         self,
         event: ProjectEvent,
+        authority: AuthorityContext | None = None,
     ) -> GovernanceEvaluation:
         """Validate whether an attempted gate.overridden event is authoritative.
 
         Enforces P0-3: Untrusted / model-derived candidates CANNOT override gates.
         Requires recognized authorized role and non-empty justification.
+
+        In authoritative mode (authority provided) payload role strings never
+        grant override authority: the actor must resolve to canonical
+        RACI/governance state, and the frozen required metadata
+        (overridden_by, justification/reason, approved_by) must be present and
+        must verify against canonical authority identities.
         """
         event_ids = [event.event_id]
 
@@ -464,12 +706,64 @@ class GovernanceEngine:
         payload = event.payload or {}
         gate_name = payload.get("gate") or payload.get("gate_name")
         role = payload.get("role", "")
-        reason = payload.get("reason", "")
+        reason = payload.get("reason", "") or payload.get("justification", "")
 
         if not gate_name:
             return GovernanceEvaluation(
                 decision=GovernanceDecision.DENY,
                 reason_codes=["MISSING_OVERRIDE_GATE_NAME"],
+                policy_version=self.policy_version,
+                relevant_event_ids=event_ids,
+            )
+
+        if authority is not None:
+            overridden_by = payload.get("overridden_by") or event.actor
+            approved_by = payload.get("approved_by")
+            if not isinstance(overridden_by, str) or not overridden_by.strip():
+                return GovernanceEvaluation(
+                    decision=GovernanceDecision.DENY,
+                    reason_codes=["MISSING_OVERRIDE_ACTOR"],
+                    policy_version=self.policy_version,
+                    relevant_event_ids=event_ids,
+                )
+            if not reason or not str(reason).strip():
+                return GovernanceEvaluation(
+                    decision=GovernanceDecision.DENY,
+                    reason_codes=["MISSING_OVERRIDE_REASON"],
+                    policy_version=self.policy_version,
+                    relevant_event_ids=event_ids,
+                )
+            if not isinstance(approved_by, str) or not approved_by.strip():
+                return GovernanceEvaluation(
+                    decision=GovernanceDecision.DENY,
+                    reason_codes=["MISSING_OVERRIDE_APPROVAL"],
+                    policy_version=self.policy_version,
+                    relevant_event_ids=event_ids,
+                )
+            canonical_actors = {a for actors in authority.raci.values() for a in actors}
+            if overridden_by.strip() not in canonical_actors:
+                return GovernanceEvaluation(
+                    decision=GovernanceDecision.DENY,
+                    reason_codes=["UNAUTHORIZED_OVERRIDE_ACTOR"],
+                    policy_version=self.policy_version,
+                    relevant_event_ids=event_ids,
+                )
+            approver_ok = (
+                approved_by.strip() == (authority.accountable_actor or "")
+                or approved_by.strip() in authority.approved_decision_ids
+            )
+            if not approver_ok:
+                # approved_by may also reference a canonically approved decision
+                # that authorized this override.
+                return GovernanceEvaluation(
+                    decision=GovernanceDecision.DENY,
+                    reason_codes=["OVERRIDE_APPROVAL_NOT_CANONICAL"],
+                    policy_version=self.policy_version,
+                    relevant_event_ids=event_ids,
+                )
+            return GovernanceEvaluation(
+                decision=GovernanceDecision.ALLOW,
+                reason_codes=["GATE_OVERRIDE_AUTHORIZED"],
                 policy_version=self.policy_version,
                 relevant_event_ids=event_ids,
             )
@@ -552,10 +846,15 @@ class GovernanceEngine:
         state: ProjectState,
         target_phase: ProjectPhase = ProjectPhase.CLOSED,
         event: ProjectEvent | None = None,
+        authority: AuthorityContext | None = None,
     ) -> DoDEvaluation:
         """Evaluate Definition-of-Done criteria before closing.
 
         Enforces P0-2: Untrusted / model claims cannot satisfy DoD without canonical evidence.
+
+        In authoritative mode (authority provided) task receipts are validated
+        through canonical TaskStore receipt semantics: a random receipt ID
+        never satisfies DoD, only receipts verified via the owning subsystem.
         """
         reason_codes: list[str] = []
         missing_evidence: list[str] = []
@@ -599,24 +898,40 @@ class GovernanceEngine:
             failed_conditions.extend([f"UNRESOLVED_ISSUE:{iid}" for iid in blocking_issues])
             reason_codes.append("DOD_UNRESOLVED_BLOCKING_ISSUES")
 
-        # 3. All valid decisions must be resolved
+        # 3. All valid decisions must be resolved (pending in canonical decisions map)
         pending_decisions = [
-            did
-            for did in sorted(state.valid_decisions)
-            if state.decisions.get(did) and state.decisions[did].status == "pending"
+            did for did, d_view in sorted(state.decisions.items()) if d_view.status == "pending"
         ]
         if pending_decisions:
             missing_approvals.extend([f"PENDING_DECISION:{did}" for did in pending_decisions])
             reason_codes.append("DOD_PENDING_DECISIONS_REMAIN")
 
-        # 4. Mandatory evidence
+        # 4. Mandatory evidence: any non-empty string is NOT evidence.
+        # Quality-gate evidence refs must resolve to canonical evidence known
+        # to PSE (attached evidence index or verified task receipts).
         evidence_present = False
-        if event is not None and (
-            event.evidence_refs or (event.payload and event.payload.get("evidence_refs"))
-        ):
-            evidence_present = True
-        if any(t.receipt_ids for t in state.tasks.values()):
-            evidence_present = True
+        if authority is not None:
+            refs: list[str] = []
+            if event is not None:
+                refs.extend(event.evidence_refs or [])
+                payload_refs = (event.payload or {}).get("evidence_refs") or []
+                if isinstance(payload_refs, list):
+                    refs.extend([r for r in payload_refs if isinstance(r, str)])
+            if refs and all(r in authority.attached_evidence for r in refs):
+                evidence_present = True
+            if any(
+                rid in authority.verified_task_receipts
+                for t in state.tasks.values()
+                for rid in t.receipt_ids
+            ):
+                evidence_present = True
+        else:
+            if event is not None and (
+                event.evidence_refs or (event.payload and event.payload.get("evidence_refs"))
+            ):
+                evidence_present = True
+            if any(t.receipt_ids for t in state.tasks.values()):
+                evidence_present = True
 
         if not evidence_present and not is_untrusted_event(event):
             missing_evidence.append("COMPLETION_EVIDENCE_REQUIRED")
@@ -771,8 +1086,11 @@ class GovernanceEngine:
 __all__ = [
     "AUTHORIZED_OVERRIDE_ROLES",
     "LEGAL_TRANSITIONS",
+    "RULES_DIGEST",
+    "AuthorityContext",
     "GovernanceEngine",
     "TransitionSpec",
+    "compute_rules_digest",
     "detect_dependency_cycles",
     "is_untrusted_event",
 ]

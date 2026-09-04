@@ -106,6 +106,10 @@ class HealthFlag(StrEnum):
     UNRESOLVED_GOVERNANCE_REQUIREMENTS = "UNRESOLVED_GOVERNANCE_REQUIREMENTS"
     INVALID_TRANSITION_ATTEMPTED = "INVALID_TRANSITION_ATTEMPTED"
     STALE_AUTHORITATIVE_PROJECTION = "STALE_AUTHORITATIVE_PROJECTION"
+    STALE_TASK_OBSERVATION = "STALE_TASK_OBSERVATION"
+    TASK_AUTHORITY_DRIFT = "TASK_AUTHORITY_DRIFT"
+    STALE_DECISION_OBSERVATION = "STALE_DECISION_OBSERVATION"
+    DECISION_AUTHORITY_DRIFT = "DECISION_AUTHORITY_DRIFT"
 
 
 class PhaseTransitionRecord(BaseModel):
@@ -136,6 +140,13 @@ class TaskAuthorityView(BaseModel):
 
     Binds TaskStore authority into the deterministic State Engine without
     duplicating or replacing Task v2 lifecycle truth (ADR-PSE-004 & Gate G4.3).
+
+    Canonical authority is established by independent resolution against the
+    owning authoritative subsystem (TaskStore/TaskService). Digests/receipts
+    record or protect the result; they are not bearer credentials. A
+    caller-constructed view — even with a matching self-digest and
+    source_identity="TaskStore:v2" — proves only internal view integrity,
+    never TaskStore authority.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -200,6 +211,13 @@ class DecisionAuthorityView(BaseModel):
 
     Binds DecisionService authority into the deterministic State Engine
     without duplicating or bypassing approval workflows (ADR-PSE-004 & Gate G4.4).
+
+    Canonical authority is established by independent resolution against the
+    owning authoritative subsystem (DecisionService). Digests/receipts record
+    or protect the result; they are not bearer credentials. A caller-constructed
+    view — even with a matching self-digest and
+    source_identity="DecisionService:v1" — proves only internal view integrity,
+    never DecisionService approval authority.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -368,8 +386,21 @@ class ProjectState(BaseModel):
     # Lineage and metadata bound into the state revision
     schema_version: Literal["power.project-state.v1"] = STATE_SCHEMA_VERSION
     rules_version: str = Field(default=GOVERNANCE_RULES_VERSION)
+    rules_digest: str = Field(default="", pattern=r"^([0-9a-f]{64})?$")
     last_event_sequence: int = Field(default=0, ge=0)
     last_event_hash: str = Field(default="", pattern=PREV_HASH_REGEX)
+
+    # Canonical governance projections (PSE-owned deterministic index)
+    # raci maps canonical role -> sorted actor list, built only from
+    # canonical raci.assigned / raci.revoked ledger events. Caller payload
+    # role strings never populate this projection.
+    raci: dict[str, list[str]] = Field(default_factory=dict)
+    # attached_evidence is the deterministic sorted index of canonical
+    # evidence refs attached via evidence.attached / artifact.created events
+    # (plus verified raw-evidence sha256: refs). Transition evidence_refs
+    # must resolve against this index; non-empty strings alone never satisfy
+    # a quality gate.
+    attached_evidence: list[str] = Field(default_factory=list)
 
     # Internal typed entity maps
     tasks: dict[str, TaskAuthorityView] = Field(default_factory=dict)
@@ -410,6 +441,13 @@ class ProjectStateSnapshot(BaseModel):
 
     Snapshots serve purely as accelerators; they never replace canonical ledger authority.
     Any tampering or hash mismatch causes immediate rejection (Gate G4.1 & Section 22).
+
+    Integrity != authority: verify_integrity() proves only internal
+    self-consistency (matching digests/revisions). Authoritative restore must
+    additionally verify snapshot.project_id, snapshot.last_event_sequence and
+    snapshot.last_event_hash against a trusted re-read of the real canonical
+    Phase-2 ledger, and must re-resolve federated TaskStore/DecisionService
+    authority (see ProjectStateService.restore_snapshot_authoritative).
     """
 
     model_config = ConfigDict(extra="forbid")

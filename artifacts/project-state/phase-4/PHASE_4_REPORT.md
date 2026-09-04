@@ -1,11 +1,21 @@
 # PHASE 4 VERIFICATION REPORT — Deterministic State Engine & Governance
+## CLOSURE CORRECTION ROUND 1 — Canonical Authority, Federation, Evidence/Approval Validation, Snapshot Authority
 
 - **Framework:** POWER 3.8 — Project State Engine (PSE)
 - **Worktree / Repository:** `/root/gemma/projects/P.O.W.E.R`
 - **Branch:** `feat/power-3.8-phase4-state-engine`
 - **Baseline Commit:** `8ccb87a6d0f6b9cd10e7ce2821ab5b383fb3461f`
+- **Round-0 Head:** `7f44d508b732dfe7c61ec36634b1b0ce7af39141`
 - **Date:** 2026-09-05
 - **Signer / Committer:** `weby-homelab <rekvizitor.ua@gmail.com>` (GPG Key: `2D49E810C7F2527E`, verified: true)
+
+> Canonical authority rule (binding for this report and the implementation):
+> “Canonical authority is established by independent resolution against the
+> owning authoritative subsystem. Digests/receipts record or protect the
+> result; they are not bearer credentials.”
+> Integrity != authority. Self-consistent object != authoritative object.
+> Digest != bearer credential. Source identity string != authority. Observed
+> lifecycle != canonical lifecycle. Snapshot integrity != snapshot authority.
 
 ---
 
@@ -14,14 +24,14 @@
 Phase 4 delivers the authoritative **Deterministic State Engine & Governance** for the POWER Project State Engine (PSE). The engine provides an auditable, provably deterministic, fail-closed projection of project state from the canonical append-only event ledger and authoritative external subsystems (TaskStore v2, DecisionService v1).
 
 All design principles and gates have been verified:
-1. **Determinism (G4.1):** Replaying the same sequence of canonical events across independent state reducer instances and separate Python processes produces 100% byte-identical canonical JSON output and identical SHA-256 `state_revision`.
+1. **Determinism (G4.1):** Replaying the same sequence of canonical events across independent state reducer instances and separate Python processes produces 100% byte-identical canonical JSON output and identical SHA-256 `state_revision`. The pure reducer (`ProjectStateReducer.reduce` / `reduce_internal`) is explicitly NON-AUTHORITATIVE determinism machinery for unit testing; it never emits canonical state on its own.
 2. **Model Safety & Zero Autonomous Advance (G4.2):** Strict P0 security enforcement blocks untrusted/model-extracted proposals from advancing lifecycle phases, satisfying DoD criteria, or overriding governance gates. Zero model transitions are permitted.
-3. **Canonical Subsystem Invariance (G4.3, G4.4):** Task v2 and DecisionService v1 remain authoritative. The state engine consumes cryptographically bound `TaskAuthorityView` and `DecisionAuthorityView` digests and rejects shadowing or forged status claims.
-4. **Finite State Machine & Closed Transitions (G4.5):** Strict 17-transition FSM table matching Phase-1 `lifecycle-v1.json`. Any undefined or illegal transition fails closed with explicit reason codes. Rollbacks require justified business rationale and closed projects require explicit `project.reopened` governance events.
+3. **Canonical Subsystem Invariance (G4.3, G4.4):** Task v2 and DecisionService v1 remain authoritative. The trusted orchestration boundary (`ProjectStateService.rebuild_project_state`) resolves live task/decision truth from the owning subsystems and constructs projections from objects actually read there. Caller-constructed `TaskAuthorityView` / `DecisionAuthorityView` objects — even with matching self-digests — prove only internal view integrity, never subsystem authority. Ledger `task.lifecycle.observed` / `decision.lifecycle.observed` payloads are audit signals; live stores win, drift emits `STALE_*_OBSERVATION` diagnostics.
+4. **Finite State Machine & Closed Transitions (G4.5):** Strict 17-transition FSM table matching Phase-1 `lifecycle-v1.json`. Any undefined or illegal transition fails closed with explicit reason codes. Rollbacks require justified business rationale and closed projects require explicit `project.reopened` governance events. Every declared `TransitionSpec.precondition` maps to a deterministic evaluator; unknown tokens fail closed. Approvals resolve only to canonical approved decisions with valid receipts (or canonical RACI Accountable where the contract explicitly permits it). Evidence refs must each resolve to canonically attached evidence. Gate overrides resolve actor authority from canonical RACI with frozen metadata (`overridden_by`, `justification`/`reason`, `approved_by`).
 5. **Deterministic Explainability (G4.6):** Every single field in `ProjectState` is fully explainable via `explain(field)`, tracing exact contributing event IDs, applicable governance rules, and external authority references.
-6. **Snapshot Equivalence:** Full replay from sequence 1 through $N$ is provably equivalent to restoring a validated snapshot at sequence $K$ and replaying tail events $K+1 \dots N$. Tampered snapshots fail closed.
+6. **Snapshot Authority:** Snapshot seals prove internal self-consistency only. Authoritative restore verifies `project_id` / `last_event_sequence` / `last_event_hash` against a trusted re-read of the canonical Phase-2 ledger and re-resolves federated TaskStore/DecisionService truth, recomputing readiness, approvals, DoR/DoD, health and `state_revision`. `valid_decisions` = approved canonical decisions; `required_approvals` = pending decisions. State lineage binds `rules_digest` = SHA-256 of the normalized effective governance ruleset.
 
-Verdict: **PHASE 4 STATUS: GO**
+Verdict: **PHASE 4 STATUS: GO (CLOSURE CORRECTION ROUND 1)**
 
 ---
 
@@ -43,8 +53,9 @@ Authorized Phase 4 Scope strictly executed:
 - Dependency cycle detection using Tarjan/DFS topological analysis (`detect_dependency_cycles`).
 - Comprehensive RAID entity state aggregation (Risks, Assumptions, Issues, Dependencies).
 - Deterministic explainability engine (`explain(field)`).
-- Snapshot creation, cryptographic validation (`snapshot_digest`), and tail-replay restoration.
-- 52 comprehensive Phase 4 tests and complete empirical evidence.
+- Snapshot creation, cryptographic validation (`snapshot_digest`), tail-replay restoration, and authoritative restore with ledger lineage plus federated re-resolution.
+- Trusted authority composition boundary (`ProjectStateService` / `ProjectStateEngine`, `AuthorityContext`, canonical RACI/evidence/approval/receipt resolution, ruleset digest binding).
+- 94 Phase 4 tests (52 pure determinism + 42 authoritative closure) and complete empirical evidence.
 
 Explicitly Out-of-Scope (BLOCKED):
 - Phase 5 (Context Compiler, ContextPacks, MCP state tools).
@@ -66,11 +77,17 @@ Explicitly Out-of-Scope (BLOCKED):
    - Legal FSM transitions catalog (17 transitions).
    - `detect_dependency_cycles()` graph cycle detector.
    - `GovernanceEngine` implementing transition evaluation, DoR/DoD evaluation, gate overrides, and health flags.
+   - `AuthorityContext` trusted canonical bundle, `compute_rules_digest()` / `RULES_DIGEST` ruleset binding, deterministic precondition evaluators for every declared token (unknown fails closed), canonical approval/evidence/receipt resolution in authoritative mode.
 3. `src/power_framework/core/state_reducer.py`:
-   - Pure functional `ProjectStateReducer`.
-   - Sequential event replay, hash chain integrity validation, payload digest verification.
-   - Task readiness projection, decision validation, RAID aggregation.
-   - Deterministic explainability traces and snapshot management.
+   - Pure functional `ProjectStateReducer` (`reduce` / `reduce_internal`, explicitly non-authoritative).
+   - Sequential event replay, hash chain integrity verification, explicit payload digest verification.
+   - Canonical RACI projection (`raci.assigned` / `raci.revoked`), canonical evidence index (`evidence.attached` / `artifact.*`), observation-vs-authority drift diagnostics.
+   - Task readiness projection, decision validation (`valid_decisions` = approved only), RAID aggregation.
+   - Deterministic explainability traces and snapshot management with lineage verification helper.
+4. `src/power_framework/core/state_service.py` (NEW — trusted authority composition boundary):
+   - `ProjectStateService` / `ProjectStateEngine` with authoritative `rebuild_project_state(vault_root, project_id)`: verifies the canonical Phase-2 ledger, re-reads the authoritative event sequence, resolves federated Task/Decision authority from canonical services, then executes pure reduction.
+   - `rebuild_from_candidates()`: fail-closed canonical-membership proof for caller streams.
+   - `restore_snapshot_authoritative()`: ledger lineage + federated re-resolution + recomputation.
 
 ### Created Artifacts:
 1. `artifacts/project-state/phase-4/state_schema_v1.json`: JSON Schema (Draft 2020-12) for `ProjectState`.
@@ -81,7 +98,8 @@ Explicitly Out-of-Scope (BLOCKED):
 6. `artifacts/project-state/phase-4/PHASE_4_REPORT.md`: This authoritative report.
 
 ### Created Test Suite:
-1. `tests/test_phase4_state_engine.py`: 52 comprehensive tests.
+1. `tests/test_phase4_state_engine.py`: 52 deterministic pure-reducer / FSM / P0 / RAID / snapshot-equivalence tests (non-authoritative determinism evidence; NOT canonical-authority evidence).
+2. `tests/test_phase4_authority_closure.py` (NEW): 42 authoritative integration tests — T1 forged chain REJECTED, T2 fake stream REJECTED, T3 forged task view REJECTED (live wins), T4 stale task observation (live wins + DoD FAIL), T5 forged decision view REJECTED, T6 stale decision observation (live wins), T7 fake approval REQUIRE_APPROVAL, T8 self-declared admin DENIED (+ canonical override positive), T9 fake evidence REQUIRE_EVIDENCE, fake task receipt DoD FAIL vs verified PASS (+ TaskStore verification), T10 full 17-transition positive matrix + per-token evaluator contract + vault-level owner/charter, RACI-accountable, accountable-approval negatives, T11 forged snapshot REJECTED, T12 stale federated snapshot re-resolved (task + decision + behind-head tail), ruleset binding, `valid_decisions` semantics, payload-digest defense, full positive authoritative E2E (CLOSED with DoR/DoD PASS).
 
 ---
 
@@ -100,11 +118,16 @@ Explicitly Out-of-Scope (BLOCKED):
 ## 6. Task / Decision Authority Boundary
 
 - **Task Authority (TaskStore v2):**
-  - Tasks originate and transition in TaskStore v2. The state engine receives authoritative `TaskAuthorityView` objects with `(task_id, state, revision, dependencies, digest)`.
-  - Task state in `ProjectState` cannot override TaskStore v2. If a model-derived event claims a task is complete while TaskStore v2 reports `ready`, the task remains uncompleted in state readiness evaluations.
+  - Tasks originate and transition in TaskStore v2. The trusted service reads live `PowerTask` objects via `TaskService`/`TaskStore` and constructs `TaskAuthorityView` projections from objects actually read there (digest recomputed for integrity).
+  - A caller-constructed view — even with a perfectly matching self-digest and `source_identity="TaskStore:v2"` — is not TaskStore authority and never overrides live state. Ledger `task.lifecycle.observed` is an audit/observation signal: if it disagrees with TaskStore, authoritative state keeps the live value and records `STALE_TASK_OBSERVATION` / `TASK_AUTHORITY_DRIFT`.
 - **Decision Authority (DecisionService v1):**
-  - Decision approval originates in DecisionService v1. The state engine receives `DecisionAuthorityView` with `(decision_id, status, revision, digest)`.
-  - Semantic proposals claiming a decision is accepted without DecisionService endorsement are classified as unapproved and remain in `required_approvals`.
+  - Decision approval originates in DecisionService v1. The trusted service reads live `Decision` objects and admits `approved` status only with a canonical `DecisionReceipt` verified through the service.
+  - Caller-constructed approved views and ledger `decision.lifecycle.observed = approved` never override a live `pending` decision (`STALE_DECISION_OBSERVATION` / `DECISION_AUTHORITY_DRIFT`). Statuses: pending, approved, rejected, expired.
+- **RACI / Approvals / Evidence / Receipts:**
+  - RACI projection is built only from canonical `raci.assigned` / `raci.revoked` events; Accountable must be exactly one actor. Payload `role` strings never grant authority.
+  - Approvals resolve only to canonically approved decisions with valid receipts, or to canonical RACI Accountable where the transition contract explicitly lists `accountable_approval`. Bare `approval_ref` strings never satisfy a gate.
+  - Evidence refs must each resolve to the canonical attached-evidence index (built from `evidence.attached` / `artifact.*` events at strictly prior sequences). Non-empty strings alone never satisfy a gate.
+  - DoD task receipts are validated through TaskStore receipt semantics; random `tcr_*` IDs never satisfy DoD.
 
 ---
 
@@ -123,12 +146,15 @@ Conforms to Draft 2020-12 JSON Schema (`artifacts/project-state/phase-4/state_sc
 - `open_issues`: Lexicographically sorted list of open/investigating issues.
 - `active_assumptions`: Lexicographically sorted list of active assumptions.
 - `active_dependencies`: Lexicographically sorted list of active dependencies.
-- `valid_decisions`: Lexicographically sorted list of accepted decisions.
+- `valid_decisions`: Lexicographically sorted list of APPROVED canonical decisions only.
 - `superseded_decisions`: Lexicographically sorted list of superseded decisions.
 - `recent_changes`: Sliding window (last 20) of applied event IDs.
 - `health_flags`: Lexicographically sorted list of `HealthFlag` strings.
 - `required_approvals`: Lexicographically sorted list of blocking approval references.
 - `state_revision`: 64-character hex SHA-256 digest.
+- `rules_digest`: 64-character hex SHA-256 binding `rules_version` to exactly one normalized effective governance ruleset (modified rules with unchanged version are detectable).
+- `raci`: Deterministic canonical role -> sorted actor list projection (PSE-owned).
+- `attached_evidence`: Deterministic sorted index of canonically attached evidence refs (PSE-owned).
 
 ---
 
@@ -177,8 +203,9 @@ ProjectState maintains typed models for:
   - Requirements: Non-empty active task backlog, no unmitigated critical risks, charter evidence present.
 - **Definition of Done (DoD):**
   - Evaluates prerequisites before entering `CLOSING` or `CLOSED`.
-  - Requirements: 100% of associated tasks in terminal state (`completed`), zero open critical/blocking issues, all associated decisions in `accepted` status, canonical evidence receipts attached.
+  - Requirements: 100% of associated tasks in terminal state (`completed`), zero open critical/blocking issues, zero pending canonical decisions, evidence refs resolved to canonically attached evidence and/or task receipts verified through TaskStore.
   - P0-2 Invariant: Model claims ("all tasks pass") without canonical evidence refs fail closed.
+  - Receipt Invariant: random `tcr_*` IDs never satisfy DoD; only TaskStore-verified receipts count.
 
 ---
 
@@ -187,8 +214,9 @@ ProjectState maintains typed models for:
 - Encapsulated in `GovernanceEngine`.
 - Verifies:
   1. `is_untrusted_event(event)`: Rejects any event with `actor="model"`, `source="model_extraction"`, or proposed verification status attempting lifecycle transitions.
-  2. Gate overrides: Permitted only with explicit authorized actor identity (`security_officer`, `project_owner`, `lead_architect`) and non-empty `justification`. Overrides are recorded in `overridden_gates`.
+  2. Gate overrides: In authoritative mode actor authority resolves from canonical RACI with frozen metadata (`overridden_by`, `justification`/`reason`, `approved_by`) verified against canonical identities; payload `role` strings never certify authority. Legacy non-authoritative checks apply without an authority bundle (determinism only).
   3. Cycle detection: DFS cycle detection over task dependency graphs.
+  4. Transition preconditions: every declared token maps to a deterministic evaluator (unknown fails closed); approvals/evidence/receipts resolve canonically in authoritative mode.
 
 ---
 
@@ -208,33 +236,46 @@ ProjectState maintains typed models for:
 ## 13. Snapshot / Replay Design
 
 - **Snapshot Creation:** `ProjectStateReducer.create_snapshot(state)` generates a `ProjectStateSnapshot` capturing `(project_id, last_event_sequence, last_event_hash, state_revision, state, snapshot_digest)`.
-- **Snapshot Integrity:** `verify_integrity()` computes `compute_snapshot_digest()` over canonical bytes and confirms state revision matches canonical state content.
+- **Snapshot Integrity (not authority):** `verify_integrity()` computes `compute_snapshot_digest()` over canonical bytes and confirms state revision matches canonical state content. This proves internal self-consistency only.
+- **Authoritative Restore:** `ProjectStateService.restore_snapshot_authoritative(snapshot)` additionally verifies lineage (`project_id`, `last_event_sequence`, `last_event_hash`) against a trusted re-read of the canonical Phase-2 ledger, replays any tail under trusted authority, re-resolves current tasks from TaskStore and decisions from DecisionService, and recomputes readiness/approvals/DoR/DoD/health/`state_revision`. Snapshot acceleration never turns stale external authority into current canonical truth.
 - **Tail Replay:** `restore_from_snapshot(snapshot, tail_events)` loads snapshot state and sequentially applies events $K+1 \dots N$.
-- **Tampering Defense:** Any modified field inside `snapshot.state` or mismatched revision raises `SnapshotIntegrityError`.
+- **Tampering & Forgery Defense:** Any modified field inside `snapshot.state`, mismatched revision, ruleset digest mismatch, or lineage mismatch raises `SnapshotIntegrityError`.
 
 ---
 
 ## 14. Determinism Evidence
 
-Recorded empirically in `artifacts/project-state/phase-4/replay_determinism.json`:
-- **Run 1 State Revision:** `ba5f8d9868aa940305a1d4fe25bd14e83f5f8a4c6da5d96c5ecaf393ee102fd2`
-- **Run 2 State Revision:** `ba5f8d9868aa940305a1d4fe25bd14e83f5f8a4c6da5d96c5ecaf393ee102fd2`
-- **Run 1 Canonical Bytes SHA-256:** `ed6cb81df5daaf37b0d56358be5ca9555ff3e533d27efa59fa441d780344c922`
-- **Run 2 Canonical Bytes SHA-256:** `ed6cb81df5daaf37b0d56358be5ca9555ff3e533d27efa59fa441d780344c922`
-- **Cross-Process Replay:** Identical canonical JSON bytes and identical `state_revision`.
+Recorded empirically in `artifacts/project-state/phase-4/replay_determinism.json` (regenerated in Closure Correction Round 1 with the current canonical state shape, including `raci`, `attached_evidence` and `rules_digest`; documented 10-event stream: `project.created`, `evidence.attached(evi_charter_01)`, `project.phase.changed->PLANNING`, `raci.assigned(Accountable)`, 2x `task.associated`, `risk.opened`, `issue.opened`, `assumption.created`, `dependency.created`):
+- **Run 1 State Revision:** `b2a043f7fc21d93607019e4162dc129c464242a6c2a16777fae8d3910d3c8927`
+- **Run 2 State Revision:** `b2a043f7fc21d93607019e4162dc129c464242a6c2a16777fae8d3910d3c8927`
+- **Run 1 Canonical Bytes SHA-256:** `109f9a0c634144aaaa4dfa04ce6bf0db891fdfd24cae82f733162254e105b8ce`
+- **Run 2 Canonical Bytes SHA-256:** `109f9a0c634144aaaa4dfa04ce6bf0db891fdfd24cae82f733162254e105b8ce`
+- **Cross-Process Replay:** Identical canonical JSON bytes and identical `state_revision` (proven by `test_separate_python_processes_determinism`).
 - **Snapshot Tail Equivalence:** Full replay revision matches snapshot + tail restored revision exactly.
 
 ---
 
 ## 15. Security Evidence
 
-Special P0 Security Gates verified in `tests/test_phase4_state_engine.py`:
+Special P0 Security Gates verified in `tests/test_phase4_state_engine.py` (pure) and `tests/test_phase4_authority_closure.py` (authoritative, real vault/stores):
 - **P0-1:** `test_p0_1_model_cannot_advance_lifecycle` -> PASSED (`UNTRUSTED_MODEL_TRANSITION_PROHIBITED`).
 - **P0-2:** `test_p0_2_model_cannot_satisfy_dod` -> PASSED (`DOD_MISSING_EVIDENCE`).
 - **P0-3:** `test_p0_3_model_cannot_override_governance` -> PASSED (`OVERRIDE_AUTHORITY_INVALID`).
 - **P0-4:** `test_p0_4_task_authority_cannot_be_shadowed` -> PASSED (TaskStore v2 retains authority).
 - **P0-5:** `test_p0_5_decision_authority_cannot_be_shadowed` -> PASSED (DecisionService v1 retains authority).
 - **P0-6:** `test_p0_6_snapshot_cannot_forge_state` -> PASSED (`SnapshotIntegrityError`).
+- **T1 forged chain:** `AUTHORITATIVE STATE = REJECTED` (pure replay still emits bytes, proving the boundary matters).
+- **T2 fake stream:** REJECTED on canonical-membership mismatch.
+- **T3 forged task view:** REJECTED — live `working` wins, DoD FAILS.
+- **T4 stale task observation:** live TaskStore wins + `STALE_TASK_OBSERVATION`, DoD FAILS.
+- **T5 forged decision view:** REJECTED — live `pending` wins, still in `required_approvals`.
+- **T6 stale decision observation:** live DecisionService wins + `STALE_DECISION_OBSERVATION`.
+- **T7 fake approval ref:** `REQUIRE_APPROVAL` (`MISSING_REQUIRED_APPROVAL`), never ALLOW.
+- **T8 self-declared admin:** OVERRIDE DENIED; canonical RACI override with frozen metadata ACCEPTED.
+- **T9 fake evidence ref:** `REQUIRE_EVIDENCE` (`EVIDENCE_REF_NOT_CANONICALLY_ATTACHED`).
+- **Fake task receipt:** DoD FAILS; TaskStore-verified receipts PASS.
+- **T11 forged snapshot:** `AUTHORITATIVE RESTORE = REJECTED` (lineage mismatch).
+- **T12 stale federated snapshot:** live authorities re-resolved (task + decision analogues PASS).
 
 ---
 
@@ -251,11 +292,11 @@ Memory allocation is linear in the number of unique active entities; immutable s
 
 ## 17. Tests and Exact Commands
 
-### Phase 4 Test Suite:
+### Phase 4 Test Suites (pure determinism + authoritative closure):
 ```bash
-uv run --python 3.13 pytest tests/test_phase4_state_engine.py -o addopts="" -v
+uv run --python 3.13 pytest tests/test_phase4_state_engine.py tests/test_phase4_authority_closure.py -o addopts="" -v
 ```
-**Result:** 52 passed in 2.98s.
+**Result:** 94 passed (52 pure + 42 authoritative).
 
 ### Linters & Type Checking:
 ```bash
@@ -275,23 +316,23 @@ uv run --python 3.13 pip-audit
 
 ## 18. Full Regression
 
-### PSE Regression Suite (Phases 1, 2, 3, Tasks, Decisions, Phase 4):
+### PSE Regression Suite (Phases 1, 2, 3, Tasks, Decisions, Phase 4 pure + authoritative):
 ```bash
-uv run --python 3.13 pytest tests/test_phase1_project_state_contracts.py tests/test_phase2_event_ledger.py tests/test_phase3_semantic_compiler.py tests/test_task_service.py tests/test_decision_service.py tests/test_phase4_state_engine.py -o addopts="" -v
+uv run --python 3.13 pytest tests/test_phase1_project_state_contracts.py tests/test_phase2_event_ledger.py tests/test_phase3_semantic_compiler.py tests/test_task_service.py tests/test_decision_service.py tests/test_phase4_state_engine.py tests/test_phase4_authority_closure.py -o addopts="" -v
 ```
-**Result:** 190 passed in 5.98s.
+**Result:** 232 passed.
 
 ### Full Framework Test Suite:
 ```bash
 uv run --python 3.13 pytest tests/ -m "not real_neural and not bench" -o addopts="" -q
 ```
-**Result:** 1555 passed, 4 skipped, 17 deselected in 95.22s.
+**Result:** 1597 passed, 4 skipped, 17 deselected.
 
 ### Phase 4 Modules Coverage:
 ```bash
-uv run --python 3.13 pytest --cov=power_framework.core.state_models --cov=power_framework.core.governance_engine --cov=power_framework.core.state_reducer tests/test_phase4_state_engine.py -o addopts=""
+uv run --python 3.13 pytest --cov=power_framework.core.state_models --cov=power_framework.core.governance_engine --cov=power_framework.core.state_reducer --cov=power_framework.core.state_service tests/test_phase4_state_engine.py tests/test_phase4_authority_closure.py -o addopts=""
 ```
-**Result:** 78% coverage (exceeds mandatory >= 70% threshold).
+**Result:** 82% total coverage on Phase 4 modules (gate >= 70%); every new authority boundary (ledger membership, forged/stale views, approvals, RACI, evidence, receipts, preconditions, snapshots, ruleset) has direct positive and adversarial coverage. Coverage is not a substitute for threat tests.
 
 ---
 
@@ -322,9 +363,9 @@ GitHub CI workflows (`ci.yml`, `codeql.yml`, `docs.yml`) are configured for bran
 | :--- | :--- | :--- | :--- |
 | **G4.1** | **Full replay is deterministic** | **PASSED** | Dual independent runs produce identical bytes and `state_revision`. Subprocess tests confirm cross-process determinism. Snapshot + tail restoration matches full replay. |
 | **G4.2** | **No LLM can force a state transition** | **PASSED** | `is_untrusted_event()` rejects model-derived candidate transitions; P0-1 test confirms 0 autonomous transitions allowed. |
-| **G4.3** | **Task v2 remains canonical** | **PASSED** | State binds `TaskAuthorityView` digests; task completion requires TaskStore v2 receipt; task authority cannot be shadowed. |
-| **G4.4** | **Decision workflow remains canonical** | **PASSED** | State binds `DecisionAuthorityView` digests; decision approval requires DecisionService v1 record; unapproved decisions cannot satisfy DoD. |
-| **G4.5** | **Illegal transitions fail closed** | **PASSED** | All 17 legal transitions verified; 10 illegal transitions tested and failed closed; rollbacks require justification; closed projects require explicit reopen events. |
+| **G4.3** | **Task v2 remains canonical** | **PASSED** | Live TaskStore objects are resolved by the trusted service; forged views and stale observations never override them (T3/T4). View digests prove internal integrity only. |
+| **G4.4** | **Decision workflow remains canonical** | **PASSED** | Live DecisionService objects with verified receipts are the only approval authority; forged views and stale observations never override them (T5/T6). |
+| **G4.5** | **Illegal transitions fail closed** | **PASSED** | All 17 legal transitions verified with full positive matrix; 10 illegal transitions tested and failed closed; rollbacks require justification; closed projects require explicit reopen events; every precondition token has an executable evaluator (T10). |
 | **G4.6** | **State fields can be explained from evidence** | **PASSED** | `explain(field)` traces all 10 mandatory fields to contributing events, rules, and external authority references. |
 
 ---
@@ -332,4 +373,4 @@ GitHub CI workflows (`ci.yml`, `codeql.yml`, `docs.yml`) are configured for bran
 ## 23. Final Status
 
 PHASE 4 STATUS:
-GO
+GO (CLOSURE CORRECTION ROUND 1)
