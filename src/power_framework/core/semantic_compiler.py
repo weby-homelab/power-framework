@@ -192,13 +192,13 @@ assert set(PROJECT_EVENT_DISPATCH_REGISTRY.keys()) == PROJECT_EVENT_TYPES, (
 
 
 class VerifiedEventBatch(BaseModel):
-    """Container for cryptographically verified authoritative project events."""
+    """Legacy event container; the authority marker is informational only."""
 
     model_config = ConfigDict(extra="forbid")
 
     project_id: str
     events: list[ProjectEvent] = Field(default_factory=list)
-    is_authoritative: bool = True
+    is_authoritative: bool = False
 
 
 class CompilationResult(BaseModel):
@@ -271,43 +271,15 @@ class SemanticCompiler:
         )
         validate_project_id(project_id)
 
-        # P0 Authority Boundary Check
-        is_ledger_authorized = False
-        if (
-            receipt is not None
-            and receipt.verified
-            and receipt.project_id == project_id
-            and receipt.event_count == len(event_list)
-        ):
-            first_seq = (
-                event_list[0].sequence
-                if isinstance(event_list[0], ProjectEvent)
-                else event_list[0].get("sequence")
-            )
-            last_seq = (
-                event_list[-1].sequence
-                if isinstance(event_list[-1], ProjectEvent)
-                else event_list[-1].get("sequence")
-            )
-            last_hash = (
-                event_list[-1].event_hash
-                if isinstance(event_list[-1], ProjectEvent)
-                else event_list[-1].get("event_hash")
-            )
-            if (
-                first_seq == receipt.from_sequence
-                and last_seq == receipt.to_sequence
-                and last_hash == receipt.head_event_hash
-            ):
-                ledger_file = Path(receipt.ledger_path)
-                if ledger_file.is_file():
-                    is_ledger_authorized = True
-                elif vault_root is not None:
-                    store = ProjectEventStore(project_id, vault_root)
-                    if store.active_events_file.is_file():
-                        is_ledger_authorized = True
-                elif receipt.ledger_path == "in_memory_benchmark_trusted":
-                    is_ledger_authorized = True
+        # P0 Authority Boundary Check.  Receipt fields are audit metadata only;
+        # authority is granted solely after exact canonical ledger membership
+        # verification under an explicit vault root.
+        is_ledger_authorized = self._canonical_replay_matches(
+            event_list=event_list,
+            project_id=project_id,
+            receipt=receipt,
+            vault_root=vault_root,
+        )
 
         # Deterministic timestamp anchor (G3.4)
         if as_of is None:
@@ -437,8 +409,14 @@ class SemanticCompiler:
                 errors.append(f"Event {event_id}: {type(e).__name__}: {e!s}")
 
         # Step 4: Deduplication & Idempotent ID generation (G3.4)
+        existing_for_merge = list(existing_candidates or [])
+        if not is_ledger_authorized:
+            existing_for_merge = [
+                self._downgrade_untrusted_existing_candidate(candidate)
+                for candidate in existing_for_merge
+            ]
         deduped_candidates, duplicate_count = self._deduplicate_candidates(
-            all_candidates, existing_candidates or []
+            all_candidates, existing_for_merge
         )
 
         # Step 5: Contradiction and Supersession Detection (G3.5)
@@ -506,14 +484,111 @@ class SemanticCompiler:
         batch: VerifiedReplayBatch,
         existing_candidates: Sequence[SemanticEntityCandidate] | None = None,
         as_of: str | None = None,
-        vault_root: Path | None = None,
+        *,
+        vault_root: Path,
     ) -> CompilationResult:
-        """Compile an explicitly verified ledger replay batch."""
+        """Compile a batch after independently checking canonical ledger membership.
+
+        ``vault_root`` is mandatory because a caller-created replay batch is not an
+        authority capability.  The supplied receipt path and metadata are checked
+        only as consistency evidence after the canonical store is re-read.
+        """
         return self.compile_events(
             batch,
             existing_candidates=existing_candidates,
             as_of=as_of,
             vault_root=vault_root,
+        )
+
+    def _canonical_replay_matches(
+        self,
+        event_list: Sequence[ProjectEvent | dict[str, Any]],
+        project_id: str,
+        receipt: TrustedReplayReceipt | None,
+        vault_root: Path | None,
+    ) -> bool:
+        """Return true only for an exact replay of the canonical project ledger.
+
+        A ``TrustedReplayReceipt`` is caller-constructible evidence, so its boolean,
+        path, range, and hashes never grant authority by themselves.  The canonical
+        store is derived from ``project_id`` and ``vault_root``; its verified replay
+        must match every supplied event in order, not only the batch endpoints.
+        """
+        if receipt is None or vault_root is None or receipt.verified is not True:
+            return False
+
+        try:
+            supplied_events = [
+                event if isinstance(event, ProjectEvent) else ProjectEvent.model_validate(event)
+                for event in event_list
+            ]
+            if not supplied_events or receipt.project_id != project_id:
+                return False
+            if any(event.project_id != project_id for event in supplied_events):
+                return False
+            if receipt.event_count != len(supplied_events):
+                return False
+            if (
+                supplied_events[0].sequence != receipt.from_sequence
+                or supplied_events[-1].sequence != receipt.to_sequence
+                or supplied_events[-1].event_hash != receipt.head_event_hash
+            ):
+                return False
+
+            store = ProjectEventStore(project_id, vault_root)
+            expected_ledger_path = store.active_events_file.resolve()
+            supplied_ledger_path = Path(receipt.ledger_path).expanduser().resolve(strict=True)
+            if supplied_ledger_path != expected_ledger_path:
+                return False
+
+            canonical_batch = store.read_verified_replay(from_sequence=receipt.from_sequence)
+            canonical_receipt = canonical_batch.receipt
+            if (
+                canonical_receipt.project_id != receipt.project_id
+                or canonical_receipt.from_sequence != receipt.from_sequence
+                or canonical_receipt.to_sequence != receipt.to_sequence
+                or canonical_receipt.event_count != receipt.event_count
+                or canonical_receipt.head_event_hash != receipt.head_event_hash
+                or canonical_receipt.verified is not True
+            ):
+                return False
+
+            supplied_identity = [event.model_dump() for event in supplied_events]
+            canonical_identity = [event.model_dump() for event in canonical_batch.events]
+            return supplied_identity == canonical_identity
+        except Exception as exc:
+            # Fail closed without echoing potentially untrusted paths or payloads.
+            logger.debug("Canonical replay authority check failed: %s", type(exc).__name__)
+            return False
+
+    @staticmethod
+    def _downgrade_untrusted_existing_candidate(
+        candidate: SemanticEntityCandidate,
+    ) -> SemanticEntityCandidate:
+        """Prevent caller-provided prior evidence from promoting an untrusted batch."""
+        provenance = dict(candidate.entity.get("provenance", {}))
+        if (
+            candidate.verification_status != VerificationStatus.VERIFIED
+            and provenance.get("verification_status") != "verified"
+        ):
+            return candidate
+
+        try:
+            safe_confidence = min(float(candidate.confidence), 0.5)
+        except (TypeError, ValueError):
+            safe_confidence = 0.5
+        provenance["verification_status"] = "unverified"
+        provenance["confidence"] = safe_confidence
+        entity = dict(candidate.entity)
+        entity["provenance"] = provenance
+        return SemanticEntityCandidate(
+            entity_type=candidate.entity_type,
+            entity_id=candidate.entity_id,
+            entity=entity,
+            verification_status=VerificationStatus.PROPOSED,
+            source=candidate.source,
+            confidence=safe_confidence,
+            metadata=dict(candidate.metadata),
         )
 
     def compile_unstructured(
@@ -619,11 +694,17 @@ class SemanticCompiler:
                 logger.exception("Model extraction failed on unstructured text: %s", e)
                 errors.append(f"ModelProvider: {type(e).__name__}: {e!s}")
 
-        # Deduplicate and propose contradictions
-        deduped, dup_count = self._deduplicate_candidates(candidates, existing_candidates or [])
+        # Deduplicate and propose contradictions. Unstructured compilation has
+        # no canonical ledger authority, so prior caller-provided candidates must
+        # not promote the current model/observation output.
+        existing_for_merge = [
+            self._downgrade_untrusted_existing_candidate(candidate)
+            for candidate in existing_candidates or []
+        ]
+        deduped, dup_count = self._deduplicate_candidates(candidates, existing_for_merge)
         proposals = self._detect_contradictions_and_supersessions(
             new_candidates=deduped,
-            existing_candidates=existing_candidates or [],
+            existing_candidates=existing_for_merge,
             as_of=timestamp,
         )
         valid_candidates, val_errors = self._validate_candidates(deduped)
@@ -1567,7 +1648,9 @@ class SemanticCompiler:
             elif cid in existing_by_id:
                 # Merge into existing from earlier state
                 duplicate_count += 1
-                merged_by_id[cid] = self._merge_two_candidates(existing_by_id[cid], candidate)
+                # The current event is the source of truth for the current
+                # compilation. Prior candidates may be stale or caller-created.
+                merged_by_id[cid] = self._merge_two_candidates(candidate, existing_by_id[cid])
             else:
                 merged_by_id[cid] = candidate
 
@@ -1918,19 +2001,9 @@ class SemanticCompiler:
             # Compile sample
             if input_type == "structured_event":
                 evt_dict = sample["input"]
-                receipt = TrustedReplayReceipt(
-                    project_id=evt_dict.get("project_id", "prj_eval_test"),
-                    ledger_path="in_memory_benchmark_trusted",
-                    from_sequence=evt_dict.get("sequence", 1),
-                    to_sequence=evt_dict.get("sequence", 1),
-                    head_event_hash=evt_dict.get("event_hash", ""),
-                    event_count=1,
-                    verified=True,
-                )
                 comp_result = self.compile_event(
                     evt_dict,
                     existing_candidates=existing_knowledge,
-                    replay_receipt=receipt,
                 )
             elif input_type == "unstructured_text":
                 text = sample["input"]

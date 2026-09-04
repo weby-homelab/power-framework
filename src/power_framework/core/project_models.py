@@ -271,7 +271,12 @@ def _default_replayed_at() -> str:
 
 
 class TrustedReplayReceipt(BaseModel):
-    """Authority receipt proving events were sourced from and verified by the canonical Phase 2 ledger."""
+    """Audit record for a replay verified against the canonical Phase 2 ledger.
+
+    This model is intentionally constructible by callers.  Its fields are evidence
+    that must be independently checked against the canonical store; they are not an
+    authority capability.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -281,12 +286,16 @@ class TrustedReplayReceipt(BaseModel):
     to_sequence: int = Field(default=1, ge=1)
     event_count: int = Field(default=0, ge=0)
     head_event_hash: str = Field(default="", pattern=PREV_HASH_REGEX)
-    verified: bool = Field(default=True)
+    verified: bool = Field(default=False)
     replayed_at: str = Field(default_factory=_default_replayed_at, pattern=TIMESTAMP_REGEX)
 
 
 class VerifiedReplayBatch(BaseModel):
-    """A batch of events read directly from an authoritative Phase-2 ledger with cryptographic verification."""
+    """Replay data returned by the canonical store after cryptographic verification.
+
+    Direct construction is allowed for transport and testing, but neither this
+    container nor its receipt grants authority without canonical membership checks.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

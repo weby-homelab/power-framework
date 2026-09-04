@@ -496,23 +496,24 @@ class ProjectEventStore:
 
     def read_verified_replay(self, from_sequence: int = 1) -> VerifiedReplayBatch:
         """Read and verify events from the authoritative Phase-2 ledger, returning a verified replay batch."""
-        res = self.verify()
-        if not res.valid:
-            raise LedgerIntegrityError(f"Ledger verification failed: {res.errors}")
-        events = list(self.replay(from_sequence=from_sequence))
-        head_hash = events[-1].event_hash if events else ""
-        to_seq = events[-1].sequence if events else from_sequence
-        receipt = TrustedReplayReceipt(
-            project_id=self.project_id,
-            ledger_path=str(self.active_events_file.resolve()),
-            from_sequence=from_sequence,
-            to_sequence=max(to_seq, from_sequence),
-            event_count=len(events),
-            head_event_hash=head_hash,
-            verified=True,
-            replayed_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        )
-        return VerifiedReplayBatch(receipt=receipt, events=events)
+        with self.lock():
+            res = self.verify()
+            if not res.valid:
+                raise LedgerIntegrityError(f"Ledger verification failed: {res.errors}")
+            events = list(self.replay(from_sequence=from_sequence))
+            head_hash = events[-1].event_hash if events else ""
+            to_seq = events[-1].sequence if events else from_sequence
+            receipt = TrustedReplayReceipt(
+                project_id=self.project_id,
+                ledger_path=str(self.active_events_file.resolve()),
+                from_sequence=from_sequence,
+                to_sequence=max(to_seq, from_sequence),
+                event_count=len(events),
+                head_event_hash=head_hash,
+                verified=True,
+                replayed_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            )
+            return VerifiedReplayBatch(receipt=receipt, events=events)
 
     def verify(self) -> LedgerVerificationResult:
         """Verify the full cryptographic hash chain and schema compliance across all event files."""

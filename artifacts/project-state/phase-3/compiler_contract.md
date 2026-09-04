@@ -64,15 +64,20 @@ All semantic entities strictly conform to `artifacts/project-state/phase-1/seman
 
 | Semantic Type | ID Prefix & Regex Pattern | Core Fields | Default Initial Status |
 | :--- | :--- | :--- | :--- |
-| **`FACT`** | `fct_[A-Za-z0-9._-]{2,64}` | `statement`, `category`, `verified_at`, `verification_method` | `verified` (if structured) |
+| **`FACT`** | `fct_[A-Za-z0-9._-]{2,64}` | `statement`, `category`, `verified_at`, `verification_method` | `proposed` by default; `verified` only after canonical ledger replay |
 | **`DECISION`** | `dref_[A-Za-z0-9._-]{2,64}` | `decision_id`, `relation`, `status`, `task_id`, `receipt_ref` | `accepted` / `proposed` / `rejected` |
 | **`ASSUMPTION`** | `asm_[A-Za-z0-9._-]{2,64}` | `statement`, `rationale`, `confidence`, `status`, `invalidated_by` | `valid` / `invalidated` / `confirmed` |
 | **`HYPOTHESIS`** | `hyp_[A-Za-z0-9._-]{2,64}` | `statement`, `rationale`, `validation_criteria`, `confidence`, `status` | `proposed` / `testing` / `validated` |
 | **`RISK`** | `rsk_[A-Za-z0-9._-]{2,64}` | `title`, `description`, `probability`, `impact`, `owner`, `status` | `identified` / `mitigated` / `retired` |
 | **`ISSUE`** | `iss_[A-Za-z0-9._-]{2,64}` | `title`, `description`, `severity`, `status`, `blocking_task_ids` | `open` / `investigating` / `resolved` |
 | **`DEPENDENCY`** | `dep_[A-Za-z0-9._-]{2,64}` | `source_id`, `target_id`, `target_type`, `dependency_kind`, `status` | `pending` / `satisfied` / `broken` |
-| **`OBSERVATION`** | `obs_[A-Za-z0-9._-]{2,64}` | `content`, `context`, `observer`, `confidence`, `observed_at` | `verified` (structured) / `proposed` (unstr) |
-| **`LESSON`** | `lsn_[A-Za-z0-9._-]{2,64}` | `title`, `summary`, `category`, `applies_to`, `recommendation` | `verified` |
+| **`OBSERVATION`** | `obs_[A-Za-z0-9._-]{2,64}` | `content`, `context`, `observer`, `confidence`, `observed_at` | `proposed` by default; `verified` only after canonical ledger replay |
+| **`LESSON`** | `lsn_[A-Za-z0-9._-]{2,64}` | `title`, `summary`, `category`, `applies_to`, `recommendation` | `proposed` by default; `verified` only after canonical ledger replay |
+
+Structured domain status (for example `accepted`, `valid`, or `identified`) is
+not semantic verification authority.  Every candidate starts as `proposed`
+unless the exact ordered events have been independently matched to the
+canonical Phase-2 ledger.
 
 ---
 
@@ -80,7 +85,7 @@ All semantic entities strictly conform to `artifacts/project-state/phase-1/seman
 
 The compiler operates with 5 discrete verification statuses:
 1. `proposed`: Initial state for all model-extracted candidates and newly proposed associations.
-2. `verified`: Certified by deterministic canonical event receipt or human operator assertion.
+2. `verified`: Certified by independent canonical ledger membership verification; the receipt records that verification as audit evidence.
 3. `rejected`: Explicitly disassociated, refuted, or rejected by architectural authority.
 4. `superseded`: Replaced by a newer authoritative decision or updated entity; **history preserved**.
 5. `invalidated`: Disproven assumption or deprecated fact; **history preserved**.
@@ -171,15 +176,15 @@ The semantic compiler never manufactures placeholder or synthetic domain values:
    - Cryptographic validity (valid `payload_digest`, valid `event_hash`, unbroken monotonic `sequence`, valid JSON schema) proves internal structural tamper-evidence, but does NOT grant ledger authority.
    - An arbitrary in-memory event stream or raw event dictionary cannot self-attest to being part of the authoritative project ledger.
 2. **Authoritative Replay Boundary (`VerifiedReplayBatch` / `TrustedReplayReceipt`):**
-   - Authoritative `VERIFIED` semantic candidates are produced ONLY when events are replayed through the explicit Phase-2 ledger boundary (`ProjectEventStore.read_verified_replay()`, `replay_project_verified()`, or `SemanticCompiler.compile_ledger_replay()`).
-   - The ledger receipt proves:
-     - The event stream was read directly from `.power/projects/<project_id>/events.jsonl` under project file locking.
-     - Full ledger cryptographic verification succeeded without corruption or gaps.
-     - Exact sequence range (`from_sequence` to `to_sequence`), event count, and head event hash match the replayed batch.
+   - Authority is established only when the exact ordered events are independently matched to a full, verified canonical Phase-2 replay through `ProjectEventStore.read_verified_replay()`, `replay_project_verified()`, or `SemanticCompiler.compile_ledger_replay()`.
+   - `TrustedReplayReceipt` is the audit record of that canonical membership verification, not a bearer credential.  Its path, boolean, range, count, and hashes cannot grant authority by themselves.
+   - The canonical verification records:
+      - The event stream was read from the derived `.power/projects/<project_id>/events.jsonl` boundary under project file locking.
+      - Full ledger cryptographic verification succeeded without corruption or gaps.
+      - The complete ordered event identity/hash sequence, exact range, event count, project, and head hash match the supplied replay batch.
 3. **Fail-Closed Unverified Fallback:**
-   - Any event stream passed without verified ledger receipt is treated as untrusted external observation:
+    - Any event stream without successful canonical membership verification is treated as an untrusted external observation:
      - `candidates[i].verification_status = VerificationStatus.PROPOSED`
      - `provenance.verification_status = "unverified"`
      - `confidence <= 0.5`
      - Total `VERIFIED` candidate count from untrusted streams is strictly **0**.
-

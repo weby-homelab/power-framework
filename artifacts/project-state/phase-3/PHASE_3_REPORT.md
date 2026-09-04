@@ -4,10 +4,10 @@
 - **Worktree:** `/root/gemma/projects/.power-framework-3.7.11-worktree`
 - **Branch:** `feat/power-3.8-project-state-engine`
 - **PR:** [#388](https://github.com/weby-homelab/power-framework/pull/388)
-- **Commit:** `f898236ebdaf2f6eb6c7275e6c333ba536dbeafd`
+- **Baseline Commit:** `78d793eb8a314b436cb95d33a5af7c9feb94fb3c`
 - **Date:** 2026-09-04
 - **Signer / Committer:** `weby-homelab <rekvizitor.ua@gmail.com>` (GPG Key: `2D49E810C7F2527E`, verified: true)
-- **Status:** APPROVED & COMPLETE (Phase 3 Closure Correction Round 1 Verified)
+- **Status:** Phase 3 Closure Correction Round 2 — P0 authority revalidation
 
 ---
 
@@ -16,7 +16,7 @@
 Phase 3 delivers the **Project Semantic Compiler** for the POWER Project State Engine. The compiler bridges raw append-only ledger events and unstructured operational observations to typed, provenance-bound, validated semantic knowledge entities and change proposals.
 
 In strict accordance with the Phase 3 specification (`05_PHASE_3_SEMANTIC_COMPILER.md`) and frozen Phase 1 contracts:
-1. **Deterministic-First Mandate:** All 44 canonical ledger events (including Task v2, Decision references, and RAID lifecycle events) are parsed and compiled into domain entities completely deterministically **without any LLM dependency**.
+1. **Deterministic-First Mandate:** All 44 canonical ledger events are classified deterministically without any LLM dependency: 21 semantic-entity producers, 5 relationship-proposal events, 18 lifecycle/metadata no-ops, and 0 explicitly rejected registry entries.
 2. **Epistemic Invariant & Zero-False-Verification Gate:** Model-extracted candidate entities are unconditionally restricted to `verification_status="proposed"` and `provenance.verification_status="unverified"`. The false-verified rate is guaranteed to be **0.00%**.
 3. **Mandatory Provenance:** Every candidate entity carries cryptographic, actor, timestamp, and event-linkage provenance conforming to `artifacts/project-state/phase-1/semantic-entity-schema-v1.json`.
 4. **Idempotent Deterministic Identity:** Re-compiling the same events generates identical stable entity IDs using content-addressed SHA-256 digests (`f"{prefix}_{sha256(content)[:16]}"`), ensuring deterministic deduplication and provenance merging.
@@ -41,9 +41,9 @@ All seven Phase 3 Gates (G3.1 – G3.7) have been empirically verified and passe
 
 ---
 
-## 3. Phase 3 Closure Correction Round 1 Enhancements
+## 3. Phase 3 Closure Correction Round 2 Enhancements
 
-The following architectural and security closures were implemented and verified during Round 1:
+The following architectural and security closures were implemented and verified during Round 2:
 1. **P0 Cryptographic Trust Boundary Gate:**
    - Pre-validation of `schema_version == "power.project-event.v1"`.
    - Canonical SHA-256 validation of `payload_digest` and envelope `event_hash`.
@@ -65,15 +65,17 @@ The following architectural and security closures were implemented and verified 
 7. **G3.4 Wall-Clock Time Removal & Temporal Replay Determinism:**
    - Eliminated all wall-clock `datetime.now()` calls in the compiler pipeline. Timestamps are deterministically anchored to the event stream (`as_of`), guaranteeing byte-exact replay determinism across runs.
 8. **G3.7 Honest Evaluation Metrics with 9-Type Non-Zero Support:**
-   - Dataset expanded to v1.1.0 (17 samples) covering all 9 semantic entity types + structured adversarial injection.
+    - Dataset v1.1.0 (17 samples) covers all 9 semantic entity types + structured adversarial injection; synthetic structured samples remain untrusted and produce 0 verified candidates.
    - Evaluation harness reports explicit per-type support counts (`expected_count`, `predicted_count`, `tp`, `fp`, `fn`), returns `None` on zero-support to avoid misleading scores, and excludes zero-support types from macro averages.
 9. **CodeQL Review Findings Resolved:**
    - Cleaned up protocols, renamed regex constants to public `..._COMPILED`, exported in `__all__`, and guaranteed safe `os.close(fd)` cleanup in `try/finally` blocks.
 10. **P0 Authority Boundary (Integrity $\neq$ Authority):**
-    - Established strict boundary separating cryptographic integrity from ledger authority.
-    - Arbitrary in-memory event streams (even cryptographically continuous and valid) cannot self-certify authority and produce **0 VERIFIED candidates** (all candidates receive `PROPOSED`, `provenance.verification_status="unverified"`, `confidence <= 0.5`).
-    - Authoritative `VERIFIED` status requires explicit Phase-2 ledger replay via `VerifiedReplayBatch`, `TrustedReplayReceipt`, or `compile_ledger_replay()`.
-    - Protected by mandatory regression test `test_a1_untrusted_event_stream_cannot_produce_verified_candidates`.
+     - Established strict separation between cryptographic integrity and canonical ledger authority.
+     - Arbitrary in-memory streams, caller-created receipts, existing-file paths, and caller-created `VerifiedReplayBatch` objects cannot self-certify authority and produce **0 VERIFIED candidates**.
+     - Authoritative `VERIFIED` status requires exact ordered event membership in the canonical Phase-2 ledger, independently re-read and verified under an explicit vault root.
+     - `TrustedReplayReceipt` is the audit record of that verification, not a bearer credential; its boolean, path, range, count, and hashes are insufficient by themselves.
+     - `compile_verified_batch()` requires an explicit canonical vault root; the production benchmark sentinel was removed.
+     - Protected by adversarial T1–T4 regressions and the canonical replay/determinism control in `test_phase3_semantic_compiler.py`.
 
 ---
 
@@ -95,8 +97,8 @@ The following architectural and security closures were implemented and verified 
    - Deterministic ID generator `generate_deterministic_entity_id(project_id, entity_type, content)`.
 
 2. **`power_framework.core.semantic_compiler`**:
-   - Cryptographically guarded, fail-safe compiler pipeline:
-     `trust boundary -> normalization -> structured 44-event registry dispatch -> optional model extraction -> candidates -> deduplication -> provenance linking -> contradiction proposal -> validation -> candidate entities`.
+    - Cryptographically guarded, fail-safe compiler pipeline:
+      `canonical membership check -> trust boundary -> normalization -> structured 44-event registry dispatch -> optional model extraction -> candidates -> deduplication -> provenance linking -> contradiction proposal -> validation -> candidate entities`.
    - `ExtractionProviderProtocol` defining abstract contract for unstructured model extraction with zero hardcoded model lock-in.
    - Comprehensive heuristic contradiction engine distinguishing 5 classes (G3.5).
    - Defensive prompt injection scanner and regex secret scrubber.
@@ -121,20 +123,20 @@ Targeted PSE regression test suite executed via pytest:
 ```bash
 .venv/bin/pytest --no-cov -v tests/test_phase1_project_state_contracts.py tests/test_phase2_event_ledger.py tests/test_phase3_semantic_compiler.py tests/test_task_service.py tests/test_decision_service.py
 ```
-**Result: 130 passed in 3.41s (100% PASS)**
+**Result: 138 passed in 3.32s (100% PASS)**
 
 Phase 3 compiler specific suite:
 ```bash
 .venv/bin/pytest --no-cov -v tests/test_phase3_semantic_compiler.py
 ```
-**Result: 19 passed in 1.09s (100% PASS)**
+**Result: 25 passed in 0.92s (100% PASS)**
 
 Full repository regression test suite:
 ```bash
 .venv/bin/pytest tests/ -v --tb=short -m "not real_neural and not bench" -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
 ```
-**Result: 1,495 passed, 4 skipped, 17 deselected in 98.72s (100% PASS)**  
-**Code Coverage: 82.68%** (exceeds mandatory >= 70% threshold).
+**Result: 1,503 passed, 4 skipped, 17 deselected in 95.79s (100% PASS)**
+**Code Coverage: 82.73%** (exceeds mandatory >= 70% threshold).
 
 Static analysis and linting:
 ```bash

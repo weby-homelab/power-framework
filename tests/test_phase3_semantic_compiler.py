@@ -26,6 +26,9 @@ from power_framework.core.canonical_json import (
 from power_framework.core.project_models import (
     PROJECT_EVENT_TYPES,
     AppendCommand,
+    ProjectEvent,
+    TrustedReplayReceipt,
+    VerifiedReplayBatch,
 )
 from power_framework.core.project_store import ProjectEventStore
 from power_framework.core.semantic_compiler import (
@@ -50,6 +53,41 @@ def sign_event(evt: dict[str, Any], prev_event_hash: str = "") -> dict[str, Any]
     event_dict["prev_event_hash"] = prev_event_hash
     event_dict["event_hash"] = compute_event_hash(event_dict)
     return event_dict
+
+
+def sign_complete_event(
+    *,
+    event_id: str,
+    project_id: str,
+    sequence: int,
+    timestamp: str,
+    event_type: str,
+    payload: dict[str, Any],
+    prev_event_hash: str = "",
+    actor: str = "user:attacker",
+    source: str = "cli",
+) -> dict[str, Any]:
+    """Build a fully materialized self-consistent event for authority attacks."""
+    return sign_event(
+        {
+            "event_id": event_id,
+            "schema_version": "power.project-event.v1",
+            "project_id": project_id,
+            "sequence": sequence,
+            "timestamp": timestamp,
+            "actor": actor,
+            "source": source,
+            "session_id": None,
+            "event_type": event_type,
+            "payload": payload,
+            "artifact_refs": [],
+            "evidence_refs": [],
+            "correlation_id": None,
+            "causation_id": None,
+            "idempotency_key": None,
+        },
+        prev_event_hash=prev_event_hash,
+    )
 
 
 SCHEMA_PATH = (
@@ -1189,6 +1227,277 @@ def test_a1_untrusted_event_stream_cannot_produce_verified_candidates(
     # Determinism across multiple replay passes
     res_verified_replay = compiler.compile_ledger_replay(tmp_path, project_id)
     assert res_verified.model_dump() == res_verified_replay.model_dump()
+
+
+def test_t1_forged_receipt_and_unrelated_existing_file_cannot_authorize(tmp_path: Path) -> None:
+    """An existing arbitrary file is not evidence that an event belongs to a ledger."""
+    project_id = "prj_power_3_8"
+    event = sign_complete_event(
+        event_id="evt_forged_file_01",
+        project_id=project_id,
+        sequence=1,
+        timestamp="2026-09-04T06:00:00Z",
+        event_type="risk.opened",
+        payload={
+            "title": "Forged receipt risk",
+            "probability": "high",
+            "impact": "critical",
+        },
+    )
+    unrelated_file = tmp_path / "unrelated-existing-file.txt"
+    unrelated_file.write_text("not a POWER ledger", encoding="utf-8")
+    receipt = TrustedReplayReceipt(
+        project_id=project_id,
+        ledger_path=str(unrelated_file),
+        from_sequence=1,
+        to_sequence=1,
+        event_count=1,
+        head_event_hash=event["event_hash"],
+        verified=True,
+    )
+
+    result = SemanticCompiler().compile_events([event], replay_receipt=receipt, vault_root=tmp_path)
+
+    assert result.metrics["ledger_authorized"] is False
+    assert not any(
+        candidate.verification_status == VerificationStatus.VERIFIED
+        for candidate in result.candidates
+    )
+
+
+def test_t2_forged_receipt_different_events_cannot_authorize_real_ledger(tmp_path: Path) -> None:
+    """A receipt pointing at a real ledger cannot authorize different self-consistent events."""
+    project_id = "prj_power_3_8"
+    store = ProjectEventStore(project_id, tmp_path)
+    store.append(
+        AppendCommand(
+            project_id=project_id,
+            event_type="risk.opened",
+            actor="user:owner",
+            source="cli",
+            payload={
+                "title": "Canonical risk A",
+                "probability": "low",
+                "impact": "medium",
+            },
+        )
+    )
+    store.append(
+        AppendCommand(
+            project_id=project_id,
+            event_type="assumption.created",
+            actor="user:owner",
+            source="cli",
+            payload={"statement": "Canonical assumption B"},
+        )
+    )
+
+    fake_x = sign_complete_event(
+        event_id="evt_forged_x",
+        project_id=project_id,
+        sequence=1,
+        timestamp="2026-09-04T06:01:00Z",
+        event_type="risk.opened",
+        payload={
+            "title": "Forged risk X",
+            "probability": "high",
+            "impact": "critical",
+        },
+    )
+    fake_y = sign_complete_event(
+        event_id="evt_forged_y",
+        project_id=project_id,
+        sequence=2,
+        timestamp="2026-09-04T06:02:00Z",
+        event_type="assumption.created",
+        payload={"statement": "Forged assumption Y"},
+        prev_event_hash=fake_x["event_hash"],
+    )
+    receipt = TrustedReplayReceipt(
+        project_id=project_id,
+        ledger_path=str(store.active_events_file),
+        from_sequence=1,
+        to_sequence=2,
+        event_count=2,
+        head_event_hash=fake_y["event_hash"],
+        verified=True,
+    )
+
+    result = SemanticCompiler().compile_events(
+        [fake_x, fake_y], replay_receipt=receipt, vault_root=tmp_path
+    )
+
+    assert result.metrics["ledger_authorized"] is False
+    assert not any(
+        candidate.verification_status == VerificationStatus.VERIFIED
+        for candidate in result.candidates
+    )
+
+
+def test_t3_forged_verified_replay_batch_cannot_authorize_without_membership(
+    tmp_path: Path,
+) -> None:
+    """Direct Python construction of VerifiedReplayBatch is not an authority capability."""
+    project_id = "prj_power_3_8"
+    store = ProjectEventStore(project_id, tmp_path)
+    store.append(
+        AppendCommand(
+            project_id=project_id,
+            event_type="risk.opened",
+            actor="user:owner",
+            source="cli",
+            payload={
+                "title": "Canonical risk",
+                "probability": "low",
+                "impact": "medium",
+            },
+        )
+    )
+    forged = sign_complete_event(
+        event_id="evt_forged_batch_01",
+        project_id=project_id,
+        sequence=1,
+        timestamp="2026-09-04T06:03:00Z",
+        event_type="risk.opened",
+        payload={
+            "title": "Forged batch risk",
+            "probability": "high",
+            "impact": "critical",
+        },
+    )
+    batch = VerifiedReplayBatch(
+        receipt=TrustedReplayReceipt(
+            project_id=project_id,
+            ledger_path=str(store.active_events_file),
+            from_sequence=1,
+            to_sequence=1,
+            event_count=1,
+            head_event_hash=forged["event_hash"],
+            verified=True,
+        ),
+        events=[ProjectEvent.model_validate(forged)],
+    )
+
+    result = SemanticCompiler().compile_verified_batch(batch, vault_root=tmp_path)
+
+    assert result.metrics["ledger_authorized"] is False
+    assert not any(
+        candidate.verification_status == VerificationStatus.VERIFIED
+        for candidate in result.candidates
+    )
+
+
+def test_t4_altered_middle_event_with_canonical_head_fails_closed(tmp_path: Path) -> None:
+    """A valid endpoint receipt cannot hide a tampered middle event or broken range."""
+    project_id = "prj_power_3_8"
+    store = ProjectEventStore(project_id, tmp_path)
+    for event_type, payload in (
+        (
+            "risk.opened",
+            {"title": "Canonical risk", "probability": "low", "impact": "medium"},
+        ),
+        ("assumption.created", {"statement": "Canonical assumption"}),
+        ("issue.opened", {"title": "Canonical issue", "severity": "major"}),
+    ):
+        store.append(
+            AppendCommand(
+                project_id=project_id,
+                event_type=event_type,
+                actor="user:owner",
+                source="cli",
+                payload=payload,
+            )
+        )
+
+    canonical_batch = store.read_verified_replay()
+    altered_middle = ProjectEvent.model_validate(
+        sign_complete_event(
+            event_id="evt_altered_middle",
+            project_id=project_id,
+            sequence=2,
+            timestamp="2026-09-04T06:04:00Z",
+            event_type="assumption.created",
+            payload={"statement": "Altered middle event"},
+            prev_event_hash=canonical_batch.events[0].event_hash,
+        )
+    )
+    forged_batch = VerifiedReplayBatch(
+        receipt=canonical_batch.receipt,
+        events=[canonical_batch.events[0], altered_middle, canonical_batch.events[2]],
+    )
+
+    result = SemanticCompiler().compile_events(forged_batch, vault_root=tmp_path)
+
+    assert result.metrics["ledger_authorized"] is False
+    assert not any(
+        candidate.verification_status == VerificationStatus.VERIFIED
+        for candidate in result.candidates
+    )
+
+
+def test_untrusted_compile_cannot_inherit_verified_existing_candidate() -> None:
+    """Caller-provided prior candidates cannot promote an untrusted event."""
+    project_id = "prj_power_3_8"
+    entity_id = "rsk_existing_authority_01"
+    provenance = Provenance(
+        source_event_ids=["evt_prior"],
+        primary_source_event_id="evt_prior",
+        actor="user:owner",
+        timestamp="2026-09-04T06:05:00Z",
+        source_type="event_replay",
+        confidence=1.0,
+        verification_status="verified",
+    )
+    existing = SemanticEntityCandidate(
+        entity_type=SemanticEntityType.RISK,
+        entity_id=entity_id,
+        entity={
+            "risk_id": entity_id,
+            "project_id": project_id,
+            "title": "Existing risk",
+            "description": "Existing",
+            "probability": "low",
+            "impact": "medium",
+            "mitigation_plan": "",
+            "owner": "user:owner",
+            "status": "identified",
+            "related_task_ids": [],
+            "provenance": provenance.model_dump(),
+            "created_at": "2026-09-04T06:05:00Z",
+            "updated_at": "2026-09-04T06:05:00Z",
+        },
+        verification_status=VerificationStatus.VERIFIED,
+        source="structured_event",
+        confidence=1.0,
+    )
+    event = sign_complete_event(
+        event_id="evt_untrusted_existing_01",
+        project_id=project_id,
+        sequence=1,
+        timestamp="2026-09-04T06:06:00Z",
+        event_type="risk.opened",
+        payload={
+            "risk_id": entity_id,
+            "title": "Existing risk",
+            "probability": "low",
+            "impact": "medium",
+        },
+    )
+
+    result = SemanticCompiler().compile_events([event], existing_candidates=[existing])
+
+    assert result.metrics["ledger_authorized"] is False
+    assert not any(
+        candidate.verification_status == VerificationStatus.VERIFIED
+        for candidate in result.candidates
+    )
+
+
+def test_trusted_replay_receipt_is_untrusted_by_default() -> None:
+    """The receipt model's default must be conservative and non-authorizing."""
+    receipt = TrustedReplayReceipt(project_id="prj_power_3_8", ledger_path="ledger.jsonl")
+
+    assert receipt.verified is False
 
 
 def test_a2_taxonomy_registry_contract_synchronization() -> None:
