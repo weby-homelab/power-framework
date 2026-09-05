@@ -63,27 +63,33 @@ ROTATION_FILE_PATTERN = re.compile(r"^events_[0-9]{6}\.jsonl$")
 _project_thread_locks: dict[str, threading.RLock] = {}
 _project_thread_locks_guard = threading.Lock()
 _local_project_locks = threading.local()
-_PSE_GOVERNANCE_EVENT_TYPES = {
-    "project.created",
-    "project.updated",
-    "project.phase.changed",
-    "project.reopened",
-    "raci.assigned",
-    "raci.revoked",
-    "evidence.attached",
-    "artifact.created",
-    "artifact.updated",
-    "task.associated",
-    "task.disassociated",
-    "decision.associated",
-    "decision.disassociated",
-    "dor.evaluated",
-    "dod.evaluated",
-    "gate.overridden",
-    "task.lifecycle.observed",
-    "decision.lifecycle.observed",
-}
-_PSE_RESERVED_EVENT_TYPES = {"dor.evaluated", "dod.evaluated", "gate.overridden"}
+PSE_GOVERNANCE_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "project.created",
+        "project.updated",
+        "project.phase.changed",
+        "project.reopened",
+        "raci.assigned",
+        "raci.revoked",
+        "evidence.attached",
+        "artifact.created",
+        "artifact.updated",
+        "task.associated",
+        "task.disassociated",
+        "decision.associated",
+        "decision.disassociated",
+        "dor.evaluated",
+        "dod.evaluated",
+        "gate.overridden",
+    }
+)
+PSE_OBSERVATION_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "task.lifecycle.observed",
+        "decision.lifecycle.observed",
+    }
+)
+_PSE_EVENT_TYPES = PSE_GOVERNANCE_EVENT_TYPES | PSE_OBSERVATION_EVENT_TYPES
 
 
 def _get_project_thread_lock(project_dir: Path) -> threading.RLock:
@@ -371,15 +377,19 @@ class ProjectEventStore:
         timeout: float = 10.0,
     ) -> ProjectEvent:
         """Append ordinary Phase-2 input; governance events require the trusted writer."""
-        if command.event_type in _PSE_RESERVED_EVENT_TYPES or (
-            command.source == "pse_governance" and command.event_type in _PSE_GOVERNANCE_EVENT_TYPES
+        command = AppendCommand.model_validate(command.model_dump())
+        if command.event_type in PSE_GOVERNANCE_EVENT_TYPES or (
+            command.source == "pse_governance" and command.event_type in PSE_OBSERVATION_EVENT_TYPES
         ):
-            raise PermissionError("Governance-bearing events require the trusted PSE writer")
+            raise PermissionError("Public writer rejects governance-bearing event")
         return self._append_unchecked(command, timeout=timeout)
 
     def append_untrusted(self, command: AppendCommand, timeout: float = 10.0) -> ProjectEvent:
-        """Persist Phase-2 input while quarantining PSE authority claims."""
-        if command.event_type in _PSE_GOVERNANCE_EVENT_TYPES:
+        """Persist non-authoritative observations while rejecting PSE claims."""
+        command = AppendCommand.model_validate(command.model_dump())
+        if command.event_type in PSE_GOVERNANCE_EVENT_TYPES:
+            raise PermissionError("Public writer rejects governance-bearing event")
+        if command.event_type in PSE_OBSERVATION_EVENT_TYPES:
             command = command.model_copy(update={"source": "untrusted_ingest"})
         return self._append_unchecked(command, timeout=timeout)
 
@@ -392,10 +402,7 @@ class ProjectEventStore:
         expected_last_event_hash: str | None = None,
     ) -> ProjectEvent:
         """Append a fully validated PSE command through the trusted writer."""
-        if (
-            command.source != "pse_governance"
-            or command.event_type not in _PSE_GOVERNANCE_EVENT_TYPES
-        ):
+        if command.source != "pse_governance" or command.event_type not in _PSE_EVENT_TYPES:
             raise PermissionError("Trusted PSE writer requires governed provenance")
         return self._append_unchecked(
             command,

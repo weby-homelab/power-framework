@@ -29,8 +29,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from power_framework.core.canonical_json import compute_event_hash, compute_payload_digest
+from power_framework.core.decision_models import (
+    CANONICAL_DECISION_STATUSES,
+    RESOLVED_DECISION_STATUSES,
+)
 from power_framework.core.decision_service import DecisionService
-from power_framework.core.governance_engine import RULES_DIGEST, AuthorityContext
+from power_framework.core.governance_engine import (
+    RULES_DIGEST,
+    AuthorityContext,
+    is_untrusted_actor,
+)
 from power_framework.core.project_models import AppendCommand, LedgerIntegrityError, ProjectEvent
 from power_framework.core.project_store import ProjectEventStore
 from power_framework.core.state_models import (
@@ -279,10 +287,17 @@ class ProjectStateService:
                         f"'{task_view.task_id}'"
                     )
             for decision_view in evaluation.decision_views:
+                if decision_view.status not in CANONICAL_DECISION_STATUSES:
+                    raise AuthoritativeStateError(
+                        "Historical evaluation contains unknown decision status: "
+                        f"'{decision_view.decision_id}'"
+                    )
                 decision = self.decision_service.get_decision(decision_view.decision_id)
                 if decision is None:
                     continue
-                if decision_view.status == "approved":
+                if decision_view.status in RESOLVED_DECISION_STATUSES:
+                    if decision_view.status != "approved":
+                        continue
                     decision_receipt_id = decision_view.receipt_id
                     decision_receipt = self.decision_service.get_receipt(decision_receipt_id or "")
                     if (
@@ -452,8 +467,12 @@ class ProjectStateService:
         their receipts, validates prior canonical evidence, binds rules and
         event identity, and only then writes the evaluation record.
         """
+        if not isinstance(actor, str):
+            raise TypeError("actor must be a string")
         if not actor.strip():
             raise ValueError("actor must be non-empty")
+        if is_untrusted_actor(actor):
+            raise PermissionError("untrusted actor cannot append governance evaluation")
 
         canonical_events = self._read_canonical_events(project_id)
         expected_sequence = canonical_events[-1].sequence if canonical_events else 0

@@ -120,19 +120,16 @@ Risk `rsk_upstream_rate_limit` was opened in event `evt_...0006` and updated wit
   "field": "valid_decisions",
   "state_revision": "4f8a91c7b2e35a6d90f14892c53a71b802de9a13b4cf7102e3a51809cb2d41fa",
   "value": [
-    "dec_approval_execution_kickoff_01",
-    "dec_select_database_engine"
+    "dec_approval_execution_kickoff_01"
   ],
   "contributing_event_ids": [
-    "evt_01J8F90A11B2C3D4E5F60007",
-    "evt_01J8F90A11B2C3D4E5F60010"
+    "evt_01J8F90A11B2C3D4E5F60007"
   ],
   "applicable_rules": [
-    "DECISION_STATUS_PENDING_OR_APPROVED"
+    "DECISION_STATUS_APPROVED"
   ],
   "decision_references": [
-    "dec_approval_execution_kickoff_01",
-    "dec_select_database_engine"
+    "dec_approval_execution_kickoff_01"
   ],
   "evidence_references": [
     "dcr_883a2bf9104c81a28cf1204859a01d672839401bf5829104fa281048bcae9021"
@@ -144,7 +141,7 @@ Risk `rsk_upstream_rate_limit` was opened in event `evt_...0006` and updated wit
 ```
 
 *Explanation Summary:*
-`dec_approval_execution_kickoff_01` is resolved with receipt `dcr_883...`. `dec_select_database_engine` is pending architectural vote. Both are valid (neither is superseded).
+`dec_approval_execution_kickoff_01` is approved with receipt `dcr_883...`. `dec_select_database_engine` remains pending and appears under `required_approvals`, not `valid_decisions`.
 
 ---
 

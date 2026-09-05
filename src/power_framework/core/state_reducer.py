@@ -83,8 +83,8 @@ class ProjectStateReducer:
     deterministic replay of caller-supplied events for unit testing only.
     Integrity != authority: a self-consistent event chain is NOT proof of
     canonical ledger membership. Authoritative ProjectState must be built
-    only via ProjectStateService.rebuild_project_state(vault_root,
-    project_id), which verifies the canonical Phase-2 ledger, re-reads the
+    only via ProjectStateService(vault_root).rebuild_project_state(project_id),
+    which verifies the canonical Phase-2 ledger, re-reads the
     authoritative event sequence from that store, resolves federated Task and
     Decision authority from their canonical services, and only then executes
     this pure reduction. Never present reduce() output as canonical state.
@@ -1238,21 +1238,18 @@ class ProjectStateReducer:
         # decisions; required_approvals = pending decisions. Pending is never
         # reported as valid/approved.
         valid_decs: list[str] = []
-        super_decs: list[str] = []
         req_approvals: list[str] = []
 
         for dec_id in sorted(state.decisions):
             d_view = state.decisions[dec_id]
             if d_view.status == "approved":
                 valid_decs.append(dec_id)
-            elif d_view.status == "superseded":
-                super_decs.append(dec_id)
 
             if d_view.status == "pending":
                 req_approvals.append(dec_id)
 
         state.valid_decisions = sorted(valid_decs)
-        state.superseded_decisions = sorted(super_decs)
+        state.superseded_decisions = []
         state.required_approvals = sorted(req_approvals)
 
         # 4. RAID projections sorting (+ canonical governance projections)
@@ -1423,8 +1420,14 @@ class ProjectStateReducer:
             )
 
         if field == "valid_decisions":
-            contributing = [d.source_identity for d in state.decisions.values()]
-            receipts = [d.receipt_id for d in state.decisions.values() if d.receipt_id]
+            valid_views = [
+                state.decisions[decision_id]
+                for decision_id in state.valid_decisions
+                if decision_id in state.decisions
+                and state.decisions[decision_id].status == "approved"
+            ]
+            contributing = [d.source_identity for d in valid_views]
+            receipts = [d.receipt_id for d in valid_views if d.receipt_id]
             return StateExplanation(
                 project_id=state.project_id,
                 field=field,
@@ -1432,7 +1435,7 @@ class ProjectStateReducer:
                 value=state.valid_decisions,
                 contributing_event_ids=sorted(set(contributing)),
                 applicable_rules=["DECISION_STATUS_APPROVED"],
-                decision_references=state.valid_decisions,
+                decision_references=[d.decision_id for d in valid_views],
                 evidence_references=sorted(set(receipts)),
                 authority_references=["DecisionService:v1"],
             )

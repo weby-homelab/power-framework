@@ -1,8 +1,8 @@
 # PHASE 4 VERIFICATION REPORT — Deterministic State Engine & Governance
-## CLOSURE CORRECTION ROUND 2 — Temporal Authority, Historical Causality, RACI Cardinality
+## CLOSURE CORRECTION ROUND 3 — Trusted Ingress Normalization and Final Authority Closure
 
 - **Framework:** POWER 3.8 — Project State Engine (PSE)
-- **Worktree / Repository:** `/root/geminicli/projects/power-framework`
+- **Worktree / Repository:** `/root/gemma/projects/P.O.W.E.R` (remote: `https://github.com/weby-homelab/power-framework`)
 - **Branch:** `feat/power-3.8-phase4-state-engine`
 - **Baseline Commit:** `8ccb87a6d0f6b9cd10e7ce2821ab5b383fb3461f`
 - **Round-1 Head:** `a959c0fb79249e29520743bd590e25ff5da6523b`
@@ -22,9 +22,9 @@
 
 ## 1. Executive Verdict
 
-Phase 4 delivers the authoritative **Deterministic State Engine & Governance** for the POWER Project State Engine (PSE). Closure Correction Round 2 separates historical governance replay from current federation and prevents future authority from authorizing an earlier canonical event.
+Phase 4 delivers the authoritative **Deterministic State Engine & Governance** for the POWER Project State Engine (PSE). Closure Correction Round 3 preserves historical governance replay and closes mutable/coercible trusted-ingress bypasses.
 
-All design principles and gates have been verified:
+Local and remote verification are complete for the current PR head. Merge was intentionally not performed:
 1. **Determinism (G4.1):** Replaying the same sequence of canonical events across independent state reducer instances and separate Python processes produces 100% byte-identical canonical JSON output and identical SHA-256 `state_revision`. The pure reducer (`ProjectStateReducer.reduce` / `reduce_internal`) is explicitly NON-AUTHORITATIVE determinism machinery for unit testing; it never emits canonical state on its own.
 2. **Model Safety & Zero Autonomous Advance (G4.2):** Strict P0 security enforcement blocks untrusted/model-extracted proposals from advancing lifecycle phases, satisfying DoD criteria, or overriding governance gates. Zero model transitions are permitted.
 3. **Canonical Subsystem Invariance (G4.3, G4.4):** Task v2 and DecisionService v1 remain authoritative. The trusted orchestration boundary (`ProjectStateService.rebuild_project_state`) resolves live task/decision truth from the owning subsystems and constructs projections from objects actually read there. Caller-constructed `TaskAuthorityView` / `DecisionAuthorityView` objects — even with matching self-digests — prove only internal view integrity, never subsystem authority. Ledger `task.lifecycle.observed` / `decision.lifecycle.observed` payloads are audit signals; live stores win, drift emits `STALE_*_OBSERVATION` diagnostics.
@@ -32,7 +32,7 @@ All design principles and gates have been verified:
 5. **Deterministic Explainability (G4.6):** Every single field in `ProjectState` is fully explainable via `explain(field)`, tracing exact contributing event IDs, applicable governance rules, and external authority references.
 6. **Snapshot Authority:** Snapshot seals prove internal self-consistency only. Authoritative restore replays and compares the canonical prefix through K, replays the tail, then resolves current TaskStore/DecisionService overlays. `valid_decisions` = approved canonical decisions; `required_approvals` = pending decisions. State lineage binds `rules_digest` = SHA-256 of the normalized effective governance ruleset.
 
-Verdict: **PHASE 4 STATUS: CLOSURE CORRECTION ROUND 2 — VALIDATION PENDING**
+Verdict: **PHASE 4 STATUS: CLOSURE CORRECTION ROUND 3 — LOCAL AND REMOTE VERIFICATION COMPLETE; MERGE INTENTIONALLY NOT PERFORMED**
 
 ---
 
@@ -56,7 +56,7 @@ Authorized Phase 4 Scope strictly executed:
 - Deterministic explainability engine (`explain(field)`).
 - Snapshot creation, cryptographic validation (`snapshot_digest`), tail-replay restoration, and authoritative restore with ledger lineage plus federated re-resolution.
 - Trusted authority composition boundary (`ProjectStateService` / `ProjectStateEngine`, `AuthorityContext`, canonical RACI/evidence/approval/receipt resolution, ruleset digest binding).
-- 107 Phase 4 tests (52 pure + 42 Round-1 authoritative + 13 temporal/causal) and complete empirical evidence.
+- 126 Phase 4 tests covering pure reduction, authoritative closure, temporal causality, and trusted-ingress regressions.
 
 Explicitly Out-of-Scope (BLOCKED):
 - Phase 5 (Context Compiler, ContextPacks, MCP state tools).
@@ -86,7 +86,7 @@ Explicitly Out-of-Scope (BLOCKED):
    - Task readiness projection, decision validation (`valid_decisions` = approved only), RAID aggregation.
    - Deterministic explainability traces and snapshot management with lineage verification helper.
 4. `src/power_framework/core/state_service.py` (NEW — trusted authority composition boundary):
-   - `ProjectStateService` / `ProjectStateEngine` with authoritative `rebuild_project_state(vault_root, project_id)`: verifies the canonical Phase-2 ledger, re-reads the authoritative event sequence, resolves federated Task/Decision authority from canonical services, then executes pure reduction.
+   - `ProjectStateService(vault_root)` / `ProjectStateEngine` with authoritative `rebuild_project_state(project_id)`: verifies the canonical Phase-2 ledger, re-reads the authoritative event sequence, resolves federated Task/Decision authority from canonical services, then executes pure reduction.
    - `rebuild_from_candidates()`: fail-closed canonical-membership proof for caller streams.
    - `restore_snapshot_authoritative()`: ledger lineage + federated re-resolution + recomputation.
 
@@ -100,7 +100,7 @@ Explicitly Out-of-Scope (BLOCKED):
 
 ### Created Test Suite:
 1. `tests/test_phase4_state_engine.py`: 52 deterministic pure-reducer / FSM / P0 / RAID / snapshot-equivalence tests (non-authoritative determinism evidence; NOT canonical-authority evidence).
-2. `tests/test_phase4_authority_closure.py` and `tests/test_phase4_temporal_authority.py`: 107 Phase-4 tests — Round-1 authority regressions plus T13 future task association, T14 future task completion, T15 future decision association, T16 future decision approval, T17 RACI cardinality, future RACI/evidence, T18 owner, T19 charter, T20 ruleset drift, governed ingestion, current overlay, and snapshot temporal separation.
+2. `tests/test_phase4_authority_closure.py` and `tests/test_phase4_temporal_authority.py`: These files are included in the overall Phase-4 suite of 126 tests (not an additional 126 tests) — authority regressions plus T13 future task association, T14 future task completion, T15 future decision association, T16 future decision approval, T17 RACI cardinality, future RACI/evidence, T18 owner, T19 charter, T20 ruleset drift, governed ingestion, current overlay, snapshots, and trusted-ingress normalization.
 
 ---
 
@@ -212,9 +212,9 @@ Conforms to Draft 2020-12 JSON Schema (`artifacts/project-state/phase-4/state_sc
 - `active_dependencies`: Lexicographically sorted list of active dependencies.
 - `valid_decisions`: Lexicographically sorted list of APPROVED canonical decisions only.
 - `superseded_decisions`: Lexicographically sorted list of superseded decisions.
-- `recent_changes`: Sliding window (last 20) of applied event IDs.
+- `recent_changes`: Sliding window (last 10) of applied event IDs.
 - `health_flags`: Lexicographically sorted list of `HealthFlag` strings.
-- `required_approvals`: Lexicographically sorted list of blocking approval references.
+- `required_approvals`: Lexicographically sorted list of pending canonical DecisionService approval references.
 - `state_revision`: 64-character hex SHA-256 digest.
 - `rules_digest`: 64-character hex SHA-256 binding `rules_version` to exactly one normalized effective governance ruleset (modified rules with unchanged version are detectable).
 - `raci`: Deterministic canonical role -> sorted actor list projection (PSE-owned).
@@ -370,7 +370,7 @@ Memory allocation is linear in the number of unique active entities; immutable s
 ```bash
 uv run --python 3.13 pytest tests/test_phase4_state_engine.py tests/test_phase4_authority_closure.py tests/test_phase4_temporal_authority.py -o addopts="" -v
 ```
-**Result:** 107 passed (52 pure + 42 Round-1 authoritative + 13 temporal/causal).
+**Result:** 126 passed.
 
 ### Linters & Type Checking:
 ```bash
@@ -394,13 +394,13 @@ uv run --python 3.13 pip-audit
 ```bash
 uv run --python 3.13 pytest tests/test_phase1_project_state_contracts.py tests/test_phase2_event_ledger.py tests/test_phase3_semantic_compiler.py tests/test_task_service.py tests/test_decision_service.py tests/test_phase4_state_engine.py tests/test_phase4_authority_closure.py tests/test_phase4_temporal_authority.py -o addopts="" -v
 ```
-**Result:** 245 passed.
+**Result:** 348 passed.
 
 ### Full Framework Test Suite:
 ```bash
-uv run --python 3.13 pytest tests/ -m "not real_neural and not bench" -o addopts="" -q
+uv run --python 3.13 pytest tests/ -v --tb=short -m "not real_neural and not bench" --cov=src/power_framework/ --cov-report=term-missing --cov-fail-under=70 -W error::ResourceWarning -W error::pytest.PytestUnraisableExceptionWarning
 ```
-**Result:** 1610 passed, 4 skipped, 17 deselected; coverage 82.41%.
+**Result:** 1713 passed, 4 skipped, 17 deselected; coverage 82.55%.
 
 ### Phase 4 Modules Coverage:
 ```bash
@@ -412,11 +412,11 @@ uv run --python 3.13 pytest --cov=power_framework.core.state_models --cov=power_
 
 ## 20. Remote CI / CodeQL
 
-GitHub CI workflows (`ci.yml`, `codeql.yml`, `docs.yml`) were read back at exact
-head `bf823c0`. CI, CodeQL, Docs, package smoke, security, benchmark, base
-runtime, upgrade matrix, and Python 3.13/3.14 tests all completed successfully;
-deploy remained intentionally skipped. CodeRabbit returned pass/rate-limited
-on the final head. No merge was performed.
+GitHub CI passed for Python 3.13/3.14, package smoke, security, benchmark, base
+runtime, and upgrade matrix. CodeQL passed and Docs build passed; Docs deploy
+was skipped as configured. CodeRabbit status check passed/rate-limited, and the
+GraphQL review-thread disposition is 0 unresolved. Merge was intentionally not
+performed.
 
 ---
 
@@ -451,4 +451,4 @@ on the final head. No merge was performed.
 ## 24. Final Status
 
 PHASE 4 STATUS:
-GO — CLOSURE CORRECTION ROUND 2 / FROZEN
+GO — CLOSURE CORRECTION ROUND 3 / FROZEN

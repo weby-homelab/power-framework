@@ -35,7 +35,7 @@ def _append(
     evidence_refs: list[str] | None = None,
 ) -> None:
     store = ProjectEventStore(project_id, vault)
-    writer = store._append_governed if source == "pse_governance" else store.append_untrusted
+    writer = store._append_governed if source == "pse_governance" else store._append_unchecked
     writer(
         AppendCommand(
             project_id=project_id,
@@ -441,7 +441,7 @@ class TestTemporalAuthority:
         vault.mkdir()
         project_id = "prj_reserved_ingress"
         store = ProjectEventStore(project_id, vault)
-        with pytest.raises(PermissionError, match="trusted PSE writer"):
+        with pytest.raises(PermissionError, match="governance-bearing"):
             store.append(
                 AppendCommand(
                     project_id=project_id,
