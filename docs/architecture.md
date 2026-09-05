@@ -117,6 +117,28 @@ ordered membership in the canonical Phase 2 ledger. The receipt is audit
 evidence of that verification, not a bearer credential; `compile_ledger_replay()`
 is the preferred authoritative entry point.
 
+### Phase-4 temporal authority
+
+Phase 4 keeps two projections separate:
+
+- **Historical PSE governance state** is reconstructed only from the canonical
+  event sequence and sequence-bound `dor.evaluated` / `dod.evaluated` evidence.
+  Task/decision association, RACI, evidence, approval, and completion authority
+  must already exist at or before the evaluated sequence. A later authority
+  cannot authorize an earlier transition.
+- **Current federated composed state** is produced after historical replay by
+  overlaying the currently active TaskStore and DecisionService relationships.
+  The overlay updates task readiness, decision status, and health projections;
+  it never rewrites `phase_history` or historical transition legality.
+
+Snapshots represent the historical prefix through sequence `K`. Authoritative
+restore replays the canonical prefix and tail first, then applies the current
+federation overlay. Historical replay determinism means the same canonical PSE
+history plus the same versioned governance evidence yields the same lifecycle
+history. Current composed-state determinism additionally includes the current
+TaskStore and DecisionService snapshots, so live subsystem drift may change the
+composed `state_revision` without changing historical phase validity.
+
 ## Canonical retrieval registry
 
 `SEARCH_MODE_REGISTRY` in `core/searcher.py` is the executable retrieval
