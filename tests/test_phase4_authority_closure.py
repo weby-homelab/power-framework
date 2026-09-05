@@ -18,9 +18,10 @@ must not be read as canonical-authority evidence.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
+from pydantic import ValidationError
 
 from power_framework.core.canonical_json import (
     compute_event_hash,
@@ -706,6 +707,54 @@ def _allow_payload(from_phase: ProjectPhase, to_phase: ProjectPhase) -> dict[str
 
 
 class TestT10PreconditionCoverage:
+    def test_authority_preconditions_ignore_caller_charter_payload(self) -> None:
+        """Caller payload text cannot manufacture canonical charter evidence."""
+        state = _passing_state_for(
+            ProjectPhase.DISCOVERY,
+            with_tasks=False,
+            with_decisions="none",
+        )
+        event = _transition_event(
+            ProjectPhase.DISCOVERY,
+            ProjectPhase.PLANNING,
+            evidence=["evi_misc"],
+            extra_payload={"charter": "charter", "charter_ref": "charter"},
+        )
+
+        result = GovernanceEngine().evaluate_transition(
+            state,
+            ProjectPhase.PLANNING,
+            event,
+            _authority({"evi_misc"}),
+        )
+
+        assert result.decision == GovernanceDecision.DENY
+        assert "PRECONDITION_FAILED:charter_present" in result.reason_codes
+
+    def test_authority_preconditions_ignore_caller_owner_payload(self) -> None:
+        """Caller payload text cannot manufacture a canonical owner assignment."""
+        state = _passing_state_for(
+            ProjectPhase.DISCOVERY,
+            with_tasks=False,
+            with_decisions="none",
+        )
+        event = _transition_event(
+            ProjectPhase.DISCOVERY,
+            ProjectPhase.PLANNING,
+            evidence=["evi_charter"],
+            extra_payload={"owner": LEAD, "owner_assigned": LEAD},
+        )
+
+        result = GovernanceEngine().evaluate_transition(
+            state,
+            ProjectPhase.PLANNING,
+            event,
+            _authority({"evi_charter"}, accountable=None),
+        )
+
+        assert result.decision == GovernanceDecision.DENY
+        assert "PRECONDITION_FAILED:owner_assigned" in result.reason_codes
+
     def test_every_precondition_token_maps_to_evaluator(self) -> None:
         """Contract: every declared token in all 17 transitions has an evaluator; unknown fails closed."""
         engine = GovernanceEngine()
@@ -1117,6 +1166,119 @@ class TestValidDecisionsSemantics:
         state = service.rebuild_project_state(pid)
         assert state.valid_decisions == ["dec_approved_1"]
         assert state.required_approvals == ["dec_pending_1"]
+
+    def test_decision_authority_view_rejects_unknown_status(self) -> None:
+        """Decision status must use the canonical DecisionService vocabulary."""
+        with pytest.raises(ValidationError, match="status"):
+            DecisionAuthorityView(
+                decision_id="dec_garbage",
+                status="garbage",
+                digest=DecisionAuthorityView.compute_digest("dec_garbage", "garbage"),
+            )
+
+    @pytest.mark.parametrize("status", ["approved", "rejected", "expired"])
+    def test_canonical_resolved_statuses_satisfy_resolution(
+        self, status: Literal["approved", "rejected", "expired"]
+    ) -> None:
+        """Only approved, rejected, and expired are resolved decision states."""
+        state = _passing_state_for(
+            ProjectPhase.CLOSING,
+            with_tasks=True,
+            with_decisions="none",
+        )
+        state.decisions["dec_resolved"] = DecisionAuthorityView(
+            decision_id="dec_resolved",
+            status=status,
+            digest=DecisionAuthorityView.compute_digest("dec_resolved", status),
+            receipt_id="dcr_" + "a" * 64 if status != "expired" else None,
+        )
+        governance = GovernanceEngine()
+        event = _transition_event(ProjectPhase.CLOSING, ProjectPhase.CLOSED)
+
+        assert (
+            governance._evaluate_precondition("all_decisions_resolved", state, event, _authority())
+            is True
+        )
+        assert governance.evaluate_dod(state, ProjectPhase.CLOSED).passed is True
+
+    def test_unknown_status_cannot_satisfy_dod_or_close(self) -> None:
+        """A status outside the canonical vocabulary fails every closing gate."""
+        state = _passing_state_for(
+            ProjectPhase.CLOSING,
+            with_tasks=True,
+            with_decisions="approved",
+        )
+        state.decisions["dec_garbage"] = DecisionAuthorityView.model_construct(
+            decision_id="dec_garbage",
+            status="garbage",
+            digest=DecisionAuthorityView.compute_digest("dec_garbage", "garbage"),
+        )
+        authority = _authority({"evi_close"}, {"dec_ok_1"})
+        event = _transition_event(
+            ProjectPhase.CLOSING,
+            ProjectPhase.CLOSED,
+            evidence=["evi_close"],
+            extra_payload={"approval_ref": "dec_ok_1"},
+        )
+        governance = GovernanceEngine()
+
+        dod = governance.evaluate_dod(
+            state,
+            ProjectPhase.CLOSED,
+            event=event,
+            authority=authority,
+        )
+        assert dod.passed is False
+        assert "DOD_UNRESOLVED_DECISION_STATUS" in dod.reason_codes
+        assert (
+            governance._evaluate_precondition("all_decisions_resolved", state, event, authority)
+            is False
+        )
+        assert (
+            governance.evaluate_transition(state, ProjectPhase.CLOSED, event, authority).decision
+            == GovernanceDecision.DENY
+        )
+
+    def test_historical_validation_rejects_unknown_decision_status(self, tmp_path: Path) -> None:
+        """Historical evaluation validation fails closed on an unknown status."""
+        pid = "prj_historical_status"
+        decision_id = "dec_historical"
+        decision_view = {
+            "decision_id": decision_id,
+            "status": "garbage",
+            "digest": DecisionAuthorityView.compute_digest(decision_id, "garbage"),
+        }
+        payload: dict[str, Any] = {
+            "evaluation_type": "dor",
+            "result": "passed",
+            "evaluated_from_phase": "DISCOVERY",
+            "evaluated_phase": "PLANNING",
+            "evaluation_event_id": "evt_historical_status",
+            "decision_views": [decision_view],
+            "rules_version": "1.0.0",
+            "rules_digest": compute_rules_digest(),
+        }
+        event_raw: dict[str, Any] = {
+            "event_id": "evt_historical_status",
+            "schema_version": "power.project-event.v1",
+            "project_id": pid,
+            "sequence": 1,
+            "timestamp": "2026-09-05T04:00:01Z",
+            "actor": LEAD,
+            "source": "pse_governance",
+            "event_type": "dor.evaluated",
+            "payload": payload,
+            "payload_digest": compute_payload_digest(payload),
+            "prev_event_hash": "",
+            "event_hash": "0" * 64,
+        }
+        event = ProjectEvent.model_validate(event_raw)
+        event.event_hash = compute_event_hash(event.model_dump())
+
+        with pytest.raises(
+            AuthoritativeStateError, match="Invalid historical governance evaluation"
+        ):
+            ProjectStateService(make_vault(tmp_path))._validate_historical_evaluations([event])
 
 
 class TestPayloadDigestDefense:

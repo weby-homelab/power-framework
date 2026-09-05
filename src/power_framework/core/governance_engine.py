@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from power_framework.core.canonical_json import canonical_json_bytes
+from power_framework.core.decision_models import RESOLVED_DECISION_STATUSES
 from power_framework.core.state_models import (
     GOVERNANCE_RULES_VERSION,
     DoDEvaluation,
@@ -721,20 +722,15 @@ class GovernanceEngine:
                     authority.charter_evidence_refs
                     and authority.charter_evidence_refs.issubset(authority.attached_evidence)
                 )
-            if any("charter" in ref.lower() for ref in authority.attached_evidence):
-                return True
-            charter_keys = ("charter", "charter_present", "charter_ref")
-            return any(
-                isinstance(payload.get(k), str) and str(payload.get(k)).strip()
-                for k in charter_keys
-            ) and any("charter" in str(v).lower() for v in payload.values() if isinstance(v, str))
+            # Caller payload strings are not evidence of a canonical charter.
+            return any("charter" in ref.lower() for ref in authority.attached_evidence)
         if precondition == "owner_assigned":
             if authority.historical:
                 return isinstance(state.owner, str) and bool(state.owner.strip())
-            owner = payload.get("owner") or payload.get("owner_assigned")
-            if isinstance(owner, str) and owner.strip():
-                return True
-            return any(len(actors) > 0 for actors in authority.raci.values())
+            return authority.accountable_actor is not None or any(
+                role.strip().casefold() == "owner" and actors
+                for role, actors in authority.raci.items()
+            )
         if precondition in (
             "cancellation_reason_provided",
             "termination_reason_recorded",
@@ -776,7 +772,7 @@ class GovernanceEngine:
             dod = self.evaluate_dod(state, ProjectPhase.CLOSED, event, authority)
             return dod.passed
         if precondition == "all_decisions_resolved":
-            return all(d.status != "pending" for d in state.decisions.values())
+            return all(d.status in RESOLVED_DECISION_STATUSES for d in state.decisions.values())
         if precondition == "all_issues_resolved_or_waived":
             return len(state.open_issues) == 0
         if precondition == "accountable_approval":
@@ -1046,13 +1042,23 @@ class GovernanceEngine:
             failed_conditions.extend([f"UNRESOLVED_ISSUE:{iid}" for iid in blocking_issues])
             reason_codes.append("DOD_UNRESOLVED_BLOCKING_ISSUES")
 
-        # 3. All valid decisions must be resolved (pending in canonical decisions map)
+        # 3. Every decision must use the canonical resolved-status allowlist.
         pending_decisions = [
             did for did, d_view in sorted(state.decisions.items()) if d_view.status == "pending"
+        ]
+        invalid_status_decisions = [
+            did
+            for did, d_view in sorted(state.decisions.items())
+            if d_view.status not in RESOLVED_DECISION_STATUSES and d_view.status != "pending"
         ]
         if pending_decisions:
             missing_approvals.extend([f"PENDING_DECISION:{did}" for did in pending_decisions])
             reason_codes.append("DOD_PENDING_DECISIONS_REMAIN")
+        if invalid_status_decisions:
+            failed_conditions.extend(
+                [f"UNKNOWN_DECISION_STATUS:{did}" for did in invalid_status_decisions]
+            )
+            reason_codes.append("DOD_UNRESOLVED_DECISION_STATUS")
 
         # 4. Mandatory evidence: any non-empty string is NOT evidence.
         # Quality-gate evidence refs must resolve to canonical evidence known

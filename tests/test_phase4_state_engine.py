@@ -1038,6 +1038,17 @@ class TestSnapshots:
         with pytest.raises(SnapshotIntegrityError):
             reducer.restore_from_snapshot(bad_snapshot)
 
+    def test_snapshot_create_rejects_stale_state_revision(self) -> None:
+        """Snapshot creation refuses a state whose revision no longer matches its content."""
+        reducer = ProjectStateReducer()
+        state = reducer.reduce(
+            build_event_chain("prj_snap_create", [("project.created", {}, None)])
+        )
+        state.state_revision = "0" * 64
+
+        with pytest.raises(SnapshotIntegrityError, match="state_revision does not match"):
+            ProjectStateSnapshot.create(state)
+
 
 # ---------------------------------------------------------------------------
 # 8. Explainability (Gate G4.6)
@@ -1115,6 +1126,51 @@ class TestExplainability:
         state = reducer.reduce(events)
         with pytest.raises(UnexplainableFieldError):
             reducer.explain(state, "arbitrary_nonexistent_field")
+
+    def test_valid_decisions_explanation_excludes_unresolved_decisions(self) -> None:
+        """The valid_decisions trace only cites approved projected decisions."""
+        approved = DecisionAuthorityView(
+            decision_id="dec_approved",
+            status="approved",
+            digest=DecisionAuthorityView.compute_digest(
+                "dec_approved", "approved", receipt_id="dcr_approved"
+            ),
+            source_identity="evt_approved",
+            receipt_id="dcr_approved",
+        )
+        pending = DecisionAuthorityView(
+            decision_id="dec_pending",
+            status="pending",
+            digest=DecisionAuthorityView.compute_digest("dec_pending", "pending"),
+            source_identity="evt_pending",
+        )
+        rejected = DecisionAuthorityView(
+            decision_id="dec_rejected",
+            status="rejected",
+            digest=DecisionAuthorityView.compute_digest(
+                "dec_rejected", "rejected", receipt_id="dcr_rejected"
+            ),
+            source_identity="evt_rejected",
+            receipt_id="dcr_rejected",
+        )
+        expired = DecisionAuthorityView(
+            decision_id="dec_expired",
+            status="expired",
+            digest=DecisionAuthorityView.compute_digest("dec_expired", "expired"),
+            source_identity="evt_expired",
+        )
+        state = ProjectState(
+            project_id="prj_explain_decisions",
+            state_revision="0" * 64,
+            decisions={view.decision_id: view for view in (approved, pending, rejected, expired)},
+            valid_decisions=["dec_approved"],
+        )
+
+        explanation = ProjectStateReducer().explain(state, "valid_decisions")
+
+        assert explanation.contributing_event_ids == ["evt_approved"]
+        assert explanation.decision_references == ["dec_approved"]
+        assert explanation.evidence_references == ["dcr_approved"]
 
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,12 @@ ResponseType = Literal["string", "boolean", "number"]
 DecisionAction = Literal["approve", "reject", "provide_input"]
 DecisionStatus = Literal["pending", "approved", "rejected", "expired"]
 DecisionAuthority = Literal["propose", "apply"]
+CANONICAL_DECISION_STATUSES: frozenset[DecisionStatus] = frozenset(
+    {"pending", "approved", "rejected", "expired"}
+)
+RESOLVED_DECISION_STATUSES: frozenset[DecisionStatus] = frozenset(
+    {"approved", "rejected", "expired"}
+)
 
 
 class Decision(BaseModel):
@@ -151,8 +157,10 @@ class DecisionReceipt(BaseModel):
 
 
 __all__ = [
+    "CANONICAL_DECISION_STATUSES",
     "DECISION_ID_PATTERN",
     "DECISION_RECEIPT_PATTERN",
+    "RESOLVED_DECISION_STATUSES",
     "Decision",
     "DecisionAction",
     "DecisionAuthority",

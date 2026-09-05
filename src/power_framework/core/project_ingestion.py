@@ -1,7 +1,7 @@
 """POWER Project State Engine (PSE) Ingestion Boundary & Privacy Perimeter.
 
 Implements:
-- Single authoritative Ingestion API:
+- Public generic ingestion boundary:
     - append_project_event(...)
     - import_project_events(...)
     - verify_project_ledger(...)
@@ -76,6 +76,27 @@ RAW_DIALOGUE_KEYS: frozenset[str] = frozenset(
         "messages",
         "reasoning",
         "thinking",
+    }
+)
+
+GOVERNANCE_BEARING_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "project.created",
+        "project.updated",
+        "project.phase.changed",
+        "project.reopened",
+        "raci.assigned",
+        "raci.revoked",
+        "evidence.attached",
+        "artifact.created",
+        "artifact.updated",
+        "task.associated",
+        "task.disassociated",
+        "decision.associated",
+        "decision.disassociated",
+        "dor.evaluated",
+        "dod.evaluated",
+        "gate.overridden",
     }
 )
 
@@ -367,7 +388,7 @@ def append_project_event(
     raw_evidence_ttl_days: int = 14,
     timeout: float = 10.0,
 ) -> ProjectEvent:
-    """Authoritative API to append an event to the project ledger.
+    """Append a non-governance event to the project ledger.
 
     Enforces:
     - Privacy boundary filtering (metadata-only, structured-events, full-content)
@@ -376,7 +397,15 @@ def append_project_event(
     - Local raw-evidence storage under full-content mode
     - Mandatory saga payload contract validation
     - Level 3 project locking and atomic append
+
+    Governance-bearing events require an independently verified PSE boundary
+    and are rejected before any append-side effect.
     """
+    if command.event_type in GOVERNANCE_BEARING_EVENT_TYPES:
+        raise PermissionError(
+            f"Generic append rejects governance-bearing event '{command.event_type}'"
+        )
+
     store = ProjectEventStore(command.project_id, vault_root)
 
     # 1. Apply Redaction Pipeline
@@ -464,27 +493,7 @@ def append_project_event(
         }
     )
 
-    if prepared_command.event_type in {
-        "project.created",
-        "project.updated",
-        "project.phase.changed",
-        "project.reopened",
-        "raci.assigned",
-        "raci.revoked",
-        "evidence.attached",
-        "artifact.created",
-        "artifact.updated",
-        "task.associated",
-        "task.disassociated",
-        "decision.associated",
-        "decision.disassociated",
-        "dor.evaluated",
-        "dod.evaluated",
-        "gate.overridden",
-    }:
-        event = store.append_untrusted(prepared_command, timeout=timeout)
-    else:
-        event = store.append(prepared_command, timeout=timeout)
+    event = store.append(prepared_command, timeout=timeout)
 
     # Proactively update derived projection for this event
     with contextlib.suppress(Exception):
@@ -499,7 +508,7 @@ def import_project_events(
     events: list[ProjectEvent | dict[str, Any]],
     timeout: float = 10.0,
 ) -> int:
-    """Import an existing valid chain of events into the project ledger.
+    """Import a valid non-governance event chain into the project ledger.
 
     Atomicity Contract:
     Provides complete batch pre-validation with zero canonical ledger mutation on
@@ -508,10 +517,16 @@ def import_project_events(
     Note: does not claim physical crash-atomic multi-record transaction.
     """
     validate_project_id(project_id)
-    store = ProjectEventStore(project_id, vault_root)
 
     if not events:
         return 0
+
+    for raw in events:
+        event_type = raw.event_type if isinstance(raw, ProjectEvent) else raw.get("event_type")
+        if isinstance(event_type, str) and event_type in GOVERNANCE_BEARING_EVENT_TYPES:
+            raise PermissionError(f"Generic import rejects governance-bearing event '{event_type}'")
+
+    store = ProjectEventStore(project_id, vault_root)
 
     with store.lock(timeout=timeout):
         # 1. Recover torn tail on existing active ledger if present

@@ -24,6 +24,11 @@ from power_framework.core.canonical_json import (
     canonical_json_bytes,
     canonical_json_dumps,
 )
+from power_framework.core.decision_models import (
+    CANONICAL_DECISION_STATUSES,
+    RESOLVED_DECISION_STATUSES,
+    DecisionStatus,
+)
 from power_framework.core.project_models import (
     EVENT_ID_REGEX,
     HASH_REGEX,
@@ -223,7 +228,7 @@ class DecisionAuthorityView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision_id: str = Field(..., min_length=1, max_length=128)
-    status: str = Field(..., min_length=1, max_length=64)
+    status: DecisionStatus
     task_id: str | None = Field(default=None, max_length=128)
     task_revision: int = Field(default=1, ge=1)
     revision: int = Field(default=1, ge=1)
@@ -235,7 +240,7 @@ class DecisionAuthorityView(BaseModel):
     def compute_digest(
         cls,
         decision_id: str,
-        status: str,
+        status: DecisionStatus,
         task_id: str | None = None,
         task_revision: int = 1,
         revision: int = 1,
@@ -306,8 +311,16 @@ class HistoricalGovernanceEvaluation(BaseModel):
     def validate_bindings(self) -> HistoricalGovernanceEvaluation:
         task_ids = {view.task_id for view in self.task_views}
         decision_ids = {view.decision_id for view in self.decision_views}
+        if any(view.status not in CANONICAL_DECISION_STATUSES for view in self.decision_views):
+            raise ValueError("historical decision evaluation contains an unknown decision status")
         if not set(self.approved_decision_ids).issubset(decision_ids):
             raise ValueError("approved_decision_ids must reference included decision views")
+        if any(
+            view.status not in RESOLVED_DECISION_STATUSES or view.status != "approved"
+            for view in self.decision_views
+            if view.decision_id in self.approved_decision_ids
+        ):
+            raise ValueError("approved_decision_ids must reference approved decision views")
         receipt_ids = {receipt_id for view in self.task_views for receipt_id in view.receipt_ids}
         if not set(self.verified_task_receipts).issubset(receipt_ids):
             raise ValueError("verified_task_receipts must reference included task views")
@@ -521,6 +534,11 @@ class ProjectStateSnapshot(BaseModel):
     @classmethod
     def create(cls, state: ProjectState) -> ProjectStateSnapshot:
         """Create a cryptographically verified snapshot from current state."""
+        state_dict = state.to_canonical_dict()
+        if compute_state_revision(state_dict) != state.state_revision:
+            raise SnapshotIntegrityError(
+                "state_revision does not match state content; refusing to seal snapshot"
+            )
         raw_dict = {
             "schema_version": STATE_SCHEMA_VERSION,
             "rules_version": state.rules_version,
@@ -528,7 +546,7 @@ class ProjectStateSnapshot(BaseModel):
             "last_event_sequence": state.last_event_sequence,
             "last_event_hash": state.last_event_hash,
             "state_revision": state.state_revision,
-            "state": state.to_canonical_dict(),
+            "state": state_dict,
         }
         digest = compute_snapshot_digest(raw_dict)
         return cls(

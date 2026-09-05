@@ -97,8 +97,12 @@
           "type": "string"
         },
         "status": {
-          "maxLength": 64,
-          "minLength": 1,
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "expired"
+          ],
           "title": "Status",
           "type": "string"
         },

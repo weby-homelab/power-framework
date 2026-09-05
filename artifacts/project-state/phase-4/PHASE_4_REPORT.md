@@ -24,7 +24,7 @@
 
 Phase 4 delivers the authoritative **Deterministic State Engine & Governance** for the POWER Project State Engine (PSE). Closure Correction Round 2 separates historical governance replay from current federation and prevents future authority from authorizing an earlier canonical event.
 
-All design principles and gates have been verified:
+All local design principles and gates have been verified; remote CI and CodeQL closure remain pending:
 1. **Determinism (G4.1):** Replaying the same sequence of canonical events across independent state reducer instances and separate Python processes produces 100% byte-identical canonical JSON output and identical SHA-256 `state_revision`. The pure reducer (`ProjectStateReducer.reduce` / `reduce_internal`) is explicitly NON-AUTHORITATIVE determinism machinery for unit testing; it never emits canonical state on its own.
 2. **Model Safety & Zero Autonomous Advance (G4.2):** Strict P0 security enforcement blocks untrusted/model-extracted proposals from advancing lifecycle phases, satisfying DoD criteria, or overriding governance gates. Zero model transitions are permitted.
 3. **Canonical Subsystem Invariance (G4.3, G4.4):** Task v2 and DecisionService v1 remain authoritative. The trusted orchestration boundary (`ProjectStateService.rebuild_project_state`) resolves live task/decision truth from the owning subsystems and constructs projections from objects actually read there. Caller-constructed `TaskAuthorityView` / `DecisionAuthorityView` objects — even with matching self-digests — prove only internal view integrity, never subsystem authority. Ledger `task.lifecycle.observed` / `decision.lifecycle.observed` payloads are audit signals; live stores win, drift emits `STALE_*_OBSERVATION` diagnostics.
@@ -86,7 +86,7 @@ Explicitly Out-of-Scope (BLOCKED):
    - Task readiness projection, decision validation (`valid_decisions` = approved only), RAID aggregation.
    - Deterministic explainability traces and snapshot management with lineage verification helper.
 4. `src/power_framework/core/state_service.py` (NEW — trusted authority composition boundary):
-   - `ProjectStateService` / `ProjectStateEngine` with authoritative `rebuild_project_state(vault_root, project_id)`: verifies the canonical Phase-2 ledger, re-reads the authoritative event sequence, resolves federated Task/Decision authority from canonical services, then executes pure reduction.
+   - `ProjectStateService(vault_root)` / `ProjectStateEngine` with authoritative `rebuild_project_state(project_id)`: verifies the canonical Phase-2 ledger, re-reads the authoritative event sequence, resolves federated Task/Decision authority from canonical services, then executes pure reduction.
    - `rebuild_from_candidates()`: fail-closed canonical-membership proof for caller streams.
    - `restore_snapshot_authoritative()`: ledger lineage + federated re-resolution + recomputation.
 
