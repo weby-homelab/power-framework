@@ -789,6 +789,19 @@
       "$ref": "#/$defs/ProjectPhase",
       "default": "DISCOVERY"
     },
+    "owner": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Owner"
+    },
     "phase_history": {
       "items": {
         "$ref": "#/$defs/PhaseTransitionRecord"
@@ -897,8 +910,7 @@
       "type": "string"
     },
     "rules_digest": {
-      "default": "",
-      "pattern": "^([0-9a-f]{64})?$",
+      "pattern": "^[0-9a-f]{64}$",
       "title": "Rules Digest",
       "type": "string"
     },
@@ -918,6 +930,13 @@
       },
       "title": "Attached Evidence",
       "type": "array"
+    },
+    "evidence_kinds": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Evidence Kinds",
+      "type": "object"
     },
     "last_event_sequence": {
       "default": 0,
@@ -943,6 +962,44 @@
         "$ref": "#/$defs/DecisionAuthorityView"
       },
       "title": "Decisions",
+      "type": "object"
+    },
+    "historical_approved_decisions": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Historical Approved Decisions",
+      "type": "object"
+    },
+    "historical_task_receipts": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Historical Task Receipts",
+      "type": "object"
+    },
+    "historical_evaluations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Historical Evaluations",
+      "type": "array"
+    },
+    "historical_gate_evaluations": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Historical Gate Evaluations",
+      "type": "object"
+    },
+    "historical_gate_origins": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Historical Gate Origins",
       "type": "object"
     },
     "risks": {
@@ -990,9 +1047,10 @@
   },
   "required": [
     "project_id",
+    "rules_digest",
     "state_revision"
   ],
   "title": "POWER Project State Schema v1",
   "type": "object",
-  "": "https://json-schema.org/draft/2020-12/schema"
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
 }

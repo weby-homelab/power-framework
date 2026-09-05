@@ -12,8 +12,9 @@ Implements deterministic evaluation of:
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from power_framework.core.canonical_json import canonical_json_bytes
 from power_framework.core.state_models import (
@@ -234,47 +235,136 @@ LEGAL_TRANSITIONS: dict[tuple[ProjectPhase, ProjectPhase], TransitionSpec] = {
 AUTHORIZED_OVERRIDE_ROLES: set[str] = {"admin", "architect", "lead", "accountable"}
 
 
-def compute_rules_digest() -> str:
-    """Compute the immutable digest of the effective governance ruleset.
+def build_rules_manifest() -> dict[str, Any]:
+    """Build the executable canonical governance manifest.
 
-    Binds rules_version to exactly one normalized rules manifest: the sorted
-    FSM transition specs, authorized override roles and DoR/DoD policy flags.
-    A modified ruleset with an unchanged version string is detectable because
-    this digest changes (see test_ruleset_binding).
+    The checked-in JSON manifest is a reviewable derivative of this builder.
+    Runtime policy therefore has one authoritative definition, while tooling
+    can hash an actual manifest to detect effective-rule drift.
     """
-    manifest = {
+    return {
+        "schema_version": "power.governance-rules.v1",
+        "rules_version": GOVERNANCE_RULES_VERSION,
+        "name": "POWER Project State Engine Governance Rules v1",
+        "description": "Deterministic declarative governance and quality gate rules for POWER 3.8 PSE Phase 4.",
+        "fsm": {
+            "states": [phase.value for phase in ProjectPhase],
+            "transitions_count": len(LEGAL_TRANSITIONS),
+            "transitions": sorted(
+                [
+                    {
+                        "name": spec.name,
+                        "from_phase": spec.from_phase.value,
+                        "to_phase": spec.to_phase.value,
+                        "preconditions": sorted(spec.preconditions),
+                        "required_gate": spec.required_gate,
+                        "approval_required": spec.approval_required,
+                        "evidence_required": spec.evidence_required,
+                        "is_rollback": spec.is_rollback,
+                    }
+                    for spec in LEGAL_TRANSITIONS.values()
+                ],
+                key=lambda transition: (
+                    transition["from_phase"],
+                    transition["to_phase"],
+                ),
+            ),
+        },
         "dor_rules": {
-            "blocking_issue_severities": ["blocker", "critical"],
             "require_initial_tasks": True,
             "require_no_circular_dependencies": True,
+            "blocking_issue_severities": ["blocker", "critical"],
         },
         "dod_rules": {
-            "require_all_decisions_resolved": True,
             "require_all_tasks_terminal": True,
-            "require_canonical_completion_evidence": True,
+            "require_all_decisions_resolved": True,
             "require_no_blocking_issues": True,
+            "require_canonical_completion_evidence": True,
             "untrusted_model_statements_strictly_disallowed": True,
         },
-        "override_roles": sorted(AUTHORIZED_OVERRIDE_ROLES),
-        "rules_version": GOVERNANCE_RULES_VERSION,
-        "transitions": sorted(
-            [
-                {
-                    "approval_required": spec.approval_required,
-                    "evidence_required": spec.evidence_required,
-                    "from_phase": spec.from_phase.value,
-                    "is_rollback": spec.is_rollback,
-                    "name": spec.name,
-                    "preconditions": sorted(spec.preconditions),
-                    "required_gate": spec.required_gate,
-                    "to_phase": spec.to_phase.value,
-                }
-                for spec in LEGAL_TRANSITIONS.values()
-            ],
-            key=lambda t: (t["from_phase"], t["to_phase"]),
-        ),
+        "override_policy": {
+            "authorized_roles": sorted(AUTHORIZED_OVERRIDE_ROLES),
+            "require_reason": True,
+            "require_evidence": True,
+            "allow_model_override": False,
+        },
+        "health_rules": {
+            "BLOCKING_ISSUES_PRESENT": {
+                "condition": "open_issues contains severity in [blocker, critical]",
+                "severity": "CRITICAL",
+            },
+            "HIGH_RISKS_OPEN": {
+                "condition": "open_risks contains impact in [critical, high] with status == identified",
+                "severity": "HIGH",
+            },
+            "CIRCULAR_DEPENDENCY_DETECTED": {
+                "condition": "directed cycle detected in task or project dependency graph",
+                "severity": "CRITICAL",
+            },
+            "BLOCKED_TASKS_PRESENT": {
+                "condition": "count(blocked_tasks) > 0",
+                "severity": "MEDIUM",
+            },
+            "UNRESOLVED_GOVERNANCE_REQUIREMENTS": {
+                "condition": "count(required_approvals) > 0",
+                "severity": "HIGH",
+            },
+        },
+        "temporal_authority": {
+            "historical_source": "canonical PSE evaluation evidence at or before event sequence",
+            "current_overlay_source": "current TaskStore and DecisionService snapshots",
+            "future_authority_is_invalid": True,
+        },
     }
-    return hashlib.sha256(canonical_json_bytes(manifest)).hexdigest()
+
+
+def normalize_rules_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Normalize the generated JSON derivative into the executable shape."""
+    normalized = deepcopy(manifest)
+    fsm = normalized.get("fsm")
+    if not isinstance(fsm, dict):
+        raise ValueError("governance manifest must contain an fsm object")
+    transitions = fsm.get("transitions")
+    if not isinstance(transitions, list):
+        raise ValueError("governance manifest must contain fsm.transitions")
+    for transition in transitions:
+        if not isinstance(transition, dict):
+            raise ValueError("governance transition must be an object")
+        preconditions = transition.get("preconditions", [])
+        if not isinstance(preconditions, list):
+            raise ValueError("governance transition preconditions must be a list")
+        transition["preconditions"] = sorted(preconditions)
+    fsm["states"] = list(fsm.get("states", []))
+    fsm["transitions_count"] = len(transitions)
+    fsm["transitions"] = sorted(
+        transitions,
+        key=lambda transition: (transition["from_phase"], transition["to_phase"]),
+    )
+    override_policy = normalized.get("override_policy")
+    if not isinstance(override_policy, dict):
+        roles = normalized.pop("override_roles", None)
+        if not isinstance(roles, list):
+            raise ValueError("governance manifest must contain override_policy")
+        override_policy = {
+            "authorized_roles": roles,
+            "require_reason": True,
+            "require_evidence": True,
+            "allow_model_override": False,
+        }
+        normalized["override_policy"] = override_policy
+    roles = override_policy.get("authorized_roles")
+    if not isinstance(roles, list):
+        raise ValueError("override_policy.authorized_roles must be a list")
+    override_policy["authorized_roles"] = sorted(roles)
+    return normalized
+
+
+def compute_rules_digest(manifest: dict[str, Any] | None = None) -> str:
+    """Compute SHA-256 over the normalized effective governance manifest."""
+    effective_manifest = normalize_rules_manifest(
+        manifest if manifest is not None else build_rules_manifest()
+    )
+    return hashlib.sha256(canonical_json_bytes(effective_manifest)).hexdigest()
 
 
 RULES_DIGEST: str = compute_rules_digest()
@@ -305,6 +395,9 @@ class AuthorityContext:
     accountable_actor: str | None = None
     verified_task_receipts: set[str] = field(default_factory=set)
     permit_accountable_approval: bool = False
+    historical: bool = False
+    charter_evidence_refs: set[str] = field(default_factory=set)
+    raci_accountable_cardinality_valid: bool = True
 
 
 def is_untrusted_event(event: ProjectEvent | None) -> bool:
@@ -437,6 +530,14 @@ class GovernanceEngine:
             return GovernanceEvaluation(
                 decision=GovernanceDecision.DENY,
                 reason_codes=["ILLEGAL_LIFECYCLE_TRANSITION"],
+                policy_version=self.policy_version,
+                relevant_event_ids=event_ids,
+            )
+
+        if authority is not None and not authority.raci_accountable_cardinality_valid:
+            return GovernanceEvaluation(
+                decision=GovernanceDecision.DENY,
+                reason_codes=["RACI_ACCOUNTABLE_CARDINALITY_VIOLATION"],
                 policy_version=self.policy_version,
                 relevant_event_ids=event_ids,
             )
@@ -615,6 +716,11 @@ class GovernanceEngine:
         has_reason_text = any(isinstance(v, str) and v.strip() for v in text_fields)
 
         if precondition == "charter_present":
+            if authority.historical:
+                return bool(
+                    authority.charter_evidence_refs
+                    and authority.charter_evidence_refs.issubset(authority.attached_evidence)
+                )
             if any("charter" in ref.lower() for ref in authority.attached_evidence):
                 return True
             charter_keys = ("charter", "charter_present", "charter_ref")
@@ -623,6 +729,8 @@ class GovernanceEngine:
                 for k in charter_keys
             ) and any("charter" in str(v).lower() for v in payload.values() if isinstance(v, str))
         if precondition == "owner_assigned":
+            if authority.historical:
+                return isinstance(state.owner, str) and bool(state.owner.strip())
             owner = payload.get("owner") or payload.get("owner_assigned")
             if isinstance(owner, str) and owner.strip():
                 return True
@@ -642,7 +750,10 @@ class GovernanceEngine:
             dor = self.evaluate_dor(state, ProjectPhase.EXECUTION)
             return dor.passed
         if precondition == "raci_accountable_assigned":
-            return authority.accountable_actor is not None
+            return (
+                authority.raci_accountable_cardinality_valid
+                and authority.accountable_actor is not None
+            )
         if precondition == "initial_tasks_registered":
             return len(state.tasks) > 0
         if precondition == "all_tasks_terminal":
@@ -717,6 +828,38 @@ class GovernanceEngine:
             )
 
         if authority is not None:
+            if authority.historical and not authority.raci_accountable_cardinality_valid:
+                return GovernanceEvaluation(
+                    decision=GovernanceDecision.DENY,
+                    reason_codes=["RACI_ACCOUNTABLE_CARDINALITY_VIOLATION"],
+                    policy_version=self.policy_version,
+                    relevant_event_ids=event_ids,
+                )
+            if authority.historical and authority.accountable_actor is None:
+                return GovernanceEvaluation(
+                    decision=GovernanceDecision.DENY,
+                    reason_codes=["RACI_ACCOUNTABLE_REQUIRED_FOR_OVERRIDE"],
+                    policy_version=self.policy_version,
+                    relevant_event_ids=event_ids,
+                )
+            if authority.historical:
+                evidence = event.evidence_refs or payload.get("evidence_refs") or []
+                if not isinstance(evidence, list) or not evidence:
+                    return GovernanceEvaluation(
+                        decision=GovernanceDecision.REQUIRE_EVIDENCE,
+                        reason_codes=["MISSING_OVERRIDE_EVIDENCE"],
+                        policy_version=self.policy_version,
+                        relevant_event_ids=event_ids,
+                    )
+                unresolved = [ref for ref in evidence if ref not in authority.attached_evidence]
+                if unresolved:
+                    return GovernanceEvaluation(
+                        decision=GovernanceDecision.REQUIRE_EVIDENCE,
+                        reason_codes=["OVERRIDE_EVIDENCE_NOT_CANONICAL"],
+                        policy_version=self.policy_version,
+                        relevant_event_ids=event_ids,
+                        required_evidence_refs=sorted(set(unresolved)),
+                    )
             overridden_by = payload.get("overridden_by") or event.actor
             approved_by = payload.get("approved_by")
             if not isinstance(overridden_by, str) or not overridden_by.strip():
@@ -740,8 +883,13 @@ class GovernanceEngine:
                     policy_version=self.policy_version,
                     relevant_event_ids=event_ids,
                 )
-            canonical_actors = {a for actors in authority.raci.values() for a in actors}
-            if overridden_by.strip() not in canonical_actors:
+            authorized_actors = {
+                actor
+                for raci_role, actors in authority.raci.items()
+                if raci_role.strip().casefold() in AUTHORIZED_OVERRIDE_ROLES
+                for actor in actors
+            }
+            if overridden_by.strip() not in authorized_actors:
                 return GovernanceEvaluation(
                     decision=GovernanceDecision.DENY,
                     reason_codes=["UNAUTHORIZED_OVERRIDE_ACTOR"],
@@ -1090,7 +1238,9 @@ __all__ = [
     "AuthorityContext",
     "GovernanceEngine",
     "TransitionSpec",
+    "build_rules_manifest",
     "compute_rules_digest",
     "detect_dependency_cycles",
     "is_untrusted_event",
+    "normalize_rules_manifest",
 ]

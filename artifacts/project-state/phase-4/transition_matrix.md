@@ -79,6 +79,20 @@ All 19 non-listed directed pairs are strictly prohibited and fail closed.
 
 ## 6. Gate Overrides (`gate.overridden`)
 
+- Gate overrides must be emitted through `ProjectStateService.append_governed_gate_override()`;
+  a generic `AppendCommand` cannot mint a valid override by choosing the event
+  type and payload.
+- The governed operation requires prior canonical evidence, canonical RACI
+  actor resolution, exactly-one Accountable cardinality, and canonical
+  approval/identity binding.
 - Permitted only for authorized roles: `admin`, `architect`, `lead`, `accountable`.
-- Must provide non-empty justification `reason` and non-empty `evidence_ref`.
+- Must provide non-empty justification `reason` and non-empty prior evidence refs.
 - **Untrusted / model proposals strictly prohibited:** Model-derived events attempting `gate.overridden` are rejected fail-closed with `UNTRUSTED_MODEL_OVERRIDE_PROHIBITED` (Gate G4.2 / P0-3).
+
+## 7. Temporal Authority Invariant
+
+For a transition at canonical sequence N, no task association or completion,
+decision association or approval, RACI assignment, evidence attachment, or gate
+override committed after N may authorize that transition. Historical replay is
+sequence-bound; current TaskStore/DecisionService state is applied only after
+the historical lifecycle has been reconstructed.

@@ -55,6 +55,7 @@ from power_framework.core.state_models import (
     STATE_SCHEMA_VERSION,
     DecisionAuthorityView,
     GovernanceDecision,
+    HistoricalGovernanceEvaluation,
     IllegalStateTransitionError,
     PhaseTransitionRecord,
     ProjectPhase,
@@ -161,13 +162,22 @@ class ProjectStateReducer:
                 rules_digest=RULES_DIGEST,
                 state_revision="0" * 64,
             )
+        if (
+            authority is not None
+            and authority.historical
+            and state.rules_digest not in {"", RULES_DIGEST}
+        ):
+            raise StateEngineIntegrityError("Historical replay rules digest mismatch")
+        if not state.rules_digest and authority is not None and authority.historical:
+            raise StateEngineIntegrityError("Historical replay requires a non-empty rules digest")
         if not state.rules_digest:
             state.rules_digest = RULES_DIGEST
 
-        # Merge task views: in authoritative mode these are live views already
-        # resolved from TaskStore by the trusted service (live wins); caller
-        # views are never trusted as canonical proof on their own.
-        if tasks:
+        # Non-authoritative pure replay may preload supplied views for
+        # determinism tests.  Historical authoritative replay deliberately
+        # starts with no live federation: future TaskStore state must not be
+        # visible before a canonical relationship/evaluation event.
+        if tasks and not (authority is not None and authority.historical):
             for t_view in tasks:
                 if authority is not None:
                     expected = TaskAuthorityView.compute_digest(
@@ -185,8 +195,10 @@ class ProjectStateReducer:
                         )
                 state.tasks[t_view.task_id] = deepcopy(t_view)
 
-        # Merge decision views (same authority rule as tasks)
-        if decisions:
+        # Merge decision views only for pure replay/current non-historical
+        # callers.  Historical approval comes from sequence-bound evaluation
+        # evidence applied during replay.
+        if decisions and not (authority is not None and authority.historical):
             for d_view in decisions:
                 if authority is not None:
                     expected_d = DecisionAuthorityView.compute_digest(
@@ -261,8 +273,49 @@ class ProjectStateReducer:
         payload = event.payload or {}
         event_type = event.event_type
 
+        governance_bearing_types = {
+            "project.created",
+            "project.updated",
+            "project.phase.changed",
+            "project.reopened",
+            "raci.assigned",
+            "raci.revoked",
+            "evidence.attached",
+            "artifact.created",
+            "artifact.updated",
+            "task.associated",
+            "task.disassociated",
+            "decision.associated",
+            "decision.disassociated",
+            "dor.evaluated",
+            "dod.evaluated",
+            "gate.overridden",
+        }
+        if (
+            authority is not None
+            and authority.historical
+            and event_type in governance_bearing_types
+            and event.source != "pse_governance"
+        ):
+            raise StateEngineIntegrityError(
+                f"Governance-bearing event requires trusted PSE provenance: {event.event_id}"
+            )
+        if (
+            authority is not None
+            and authority.historical
+            and event_type in governance_bearing_types
+            and is_untrusted_event(event)
+        ):
+            raise StateEngineIntegrityError(
+                f"Untrusted governance-bearing event rejected: {event.event_id}"
+            )
+
         if event_type == "project.created":
             state.current_phase = ProjectPhase.DISCOVERY
+            self._handle_project_owner(state, event)
+
+        elif event_type == "project.updated":
+            self._handle_project_owner(state, event)
 
         elif event_type in ("project.phase.changed", "project.reopened"):
             self._handle_phase_transition(state, event, authority)
@@ -281,6 +334,9 @@ class ProjectStateReducer:
 
         elif event_type in ("artifact.created", "artifact.updated"):
             self._handle_artifact_event(state, event)
+
+        elif event_type in ("dor.evaluated", "dod.evaluated"):
+            self._handle_historical_evaluation(state, event, authority)
 
         elif event_type == "task.associated":
             task_id = payload.get("task_id")
@@ -356,6 +412,7 @@ class ProjectStateReducer:
             decision_id = payload.get("decision_id")
             if decision_id:
                 state.decisions.pop(decision_id, None)
+                state.historical_approved_decisions.pop(decision_id, None)
 
         elif event_type == "decision.lifecycle.observed":
             # Decision observation is audit signal only; DecisionService wins.
@@ -435,6 +492,153 @@ class ProjectStateReducer:
         state.last_event_hash = event.event_hash
         state.contributing_events.append(event.event_id)
 
+    @staticmethod
+    def _handle_project_owner(state: ProjectState, event: ProjectEvent) -> None:
+        """Project ownership is established only by prior project metadata."""
+        payload = event.payload or {}
+        owner = payload.get("owner") or payload.get("owner_id")
+        if isinstance(owner, str) and owner.strip():
+            state.owner = owner.strip()
+
+    def _handle_historical_evaluation(
+        self,
+        state: ProjectState,
+        event: ProjectEvent,
+        authority: AuthorityContext | None,
+    ) -> None:
+        """Apply a trusted, sequence-bound DoR/DoD evaluation record."""
+        if authority is None or not authority.historical:
+            raise StateEngineIntegrityError(
+                f"Historical governance evaluation {event.event_id} requires the trusted service boundary"
+            )
+        if event.source != "pse_governance":
+            raise StateEngineIntegrityError(
+                f"Historical governance evaluation {event.event_id} has an untrusted source"
+            )
+        try:
+            evaluation = HistoricalGovernanceEvaluation.model_validate(event.payload or {})
+        except ValueError as exc:
+            raise StateEngineIntegrityError(
+                f"Invalid historical governance evaluation on {event.event_id}: {exc}"
+            ) from exc
+
+        expected_type = "dor" if event.event_type == "dor.evaluated" else "dod"
+        if evaluation.evaluation_type != expected_type:
+            raise StateEngineIntegrityError(
+                f"Evaluation type mismatch on {event.event_id}: expected {expected_type}"
+            )
+        allowed_phases = (
+            {ProjectPhase.PLANNING, ProjectPhase.EXECUTION}
+            if expected_type == "dor"
+            else {ProjectPhase.CLOSING, ProjectPhase.CLOSED}
+        )
+        if evaluation.evaluated_phase not in allowed_phases:
+            raise StateEngineIntegrityError(
+                f"Evaluation phase is incompatible with {expected_type} on {event.event_id}"
+            )
+        if evaluation.evaluation_event_id != event.event_id:
+            raise StateEngineIntegrityError(
+                f"Evaluation event binding mismatch on {event.event_id}"
+            )
+        if (
+            evaluation.rules_version != self.rules_version
+            or evaluation.rules_digest != RULES_DIGEST
+        ):
+            raise StateEngineIntegrityError(
+                f"Historical governance rules binding mismatch on {event.event_id}"
+            )
+        if evaluation.evaluated_from_phase != state.current_phase:
+            raise StateEngineIntegrityError(
+                f"Historical evaluation {event.event_id} is bound to the wrong source phase"
+            )
+
+        if any(ref not in state.attached_evidence for ref in evaluation.required_evidence_refs):
+            raise StateEngineIntegrityError(
+                f"Historical evaluation {event.event_id} references future or unknown evidence"
+            )
+        if evaluation.accountable_actor is not None:
+            actors = self._accountable_actors(state.raci)
+            if actors != [evaluation.accountable_actor]:
+                raise StateEngineIntegrityError(
+                    f"Historical evaluation {event.event_id} has invalid Accountable binding"
+                )
+
+        for task_view in evaluation.task_views:
+            if task_view.task_id not in state.tasks:
+                raise StateEngineIntegrityError(
+                    f"Historical evaluation {event.event_id} references unassociated task "
+                    f"'{task_view.task_id}'"
+                )
+            expected_digest = TaskAuthorityView.compute_digest(
+                task_id=task_view.task_id,
+                state=task_view.state,
+                revision=task_view.revision,
+                dependencies=list(task_view.dependencies),
+                open_gates=list(task_view.open_gates),
+                receipt_ids=list(task_view.receipt_ids),
+            )
+            if expected_digest != task_view.digest:
+                raise StateEngineIntegrityError(
+                    f"Historical task evaluation digest mismatch for '{task_view.task_id}'"
+                )
+            state.tasks[task_view.task_id] = deepcopy(task_view)
+
+        for decision_view in evaluation.decision_views:
+            if decision_view.decision_id not in state.decisions:
+                raise StateEngineIntegrityError(
+                    f"Historical evaluation {event.event_id} references unassociated decision "
+                    f"'{decision_view.decision_id}'"
+                )
+            expected_digest = DecisionAuthorityView.compute_digest(
+                decision_id=decision_view.decision_id,
+                status=decision_view.status,
+                task_id=decision_view.task_id,
+                task_revision=decision_view.task_revision,
+                revision=decision_view.revision,
+                receipt_id=decision_view.receipt_id,
+            )
+            if expected_digest != decision_view.digest:
+                raise StateEngineIntegrityError(
+                    f"Historical decision evaluation digest mismatch for '{decision_view.decision_id}'"
+                )
+            state.decisions[decision_view.decision_id] = deepcopy(decision_view)
+
+        if evaluation.result == "passed":
+            if (
+                evaluation.evaluated_phase
+                in (
+                    ProjectPhase.EXECUTION,
+                    ProjectPhase.CLOSING,
+                    ProjectPhase.CLOSED,
+                )
+                and not evaluation.task_views
+            ):
+                raise StateEngineIntegrityError(
+                    f"Historical evaluation {event.event_id} lacks canonical task views"
+                )
+            state.historical_gate_evaluations[evaluation.evaluated_phase.value] = event.sequence
+            state.historical_gate_origins[evaluation.evaluated_phase.value] = (
+                evaluation.evaluated_from_phase.value
+            )
+            for decision_id in evaluation.approved_decision_ids:
+                decision = state.decisions.get(decision_id)
+                if decision is None or decision.status != "approved":
+                    raise StateEngineIntegrityError(
+                        f"Historical approval binding invalid for '{decision_id}'"
+                    )
+                state.historical_approved_decisions[decision_id] = event.sequence
+            receipt_ids = set(evaluation.verified_task_receipts)
+            known_receipts = {
+                receipt_id for task in evaluation.task_views for receipt_id in task.receipt_ids
+            }
+            if not receipt_ids.issubset(known_receipts):
+                raise StateEngineIntegrityError(
+                    f"Historical completion receipt binding invalid on {event.event_id}"
+                )
+            for receipt_id in receipt_ids:
+                state.historical_task_receipts[receipt_id] = event.sequence
+        state.historical_evaluations.append(event.event_id)
+
     def _handle_phase_transition(
         self,
         state: ProjectState,
@@ -457,6 +661,26 @@ class ProjectStateReducer:
             raise IllegalStateTransitionError(
                 f"Unknown project phase '{raw_to_phase}' in event {event.event_id}"
             ) from err
+
+        spec = LEGAL_TRANSITIONS.get((state.current_phase, to_phase))
+        if (
+            authority is not None
+            and authority.historical
+            and spec is not None
+            and spec.required_gate
+        ):
+            required_evaluation = "dor" if "dor" in spec.required_gate else "dod"
+            evaluation_sequence = state.historical_gate_evaluations.get(to_phase.value)
+            evaluation_origin = state.historical_gate_origins.get(to_phase.value)
+            if (
+                evaluation_sequence is None
+                or evaluation_sequence != state.last_event_sequence
+                or evaluation_origin != state.current_phase.value
+            ):
+                raise IllegalStateTransitionError(
+                    f"Illegal phase transition from {state.current_phase} to {to_phase} "
+                    f"rejected by governance engine: MISSING_CANONICAL_{required_evaluation.upper()}_EVALUATION"
+                )
 
         eval_result = self.governance_engine.evaluate_transition(
             state, to_phase, event, self._effective_authority(state, authority)
@@ -495,6 +719,9 @@ class ProjectStateReducer:
         )
         state.phase_history.append(transition_record)
         state.current_phase = to_phase
+        if authority is not None and authority.historical and spec.required_gate:
+            state.historical_gate_evaluations.pop(to_phase.value, None)
+            state.historical_gate_origins.pop(to_phase.value, None)
 
     def _effective_authority(
         self, state: ProjectState, authority: AuthorityContext | None
@@ -510,20 +737,51 @@ class ProjectStateReducer:
         prior_raci: dict[str, list[str]] = {
             role: sorted(actors) for role, actors in state.raci.items() if actors
         }
-        accountable: str | None = None
-        for key in ("Accountable", "accountable", "A"):
-            actors = prior_raci.get(key)
-            if actors:
-                accountable = actors[0]
-                break
+        accountable_actors = self._accountable_actors(prior_raci)
+        cardinality_valid = len(accountable_actors) <= 1
+        accountable = accountable_actors[0] if len(accountable_actors) == 1 else None
+        if authority.historical:
+            approved_decisions = {
+                decision_id
+                for decision_id, sequence in state.historical_approved_decisions.items()
+                if sequence <= state.last_event_sequence
+            }
+            verified_receipts = {
+                receipt_id
+                for receipt_id, sequence in state.historical_task_receipts.items()
+                if sequence <= state.last_event_sequence
+            }
+        else:
+            approved_decisions = set(authority.approved_decision_ids)
+            verified_receipts = set(authority.verified_task_receipts)
+        charter_refs = {
+            ref
+            for ref, kind in state.evidence_kinds.items()
+            if kind in {"charter", "project_charter"}
+        }
         return AuthorityContext(
             attached_evidence=set(state.attached_evidence),
-            approved_decision_ids=set(authority.approved_decision_ids),
+            approved_decision_ids=approved_decisions,
             raci=prior_raci,
             accountable_actor=accountable,
-            verified_task_receipts=set(authority.verified_task_receipts),
+            verified_task_receipts=verified_receipts,
             permit_accountable_approval=authority.permit_accountable_approval,
+            historical=authority.historical,
+            charter_evidence_refs=charter_refs,
+            raci_accountable_cardinality_valid=cardinality_valid,
         )
+
+    @staticmethod
+    def _accountable_actors(raci: dict[str, list[str]]) -> list[str]:
+        """Normalize Accountable aliases before enforcing exactly-one cardinality."""
+        actors = {
+            actor
+            for role, role_actors in raci.items()
+            if role.strip().casefold() in {"accountable", "a"}
+            for actor in role_actors
+            if isinstance(actor, str) and actor.strip()
+        }
+        return sorted(actors)
 
     def _handle_raci_assigned(self, state: ProjectState, event: ProjectEvent) -> None:
         """Record canonical raci.assigned into the deterministic RACI projection."""
@@ -534,9 +792,10 @@ class ProjectStateReducer:
             return
         if not isinstance(actor, str) or not actor.strip():
             return
-        actors = set(state.raci.get(role.strip(), []))
+        canonical_role = self._canonical_raci_role(role)
+        actors = set(state.raci.get(canonical_role, []))
         actors.add(actor.strip())
-        state.raci[role.strip()] = sorted(actors)
+        state.raci[canonical_role] = sorted(actors)
 
     def _handle_raci_revoked(self, state: ProjectState, event: ProjectEvent) -> None:
         """Record canonical raci.revoked; Accountable must remain exactly one actor."""
@@ -545,15 +804,23 @@ class ProjectStateReducer:
         actor = payload.get("actor")
         if not isinstance(role, str) or not role.strip():
             return
-        current = set(state.raci.get(role.strip(), []))
+        canonical_role = self._canonical_raci_role(role)
+        current = set(state.raci.get(canonical_role, []))
         if isinstance(actor, str) and actor.strip():
             current.discard(actor.strip())
         else:
             current.clear()
         if current:
-            state.raci[role.strip()] = sorted(current)
+            state.raci[canonical_role] = sorted(current)
         else:
-            state.raci.pop(role.strip(), None)
+            state.raci.pop(canonical_role, None)
+
+    @staticmethod
+    def _canonical_raci_role(role: str) -> str:
+        normalized = role.strip()
+        if normalized.casefold() in {"accountable", "a"}:
+            return "Accountable"
+        return normalized
 
     @staticmethod
     def _collect_evidence_refs(event: ProjectEvent) -> list[str]:
@@ -574,10 +841,21 @@ class ProjectStateReducer:
 
     def _handle_evidence_attached(self, state: ProjectState, event: ProjectEvent) -> None:
         """Index canonically attached evidence refs (deterministic sorted set)."""
-        for ref in self._collect_evidence_refs(event):
+        refs = self._collect_evidence_refs(event)
+        payload = event.payload or {}
+        kind = payload.get("evidence_type") or payload.get("artifact_type") or payload.get("kind")
+        normalized_kind = kind.strip().lower() if isinstance(kind, str) and kind.strip() else None
+        for ref in refs:
             if ref not in state.attached_evidence:
                 state.attached_evidence.append(ref)
+            if normalized_kind is not None:
+                state.evidence_kinds[ref] = normalized_kind
         state.attached_evidence = sorted(set(state.attached_evidence))
+        state.evidence_kinds = {
+            ref: state.evidence_kinds[ref]
+            for ref in sorted(state.evidence_kinds)
+            if ref in state.attached_evidence
+        }
 
     def _handle_artifact_event(self, state: ProjectState, event: ProjectEvent) -> None:
         """Index artifact refs as canonical evidence (same index as evidence)."""
@@ -587,6 +865,10 @@ class ProjectStateReducer:
         self, state: ProjectState, event: ProjectEvent, authority: AuthorityContext | None = None
     ) -> None:
         """Process gate.overridden events with strict trust checking."""
+        if authority is not None and authority.historical and event.source != "pse_governance":
+            raise StateEngineIntegrityError(
+                f"Gate override {event.event_id} requires the trusted service boundary"
+            )
         eval_result = self.governance_engine.evaluate_gate_override(
             event, self._effective_authority(state, authority)
         )
@@ -981,6 +1263,36 @@ class ProjectStateReducer:
         state.overridden_gates = sorted(set(state.overridden_gates))
         state.attached_evidence = sorted(set(state.attached_evidence))
         state.raci = {role: sorted(set(actors)) for role, actors in sorted(state.raci.items())}
+        state.evidence_kinds = {
+            ref: state.evidence_kinds[ref] for ref in sorted(state.evidence_kinds)
+        }
+        state.historical_approved_decisions = {
+            decision_id: state.historical_approved_decisions[decision_id]
+            for decision_id in sorted(state.historical_approved_decisions)
+        }
+        state.historical_task_receipts = {
+            receipt_id: state.historical_task_receipts[receipt_id]
+            for receipt_id in sorted(state.historical_task_receipts)
+        }
+        state.historical_evaluations = sorted(set(state.historical_evaluations))
+        state.historical_gate_evaluations = {
+            phase: state.historical_gate_evaluations[phase]
+            for phase in sorted(state.historical_gate_evaluations)
+        }
+        state.historical_gate_origins = {
+            phase: state.historical_gate_origins[phase]
+            for phase in sorted(state.historical_gate_origins)
+        }
+        if (
+            authority is not None
+            and authority.historical
+            and state.rules_digest not in {"", RULES_DIGEST}
+        ):
+            raise StateEngineIntegrityError("Historical projection rules digest mismatch")
+        if not state.rules_digest and authority is not None and authority.historical:
+            raise StateEngineIntegrityError(
+                "Historical projection requires a non-empty rules digest"
+            )
         if not state.rules_digest:
             state.rules_digest = RULES_DIGEST
 
@@ -997,6 +1309,7 @@ class ProjectStateReducer:
                 "TASK_AUTHORITY_DRIFT",
                 "STALE_DECISION_OBSERVATION",
                 "DECISION_AUTHORITY_DRIFT",
+                "STALE_AUTHORITATIVE_PROJECTION",
             )
         ]
         computed_flags = self.governance_engine.evaluate_health_flags(state, cycles)
@@ -1210,7 +1523,7 @@ class ProjectStateReducer:
                 f"Snapshot rules version '{snapshot.rules_version}' != current '{self.rules_version}'"
             )
 
-        if snapshot.state.rules_digest and snapshot.state.rules_digest != RULES_DIGEST:
+        if not snapshot.state.rules_digest or snapshot.state.rules_digest != RULES_DIGEST:
             raise SnapshotIntegrityError(
                 "Snapshot ruleset digest mismatch: effective governance rules changed"
             )

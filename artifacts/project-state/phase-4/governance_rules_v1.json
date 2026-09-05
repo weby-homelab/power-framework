@@ -243,10 +243,10 @@
   },
   "override_policy": {
     "authorized_roles": [
+      "accountable",
       "admin",
       "architect",
-      "lead",
-      "accountable"
+      "lead"
     ],
     "require_reason": true,
     "require_evidence": true,
@@ -273,5 +273,10 @@
       "condition": "count(required_approvals) > 0",
       "severity": "HIGH"
     }
+  },
+  "temporal_authority": {
+    "historical_source": "canonical PSE evaluation evidence at or before event sequence",
+    "current_overlay_source": "current TaskStore and DecisionService snapshots",
+    "future_authority_is_invalid": true
   }
 }

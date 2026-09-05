@@ -464,7 +464,27 @@ def append_project_event(
         }
     )
 
-    event = store.append(prepared_command, timeout=timeout)
+    if prepared_command.event_type in {
+        "project.created",
+        "project.updated",
+        "project.phase.changed",
+        "project.reopened",
+        "raci.assigned",
+        "raci.revoked",
+        "evidence.attached",
+        "artifact.created",
+        "artifact.updated",
+        "task.associated",
+        "task.disassociated",
+        "decision.associated",
+        "decision.disassociated",
+        "dor.evaluated",
+        "dod.evaluated",
+        "gate.overridden",
+    }:
+        event = store.append_untrusted(prepared_command, timeout=timeout)
+    else:
+        event = store.append(prepared_command, timeout=timeout)
 
     # Proactively update derived projection for this event
     with contextlib.suppress(Exception):
@@ -1197,7 +1217,7 @@ def reconcile_project_subsystems(
                     correlation_id=corr_id,
                     idempotency_key=idempotency_key,
                 )
-                store.append(cmd)
+                store._append_governed(cmd.model_copy(update={"source": "pse_governance"}))
                 reconciled_tasks += 1
                 _pop_reconcile_attempt(tracker, key)
             else:
@@ -1284,7 +1304,7 @@ def reconcile_project_subsystems(
                     correlation_id=corr_id,
                     idempotency_key=idempotency_key,
                 )
-                store.append(cmd)
+                store._append_governed(cmd.model_copy(update={"source": "pse_governance"}))
                 reconciled_decisions += 1
                 _pop_reconcile_attempt(tracker, key)
             else:

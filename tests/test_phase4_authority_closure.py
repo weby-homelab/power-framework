@@ -43,6 +43,7 @@ from power_framework.core.state_models import (
     ProjectState,
     ProjectStateSnapshot,
     SnapshotIntegrityError,
+    StateEngineIntegrityError,
     TaskAuthorityView,
 )
 from power_framework.core.state_reducer import ProjectStateReducer
@@ -73,12 +74,13 @@ def append(
     event_type: str,
     payload: dict[str, Any] | None = None,
     actor: str = ENGINEER,
-    source: str = "cli",
+    source: str = "pse_governance",
     evidence_refs: list[str] | None = None,
     artifact_refs: list[str] | None = None,
 ) -> ProjectEvent:
     store = ProjectEventStore(pid, vault)
-    return store.append(
+    writer = store._append_governed if source == "pse_governance" else store.append_untrusted
+    return writer(
         AppendCommand(
             project_id=pid,
             event_type=event_type,
@@ -87,7 +89,7 @@ def append(
             source=source,
             evidence_refs=evidence_refs or [],
             artifact_refs=artifact_refs or [],
-        )
+        ),
     )
 
 
@@ -96,7 +98,10 @@ def attach_evidence(vault: Path, pid: str, ref: str) -> ProjectEvent:
         vault,
         pid,
         "evidence.attached",
-        {"evidence_id": ref},
+        {
+            "evidence_id": ref,
+            "evidence_type": "charter" if "charter" in ref.lower() else "artifact",
+        },
         actor=LEAD,
     )
 
@@ -227,8 +232,9 @@ class TestT2RealLedgerDifferentFakeStream:
         """T2: canonical A/B/C vs internally valid fake X/Y/Z -> REJECT."""
         vault = make_vault(tmp_path)
         pid = "prj_t2_streams"
-        append(vault, pid, "project.created", {"name": "T2"})
+        append(vault, pid, "project.created", {"name": "T2", "owner": LEAD})
         attach_evidence(vault, pid, "evi_charter_01")
+        ProjectStateService(vault).append_governance_evaluation(pid, "dor", actor=LEAD)
         append(
             vault,
             pid,
@@ -393,8 +399,9 @@ class TestT7FakeApprovalRef:
         tasks = TaskService(vault)
         make_taskvault_task(tasks, "task_exec", state="ready")
         decisions = DecisionService(vault, task_service=tasks)
-        append(vault, pid, "project.created", {"name": "T7"})
+        append(vault, pid, "project.created", {"name": "T7", "owner": LEAD})
         attach_evidence(vault, pid, "evi_charter_01")
+        ProjectStateService(vault).append_governance_evaluation(pid, "dor", actor=LEAD)
         append(
             vault,
             pid,
@@ -406,6 +413,12 @@ class TestT7FakeApprovalRef:
         assign_accountable(vault, pid)
         append(vault, pid, "task.associated", {"task_id": "task_exec"})
         attach_evidence(vault, pid, "evi_dor_checklist")
+        ProjectStateService(vault).append_governance_evaluation(
+            pid,
+            "dor",
+            actor=LEAD,
+            evidence_refs=["evi_dor_checklist"],
+        )
         append(
             vault,
             pid,
@@ -436,10 +449,14 @@ class TestT8SelfDeclaredAdmin:
             "gate.overridden",
             {"gate": "dod_final_closing", "role": "admin", "reason": "override"},
             actor="user:attacker",
+            source="cli",
         )
         service = ProjectStateService(vault)
-        state = service.rebuild_project_state(pid)
-        assert "dod_final_closing" not in state.overridden_gates
+        with pytest.raises(
+            StateEngineIntegrityError,
+            match=r"trusted service boundary|trusted PSE provenance",
+        ):
+            service.rebuild_project_state(pid)
 
     def test_canonical_override_accepted(self, tmp_path: Path) -> None:
         """Positive: canonical RACI actor with frozen metadata -> override accepted."""
@@ -447,17 +464,14 @@ class TestT8SelfDeclaredAdmin:
         pid = "prj_t8_positive"
         append(vault, pid, "project.created", {"name": "T8pos"})
         assign_accountable(vault, pid, LEAD)
-        append(
-            vault,
+        attach_evidence(vault, pid, "evi_override")
+        ProjectStateService(vault).append_governed_gate_override(
             pid,
-            "gate.overridden",
-            {
-                "gate": "review_gate_alpha",
-                "overridden_by": LEAD,
-                "reason": "documented schedule risk accepted",
-                "approved_by": LEAD,
-            },
+            "review_gate_alpha",
             actor=LEAD,
+            reason="documented schedule risk accepted",
+            approved_by=LEAD,
+            evidence_refs=["evi_override"],
         )
         service = ProjectStateService(vault)
         state = service.rebuild_project_state(pid)
@@ -475,6 +489,7 @@ class TestT9FakeEvidenceRef:
         vault = make_vault(tmp_path)
         pid = "prj_t9_evidence"
         append(vault, pid, "project.created", {"name": "T9"})
+        ProjectStateService(vault).append_governance_evaluation(pid, "dor", actor=LEAD)
         append(
             vault,
             pid,
@@ -758,6 +773,7 @@ class TestT10PreconditionCoverage:
         pid = "prj_t10_disc"
         append(vault, pid, "project.created", {"name": "T10"})
         attach_evidence(vault, pid, "evi_misc_01")
+        ProjectStateService(vault).append_governance_evaluation(pid, "dor", actor=LEAD)
         append(
             vault,
             pid,
@@ -777,8 +793,9 @@ class TestT10PreconditionCoverage:
         tasks = TaskService(vault)
         make_taskvault_task(tasks, "task_e1", state="ready")
         decisions = DecisionService(vault, task_service=tasks)
-        append(vault, pid, "project.created", {"name": "T10"})
+        append(vault, pid, "project.created", {"name": "T10", "owner": LEAD})
         attach_evidence(vault, pid, "evi_charter_01")
+        ProjectStateService(vault).append_governance_evaluation(pid, "dor", actor=LEAD)
         append(
             vault,
             pid,
@@ -792,6 +809,14 @@ class TestT10PreconditionCoverage:
         make_approved_decision(decisions, "dec_exec_ok", "task_anchor")
         append(vault, pid, "decision.associated", {"decision_id": "dec_exec_ok"})
         attach_evidence(vault, pid, "evi_dor_checklist")
+        ProjectStateService(
+            vault, task_service=tasks, decision_service=decisions
+        ).append_governance_evaluation(
+            pid,
+            "dor",
+            actor=LEAD,
+            evidence_refs=["evi_dor_checklist"],
+        )
         append(
             vault,
             pid,
@@ -838,8 +863,9 @@ def _build_closed_project(vault: Path, pid: str) -> ProjectStateService:
     decisions = DecisionService(vault, task_service=tasks)
     make_taskvault_task(tasks, "task_alpha", state="backlog")
     make_taskvault_task(tasks, "task_anchor", state="working")
-    append(vault, pid, "project.created", {"name": "closed-positive"})
+    append(vault, pid, "project.created", {"name": "closed-positive", "owner": LEAD})
     attach_evidence(vault, pid, "evi_charter_01")
+    ProjectStateService(vault).append_governance_evaluation(pid, "dor", actor=LEAD)
     append(
         vault,
         pid,
@@ -854,6 +880,14 @@ def _build_closed_project(vault: Path, pid: str) -> ProjectStateService:
     make_approved_decision(decisions, "dec_exec_gate", "task_anchor")
     append(vault, pid, "decision.associated", {"decision_id": "dec_exec_gate"})
     attach_evidence(vault, pid, "evi_dor_checklist")
+    ProjectStateService(
+        vault, task_service=tasks, decision_service=decisions
+    ).append_governance_evaluation(
+        pid,
+        "dor",
+        actor=LEAD,
+        evidence_refs=["evi_dor_checklist"],
+    )
     append(
         vault,
         pid,
@@ -864,7 +898,19 @@ def _build_closed_project(vault: Path, pid: str) -> ProjectStateService:
     )
     complete_task(tasks, vault, "task_alpha")
     complete_task(tasks, vault, "task_anchor")
+    # Bind the final close decision before the DoD evaluation so all decisions
+    # are resolved in the historical proof used by the close transition.
+    make_approved_decision(decisions, "dec_close", "task_anchor")
+    append(vault, pid, "decision.associated", {"decision_id": "dec_close"})
     attach_evidence(vault, pid, "evi_dod_receipt")
+    ProjectStateService(
+        vault, task_service=tasks, decision_service=decisions
+    ).append_governance_evaluation(
+        pid,
+        "dod",
+        actor=LEAD,
+        evidence_refs=["evi_dod_receipt"],
+    )
     append(
         vault,
         pid,
@@ -873,11 +919,15 @@ def _build_closed_project(vault: Path, pid: str) -> ProjectStateService:
         actor=LEAD,
         evidence_refs=["evi_dod_receipt"],
     )
-    # Anchor/base tasks are completed; anchor revision moved, so bind close
-    # decision to a fresh completed task revision anchor.
-    make_approved_decision(decisions, "dec_close", "task_anchor")
-    append(vault, pid, "decision.associated", {"decision_id": "dec_close"})
     attach_evidence(vault, pid, "evi_close_receipt")
+    ProjectStateService(
+        vault, task_service=tasks, decision_service=decisions
+    ).append_governance_evaluation(
+        pid,
+        "dod",
+        actor=LEAD,
+        evidence_refs=["evi_close_receipt"],
+    )
     append(
         vault,
         pid,
@@ -1014,6 +1064,7 @@ class TestRulesetBinding:
         )
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         assert manifest["rules_version"] == "1.0.0"
+        assert compute_rules_digest(manifest) == compute_rules_digest()
         code_names = sorted(
             f"{s.from_phase.value}->{s.to_phase.value}:{s.name}" for s in LEGAL_TRANSITIONS.values()
         )

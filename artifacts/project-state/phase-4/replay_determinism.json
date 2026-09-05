@@ -3,24 +3,24 @@
   "project_id": "prj_determinism_receipt",
   "total_events": 10,
   "last_event_sequence": 10,
-  "last_event_hash": "ab3af223a39069d6625f0d992dbec6c7190d7a75d65cc6f619edc60ef65e54a3",
-  "state_revision": "b2a043f7fc21d93607019e4162dc129c464242a6c2a16777fae8d3910d3c8927",
-  "canonical_payload_sha256": "109f9a0c634144aaaa4dfa04ce6bf0db891fdfd24cae82f733162254e105b8ce",
+  "last_event_hash": "b0ff6d8de1c52a5e6d24b8adede3cca97e71d47db4aa272dad072d55ca4e4a5c",
+  "state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+  "canonical_payload_sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
   "run_1": {
-    "state_revision": "b2a043f7fc21d93607019e4162dc129c464242a6c2a16777fae8d3910d3c8927",
-    "sha256": "109f9a0c634144aaaa4dfa04ce6bf0db891fdfd24cae82f733162254e105b8ce",
-    "byte_length": 4290
+    "state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+    "sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
+    "byte_length": 4623
   },
   "run_2": {
-    "state_revision": "b2a043f7fc21d93607019e4162dc129c464242a6c2a16777fae8d3910d3c8927",
-    "sha256": "109f9a0c634144aaaa4dfa04ce6bf0db891fdfd24cae82f733162254e105b8ce",
-    "byte_length": 4290
+    "state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+    "sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
+    "byte_length": 4623
   },
   "snapshot_tail_restoration": {
     "snapshot_at_sequence": 5,
     "tail_events_count": 5,
-    "restored_state_revision": "b2a043f7fc21d93607019e4162dc129c464242a6c2a16777fae8d3910d3c8927",
-    "restored_sha256": "109f9a0c634144aaaa4dfa04ce6bf0db891fdfd24cae82f733162254e105b8ce",
+    "restored_state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+    "restored_sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
     "matches_full_replay": true
   },
   "verification_checks": {

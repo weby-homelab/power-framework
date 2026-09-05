@@ -18,7 +18,7 @@ import hashlib
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from power_framework.core.canonical_json import (
     canonical_json_bytes,
@@ -277,6 +277,47 @@ class DecisionAuthorityView(BaseModel):
         )
 
 
+class HistoricalGovernanceEvaluation(BaseModel):
+    """Immutable authority proof bound to one canonical PSE event sequence.
+
+    The event carrying this record is the historical source for DoR/DoD and
+    approval/completion decisions.  Current TaskStore/DecisionService state is
+    deliberately not represented here: it is applied only as a post-replay
+    federation overlay by ``ProjectStateService``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    evaluation_type: Literal["dor", "dod"]
+    result: Literal["passed", "failed"]
+    evaluated_from_phase: ProjectPhase
+    evaluated_phase: ProjectPhase
+    evaluation_event_id: str = Field(..., pattern=EVENT_ID_REGEX)
+    task_views: list[TaskAuthorityView] = Field(default_factory=list)
+    decision_views: list[DecisionAuthorityView] = Field(default_factory=list)
+    approved_decision_ids: list[str] = Field(default_factory=list)
+    verified_task_receipts: list[str] = Field(default_factory=list)
+    required_evidence_refs: list[str] = Field(default_factory=list)
+    accountable_actor: str | None = Field(default=None, max_length=128)
+    rules_version: str = Field(default=GOVERNANCE_RULES_VERSION, min_length=1, max_length=64)
+    rules_digest: str = Field(..., pattern=HASH_REGEX)
+
+    @model_validator(mode="after")
+    def validate_bindings(self) -> HistoricalGovernanceEvaluation:
+        task_ids = {view.task_id for view in self.task_views}
+        decision_ids = {view.decision_id for view in self.decision_views}
+        if not set(self.approved_decision_ids).issubset(decision_ids):
+            raise ValueError("approved_decision_ids must reference included decision views")
+        receipt_ids = {receipt_id for view in self.task_views for receipt_id in view.receipt_ids}
+        if not set(self.verified_task_receipts).issubset(receipt_ids):
+            raise ValueError("verified_task_receipts must reference included task views")
+        if len(task_ids) != len(self.task_views):
+            raise ValueError("historical task evaluation contains duplicate task IDs")
+        if len(decision_ids) != len(self.decision_views):
+            raise ValueError("historical decision evaluation contains duplicate decision IDs")
+        return self
+
+
 class TaskReadinessEvaluation(BaseModel):
     """Deterministic evaluation of one task's readiness to be executed."""
 
@@ -368,6 +409,7 @@ class ProjectState(BaseModel):
     # Authoritative outputs required by Phase 4 Specification
     project_id: str = Field(..., pattern=PROJECT_ID_REGEX, max_length=68)
     current_phase: ProjectPhase = ProjectPhase.DISCOVERY
+    owner: str | None = Field(default=None, max_length=128)
     phase_history: list[PhaseTransitionRecord] = Field(default_factory=list)
     active_tasks: list[str] = Field(default_factory=list)
     ready_tasks: list[str] = Field(default_factory=list)
@@ -395,6 +437,9 @@ class ProjectState(BaseModel):
     # canonical raci.assigned / raci.revoked ledger events. Caller payload
     # role strings never populate this projection.
     raci: dict[str, list[str]] = Field(default_factory=dict)
+    # Canonical evidence semantics are explicit; an identifier containing the
+    # word "charter" is never sufficient by itself.
+    evidence_kinds: dict[str, str] = Field(default_factory=dict)
     # attached_evidence is the deterministic sorted index of canonical
     # evidence refs attached via evidence.attached / artifact.created events
     # (plus verified raw-evidence sha256: refs). Transition evidence_refs
@@ -405,6 +450,13 @@ class ProjectState(BaseModel):
     # Internal typed entity maps
     tasks: dict[str, TaskAuthorityView] = Field(default_factory=dict)
     decisions: dict[str, DecisionAuthorityView] = Field(default_factory=dict)
+    # Historical authority is sequence-bound and cannot be replaced by the
+    # current federated overlay.
+    historical_approved_decisions: dict[str, int] = Field(default_factory=dict)
+    historical_task_receipts: dict[str, int] = Field(default_factory=dict)
+    historical_evaluations: list[str] = Field(default_factory=list)
+    historical_gate_evaluations: dict[str, int] = Field(default_factory=dict)
+    historical_gate_origins: dict[str, str] = Field(default_factory=dict)
     risks: dict[str, Risk] = Field(default_factory=dict)
     issues: dict[str, Issue] = Field(default_factory=dict)
     assumptions: dict[str, Assumption] = Field(default_factory=dict)
@@ -518,6 +570,7 @@ __all__ = [
     "GovernanceDecision",
     "GovernanceEvaluation",
     "HealthFlag",
+    "HistoricalGovernanceEvaluation",
     "IllegalStateTransitionError",
     "PhaseTransitionRecord",
     "ProjectPhase",
