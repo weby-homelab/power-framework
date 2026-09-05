@@ -23,8 +23,6 @@ result; they are not bearer credentials.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -209,7 +207,7 @@ class ProjectStateService:
     def _validate_historical_evaluations(self, events: Sequence[ProjectEvent]) -> None:
         """Re-validate immutable evaluation bindings against owning services."""
         from power_framework.core.decision_models import DecisionReceipt
-        from power_framework.core.task_models import PowerTask
+        from power_framework.core.task_models import PowerTask, TaskCompletionReceipt
 
         for event in events:
             if event.event_type not in {"dor.evaluated", "dod.evaluated"}:
@@ -242,23 +240,13 @@ class ProjectStateService:
                         raise AuthoritativeStateError(
                             f"Historical evaluation references invalid task receipt '{receipt_id}'"
                         )
-                    receipt_payload = {
-                        "task_id": receipt.task_id,
-                        "task_revision": receipt.task_revision,
-                        "completion_policy": receipt.completion_policy,
-                        "postcondition_sha256": receipt.postcondition_sha256,
-                        "artifact_digests": receipt.artifact_digests,
-                        "actor": receipt.actor,
-                    }
-                    expected_receipt_id = (
-                        "tcr_"
-                        + hashlib.sha256(
-                            json.dumps(
-                                receipt_payload,
-                                ensure_ascii=False,
-                                sort_keys=True,
-                            ).encode("utf-8")
-                        ).hexdigest()
+                    expected_receipt_id = TaskCompletionReceipt.derive_receipt_id(
+                        task_id=receipt.task_id,
+                        task_revision=receipt.task_revision,
+                        completion_policy=receipt.completion_policy,
+                        postcondition_sha256=receipt.postcondition_sha256,
+                        artifact_digests=receipt.artifact_digests,
+                        actor=receipt.actor,
                     )
                     if receipt.receipt_id != expected_receipt_id:
                         raise AuthoritativeStateError(

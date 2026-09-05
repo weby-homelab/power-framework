@@ -149,7 +149,7 @@ class TestTemporalAuthority:
 
         with pytest.raises(
             IllegalStateTransitionError,
-            match=r"MISSING_REQUIRED_APPROVAL|initial_tasks_registered|dor_passed_or_overridden|MISSING_CANONICAL_DOR_EVALUATION",
+            match=r"MISSING_CANONICAL_DOR_EVALUATION",
         ):
             ProjectStateService(
                 vault, task_service=tasks, decision_service=decisions
@@ -196,7 +196,10 @@ class TestTemporalAuthority:
             completion_artifact_refs=[artifact.name],
         )
 
-        with pytest.raises(IllegalStateTransitionError, match=r"all_tasks_terminal|DOD"):
+        with pytest.raises(
+            IllegalStateTransitionError,
+            match=r"MISSING_CANONICAL_DOD_EVALUATION",
+        ):
             ProjectStateService(
                 vault, task_service=tasks, decision_service=decisions
             ).rebuild_project_state(project_id)

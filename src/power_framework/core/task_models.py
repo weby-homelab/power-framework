@@ -225,6 +225,31 @@ class TaskCompletionReceipt(BaseModel):
     status: Literal["verified"] = "verified"
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    @classmethod
+    def derive_receipt_id(
+        cls,
+        *,
+        task_id: str,
+        task_revision: int,
+        completion_policy: str,
+        postcondition_sha256: str,
+        artifact_digests: dict[str, str],
+        actor: str,
+    ) -> str:
+        """Derive the canonical receipt ID from its immutable content."""
+        receipt_payload: dict[str, object] = {
+            "task_id": task_id,
+            "task_revision": task_revision,
+            "completion_policy": completion_policy,
+            "postcondition_sha256": postcondition_sha256,
+            "artifact_digests": artifact_digests,
+            "actor": actor,
+        }
+        digest = hashlib.sha256(
+            json.dumps(receipt_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        return f"tcr_{digest}"
+
     @field_validator("task_id")
     @classmethod
     def validate_task_id(cls, value: str) -> str:
