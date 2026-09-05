@@ -412,7 +412,11 @@ uv run --python 3.13 pytest --cov=power_framework.core.state_models --cov=power_
 
 ## 20. Remote CI / CodeQL
 
-GitHub CI workflows (`ci.yml`, `codeql.yml`, `docs.yml`) are configured for branches targeting `main`. The implementation branch `feat/power-3.8-phase4-state-engine` will execute CI upon opening the Pull Request. Local checks run the identical ruff, mypy, and pytest matrix.
+GitHub CI workflows (`ci.yml`, `codeql.yml`, `docs.yml`) were read back at exact
+head `bf823c0`. CI, CodeQL, Docs, package smoke, security, benchmark, base
+runtime, upgrade matrix, and Python 3.13/3.14 tests all completed successfully;
+deploy remained intentionally skipped. CodeRabbit returned pass/rate-limited
+on the final head. No merge was performed.
 
 ---
 
@@ -447,4 +451,4 @@ GitHub CI workflows (`ci.yml`, `codeql.yml`, `docs.yml`) are configured for bran
 ## 24. Final Status
 
 PHASE 4 STATUS:
-GO CANDIDATE — LOCAL GATES GREEN; REMOTE HEAD/CI/CODEQL CLOSURE PENDING
+GO — CLOSURE CORRECTION ROUND 2 / FROZEN
