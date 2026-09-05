@@ -63,6 +63,33 @@ ROTATION_FILE_PATTERN = re.compile(r"^events_[0-9]{6}\.jsonl$")
 _project_thread_locks: dict[str, threading.RLock] = {}
 _project_thread_locks_guard = threading.Lock()
 _local_project_locks = threading.local()
+PSE_GOVERNANCE_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "project.created",
+        "project.updated",
+        "project.phase.changed",
+        "project.reopened",
+        "raci.assigned",
+        "raci.revoked",
+        "evidence.attached",
+        "artifact.created",
+        "artifact.updated",
+        "task.associated",
+        "task.disassociated",
+        "decision.associated",
+        "decision.disassociated",
+        "dor.evaluated",
+        "dod.evaluated",
+        "gate.overridden",
+    }
+)
+PSE_OBSERVATION_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "task.lifecycle.observed",
+        "decision.lifecycle.observed",
+    }
+)
+_PSE_EVENT_TYPES = PSE_GOVERNANCE_EVENT_TYPES | PSE_OBSERVATION_EVENT_TYPES
 
 
 def _get_project_thread_lock(project_dir: Path) -> threading.RLock:
@@ -76,8 +103,11 @@ def _get_project_thread_lock(project_dir: Path) -> threading.RLock:
 def validate_vault_root(vault_root: Path) -> Path:
     """Validate that vault root exists, is not a symlink, and return resolved path."""
     raw_root = Path(vault_root).expanduser()
-    if raw_root.is_symlink():
-        raise ValueError(f"Vault root must not be a symlink: {vault_root}")
+    for ancestor in (raw_root, *raw_root.parents):
+        if ancestor.is_symlink():
+            raise ValueError(f"Vault path contains a symlink ancestor: {ancestor}")
+        if ancestor == ancestor.parent:
+            break
     resolved = raw_root.resolve()
     if resolved.is_symlink():
         raise ValueError(f"Vault root must not be a symlink: {vault_root}")
@@ -341,8 +371,55 @@ class ProjectEventStore:
         with project_lock(self.project_id, self.vault_root, timeout=timeout) as p:
             yield p
 
-    def append(self, command: AppendCommand, timeout: float = 10.0) -> ProjectEvent:
-        """Append an event under Level 3 project lock with atomic fsync and idempotency deduplication."""
+    def append(
+        self,
+        command: AppendCommand,
+        timeout: float = 10.0,
+    ) -> ProjectEvent:
+        """Append ordinary Phase-2 input; governance events require the trusted writer."""
+        command = AppendCommand.model_validate(command.model_dump())
+        if command.event_type in PSE_GOVERNANCE_EVENT_TYPES or (
+            command.source == "pse_governance" and command.event_type in PSE_OBSERVATION_EVENT_TYPES
+        ):
+            raise PermissionError("Public writer rejects governance-bearing event")
+        return self._append_unchecked(command, timeout=timeout)
+
+    def append_untrusted(self, command: AppendCommand, timeout: float = 10.0) -> ProjectEvent:
+        """Persist non-authoritative observations while rejecting PSE claims."""
+        command = AppendCommand.model_validate(command.model_dump())
+        if command.event_type in PSE_GOVERNANCE_EVENT_TYPES:
+            raise PermissionError("Public writer rejects governance-bearing event")
+        if command.event_type in PSE_OBSERVATION_EVENT_TYPES:
+            command = command.model_copy(update={"source": "untrusted_ingest"})
+        return self._append_unchecked(command, timeout=timeout)
+
+    def _append_governed(
+        self,
+        command: AppendCommand,
+        timeout: float = 10.0,
+        *,
+        expected_last_sequence: int | None = None,
+        expected_last_event_hash: str | None = None,
+    ) -> ProjectEvent:
+        """Append a fully validated PSE command through the trusted writer."""
+        if command.source != "pse_governance" or command.event_type not in _PSE_EVENT_TYPES:
+            raise PermissionError("Trusted PSE writer requires governed provenance")
+        return self._append_unchecked(
+            command,
+            timeout=timeout,
+            expected_last_sequence=expected_last_sequence,
+            expected_last_event_hash=expected_last_event_hash,
+        )
+
+    def _append_unchecked(
+        self,
+        command: AppendCommand,
+        timeout: float = 10.0,
+        *,
+        expected_last_sequence: int | None = None,
+        expected_last_event_hash: str | None = None,
+    ) -> ProjectEvent:
+        """Append under the project lock after the public boundary is checked."""
         if command.project_id != self.project_id:
             raise ValueError(
                 f"Command project_id '{command.project_id}' does not match store '{self.project_id}'"
@@ -359,6 +436,16 @@ class ProjectEventStore:
                 raise LedgerIntegrityError(
                     f"Ledger integrity verification failed for project {self.project_id}: {'; '.join(verify_res.errors)}"
                 )
+            if (
+                expected_last_sequence is not None
+                and verify_res.last_sequence != expected_last_sequence
+            ):
+                raise ValueError("Canonical ledger head changed before governed append")
+            if (
+                expected_last_event_hash is not None
+                and verify_res.last_event_hash != expected_last_event_hash
+            ):
+                raise ValueError("Canonical ledger hash changed before governed append")
 
             # 3. Idempotency resolution with command fingerprint conflict checking
             cmd_fingerprint = compute_command_fingerprint(

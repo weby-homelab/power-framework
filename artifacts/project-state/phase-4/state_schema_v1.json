@@ -1,0 +1,1060 @@
+{
+  "$defs": {
+    "Assumption": {
+      "additionalProperties": false,
+      "description": "Assumption entity in RAID log.",
+      "properties": {
+        "assumption_id": {
+          "pattern": "^asm_[A-Za-z0-9._-]{2,64}$",
+          "title": "Assumption Id",
+          "type": "string"
+        },
+        "project_id": {
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "rationale": {
+          "default": "",
+          "maxLength": 4096,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "valid",
+            "invalidated",
+            "confirmed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "validated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validated At"
+        },
+        "invalidated_by": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invalidated By"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assumption_id",
+        "project_id",
+        "statement",
+        "confidence",
+        "status",
+        "provenance",
+        "created_at"
+      ],
+      "title": "Assumption",
+      "type": "object"
+    },
+    "DecisionAuthorityView": {
+      "additionalProperties": false,
+      "description": "Immutable, versioned projection of canonical typed Decision state.\n\nBinds DecisionService authority into the deterministic State Engine\nwithout duplicating or bypassing approval workflows (ADR-PSE-004 & Gate G4.4).",
+      "properties": {
+        "decision_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "task_revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Task Revision",
+          "type": "integer"
+        },
+        "revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "source_identity": {
+          "default": "DecisionService:v1",
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Source Identity",
+          "type": "string"
+        },
+        "receipt_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Receipt Id"
+        }
+      },
+      "required": [
+        "decision_id",
+        "status",
+        "digest"
+      ],
+      "title": "DecisionAuthorityView",
+      "type": "object"
+    },
+    "Dependency": {
+      "additionalProperties": false,
+      "description": "Typed cross-entity dependency in RAID log.",
+      "properties": {
+        "dependency_id": {
+          "pattern": "^dep_[A-Za-z0-9._-]{2,64}$",
+          "title": "Dependency Id",
+          "type": "string"
+        },
+        "project_id": {
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "enum": [
+            "task",
+            "decision",
+            "artifact",
+            "project",
+            "external"
+          ],
+          "title": "Target Type",
+          "type": "string"
+        },
+        "dependency_kind": {
+          "enum": [
+            "blocks",
+            "blocked_by",
+            "relates_to",
+            "requires"
+          ],
+          "title": "Dependency Kind",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "satisfied",
+            "broken"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "external_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Ref"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dependency_id",
+        "project_id",
+        "source_id",
+        "target_id",
+        "target_type",
+        "dependency_kind",
+        "status",
+        "provenance",
+        "created_at"
+      ],
+      "title": "Dependency",
+      "type": "object"
+    },
+    "Issue": {
+      "additionalProperties": false,
+      "description": "Issue entity in RAID log.",
+      "properties": {
+        "issue_id": {
+          "pattern": "^iss_[A-Za-z0-9._-]{2,64}$",
+          "title": "Issue Id",
+          "type": "string"
+        },
+        "project_id": {
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 4096,
+          "title": "Description",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "minor",
+            "major",
+            "critical",
+            "blocker"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "investigating",
+            "resolved",
+            "closed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "blocking_task_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Task Ids",
+          "type": "array"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved At"
+        }
+      },
+      "required": [
+        "issue_id",
+        "project_id",
+        "title",
+        "severity",
+        "status",
+        "provenance",
+        "created_at"
+      ],
+      "title": "Issue",
+      "type": "object"
+    },
+    "PhaseTransitionRecord": {
+      "additionalProperties": false,
+      "description": "Immutable audit record for one project lifecycle phase transition.",
+      "properties": {
+        "from_phase": {
+          "$ref": "#/$defs/ProjectPhase"
+        },
+        "to_phase": {
+          "$ref": "#/$defs/ProjectPhase"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "actor": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Actor",
+          "type": "string"
+        },
+        "event_id": {
+          "pattern": "^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "is_rollback": {
+          "default": false,
+          "title": "Is Rollback",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "gate": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gate"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "approval_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Approval Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "from_phase",
+        "to_phase",
+        "name",
+        "timestamp",
+        "actor",
+        "event_id"
+      ],
+      "title": "PhaseTransitionRecord",
+      "type": "object"
+    },
+    "ProjectPhase": {
+      "description": "Canonical 6-state project lifecycle defined in Phase 1 & ADR-PSE-003.",
+      "enum": [
+        "DISCOVERY",
+        "PLANNING",
+        "EXECUTION",
+        "MONITORING",
+        "CLOSING",
+        "CLOSED"
+      ],
+      "title": "ProjectPhase",
+      "type": "string"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "Mandatory audit and origin metadata for semantic entities.",
+      "properties": {
+        "source_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Event Ids",
+          "type": "array"
+        },
+        "primary_source_event_id": {
+          "anyOf": [
+            {
+              "pattern": "^evt_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Source Event Id"
+        },
+        "actor": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Actor",
+          "type": "string"
+        },
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "source_type": {
+          "enum": [
+            "event_replay",
+            "direct_mutation",
+            "reconciliation",
+            "agent_inference",
+            "human_entry",
+            "automated_test"
+          ],
+          "title": "Source Type",
+          "type": "string"
+        },
+        "correlation_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Correlation Id"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "verification_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "unverified",
+                "verified",
+                "refuted",
+                "quarantined"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verification Status"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "supersedes": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes"
+        },
+        "invalidates": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invalidates"
+        }
+      },
+      "required": [
+        "source_event_ids",
+        "actor",
+        "timestamp",
+        "source_type"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "Risk": {
+      "additionalProperties": false,
+      "description": "Risk entity in RAID log.",
+      "properties": {
+        "risk_id": {
+          "pattern": "^rsk_[A-Za-z0-9._-]{2,64}$",
+          "title": "Risk Id",
+          "type": "string"
+        },
+        "project_id": {
+          "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 4096,
+          "title": "Description",
+          "type": "string"
+        },
+        "probability": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Probability",
+          "type": "string"
+        },
+        "impact": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Impact",
+          "type": "string"
+        },
+        "mitigation_plan": {
+          "default": "",
+          "maxLength": 4096,
+          "title": "Mitigation Plan",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "identified",
+            "mitigated",
+            "materialized",
+            "retired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "related_task_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Task Ids",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "risk_id",
+        "project_id",
+        "title",
+        "probability",
+        "impact",
+        "owner",
+        "status",
+        "provenance",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "Risk",
+      "type": "object"
+    },
+    "TaskAuthorityView": {
+      "additionalProperties": false,
+      "description": "Immutable, versioned projection of canonical Task v2 state.\n\nBinds TaskStore authority into the deterministic State Engine without\nduplicating or replacing Task v2 lifecycle truth (ADR-PSE-004 & Gate G4.3).",
+      "properties": {
+        "task_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Task Id",
+          "type": "string"
+        },
+        "state": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "State",
+          "type": "string"
+        },
+        "revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "source_identity": {
+          "default": "TaskStore:v2",
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Source Identity",
+          "type": "string"
+        },
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "open_gates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Gates",
+          "type": "array"
+        },
+        "receipt_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Receipt Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "state",
+        "digest"
+      ],
+      "title": "TaskAuthorityView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Authoritative, deterministic state projection of a POWER project.\n\nStrictly validated: extra='forbid'.\nAll list projections are deterministically sorted to ensure byte-equivalent\ncanonical JSON across independent Python processes and replays.",
+  "properties": {
+    "project_id": {
+      "maxLength": 68,
+      "pattern": "^prj_[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "current_phase": {
+      "$ref": "#/$defs/ProjectPhase",
+      "default": "DISCOVERY"
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Owner"
+    },
+    "phase_history": {
+      "items": {
+        "$ref": "#/$defs/PhaseTransitionRecord"
+      },
+      "title": "Phase History",
+      "type": "array"
+    },
+    "active_tasks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Active Tasks",
+      "type": "array"
+    },
+    "ready_tasks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Ready Tasks",
+      "type": "array"
+    },
+    "blocked_tasks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocked Tasks",
+      "type": "array"
+    },
+    "open_risks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Open Risks",
+      "type": "array"
+    },
+    "open_issues": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Open Issues",
+      "type": "array"
+    },
+    "active_assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Active Assumptions",
+      "type": "array"
+    },
+    "active_dependencies": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Active Dependencies",
+      "type": "array"
+    },
+    "valid_decisions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Valid Decisions",
+      "type": "array"
+    },
+    "superseded_decisions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Superseded Decisions",
+      "type": "array"
+    },
+    "recent_changes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recent Changes",
+      "type": "array"
+    },
+    "health_flags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Health Flags",
+      "type": "array"
+    },
+    "required_approvals": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Approvals",
+      "type": "array"
+    },
+    "state_revision": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "State Revision",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "power.project-state.v1",
+      "default": "power.project-state.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "rules_version": {
+      "default": "1.0.0",
+      "title": "Rules Version",
+      "type": "string"
+    },
+    "rules_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Rules Digest",
+      "type": "string"
+    },
+    "raci": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Raci",
+      "type": "object"
+    },
+    "attached_evidence": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attached Evidence",
+      "type": "array"
+    },
+    "evidence_kinds": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Evidence Kinds",
+      "type": "object"
+    },
+    "last_event_sequence": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Last Event Sequence",
+      "type": "integer"
+    },
+    "last_event_hash": {
+      "default": "",
+      "pattern": "^([0-9a-f]{64})?$",
+      "title": "Last Event Hash",
+      "type": "string"
+    },
+    "tasks": {
+      "additionalProperties": {
+        "$ref": "#/$defs/TaskAuthorityView"
+      },
+      "title": "Tasks",
+      "type": "object"
+    },
+    "decisions": {
+      "additionalProperties": {
+        "$ref": "#/$defs/DecisionAuthorityView"
+      },
+      "title": "Decisions",
+      "type": "object"
+    },
+    "historical_approved_decisions": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Historical Approved Decisions",
+      "type": "object"
+    },
+    "historical_task_receipts": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Historical Task Receipts",
+      "type": "object"
+    },
+    "historical_evaluations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Historical Evaluations",
+      "type": "array"
+    },
+    "historical_gate_evaluations": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Historical Gate Evaluations",
+      "type": "object"
+    },
+    "historical_gate_origins": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Historical Gate Origins",
+      "type": "object"
+    },
+    "risks": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Risk"
+      },
+      "title": "Risks",
+      "type": "object"
+    },
+    "issues": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Issue"
+      },
+      "title": "Issues",
+      "type": "object"
+    },
+    "assumptions": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Assumption"
+      },
+      "title": "Assumptions",
+      "type": "object"
+    },
+    "dependencies": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Dependency"
+      },
+      "title": "Dependencies",
+      "type": "object"
+    },
+    "overridden_gates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Overridden Gates",
+      "type": "array"
+    },
+    "contributing_events": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Contributing Events",
+      "type": "array"
+    }
+  },
+  "required": [
+    "project_id",
+    "rules_digest",
+    "state_revision"
+  ],
+  "title": "POWER Project State Schema v1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

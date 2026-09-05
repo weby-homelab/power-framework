@@ -24,7 +24,7 @@ import sqlite3
 import stat
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -51,6 +51,7 @@ from power_framework.core.project_ingestion import (
     redact_secrets,
     replay_project,
     store_raw_evidence,
+    update_derived_index_for_event,
 )
 from power_framework.core.project_models import (
     EVENT_ID_REGEX,
@@ -66,12 +67,46 @@ from power_framework.core.project_models import (
 )
 from power_framework.core.project_store import (
     LockAcquisitionTimeoutError,
-    ProjectEventStore,
     get_project_dir,
     project_lock,
     recover_torn_tail,
 )
+from power_framework.core.project_store import ProjectEventStore as CanonicalProjectEventStore
 from power_framework.core.task_store import TaskStore
+
+GOVERNANCE_BEARING_EVENT_TYPES = (
+    "project.created",
+    "project.updated",
+    "project.phase.changed",
+    "project.reopened",
+    "raci.assigned",
+    "raci.revoked",
+    "evidence.attached",
+    "artifact.created",
+    "artifact.updated",
+    "task.associated",
+    "task.disassociated",
+    "decision.associated",
+    "decision.disassociated",
+    "dor.evaluated",
+    "dod.evaluated",
+    "gate.overridden",
+)
+
+
+class Phase2TestEventStore(CanonicalProjectEventStore):
+    """Use the explicit trusted writer for legacy governance setup fixtures."""
+
+    def append(self, command: AppendCommand, timeout: float = 10.0) -> ProjectEvent:
+        if command.event_type in GOVERNANCE_BEARING_EVENT_TYPES:
+            return self._append_governed(
+                command.model_copy(update={"source": "pse_governance"}),
+                timeout=timeout,
+            )
+        return super().append(command, timeout=timeout)
+
+
+ProjectEventStore = Phase2TestEventStore
 
 
 @pytest.fixture
@@ -994,41 +1029,42 @@ def test_ledger_rotation_and_seamless_replay(vault_root: Path) -> None:
 
 def test_derived_index_rebuild_from_canonical_ledger(vault_root: Path) -> None:
     pid = "prj_rebuild"
+    store = CanonicalProjectEventStore(pid, vault_root)
     cmd1 = AppendCommand(
         project_id=pid,
         event_type="project.created",
         payload={"name": "Rebuild Target Project", "description": "Derived index test"},
         actor="user:rekvizitor",
-        source="cli",
+        source="pse_governance",
     )
-    append_project_event(vault_root, cmd1)
+    update_derived_index_for_event(vault_root, store._append_governed(cmd1))
 
     cmd2 = AppendCommand(
         project_id=pid,
         event_type="project.phase.changed",
         payload={"new_phase": "phase_1_discovery"},
         actor="user:rekvizitor",
-        source="cli",
+        source="pse_governance",
     )
-    append_project_event(vault_root, cmd2)
+    update_derived_index_for_event(vault_root, store._append_governed(cmd2))
 
     cmd3 = AppendCommand(
         project_id=pid,
         event_type="raci.assigned",
         payload={"role": "Accountable", "actor": "user:rekvizitor"},
         actor="user:rekvizitor",
-        source="cli",
+        source="pse_governance",
     )
-    append_project_event(vault_root, cmd3)
+    update_derived_index_for_event(vault_root, store._append_governed(cmd3))
 
     cmd4 = AppendCommand(
         project_id=pid,
         event_type="dod.evaluated",
         payload={"phase": "phase_1_discovery", "passed": True, "criteria": ["tests pass"]},
         actor="agent:agy",
-        source="internal_engine",
+        source="pse_governance",
     )
-    append_project_event(vault_root, cmd4)
+    update_derived_index_for_event(vault_root, store._append_governed(cmd4))
 
     db_path = vault_root / ".power" / "project-state" / "indexes" / "project_state.sqlite3"
     assert db_path.exists()
@@ -1125,7 +1161,7 @@ def test_privacy_modes_verification(vault_root: Path) -> None:
     # 1. Metadata-Only Mode
     cmd_meta = AppendCommand(
         project_id=pid,
-        event_type="project.created",
+        event_type="observation.recorded",
         payload={
             "name": "Secret Project",
             "confidential_rationale": "Deep proprietary strategy",
@@ -1142,7 +1178,7 @@ def test_privacy_modes_verification(vault_root: Path) -> None:
     # 2. Structured-Events Mode (Default): dialogue buffers purged
     cmd_struct = AppendCommand(
         project_id=pid,
-        event_type="project.updated",
+        event_type="observation.recorded",
         payload={
             "summary": "Phase milestone achieved",
             "raw_dialogue": "Agent: How are you? User: Please fix this bug.",
@@ -1161,7 +1197,7 @@ def test_privacy_modes_verification(vault_root: Path) -> None:
     # 3. Full-Content Mode (Explicit Opt-In): stores evidence locally under 0600
     cmd_full = AppendCommand(
         project_id=pid,
-        event_type="project.updated",
+        event_type="observation.recorded",
         payload={"note": "Full evidence audit"},
         actor="user:rekvizitor",
         source="cli",
@@ -1315,7 +1351,7 @@ def test_raw_dialogue_prohibited_across_all_privacy_modes(vault_root: Path) -> N
     # 1. Full-Content mode: extracts dialogue to raw-evidence, keeps payload clean
     cmd_full = AppendCommand(
         project_id=pid,
-        event_type="project.updated",
+        event_type="observation.recorded",
         payload=raw_dialogue_payload,
         actor="user:rekvizitor",
         source="cli",
@@ -1344,7 +1380,7 @@ def test_raw_dialogue_prohibited_across_all_privacy_modes(vault_root: Path) -> N
     # 2. Structured-Events mode: strips dialogue, no raw evidence file
     cmd_struct = AppendCommand(
         project_id=pid,
-        event_type="project.updated",
+        event_type="observation.recorded",
         payload=raw_dialogue_payload,
         actor="user:rekvizitor",
         source="cli",
@@ -1359,7 +1395,7 @@ def test_raw_dialogue_prohibited_across_all_privacy_modes(vault_root: Path) -> N
     # 3. Metadata-Only mode
     cmd_meta = AppendCommand(
         project_id=pid,
-        event_type="project.updated",
+        event_type="observation.recorded",
         payload=raw_dialogue_payload,
         actor="user:rekvizitor",
         source="cli",
@@ -1643,7 +1679,7 @@ def test_materialize_status_markdown_diagnostic_summary(vault_root: Path) -> Non
     pid = "prj_status_md"
     cmd = AppendCommand(
         project_id=pid,
-        event_type="project.created",
+        event_type="observation.recorded",
         payload={"name": "Status Test"},
         actor="user:rekvizitor",
         source="cli",
@@ -1671,7 +1707,7 @@ def test_import_refuses_corrupted_existing_ledger_with_zero_mutation(vault_root:
     store = ProjectEventStore(pid, vault_root)
     cmd = AppendCommand(
         project_id=pid,
-        event_type="project.created",
+        event_type="observation.recorded",
         payload={"name": "Corrupt Import Test"},
         actor="user:rekvizitor",
         source="cli",
@@ -1692,7 +1728,7 @@ def test_import_refuses_corrupted_existing_ledger_with_zero_mutation(vault_root:
         "timestamp": "2026-09-03T12:00:00Z",
         "actor": "user:rekvizitor",
         "source": "cli",
-        "event_type": "project.updated",
+        "event_type": "observation.recorded",
         "payload": {"name": "Should Not Import"},
         "payload_digest": compute_payload_digest({"name": "Should Not Import"}),
         "prev_event_hash": "a" * 64,
@@ -1730,7 +1766,7 @@ def test_import_all_or_nothing_batch_rejection(vault_root: Path) -> None:
         "timestamp": "2026-09-03T12:00:01Z",
         "actor": "user:rekvizitor",
         "source": "cli",
-        "event_type": "project.updated",
+        "event_type": "observation.recorded",
         "payload": {"update": 2},
         "payload_digest": compute_payload_digest({"update": 2}),
         "prev_event_hash": ev1.event_hash,
@@ -1749,7 +1785,7 @@ def test_import_all_or_nothing_batch_rejection(vault_root: Path) -> None:
         "timestamp": "2026-09-03T12:00:02Z",
         "actor": "user:rekvizitor",
         "source": "cli",
-        "event_type": "project.updated",
+        "event_type": "observation.recorded",
         "payload": {"update": 4},
         "payload_digest": compute_payload_digest({"update": 4}),
         "prev_event_hash": raw2["event_hash"],
@@ -1792,7 +1828,7 @@ def test_import_rejects_raw_dialogue_payload(vault_root: Path) -> None:
             "timestamp": "2026-09-03T12:00:00Z",
             "actor": "user:rekvizitor",
             "source": "cli",
-            "event_type": "project.created",
+            "event_type": "observation.recorded",
             "payload": {key: "leaked conversation transcript"},
             "payload_digest": compute_payload_digest({key: "leaked conversation transcript"}),
             "prev_event_hash": "",
@@ -1831,12 +1867,286 @@ def test_import_rejects_invalid_saga_payload(vault_root: Path) -> None:
     assert not store.active_events_file.exists() or store.active_events_file.stat().st_size == 0
 
 
+def _governance_payload(project_id: str, event_type: str) -> dict[str, Any]:
+    if event_type == "task.associated":
+        return {"project_id": project_id, "task_id": "tsk_import_01"}
+    if event_type == "decision.associated":
+        return {"project_id": project_id, "decision_id": "dec_import_01"}
+    if event_type in {"task.disassociated", "task.lifecycle.observed"}:
+        return {"task_id": "tsk_import_01"}
+    if event_type in {"decision.disassociated", "decision.lifecycle.observed"}:
+        return {"decision_id": "dec_import_01"}
+    if event_type == "raci.assigned" or event_type == "raci.revoked":
+        return {"role": "Accountable", "actor": "user:importer"}
+    if event_type == "evidence.attached":
+        return {"evidence_id": "evi_import_01", "evidence_type": "artifact"}
+    if event_type in {"artifact.created", "artifact.updated"}:
+        return {"artifact_id": "art_import_01", "evidence_type": "artifact"}
+    if event_type in {"project.phase.changed", "project.reopened"}:
+        return {"target_phase": "PLANNING"}
+    if event_type in {"dor.evaluated", "dod.evaluated"}:
+        return {"evaluation_type": event_type.removesuffix(".evaluated"), "result": "passed"}
+    if event_type == "gate.overridden":
+        return {"gate": "gate_import_01", "reason": "import test", "approved_by": "user:importer"}
+    return {"name": "import test"}
+
+
+def _make_import_event(
+    project_id: str,
+    sequence: int,
+    prev_event_hash: str,
+    event_type: str,
+    payload: dict[str, Any],
+    source: str = "pse_governance",
+) -> ProjectEvent:
+    raw: dict[str, Any] = {
+        "event_id": f"evt_{project_id}_{sequence:04d}_round3",
+        "schema_version": "power.project-event.v1",
+        "project_id": project_id,
+        "sequence": sequence,
+        "timestamp": f"2026-09-05T03:00:{sequence:02d}Z",
+        "actor": "user:importer",
+        "source": source,
+        "event_type": event_type,
+        "payload": payload,
+        "payload_digest": compute_payload_digest(payload),
+        "prev_event_hash": prev_event_hash,
+        "event_hash": "0" * 64,
+    }
+    event = ProjectEvent.model_validate(raw)
+    event.event_hash = compute_event_hash(event.model_dump())
+    return event
+
+
+def test_import_rejects_self_consistent_governance_chain_before_mutation(
+    vault_root: Path,
+) -> None:
+    """A self-consistent PSE chain is not a generic migration authority."""
+    pid = "prj_import_authority"
+    store = ProjectEventStore(pid, vault_root)
+    existing = store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="session.started",
+            payload={"session": "existing"},
+            actor="user:importer",
+            source="cli",
+        )
+    )
+    before_bytes = store.active_events_file.read_bytes()
+    before_count = store.verify().event_count
+
+    events: list[ProjectEvent] = []
+    prev_hash = existing.event_hash
+    for sequence, event_type in enumerate(
+        ("project.created", "evidence.attached", "dor.evaluated", "project.phase.changed"),
+        start=2,
+    ):
+        event = _make_import_event(
+            pid,
+            sequence,
+            prev_hash,
+            event_type,
+            _governance_payload(pid, event_type),
+        )
+        events.append(event)
+        prev_hash = event.event_hash
+
+    with pytest.raises(PermissionError, match="governance-bearing"):
+        import_project_events(vault_root, pid, events)
+
+    assert store.verify().event_count == before_count
+    assert store.active_events_file.read_bytes() == before_bytes
+    assert [event.sequence for event in store.replay()] == [1]
+
+
+@pytest.mark.parametrize("event_type", GOVERNANCE_BEARING_EVENT_TYPES)
+def test_import_rejects_every_governance_type_before_append(
+    vault_root: Path, event_type: str
+) -> None:
+    """The generic import boundary rejects every canonical governance event type."""
+    pid = f"prj_import_{event_type.replace('.', '_')}"
+    event = _make_import_event(pid, 1, "", event_type, _governance_payload(pid, event_type))
+    store = ProjectEventStore(pid, vault_root)
+
+    with pytest.raises(PermissionError, match="governance-bearing"):
+        import_project_events(vault_root, pid, [event])
+
+    assert store.verify().event_count == 0
+    assert not store.active_events_file.exists()
+
+
+def test_import_normalizes_bytes_event_type_before_any_store_mutation(vault_root: Path) -> None:
+    """Bytes that Pydantic would coerce cannot bypass the pre-store deny boundary."""
+    pid = "prj_import_bytes_type"
+    store = ProjectEventStore(pid, vault_root)
+    existing = store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="session.started",
+            payload={"session": "existing"},
+            actor="user:importer",
+            source="cli",
+        )
+    )
+    ordinary = _make_import_event(
+        pid,
+        2,
+        existing.event_hash,
+        "session.ended",
+        {"session": "ordinary"},
+        source="cli",
+    )
+    governance = _make_import_event(
+        pid,
+        3,
+        ordinary.event_hash,
+        "project.created",
+        {"name": "must not import"},
+    ).model_dump()
+    governance["event_type"] = b"project.created"
+    before_bytes = store.active_events_file.read_bytes()
+    before_count = store.verify().event_count
+
+    with pytest.raises(PermissionError, match="governance-bearing"):
+        import_project_events(vault_root, pid, [ordinary, governance])
+
+    assert store.verify().event_count == before_count
+    assert store.active_events_file.read_bytes() == before_bytes
+
+
+@pytest.mark.parametrize("event_type", GOVERNANCE_BEARING_EVENT_TYPES)
+def test_import_rejects_every_governance_type_with_existing_valid_ledger(
+    vault_root: Path, event_type: str
+) -> None:
+    """Governance imports leave an existing valid canonical ledger byte-identical."""
+    pid = f"prj_existing_{event_type.replace('.', '_')}"
+    store = ProjectEventStore(pid, vault_root)
+    existing = store.append(
+        AppendCommand(
+            project_id=pid,
+            event_type="session.started",
+            payload={"session": "existing"},
+            actor="user:importer",
+            source="cli",
+        )
+    )
+    before_bytes = store.active_events_file.read_bytes()
+    before_count = store.verify().event_count
+    event = _make_import_event(
+        pid,
+        2,
+        existing.event_hash,
+        event_type,
+        _governance_payload(pid, event_type),
+    )
+
+    with pytest.raises(PermissionError, match="governance-bearing"):
+        import_project_events(vault_root, pid, [event])
+
+    assert store.verify().event_count == before_count
+    assert store.active_events_file.read_bytes() == before_bytes
+
+
+def test_import_accepts_valid_ordinary_event(vault_root: Path) -> None:
+    """The import denylist does not reject a valid ordinary Phase-2 event."""
+    pid = "prj_import_ordinary"
+    event = _make_import_event(
+        pid,
+        1,
+        "",
+        "session.started",
+        {"session": "ordinary"},
+        source="cli",
+    )
+
+    assert import_project_events(vault_root, pid, [event]) == 1
+    store = ProjectEventStore(pid, vault_root)
+    assert list(store.replay()) == [event]
+    assert store.verify().event_count == 1
+
+
+@pytest.mark.parametrize("event_type", GOVERNANCE_BEARING_EVENT_TYPES)
+def test_generic_append_rejects_every_governance_type_before_append(
+    vault_root: Path, event_type: str
+) -> None:
+    """Generic append cannot place governance claims into the authoritative ledger."""
+    pid = f"prj_append_{event_type.replace('.', '_')}"
+    command = AppendCommand(
+        project_id=pid,
+        event_type=event_type,
+        payload=_governance_payload(pid, event_type),
+        actor="user:importer",
+        source="cli",
+    )
+    if event_type == "project.created":
+        command.event_type = cast("str", b"project.created")
+
+    with pytest.raises(PermissionError, match="governance-bearing"):
+        append_project_event(
+            vault_root,
+            command,
+            privacy_mode=PrivacyMode.FULL_CONTENT,
+            raw_content={"transcript": "must not be stored"},
+        )
+
+    store = ProjectEventStore(pid, vault_root)
+    assert store.verify().event_count == 0
+    assert not store.active_events_file.exists()
+    assert not (vault_root / ".power" / "raw-evidence" / pid).exists()
+
+
+@pytest.mark.parametrize("writer_name", ["append", "append_untrusted"])
+@pytest.mark.parametrize("event_type", GOVERNANCE_BEARING_EVENT_TYPES)
+def test_public_store_writers_reject_governance_types_before_append(
+    vault_root: Path, writer_name: str, event_type: str
+) -> None:
+    """Both public ProjectEventStore writers share the governance deny boundary."""
+    pid = f"prj_writer_{writer_name}_{event_type.replace('.', '_')}"
+    store = CanonicalProjectEventStore(pid, vault_root)
+    command = AppendCommand.model_construct(
+        project_id=pid,
+        event_type=event_type,
+        payload=_governance_payload(pid, event_type),
+        actor="user:importer",
+        source="cli",
+    )
+    if event_type == "project.created":
+        command.event_type = cast("str", b"project.created")
+
+    with pytest.raises(PermissionError, match="governance-bearing"):
+        getattr(store, writer_name)(command)
+
+    assert store.verify().event_count == 0
+    assert not store.active_events_file.exists()
+
+
+def test_append_untrusted_preserves_non_authoritative_observation_contract(
+    vault_root: Path,
+) -> None:
+    """Observation events remain quarantined audit signals, not governance authority."""
+    pid = "prj_observation_contract"
+    store = ProjectEventStore(pid, vault_root)
+    event = store.append_untrusted(
+        AppendCommand(
+            project_id=pid,
+            event_type="task.lifecycle.observed",
+            payload={"task_id": "tsk_observed", "state": "working"},
+            actor="system:observer",
+            source="cli",
+        )
+    )
+
+    assert event.source == "untrusted_ingest"
+    assert list(store.replay()) == [event]
+
+
 def test_evidence_retry_with_changed_content_raises_idempotency_conflict(vault_root: Path) -> None:
     """If a retry comes in with the same idempotency_key but different raw content/evidence, raise IdempotencyConflictError."""
     pid = "prj_ev_retry"
     cmd1 = AppendCommand(
         project_id=pid,
-        event_type="project.created",
+        event_type="observation.recorded",
         payload={"name": "Evidence Test"},
         actor="user:rekvizitor",
         source="cli",

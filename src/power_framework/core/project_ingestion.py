@@ -1,7 +1,7 @@
 """POWER Project State Engine (PSE) Ingestion Boundary & Privacy Perimeter.
 
 Implements:
-- Single authoritative Ingestion API:
+- Public generic ingestion boundary:
     - append_project_event(...)
     - import_project_events(...)
     - verify_project_ledger(...)
@@ -53,6 +53,8 @@ from power_framework.core.project_models import (
     validate_project_id,
 )
 from power_framework.core.project_store import (
+    PSE_GOVERNANCE_EVENT_TYPES,
+    PSE_OBSERVATION_EVENT_TYPES,
     ProjectEventStore,
     get_project_dir,
     get_projects_dir,
@@ -367,7 +369,7 @@ def append_project_event(
     raw_evidence_ttl_days: int = 14,
     timeout: float = 10.0,
 ) -> ProjectEvent:
-    """Authoritative API to append an event to the project ledger.
+    """Append a non-governance event to the project ledger.
 
     Enforces:
     - Privacy boundary filtering (metadata-only, structured-events, full-content)
@@ -376,7 +378,16 @@ def append_project_event(
     - Local raw-evidence storage under full-content mode
     - Mandatory saga payload contract validation
     - Level 3 project locking and atomic append
+
+    Governance-bearing events require an independently verified PSE boundary
+    and are rejected before any append-side effect.
     """
+    command = AppendCommand.model_validate(command.model_dump())
+    if command.event_type in PSE_GOVERNANCE_EVENT_TYPES:
+        raise PermissionError(
+            f"Generic append rejects governance-bearing event '{command.event_type}'"
+        )
+
     store = ProjectEventStore(command.project_id, vault_root)
 
     # 1. Apply Redaction Pipeline
@@ -436,7 +447,7 @@ def append_project_event(
             "evidence_refs": evidence_refs,
         }
     )
-    AppendCommand.model_validate(test_command.model_dump())
+    prepared_command = AppendCommand.model_validate(test_command.model_dump())
 
     # 7. Store raw evidence ONLY after all command and payload validations have succeeded
     if privacy_mode == PrivacyMode.FULL_CONTENT:
@@ -456,15 +467,13 @@ def append_project_event(
             if evidence_ref not in evidence_refs:
                 evidence_refs.append(evidence_ref)
 
-    prepared_command = command.model_copy(
-        update={
-            "event_id": target_event_id,
-            "payload": final_payload,
-            "evidence_refs": evidence_refs,
-        }
-    )
+    prepared_command = prepared_command.model_copy(update={"evidence_refs": evidence_refs})
+    prepared_command = AppendCommand.model_validate(prepared_command.model_dump())
 
-    event = store.append(prepared_command, timeout=timeout)
+    if prepared_command.event_type in PSE_OBSERVATION_EVENT_TYPES:
+        event = store.append_untrusted(prepared_command, timeout=timeout)
+    else:
+        event = store.append(prepared_command, timeout=timeout)
 
     # Proactively update derived projection for this event
     with contextlib.suppress(Exception):
@@ -479,7 +488,7 @@ def import_project_events(
     events: list[ProjectEvent | dict[str, Any]],
     timeout: float = 10.0,
 ) -> int:
-    """Import an existing valid chain of events into the project ledger.
+    """Import a valid non-governance event chain into the project ledger.
 
     Atomicity Contract:
     Provides complete batch pre-validation with zero canonical ledger mutation on
@@ -488,10 +497,32 @@ def import_project_events(
     Note: does not claim physical crash-atomic multi-record transaction.
     """
     validate_project_id(project_id)
-    store = ProjectEventStore(project_id, vault_root)
 
     if not events:
         return 0
+
+    parsed_events: list[ProjectEvent] = []
+    for raw in events:
+        raw_dict = raw.model_dump() if isinstance(raw, ProjectEvent) else raw
+        ev = ProjectEvent.model_validate(raw_dict)
+        if ev.event_type in PSE_GOVERNANCE_EVENT_TYPES:
+            raise PermissionError(
+                f"Generic import rejects governance-bearing event '{ev.event_type}'"
+            )
+        if contains_raw_dialogue(raw_dict):
+            raise ValueError(
+                "Import rejected: event payload contains prohibited raw dialogue / LLM transcript data"
+            )
+
+        # Validate saga payloads before creating the store or acquiring its lock.
+        model_cls = SAGA_PAYLOAD_MODELS.get(ev.event_type)
+        if model_cls is not None:
+            model_cls.model_validate(ev.payload)
+        parsed_events.append(ev)
+
+    parsed_events.sort(key=lambda e: e.sequence)
+
+    store = ProjectEventStore(project_id, vault_root)
 
     with store.lock(timeout=timeout):
         # 1. Recover torn tail on existing active ledger if present
@@ -509,31 +540,6 @@ def import_project_events(
         seen_event_ids: set[str] = {ev.event_id for ev in existing_events}
         last_seq = existing_events[-1].sequence if existing_events else 0
         last_hash = existing_events[-1].event_hash if existing_events else ""
-
-        # 3. Pre-validate entire batch in memory before opening file or writing any byte
-        parsed_events: list[ProjectEvent] = []
-        for raw in events:
-            raw_dict = raw if isinstance(raw, dict) else raw.model_dump()
-            if contains_raw_dialogue(raw_dict):
-                raise ValueError(
-                    "Import rejected: event payload contains prohibited raw dialogue / LLM transcript data"
-                )
-
-            ev = raw if isinstance(raw, ProjectEvent) else ProjectEvent.model_validate(raw)
-
-            # Validate saga payload schema
-            model_cls = SAGA_PAYLOAD_MODELS.get(ev.event_type)
-            if model_cls is not None:
-                if not isinstance(ev.payload, dict) or not ev.payload:
-                    raise ValueError(
-                        f"Payload for saga event '{ev.event_type}' must be a non-empty dictionary conforming to {model_cls.__name__}"
-                    )
-                model_cls.model_validate(ev.payload)
-
-            parsed_events.append(ev)
-
-        # Ensure events are ordered by sequence
-        parsed_events.sort(key=lambda e: e.sequence)
 
         lines_to_write: list[str] = []
         curr_seq = last_seq
@@ -1197,7 +1203,7 @@ def reconcile_project_subsystems(
                     correlation_id=corr_id,
                     idempotency_key=idempotency_key,
                 )
-                store.append(cmd)
+                store._append_governed(cmd.model_copy(update={"source": "pse_governance"}))
                 reconciled_tasks += 1
                 _pop_reconcile_attempt(tracker, key)
             else:
@@ -1284,7 +1290,7 @@ def reconcile_project_subsystems(
                     correlation_id=corr_id,
                     idempotency_key=idempotency_key,
                 )
-                store.append(cmd)
+                store._append_governed(cmd.model_copy(update={"source": "pse_governance"}))
                 reconciled_decisions += 1
                 _pop_reconcile_attempt(tracker, key)
             else:

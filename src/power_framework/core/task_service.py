@@ -347,19 +347,16 @@ class TaskService:
             artifact_digests[canonical_rel] = hashlib.sha256(candidate.read_bytes()).hexdigest()
 
         postcondition_sha256 = hashlib.sha256(postcondition.strip().encode("utf-8")).hexdigest()
-        receipt_payload: dict[str, object] = {
-            "task_id": task.task_id,
-            "task_revision": task.revision + 1,
-            "completion_policy": task.completion_policy,
-            "postcondition_sha256": postcondition_sha256,
-            "artifact_digests": artifact_digests,
-            "actor": actor,
-        }
-        digest = hashlib.sha256(
-            json.dumps(receipt_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        receipt_id = TaskCompletionReceipt.derive_receipt_id(
+            task_id=task.task_id,
+            task_revision=task.revision + 1,
+            completion_policy=task.completion_policy,
+            postcondition_sha256=postcondition_sha256,
+            artifact_digests=artifact_digests,
+            actor=actor,
+        )
         return TaskCompletionReceipt(
-            receipt_id=f"tcr_{digest}",
+            receipt_id=receipt_id,
             task_id=task.task_id,
             task_revision=task.revision + 1,
             completion_policy=task.completion_policy,

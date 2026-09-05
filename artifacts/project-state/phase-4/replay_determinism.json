@@ -1,0 +1,32 @@
+{
+  "schema_version": "power.replay-determinism-receipt.v1",
+  "project_id": "prj_determinism_receipt",
+  "total_events": 10,
+  "last_event_sequence": 10,
+  "last_event_hash": "b0ff6d8de1c52a5e6d24b8adede3cca97e71d47db4aa272dad072d55ca4e4a5c",
+  "state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+  "canonical_payload_sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
+  "run_1": {
+    "state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+    "sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
+    "byte_length": 4623
+  },
+  "run_2": {
+    "state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+    "sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
+    "byte_length": 4623
+  },
+  "snapshot_tail_restoration": {
+    "snapshot_at_sequence": 5,
+    "tail_events_count": 5,
+    "restored_state_revision": "f529706c3be5ffef4d754d2f77d917928bed6f8253dde166b07572ac3d90b7d4",
+    "restored_sha256": "4f85eab9a9c33912c77d4dc0ad25fab89095a983f9c9ab0d985a8f020beae0a8",
+    "matches_full_replay": true
+  },
+  "verification_checks": {
+    "run1_equals_run2_bytes": true,
+    "run1_equals_run2_revision": true,
+    "snapshot_tail_equivalent": true,
+    "gate_g4_1_passed": true
+  }
+}
