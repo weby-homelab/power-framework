@@ -165,6 +165,16 @@ def test_web_runtime_dependency_lock_is_hash_bound_and_consumed_by_docker() -> N
         ), workflow_name
         assert "--no-emit-project --no-annotate --no-header" in workflow, workflow_name
         assert "cmp -- - release/web-runtime.requirements.txt" in workflow, workflow_name
+    ci_workflow = yaml.safe_load(workflow_texts["ci.yml"])
+    security_commands = "\n".join(
+        step.get("run", "")
+        for step in ci_workflow["jobs"]["security"]["steps"]
+        if isinstance(step, dict)
+    )
+    assert (
+        "uv sync --locked --group dev --extra web --extra semantic --extra rerank"
+        in security_commands
+    )
     compose = (REPO_ROOT / "deploy" / "web" / "compose.yaml").read_text(encoding="utf-8")
     assert "POWER_WHEEL_FILE:" in compose
     assert "POWER_WHEEL_FILE:?" in compose
