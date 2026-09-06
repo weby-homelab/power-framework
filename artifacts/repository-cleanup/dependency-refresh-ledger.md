@@ -47,3 +47,32 @@ version `3.7.11` remain unchanged.
   no online model-download PASS is claimed.
 - HF security refresh and Actions PR #396 remain pending by design. No merge,
   tag, release, version bump, or Phase-5 work is authorized by this record.
+
+## Python replacement remote closure — 2026-09-06
+
+- Replacement PR #400 was opened against
+  `01059114a29af2fd0f1faafa6c8190fadcca1c86` and advanced through signed commits
+  `e2dbc867e85001b6f9926840e77d76115ffbf788`,
+  `60e04ea7daac9890066d75331d970f2652314683`,
+  `67197de24852e9ddcb75708ad5d8c4cfb6673377`,
+  `2b90301ed7d9c46fcc51828c511e846ed993312d`, and
+  `7a694a373d2431c6103deb636796e9e92d93198b`.
+- #399 was closed as superseded and not merged. Its final replacement comment
+  is retained on the PR.
+- Final exact-head remote evidence for #400: CI run `34035570545`, CodeQL run
+  `34035570543`, and Docs run `34035570546`; all required contexts passed.
+  The CodeRabbit review thread is resolved and outdated with no remaining
+  actionable review comment.
+- Final local evidence: Python 3.13.5 and 3.14.6 locked environments passed
+  import/version and pip checks; MCP 58 tests; neural contract 5 tests; PSE/
+  Task/Decision/crash 359 tests; full suite 1713 passed, 4 skipped, 17
+  deselected; coverage 82.51%; benchmark integrity 114 passed, 1 skipped;
+  Ruff, format, MyPy, docs, package smoke, upgrade matrix, and full-maintained-
+  profile pip-audit passed.
+- The Web export is now raw canonical `uv export` output. Both CI and release
+  workflows enforce a blocking byte-for-byte comparison against `uv.lock`.
+- PR #400 was manually squash-merged as `1fc285ac134445841f1954648db94de4564ab6ac`.
+  Because squash merge does not retain the PR head as an ancestor, this ledger
+  update is intentionally based on signed PR head
+  `7a694a373d2431c6103deb636796e9e92d93198b` and must be
+  normal-merged before the lineage invariant is considered closed.
