@@ -72,9 +72,40 @@ version `3.7.11` remain unchanged.
 - The Web export is now raw canonical `uv export` output. Both CI and release
   workflows enforce a blocking byte-for-byte comparison against `uv.lock`.
 - PR #400 was manually squash-merged as `1fc285ac134445841f1954648db94de4564ab6ac`.
-  Because squash merge does not retain the PR head as an ancestor, this ledger
-  update is intentionally based on signed PR head
-  `7a694a373d2431c6103deb636796e9e92d93198b` and must be
-  normal-merged before the lineage invariant is considered closed.
-- The lineage branch must include current main before merge; squash is
-  prohibited for this closure because it would discard the signed refresh head.
+  Because squash merge did not retain the PR head as an ancestor, evidence PR
+  #401 was normal-merged as `be83652aec2daedeb2c98b604b5a49d13e989c7e`.
+- The signed Python refresh head
+  `7a694a373d2431c6103deb636796e9e92d93198b` is now an ancestor of canonical
+  main; the lineage invariant is closed without changing Phase-4 source.
+
+## Hugging Face security refresh — blocked / local candidate — 2026-09-06
+
+- Stage C starts from post-Python main
+  `be83652aec2daedeb2c98b604b5a49d13e989c7e`. PyPI reports `1.30.0` as the
+  current stable `huggingface-hub` release (uploaded 2026-09-03); the target is
+  therefore `1.25.1 -> 1.30.0`, not an unbounded latest-version jump.
+- The controlled resolver changes only the three optional HF specifiers to
+  `huggingface-hub>=1.30.0,<1.31.0`; `uv lock --upgrade-package
+  huggingface-hub`, `uv lock --check`, and canonical Web export comparison pass.
+  The maintained Web export SHA-256 is
+  `4001e0b073acb7c6eb40bab6047bcb13adedbca3d2a6ebdf23e1b28687b435c3`.
+
+### HF security inventory
+
+| Scanner / source | Finding ID | Severity | Affected component / reachability | Fixed version | Disposition |
+|:---|:---|:---|:---|:---|:---|
+| OSV, PyPI `huggingface-hub` | none returned | none | Package versions 1.25.1, 1.29.0, and 1.30.0 | n/a | NOT_APPLICABLE_WITH_EVIDENCE |
+| GitHub repository advisories | none returned | none | Repository dependency alert inventory is empty | n/a | NOT_APPLICABLE_WITH_EVIDENCE |
+| NVD | CVE-2026-15717 not found | none | Exact CVE lookup returned zero results | n/a | NOT_APPLICABLE_WITH_EVIDENCE |
+| pip-audit, full maintained profiles | none found | none | `dev + web + semantic + rerank`, HF 1.30.0 | n/a | FIXED / PASS |
+| Phase-0 source review | WEB-05 | P1 / High | `experimental/embeddings.py:671-688` and `experimental/reranker.py:163-205` can reach HF without the central egress gate; custom model paths lack equivalent approval/hash enforcement | no package-version fix | BLOCKER; pre-existing source hardening is outside this dependency-only scope |
+| Phase-0 source review | WEB-01 | P1 / High | Web `source.read` can disclose regular in-vault files beyond Markdown, including governed state | no package-version fix | BLOCKER; unrelated pre-existing source boundary, not changed here |
+
+- HF functional evidence passes in a synthetic cache: metadata lookup at exact
+  revision `f171d7baecaf37b5da5a3616d8833b9969753535`, controlled config and
+  safetensors downloads, cache confinement, offline fail-closed behavior, and
+  invalid repo/filename rejection. Focused semantic/rerank/security tests pass
+  `106` tests. No private vault or full BGE model download was used.
+- Because P1 source findings remain unresolved and cannot be accepted by an AI,
+  the HF refresh is **BLOCKED / NOT MERGED**. Actions PR #396 remains HOLD and
+  must not be recreated or merged from this state.
