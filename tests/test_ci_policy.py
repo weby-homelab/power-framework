@@ -122,6 +122,7 @@ def test_release_workflow_publishes_sbom_and_attestation() -> None:
 
 
 def test_web_runtime_dependency_lock_is_hash_bound_and_consumed_by_docker() -> None:
+    """Require each Docker-facing workflow to compare its Web export with uv.lock."""
     constraints = (REPO_ROOT / "release" / "web-runtime.constraints.txt").read_text(
         encoding="utf-8"
     )
@@ -129,10 +130,11 @@ def test_web_runtime_dependency_lock_is_hash_bound_and_consumed_by_docker() -> N
         encoding="utf-8"
     )
     dockerfile = (REPO_ROOT / "deploy" / "web" / "Dockerfile").read_text(encoding="utf-8")
-    workflows = "\n".join(
-        path.read_text(encoding="utf-8")
+    workflow_texts = {
+        path.name: path.read_text(encoding="utf-8")
         for path in (WORKFLOWS_DIR / "ci.yml", WORKFLOWS_DIR / "release.yml")
-    )
+    }
+    workflows = "\n".join(workflow_texts.values())
 
     assert "-r web-runtime.requirements.txt" in constraints
     assert "--no-hashes" not in requirements
@@ -156,12 +158,13 @@ def test_web_runtime_dependency_lock_is_hash_bound_and_consumed_by_docker() -> N
     assert "python -m build" not in dockerfile
     assert "pip install --upgrade pip build" not in dockerfile
     assert workflows.count("--no-header") >= 2
-    assert workflows.count("Verify Web runtime export is lock-bound") == 2
-    assert (
-        workflows.count("uv export --locked --no-dev --extra web --extra semantic --extra rerank")
-        == 2
-    )
-    assert workflows.count("cmp -- - release/web-runtime.requirements.txt") == 2
+    for workflow_name, workflow in workflow_texts.items():
+        assert workflow.count("Verify Web runtime export is lock-bound") == 1, workflow_name
+        assert (
+            "uv export --locked --no-dev --extra web --extra semantic --extra rerank" in workflow
+        ), workflow_name
+        assert "--no-emit-project --no-annotate --no-header" in workflow, workflow_name
+        assert "cmp -- - release/web-runtime.requirements.txt" in workflow, workflow_name
     compose = (REPO_ROOT / "deploy" / "web" / "compose.yaml").read_text(encoding="utf-8")
     assert "POWER_WHEEL_FILE:" in compose
     assert "POWER_WHEEL_FILE:?" in compose
@@ -175,6 +178,7 @@ def test_release_package_sbom_scans_the_wheel_as_a_file() -> None:
 
 
 def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
+    """Keep tag publication behind signed-source and release-gate validation."""
     release_text = (WORKFLOWS_DIR / "release.yml").read_text(encoding="utf-8")
     workflow = yaml.safe_load(release_text)
     jobs = workflow["jobs"]
