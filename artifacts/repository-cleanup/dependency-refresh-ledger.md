@@ -76,3 +76,5 @@ version `3.7.11` remain unchanged.
   update is intentionally based on signed PR head
   `7a694a373d2431c6103deb636796e9e92d93198b` and must be
   normal-merged before the lineage invariant is considered closed.
+- The lineage branch must include current main before merge; squash is
+  prohibited for this closure because it would discard the signed refresh head.
