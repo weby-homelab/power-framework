@@ -156,6 +156,12 @@ def test_web_runtime_dependency_lock_is_hash_bound_and_consumed_by_docker() -> N
     assert "python -m build" not in dockerfile
     assert "pip install --upgrade pip build" not in dockerfile
     assert workflows.count("--no-header") >= 2
+    assert workflows.count("Verify Web runtime export is lock-bound") == 2
+    assert (
+        workflows.count("uv export --locked --no-dev --extra web --extra semantic --extra rerank")
+        == 2
+    )
+    assert workflows.count("cmp -- - release/web-runtime.requirements.txt") == 2
     compose = (REPO_ROOT / "deploy" / "web" / "compose.yaml").read_text(encoding="utf-8")
     assert "POWER_WHEEL_FILE:" in compose
     assert "POWER_WHEEL_FILE:?" in compose
@@ -233,10 +239,12 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert "  upgrade-matrix-aggregate:" in release_text
     assert "needs: [release_input, signed_tag_admission, validate]" in release_text
     assert "needs: [release_input, signed_tag_admission, upgrade-matrix]" in release_text
-    assert (
-        "needs: [release_input, signed_tag_admission, validate, upgrade-matrix-aggregate]"
-        in release_text
-    )
+    assert jobs["release"]["needs"] == [
+        "release_input",
+        "signed_tag_admission",
+        "validate",
+        "upgrade-matrix-aggregate",
+    ]
     assert "--require-signed-tag" in release_text
     assert "Verify signed release tag and maintainer fingerprint" in release_text
     assert "Install the pinned maintainer release signing key" not in release_text
