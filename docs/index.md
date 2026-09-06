@@ -26,6 +26,8 @@ receipts can be read back from GitHub. The
 migration guides keep the source immutable, reconcile every file by manifest
 and hash, and make cutover reversible.
 
+<!-- Dependency-refresh evidence is maintained in the hash-bound repository ledger. -->
+
 ## Executable contract
 
 - Python 3.13 or 3.14.
