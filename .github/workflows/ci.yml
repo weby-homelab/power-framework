@@ -314,7 +314,7 @@ jobs:
         run: |
           python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
-          uv sync --locked --group dev
+          uv sync --locked --group dev --extra web --extra semantic --extra rerank
 
       - name: Audit dependencies for known vulnerabilities
         run: uv run pip-audit --skip-editable
@@ -337,6 +337,13 @@ jobs:
           python -m pip install --upgrade "pip>=26.2"
           python -m pip install uv==0.11.33
           uv sync --locked --group dev --extra web --extra semantic --extra rerank
+
+      - name: Verify Web runtime export is lock-bound
+        run: |
+          set -euo pipefail
+          uv export --locked --no-dev --extra web --extra semantic --extra rerank \
+            --no-emit-project --no-annotate --no-header \
+            | cmp -- - release/web-runtime.requirements.txt
 
       - name: Build wheel and sdist
         run: uv run python -m build
