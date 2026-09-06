@@ -78,12 +78,19 @@ version `3.7.11` remain unchanged.
   `7a694a373d2431c6103deb636796e9e92d93198b` is now an ancestor of canonical
   main; the lineage invariant is closed without changing Phase-4 source.
 
-## Hugging Face security refresh — blocked / local candidate — 2026-09-06
+## Hugging Face security refresh — blocked / PR #404 — 2026-09-06
 
 - Stage C starts from post-Python main
   `be83652aec2daedeb2c98b604b5a49d13e989c7e`. PyPI reports `1.30.0` as the
   current stable `huggingface-hub` release (uploaded 2026-09-03); the target is
   therefore `1.25.1 -> 1.30.0`, not an unbounded latest-version jump.
+- Maintainer replacement PR #404 is based on signed head
+  `2b4c2281f99c585d1b46c93644f5d51313eedf61`; stale Dependabot PR #403 was
+  closed as superseded and not merged.
+- Exact-head remote evidence for #404: CI `34039476987`, CodeQL
+  `34039477010`, and Docs `34039570394` all passed. CodeRabbit reported no
+  actionable review comments; merge remains intentionally blocked by the
+  source-security dispositions below.
 - The controlled resolver changes only the three optional HF specifiers to
   `huggingface-hub>=1.30.0,<1.31.0`; `uv lock --upgrade-package
   huggingface-hub`, `uv lock --check`, and canonical Web export comparison pass.
