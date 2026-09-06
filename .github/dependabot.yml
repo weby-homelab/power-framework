@@ -5,8 +5,6 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
-    labels:
-      - dependencies
     groups:
       maintenance:
         patterns:
@@ -19,8 +17,6 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
-    labels:
-      - dependencies
     groups:
       actions:
         patterns:
