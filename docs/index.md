@@ -26,6 +26,10 @@ receipts can be read back from GitHub. The
 migration guides keep the source immutable, reconcile every file by manifest
 and hash, and make cutover reversible.
 
+<!-- Dependency-refresh evidence is maintained in
+     artifacts/repository-cleanup/dependency-refresh-ledger.md,
+     bound to signed PR head 7a694a373d2431c6103deb636796e9e92d93198b. -->
+
 ## Executable contract
 
 - Python 3.13 or 3.14.
