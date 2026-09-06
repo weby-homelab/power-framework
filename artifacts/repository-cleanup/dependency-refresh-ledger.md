@@ -116,3 +116,6 @@ version `3.7.11` remain unchanged.
 - Because P1 source findings remain unresolved and cannot be accepted by an AI,
   the HF refresh is **BLOCKED / NOT MERGED**. Actions PR #396 remains HOLD and
   must not be recreated or merged from this state.
+- Final evidence head is signed commit
+  `8cd1429d87ca591f18b6daf2cee82f164ed1c560`; its exact remote runs are CI
+  `34039779304`, CodeQL `34039779369`, and Docs `34039794492`, all successful.
