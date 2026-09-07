@@ -89,6 +89,38 @@ def test_read_only_application_service_does_not_create_task_namespace(temp_vault
     assert not tasks_dir.exists()
 
 
+def test_read_only_application_service_does_not_create_control_directory(tmp_path: Path) -> None:
+    """Constructing the application boundary remains side-effect free for a new vault."""
+    vault = tmp_path / "new-vault"
+    vault.mkdir()
+
+    ApplicationService(vault)
+
+    assert not (vault / ".power").exists()
+
+
+def test_application_service_does_not_create_missing_vault(tmp_path: Path) -> None:
+    """A read-boundary construction must fail closed instead of creating a root."""
+    vault = tmp_path / "missing-vault"
+
+    with pytest.raises(FileNotFoundError, match="Vault path does not exist"):
+        ApplicationService(vault)
+
+    assert not vault.exists()
+
+
+def test_application_source_read_rejects_control_files(temp_vault: Path) -> None:
+    """ApplicationService inherits the core canonical source boundary."""
+    control_file = temp_vault / ".power" / "events.jsonl"
+    control_file.write_text("synthetic internal event", encoding="utf-8")
+    service = ApplicationService(temp_vault)
+
+    with pytest.raises(source_service.SourceNotFoundError) as exc_info:
+        service.source_read(".power/events.jsonl")
+
+    assert str(exc_info.value) == "source not found in canonical source projection"
+
+
 def test_source_list_and_pagination(temp_vault: Path) -> None:
     """Test listing sources with filters and pagination."""
     service = ApplicationService(temp_vault)

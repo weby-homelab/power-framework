@@ -472,6 +472,29 @@ def test_legacy_search_database_is_imported_before_removal(
     assert search_vault(vault, "legacy-token", mode="fts")
 
 
+def test_legacy_migration_rebuilds_content_for_changed_source_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A legacy derived row must not be paired with a newer source projection."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "legacy-rewrite", "old-token")
+    legacy_path = vault_db_path(vault)
+    with closing(sqlite3.connect(legacy_path)) as conn:
+        _init_db(conn)
+        _sync_vault_to_db(vault, conn, sync_embeddings=False)
+
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("old-token", "new-token"), encoding="utf-8"
+    )
+
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert report.actual_files == 1
+    assert search_vault(vault, "new-token", mode="fts")
+    assert not search_vault(vault, "old-token", mode="fts")
+
+
 def test_stale_legacy_database_falls_back_to_source_rebuild(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

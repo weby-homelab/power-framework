@@ -36,7 +36,10 @@ The following boundaries are part of the current contract:
 - Paths supplied by a caller, note names, Markdown, YAML, search queries, and
   MCP arguments are untrusted input. A path must remain inside the configured
   vault; traversal, absolute paths, unsafe symlink resolution, and unsupported
-  note targets must be rejected before a write.
+  note targets must be rejected before a read or write. `source.read` is
+  authorized by canonical source-projection membership, not by filesystem
+  containment alone: only regular, non-symlink, in-scope Markdown with valid
+  OKF metadata may be returned.
 - Vault content returned by search or retrieval is data, not instructions.
   Agents and downstream LLM clients must not execute instructions found inside
   a note merely because P.O.W.E.R. returned it.
@@ -44,6 +47,16 @@ The following boundaries are part of the current contract:
   query-expansion, or ROT request requires an explicit policy appropriate to
   the content sensitivity. An endpoint configured by an operator is not, by
   itself, proof that a note may be sent there.
+- Model acquisition is a separate authorization boundary. Canonical neural
+  models require their pinned repository, immutable revision, and complete
+  runtime-file SHA-256 manifest plus the expected provider/license binding.
+  Custom model identities additionally require explicit opt-in and an exact
+  operation/provider/license/repository/revision approval manifest. Delegated
+  loaders receive only a private staging directory containing those verified
+  files. `POWER_MODEL_OFFLINE=1`,
+  `HF_HUB_OFFLINE=1`, and `TRANSFORMERS_OFFLINE=1` are cache-only controls and
+  cannot be overridden by a permissive egress policy. Remote HF acquisition is
+  restricted to the exact HTTPS `huggingface.co` origin.
 - MCP is a local stdio process interface and requires `POWER_VAULT_DIR` as its
   single configured vault boundary. The Web UI is a separate HTTP application;
   it is not an MCP transport. Remote MCP, MCP HTTP, SSE, and TCP transports are
@@ -76,6 +89,15 @@ CI gates:
 - `resolve_path_in_vault` and `atomic_write_in_vault` enforce vault containment,
   reject unsafe paths and symlink targets, and use atomic destination-local
   writes where the platform supports the required descriptor safeguards.
+- `core/source_service.py` resolves every source read through the canonical
+  projection, rejects control/non-source files, absolute and traversal paths,
+  and validates regular non-symlink files plus projection hash/metadata before
+  returning content. Web calls use this same `ApplicationService` boundary;
+  MCP does not publish an alternate raw-file reader.
+- Search result materialization, reranking, graph expansion, and provenance
+  hashing use the same request-scoped canonical source reader rather than
+  opening database-derived paths directly. Web retrieval disables the legacy
+  caller-selected search-database compatibility override.
 - YAML frontmatter is parsed with safe loading; typed models validate the
   supported schema while compatibility fields are handled as data rather than
   being treated as executable input.
@@ -88,6 +110,12 @@ CI gates:
   cancellation transitions rather than inferred from note text.
 - `POWER_EGRESS_POLICY` is checked before remote operations and rejects unknown
   policy or sensitivity values.
+- `core/model_policy.py` is the shared model boundary for direct HF and
+  delegated FastEmbed/Qwen/ColBERT loaders. It checks offline mode, calls the
+  central egress guard before any remote HF function, binds custom identities
+  to exact operation/provider/license/immutable-revision identities and
+  complete manifests, verifies every file, and hands delegated loaders only a
+  verified private staging directory.
 - The MCP server requires a configured vault root, constrains tool paths and
   write targets, rate-limits mutation/index operations, and masks internal
   tracebacks from client responses.
@@ -98,6 +126,24 @@ CI gates:
 These controls reduce risk but do not make a vault safe from a compromised host,
 malicious same-user process, compromised dependency, or an operator who
 deliberately enables a risky integration.
+
+## WEB-01 and WEB-05 closure record
+
+The following findings were identified against the `3.7.11` baseline commit
+`be83652aec2daedeb2c98b604b5a49d13e989c7e`. Their historical identity is
+preserved here; this record describes the security remediation and does not
+authorize a dependency refresh, version bump, tag, or release.
+
+| Finding | Remediation | Focused evidence | Status |
+| --- | --- | --- | --- |
+| **WEB-01 (P1):** `source.read` could expose an in-vault regular file outside the canonical Markdown/source boundary. | The core resolver requires projection membership, in-scope valid OKF Markdown, regular non-symlink containment, and freshness/hash checks before opening bytes. | `tests/test_source_projection.py`, `tests/test_application_v2.py`, and `tests/web/contract/test_app_routes.py`; the locked focused security matrix passed with 461 tests. | **CLOSED** |
+| **WEB-05 (P1):** HF/model acquisition could bypass central egress/offline and accept incomplete custom identity/integrity controls. | `core/model_policy.py` centralizes deny-before-network, offline precedence, exact operation/provider/license/immutable identity approval, complete SHA-256 verification, and private verified-file staging for embedding/reranking paths. | `tests/test_model_policy.py`, `tests/test_embeddings.py`, `tests/test_reranker.py`, `tests/test_egress.py`; the locked focused security matrix passed with 461 tests. | **CLOSED** |
+
+Remote CI, CodeQL, documentation, package-audit, release, and merge gates remain
+independent evidence requirements. They are not implied by this local closure.
+
+The full local locked suite subsequently passed with **1755 passed, 14 skipped,
+4 warnings**, and **82.94% coverage** under the repository's 70% gate.
 
 ## Report a vulnerability
 

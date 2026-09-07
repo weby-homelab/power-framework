@@ -13,7 +13,7 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
 
 from .chunker import SemanticChunker
-from .constants import DENSE_INDEX_SCHEMA_VERSION, is_catalog_filename
+from .constants import DENSE_INDEX_SCHEMA_VERSION, SKIP_FILES, is_catalog_filename
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 from .source_projection import scan_projection, write_projection
@@ -125,7 +125,7 @@ def _sync_vault_to_db(
     for filepath in iter_vault_markdown_files(vault_dir):
         # Generated catalogs are navigation, not knowledge. Keep every page
         # out of both sparse and dense indexes, including `_index-N.md` pages.
-        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
+        if filepath.name in SKIP_FILES or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue

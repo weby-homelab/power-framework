@@ -7,6 +7,12 @@ import os
 import time
 from typing import Protocol
 
+from power_framework.core.egress import EgressOperation
+from power_framework.core.model_policy import (
+    acquire_model_files,
+    force_model_offline,
+    prepare_external_model,
+)
 from power_framework.core.utils import get_cpu_worker_limit
 from power_framework.experimental.embeddings import select_onnx_providers, verify_bound_provider
 
@@ -38,6 +44,7 @@ QWEN3_RERANKER_MODEL = os.getenv("POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Re
 
 # Jina remains a documented opt-in only (CC-BY-NC-4.0).
 JINA_RERANKER_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
+JINA_RERANKER_REVISION = "9cfeff2df7d40d1b78e75e5e9cebec92a99813c9"
 
 
 class RerankerProtocol(Protocol):
@@ -73,8 +80,10 @@ class RerankerManager:
     license violations when POWER is used under a GPLv3/commercial context.
     """
 
-    def __init__(self, model_name: str = JINA_RERANKER_MODEL) -> None:
-        self.model_name = model_name
+    def __init__(self, model_name: str | None = None) -> None:
+        self.model_name: str = (
+            model_name or os.getenv("POWER_JINA_RERANKER_MODEL") or JINA_RERANKER_MODEL
+        )
         self._model: object | None = None
         self._use_qwen3 = os.getenv("POWER_EMBED_PROVIDER", "").lower() == "qwen3"
 
@@ -90,27 +99,50 @@ class RerankerManager:
                 f"permitted non-commercial use, or rely on the MIT/Apache BGE reranker default."
             )
         if self._use_qwen3:
+            prepared = prepare_external_model(
+                operation=EgressOperation.RERANKING,
+                provider="qwen3-reranker-onnx",
+                model_reference=os.getenv("POWER_QWEN3_RERANKER_MODEL", QWEN3_RERANKER_MODEL),
+            )
+            with force_model_offline():
+                try:
+                    from qwen3_embed import TextCrossEncoder as Qwen3TextCrossEncoder
+                except ImportError as e:
+                    raise ImportError(
+                        "qwen3-embed is required for Qwen3 reranking. "
+                        "Install it with: pip install qwen3-embed"
+                    ) from e
+                self._model = Qwen3TextCrossEncoder(
+                    model_name=prepared.local_reference,
+                    lazy_load=False,
+                )
+            return
+        model_reference = self.model_name
+        if "@" not in model_reference:
+            model_reference = f"{model_reference}@{JINA_RERANKER_REVISION}"
+        prepared = prepare_external_model(
+            operation=EgressOperation.RERANKING,
+            provider="jina-reranker",
+            model_reference=model_reference,
+            expected_license="CC-BY-NC-4.0",
+        )
+        with force_model_offline():
             try:
-                from qwen3_embed import TextCrossEncoder as Qwen3TextCrossEncoder
+                from fastembed.rerank.cross_encoder import TextCrossEncoder
             except ImportError as e:
                 raise ImportError(
-                    "qwen3-embed is required for Qwen3 reranking. "
-                    "Install it with: pip install qwen3-embed"
+                    "fastembed is required. Install it with: pip install fastembed"
                 ) from e
-            self._model = Qwen3TextCrossEncoder(model_name=QWEN3_RERANKER_MODEL)
-            return
-        try:
-            from fastembed.rerank.cross_encoder import TextCrossEncoder
-        except ImportError as e:
-            raise ImportError(
-                "fastembed is required. Install it with: pip install fastembed"
-            ) from e
-        self._model = TextCrossEncoder(model_name=self.model_name)
+            self._model = TextCrossEncoder(
+                model_name=prepared.local_reference,
+                lazy_load=False,
+            )
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         self._lazy_init()
         assert self._model is not None
-        scores = self._model.rerank(query, documents)
+        with force_model_offline():
+            scores = self._model.rerank(query, documents)
         return [float(s) for s in scores]
 
 
@@ -128,12 +160,18 @@ class BGEM3Reranker:
 
     def __init__(
         self,
-        repo: str = BGE_RERANKER_ONNX_REPO,
-        revision: str = BGE_RERANKER_ONNX_REVISION,
+        repo: str | None = None,
+        revision: str | None = None,
     ) -> None:
-        self.repo = repo
-        self.revision = revision
-        self.model_name = f"{repo}@{revision}"
+        self.repo: str = (
+            repo or os.getenv("POWER_BGE_RERANKER_ONNX_REPO") or BGE_RERANKER_PINNED_REPO
+        )
+        self.revision: str = (
+            revision
+            or os.getenv("POWER_BGE_RERANKER_ONNX_REVISION")
+            or BGE_RERANKER_PINNED_REVISION
+        )
+        self.model_name = f"{self.repo}@{self.revision}"
         self._session: object | None = None
         self._tokenizer: object | None = None
         self.active_provider: str | None = None
@@ -150,9 +188,25 @@ class BGEM3Reranker:
         with _lock:
             if self._session is not None:
                 return
+            model_files = acquire_model_files(
+                operation=EgressOperation.RERANKING,
+                repo=self.repo,
+                revision=self.revision,
+                provider="bge-reranker-v2-m3-onnx",
+                required_files=("onnx/model.onnx", "onnx/model.onnx_data", "tokenizer.json"),
+                canonical_repo=BGE_RERANKER_PINNED_REPO,
+                canonical_revision=BGE_RERANKER_PINNED_REVISION,
+                canonical_provider="bge-reranker-v2-m3-onnx",
+                canonical_license="Apache-2.0",
+                canonical_hashes={
+                    "onnx/model.onnx": BGE_RERANKER_FILE_SHA256["model.onnx"],
+                    "onnx/model.onnx_data": BGE_RERANKER_FILE_SHA256["model.onnx_data"],
+                    "tokenizer.json": BGE_RERANKER_FILE_SHA256["tokenizer.json"],
+                },
+                custom_license="Apache-2.0",
+            )
             try:
                 import onnxruntime as ort
-                from huggingface_hub import hf_hub_download
                 from tokenizers import Tokenizer
             except ImportError as e:
                 raise ImportError(
@@ -160,66 +214,8 @@ class BGEM3Reranker:
                     "Install with: pip install power-framework"
                 ) from e
 
-            offline = (
-                os.getenv("HF_HUB_OFFLINE", "0") == "1"
-                or os.getenv("TRANSFORMERS_OFFLINE", "0") == "1"
-            )
-            local_only = offline
-            try:
-                model_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx",
-                    revision=self.revision,
-                    local_files_only=local_only,
-                )
-                data_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx_data",
-                    revision=self.revision,
-                    local_files_only=local_only,
-                )
-                tok_path = hf_hub_download(
-                    self.repo,
-                    "tokenizer.json",
-                    revision=self.revision,
-                    local_files_only=local_only,
-                )
-            except Exception:
-                model_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx",
-                    revision=self.revision,
-                    local_files_only=True,
-                )
-                data_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx_data",
-                    revision=self.revision,
-                    local_files_only=True,
-                )
-                tok_path = hf_hub_download(
-                    self.repo,
-                    "tokenizer.json",
-                    revision=self.revision,
-                    local_files_only=True,
-                )
-
-            if (
-                self.repo == BGE_RERANKER_PINNED_REPO
-                and self.revision == BGE_RERANKER_PINNED_REVISION
-            ):
-                for filename, path in {
-                    "model.onnx": model_path,
-                    "model.onnx_data": data_path,
-                    "tokenizer.json": tok_path,
-                }.items():
-                    expected = BGE_RERANKER_FILE_SHA256.get(filename)
-                    if expected:
-                        _verify_sha256(path, expected)
-                    else:
-                        raise RuntimeError(
-                            f"missing_reranker_sha256_pin:{filename}; release defaults require pins"
-                        )
+            model_path = model_files["onnx/model.onnx"]
+            tok_path = model_files["tokenizer.json"]
 
             so = ort.SessionOptions()
             so.enable_cpu_mem_arena = False

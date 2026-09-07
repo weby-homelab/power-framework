@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import sqlite3
 from contextlib import closing
 from typing import TYPE_CHECKING
@@ -80,7 +81,7 @@ def test_sync_builds_rebuildable_source_projection_and_truthful_stats(
         assert conn.execute("SELECT COUNT(*) FROM source_links").fetchone()[0] == 2
 
 
-def test_active_reads_use_projection_and_exact_read_is_direct(
+def test_active_reads_use_projection_for_exact_and_stem_reads(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Active list/stats/graph/stem reads do not rescan source files."""
@@ -104,8 +105,9 @@ def test_active_reads_use_projection_and_exact_read_is_direct(
     assert stats.actual_capability == "active_source_projection"
     assert graph.actual_capability == "active_source_projection"
     assert stem.actual_capability == "active_source_projection"
-    assert exact.actual_capability == "direct_file_read"
+    assert exact.actual_capability == "active_source_projection"
     assert exact.degraded_reason is None
+    assert exact.source_revision == listed.source_revision
     assert exact.content.endswith("[[B]]\n")
 
 
@@ -222,3 +224,130 @@ def test_active_projection_staleness_fails_closed_after_source_edit(
 
     with pytest.raises(source_service.SourceProjectionStaleError, match="run power sync"):
         source_service.get_source_stats(vault)
+
+
+def test_source_read_rejects_internal_and_arbitrary_in_vault_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Projection membership, not filesystem containment, authorizes source reads."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _projection_vault(tmp_path)
+    sync_vault_atomically(vault, sync_embeddings=False)
+
+    control_files = {
+        ".power/events.jsonl": b"private event ledger",
+        ".power/tasks/task.json": b"private task state",
+        ".power/projects/project.json": b"private project state",
+        ".power/proposals/proposal.json": b"private proposal state",
+        ".power/state.json": b"private control state",
+        ".env": b"SECRET=synthetic",
+        ".env.local": b"LOCAL_SECRET=synthetic",
+        "credentials.json": b'{"token":"synthetic"}',
+        "events.jsonl": b'{"event":"synthetic"}\n',
+        "cache.sqlite": b"SQLite synthetic",
+        "cache.db": b"database synthetic",
+        "payload.bin": bytes(range(16)),
+        "arbitrary.txt": b"arbitrary regular file",
+        "01_Projects/POWER_STATUS.md": b"internal status material",
+        "README.md": b"repository instructions are not a source note",
+        "05_Templates/template.md": b"template control material",
+        ".power/internal.md": b"internal markdown control material",
+    }
+    for rel_path, content in control_files.items():
+        target = vault / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+
+    for rel_path in control_files:
+        with pytest.raises(source_service.SourceNotFoundError) as exc_info:
+            source_service.read_source(vault, SourceReadRequest(rel_path=rel_path))
+        assert str(exc_info.value) == "source not found in canonical source projection"
+
+
+def test_source_read_rejects_invalid_markdown_outside_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Markdown file without valid OKF metadata is not a readable source."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _projection_vault(tmp_path)
+    invalid = vault / "01_Projects" / "Invalid.md"
+    invalid.write_text("not an OKF note", encoding="utf-8")
+
+    with pytest.raises(source_service.SourceNotFoundError) as exc_info:
+        source_service.read_source(vault, SourceReadRequest(rel_path="01_Projects/Invalid.md"))
+    assert str(exc_info.value) == "source not found in canonical source projection"
+
+
+def test_source_read_rejects_absolute_traversal_and_symlink_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Containment and non-symlink policy are enforced before source bytes are opened."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _projection_vault(tmp_path)
+    sync_vault_atomically(vault, sync_embeddings=False)
+
+    outside = tmp_path / "outside-secret.txt"
+    outside.write_text("outside synthetic secret", encoding="utf-8")
+    escaped = vault / "01_Projects" / "escaped.md"
+    escaped.symlink_to(outside)
+    directory_alias = vault / "01_Projects" / "index.md"
+    directory_alias.symlink_to(outside)
+
+    with pytest.raises(ValueError, match="Absolute paths"):
+        source_service.read_source(vault, SourceReadRequest(rel_path="/01_Projects/A.md"))
+    with pytest.raises(ValueError, match="Absolute paths"):
+        source_service.read_source(vault, SourceReadRequest(rel_path="C:\\outside-secret.md"))
+    with pytest.raises(PermissionError, match="Path traversal"):
+        source_service.read_source(vault, SourceReadRequest(rel_path="../outside-secret.txt"))
+    with pytest.raises(PermissionError, match="Path traversal"):
+        source_service.read_source(
+            vault, SourceReadRequest(rel_path="01_Projects/../../etc/passwd")
+        )
+
+    for rel_path in ("01_Projects/escaped.md", "01_Projects"):
+        with pytest.raises(source_service.SourceNotFoundError) as exc_info:
+            source_service.read_source(vault, SourceReadRequest(rel_path=rel_path))
+        assert str(exc_info.value) == "source not found in canonical source projection"
+    if os.name != "nt":
+        with pytest.raises(OSError, match="Too many levels"):
+            source_service._open_source_file(vault, "01_Projects/escaped.md", escaped)
+        outside_dir = tmp_path / "outside-dir"
+        outside_dir.mkdir()
+        (outside_dir / "secret.md").write_text("parent secret", encoding="utf-8")
+        parent_alias = vault / "alias"
+        parent_alias.symlink_to(outside_dir, target_is_directory=True)
+        with pytest.raises(OSError, match=r"Too many levels|Not a directory"):
+            source_service._open_source_file(vault, "alias/secret.md", parent_alias / "secret.md")
+    assert outside.read_text(encoding="utf-8") == "outside synthetic secret"
+
+
+def test_source_read_preserves_valid_unicode_nested_and_bounded_contracts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Canonical notes remain readable with Unicode names, stems, ETags, and byte bounds."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _projection_vault(tmp_path)
+    unicode_note = vault / "02_Areas" / "Внутрішня нотатка.md"
+    _note(unicode_note, "Unicode note", "nested valid source")
+    sync_vault_atomically(vault, sync_embeddings=False)
+
+    response = source_service.read_source(
+        vault, SourceReadRequest(rel_path="02_Areas/Внутрішня нотатка.md")
+    )
+    stem_response = source_service.read_source(
+        vault, SourceReadRequest(rel_path="Внутрішня нотатка")
+    )
+
+    assert response.rel_path == "02_Areas/Внутрішня нотатка.md"
+    assert response.content == stem_response.content
+    assert response.actual_capability == "active_source_projection"
+    assert response.source_revision
+    assert response.etag.startswith('"')
+    with pytest.raises(ValueError, match="max_bytes"):
+        source_service.read_source(
+            vault, SourceReadRequest(rel_path="02_Areas/Внутрішня нотатка.md", max_bytes=1)
+        )

@@ -9,13 +9,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import posixpath
 import sqlite3
+import stat as stat_module
 from collections import deque
 from contextlib import closing
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import BinaryIO
 
 from .application_models import (
     GraphEdgeDTO,
@@ -28,7 +34,7 @@ from .application_models import (
     SourceReadResponse,
     SourceStatsResponse,
 )
-from .constants import is_catalog_filename
+from .constants import SKIP_FILES, is_catalog_filename
 from .generation_index import resolve_active_generation
 from .ignore import should_skip
 from .parser import validate_metadata
@@ -39,7 +45,7 @@ from .source_projection import (
     SourceRecord,
     scan_projection,
 )
-from .utils import iter_vault_markdown_files
+from .utils import is_regular_vault_file, iter_vault_markdown_files
 from .vault_storage import read_vault_identity
 
 # Compatibility name retained for integrations that patched the old helper. It
@@ -48,9 +54,9 @@ ensure_vault_identity = read_vault_identity
 
 ACTIVE_CAPABILITY = "active_source_projection"
 DEGRADED_CAPABILITY = "degraded_bounded_source_scan"
-DIRECT_CAPABILITY = "direct_file_read"
 DEGRADED_SCAN_LIMIT = 5000
 DEGRADED_SOURCE_BYTES = 2_000_000
+CANONICAL_SOURCE_NOT_FOUND = "source not found in canonical source projection"
 
 
 class SourceProjectionError(RuntimeError):
@@ -91,6 +97,15 @@ class _ProjectionData:
     last_indexed_at: str | None
     healthy: bool
     vault_id: str
+
+
+@dataclass(frozen=True)
+class SourceReadContext:
+    """Request-scoped canonical projection used by retrieval materialization."""
+
+    root: Path
+    projection: _ProjectionData
+    generation_path: Path | None
 
 
 def normalize_rel_path(path: str) -> str:
@@ -223,7 +238,7 @@ def _load_active_projection(root: Path) -> _ProjectionData | None:
             for filepath in sorted(iter_vault_markdown_files(root)):
                 rel_path = filepath.relative_to(root).as_posix()
                 if (
-                    filepath.name in {"index.md", "log.md"}
+                    filepath.name in SKIP_FILES
                     or is_catalog_filename(filepath.name)
                     or should_skip(root, rel_path)
                 ):
@@ -308,28 +323,112 @@ def _resolve_projection_path(projection: _ProjectionData, requested: str) -> str
     return candidates[0]
 
 
-def resolve_note_file(vault_dir: Path, rel_path: str) -> tuple[Path, str]:
-    """Resolve an exact path directly or a stem through the source projection."""
-    normalized = normalize_rel_path(rel_path)
+def _validate_source_request_path(requested: str) -> str:
+    """Reject absolute source requests before normalizing their relative form."""
+    raw_path = requested.strip()
+    windows_path = PureWindowsPath(raw_path)
+    if raw_path.startswith(("/", "\\")) or windows_path.is_absolute() or bool(windows_path.drive):
+        raise ValueError("Absolute paths are not allowed")
+    return normalize_rel_path(raw_path)
+
+
+def _reject_ineligible_source_path(root: Path, rel_path: str) -> None:
+    """Reject paths that cannot be canonical sources without touching projection state."""
+    path = Path(rel_path)
+    explicit_file = bool(path.suffix)
+    if (
+        (explicit_file and path.suffix.casefold() != ".md")
+        or path.name in SKIP_FILES
+        or is_catalog_filename(path.name)
+        or (explicit_file and should_skip(root, rel_path))
+    ):
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+
+
+def create_source_read_context(vault_dir: Path) -> SourceReadContext:
+    """Load one canonical projection for a bounded group of source reads."""
+    root = vault_dir.expanduser().resolve()
+    active = resolve_active_generation(root)
+    return SourceReadContext(
+        root=root,
+        projection=_read_projection(root),
+        generation_path=active.path if active is not None else None,
+    )
+
+
+def _resolve_canonical_source(
+    vault_dir: Path, requested: str, projection: _ProjectionData | None = None
+) -> tuple[Path, str, _ProjectionData, SourceRecord]:
+    """Resolve one request to a projected, regular, non-symlink source note."""
+    root = vault_dir.expanduser().resolve()
+    normalized = _validate_source_request_path(requested)
     if not normalized:
         raise ValueError("Relative path cannot be empty")
-    root = vault_dir.expanduser().resolve()
-    target = resolve_safe_vault_path(root, normalized)
-    if target.is_file():
-        return target, target.relative_to(root).as_posix()
-    if target.is_dir():
-        for candidate in (
-            target / f"{target.name}.md",
-            target / "index.md",
-            target / "_index.md",
-        ):
-            if candidate.is_file():
-                return candidate, candidate.relative_to(root).as_posix()
-    if "/" in normalized or normalized.endswith(".md"):
-        raise SourceNotFoundError(f"source file is missing: {normalized}")
-    projection = _read_projection(root)
-    resolved = _resolve_projection_path(projection, normalized)
-    return resolve_safe_vault_path(root, resolved), resolved
+    _reject_ineligible_source_path(root, normalized)
+
+    projection = projection or _read_projection(root)
+    try:
+        rel_norm = _resolve_projection_path(projection, normalized)
+    except SourceNotFoundError as exc:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND) from exc
+    record = next((source for source in projection.sources if source.rel_path == rel_norm), None)
+    if record is None:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+
+    raw_target = root / rel_norm
+    if not is_regular_vault_file(root, raw_target):
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+    try:
+        target = resolve_safe_vault_path(root, rel_norm)
+    except (PermissionError, ValueError) as exc:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND) from exc
+    if not target.is_file():
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+    return target, rel_norm, projection, record
+
+
+def _open_source_file(root: Path, rel_path: str, fallback: Path) -> BinaryIO:
+    """Open a projected source with descriptor-relative no-follow semantics."""
+    if os.name == "nt":  # pragma: no cover - Linux is the supported release platform
+        return fallback.open("rb")
+
+    components = tuple(rel_path.split("/"))
+    if not components or any(not component for component in components):
+        raise OSError("source path has no components")
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    root_fd: int | None = None
+    current_fd: int | None = None
+    file_fd: int | None = None
+    try:
+        root_fd = os.open(root, directory_flags)
+        current_fd = root_fd
+        for component in components[:-1]:
+            assert current_fd is not None
+            next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            if current_fd != root_fd:
+                os.close(current_fd)
+            current_fd = next_fd
+        assert current_fd is not None
+        file_fd = os.open(components[-1], file_flags, dir_fd=current_fd)
+        if not stat_module.S_ISREG(os.fstat(file_fd).st_mode):
+            raise OSError("source target is not a regular file")
+        handle = os.fdopen(file_fd, "rb", closefd=True)
+        file_fd = None
+        return handle
+    finally:
+        if file_fd is not None:
+            os.close(file_fd)
+        if current_fd is not None and current_fd != root_fd:
+            os.close(current_fd)
+        if root_fd is not None:
+            os.close(root_fd)
+
+
+def resolve_note_file(vault_dir: Path, rel_path: str) -> tuple[Path, str]:
+    """Resolve only a canonical projected source, never an arbitrary file."""
+    target, resolved, _projection, _record = _resolve_canonical_source(vault_dir, rel_path)
+    return target, resolved
 
 
 def list_sources(vault_dir: Path, request: SourceListRequest | None = None) -> SourceListResponse:
@@ -379,53 +478,45 @@ def list_sources(vault_dir: Path, request: SourceListRequest | None = None) -> S
     )
 
 
-def read_source(vault_dir: Path, request: SourceReadRequest) -> SourceReadResponse:
-    """Read a bounded file directly; only stem lookup consults the projection."""
+def read_source(
+    vault_dir: Path,
+    request: SourceReadRequest,
+    *,
+    context: SourceReadContext | None = None,
+) -> SourceReadResponse:
+    """Read a bounded note only after canonical projection and file-policy checks."""
     root = vault_dir.expanduser().resolve()
-    normalized = normalize_rel_path(request.rel_path)
-    if not normalized:
-        raise ValueError("Relative path cannot be empty")
-    exact_target = resolve_safe_vault_path(root, normalized)
-    actual_capability = DIRECT_CAPABILITY
-    degraded_reason: str | None = None
-    source_revision = ""
-    direct_target = exact_target
-    if exact_target.is_dir():
-        direct_candidates = (
-            exact_target / f"{exact_target.name}.md",
-            exact_target / "index.md",
-            exact_target / "_index.md",
-        )
-        direct_target = next(
-            (candidate for candidate in direct_candidates if candidate.is_file()), exact_target
-        )
-    if direct_target.is_file():
-        target_file, rel_norm = direct_target, direct_target.relative_to(root).as_posix()
-    else:
-        if "/" in normalized or normalized.endswith(".md"):
-            raise SourceNotFoundError(f"source file is missing: {normalized}")
-        projection = _read_projection(root)
-        rel_norm = _resolve_projection_path(projection, normalized)
-        target_file = resolve_safe_vault_path(root, rel_norm)
-        if not target_file.is_file():
-            raise SourceNotFoundError(f"source file is missing: {rel_norm}")
-        source_revision = projection.source_revision
-        actual_capability = projection.actual_capability
-        degraded_reason = projection.degraded_reason
+    if context is not None and context.root != root:
+        raise ValueError("source read context does not match the vault")
+    target_file, rel_norm, projection, record = _resolve_canonical_source(
+        root, request.rel_path, context.projection if context is not None else None
+    )
 
-    stat = target_file.stat()
-    if stat.st_size > request.max_bytes:
-        raise ValueError(
-            f"File size {stat.st_size} exceeds requested max_bytes {request.max_bytes}"
-        )
-    with target_file.open("rb") as handle:
+    try:
+        handle = _open_source_file(root, rel_norm, target_file)
+    except OSError as exc:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND) from exc
+    with handle:
+        stat = os.fstat(handle.fileno())
+        if stat.st_size > request.max_bytes:
+            raise ValueError(
+                f"File size {stat.st_size} exceeds requested max_bytes {request.max_bytes}"
+            )
         raw_content = handle.read(request.max_bytes + 1)
     if len(raw_content) > request.max_bytes:
         raise ValueError(f"File size exceeds requested max_bytes {request.max_bytes}")
     content = raw_content.decode("utf-8", errors="ignore")
     meta = validate_metadata(content)
-    meta_dict = meta.model_dump(mode="json") if meta else {}
     sha256_digest = hashlib.sha256(raw_content).hexdigest()
+    current_modified_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
+    if (
+        meta is None
+        or stat.st_size != record.size_bytes
+        or current_modified_at != record.modified_at
+        or sha256_digest != record.content_sha256
+    ):
+        raise SourceProjectionStaleError("source projection is stale; run power sync")
+    meta_dict = meta.model_dump(mode="json") if meta else {}
     return SourceReadResponse(
         rel_path=rel_norm,
         content=content,
@@ -435,9 +526,9 @@ def read_source(vault_dir: Path, request: SourceReadRequest) -> SourceReadRespon
         modified_at=datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
         metadata=meta_dict,
         trust_label="local",
-        source_revision=source_revision,
-        actual_capability=actual_capability,
-        degraded_reason=degraded_reason,
+        source_revision=projection.source_revision,
+        actual_capability=projection.actual_capability,
+        degraded_reason=projection.degraded_reason,
     )
 
 
@@ -554,6 +645,8 @@ __all__ = [
     "SourceNotFoundError",
     "SourceProjectionError",
     "SourceProjectionStaleError",
+    "SourceReadContext",
+    "create_source_read_context",
     "get_graph_projection",
     "get_source_stats",
     "list_sources",

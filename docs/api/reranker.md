@@ -50,7 +50,7 @@ Predict relevance scores for document strings against a query in bounded batches
 
 Cross-encoder adapter for `jinaai/jina-reranker-v2-base-multilingual` or Qwen3 reranker. The Jina model is CC-BY-NC-4.0 and is **not** a production default.
 
-It is loaded only when **both** `POWER_RERANKER=jina` and `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` are explicitly set for permitted non-commercial use. Otherwise, lazy model initialization on the first `rerank()` call raises `NonCommercialModelDisabledError`.
+It is loaded only when **both** `POWER_RERANKER=jina` and `POWER_ALLOW_NONCOMMERCIAL_MODELS=1` are explicitly set for permitted non-commercial use, and the central immutable approval/hash contract also passes. Otherwise, lazy model initialization on the first `rerank()` call raises a typed policy error.
 
 ### Constructor
 
@@ -59,6 +59,15 @@ RerankerManager(model_name: str = "jinaai/jina-reranker-v2-base-multilingual")
 ```
 
 - `model_name`: Cross-encoder model name to load when the license policy permits it.
+
+For the Jina/Qwen/ColBERT delegated paths, model loading also requires the
+central custom-model contract: an immutable `org/model@<40-hex-commit>`
+reference, `POWER_ALLOW_CUSTOM_MODELS=1`, and a `POWER_MODEL_APPROVAL` manifest
+binding exact operation/provider/license/repository/revision values to a
+complete runtime-file SHA-256 map. Verified files are staged privately before
+construction; `POWER_MODEL_OFFLINE=1`, `HF_HUB_OFFLINE=1`, and
+`TRANSFORMERS_OFFLINE=1` remain authoritative during import, construction, and
+inference. Missing approval or cache data fails before a remote loader call.
 
 ### Methods
 

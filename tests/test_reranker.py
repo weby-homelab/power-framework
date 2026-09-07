@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from huggingface_hub import try_to_load_from_cache
 
+from power_framework.core.model_policy import ModelApprovalError
 from power_framework.core.reranker import (
     ALLOW_NONCOMMERCIAL_MODELS_ENV,
     BGE_RERANKER_FILE_SHA256,
@@ -234,7 +235,7 @@ class TestRerankerManager:
         # The UA↔EN semantic query should favor the knowledge-base passages.
         assert scores[0] > scores[1]
 
-    def test_qwen3_reranker_import_error(self):
+    def test_qwen3_reranker_requires_model_policy_before_import(self):
         import sys
         from unittest.mock import patch
 
@@ -254,10 +255,10 @@ class TestRerankerManager:
             patch.dict(sys.modules, {"qwen3_embed": None}),
         ):
             mgr = RerankerManager()
-            with pytest.raises(ImportError, match="qwen3-embed is required"):
+            with pytest.raises(ModelApprovalError, match="immutable_model_revision_required"):
                 mgr._lazy_init()
 
-    def test_fastembed_reranker_import_error(self):
+    def test_fastembed_reranker_requires_model_policy_before_import(self):
         import sys
         from unittest.mock import patch
 
@@ -276,7 +277,7 @@ class TestRerankerManager:
             patch.dict(sys.modules, {"fastembed.rerank.cross_encoder": None}),
         ):
             mgr = RerankerManager()
-            with pytest.raises(ImportError, match="fastembed is required"):
+            with pytest.raises(ModelApprovalError, match="custom_model_requires_approval"):
                 mgr._lazy_init()
 
     def test_colbert_rerank_with_mock_model(self):

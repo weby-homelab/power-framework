@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import signal
 import sys
@@ -35,14 +36,31 @@ class TestEmbeddingManager:
             tmp_path / "models--aapot--bge-m3-onnx" / "snapshots" / embeddings.BGE_M3_ONNX_REVISION
         )
         snapshot.mkdir(parents=True)
+        expected_hashes: dict[str, str] = {}
         for filename in ("model.onnx", "model.onnx.data", "tokenizer.json"):
-            (snapshot / filename).write_bytes(b"cached")
+            content = f"cached:{filename}".encode()
+            (snapshot / filename).write_bytes(content)
+            expected_hashes[filename] = hashlib.sha256(content).hexdigest()
+        monkeypatch.setattr(embeddings, "BGE_M3_FILE_SHA256", expected_hashes)
         monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path))
 
         ready, reason = embeddings.dense_embedding_ready()
 
         assert ready is True
         assert reason == "ready"
+
+    def test_dense_readiness_rejects_unapproved_model_override(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REPO", "custom/model")
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REVISION", "b" * 40)
+        monkeypatch.delenv("POWER_ALLOW_CUSTOM_MODELS", raising=False)
+        monkeypatch.delenv("POWER_MODEL_APPROVAL", raising=False)
+
+        ready, reason = embeddings.dense_embedding_ready()
+
+        assert ready is False
+        assert reason == "model_approval_required"
 
     def test_auto_device_prefers_cuda_and_keeps_cpu_fallback(self, monkeypatch: pytest.MonkeyPatch):
         class FakeOrt:
@@ -300,6 +318,8 @@ class TestEmbeddingManager:
     def test_failed_binding_does_not_retain_an_unsafe_embedder_session(
         self, monkeypatch: pytest.MonkeyPatch
     ):
+        from power_framework.core import model_policy
+
         class FakeOptions:
             pass
 
@@ -326,9 +346,17 @@ class TestEmbeddingManager:
         monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
         monkeypatch.setitem(sys.modules, "tokenizers", fake_tokenizers)
         monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
-        monkeypatch.setenv("POWER_ALLOW_UNVERIFIED_MODELS", "1")
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
+        monkeypatch.setattr(
+            model_policy,
+            "_verify_model_files",
+            lambda _spec, paths: dict(paths),
+        )
 
-        manager = embeddings.BGEM3OnnxManager(repo="example/repo", revision="dev")
+        manager = embeddings.BGEM3OnnxManager(
+            repo=embeddings.BGE_M3_PINNED_REPO,
+            revision=embeddings.BGE_M3_PINNED_REVISION,
+        )
         with pytest.raises(RuntimeError, match="requested_onnx_provider_not_bound"):
             manager.embed("provider probe")
         assert manager._session is None

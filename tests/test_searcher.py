@@ -560,8 +560,10 @@ class TestSearchModeContract:
             "power_framework.core.searcher.get_embedding_manager", lambda: _Embedder()
         )
 
+        source_dir = tmp_path / "03_Resources"
+        source_dir.mkdir()
         for name in ("near.md", "far.md", "orthogonal.md"):
-            (tmp_path / name).write_text(
+            (source_dir / name).write_text(
                 "---\n"
                 "type: Resource\n"
                 f'title: "{name}"\n'
@@ -579,9 +581,15 @@ class TestSearchModeContract:
             conn.executemany(
                 "INSERT INTO chunk_embeddings VALUES (?, ?, ?, ?, ?)",
                 [
-                    ("c1", "near.md", vec(1.0, 0.0, 0.0, 0.0), "near", 0.0),
-                    ("c2", "far.md", vec(0.3, 0.95, 0.0, 0.0), "far", 0.0),
-                    ("c3", "orthogonal.md", vec(0.0, 0.0, 1.0, 0.0), "orth", 0.0),
+                    ("c1", "03_Resources/near.md", vec(1.0, 0.0, 0.0, 0.0), "near", 0.0),
+                    ("c2", "03_Resources/far.md", vec(0.3, 0.95, 0.0, 0.0), "far", 0.0),
+                    (
+                        "c3",
+                        "03_Resources/orthogonal.md",
+                        vec(0.0, 0.0, 1.0, 0.0),
+                        "orth",
+                        0.0,
+                    ),
                 ],
             )
             conn.executemany(
@@ -598,9 +606,12 @@ class TestSearchModeContract:
 
         results = _semantic_search(tmp_path, "query", max_results=5)
 
-        assert [result.rel_path for result in results] == ["near.md", "far.md"]
+        assert [result.rel_path for result in results] == [
+            "03_Resources/near.md",
+            "03_Resources/far.md",
+        ]
         assert results[0].score > results[1].score
-        assert [result.snippet for result in results] == ["near", "far"]
+        assert [result.snippet for result in results] == ["body", "body"]
 
     def test_dense_index_validation_requires_matching_manifest(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1037,6 +1048,32 @@ class TestSearchVault:
         assert "body-only phrase" in results[0].matched_text
         assert "metadata-only phrase" not in results[0].matched_text
         assert "description:" not in results[0].matched_text
+
+    def test_fts_search_rejects_control_file_from_crafted_index(
+        self, sample_vault: Path, tmp_path: Path
+    ) -> None:
+        """DB-derived result paths cannot bypass the canonical source projection."""
+        control = sample_vault / ".power" / "events.jsonl"
+        control.parent.mkdir(parents=True, exist_ok=True)
+        control.write_text("internal secret event", encoding="utf-8")
+        database = tmp_path / "crafted-fts.db"
+        with closing(sqlite3.connect(database)) as conn:
+            _init_db(conn)
+            conn.execute(
+                "INSERT INTO fts_notes(title, tags, description, content, rel_path, note_type) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("Internal", "", "", "internal secret event", ".power/events.jsonl", "Resource"),
+            )
+            conn.commit()
+
+        results = _fts_search(
+            sample_vault,
+            "secret",
+            max_results=5,
+            resolved_db=searcher._ResolvedDb(database, False),
+        )
+
+        assert results == []
 
     def test_auto_domain_policy_scopes_results(self, sample_vault: Path):
         (sample_vault / ".power").mkdir(exist_ok=True)

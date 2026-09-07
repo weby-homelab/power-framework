@@ -119,6 +119,39 @@ def test_notes_listing_and_read(client: TestClient) -> None:
     assert 'class="wikilink"' in resp_read.text
 
 
+def test_notes_read_rejects_control_files_without_disclosure(
+    client: TestClient, test_vault: Path
+) -> None:
+    """The Web route exposes only the core source projection and redacted errors."""
+    (test_vault / ".power" / "events.jsonl").write_text(
+        "synthetic internal event secret", encoding="utf-8"
+    )
+    (test_vault / ".env").write_text("SECRET=synthetic", encoding="utf-8")
+
+    for rel_path in (".power/events.jsonl", ".env", "missing.json"):
+        response = client.get("/notes/read", params={"path": rel_path})
+        assert response.status_code == 404
+        assert "requested resource was not found" in response.text.lower()
+        assert "synthetic" not in response.text
+        assert "events.jsonl" not in response.text
+
+
+def test_web_client_disables_legacy_search_db_override(
+    test_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Web read cannot create or use a caller-selected external SQLite DB."""
+    from power_framework.web.clients.power import PowerClient
+
+    database = tmp_path / "external-search.db"
+    monkeypatch.setenv("POWER_SEARCH_DB", str(database))
+    power_client = PowerClient(test_vault)
+
+    assert not database.exists()
+    power_client.search("Alpha", mode="fts")
+    assert not database.exists()
+    assert not (test_vault / ".power" / "tasks").exists()
+
+
 def test_notes_edit_and_proposal_flow(client: TestClient) -> None:
     """Test transactional note edit and proposal review."""
     resp_edit = client.get("/notes/edit?path=01_Projects/Project_Alpha.md")

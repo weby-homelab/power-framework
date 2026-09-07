@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 
-from .constants import is_catalog_filename
+from .constants import SKIP_FILES, is_catalog_filename
 from .db import _init_db
 from .ignore import should_skip
 from .index_sync import _sync_vault_to_db
@@ -247,7 +247,7 @@ def _source_inventory(vault_dir: Path) -> SourceInventory:
     invalid_sources: dict[str, str] = {}
     total_scanned = 0
     for path in sorted(iter_vault_markdown_files(vault_dir)):
-        if path.name in {"index.md", "log.md"} or is_catalog_filename(path.name):
+        if path.name in SKIP_FILES or is_catalog_filename(path.name):
             continue
         rel_path = path.relative_to(vault_dir).as_posix()
         if should_skip(vault_dir, rel_path):
@@ -836,6 +836,25 @@ def _migrate_legacy_database(
         ):
             legacy_conn.backup(staging_conn)
             _init_db(staging_conn)
+            # The legacy database may contain rows built from an older version
+            # of a note at the same relative path. Preserve it in the archive,
+            # but never pair that derived content with the current projection.
+            for table in (
+                "fts_notes",
+                "file_metadata",
+                "tf_vectors",
+                "doc_embeddings",
+                "chunk_embeddings",
+                "temporal_records",
+            ):
+                staging_conn.execute(f"DELETE FROM {table}")  # noqa: S608
+            staging_conn.commit()
+            _sync_vault_to_db(
+                vault_dir,
+                staging_conn,
+                sync_embeddings=sync_embeddings,
+                force_rebuild=True,
+            )
             write_projection(staging_conn, scan_projection(vault_dir))
             actual_files, actual_chunks, provider, model = _validate_staging(
                 staging_conn,

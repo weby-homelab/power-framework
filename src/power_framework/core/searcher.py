@@ -20,23 +20,33 @@ import sqlite3
 import time
 import warnings
 from collections import OrderedDict
+from contextvars import ContextVar
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from threading import RLock
 from typing import TYPE_CHECKING, Any
 
+from .application_models import SourceReadRequest
 from .constants import DENSE_INDEX_SCHEMA_VERSION, is_catalog_filename
 from .db import _init_db
 from .domains import DomainConfigError, resolve_search_policy
 from .generation_index import (
     ActiveGenerationError,
+    _state_db_path,
     resolve_active_generation,
     resolve_active_generation_path,
 )
 from .ignore import should_skip
 from .index_sync import _compute_tf_vector, _sync_vault_to_db, _tokenize
 from .models import OKFMetadata  # noqa: TC001
-from .parser import FRONTMATTER_PATTERN, read_file_content, validate_metadata
+from .parser import FRONTMATTER_PATTERN, validate_metadata
+from .source_service import (
+    SourceReadContext,
+    create_source_read_context,
+    read_source,
+    resolve_safe_vault_path,
+)
 from .temporal import (
     TemporalStatus,
     includes_temporal_status,
@@ -47,7 +57,7 @@ from .temporal import (
     scan_temporal_records,
 )
 from .timing import timing_span
-from .utils import iter_vault_markdown_files, resolve_path_in_vault
+from .utils import is_regular_vault_file, iter_vault_markdown_files
 from .vault_storage import existing_vault_db_path, vault_db_path
 
 if TYPE_CHECKING:
@@ -56,6 +66,10 @@ if TYPE_CHECKING:
     from power_framework.experimental.reranker import RerankerProtocol
 
 logger = logging.getLogger(__name__)
+
+_SOURCE_READ_CONTEXT: ContextVar[SourceReadContext | None] = ContextVar(
+    "power_source_read_context", default=None
+)
 
 
 def get_embedding_manager() -> Any:
@@ -97,6 +111,15 @@ class _DenseMatrixCacheEntry:
     rel_paths: tuple[str, ...]
     chunk_ids: tuple[str, ...]
     dimension: int
+
+
+@dataclass(frozen=True)
+class _IndexedSource:
+    """Validated source material from either an immutable generation or disk."""
+
+    content: str
+    metadata: OKFMetadata
+    sha256: str
 
 
 _DENSE_MATRIX_CACHE_MAX_ENTRIES = 4
@@ -450,13 +473,13 @@ def validate_dense_index(vault_dir: Path, resolved_db: _ResolvedDb | None = None
     return dimension
 
 
-def _make_snippet(content: str, terms: list[str]) -> str:
-    """Extract a relevant snippet around the first match."""
+def _make_snippet(content: str, terms: list[str], *, prefer_last: bool = False) -> str:
+    """Extract a bounded snippet around the first or last matching term."""
     lower = content.lower()
     best_pos = -1
     for term in terms:
         pos = lower.find(term.lower())
-        if pos != -1 and (best_pos == -1 or pos < best_pos):
+        if pos != -1 and (best_pos == -1 or (pos > best_pos if prefer_last else pos < best_pos)):
             best_pos = pos
 
     if best_pos == -1:
@@ -497,40 +520,125 @@ def _body_centered_text(text: str) -> str:
     return body.lstrip()
 
 
-def _matched_text(text: str, terms: list[str] | None = None) -> str:
+def _matched_text(text: str, terms: list[str] | None = None, *, prefer_last: bool = False) -> str:
     """Return a bounded, body-only passage for agent-facing result context."""
     body = _body_centered_text(text)
     if not body:
         return ""
     if terms:
-        return _make_snippet(body, terms)
+        return _make_snippet(body, terms, prefer_last=prefer_last)
     return body[:MAX_SNIPPET_LENGTH].replace("\n", " ").strip()
+
+
+def _source_read_context(vault_dir: Path) -> SourceReadContext:
+    """Return one request-local canonical source projection for retrieval reads."""
+    root = Path(vault_dir).expanduser().resolve()
+    current = _SOURCE_READ_CONTEXT.get()
+    if current is not None and current.root == root:
+        if current.generation_path is None:
+            current = None
+        elif resolve_active_generation_path(root) == current.generation_path:
+            return current
+    context = create_source_read_context(root)
+    _SOURCE_READ_CONTEXT.set(context)
+    return context
+
+
+@lru_cache(maxsize=512)
+def _generation_source_hash(state_path: str, generation_id: str, rel_path: str) -> str:
+    """Read one immutable generation source hash from the state ledger."""
+    state_db = Path(state_path)
+    with contextlib.closing(
+        sqlite3.connect(f"file:{state_db}?mode=ro", uri=True, timeout=30)
+    ) as conn:
+        row = conn.execute(
+            "SELECT content_hash FROM generation_sources WHERE generation_id = ? AND rel_path = ?",
+            (generation_id, rel_path),
+        ).fetchone()
+    if row is None or not isinstance(row[0], str):
+        raise ValueError("immutable generation source hash is missing")
+    return row[0]
+
+
+def _read_generation_source(
+    vault_dir: Path, resolved_db: _ResolvedDb, rel_path: str
+) -> _IndexedSource:
+    """Read one source from a verified immutable generation projection."""
+    if resolved_db.path is None or resolved_db.generation_id is None:
+        raise FileNotFoundError("immutable generation identity is missing")
+    with contextlib.closing(_open_readonly_db(resolved_db.path)) as conn:
+        row = conn.execute(
+            """
+            SELECT f.content, s.content_sha256
+            FROM fts_notes AS f
+            INNER JOIN source_metadata AS s ON s.rel_path = f.rel_path
+            WHERE f.rel_path = ?
+            """,
+            (rel_path,),
+        ).fetchone()
+    if row is None or not isinstance(row[0], str) or not isinstance(row[1], str):
+        raise FileNotFoundError("source is absent from the immutable projection")
+    content = row[0]
+    metadata = validate_metadata(content)
+    if metadata is None:
+        raise ValueError("immutable source projection metadata is invalid")
+    # The generation stores the raw-byte source hash while text extraction
+    # normalizes CRLF to LF. Keep the authoritative raw-byte digest from the
+    # source projection and validate the decoded snapshot through its own DB
+    # integrity/metadata contract.
+    digest = str(row[1])
+    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise ValueError("immutable source projection digest is invalid")
+    normalized_hash = hashlib.blake2b(content.encode("utf-8"), digest_size=32).hexdigest()
+    expected_hash = _generation_source_hash(
+        str(_state_db_path(vault_dir)), resolved_db.generation_id, rel_path
+    )
+    if normalized_hash != expected_hash:
+        raise ValueError("immutable generation source content is stale or tampered")
+    return _IndexedSource(content=content, metadata=metadata, sha256=digest)
+
+
+def _read_indexed_source(
+    vault_dir: Path,
+    rel_path: str,
+    *,
+    resolved_db: _ResolvedDb | None = None,
+) -> _IndexedSource:
+    """Read indexed material through the canonical source or generation boundary."""
+    if resolved_db is not None and resolved_db.is_generation and resolved_db.path is not None:
+        return _read_generation_source(vault_dir, resolved_db, rel_path)
+    response = read_source(
+        vault_dir,
+        SourceReadRequest(rel_path=rel_path),
+        context=_source_read_context(vault_dir),
+    )
+    metadata = validate_metadata(response.content)
+    if metadata is None:
+        raise ValueError("canonical source metadata is invalid")
+    return _IndexedSource(content=response.content, metadata=metadata, sha256=response.sha256)
 
 
 def _read_matched_text(vault_dir: Path, rel_path: str, terms: list[str]) -> str:
     """Read one bounded source note to produce a body-only passage."""
-    filepath = _safe_indexed_note_path(vault_dir, rel_path)
-    if filepath is None:
-        return ""
     try:
-        return _matched_text(read_file_content(filepath), terms)
-    except (OSError, UnicodeError):
+        return _matched_text(_read_indexed_source(vault_dir, rel_path).content, terms)
+    except (OSError, UnicodeError, RuntimeError, ValueError):
         return ""
 
 
 def _safe_indexed_note_path(vault_dir: Path, rel_path: str) -> Path | None:
-    """Resolve an index path only when every filesystem component is in-vault."""
+    """Resolve an index path only when it is a canonical projected source."""
     if not isinstance(rel_path, str):
         return None
     try:
-        resolve_path_in_vault(vault_dir, rel_path)
-        parts = Path(rel_path).parts
-        candidate = vault_dir.joinpath(*parts)
-        if any(parent.is_symlink() for parent in (candidate.parent, *candidate.parent.parents)):
+        context = _source_read_context(vault_dir)
+        if rel_path not in {source.rel_path for source in context.projection.sources}:
             return None
-        if candidate.is_symlink() or not candidate.is_file():
+        root = context.root
+        candidate = root / rel_path
+        if not is_regular_vault_file(root, candidate):
             return None
-        return candidate
+        return resolve_safe_vault_path(root, rel_path)
     except (OSError, RuntimeError, TypeError, ValueError):
         return None
 
@@ -585,6 +693,7 @@ def _scan_and_search(
 ) -> list[SearchResult]:
     """Scan vault and return scored search results (fallback)."""
     results: list[SearchResult] = []
+    source_context = _source_read_context(vault_dir)
 
     for filepath in iter_vault_markdown_files(vault_dir):
         if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
@@ -593,7 +702,11 @@ def _scan_and_search(
             continue
 
         try:
-            content = read_file_content(filepath)
+            content = read_source(
+                vault_dir,
+                SourceReadRequest(rel_path=filepath.relative_to(vault_dir).as_posix()),
+                context=source_context,
+            ).content
             metadata = validate_metadata(content)
             if metadata is None:
                 continue
@@ -631,6 +744,7 @@ def _scan_and_vector_search(
         return []
     query_vec = _compute_tf_vector(query_tokens)
     results: list[SearchResult] = []
+    source_context = _source_read_context(vault_dir)
     scanned = 0
     for filepath in sorted(iter_vault_markdown_files(vault_dir)):
         rel_path = filepath.relative_to(vault_dir).as_posix()
@@ -644,7 +758,11 @@ def _scan_and_vector_search(
         try:
             if filepath.stat().st_size > 2_000_000:
                 continue
-            content = read_file_content(filepath)
+            content = read_source(
+                vault_dir,
+                SourceReadRequest(rel_path=rel_path),
+                context=source_context,
+            ).content
             metadata = validate_metadata(content)
             if metadata is None:
                 continue
@@ -787,20 +905,26 @@ def _fts_search(
         matched_terms = _tokenize(query)
         with timing_span("result_materialization"):
             for row in rows:
-                rel_path, title, description, note_type, score, snippet, tags_str = row
-                tags = tags_str.split(" ") if tags_str else []
+                rel_path, _title, _description, _note_type, score, _snippet, _tags_str = row
+                try:
+                    source = _read_indexed_source(vault_dir, rel_path, resolved_db=resolved_db)
+                except (OSError, UnicodeError, RuntimeError, ValueError):
+                    continue
+                metadata = validate_metadata(source.content)
+                if metadata is None:
+                    continue
                 match_count = 1
                 results.append(
                     SearchResult(
                         rel_path=rel_path,
-                        title=title,
-                        description=description,
-                        note_type=note_type,
+                        title=metadata.title,
+                        description=metadata.description,
+                        note_type=metadata.type,
                         score=float(score),
-                        snippet=snippet,
+                        snippet=_matched_text(source.content, matched_terms, prefer_last=True),
                         match_count=match_count,
-                        matched_text=_read_matched_text(vault_dir, rel_path, matched_terms),
-                        tags=tags,
+                        matched_text=_matched_text(source.content, matched_terms),
+                        tags=metadata.tags,
                     )
                 )
 
@@ -904,12 +1028,12 @@ def _vector_search(
     scored: list[tuple[float, SearchResult]] = []
 
     with timing_span("scoring"):
-        for rel_path, tf_data_str, title, description, note_type, tags_str, content in rows:
+        for rel_path, tf_data_str, _title, _description, _note_type, _tags_str, _content in rows:
             try:
-                filepath = _safe_indexed_note_path(vault_dir, rel_path)
-                if filepath is None:
-                    continue
-                if should_skip(vault_dir, rel_path):
+                source = _read_indexed_source(vault_dir, rel_path, resolved_db=resolved_db)
+                content = source.content
+                metadata = validate_metadata(content)
+                if metadata is None:
                     continue
 
                 doc_vec = json.loads(tf_data_str)
@@ -918,21 +1042,20 @@ def _vector_search(
                 if similarity == 0:
                     continue
 
-                tags = tags_str.split(" ") if tags_str else []
-                snippet = _make_snippet(content, query_tokens)
+                snippet = _matched_text(content, query_tokens, prefer_last=True)
                 scored.append(
                     (
                         similarity,
                         SearchResult(
                             rel_path=rel_path,
-                            title=title,
-                            description=description,
-                            note_type=note_type,
+                            title=metadata.title,
+                            description=metadata.description,
+                            note_type=metadata.type,
                             score=similarity,
                             snippet=snippet,
                             match_count=len(query_tokens),
                             matched_text=_matched_text(content, query_tokens),
-                            tags=tags,
+                            tags=metadata.tags,
                         ),
                     )
                 )
@@ -1177,39 +1300,15 @@ def _semantic_search(
     scored_docs = sorted(doc_best.items(), key=lambda x: -x[1][0])
     top_paths = [rel for rel, _ in scored_docs[:max_results]]
 
-    snippets: dict[str, str] = {}
-    wanted = [doc_best[rel][1] for rel in top_paths]
-    if wanted:
-        conn = None
-        try:
-            conn = _open_readonly_db(db_path)
-            placeholders = ",".join("?" * len(wanted))
-            with timing_span("sqlite_read"):
-                snippets = dict(
-                    conn.execute(
-                        f"SELECT chunk_id, content FROM chunk_embeddings "  # noqa: S608
-                        f"WHERE chunk_id IN ({placeholders})",
-                        wanted,
-                    ).fetchall()
-                )
-        except Exception as exc:
-            _dense_failure(f"db error: {type(exc).__name__}")
-        finally:
-            if conn is not None:
-                conn.close()
-
     results: list[SearchResult] = []
+    query_terms = _tokenize(query)
     with timing_span("result_materialization"):
         for rel_path in top_paths:
-            filepath = _safe_indexed_note_path(vault_dir, rel_path)
-            if filepath is None:
-                continue
             try:
-                content = read_file_content(filepath)
-                metadata = validate_metadata(content)
-                if metadata is None:
-                    continue
-                similarity, chunk_id = doc_best[rel_path]
+                source = _read_indexed_source(vault_dir, rel_path, resolved_db=resolved_db)
+                content = source.content
+                metadata = source.metadata
+                similarity, _chunk_id = doc_best[rel_path]
                 results.append(
                     SearchResult(
                         rel_path=rel_path,
@@ -1217,9 +1316,9 @@ def _semantic_search(
                         description=metadata.description,
                         note_type=metadata.type,
                         score=similarity,
-                        snippet=snippets.get(chunk_id, ""),
+                        snippet=_matched_text(content, query_terms, prefer_last=True),
                         match_count=1,
-                        matched_text=_matched_text(snippets.get(chunk_id, "")),
+                        matched_text=_matched_text(content, query_terms),
                         tags=metadata.tags,
                     )
                 )
@@ -1694,27 +1793,29 @@ def _hybrid_reranked_search(
     rerank_pool = candidates[: min(len(candidates), RERANK_CANDIDATE_LIMIT)]
 
     documents: list[str] = []
+    rerankable: list[SearchResult] = []
     for result in rerank_pool:
-        filepath = vault_dir / result.rel_path
         try:
             # Search snippets may be synthetic, frontmatter-heavy, or chunk
             # headers rather than the note's meaning.  Read the source note so
             # the reranker always sees the same body-centered representation.
-            text = read_file_content(filepath)
+            text = _read_indexed_source(vault_dir, result.rel_path, resolved_db=resolved_db).content
             documents.append(_reranker_document_text(text, result.title)[:RERANK_TEXT_CHARS])
-        except Exception:
-            # Preserve a bounded degraded path for an unreadable source file;
-            # the snippet is still better than dropping the candidate.
-            documents.append(
-                _reranker_document_text(result.snippet, result.title)[:RERANK_TEXT_CHARS]
-            )
+            rerankable.append(result)
+        except (OSError, UnicodeError, RuntimeError, ValueError):
+            # A source that fails the canonical boundary must not be replaced
+            # with index-controlled snippet data.
+            continue
+
+    if not documents:
+        return candidates[:max_results]
 
     with timing_span("reranker_session_startup"):
         reranker = _get_reranker()
     with timing_span("reranker_scoring"):
         reranked_scores = reranker.rerank(query, documents)
 
-    reranked = rerank_pool[:]
+    reranked = rerankable[:]
     for result, score in zip(reranked, reranked_scores, strict=False):
         result.score = score
     reranked.sort(key=lambda r: -r.score)
@@ -1797,12 +1898,10 @@ def _graph_assisted_search(
     for path, boost in graph_boosts.items():
         if path in result_map:
             continue
-        source = vault_dir / path
         try:
-            content = read_file_content(source)
-            metadata = validate_metadata(content)
-            if metadata is None:
-                continue
+            source = _read_indexed_source(vault_dir, path, resolved_db=resolved_db)
+            content = source.content
+            metadata = source.metadata
             result_map[path] = SearchResult(
                 rel_path=path,
                 title=metadata.title,
@@ -1815,7 +1914,7 @@ def _graph_assisted_search(
                 tags=metadata.tags,
                 retrieval_contract="graph_assisted",
             )
-        except Exception:  # noqa: S112
+        except (OSError, UnicodeError, RuntimeError, ValueError):
             continue
 
     return sorted(result_map.values(), key=lambda item: (-item.score, item.title, item.rel_path))[
@@ -1961,10 +2060,8 @@ def format_untrusted_search_envelope(
     for result in results:
         content_hash: str | None = None
         try:
-            source_path = (root / result.rel_path).resolve(strict=True)
-            source_path.relative_to(root)
-            content_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
-        except (FileNotFoundError, OSError, ValueError):
+            content_hash = _read_indexed_source(root, result.rel_path).sha256
+        except (FileNotFoundError, OSError, RuntimeError, ValueError):
             logger.warning("Unable to create provenance hash for search result %s", result.rel_path)
 
         identifier_input = f"{result.rel_path}\0{content_hash or 'unavailable'}"

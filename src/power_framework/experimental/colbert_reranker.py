@@ -18,6 +18,9 @@ import logging
 import os
 from typing import Any
 
+from power_framework.core.egress import EgressOperation
+from power_framework.core.model_policy import force_model_offline, prepare_external_model
+
 logger = logging.getLogger(__name__)
 
 # Engaged only when POWER_RERANKER == this value.
@@ -60,8 +63,10 @@ class ColBERTLateInteractionReranker:
         rerank(query, documents) -> list[float]  # scores aligned to documents
     """
 
-    def __init__(self, model_name: str = COLBERT_DEFAULT_MODEL) -> None:
-        self.model_name = model_name
+    def __init__(self, model_name: str | None = None) -> None:
+        self.model_name: str = (
+            model_name or os.getenv("POWER_COLBERT_MODEL") or COLBERT_DEFAULT_MODEL
+        )
         self._model: Any | None = None
         if not is_colbert_enabled():
             raise ColBERTUnavailableError(
@@ -76,18 +81,24 @@ class ColBERTLateInteractionReranker:
     def _lazy_init(self) -> None:
         if self._model is not None:
             return
-        try:
-            from colbert.infra import ColBERTConfig  # type: ignore
-            from colbert.modeling.checkpoint import Checkpoint  # type: ignore
-        except ModuleNotFoundError as e:  # pragma: no cover - depends on env
-            raise ColBERTUnavailableError(
-                "The 'colbert' package is not installed. Install with: pip install colbert-ai"
-            ) from e
-        # Late-interaction scoring reuses ColBERT's checkpoint scorer; the heavy
-        # FAISS index build is avoided because we score a small candidate set
-        # directly (reranking already-filtered top-K, not full-corpus search).
-        config = ColBERTConfig()
-        self._model = Checkpoint(self.model_name, colbert_config=config)
+        prepared = prepare_external_model(
+            operation=EgressOperation.RERANKING,
+            provider="colbert-reranker",
+            model_reference=self.model_name,
+        )
+        with force_model_offline():
+            try:
+                from colbert.infra import ColBERTConfig  # type: ignore
+                from colbert.modeling.checkpoint import Checkpoint  # type: ignore
+            except ModuleNotFoundError as e:  # pragma: no cover - depends on env
+                raise ColBERTUnavailableError(
+                    "The 'colbert' package is not installed. Install with: pip install colbert-ai"
+                ) from e
+            # Late-interaction scoring reuses ColBERT's checkpoint scorer; the heavy
+            # FAISS index build is avoided because we score a small candidate set
+            # directly (reranking already-filtered top-K, not full-corpus search).
+            config = ColBERTConfig()
+            self._model = Checkpoint(prepared.local_reference, colbert_config=config)
         logger.info("ColBERT late-interaction reranker loaded: %s", self.model_name)
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
@@ -99,15 +110,16 @@ class ColBERTLateInteractionReranker:
         """
         self._lazy_init()
         assert self._model is not None
-        q_tokens = self._model.query(query)
-        scores: list[float] = []
-        for doc in documents:
-            d_tokens = self._model.doc(doc)
-            # MaxSim over token embeddings (late interaction).
-            sim = q_tokens @ d_tokens.T if hasattr(q_tokens, "T") else None
-            if sim is None:
-                scores.append(0.0)
-                continue
-            max_sim_per_q = sim.max(dim=1).values
-            scores.append(float(max_sim_per_q.sum()))
-        return scores
+        with force_model_offline():
+            q_tokens = self._model.query(query)
+            scores: list[float] = []
+            for doc in documents:
+                d_tokens = self._model.doc(doc)
+                # MaxSim over token embeddings (late interaction).
+                sim = q_tokens @ d_tokens.T if hasattr(q_tokens, "T") else None
+                if sim is None:
+                    scores.append(0.0)
+                    continue
+                max_sim_per_q = sim.max(dim=1).values
+                scores.append(float(max_sim_per_q.sum()))
+            return scores
