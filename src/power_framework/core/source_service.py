@@ -425,6 +425,40 @@ def _open_source_file(root: Path, rel_path: str, fallback: Path) -> BinaryIO:
             os.close(root_fd)
 
 
+def authorize_current_source(vault_dir: Path, requested: str) -> str:
+    """Authorize a current source path without requiring projection freshness.
+
+    A last-known-good immutable generation may remain searchable while a caller's
+    current edit is being repaired. The path itself must nevertheless still be a
+    safe, eligible Markdown source with valid metadata; this prevents an old
+    generation from re-exposing a newly excluded control file or invalid note.
+    """
+    root = vault_dir.expanduser().resolve()
+    normalized = _validate_source_request_path(requested)
+    if not normalized:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+    _reject_ineligible_source_path(root, normalized)
+    raw_target = root / normalized
+    if not is_regular_vault_file(root, raw_target):
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+    try:
+        target = resolve_safe_vault_path(root, normalized)
+        if not target.is_file():
+            raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+        handle = _open_source_file(root, normalized, target)
+    except (OSError, ValueError) as exc:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND) from exc
+    with handle:
+        content = handle.read(10_000_001).decode("utf-8", errors="ignore")
+    try:
+        metadata = validate_metadata(content)
+    except Exception as exc:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND) from exc
+    if metadata is None:
+        raise SourceNotFoundError(CANONICAL_SOURCE_NOT_FOUND)
+    return normalized
+
+
 def resolve_note_file(vault_dir: Path, rel_path: str) -> tuple[Path, str]:
     """Resolve only a canonical projected source, never an arbitrary file."""
     target, resolved, _projection, _record = _resolve_canonical_source(vault_dir, rel_path)

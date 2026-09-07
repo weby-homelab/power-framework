@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
+import threading
 from pathlib import Path
 from types import ModuleType
 
@@ -67,6 +69,7 @@ def isolate_model_policy_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _files(tmp_path: Path, *, mismatch: bool = False) -> tuple[dict[str, str], dict[str, str]]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     paths: dict[str, str] = {}
     hashes: dict[str, str] = {}
     for filename, content in (
@@ -157,6 +160,100 @@ def test_unapproved_hf_endpoint_is_rejected_before_network(
     with pytest.raises(model_policy.ModelApprovalError, match="model_endpoint_not_approved"):
         model_policy.acquire_model_files(**_acquire_kwargs("org/model", "a" * 40, hashes))
     assert calls == []
+
+
+def test_hf_acquisition_binds_the_validated_endpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The downloader must receive the same endpoint that policy validated."""
+    paths, hashes = _files(tmp_path)
+    calls: list[dict[str, object]] = []
+    module = ModuleType("huggingface_hub")
+
+    def download(_repo: str, filename: str, **kwargs: object) -> str:
+        calls.append(kwargs)
+        return paths[filename]
+
+    module.hf_hub_download = download  # type: ignore[attr-defined]
+    monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
+    monkeypatch.setenv("HF_ENDPOINT", "https://huggingface.co")
+    monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: {})
+    monkeypatch.setitem(sys.modules, "huggingface_hub", module)
+
+    result = model_policy.acquire_model_files(**_acquire_kwargs("org/model", "a" * 40, hashes))
+
+    assert result == paths
+    assert calls == [
+        {
+            "revision": "a" * 40,
+            "local_files_only": False,
+            "endpoint": "https://huggingface.co",
+        },
+        {
+            "revision": "a" * 40,
+            "local_files_only": False,
+            "endpoint": "https://huggingface.co",
+        },
+    ]
+
+
+def test_model_acquisition_cannot_be_interleaved_by_constructor_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A constructor-local environment window cannot contaminate an active download."""
+    paths, hashes = _files(tmp_path)
+    download_started = threading.Event()
+    release_download = threading.Event()
+    constructor_entered = threading.Event()
+    observed_flags: list[tuple[str | None, ...]] = []
+    errors: list[BaseException] = []
+    monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
+    monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: {})
+
+    module = ModuleType("huggingface_hub")
+
+    def download(_repo: str, filename: str, **_kwargs: object) -> str:
+        download_started.set()
+        if not release_download.wait(5):
+            raise AssertionError("download release was not signalled")
+        observed_flags.append(
+            tuple(
+                os.getenv(name)
+                for name in ("POWER_MODEL_OFFLINE", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")
+            )
+        )
+        return paths[filename]
+
+    module.hf_hub_download = download  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "huggingface_hub", module)
+
+    def acquire() -> None:
+        try:
+            model_policy.acquire_model_files(**_acquire_kwargs("org/model", "a" * 40, hashes))
+        except BaseException as exc:  # pragma: no cover - assertion below reports the failure
+            errors.append(exc)
+
+    acquisition_thread = threading.Thread(target=acquire)
+    acquisition_thread.start()
+    assert download_started.wait(5)
+
+    def enter_constructor_window() -> None:
+        with model_policy.force_model_offline():
+            constructor_entered.set()
+
+    constructor_thread = threading.Thread(target=enter_constructor_window)
+    constructor_thread.start()
+    assert not constructor_entered.wait(0.1)
+
+    release_download.set()
+    acquisition_thread.join(timeout=5)
+    constructor_thread.join(timeout=5)
+
+    assert not acquisition_thread.is_alive()
+    assert not constructor_thread.is_alive()
+    assert not errors
+    assert observed_flags == [(None, None, None), (None, None, None)]
+    assert constructor_entered.is_set()
 
 
 def test_complete_cached_canonical_model_works_under_deny_without_hf_call(
@@ -597,3 +694,252 @@ def test_approved_external_loader_receives_verified_local_snapshot(
         paths
     )
     assert not (staging / "unapproved-config.py").exists()
+
+    prepared.release()
+    assert not staging.exists()
+    prepared.close()
+
+
+def test_prepare_external_model_releases_staging_when_copy_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed hardlink and copy fallback must not leave a staging tree behind."""
+    snapshot = tmp_path / "snapshot"
+    paths, hashes = _files(snapshot)
+    repo = "custom/model"
+    revision = "b" * 40
+    monkeypatch.setenv("POWER_EGRESS_POLICY", "deny")
+    monkeypatch.setenv(model_policy.ALLOW_CUSTOM_MODELS_ENV, "1")
+    monkeypatch.setenv(
+        model_policy.MODEL_APPROVAL_ENV,
+        json.dumps(
+            {
+                "operation": "embeddings",
+                "provider": "test-external",
+                "license": "MIT",
+                "repo": repo,
+                "revision": revision,
+                "files": hashes,
+            }
+        ),
+    )
+    monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: paths)
+
+    staging = tmp_path / "power-model-copy-failure"
+
+    def make_staging(*, prefix: str) -> str:
+        del prefix
+        staging.mkdir()
+        return str(staging)
+
+    def fail_link(_source: Path, _destination: Path) -> None:
+        raise OSError("synthetic hardlink failure")
+
+    def fail_copy(_source: Path, _destination: Path) -> None:
+        raise OSError("synthetic copy failure")
+
+    monkeypatch.setattr(model_policy.tempfile, "mkdtemp", make_staging)
+    monkeypatch.setattr(model_policy.os, "link", fail_link)
+    monkeypatch.setattr(model_policy.shutil, "copyfile", fail_copy)
+
+    with pytest.raises(model_policy.ModelIntegrityError, match="isolated_model_snapshot_failed"):
+        model_policy.prepare_external_model(
+            operation=EgressOperation.EMBEDDINGS,
+            provider="test-external",
+            model_reference=f"{repo}@{revision}",
+        )
+
+    assert not staging.exists()
+
+
+def test_prepare_external_model_releases_staging_when_staged_hash_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A post-copy verification failure must release the owned staging tree."""
+    snapshot = tmp_path / "snapshot"
+    paths, hashes = _files(snapshot)
+    repo = "custom/model"
+    revision = "b" * 40
+    monkeypatch.setenv("POWER_EGRESS_POLICY", "deny")
+    monkeypatch.setenv(model_policy.ALLOW_CUSTOM_MODELS_ENV, "1")
+    monkeypatch.setenv(
+        model_policy.MODEL_APPROVAL_ENV,
+        json.dumps(
+            {
+                "operation": "embeddings",
+                "provider": "test-external",
+                "license": "MIT",
+                "repo": repo,
+                "revision": revision,
+                "files": hashes,
+            }
+        ),
+    )
+    monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: paths)
+
+    staging = tmp_path / "power-model-hash-failure"
+
+    def make_staging(*, prefix: str) -> str:
+        del prefix
+        staging.mkdir()
+        return str(staging)
+
+    original_verify = model_policy.verify_model_files
+    verify_calls = 0
+
+    def fail_staged_verify(spec: model_policy.ApprovedModel, candidate: dict[str, str]):
+        nonlocal verify_calls
+        verify_calls += 1
+        if verify_calls == 2:
+            raise model_policy.ModelIntegrityError("synthetic staged hash failure")
+        return original_verify(spec, candidate)
+
+    monkeypatch.setattr(model_policy.tempfile, "mkdtemp", make_staging)
+    monkeypatch.setattr(model_policy, "verify_model_files", fail_staged_verify)
+
+    with pytest.raises(model_policy.ModelIntegrityError, match="isolated_model_snapshot_failed"):
+        model_policy.prepare_external_model(
+            operation=EgressOperation.EMBEDDINGS,
+            provider="test-external",
+            model_reference=f"{repo}@{revision}",
+        )
+
+    assert verify_calls == 2
+    assert not staging.exists()
+
+
+def test_constructor_local_offline_state_does_not_block_concurrent_acquisition(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A delegated constructor's temporary flags cannot become another request's policy."""
+    delegated_snapshot = tmp_path / "delegated-snapshot"
+    delegated_paths, delegated_hashes = _files(delegated_snapshot)
+    delegated_repo = "custom/delegated"
+    delegated_revision = "b" * 40
+    monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
+    monkeypatch.setenv(model_policy.ALLOW_CUSTOM_MODELS_ENV, "1")
+    monkeypatch.setenv(
+        model_policy.MODEL_APPROVAL_ENV,
+        json.dumps(
+            {
+                "operation": "embeddings",
+                "provider": "fastembed-embedding",
+                "license": "MIT",
+                "repo": delegated_repo,
+                "revision": delegated_revision,
+                "files": delegated_hashes,
+            }
+        ),
+    )
+
+    remote_snapshot = tmp_path / "remote-snapshot"
+    remote_paths, remote_hashes = _files(remote_snapshot)
+    remote_calls: list[str] = []
+    monkeypatch.setattr(
+        model_policy,
+        "_cached_model_files",
+        lambda spec: delegated_paths if spec.repo == delegated_repo else {},
+    )
+    monkeypatch.setitem(sys.modules, "huggingface_hub", _fake_hub(remote_calls, remote_paths))
+
+    constructor_started = threading.Event()
+    release_constructor = threading.Event()
+    acquisition_started = threading.Event()
+    acquisition_checked = threading.Event()
+    offline_check_started = threading.Event()
+    constructor_errors: list[BaseException] = []
+    acquisition_errors: list[BaseException] = []
+    acquisition_result: list[dict[str, str]] = []
+
+    class BlockingEmbedding:
+        def __init__(self, **_kwargs: object) -> None:
+            constructor_started.set()
+            if not release_constructor.wait(5):
+                raise AssertionError("constructor release was not signalled")
+
+    fastembed = ModuleType("fastembed")
+    fastembed.TextEmbedding = BlockingEmbedding  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "fastembed", fastembed)
+
+    original_model_offline = model_policy.model_offline
+
+    def observe_model_offline() -> bool:
+        offline_check_started.set()
+        return original_model_offline()
+
+    monkeypatch.setattr(model_policy, "model_offline", observe_model_offline)
+    manager = embeddings.FastEmbedManager(f"{delegated_repo}@{delegated_revision}")
+
+    def construct_delegated() -> None:
+        try:
+            manager._lazy_init()
+        except BaseException as exc:  # pragma: no cover - assertion below reports the failure
+            constructor_errors.append(exc)
+
+    def acquire_remote() -> None:
+        acquisition_started.set()
+        try:
+            acquisition_result.append(
+                model_policy.acquire_model_files(
+                    operation=EgressOperation.EMBEDDINGS,
+                    repo="remote/model",
+                    revision="a" * 40,
+                    provider="bge-m3-onnx",
+                    required_files=("model.onnx", "tokenizer.json"),
+                    canonical_repo="remote/model",
+                    canonical_revision="a" * 40,
+                    canonical_provider="bge-m3-onnx",
+                    canonical_license="MIT",
+                    canonical_hashes=remote_hashes,
+                )
+            )
+        except BaseException as exc:  # pragma: no cover - assertion below reports the failure
+            acquisition_errors.append(exc)
+
+    constructor_thread = threading.Thread(target=construct_delegated)
+    constructor_thread.start()
+    assert constructor_started.wait(5)
+
+    original_cached = model_policy._cached_model_files
+
+    def observe_acquisition_cache(spec: model_policy.ApprovedModel) -> dict[str, str]:
+        if spec.repo != delegated_repo:
+            acquisition_checked.set()
+        return original_cached(spec) if spec.repo == delegated_repo else {}
+
+    monkeypatch.setattr(model_policy, "_cached_model_files", observe_acquisition_cache)
+    acquisition_thread = threading.Thread(target=acquire_remote)
+    acquisition_thread.start()
+    assert acquisition_started.wait(5)
+    assert not acquisition_errors
+    assert acquisition_thread.is_alive()
+    assert not acquisition_checked.is_set()
+    assert not offline_check_started.is_set()
+
+    release_constructor.set()
+    constructor_thread.join(timeout=5)
+    acquisition_thread.join(timeout=5)
+
+    assert not constructor_thread.is_alive()
+    assert not acquisition_thread.is_alive()
+    assert not constructor_errors
+    assert not acquisition_errors
+    assert acquisition_result == [remote_paths]
+    assert remote_calls == ["model.onnx", "tokenizer.json"]
+
+    monkeypatch.setenv("POWER_MODEL_OFFLINE", "1")
+    with pytest.raises(model_policy.ModelOfflineError, match="model_offline_cache_missing"):
+        model_policy.acquire_model_files(
+            operation=EgressOperation.EMBEDDINGS,
+            repo="remote/model",
+            revision="a" * 40,
+            provider="bge-m3-onnx",
+            required_files=("model.onnx", "tokenizer.json"),
+            canonical_repo="remote/model",
+            canonical_revision="a" * 40,
+            canonical_provider="bge-m3-onnx",
+            canonical_license="MIT",
+            canonical_hashes=remote_hashes,
+        )
+    assert remote_calls == ["model.onnx", "tokenizer.json"]
+    manager.close()

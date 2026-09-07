@@ -43,6 +43,7 @@ from .models import OKFMetadata  # noqa: TC001
 from .parser import FRONTMATTER_PATTERN, validate_metadata
 from .source_service import (
     SourceReadContext,
+    authorize_current_source,
     create_source_read_context,
     read_source,
     resolve_safe_vault_path,
@@ -534,11 +535,13 @@ def _source_read_context(vault_dir: Path) -> SourceReadContext:
     """Return one request-local canonical source projection for retrieval reads."""
     root = Path(vault_dir).expanduser().resolve()
     current = _SOURCE_READ_CONTEXT.get()
-    if current is not None and current.root == root:
-        if current.generation_path is None:
-            current = None
-        elif resolve_active_generation_path(root) == current.generation_path:
-            return current
+    if (
+        current is not None
+        and current.root == root
+        and current.generation_path is not None
+        and resolve_active_generation_path(root) == current.generation_path
+    ):
+        return current
     context = create_source_read_context(root)
     _SOURCE_READ_CONTEXT.set(context)
     return context
@@ -566,6 +569,11 @@ def _read_generation_source(
     """Read one source from a verified immutable generation projection."""
     if resolved_db.path is None or resolved_db.generation_id is None:
         raise FileNotFoundError("immutable generation identity is missing")
+    authorized_path = authorize_current_source(vault_dir, rel_path)
+    if authorized_path != rel_path:
+        raise FileNotFoundError("immutable generation source path is not canonical")
+    if resolve_active_generation_path(vault_dir) != resolved_db.path:
+        raise ActiveGenerationError("active generation changed during source materialization")
     with contextlib.closing(_open_readonly_db(resolved_db.path)) as conn:
         row = conn.execute(
             """
@@ -582,10 +590,6 @@ def _read_generation_source(
     metadata = validate_metadata(content)
     if metadata is None:
         raise ValueError("immutable source projection metadata is invalid")
-    # The generation stores the raw-byte source hash while text extraction
-    # normalizes CRLF to LF. Keep the authoritative raw-byte digest from the
-    # source projection and validate the decoded snapshot through its own DB
-    # integrity/metadata contract.
     digest = str(row[1])
     if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise ValueError("immutable source projection digest is invalid")
@@ -2041,29 +2045,43 @@ def format_untrusted_search_envelope(
     """
     root = vault_dir.resolve()
     envelope_results: list[dict[str, object]] = []
-    actual_modes = sorted({result.actual_mode or mode for result in results})
-    fallback_reasons = sorted(
-        {result.fallback_reason for result in results if result.fallback_reason}
-    )
-    index_ages = [
-        result.index_age_seconds for result in results if result.index_age_seconds is not None
-    ]
-    actual_mode: str = (
-        actual_modes[0] if actual_modes else getattr(results, "actual_mode", "unknown")
-    )
-    fallback_reason: str | None = (
-        fallback_reasons[0]
-        if len(fallback_reasons) == 1
-        else getattr(results, "fallback_reason", None)
-    )
+    verified_results: list[SearchResult] = []
+    matched_terms = _tokenize(query)
+    active_generation = resolve_active_generation(root)
 
     for result in results:
-        content_hash: str | None = None
+        resolved_db: _ResolvedDb | None = None
+        if result.index_kind == "immutable_generation":
+            if (
+                active_generation is None
+                or result.index_generation_id != active_generation.generation_id
+            ):
+                continue
+            resolved_db = _ResolvedDb(
+                active_generation.path,
+                True,
+                generation_id=active_generation.generation_id,
+                source_snapshot_hash=active_generation.source_snapshot_hash,
+                db_sha256=active_generation.db_sha256,
+            )
+        elif result.index_kind == "legacy_db" and active_generation is not None:
+            continue
         try:
-            content_hash = _read_indexed_source(root, result.rel_path).sha256
+            source = _read_indexed_source(root, result.rel_path, resolved_db=resolved_db)
         except (FileNotFoundError, OSError, RuntimeError, ValueError):
             logger.warning("Unable to create provenance hash for search result %s", result.rel_path)
+            continue
+        active_after_read = resolve_active_generation(root)
+        if result.index_kind == "legacy_db" and active_after_read is not None:
+            continue
+        if result.index_kind == "immutable_generation" and (
+            active_after_read is None
+            or active_after_read.generation_id != result.index_generation_id
+        ):
+            continue
 
+        verified_results.append(result)
+        content_hash = source.sha256
         identifier_input = f"{result.rel_path}\0{content_hash or 'unavailable'}"
         result_id = hashlib.sha256(identifier_input.encode("utf-8")).hexdigest()[:16]
         envelope_results.append(
@@ -2075,10 +2093,10 @@ def format_untrusted_search_envelope(
                     "content_sha256": content_hash,
                 },
                 "metadata": {
-                    "title": result.title,
-                    "description": result.description,
-                    "note_type": result.note_type,
-                    "tags": result.tags,
+                    "title": source.metadata.title,
+                    "description": source.metadata.description,
+                    "note_type": source.metadata.type,
+                    "tags": source.metadata.tags,
                     "retrieval_contract": result.retrieval_contract,
                     "actual_mode": result.actual_mode,
                     "fallback_reason": result.fallback_reason,
@@ -2087,10 +2105,30 @@ def format_untrusted_search_envelope(
                 },
                 "score": result.score,
                 "match_count": result.match_count,
-                "snippet": result.snippet[:MAX_SNIPPET_LENGTH],
-                "matched_text": (result.matched_text or result.snippet)[:MAX_SNIPPET_LENGTH],
+                "snippet": _matched_text(source.content, matched_terms, prefer_last=True)[
+                    :MAX_SNIPPET_LENGTH
+                ],
+                "matched_text": _matched_text(source.content, matched_terms)[:MAX_SNIPPET_LENGTH],
             }
         )
+
+    actual_modes = sorted({result.actual_mode or mode for result in verified_results})
+    fallback_reasons = sorted(
+        {result.fallback_reason for result in verified_results if result.fallback_reason}
+    )
+    index_ages = [
+        result.index_age_seconds
+        for result in verified_results
+        if result.index_age_seconds is not None
+    ]
+    actual_mode: str = (
+        actual_modes[0] if actual_modes else getattr(results, "actual_mode", "unknown")
+    )
+    fallback_reason: str | None = (
+        fallback_reasons[0]
+        if len(fallback_reasons) == 1
+        else getattr(results, "fallback_reason", None)
+    )
 
     envelope = {
         "schema_version": "power.retrieval-envelope.v1",
@@ -2107,7 +2145,7 @@ def format_untrusted_search_envelope(
         "index_age_seconds": max(index_ages) if index_ages else None,
         "temporal_view": temporal_view,
         "as_of": as_of,
-        "index_provenance": _format_index_provenance(results),
+        "index_provenance": _format_index_provenance(verified_results),
         "result_count": len(envelope_results),
         "results": envelope_results,
     }

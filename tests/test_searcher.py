@@ -852,6 +852,130 @@ class TestFormatSearchResults:
             "source_snapshot_hash": report.source_snapshot_hash,
         }
 
+    def test_active_generation_cannot_materialize_stale_current_source(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Search and envelopes must reject old generation data after source drift."""
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+        vault = tmp_path / "stale-generation-source"
+        note = vault / "01_Projects" / "Current.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            "title: Current\n"
+            "description: source drift regression\n"
+            "timestamp: 2026-07-27T00:00:00Z\n"
+            "---\n\nold-generation-token\n",
+            encoding="utf-8",
+        )
+        sync_vault_atomically(vault, sync_embeddings=False)
+        original_results = search_vault(vault, "old-generation-token", mode="fts")
+        assert original_results
+
+        note.write_text("# invalidated source\n", encoding="utf-8")
+
+        assert search_vault(vault, "old-generation-token", mode="fts") == []
+        envelope = json.loads(
+            format_untrusted_search_envelope(
+                original_results,
+                "old-generation-token",
+                mode="fts",
+                vault_dir=vault,
+            )
+        )
+        assert envelope["result_count"] == 0
+
+    def test_untrusted_envelope_drops_results_from_a_replaced_generation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Envelope content and provenance must come from one active generation."""
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+        vault = tmp_path / "replaced-generation-envelope"
+        note = vault / "01_Projects" / "Current.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            "title: Current\n"
+            "description: generation replacement regression\n"
+            "timestamp: 2026-07-27T00:00:00Z\n"
+            "---\n\nold-envelope-token\n",
+            encoding="utf-8",
+        )
+        first = sync_vault_atomically(vault, sync_embeddings=False)
+        old_results = search_vault(vault, "old-envelope-token", mode="fts")
+        assert old_results
+        assert old_results[0].index_generation_id == first.generation_id
+
+        note.write_text(
+            note.read_text(encoding="utf-8").replace("old-envelope-token", "new-envelope-token"),
+            encoding="utf-8",
+        )
+        second = sync_vault_atomically(vault, sync_embeddings=False)
+        assert second.generation_id != first.generation_id
+
+        envelope = json.loads(
+            format_untrusted_search_envelope(
+                old_results,
+                "old-envelope-token",
+                mode="fts",
+                vault_dir=vault,
+            )
+        )
+
+        assert envelope["result_count"] == 0
+        assert envelope["index_provenance"] == {"kind": "unavailable"}
+
+    def test_untrusted_envelope_drops_legacy_result_when_generation_appears_mid_read(
+        self, sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A legacy result cannot be paired with a generation published mid-request."""
+        from power_framework.core.searcher import _format_index_provenance
+
+        result = SearchResult(
+            rel_path="01_Projects/TestProject.md",
+            title="Test Project",
+            description="A sample project note for testing",
+            note_type="Project",
+            score=1.0,
+            snippet="legacy result",
+            match_count=1,
+            index_kind="legacy_db",
+        )
+        fake_active = ActiveGeneration(
+            path=tmp_path / "new-generation.db",
+            generation_id="new-generation",
+            source_snapshot_hash="a" * 64,
+            db_sha256="b" * 64,
+            db_size=1,
+            completed_at="2026-09-07T00:00:00Z",
+            activated_at="2026-09-07T00:00:01Z",
+        )
+        calls = 0
+
+        def resolve(_vault: Path) -> ActiveGeneration | None:
+            nonlocal calls
+            calls += 1
+            return None if calls == 1 else fake_active
+
+        monkeypatch.setattr(searcher, "resolve_active_generation", resolve)
+
+        envelope = json.loads(
+            format_untrusted_search_envelope(
+                [result],
+                "test",
+                mode="fts",
+                vault_dir=sample_vault,
+            )
+        )
+
+        assert envelope["result_count"] == 0
+        assert envelope["index_provenance"] == _format_index_provenance([])
+        assert calls == 2
+
     def test_untrusted_envelope_marks_manual_results_without_request_provenance(
         self, sample_vault: Path
     ) -> None:

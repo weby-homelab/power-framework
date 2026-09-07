@@ -15,7 +15,7 @@ import re
 import shutil
 import tempfile
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from threading import RLock
 from typing import TYPE_CHECKING
@@ -77,13 +77,33 @@ class ApprovedModel:
         return dict(self.files)
 
 
-@dataclass(frozen=True)
+@dataclass
 class PreparedModel:
     """Verified local files ready to be handed to an external model loader."""
 
     spec: ApprovedModel
     files: dict[str, str]
     local_reference: str
+    _release_lock: RLock = field(default_factory=RLock, init=False, repr=False, compare=False)
+    _released: bool = field(default=False, init=False, repr=False, compare=False)
+
+    def release(self) -> None:
+        """Release this model's private staging tree exactly once."""
+        with self._release_lock:
+            if self._released:
+                return
+            staging_root = Path(self.local_reference)
+            if staging_root.is_symlink():
+                raise ModelIntegrityError("model_staging_root_is_symlink")
+            if staging_root.exists():
+                if not staging_root.is_dir():
+                    raise ModelIntegrityError("model_staging_root_is_not_directory")
+                shutil.rmtree(staging_root)
+            self._released = True
+
+    def close(self) -> None:
+        """Compatibility alias for :meth:`release` used by manager shutdown."""
+        self.release()
 
 
 def _env_flag(name: str) -> bool:
@@ -92,7 +112,8 @@ def _env_flag(name: str) -> bool:
 
 def model_offline() -> bool:
     """Return whether any POWER or maintained HF offline flag is authoritative."""
-    return any(_env_flag(name) for name in MODEL_OFFLINE_ENV_VARS)
+    with _MODEL_ENV_LOCK:
+        return any(_env_flag(name) for name in MODEL_OFFLINE_ENV_VARS)
 
 
 def _validate_repository(repo: str) -> str:
@@ -294,6 +315,14 @@ def verify_model_files(spec: ApprovedModel, paths: Mapping[str, str]) -> dict[st
 
 
 def _acquire_resolved_model(spec: ApprovedModel, operation: EgressOperation) -> dict[str, str]:
+    """Acquire one approved model while serializing constructor environment windows."""
+    with _MODEL_ENV_LOCK:
+        return _acquire_resolved_model_locked(spec, operation)
+
+
+def _acquire_resolved_model_locked(
+    spec: ApprovedModel, operation: EgressOperation
+) -> dict[str, str]:
     """Use cache when complete; otherwise authorize and fetch exactly pinned files."""
     cached = _cached_model_files(spec)
     if len(cached) == len(spec.files):
@@ -328,6 +357,7 @@ def _acquire_resolved_model(spec: ApprovedModel, operation: EgressOperation) -> 
                 filename,
                 revision=spec.revision,
                 local_files_only=False,
+                endpoint=endpoint.origin,
             )
         )
     return verify_model_files(spec, downloaded)
@@ -416,7 +446,7 @@ def prepare_external_model(
     # copying multi-gigabyte model sidecars; the fallback copy keeps the same
     # isolated file set on filesystems that do not support hardlinks.
     staging_root = Path(tempfile.mkdtemp(prefix="power-model-"))
-    staged_files: dict[str, str] = {}
+    prepared = PreparedModel(spec=spec, files={}, local_reference=str(staging_root))
     try:
         for filename, _digest in spec.files:
             source = Path(files[filename]).resolve(strict=True)
@@ -426,32 +456,40 @@ def prepare_external_model(
                 os.link(source, destination)
             except OSError:
                 shutil.copyfile(source, destination)
-            staged_files[filename] = str(destination)
-        verified_staged = verify_model_files(spec, staged_files)
-    except (OSError, RuntimeError) as exc:
-        raise ModelIntegrityError("isolated_model_snapshot_failed") from exc
-    return PreparedModel(
-        spec=spec,
-        files=verified_staged,
-        local_reference=str(staging_root),
-    )
+            prepared.files[filename] = str(destination)
+        prepared.files = verify_model_files(spec, prepared.files)
+    except BaseException as exc:
+        prepared.release()
+        if isinstance(exc, Exception):
+            raise ModelIntegrityError("isolated_model_snapshot_failed") from exc
+        raise
+    return prepared
 
 
 @contextmanager
-def force_model_offline() -> Iterator[None]:
-    """Prevent delegated constructors from opening a second remote acquisition path."""
+def force_model_offline(*, extra_environment: Mapping[str, str] | None = None) -> Iterator[None]:
+    """Protect one delegated import/constructor window from remote acquisition.
+
+    The lock is shared with :func:`model_offline`, so another POWER acquisition
+    waits for the temporary constructor state and then reads the real user/CI
+    policy after the environment is restored. Callers must not hold this context
+    around normal model inference.
+    """
     with _MODEL_ENV_LOCK:
-        previous = {name: os.environ.get(name) for name in MODEL_OFFLINE_ENV_VARS}
+        temporary = dict(extra_environment or {})
         for name in MODEL_OFFLINE_ENV_VARS:
-            os.environ[name] = "1"
+            temporary[name] = "1"
+        previous: dict[str, str | None] = {name: os.environ.get(name) for name in temporary}
+        for name, temporary_value in temporary.items():
+            os.environ[name] = temporary_value
         try:
             yield
         finally:
-            for name, value in previous.items():
-                if value is None:
+            for name, previous_value in previous.items():
+                if previous_value is None:
                     os.environ.pop(name, None)
                 else:
-                    os.environ[name] = value
+                    os.environ[name] = previous_value
 
 
 __all__ = [

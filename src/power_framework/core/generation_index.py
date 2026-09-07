@@ -839,15 +839,16 @@ def _migrate_legacy_database(
             # The legacy database may contain rows built from an older version
             # of a note at the same relative path. Preserve it in the archive,
             # but never pair that derived content with the current projection.
-            for table in (
-                "fts_notes",
-                "file_metadata",
-                "tf_vectors",
-                "doc_embeddings",
-                "chunk_embeddings",
-                "temporal_records",
+            for statement in (
+                "DELETE FROM fts_notes",
+                "DELETE FROM file_metadata",
+                "DELETE FROM tf_vectors",
+                "DELETE FROM doc_embeddings",
+                "DELETE FROM chunk_embeddings",
+                "DELETE FROM temporal_records",
+                "DELETE FROM dense_index_manifest",
             ):
-                staging_conn.execute(f"DELETE FROM {table}")  # noqa: S608
+                staging_conn.execute(statement)
             staging_conn.commit()
             _sync_vault_to_db(
                 vault_dir,
