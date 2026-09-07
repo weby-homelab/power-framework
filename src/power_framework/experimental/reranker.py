@@ -6,6 +6,7 @@ import math
 import os
 import threading
 import time
+from contextlib import contextmanager
 from typing import Protocol
 
 from power_framework.core.egress import EgressOperation
@@ -73,6 +74,17 @@ def _verify_sha256(path: str, expected: str) -> None:
     actual = digest.hexdigest()
     if actual != expected:
         raise RuntimeError(f"model_sha256_mismatch:{os.path.basename(path)}")
+
+
+@contextmanager
+def _prepared_model_constructor_environment(prepared: PreparedModel):
+    """Protect a delegated constructor and release staging on any failure."""
+    try:
+        with force_model_offline():
+            yield
+    except BaseException:
+        prepared.close()
+        raise
 
 
 class RerankerManager:
@@ -151,23 +163,18 @@ class RerankerManager:
             expected_license="CC-BY-NC-4.0",
         )
         loader_model_name = model_reference.rsplit("@", 1)[0]
-        with force_model_offline():
+        with _prepared_model_constructor_environment(prepared):
             try:
                 from fastembed.rerank.cross_encoder import TextCrossEncoder
             except Exception as e:
-                prepared.close()
                 raise ImportError(
                     "fastembed is required. Install it with: pip install fastembed"
                 ) from e
-            try:
-                model = TextCrossEncoder(
-                    model_name=loader_model_name,
-                    specific_model_path=prepared.local_reference,
-                    lazy_load=False,
-                )
-            except BaseException:
-                prepared.close()
-                raise
+            model = TextCrossEncoder(
+                model_name=loader_model_name,
+                specific_model_path=prepared.local_reference,
+                lazy_load=False,
+            )
         self._model = model
         self._prepared_model = prepared
 

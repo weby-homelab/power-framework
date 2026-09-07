@@ -976,6 +976,27 @@ class TestFormatSearchResults:
         assert envelope["index_provenance"] == _format_index_provenance([])
         assert calls == 2
 
+    def test_source_read_context_caches_bounded_scan_without_generation(
+        self, sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A no-generation context is reusable while the active identity stays absent."""
+        searcher._SOURCE_READ_CONTEXT.set(None)
+        original_create = searcher.create_source_read_context
+        create_calls = 0
+
+        def counted_create(root: Path):
+            nonlocal create_calls
+            create_calls += 1
+            return original_create(root)
+
+        monkeypatch.setattr(searcher, "create_source_read_context", counted_create)
+        first = searcher._source_read_context(sample_vault)
+        second = searcher._source_read_context(sample_vault)
+
+        assert first is second
+        assert first.generation_path is None
+        assert create_calls == 1
+
     def test_untrusted_envelope_marks_manual_results_without_request_provenance(
         self, sample_vault: Path
     ) -> None:

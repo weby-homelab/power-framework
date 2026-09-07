@@ -727,8 +727,7 @@ def test_prepare_external_model_releases_staging_when_copy_fails(
 
     staging = tmp_path / "power-model-copy-failure"
 
-    def make_staging(*, prefix: str) -> str:
-        del prefix
+    def make_staging(**_kwargs: str) -> str:
         staging.mkdir()
         return str(staging)
 
@@ -750,6 +749,64 @@ def test_prepare_external_model_releases_staging_when_copy_fails(
         )
 
     assert not staging.exists()
+
+
+def test_prepare_external_model_preserves_staging_cleanup_failure_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A staging tamper error remains visible and retains the preparation cause."""
+    paths, hashes = _files(tmp_path / "snapshot")
+    repo = "custom/model"
+    revision = "b" * 40
+    monkeypatch.setenv("POWER_EGRESS_POLICY", "deny")
+    monkeypatch.setenv(model_policy.ALLOW_CUSTOM_MODELS_ENV, "1")
+    monkeypatch.setenv(
+        model_policy.MODEL_APPROVAL_ENV,
+        json.dumps(
+            {
+                "operation": "embeddings",
+                "provider": "test-external",
+                "license": "MIT",
+                "repo": repo,
+                "revision": revision,
+                "files": hashes,
+            }
+        ),
+    )
+    monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: paths)
+
+    staging = tmp_path / "power-model-tampered"
+
+    def make_staging(**_kwargs: str) -> str:
+        staging.mkdir()
+        return str(staging)
+
+    def fail_link(_source: Path, _destination: Path) -> None:
+        raise OSError("synthetic preparation failure")
+
+    def fail_copy(_source: Path, _destination: Path) -> None:
+        raise OSError("synthetic copy failure")
+
+    def fail_release(_prepared: model_policy.PreparedModel) -> None:
+        raise model_policy.ModelIntegrityError("synthetic staging tamper")
+
+    monkeypatch.setattr(model_policy.tempfile, "mkdtemp", make_staging)
+    monkeypatch.setattr(model_policy.os, "link", fail_link)
+    monkeypatch.setattr(model_policy.shutil, "copyfile", fail_copy)
+    monkeypatch.setattr(model_policy.PreparedModel, "release", fail_release)
+
+    with pytest.raises(
+        model_policy.ModelIntegrityError, match="synthetic staging tamper"
+    ) as exc_info:
+        model_policy.prepare_external_model(
+            operation=EgressOperation.EMBEDDINGS,
+            provider="test-external",
+            model_reference=f"{repo}@{revision}",
+        )
+
+    assert isinstance(exc_info.value.__cause__, OSError)
+    assert str(exc_info.value.__cause__) == "synthetic copy failure"
+    assert staging.exists()
 
 
 def test_prepare_external_model_releases_staging_when_staged_hash_fails(
@@ -779,8 +836,7 @@ def test_prepare_external_model_releases_staging_when_staged_hash_fails(
 
     staging = tmp_path / "power-model-hash-failure"
 
-    def make_staging(*, prefix: str) -> str:
-        del prefix
+    def make_staging(**_kwargs: str) -> str:
         staging.mkdir()
         return str(staging)
 

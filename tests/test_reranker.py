@@ -203,6 +203,37 @@ class TestRerankerManager:
         assert not Path(prepared_models[0].local_reference).exists()
         assert constructor_args["specific_model_path"] == prepared_models[0].local_reference
 
+    def test_jina_force_environment_entry_failure_releases_owned_staging(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Failure entering the constructor environment must still release staging."""
+        prepared_models = []
+
+        def prepare(**_kwargs: object):
+            prepared = _prepared_stub(tmp_path, len(prepared_models) + 1, "jina-reranker")
+            prepared_models.append(prepared)
+            return prepared
+
+        class FailingEnvironment:
+            def __enter__(self):
+                raise RuntimeError("synthetic force environment failure")
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+        monkeypatch.setattr(reranker_module, "prepare_external_model", prepare)
+        monkeypatch.setattr(reranker_module, "force_model_offline", FailingEnvironment)
+        monkeypatch.setenv("POWER_RERANKER", "jina")
+        monkeypatch.setenv(ALLOW_NONCOMMERCIAL_MODELS_ENV, "1")
+        monkeypatch.setenv("POWER_EMBED_PROVIDER", "bge-m3")
+
+        manager = RerankerManager("custom/model@" + "a" * 40)
+        with pytest.raises(RuntimeError, match="synthetic force environment failure"):
+            manager._lazy_init()
+
+        assert manager._model is None
+        assert not Path(prepared_models[0].local_reference).exists()
+
     def test_installed_fastembed_cross_encoder_accepts_specific_local_snapshot_path(
         self, tmp_path: Path
     ) -> None:

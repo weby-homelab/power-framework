@@ -459,7 +459,10 @@ def prepare_external_model(
             prepared.files[filename] = str(destination)
         prepared.files = verify_model_files(spec, prepared.files)
     except BaseException as exc:
-        prepared.release()
+        try:
+            prepared.release()
+        except Exception as release_exc:
+            raise release_exc from exc
         if isinstance(exc, Exception):
             raise ModelIntegrityError("isolated_model_snapshot_failed") from exc
         raise

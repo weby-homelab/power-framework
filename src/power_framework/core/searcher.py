@@ -538,7 +538,6 @@ def _source_read_context(vault_dir: Path) -> SourceReadContext:
     if (
         current is not None
         and current.root == root
-        and current.generation_path is not None
         and resolve_active_generation_path(root) == current.generation_path
     ):
         return current

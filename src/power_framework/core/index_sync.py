@@ -389,7 +389,8 @@ def _sync_vault_to_db(
         embedding_dimension = embedding_bytes // 4
     elif dense_count == 0:
         try:
-            embedding_dimension = int(embedder.dimension)
+            dimension = embedder.dimension
+            embedding_dimension = int(dimension() if callable(dimension) else dimension)
         except (AttributeError, TypeError, ValueError):
             embedding_dimension = 0
     else:

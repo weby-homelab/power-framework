@@ -711,8 +711,10 @@ def test_empty_legacy_dense_migration_writes_zero_count_manifest(
         conn.commit()
 
     class EmptyDenseManager:
-        dimension = 3
         model_name = "empty-migration"
+
+        def dimension(self) -> int:
+            return 3
 
         def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
             del batch_size
