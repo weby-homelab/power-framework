@@ -72,7 +72,7 @@ class SourceReadResponse(BaseDTO):
     metadata: dict[str, Any] = Field(default_factory=dict)
     trust_label: str = "local"
     source_revision: str = ""
-    actual_capability: str = "direct_file_read"
+    actual_capability: str = "active_source_projection"
     degraded_reason: str | None = None
 
 

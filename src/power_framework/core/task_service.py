@@ -27,9 +27,9 @@ logger = logging.getLogger(__name__)
 class TaskService:
     """Canonical domain service managing task lifecycles, revisions, and events."""
 
-    def __init__(self, vault_dir: Path) -> None:
+    def __init__(self, vault_dir: Path, *, create_vault: bool = True) -> None:
         self.vault_dir = Path(vault_dir).expanduser().resolve()
-        self.store = TaskStore(self.vault_dir)
+        self.store = TaskStore(self.vault_dir, create_vault=create_vault)
 
     def create_task(
         self,

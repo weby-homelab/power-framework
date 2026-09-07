@@ -13,7 +13,7 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
 
 from .chunker import SemanticChunker
-from .constants import DENSE_INDEX_SCHEMA_VERSION, is_catalog_filename
+from .constants import DENSE_INDEX_SCHEMA_VERSION, SKIP_FILES, is_catalog_filename
 from .ignore import should_skip
 from .parser import read_file_content, validate_metadata
 from .source_projection import scan_projection, write_projection
@@ -115,6 +115,7 @@ def _sync_vault_to_db(
             try:
                 cursor.execute("DELETE FROM doc_embeddings")
                 cursor.execute("DELETE FROM chunk_embeddings")
+                cursor.execute("DELETE FROM dense_index_manifest")
                 cursor.execute("UPDATE file_metadata SET mtime = 0")
                 conn.commit()
             except sqlite3.OperationalError:
@@ -125,7 +126,7 @@ def _sync_vault_to_db(
     for filepath in iter_vault_markdown_files(vault_dir):
         # Generated catalogs are navigation, not knowledge. Keep every page
         # out of both sparse and dense indexes, including `_index-N.md` pages.
-        if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
+        if filepath.name in SKIP_FILES or is_catalog_filename(filepath.name):
             continue
         if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
             continue
@@ -385,18 +386,32 @@ def _sync_vault_to_db(
     ).fetchone()
     dense_count, embedding_bytes = dense_row
     if dense_count and embedding_bytes and embedding_bytes % 4 == 0:
-        provider, model = _embedding_manifest_identity(embedder)
-        cursor.executemany(
-            "INSERT OR REPLACE INTO dense_index_manifest (manifest_key, manifest_value) VALUES (?, ?)",
-            [
-                ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
-                ("embedding_dimension", str(embedding_bytes // 4)),
-                ("chunk_count", str(dense_count)),
-                ("embedding_provider", provider),
-                ("embedding_model", model),
-            ],
-        )
+        embedding_dimension = embedding_bytes // 4
+    elif dense_count == 0:
+        try:
+            dimension = embedder.dimension
+            embedding_dimension = int(dimension() if callable(dimension) else dimension)
+        except (AttributeError, TypeError, ValueError):
+            embedding_dimension = 0
+    else:
+        cursor.execute("DELETE FROM dense_index_manifest")
         conn.commit()
+        _maybe_vacuum(conn, to_delete, db_files)
+        conn.commit()
+        return
+
+    provider, model = _embedding_manifest_identity(embedder)
+    cursor.executemany(
+        "INSERT OR REPLACE INTO dense_index_manifest (manifest_key, manifest_value) VALUES (?, ?)",
+        [
+            ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
+            ("embedding_dimension", str(embedding_dimension)),
+            ("chunk_count", str(dense_count)),
+            ("embedding_provider", provider),
+            ("embedding_model", model),
+        ],
+    )
+    conn.commit()
     _maybe_vacuum(conn, to_delete, db_files)
     conn.commit()
 

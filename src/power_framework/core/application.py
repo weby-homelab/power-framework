@@ -200,7 +200,7 @@ class ApplicationService:
         self.vault_dir = Path(vault_dir).expanduser().resolve()
         self._audit_hook = audit_hook
         self._search_fn = search_fn or search_vault
-        self.task_service = task_service or TaskService(self.vault_dir)
+        self.task_service = task_service or TaskService(self.vault_dir, create_vault=False)
         self.decision_service = DecisionService(self.vault_dir, task_service=self.task_service)
 
     def discover(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:

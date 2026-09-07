@@ -560,8 +560,10 @@ class TestSearchModeContract:
             "power_framework.core.searcher.get_embedding_manager", lambda: _Embedder()
         )
 
+        source_dir = tmp_path / "03_Resources"
+        source_dir.mkdir()
         for name in ("near.md", "far.md", "orthogonal.md"):
-            (tmp_path / name).write_text(
+            (source_dir / name).write_text(
                 "---\n"
                 "type: Resource\n"
                 f'title: "{name}"\n'
@@ -579,9 +581,15 @@ class TestSearchModeContract:
             conn.executemany(
                 "INSERT INTO chunk_embeddings VALUES (?, ?, ?, ?, ?)",
                 [
-                    ("c1", "near.md", vec(1.0, 0.0, 0.0, 0.0), "near", 0.0),
-                    ("c2", "far.md", vec(0.3, 0.95, 0.0, 0.0), "far", 0.0),
-                    ("c3", "orthogonal.md", vec(0.0, 0.0, 1.0, 0.0), "orth", 0.0),
+                    ("c1", "03_Resources/near.md", vec(1.0, 0.0, 0.0, 0.0), "near", 0.0),
+                    ("c2", "03_Resources/far.md", vec(0.3, 0.95, 0.0, 0.0), "far", 0.0),
+                    (
+                        "c3",
+                        "03_Resources/orthogonal.md",
+                        vec(0.0, 0.0, 1.0, 0.0),
+                        "orth",
+                        0.0,
+                    ),
                 ],
             )
             conn.executemany(
@@ -598,9 +606,12 @@ class TestSearchModeContract:
 
         results = _semantic_search(tmp_path, "query", max_results=5)
 
-        assert [result.rel_path for result in results] == ["near.md", "far.md"]
+        assert [result.rel_path for result in results] == [
+            "03_Resources/near.md",
+            "03_Resources/far.md",
+        ]
         assert results[0].score > results[1].score
-        assert [result.snippet for result in results] == ["near", "far"]
+        assert [result.snippet for result in results] == ["body", "body"]
 
     def test_dense_index_validation_requires_matching_manifest(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -841,6 +852,151 @@ class TestFormatSearchResults:
             "source_snapshot_hash": report.source_snapshot_hash,
         }
 
+    def test_active_generation_cannot_materialize_stale_current_source(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Search and envelopes must reject old generation data after source drift."""
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+        vault = tmp_path / "stale-generation-source"
+        note = vault / "01_Projects" / "Current.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            "title: Current\n"
+            "description: source drift regression\n"
+            "timestamp: 2026-07-27T00:00:00Z\n"
+            "---\n\nold-generation-token\n",
+            encoding="utf-8",
+        )
+        sync_vault_atomically(vault, sync_embeddings=False)
+        original_results = search_vault(vault, "old-generation-token", mode="fts")
+        assert original_results
+
+        note.write_text("# invalidated source\n", encoding="utf-8")
+
+        assert search_vault(vault, "old-generation-token", mode="fts") == []
+        envelope = json.loads(
+            format_untrusted_search_envelope(
+                original_results,
+                "old-generation-token",
+                mode="fts",
+                vault_dir=vault,
+            )
+        )
+        assert envelope["result_count"] == 0
+
+    def test_untrusted_envelope_drops_results_from_a_replaced_generation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Envelope content and provenance must come from one active generation."""
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+        vault = tmp_path / "replaced-generation-envelope"
+        note = vault / "01_Projects" / "Current.md"
+        note.parent.mkdir(parents=True)
+        note.write_text(
+            "---\n"
+            "type: Project\n"
+            "title: Current\n"
+            "description: generation replacement regression\n"
+            "timestamp: 2026-07-27T00:00:00Z\n"
+            "---\n\nold-envelope-token\n",
+            encoding="utf-8",
+        )
+        first = sync_vault_atomically(vault, sync_embeddings=False)
+        old_results = search_vault(vault, "old-envelope-token", mode="fts")
+        assert old_results
+        assert old_results[0].index_generation_id == first.generation_id
+
+        note.write_text(
+            note.read_text(encoding="utf-8").replace("old-envelope-token", "new-envelope-token"),
+            encoding="utf-8",
+        )
+        second = sync_vault_atomically(vault, sync_embeddings=False)
+        assert second.generation_id != first.generation_id
+
+        envelope = json.loads(
+            format_untrusted_search_envelope(
+                old_results,
+                "old-envelope-token",
+                mode="fts",
+                vault_dir=vault,
+            )
+        )
+
+        assert envelope["result_count"] == 0
+        assert envelope["index_provenance"] == {"kind": "unavailable"}
+
+    def test_untrusted_envelope_drops_legacy_result_when_generation_appears_mid_read(
+        self, sample_vault: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A legacy result cannot be paired with a generation published mid-request."""
+        from power_framework.core.searcher import _format_index_provenance
+
+        result = SearchResult(
+            rel_path="01_Projects/TestProject.md",
+            title="Test Project",
+            description="A sample project note for testing",
+            note_type="Project",
+            score=1.0,
+            snippet="legacy result",
+            match_count=1,
+            index_kind="legacy_db",
+        )
+        fake_active = ActiveGeneration(
+            path=tmp_path / "new-generation.db",
+            generation_id="new-generation",
+            source_snapshot_hash="a" * 64,
+            db_sha256="b" * 64,
+            db_size=1,
+            completed_at="2026-09-07T00:00:00Z",
+            activated_at="2026-09-07T00:00:01Z",
+        )
+        calls = 0
+
+        def resolve(_vault: Path) -> ActiveGeneration | None:
+            nonlocal calls
+            calls += 1
+            return None if calls == 1 else fake_active
+
+        monkeypatch.setattr(searcher, "resolve_active_generation", resolve)
+
+        envelope = json.loads(
+            format_untrusted_search_envelope(
+                [result],
+                "test",
+                mode="fts",
+                vault_dir=sample_vault,
+            )
+        )
+
+        assert envelope["result_count"] == 0
+        assert envelope["index_provenance"] == _format_index_provenance([])
+        assert calls == 2
+
+    def test_source_read_context_caches_bounded_scan_without_generation(
+        self, sample_vault: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A no-generation context is reusable while the active identity stays absent."""
+        searcher._SOURCE_READ_CONTEXT.set(None)
+        original_create = searcher.create_source_read_context
+        create_calls = 0
+
+        def counted_create(root: Path):
+            nonlocal create_calls
+            create_calls += 1
+            return original_create(root)
+
+        monkeypatch.setattr(searcher, "create_source_read_context", counted_create)
+        first = searcher._source_read_context(sample_vault)
+        second = searcher._source_read_context(sample_vault)
+
+        assert first is second
+        assert first.generation_path is None
+        assert create_calls == 1
+
     def test_untrusted_envelope_marks_manual_results_without_request_provenance(
         self, sample_vault: Path
     ) -> None:
@@ -1037,6 +1193,32 @@ class TestSearchVault:
         assert "body-only phrase" in results[0].matched_text
         assert "metadata-only phrase" not in results[0].matched_text
         assert "description:" not in results[0].matched_text
+
+    def test_fts_search_rejects_control_file_from_crafted_index(
+        self, sample_vault: Path, tmp_path: Path
+    ) -> None:
+        """DB-derived result paths cannot bypass the canonical source projection."""
+        control = sample_vault / ".power" / "events.jsonl"
+        control.parent.mkdir(parents=True, exist_ok=True)
+        control.write_text("internal secret event", encoding="utf-8")
+        database = tmp_path / "crafted-fts.db"
+        with closing(sqlite3.connect(database)) as conn:
+            _init_db(conn)
+            conn.execute(
+                "INSERT INTO fts_notes(title, tags, description, content, rel_path, note_type) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("Internal", "", "", "internal secret event", ".power/events.jsonl", "Resource"),
+            )
+            conn.commit()
+
+        results = _fts_search(
+            sample_vault,
+            "secret",
+            max_results=5,
+            resolved_db=searcher._ResolvedDb(database, False),
+        )
+
+        assert results == []
 
     def test_auto_domain_policy_scopes_results(self, sample_vault: Path):
         (sample_vault / ".power").mkdir(exist_ok=True)

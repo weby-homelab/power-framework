@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ from power_framework.core.application_models import (
     TaskDTO,
     TaskEventDTO,
 )
+from power_framework.core.searcher import search_vault
 
 
 class PowerClient:
@@ -22,7 +24,10 @@ class PowerClient:
 
     def __init__(self, vault_path: Path) -> None:
         self.vault_path = Path(vault_path).expanduser().resolve()
-        self._service = ApplicationService(self.vault_path)
+        self._service = ApplicationService(
+            self.vault_path,
+            search_fn=partial(search_vault, allow_search_db_override=False),
+        )
 
     def discover(self, actor: str = "web") -> ApplicationEnvelope:
         """Fetch system capability manifest."""

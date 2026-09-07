@@ -35,6 +35,7 @@ environment is trustworthy.
 | --- | --- | --- | --- |
 | CLI/MCP input to core | validated core APIs | paths, note text, queries, proposal JSON, MCP arguments | Treat inputs as untrusted; validate before read/write/network use. |
 | Vault root to host filesystem | selected canonical vault | traversal strings, symlinks, absolute paths, arbitrary parents | No read or write may escape the configured vault. |
+| Canonical source projection to source.read | validated source records | in-vault regular files, invalid Markdown, hidden control material, projection aliases | Containment is necessary but not sufficient; only a current, regular, non-symlink source record may be read. |
 | Read-only retrieval to mutation | search and proposal creation | an agent or caller requesting a change | Proposal creation may write only its content-addressed `.power/proposals/` ledger; it cannot write the target note, catalog, or search. Apply requires explicit `approved=True` and an unchanged pre-image hash. |
 | Agent handoff to workflow execution | validated work-packet state | packet objective, next action, retrieved note text, and caller-supplied metadata | `.power/work-packets/` stores content-free Markdown checkpoints; state transitions are idempotent and approval-gated, and no packet operation executes its `next_action`. |
 | Local process to network | local ONNX/FTS/index paths | OpenRouter, non-loopback Ollama, link/ROT HTTP targets | Default deny; an explicit sensitivity-appropriate egress policy is required before contact. |
@@ -61,7 +62,9 @@ environment is trustworthy.
 ### Primary runtime surfaces
 
 1. **CLI and library calls** accept a vault directory, Markdown, search text,
-   policy settings, and transaction proposals.
+   policy settings, and transaction proposals. `source.read` is a
+   projection-backed core operation; the Web UI delegates to it and MCP has no
+   separate raw-file reader.
 2. **MCP tools** expose read, index, ingest, maintenance, and memory operations
    to an MCP client. The server resolves only `POWER_VAULT_DIR`
    before accepting a vault and rejects a substituted root.
@@ -78,6 +81,17 @@ environment is trustworthy.
   control characters, non-Markdown targets, missing parents, and symlink
   escapes. `atomic_write_in_vault` uses descriptor-relative operations and
   `O_NOFOLLOW` for the destination directory.
+- `core/source_service.py::_resolve_canonical_source` requires exact or stem
+  membership in the active or bounded source projection, applies the existing
+  P.A.R.A./ignore/catalog eligibility rules, rejects symlinks and unsupported
+  files, and checks source metadata, size, modification time, and SHA-256
+  before returning content. Rejected non-source paths use typed, redacted
+  not-found behavior.
+- Search FTS/vector/semantic/rerank/graph/provenance materialization reuses a
+  request-scoped canonical source reader for both file bytes and result
+  metadata. The Web client disables the legacy caller-selected search database
+  override, and application construction does not create task control state
+  until a task operation needs it.
 - `core/mutation.py` serializes same-vault mutations with an in-process lock
   plus an advisory cross-process file lock. `core/memory_api.py` requires
   explicit approval, validates content and pre-image hashes, and appends a
@@ -89,6 +103,14 @@ environment is trustworthy.
 - `core/egress.py` defaults `POWER_EGRESS_POLICY` to `deny`; remote embeddings,
   query expansion, and ROT paths call the policy guard before network use.
   Loopback model endpoints are treated as local.
+- `core/model_policy.py` is the single model-acquisition boundary. It treats
+  model names and overrides as untrusted, gives explicit offline flags
+  precedence, authorizes remote HF calls through `core/egress.py`, requires
+  immutable approved operation/provider/license identities and complete
+  runtime-file hashes, and verifies bytes before any model loader receives
+  them. Delegated loaders receive a private staging directory containing only
+  the approved files. Remote HF acquisition is restricted to the exact HTTPS
+  `huggingface.co` origin.
 - `mcp/power_server.py` validates the configured vault root, limits write and
   index request rates, masks error details, and fails closed for non-loopback
   HTTP transport.
@@ -101,6 +123,10 @@ environment is trustworthy.
 - A malicious note or MCP argument attempts `../`, a symlink swap, or an
   absolute filename to overwrite a host file. Path and atomic-write controls
   must reject it before a file descriptor outside the vault is used.
+- A caller requests `.power` state, a JSON/SQLite file, invalid Markdown, or a
+  symlink through `source.read`. Filesystem containment alone does not
+  authorize the request; the source projection must reject it without
+  returning file contents, size, digest, or control-path metadata.
 - An agent submits a memory proposal without approval, tampers with its durable content
   hash, or applies it after another writer changed the note. The transaction
   API must reject all three cases and preserve receipts without storing note
@@ -115,8 +141,10 @@ environment is trustworthy.
   not an authorization grant.
 - A hostile or unreliable remote link/model endpoint attempts to consume time,
   return malformed responses, or influence downstream reasoning. The current
-  controls limit which calls may start; callers must retain timeouts, response
-  validation, and treat returned text as untrusted data.
+  controls limit which calls may start. Model downloads additionally require
+  central egress authorization, offline precedence, immutable identity approval,
+  and complete hash verification before execution; callers must retain
+  timeouts, response validation, and treat returned text as untrusted data.
 - A local process with the same OS privileges uses the MCP stdio server or
   reads `.power` state. This is a host authorization concern; do not expose the
   server remotely until the transport has authenticated client identity and
@@ -158,3 +186,31 @@ credible boundary crossing are not security findings.
 
 Repository: weby-homelab/power-framework
 Version: 3.7.11
+
+## WEB-01 and WEB-05 closure record
+
+Both findings were identified against the `3.7.11` baseline commit
+`be83652aec2daedeb2c98b604b5a49d13e989c7e`; their identifiers remain preserved
+for traceability. The focused locked-environment security matrix passed with
+461 tests.
+
+- **WEB-01 (P1) — CLOSED:** source-read authority is now the canonical
+  projection boundary, with existing scope/ignore/Markdown/OKF rules, regular
+  non-symlink checks, typed redacted rejection, and projection freshness/hash
+  validation. Evidence: `tests/test_source_projection.py`,
+  `tests/test_application_v2.py`, and
+  `tests/web/contract/test_app_routes.py`.
+- **WEB-05 (P1) — CLOSED:** direct and delegated model loaders now share the
+  model policy boundary for deny-before-network, all maintained offline flags,
+  immutable approved operation/provider/license identity, complete runtime
+  hashes, and private verified-file staging before construction. Evidence:
+  `tests/test_model_policy.py`,
+  `tests/test_embeddings.py`, `tests/test_reranker.py`, and
+  `tests/test_egress.py`.
+
+This local closure does not claim remote CI, CodeQL, Docs, package-audit,
+dependency-refresh, merge, or release gates. Phase 4 and version `3.7.11`
+remain unchanged.
+
+The full local locked suite subsequently passed with **1755 passed, 14 skipped,
+4 warnings**, and **82.94% coverage**.

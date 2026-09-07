@@ -16,7 +16,15 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any
+
+from power_framework.core.egress import EgressOperation
+from power_framework.core.model_policy import (
+    PreparedModel,
+    force_model_offline,
+    prepare_external_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +68,13 @@ class ColBERTLateInteractionReranker:
         rerank(query, documents) -> list[float]  # scores aligned to documents
     """
 
-    def __init__(self, model_name: str = COLBERT_DEFAULT_MODEL) -> None:
-        self.model_name = model_name
+    def __init__(self, model_name: str | None = None) -> None:
+        self.model_name: str = (
+            model_name or os.getenv("POWER_COLBERT_MODEL") or COLBERT_DEFAULT_MODEL
+        )
         self._model: Any | None = None
+        self._prepared_model: PreparedModel | None = None
+        self._init_lock = threading.Lock()
         if not is_colbert_enabled():
             raise ColBERTUnavailableError(
                 "ColBERT backend is opt-in; set POWER_RERANKER=colbert to enable."
@@ -76,19 +88,34 @@ class ColBERTLateInteractionReranker:
     def _lazy_init(self) -> None:
         if self._model is not None:
             return
-        try:
-            from colbert.infra import ColBERTConfig  # type: ignore
-            from colbert.modeling.checkpoint import Checkpoint  # type: ignore
-        except ModuleNotFoundError as e:  # pragma: no cover - depends on env
-            raise ColBERTUnavailableError(
-                "The 'colbert' package is not installed. Install with: pip install colbert-ai"
-            ) from e
-        # Late-interaction scoring reuses ColBERT's checkpoint scorer; the heavy
-        # FAISS index build is avoided because we score a small candidate set
-        # directly (reranking already-filtered top-K, not full-corpus search).
-        config = ColBERTConfig()
-        self._model = Checkpoint(self.model_name, colbert_config=config)
-        logger.info("ColBERT late-interaction reranker loaded: %s", self.model_name)
+        with self._init_lock:
+            if self._model is not None:
+                return
+            prepared = prepare_external_model(
+                operation=EgressOperation.RERANKING,
+                provider="colbert-reranker",
+                model_reference=self.model_name,
+            )
+            try:
+                with force_model_offline():
+                    try:
+                        from colbert.infra import ColBERTConfig  # type: ignore
+                        from colbert.modeling.checkpoint import Checkpoint  # type: ignore
+                    except ModuleNotFoundError as e:  # pragma: no cover - depends on env
+                        raise ColBERTUnavailableError(
+                            "The 'colbert' package is not installed. Install with: pip install colbert-ai"
+                        ) from e
+                    # Late-interaction scoring reuses ColBERT's checkpoint scorer; the heavy
+                    # FAISS index build is avoided because we score a small candidate set
+                    # directly (reranking already-filtered top-K, not full-corpus search).
+                    config = ColBERTConfig()
+                    model = Checkpoint(prepared.local_reference, colbert_config=config)
+            except BaseException:
+                prepared.close()
+                raise
+            self._model = model
+            self._prepared_model = prepared
+            logger.info("ColBERT late-interaction reranker loaded: %s", self.model_name)
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         """Score each document against the query via late interaction.
@@ -111,3 +138,17 @@ class ColBERTLateInteractionReranker:
             max_sim_per_q = sim.max(dim=1).values
             scores.append(float(max_sim_per_q.sum()))
         return scores
+
+    def close(self) -> None:
+        """Close the delegated loader and release its owned staging tree."""
+        model = self._model
+        prepared = self._prepared_model
+        self._model = None
+        self._prepared_model = None
+        try:
+            close = getattr(model, "close", None) if model is not None else None
+            if callable(close):
+                close()
+        finally:
+            if prepared is not None:
+                prepared.close()

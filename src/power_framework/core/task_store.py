@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class TaskStore:
     """Filesystem-backed durable store for tasks, checkpoints, and event journals."""
 
-    def __init__(self, vault_dir: Path) -> None:
+    def __init__(self, vault_dir: Path, *, create_vault: bool = True) -> None:
         raw_vault_dir = Path(vault_dir).expanduser()
         if raw_vault_dir == raw_vault_dir.parent:
             raise ValueError("Vault path must be a dedicated directory, not the filesystem root")
@@ -45,9 +45,11 @@ class TaskStore:
             if parent.is_symlink():
                 raise ValueError("Vault path symlink ancestors are not followed")
         if not raw_vault_dir.exists():
+            if not create_vault:
+                raise FileNotFoundError(f"Vault path does not exist: {raw_vault_dir}")
             raw_vault_dir.mkdir(parents=True)
         self.vault_dir = raw_vault_dir.resolve()
-        self.power_dir = vault_control_dir(self.vault_dir, create=True)
+        self.power_dir = vault_control_dir(self.vault_dir, create=False)
         self.tasks_dir = self.power_dir / "tasks"
         self.events_dir = self.tasks_dir / "events"
         self.checkpoints_dir = self.tasks_dir / "checkpoints"

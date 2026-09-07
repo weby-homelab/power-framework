@@ -4,9 +4,18 @@ import hashlib
 import logging
 import math
 import os
+import threading
 import time
+from contextlib import contextmanager
 from typing import Protocol
 
+from power_framework.core.egress import EgressOperation
+from power_framework.core.model_policy import (
+    PreparedModel,
+    acquire_model_files,
+    force_model_offline,
+    prepare_external_model,
+)
 from power_framework.core.utils import get_cpu_worker_limit
 from power_framework.experimental.embeddings import select_onnx_providers, verify_bound_provider
 
@@ -38,6 +47,8 @@ QWEN3_RERANKER_MODEL = os.getenv("POWER_QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Re
 
 # Jina remains a documented opt-in only (CC-BY-NC-4.0).
 JINA_RERANKER_MODEL = "jinaai/jina-reranker-v2-base-multilingual"
+JINA_RERANKER_REVISION = "9cfeff2df7d40d1b78e75e5e9cebec92a99813c9"
+_BGE_RERANKER_INIT_LOCK = threading.Lock()
 
 
 class RerankerProtocol(Protocol):
@@ -65,6 +76,17 @@ def _verify_sha256(path: str, expected: str) -> None:
         raise RuntimeError(f"model_sha256_mismatch:{os.path.basename(path)}")
 
 
+@contextmanager
+def _prepared_model_constructor_environment(prepared: PreparedModel):
+    """Protect a delegated constructor and release staging on any failure."""
+    try:
+        with force_model_offline():
+            yield
+    except BaseException:
+        prepared.close()
+        raise
+
+
 class RerankerManager:
     """Jina v2 cross-encoder reranker — OPT-IN ONLY (CC-BY-NC-4.0).
 
@@ -73,14 +95,25 @@ class RerankerManager:
     license violations when POWER is used under a GPLv3/commercial context.
     """
 
-    def __init__(self, model_name: str = JINA_RERANKER_MODEL) -> None:
-        self.model_name = model_name
+    def __init__(self, model_name: str | None = None) -> None:
+        self.model_name: str = (
+            model_name or os.getenv("POWER_JINA_RERANKER_MODEL") or JINA_RERANKER_MODEL
+        )
         self._model: object | None = None
+        self._prepared_model: PreparedModel | None = None
+        self._init_lock = threading.Lock()
         self._use_qwen3 = os.getenv("POWER_EMBED_PROVIDER", "").lower() == "qwen3"
 
     def _lazy_init(self) -> None:
         if self._model is not None:
             return
+        with self._init_lock:
+            if self._model is not None:
+                return
+            self._initialize_model()
+
+    def _initialize_model(self) -> None:
+        """Construct a delegated model while the caller holds the init lock."""
         if os.getenv("POWER_RERANKER", "").lower() != "jina" or not _env_flag(
             ALLOW_NONCOMMERCIAL_MODELS_ENV
         ):
@@ -90,28 +123,80 @@ class RerankerManager:
                 f"permitted non-commercial use, or rely on the MIT/Apache BGE reranker default."
             )
         if self._use_qwen3:
+            prepared = prepare_external_model(
+                operation=EgressOperation.RERANKING,
+                provider="qwen3-reranker-onnx",
+                model_reference=os.getenv("POWER_QWEN3_RERANKER_MODEL", QWEN3_RERANKER_MODEL),
+            )
+            loader_model_name = os.getenv(
+                "POWER_QWEN3_RERANKER_MODEL", QWEN3_RERANKER_MODEL
+            ).rsplit("@", 1)[0]
             try:
-                from qwen3_embed import TextCrossEncoder as Qwen3TextCrossEncoder
-            except ImportError as e:
-                raise ImportError(
-                    "qwen3-embed is required for Qwen3 reranking. "
-                    "Install it with: pip install qwen3-embed"
-                ) from e
-            self._model = Qwen3TextCrossEncoder(model_name=QWEN3_RERANKER_MODEL)
+                with force_model_offline():
+                    try:
+                        from qwen3_embed import TextCrossEncoder as Qwen3TextCrossEncoder
+                    except ImportError as e:
+                        raise ImportError(
+                            "qwen3-embed is required for Qwen3 reranking. "
+                            "Install it with: pip install qwen3-embed"
+                        ) from e
+                    model = Qwen3TextCrossEncoder(
+                        model_name=loader_model_name,
+                        specific_model_path=prepared.local_reference,
+                        threads=get_cpu_worker_limit(),
+                        local_files_only=True,
+                        lazy_load=False,
+                    )
+            except BaseException:
+                prepared.close()
+                raise
+            self._model = model
+            self._prepared_model = prepared
             return
-        try:
-            from fastembed.rerank.cross_encoder import TextCrossEncoder
-        except ImportError as e:
-            raise ImportError(
-                "fastembed is required. Install it with: pip install fastembed"
-            ) from e
-        self._model = TextCrossEncoder(model_name=self.model_name)
+        model_reference = self.model_name
+        if "@" not in model_reference:
+            model_reference = f"{model_reference}@{JINA_RERANKER_REVISION}"
+        prepared = prepare_external_model(
+            operation=EgressOperation.RERANKING,
+            provider="jina-reranker",
+            model_reference=model_reference,
+            expected_license="CC-BY-NC-4.0",
+        )
+        loader_model_name = model_reference.rsplit("@", 1)[0]
+        with _prepared_model_constructor_environment(prepared):
+            try:
+                from fastembed.rerank.cross_encoder import TextCrossEncoder
+            except Exception as e:
+                raise ImportError(
+                    "fastembed is required. Install it with: pip install fastembed"
+                ) from e
+            model = TextCrossEncoder(
+                model_name=loader_model_name,
+                specific_model_path=prepared.local_reference,
+                lazy_load=False,
+            )
+        self._model = model
+        self._prepared_model = prepared
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         self._lazy_init()
         assert self._model is not None
         scores = self._model.rerank(query, documents)
         return [float(s) for s in scores]
+
+    def close(self) -> None:
+        """Close the delegated loader and release its owned staging tree."""
+        model = self._model
+        prepared = self._prepared_model
+        self._model = None
+        self._prepared_model = None
+        try:
+            close = getattr(model, "close", None) if model is not None else None
+            if callable(close):
+                close()
+        finally:
+            if prepared is not None:
+                prepared.close()
 
 
 class BGEM3Reranker:
@@ -128,12 +213,18 @@ class BGEM3Reranker:
 
     def __init__(
         self,
-        repo: str = BGE_RERANKER_ONNX_REPO,
-        revision: str = BGE_RERANKER_ONNX_REVISION,
+        repo: str | None = None,
+        revision: str | None = None,
     ) -> None:
-        self.repo = repo
-        self.revision = revision
-        self.model_name = f"{repo}@{revision}"
+        self.repo: str = (
+            repo or os.getenv("POWER_BGE_RERANKER_ONNX_REPO") or BGE_RERANKER_PINNED_REPO
+        )
+        self.revision: str = (
+            revision
+            or os.getenv("POWER_BGE_RERANKER_ONNX_REVISION")
+            or BGE_RERANKER_PINNED_REVISION
+        )
+        self.model_name = f"{self.repo}@{self.revision}"
         self._session: object | None = None
         self._tokenizer: object | None = None
         self.active_provider: str | None = None
@@ -141,18 +232,28 @@ class BGEM3Reranker:
     def _lazy_init(self) -> None:
         if self._session is not None:
             return
-        import threading
-
-        _lock = getattr(type(self), "_init_lock", None)
-        if _lock is None:
-            _lock = threading.Lock()
-            type(self)._init_lock = _lock
-        with _lock:
+        with _BGE_RERANKER_INIT_LOCK:
             if self._session is not None:
                 return
+            model_files = acquire_model_files(
+                operation=EgressOperation.RERANKING,
+                repo=self.repo,
+                revision=self.revision,
+                provider="bge-reranker-v2-m3-onnx",
+                required_files=("onnx/model.onnx", "onnx/model.onnx_data", "tokenizer.json"),
+                canonical_repo=BGE_RERANKER_PINNED_REPO,
+                canonical_revision=BGE_RERANKER_PINNED_REVISION,
+                canonical_provider="bge-reranker-v2-m3-onnx",
+                canonical_license="Apache-2.0",
+                canonical_hashes={
+                    "onnx/model.onnx": BGE_RERANKER_FILE_SHA256["model.onnx"],
+                    "onnx/model.onnx_data": BGE_RERANKER_FILE_SHA256["model.onnx_data"],
+                    "tokenizer.json": BGE_RERANKER_FILE_SHA256["tokenizer.json"],
+                },
+                custom_license="Apache-2.0",
+            )
             try:
                 import onnxruntime as ort
-                from huggingface_hub import hf_hub_download
                 from tokenizers import Tokenizer
             except ImportError as e:
                 raise ImportError(
@@ -160,66 +261,8 @@ class BGEM3Reranker:
                     "Install with: pip install power-framework"
                 ) from e
 
-            offline = (
-                os.getenv("HF_HUB_OFFLINE", "0") == "1"
-                or os.getenv("TRANSFORMERS_OFFLINE", "0") == "1"
-            )
-            local_only = offline
-            try:
-                model_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx",
-                    revision=self.revision,
-                    local_files_only=local_only,
-                )
-                data_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx_data",
-                    revision=self.revision,
-                    local_files_only=local_only,
-                )
-                tok_path = hf_hub_download(
-                    self.repo,
-                    "tokenizer.json",
-                    revision=self.revision,
-                    local_files_only=local_only,
-                )
-            except Exception:
-                model_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx",
-                    revision=self.revision,
-                    local_files_only=True,
-                )
-                data_path = hf_hub_download(
-                    self.repo,
-                    "onnx/model.onnx_data",
-                    revision=self.revision,
-                    local_files_only=True,
-                )
-                tok_path = hf_hub_download(
-                    self.repo,
-                    "tokenizer.json",
-                    revision=self.revision,
-                    local_files_only=True,
-                )
-
-            if (
-                self.repo == BGE_RERANKER_PINNED_REPO
-                and self.revision == BGE_RERANKER_PINNED_REVISION
-            ):
-                for filename, path in {
-                    "model.onnx": model_path,
-                    "model.onnx_data": data_path,
-                    "tokenizer.json": tok_path,
-                }.items():
-                    expected = BGE_RERANKER_FILE_SHA256.get(filename)
-                    if expected:
-                        _verify_sha256(path, expected)
-                    else:
-                        raise RuntimeError(
-                            f"missing_reranker_sha256_pin:{filename}; release defaults require pins"
-                        )
+            model_path = model_files["onnx/model.onnx"]
+            tok_path = model_files["tokenizer.json"]
 
             so = ort.SessionOptions()
             so.enable_cpu_mem_arena = False
@@ -234,15 +277,19 @@ class BGEM3Reranker:
             active_provider = verify_bound_provider(session, providers, "POWER_RERANKER_DEVICE")
             self._session = session
             self.active_provider = active_provider
-            self._tokenizer = Tokenizer.from_file(tok_path)
-            self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
+            try:
+                self._tokenizer = Tokenizer.from_file(tok_path)
+                self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
 
-            # Probe: eagerly verify the backend can allocate and produce a score.
-            probe = self._rerank_raw("probe query", "probe passage")
-            if probe is None or len(probe) != 1:
+                # Probe: eagerly verify the backend can allocate and produce a score.
+                probe = self._rerank_raw("probe query", "probe passage")
+                if probe is None or len(probe) != 1:
+                    raise RuntimeError("bge_reranker_onnx_probe_failed")
+            except Exception:
                 self._session = None
+                self._tokenizer = None
                 self.active_provider = None
-                raise RuntimeError("bge_reranker_onnx_probe_failed")
+                raise
 
     def _rerank_batch(self, query: str, documents: list[str]) -> list[float] | None:
         import numpy as np

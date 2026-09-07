@@ -39,6 +39,28 @@ when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, and
   the verified provider after successful session creation; a failed check does
   not retain the invalid session.
 
+### Model acquisition security contract
+
+The canonical BGE-M3 loader uses the pinned repository, immutable commit, and
+complete runtime-file SHA-256 manifest from `release/models.lock.json`. A
+complete cached canonical snapshot works with the default
+`POWER_EGRESS_POLICY=deny`; a missing file fails before any HF network call
+under deny/offline policy. An explicitly permissive policy may fetch the
+missing pinned files through the central egress gate and verifies them before
+loading.
+`POWER_MODEL_OFFLINE=1`, `HF_HUB_OFFLINE=1`, and `TRANSFORMERS_OFFLINE=1` all
+force cache-only behavior, even when a permissive egress policy is configured.
+Remote acquisition is restricted to the exact HTTPS `huggingface.co` origin.
+
+Legacy FastEmbed and Qwen model references are not authorization grants. A
+delegated custom model must use `org/model@<40-hex-commit>` and require both
+`POWER_ALLOW_CUSTOM_MODELS=1` and a `POWER_MODEL_APPROVAL` JSON manifest with
+exact `operation`, `provider`, `license`, `repo`, `revision`, and a complete
+`files` SHA-256 map. The model policy verifies every approved file and gives
+the delegated loader a private staging directory containing only those files.
+Unapproved, floating, partial, or mismatched models fail closed. Ollama remains
+local-loopback-only.
+
 `POWER_EMBED_DEVICE=cuda` and `POWER_RERANKER_DEVICE=cuda` are therefore
 runtime assertions, not performance hints. Set the corresponding variable to
 `auto` when CPU fallback is intended.
@@ -46,7 +68,7 @@ runtime assertions, not performance hints. Set the corresponding variable to
 ### Canonical — `BGEM3OnnxManager`
 
 ```python
-BGEM3OnnxManager(model_name: str = "BAAI/bge-m3")
+BGEM3OnnxManager(repo: str | None = None, revision: str | None = None)
 ```
 
 - Direct `onnxruntime` + `tokenizers` loader (no PyTorch, no fastembed).

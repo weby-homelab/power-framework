@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from power_framework.core import generation_index
+from power_framework.core import generation_index, index_sync
+from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
 from power_framework.core.db import _init_db
 from power_framework.core.generation_index import (
     ActiveGeneration,
@@ -472,6 +473,29 @@ def test_legacy_search_database_is_imported_before_removal(
     assert search_vault(vault, "legacy-token", mode="fts")
 
 
+def test_legacy_migration_rebuilds_content_for_changed_source_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A legacy derived row must not be paired with a newer source projection."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    vault = _vault(tmp_path, "legacy-rewrite", "old-token")
+    legacy_path = vault_db_path(vault)
+    with closing(sqlite3.connect(legacy_path)) as conn:
+        _init_db(conn)
+        _sync_vault_to_db(vault, conn, sync_embeddings=False)
+
+    note = vault / "01_Projects" / "Test.md"
+    note.write_text(
+        note.read_text(encoding="utf-8").replace("old-token", "new-token"), encoding="utf-8"
+    )
+
+    report = sync_vault_atomically(vault, sync_embeddings=False)
+
+    assert report.actual_files == 1
+    assert search_vault(vault, "new-token", mode="fts")
+    assert not search_vault(vault, "old-token", mode="fts")
+
+
 def test_stale_legacy_database_falls_back_to_source_rebuild(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -656,3 +680,122 @@ def test_legacy_dense_state_is_also_fail_closed(
     assert active_dense_chunk_count(vault) == 1
     with pytest.raises(IndexGenerationError, match=r"Refusing --fts-only.*1 chunks"):
         sync_vault_atomically(vault, sync_embeddings=False)
+
+
+def test_empty_legacy_dense_migration_writes_zero_count_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty forced rebuild must not inherit a legacy dense identity."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = tmp_path / "empty-legacy-dense"
+    vault.mkdir()
+    legacy = vault_db_path(vault)
+    with closing(sqlite3.connect(legacy)) as conn:
+        _init_db(conn)
+        conn.execute(
+            "INSERT INTO chunk_embeddings(chunk_id, rel_path, embedding, content, mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("legacy", "01_Projects/Removed.md", b"old", "old", 0.0),
+        )
+        conn.executemany(
+            "INSERT INTO dense_index_manifest(manifest_key, manifest_value) VALUES (?, ?)",
+            [
+                ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
+                ("embedding_dimension", "3"),
+                ("chunk_count", "1"),
+                ("embedding_provider", "legacy-provider"),
+                ("embedding_model", "legacy-model"),
+            ],
+        )
+        conn.commit()
+
+    class EmptyDenseManager:
+        model_name = "empty-migration"
+
+        def dimension(self) -> int:
+            return 3
+
+        def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+            del batch_size
+            return [[0.0, 0.0, 0.0] for _ in texts]
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: EmptyDenseManager())
+
+    report = sync_vault_atomically(vault, sync_embeddings=True, force_rebuild=True)
+
+    assert report.actual_chunks == 0
+    active = _active_db(vault)
+    with closing(sqlite3.connect(active)) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0] == 0
+        manifest = dict(
+            conn.execute("SELECT manifest_key, manifest_value FROM dense_index_manifest")
+        )
+        validated = generation_index._validate_staging(
+            conn,
+            set(),
+            True,
+            expected_source_revision=report.source_snapshot_hash,
+        )
+
+    assert manifest == {
+        "schema_version": DENSE_INDEX_SCHEMA_VERSION,
+        "embedding_dimension": "3",
+        "chunk_count": "0",
+        "embedding_provider": "EmptyDenseManager",
+        "embedding_model": "empty-migration",
+    }
+    assert validated[1:] == (0, "EmptyDenseManager", "empty-migration")
+
+
+def test_nonempty_legacy_dense_migration_rewrites_manifest_from_new_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-empty forced migration keeps the regular manifest contract."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "nonempty-legacy-dense", "current-token")
+    legacy = vault_db_path(vault)
+    with closing(sqlite3.connect(legacy)) as conn:
+        _init_db(conn)
+        conn.execute(
+            "INSERT INTO chunk_embeddings(chunk_id, rel_path, embedding, content, mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("legacy", "01_Projects/Test.md", b"old", "old", 0.0),
+        )
+        conn.executemany(
+            "INSERT INTO dense_index_manifest(manifest_key, manifest_value) VALUES (?, ?)",
+            [
+                ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
+                ("embedding_dimension", "99"),
+                ("chunk_count", "1"),
+                ("embedding_provider", "legacy-provider"),
+                ("embedding_model", "legacy-model"),
+            ],
+        )
+        conn.commit()
+
+    class DenseMigrationManager:
+        dimension = 3
+        model_name = "nonempty-migration"
+
+        def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+            del batch_size
+            return [[float(index), 1.0, 0.0] for index, _ in enumerate(texts)]
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: DenseMigrationManager())
+
+    report = sync_vault_atomically(vault, sync_embeddings=True, force_rebuild=True)
+
+    assert report.actual_chunks > 0
+    with closing(sqlite3.connect(_active_db(vault))) as conn:
+        chunk_count = conn.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
+        manifest = dict(
+            conn.execute("SELECT manifest_key, manifest_value FROM dense_index_manifest")
+        )
+
+    assert manifest["schema_version"] == DENSE_INDEX_SCHEMA_VERSION
+    assert manifest["embedding_dimension"] == "3"
+    assert manifest["chunk_count"] == str(chunk_count)
+    assert manifest["embedding_provider"] == "DenseMigrationManager"
+    assert manifest["embedding_model"] == "nonempty-migration"

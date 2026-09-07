@@ -9,7 +9,16 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from power_framework.core.egress import validate_local_ollama_endpoint
+from power_framework.core.egress import EgressOperation, validate_local_ollama_endpoint
+from power_framework.core.model_policy import (
+    ModelPolicyError,
+    PreparedModel,
+    acquire_model_files,
+    force_model_offline,
+    prepare_external_model,
+    resolve_model,
+    verify_model_files,
+)
 from power_framework.core.utils import get_cpu_worker_limit
 
 if TYPE_CHECKING:
@@ -37,8 +46,8 @@ logger = logging.getLogger(__name__)
 #     ~1.6 GB — inside the POWER 3.0 <=2 GB contract — and exposes
 #     dense/sparse/colbert vectors for the Phase 3 late-interaction reranker.
 #
-# Legacy providers (fastembed / qwen3 / ollama) remain reachable via
-# POWER_EMBED_PROVIDER for debugging only; none are the default anymore.
+# Legacy providers remain reachable for debugging only when their model identity
+# is explicitly approved; none are the default anymore.
 EMBED_PROVIDER = os.getenv("POWER_EMBED_PROVIDER", "bge-m3").lower()
 
 # Number of threads used by the embedding engine. Strict 50% CPU Throttling Mandate:
@@ -76,6 +85,18 @@ BGE_M3_FILE_SHA256 = {
 }
 BGE_M3_DIM = 1024
 
+_FASTEMBED_INIT_LOCK = threading.Lock()
+_QWEN3_INIT_LOCK = threading.Lock()
+_BGE_M3_INIT_LOCK = threading.Lock()
+
+
+def _configured_bge_identity() -> tuple[str, str]:
+    """Read the BGE repository and revision at loader/probe time."""
+    return (
+        os.getenv("POWER_BGE_M3_ONNX_REPO", BGE_M3_PINNED_REPO),
+        os.getenv("POWER_BGE_M3_ONNX_REVISION", BGE_M3_PINNED_REVISION),
+    )
+
 
 def dense_embedding_ready() -> tuple[bool, str]:
     """Report whether the canonical dense runtime is locally ready, read-only.
@@ -86,6 +107,24 @@ def dense_embedding_ready() -> tuple[bool, str]:
     """
     if os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower() != "bge-m3":
         return False, "non_canonical_provider"
+    repo, revision = _configured_bge_identity()
+    required_files = ("model.onnx", "model.onnx.data", "tokenizer.json")
+    try:
+        spec = resolve_model(
+            operation=EgressOperation.EMBEDDINGS,
+            repo=repo,
+            revision=revision,
+            provider="bge-m3-onnx",
+            required_files=required_files,
+            canonical_repo=BGE_M3_PINNED_REPO,
+            canonical_revision=BGE_M3_PINNED_REVISION,
+            canonical_provider="bge-m3-onnx",
+            canonical_license="MIT",
+            canonical_hashes=BGE_M3_FILE_SHA256,
+            custom_license="MIT",
+        )
+    except ModelPolicyError:
+        return False, "model_approval_required"
     required_modules = ("onnxruntime", "huggingface_hub", "tokenizers", "numpy")
 
     def module_available(name: str) -> bool:
@@ -113,20 +152,18 @@ def dense_embedding_ready() -> tuple[bool, str]:
                 if xdg_cache
                 else Path.home() / ".cache" / "huggingface" / "hub"
             )
-    snapshot = (
-        cache_root
-        / f"models--{BGE_M3_ONNX_REPO.replace('/', '--')}"
-        / "snapshots"
-        / BGE_M3_ONNX_REVISION
-    )
+    snapshot = cache_root / f"models--{repo.replace('/', '--')}" / "snapshots" / revision
     required_files = ("model.onnx", "model.onnx.data", "tokenizer.json")
     if any(not (snapshot / filename).is_file() for filename in required_files):
         return False, "model_snapshot_missing"
+    try:
+        verify_model_files(
+            spec,
+            {filename: str(snapshot / filename) for filename in required_files},
+        )
+    except ModelPolicyError:
+        return False, "model_snapshot_integrity_failed"
     return True, "ready"
-
-
-def _env_flag(name: str) -> bool:
-    return os.getenv(name, "").lower() in {"1", "true", "yes"}
 
 
 def _preload_gpu_runtime(ort: Any) -> None:
@@ -274,12 +311,13 @@ def configured_embedding_identity() -> tuple[str, str]:
     """Return the configured provider/model identity without loading model assets."""
     provider = os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower()
     if provider == "bge-m3":
-        return "BGEM3OnnxManager", f"{BGE_M3_ONNX_REPO}@{BGE_M3_ONNX_REVISION}"
+        repo, revision = _configured_bge_identity()
+        return "BGEM3OnnxManager", f"{repo}@{revision}"
     if provider == "qwen3":
-        return "Qwen3EmbeddingManager", QWEN3_EMBED_MODEL
+        return "Qwen3EmbeddingManager", os.getenv("POWER_QWEN3_EMBED_MODEL", QWEN3_EMBED_MODEL)
     if provider == "ollama":
-        return "OllamaEmbeddingManager", OLLAMA_EMBED_MODEL
-    return "FastEmbedManager", FASTEMBED_MODEL
+        return "OllamaEmbeddingManager", os.getenv("POWER_OLLAMA_EMBED_MODEL", OLLAMA_EMBED_MODEL)
+    return "FastEmbedManager", os.getenv("POWER_EMBEDDING_MODEL", FASTEMBED_MODEL)
 
 
 def _get_embedding_dim(model_name: str) -> int:
@@ -311,14 +349,8 @@ def _get_embedding_dim(model_name: str) -> int:
         except Exception as e:
             logger.debug("Failed to get embedding dim from Ollama: %s", e)
         return 1024
-    try:
-        from fastembed import TextEmbedding
-
-        for m in TextEmbedding.list_supported_models():
-            if m["model"] == model_name:
-                return int(m["dim"])
-    except Exception as e:
-        logger.debug("Failed to list fastembed models: %s", e)
+    # Do not import a delegated model package while this module is initializing:
+    # its registry may perform acquisition work before the model policy runs.
     return 384
 
 
@@ -459,9 +491,10 @@ class OllamaEmbeddingManager:
 
 
 class FastEmbedManager:
-    def __init__(self, model_name: str = FASTEMBED_MODEL) -> None:
-        self.model_name = model_name
+    def __init__(self, model_name: str | None = None) -> None:
+        self.model_name: str = model_name or os.getenv("POWER_EMBEDDING_MODEL") or FASTEMBED_MODEL
         self._model: TextEmbedding | None = None
+        self._prepared_model: PreparedModel | None = None
 
     @property
     def dimension(self) -> int:
@@ -480,31 +513,45 @@ class FastEmbedManager:
     def _lazy_init(self) -> None:
         if self._model is not None:
             return
-        import threading
-
-        _lock = getattr(type(self), "_init_lock", None)
-        if _lock is None:
-            _lock = threading.Lock()
-            type(self)._init_lock = _lock
-        with _lock:
+        with _FASTEMBED_INIT_LOCK:
             if self._model is not None:
                 return
+            prepared = prepare_external_model(
+                operation=EgressOperation.EMBEDDINGS,
+                provider="fastembed-embedding",
+                model_reference=self.model_name,
+            )
+            loader_model_name = self.model_name.rsplit("@", 1)[0]
             try:
-                os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
-                os.environ["OMP_NUM_THREADS"] = str(EMBED_NUM_THREADS)
-                os.environ["OPENBLAS_NUM_THREADS"] = str(EMBED_NUM_THREADS)
-                from fastembed import TextEmbedding
-            except ImportError:
-                raise ImportError(
-                    "fastembed is required. Install it with: pip install fastembed"
-                ) from None
-
-        logger.info(
-            "Loading embedding model %s (threads=%d) ...",
-            self.model_name,
-            EMBED_NUM_THREADS,
-        )
-        self._model = TextEmbedding(model_name=self.model_name)
+                with force_model_offline(
+                    extra_environment={
+                        "HF_HUB_DISABLE_SYMLINKS": "1",
+                        "OMP_NUM_THREADS": str(EMBED_NUM_THREADS),
+                        "OPENBLAS_NUM_THREADS": str(EMBED_NUM_THREADS),
+                    }
+                ):
+                    try:
+                        from fastembed import TextEmbedding
+                    except ImportError:
+                        raise ImportError(
+                            "fastembed is required. Install it with: pip install fastembed"
+                        ) from None
+                    logger.info(
+                        "Loading embedding model %s (threads=%d) ...",
+                        self.model_name,
+                        EMBED_NUM_THREADS,
+                    )
+                    model = TextEmbedding(
+                        model_name=loader_model_name,
+                        specific_model_path=prepared.local_reference,
+                        threads=EMBED_NUM_THREADS,
+                        lazy_load=False,
+                    )
+            except BaseException:
+                prepared.close()
+                raise
+            self._model = model
+            self._prepared_model = prepared
 
     def embed(self, text: str) -> list[float]:
         self._lazy_init()
@@ -529,6 +576,20 @@ class FastEmbedManager:
             for vec in self._model.embed(texts, batch_size=batch_size, parallel=parallel)
         ]
 
+    def close(self) -> None:
+        """Close the delegated loader and release its owned staging tree."""
+        model = self._model
+        prepared = self._prepared_model
+        self._model = None
+        self._prepared_model = None
+        try:
+            close = getattr(model, "close", None) if model is not None else None
+            if callable(close):
+                close()
+        finally:
+            if prepared is not None:
+                prepared.close()
+
 
 class Qwen3EmbeddingManager:
     """Qwen3-Embedding via the `qwen3-embed` ONNX Runtime backend.
@@ -537,9 +598,12 @@ class Qwen3EmbeddingManager:
     (e.g. i5-5200U / 16GB DDR3). Embedding dim is fixed at 1024 for 0.6B.
     """
 
-    def __init__(self, model_name: str = QWEN3_EMBED_MODEL) -> None:
-        self.model_name = model_name
+    def __init__(self, model_name: str | None = None) -> None:
+        self.model_name: str = (
+            model_name or os.getenv("POWER_QWEN3_EMBED_MODEL") or QWEN3_EMBED_MODEL
+        )
         self._model: Any | None = None
+        self._prepared_model: PreparedModel | None = None
         self._dim = 1024
 
     @property
@@ -549,35 +613,60 @@ class Qwen3EmbeddingManager:
     def _lazy_init(self) -> None:
         if self._model is not None:
             return
-        try:
-            from qwen3_embed import TextEmbedding as Qwen3TextEmbedding
-        except ImportError:
-            raise ImportError(
-                "qwen3-embed is required for the qwen3 provider. "
-                "Install it with: pip install qwen3-embed"
-            ) from None
-        os.environ["OMP_NUM_THREADS"] = str(EMBED_NUM_THREADS)
-        os.environ["OPENBLAS_NUM_THREADS"] = str(EMBED_NUM_THREADS)
-        logger.info(
-            "Loading Qwen3 embedding model %s (ONNX, threads=%d) ...",
-            self.model_name,
-            EMBED_NUM_THREADS,
-        )
-        self._model = Qwen3TextEmbedding(model_name=self.model_name)
-        # Probe: ONNXRuntime's BFCArena can request a multi-GB (or, on some
-        # hosts, tens-of-GB) buffer for a single MatMul node and fail to
-        # allocate even batch_size=1. Detect this eagerly so callers can fall
-        # back instead of silently returning zero embeddings (FP-7).
-        try:
-            _ = next(iter(self._model.embed(["probe"])))
-        except Exception as e:
-            logger.error(
-                "Qwen3 ONNX backend failed to allocate on this host (%s). "
-                "Falling back to fastembed for embeddings.",
-                type(e).__name__,
+        with _QWEN3_INIT_LOCK:
+            if self._model is not None:
+                return
+            prepared = prepare_external_model(
+                operation=EgressOperation.EMBEDDINGS,
+                provider="qwen3-embedding-onnx",
+                model_reference=self.model_name,
             )
-            self._model = None
-            raise RuntimeError("qwen3_onnx_alloc_failed") from e
+            loader_model_name = self.model_name.rsplit("@", 1)[0]
+            try:
+                with force_model_offline(
+                    extra_environment={
+                        "OMP_NUM_THREADS": str(EMBED_NUM_THREADS),
+                        "OPENBLAS_NUM_THREADS": str(EMBED_NUM_THREADS),
+                    }
+                ):
+                    try:
+                        from qwen3_embed import TextEmbedding as Qwen3TextEmbedding
+                    except ImportError:
+                        raise ImportError(
+                            "qwen3-embed is required for the qwen3 provider. "
+                            "Install it with: pip install qwen3-embed"
+                        ) from None
+                    logger.info(
+                        "Loading Qwen3 embedding model %s (ONNX, threads=%d) ...",
+                        self.model_name,
+                        EMBED_NUM_THREADS,
+                    )
+                    model = Qwen3TextEmbedding(
+                        model_name=loader_model_name,
+                        specific_model_path=prepared.local_reference,
+                        threads=EMBED_NUM_THREADS,
+                        local_files_only=True,
+                        lazy_load=False,
+                    )
+                # Probe: ONNXRuntime's BFCArena can request a multi-GB (or, on
+                # some hosts, tens-of-GB) buffer for a single MatMul node and
+                # fail to allocate even batch_size=1. Detect this eagerly so
+                # callers fail instead of silently returning zero embeddings.
+                try:
+                    _ = next(iter(model.embed(["probe"])))
+                except Exception as exc:
+                    logger.error(
+                        "Qwen3 ONNX backend failed to allocate on this host (%s).",
+                        type(exc).__name__,
+                    )
+                    raise RuntimeError("qwen3_onnx_alloc_failed") from exc
+                self._model = model
+                self._prepared_model = prepared
+            except BaseException:
+                self._model = None
+                self._prepared_model = None
+                prepared.close()
+                raise
 
     def embed(self, text: str) -> list[float]:
         self._lazy_init()
@@ -602,6 +691,20 @@ class Qwen3EmbeddingManager:
             for t, v in zip(texts, vecs, strict=True)
         ]
 
+    def close(self) -> None:
+        """Close the delegated loader and release its owned staging tree."""
+        model = self._model
+        prepared = self._prepared_model
+        self._model = None
+        self._prepared_model = None
+        try:
+            close = getattr(model, "close", None) if model is not None else None
+            if callable(close):
+                close()
+        finally:
+            if prepared is not None:
+                prepared.close()
+
 
 class BGEM3OnnxManager:
     """POWER 3.0 canonical embedder: BAAI/bge-m3 via DIRECT onnxruntime.
@@ -623,12 +726,14 @@ class BGEM3OnnxManager:
 
     def __init__(
         self,
-        repo: str = BGE_M3_ONNX_REPO,
-        revision: str = BGE_M3_ONNX_REVISION,
+        repo: str | None = None,
+        revision: str | None = None,
     ) -> None:
-        self.repo = repo
-        self.revision = revision
-        self.model_name = f"{repo}@{revision}"
+        self.repo: str = repo or os.getenv("POWER_BGE_M3_ONNX_REPO") or BGE_M3_PINNED_REPO
+        self.revision: str = (
+            revision or os.getenv("POWER_BGE_M3_ONNX_REVISION") or BGE_M3_PINNED_REVISION
+        )
+        self.model_name = f"{self.repo}@{self.revision}"
         self._session: Any | None = None
         self._tokenizer: Any | None = None
         self._dim = BGE_M3_DIM
@@ -641,18 +746,24 @@ class BGEM3OnnxManager:
     def _lazy_init(self) -> None:
         if self._session is not None:
             return
-        import threading
-
-        _lock = getattr(type(self), "_init_lock", None)
-        if _lock is None:
-            _lock = threading.Lock()
-            type(self)._init_lock = _lock
-        with _lock:
+        with _BGE_M3_INIT_LOCK:
             if self._session is not None:
                 return
             try:
+                model_files = acquire_model_files(
+                    operation=EgressOperation.EMBEDDINGS,
+                    repo=self.repo,
+                    revision=self.revision,
+                    provider="bge-m3-onnx",
+                    required_files=("model.onnx", "model.onnx.data", "tokenizer.json"),
+                    canonical_repo=BGE_M3_PINNED_REPO,
+                    canonical_revision=BGE_M3_PINNED_REVISION,
+                    canonical_provider="bge-m3-onnx",
+                    canonical_license="MIT",
+                    canonical_hashes=BGE_M3_FILE_SHA256,
+                    custom_license="MIT",
+                )
                 import onnxruntime as ort
-                from huggingface_hub import hf_hub_download
                 from tokenizers import Tokenizer
             except ImportError as e:
                 raise ImportError(
@@ -660,46 +771,13 @@ class BGEM3OnnxManager:
                     "huggingface-hub. Install with: pip install power-framework"
                 ) from e
 
-            os.environ["OMP_NUM_THREADS"] = str(EMBED_NUM_THREADS)
-            os.environ["OPENBLAS_NUM_THREADS"] = str(EMBED_NUM_THREADS)
-
             logger.info(
                 "Loading BGE-M3 ONNX embedder from %s (threads=%d, tamed arena) ...",
                 self.repo,
                 EMBED_NUM_THREADS,
             )
-            offline = _env_flag("POWER_MODEL_OFFLINE")
-            model_path = hf_hub_download(
-                self.repo,
-                "model.onnx",
-                revision=self.revision,
-                local_files_only=offline,
-            )
-            sidecar_path = hf_hub_download(
-                self.repo,
-                "model.onnx.data",
-                revision=self.revision,
-                local_files_only=offline,
-            )
-            tok_path = hf_hub_download(
-                self.repo,
-                "tokenizer.json",
-                revision=self.revision,
-                local_files_only=offline,
-            )
-
-            if self.repo == BGE_M3_PINNED_REPO and self.revision == BGE_M3_PINNED_REVISION:
-                for filename, path in {
-                    "model.onnx": model_path,
-                    "model.onnx.data": sidecar_path,
-                    "tokenizer.json": tok_path,
-                }.items():
-                    _verify_sha256(path, BGE_M3_FILE_SHA256[filename])
-            elif not _env_flag("POWER_ALLOW_UNVERIFIED_MODELS"):
-                raise RuntimeError(
-                    "unverified_model_revision: set POWER_ALLOW_UNVERIFIED_MODELS=1 "
-                    "only for explicit development overrides"
-                )
+            model_path = model_files["model.onnx"]
+            tok_path = model_files["tokenizer.json"]
 
             so = ort.SessionOptions()
             # R2 arena taming: no persistent CPU mem arena; grow only on demand.
@@ -711,16 +789,20 @@ class BGEM3OnnxManager:
             active_provider = verify_bound_provider(session, providers, "POWER_EMBED_DEVICE")
             self._session = session
             self.active_provider = active_provider
-            self._tokenizer = Tokenizer.from_file(tok_path)
-            self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
-            # Probe: eagerly verify the backend can allocate and produce a
-            # dense vector, so callers fail loudly here rather than silently
-            # returning [] later (FP-7).
-            probe = self._embed_raw(["probe"])
-            if probe is None or len(probe) != 1 or len(probe[0]) != self._dim:
+            try:
+                self._tokenizer = Tokenizer.from_file(tok_path)
+                self._tokenizer.enable_truncation(max_length=self._MAX_TOKENS)
+                # Probe: eagerly verify the backend can allocate and produce a
+                # dense vector, so callers fail loudly here rather than silently
+                # returning [] later (FP-7).
+                probe = self._embed_raw(["probe"])
+                if probe is None or len(probe) != 1 or len(probe[0]) != self._dim:
+                    raise RuntimeError("bge_m3_onnx_probe_failed")
+            except Exception:
                 self._session = None
+                self._tokenizer = None
                 self.active_provider = None
-                raise RuntimeError("bge_m3_onnx_probe_failed")
+                raise
 
     def _embed_raw(self, texts: list[str]) -> list[list[float]] | None:
         import numpy as np
@@ -765,9 +847,18 @@ class BGEM3OnnxManager:
 
 
 _EMBED_MANAGER_CACHE: dict[str, object] = {}
+_EMBED_MANAGER_CACHE_LOCK = threading.Lock()
 
 
 def get_embedding_manager(
+    model_name: str | None = None,
+) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager | BGEM3OnnxManager:
+    """Return one cache-owned manager per configured provider/model identity."""
+    with _EMBED_MANAGER_CACHE_LOCK:
+        return _get_embedding_manager_unlocked(model_name)
+
+
+def _get_embedding_manager_unlocked(
     model_name: str | None = None,
 ) -> OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager | BGEM3OnnxManager:
     # Respect the module-level default (POWER 3.0: bge-m3) unless explicitly
@@ -780,36 +871,24 @@ def get_embedding_manager(
     # cache, or allocation failures are release-contract failures and must not
     # silently switch the retrieval model.
     if effective_provider == "bge-m3":
-        key = f"bge-m3:{BGE_M3_ONNX_REPO}@{BGE_M3_ONNX_REVISION}"
+        repo, revision = _configured_bge_identity()
+        key = f"bge-m3:{repo}@{revision}"
         if key in _EMBED_MANAGER_CACHE:
             return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
         try:
             mgr: (
                 OllamaEmbeddingManager | FastEmbedManager | Qwen3EmbeddingManager | BGEM3OnnxManager
-            ) = BGEM3OnnxManager(BGE_M3_ONNX_REPO, BGE_M3_ONNX_REVISION)
+            ) = BGEM3OnnxManager(repo, revision)
             mgr._lazy_init()  # eager probe: fail loudly, not silently
             _EMBED_MANAGER_CACHE[key] = mgr
             return mgr
+        except ModelPolicyError:
+            raise
         except Exception as e:
             raise RuntimeError(
                 "bge_m3_init_failed: verify release/models.lock.json, prefetch the pinned "
                 "snapshot, and rerun 'power sync'"
             ) from e
-
-    # Graceful fallback: if the qwen3 backend is selected but `qwen3-embed`
-    # is not installed (e.g. minimal install / CI without the extra), fall
-    # back to fastembed instead of raising at import time. This keeps the CLI
-    # and tests working everywhere.
-    if effective_provider == "qwen3":
-        try:
-            import qwen3_embed  # noqa: F401
-        except ImportError:
-            logger.warning(
-                "POWER_EMBED_PROVIDER=qwen3 but `qwen3-embed` is not installed. "
-                "Falling back to fastembed (MiniLM). Install with: pip install "
-                "'power-framework[qwen3]'."
-            )
-            effective_provider = "fastembed"
 
     if effective_provider == "ollama":
         key = f"ollama:{model_name or OLLAMA_EMBED_MODEL}"
@@ -817,22 +896,18 @@ def get_embedding_manager(
             _EMBED_MANAGER_CACHE[key] = OllamaEmbeddingManager(model_name or OLLAMA_EMBED_MODEL)
         return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
     if effective_provider == "qwen3":
-        key = f"qwen3:{model_name or QWEN3_EMBED_MODEL}"
+        configured_model = model_name or os.getenv("POWER_QWEN3_EMBED_MODEL") or QWEN3_EMBED_MODEL
+        key = f"qwen3:{configured_model}"
         if key not in _EMBED_MANAGER_CACHE:
-            try:
-                mgr = Qwen3EmbeddingManager(model_name or QWEN3_EMBED_MODEL)
-                mgr._lazy_init()  # probe allocation eagerly
-                _EMBED_MANAGER_CACHE[key] = mgr
-            except RuntimeError as e:
-                if "qwen3_onnx_alloc_failed" in str(e):
-                    logger.warning("Qwen3 ONNX allocation failed; falling back to fastembed.")
-                    effective_provider = "fastembed"
-                else:
-                    raise
+            mgr = Qwen3EmbeddingManager(configured_model)
+            mgr._lazy_init()  # probe allocation eagerly
+            _EMBED_MANAGER_CACHE[key] = mgr
+        return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
     if effective_provider == "fastembed":
-        key = f"fastembed:{model_name or FASTEMBED_MODEL}"
+        configured_model = model_name or os.getenv("POWER_EMBEDDING_MODEL") or FASTEMBED_MODEL
+        key = f"fastembed:{configured_model}"
         if key not in _EMBED_MANAGER_CACHE:
-            _EMBED_MANAGER_CACHE[key] = FastEmbedManager(model_name or FASTEMBED_MODEL)
+            _EMBED_MANAGER_CACHE[key] = FastEmbedManager(configured_model)
         return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
 
     # WTF #3 remediation: never silently fall back to an unintended embedding

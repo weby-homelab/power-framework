@@ -49,11 +49,17 @@ cache namespace, or a legacy index during a normal request. The explicit
 behavior and is not a production deployment profile. The bounded fallback is
 labelled `no_active_generation_bounded_scan` in result metadata.
 
-`source.read` reads one bounded file directly. Stem lookup consults the
-projection; multiple candidates produce a typed conflict rather than silently
-selecting the first file. `last_indexed_at` is the generation completion time,
-`healthy` means verified projection coverage/integrity, and `total_links` counts
-resolved links only. Ambiguities remain separately visible in graph data.
+`source.read` resolves both exact paths and stems through the canonical source
+projection before opening bytes. A readable source must be a current, regular,
+non-symlink Markdown file in the existing P.A.R.A./ignore scope with valid OKF
+metadata; filesystem containment alone is not authorization. Unsupported
+regular files, control directories, absolute paths, traversal, and projection
+misses use typed not-found/invalid failures without returning file contents,
+size, digest, or internal control metadata. Multiple stem candidates produce a
+typed conflict rather than silently selecting the first file. `last_indexed_at`
+is the generation completion time, `healthy` means verified projection
+coverage/integrity, and `total_links` counts resolved links only. Ambiguities
+remain separately visible in graph data.
 
 Graph `focus_path` and `max_depth` implement deterministic bounded BFS. A missing
 focus path is a typed not-found result; `max_depth` is not an echoed decorative
@@ -70,7 +76,7 @@ as typed `source_projection_stale` and fails closed; operators must run
 |---|---:|---:|---:|---:|
 | `source.list` | supported | not published | not published | supported through `PowerClient` |
 | `source.stats` | supported | not published | not published | supported through `PowerClient` |
-| `source.read` | supported | not published | not published | supported through `PowerClient` |
+| `source.read` | supported | not published | not published (catalog reads only) | supported through `PowerClient` |
 | `source.graph` | supported | not published | not published | supported through `PowerClient` |
 | `retrieve` | supported | supported | supported | supported through `PowerClient` |
 | Task/Decision/Proposal/Receipt | supported | supported adapter paths | supported adapter paths | supported through `PowerClient` |
