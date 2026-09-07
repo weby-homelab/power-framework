@@ -206,7 +206,7 @@ def test_model_acquisition_cannot_be_interleaved_by_constructor_environment(
     release_download = threading.Event()
     constructor_entered = threading.Event()
     observed_flags: list[tuple[str | None, ...]] = []
-    errors: list[BaseException] = []
+    errors: list[Exception] = []
     monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
     monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: {})
 
@@ -230,7 +230,7 @@ def test_model_acquisition_cannot_be_interleaved_by_constructor_environment(
     def acquire() -> None:
         try:
             model_policy.acquire_model_files(**_acquire_kwargs("org/model", "a" * 40, hashes))
-        except BaseException as exc:  # pragma: no cover - assertion below reports the failure
+        except Exception as exc:  # pragma: no cover - assertion below reports the failure
             errors.append(exc)
 
     acquisition_thread = threading.Thread(target=acquire)
@@ -847,8 +847,8 @@ def test_constructor_local_offline_state_does_not_block_concurrent_acquisition(
     acquisition_started = threading.Event()
     acquisition_checked = threading.Event()
     offline_check_started = threading.Event()
-    constructor_errors: list[BaseException] = []
-    acquisition_errors: list[BaseException] = []
+    constructor_errors: list[Exception] = []
+    acquisition_errors: list[Exception] = []
     acquisition_result: list[dict[str, str]] = []
 
     class BlockingEmbedding:
@@ -873,7 +873,7 @@ def test_constructor_local_offline_state_does_not_block_concurrent_acquisition(
     def construct_delegated() -> None:
         try:
             manager._lazy_init()
-        except BaseException as exc:  # pragma: no cover - assertion below reports the failure
+        except Exception as exc:  # pragma: no cover - assertion below reports the failure
             constructor_errors.append(exc)
 
     def acquire_remote() -> None:
@@ -893,7 +893,7 @@ def test_constructor_local_offline_state_does_not_block_concurrent_acquisition(
                     canonical_hashes=remote_hashes,
                 )
             )
-        except BaseException as exc:  # pragma: no cover - assertion below reports the failure
+        except Exception as exc:  # pragma: no cover - assertion below reports the failure
             acquisition_errors.append(exc)
 
     constructor_thread = threading.Thread(target=construct_delegated)

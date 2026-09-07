@@ -588,8 +588,8 @@ def test_bge_reranker_probe_failure_clears_session_and_allows_clean_retry(
         def from_file(_path: str) -> FakeTokenizer:
             return FakeTokenizer()
 
-        def enable_truncation(self, max_length: int) -> None:
-            del max_length
+        def enable_truncation(self, **_kwargs: int) -> None:
+            return None
 
     tokenizers = ModuleType("tokenizers")
     tokenizers.Tokenizer = FakeTokenizer  # type: ignore[attr-defined]

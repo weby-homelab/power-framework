@@ -345,13 +345,13 @@ class TestEmbeddingManager:
 
         manager = embeddings.FastEmbedManager("custom/model@" + "a" * 40)
         start_barrier = threading.Barrier(2)
-        errors: list[BaseException] = []
+        errors: list[Exception] = []
 
         def initialize() -> None:
             try:
                 start_barrier.wait(timeout=5)
                 manager._lazy_init()
-            except BaseException as exc:  # pragma: no cover - assertion below reports the failure
+            except Exception as exc:  # pragma: no cover - assertion below reports the failure
                 errors.append(exc)
 
         workers = [threading.Thread(target=initialize) for _ in range(2)]
@@ -685,8 +685,8 @@ class TestEmbeddingManager:
                     raise RuntimeError("synthetic BGE tokenizer failure")
                 return FakeTokenizer()
 
-            def enable_truncation(self, max_length: int) -> None:
-                del max_length
+            def enable_truncation(self, **_kwargs: int) -> None:
+                return None
 
         tokenizers = ModuleType("tokenizers")
         tokenizers.Tokenizer = FakeTokenizer  # type: ignore[attr-defined]
