@@ -15,6 +15,57 @@ from power_framework.core.egress import EgressDeniedError, EgressOperation
 from power_framework.experimental import embeddings, reranker
 
 
+@pytest.fixture(autouse=True)
+def isolate_model_policy_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep model-policy assertions independent of shell and CI environment state."""
+    assert model_policy.MODEL_OFFLINE_ENV_VARS == (
+        "POWER_MODEL_OFFLINE",
+        "HF_HUB_OFFLINE",
+        "TRANSFORMERS_OFFLINE",
+    )
+    for name in model_policy.MODEL_OFFLINE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    for name in (
+        "HF_ENDPOINT",
+        "POWER_EGRESS_POLICY",
+        "POWER_ALLOW_UNVERIFIED_MODELS",
+        "POWER_ALLOW_NONCOMMERCIAL_MODELS",
+        "POWER_EMBED_PROVIDER",
+        "POWER_RERANKER",
+        "POWER_BGE_M3_ONNX_REPO",
+        "POWER_BGE_M3_ONNX_REVISION",
+        "POWER_BGE_RERANKER_ONNX_REPO",
+        "POWER_BGE_RERANKER_ONNX_REVISION",
+        "POWER_QWEN3_RERANKER_MODEL",
+        "POWER_JINA_RERANKER_MODEL",
+        "POWER_QWEN3_EMBED_MODEL",
+        "POWER_OLLAMA_EMBED_MODEL",
+        "POWER_EMBEDDING_MODEL",
+        "POWER_COLBERT_MODEL",
+        model_policy.ALLOW_CUSTOM_MODELS_ENV,
+        model_policy.MODEL_APPROVAL_ENV,
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(embeddings, "EMBED_PROVIDER", "bge-m3")
+    monkeypatch.setattr(embeddings, "QWEN3_EMBED_MODEL", "n24q02m/Qwen3-Embedding-0.6B-ONNX")
+    monkeypatch.setattr(embeddings, "OLLAMA_EMBED_MODEL", "qwen3-embedding:0.6b")
+    monkeypatch.setattr(
+        embeddings,
+        "FASTEMBED_MODEL",
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    )
+    monkeypatch.setattr(embeddings, "BGE_M3_ONNX_REPO", embeddings.BGE_M3_PINNED_REPO)
+    monkeypatch.setattr(embeddings, "BGE_M3_ONNX_REVISION", embeddings.BGE_M3_PINNED_REVISION)
+    monkeypatch.setattr(reranker, "BGE_RERANKER_ONNX_REPO", reranker.BGE_RERANKER_PINNED_REPO)
+    monkeypatch.setattr(
+        reranker, "BGE_RERANKER_ONNX_REVISION", reranker.BGE_RERANKER_PINNED_REVISION
+    )
+    monkeypatch.setattr(reranker, "QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX")
+    from power_framework.experimental import colbert_reranker
+
+    monkeypatch.setattr(colbert_reranker, "COLBERT_DEFAULT_MODEL", "colbert-ir/colbertv2.0")
+
+
 def _files(tmp_path: Path, *, mismatch: bool = False) -> tuple[dict[str, str], dict[str, str]]:
     paths: dict[str, str] = {}
     hashes: dict[str, str] = {}

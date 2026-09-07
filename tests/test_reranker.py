@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import MagicMock
 
 import pytest
 from huggingface_hub import try_to_load_from_cache
 
-from power_framework.core.model_policy import ModelApprovalError
+from power_framework.core.model_policy import MODEL_OFFLINE_ENV_VARS, ModelApprovalError
 from power_framework.core.reranker import (
     ALLOW_NONCOMMERCIAL_MODELS_ENV,
     BGE_RERANKER_FILE_SHA256,
@@ -20,6 +22,7 @@ from power_framework.core.reranker import (
     RerankerManager,
     get_reranker,
 )
+from power_framework.experimental import reranker as reranker_module
 
 
 def _bge_reranker_available() -> bool:
@@ -36,6 +39,20 @@ def _bge_reranker_available() -> bool:
         and Path(cached).is_file()
         for filename in ("onnx/model.onnx", "onnx/model.onnx_data", "tokenizer.json")
     )
+
+
+def _install_hf_download_spy(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Install a local HF double so policy tests cannot perform real egress."""
+    calls: list[str] = []
+    module = ModuleType("huggingface_hub")
+
+    def download(_repo: str, filename: str, **_kwargs: object) -> str:
+        calls.append(filename)
+        return "unexpected-model-file"
+
+    module.hf_hub_download = download  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "huggingface_hub", module)
+    return calls
 
 
 class TestRerankerManager:
@@ -235,13 +252,32 @@ class TestRerankerManager:
         # The UA↔EN semantic query should favor the knowledge-base passages.
         assert scores[0] > scores[1]
 
-    def test_qwen3_reranker_requires_model_policy_before_import(self):
-        import sys
+    def test_qwen3_reranker_requires_model_policy_before_import(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
         from unittest.mock import patch
 
         import pytest
 
+        from power_framework.core import model_policy
         from power_framework.core.reranker import RerankerManager
+
+        for name in MODEL_OFFLINE_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+        for name in (
+            "HF_ENDPOINT",
+            "POWER_EGRESS_POLICY",
+            "POWER_ALLOW_CUSTOM_MODELS",
+            "POWER_MODEL_APPROVAL",
+            "POWER_QWEN3_RERANKER_MODEL",
+        ):
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
+        monkeypatch.setattr(
+            reranker_module, "QWEN3_RERANKER_MODEL", "n24q02m/Qwen3-Reranker-0.6B-ONNX"
+        )
+        monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: {})
+        calls = _install_hf_download_spy(monkeypatch)
 
         with (
             patch.dict(
@@ -257,28 +293,50 @@ class TestRerankerManager:
             mgr = RerankerManager()
             with pytest.raises(ModelApprovalError, match="immutable_model_revision_required"):
                 mgr._lazy_init()
+        assert calls == []
 
-    def test_fastembed_reranker_requires_model_policy_before_import(self):
-        import sys
+    def test_fastembed_reranker_requires_model_policy_before_import(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
         from unittest.mock import patch
 
         import pytest
 
+        from power_framework.core import model_policy
         from power_framework.core.reranker import (
             ALLOW_NONCOMMERCIAL_MODELS_ENV,
             RerankerManager,
         )
 
+        for name in MODEL_OFFLINE_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+        for name in (
+            "HF_ENDPOINT",
+            "POWER_EGRESS_POLICY",
+            "POWER_ALLOW_CUSTOM_MODELS",
+            "POWER_MODEL_APPROVAL",
+            "POWER_JINA_RERANKER_MODEL",
+        ):
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
+        monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: {})
+        calls = _install_hf_download_spy(monkeypatch)
+
         with (
             patch.dict(
                 "os.environ",
-                {ALLOW_NONCOMMERCIAL_MODELS_ENV: "1", "POWER_RERANKER": "jina"},
+                {
+                    ALLOW_NONCOMMERCIAL_MODELS_ENV: "1",
+                    "POWER_EMBED_PROVIDER": "bge-m3",
+                    "POWER_RERANKER": "jina",
+                },
             ),
             patch.dict(sys.modules, {"fastembed.rerank.cross_encoder": None}),
         ):
             mgr = RerankerManager()
             with pytest.raises(ModelApprovalError, match="custom_model_requires_approval"):
                 mgr._lazy_init()
+        assert calls == []
 
     def test_colbert_rerank_with_mock_model(self):
         from unittest.mock import MagicMock, patch

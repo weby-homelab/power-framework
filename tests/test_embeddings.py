@@ -21,6 +21,9 @@ class TestEmbeddingManager:
     def test_dense_readiness_is_read_only_and_reports_missing_snapshot(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        monkeypatch.setenv("POWER_EMBED_PROVIDER", "bge-m3")
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REPO", embeddings.BGE_M3_PINNED_REPO)
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REVISION", embeddings.BGE_M3_PINNED_REVISION)
         monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "cache"))
 
         ready, reason = embeddings.dense_embedding_ready()
@@ -32,8 +35,14 @@ class TestEmbeddingManager:
     def test_dense_readiness_accepts_complete_local_snapshot(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        monkeypatch.setenv("POWER_EMBED_PROVIDER", "bge-m3")
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REPO", embeddings.BGE_M3_PINNED_REPO)
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REVISION", embeddings.BGE_M3_PINNED_REVISION)
         snapshot = (
-            tmp_path / "models--aapot--bge-m3-onnx" / "snapshots" / embeddings.BGE_M3_ONNX_REVISION
+            tmp_path
+            / "models--aapot--bge-m3-onnx"
+            / "snapshots"
+            / embeddings.BGE_M3_PINNED_REVISION
         )
         snapshot.mkdir(parents=True)
         expected_hashes: dict[str, str] = {}
@@ -52,6 +61,7 @@ class TestEmbeddingManager:
     def test_dense_readiness_rejects_unapproved_model_override(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        monkeypatch.setenv("POWER_EMBED_PROVIDER", "bge-m3")
         monkeypatch.setenv("POWER_BGE_M3_ONNX_REPO", "custom/model")
         monkeypatch.setenv("POWER_BGE_M3_ONNX_REVISION", "b" * 40)
         monkeypatch.delenv("POWER_ALLOW_CUSTOM_MODELS", raising=False)
@@ -320,6 +330,10 @@ class TestEmbeddingManager:
     ):
         from power_framework.core import model_policy
 
+        for name in model_policy.MODEL_OFFLINE_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv("HF_ENDPOINT", raising=False)
+
         class FakeOptions:
             pass
 
@@ -345,8 +359,10 @@ class TestEmbeddingManager:
         monkeypatch.setitem(sys.modules, "onnxruntime", fake_ort)
         monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
         monkeypatch.setitem(sys.modules, "tokenizers", fake_tokenizers)
+        monkeypatch.setenv("POWER_EMBED_PROVIDER", "bge-m3")
         monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
         monkeypatch.setenv("POWER_EGRESS_POLICY", "allow-public")
+        monkeypatch.setattr(model_policy, "_cached_model_files", lambda _spec: {})
         monkeypatch.setattr(
             model_policy,
             "_verify_model_files",
