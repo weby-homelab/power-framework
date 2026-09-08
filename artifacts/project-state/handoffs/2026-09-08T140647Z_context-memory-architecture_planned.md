@@ -55,9 +55,9 @@ BLOCKED / NOT STARTED
 
 ## PR
 
-NOT CREATED — authenticated branch publication was unavailable in this session.
-The local planning branch and signed commit must not be described as a remote PR
-or merged-main evidence.
+[#412](https://github.com/weby-homelab/power-framework/pull/412): OPEN.
+The branch and initial planning commit were published through the GitHub REST
+Git Database API; this packet records the exact PR epoch below.
 
 ## BASE_SHA
 
@@ -65,8 +65,20 @@ or merged-main evidence.
 
 ## HEAD_SHA
 
-No remote HEAD exists because the branch has not been published. The exact
-local signed content commit is recorded below.
+REMOTE_HEAD_AT_PR_CREATION:
+
+`9f505cc9a5cc41d30d5e1dd44b10e3d4ff5ea048`
+
+REMOTE_TREE_AT_PR_CREATION:
+
+`cbdc472ba17a979f6425a10daba167dc00db245d`
+
+REMOTE_PARENT_AT_PR_CREATION:
+
+`d8b704f6125347ff9f9c39981193807d2160b135`
+
+The handoff update below is a new pre-merge candidate epoch and requires fresh
+PR-head/check verification before merge.
 
 LOCAL_CONTENT_COMMIT_SHA:
 
@@ -83,26 +95,29 @@ LOCAL_CONTENT_PARENT:
 ## CANDIDATE_EPOCH
 
 ```text
-PR: NOT CREATED
+PR: 412 OPEN
 BASE_SHA: d8b704f6125347ff9f9c39981193807d2160b135
-LOCAL_HEAD_SHA: ede1d6a646f403f4adbe801033eb696e5e4fdf17
-LOCAL_HEAD_TREE: 75bcde21e2d64384b077caebf49685fc8553d37f
-LOCAL_HEAD_PARENT: d8b704f6125347ff9f9c39981193807d2160b135
-REMOTE_HEAD/TREE/PARENT: NOT AVAILABLE — AUTHENTICATED PUBLICATION PENDING
+HEAD_SHA: 9f505cc9a5cc41d30d5e1dd44b10e3d4ff5ea048
+HEAD_TREE: cbdc472ba17a979f6425a10daba167dc00db245d
+HEAD_PARENT: d8b704f6125347ff9f9c39981193807d2160b135
+RESULT: REST published; GitHub signature verified; handoff update creates a new epoch
 ```
 
-This is an explicit unpublished state, not a candidate approval or a merge
-receipt.
+This is a remote exact-head planning epoch, not a merge receipt or implementation
+approval.
 
 ## MERGE_STATUS
 
-NOT ATTEMPTED — no remote PR exists.
+NOT ATTEMPTED — PR #412 remains open; protected normal merge is pending required
+checks, review policy, and exact-head revalidation.
 
 ## GPG
 
-Local signing key preflight: PASS (`2D49E810C7F2527E`). Local content commit
-`ede1d6a646f403f4adbe801033eb696e5e4fdf17`: `git verify-commit` PASS. GitHub
-signature verification: PENDING because no remote PR/commit was published.
+Local signing key preflight: PASS (`2D49E810C7F2527E`). Local content commits
+`ede1d6a646f403f4adbe801033eb696e5e4fdf17` and `9940ea3dbf751efb6168efc697ff61a524860049`:
+`git verify-commit` PASS. REST-published head
+`9f505cc9a5cc41d30d5e1dd44b10e3d4ff5ea048`: GitHub verification PASS,
+`reason=valid`, `verified_at=2026-09-08T18:08:30Z`.
 
 ## TESTS
 
@@ -128,13 +143,13 @@ environment.
 
 ## CI
 
-NOT RUN — no authenticated remote branch or PR exists. Required remote checks
-remain pending until publication.
+PR #412 was created through REST; required remote checks are pending and must be
+read back from the exact current PR head after the handoff update.
 
 ## CODEQL
 
-NOT RUN — no source or workflow files changed; remote CodeQL is pending a real
-PR if repository policy requests it.
+No source or workflow files changed. CodeQL is pending/read-only remote status
+for the exact PR head if repository policy requires it.
 
 ## DOCS
 
@@ -178,8 +193,8 @@ files, and workflows are untouched.
 
 ## OPEN_BLOCKERS
 
-- The planning branch still requires authenticated publication, a real PR, and
-  protected normal merge before it is canonical repository state.
+- PR #412 requires exact-head required-check/review admission and protected
+  normal merge before it is canonical repository state.
 - Actions #396 is the next independent execution gate and remains HOLD / NOT
   STARTED; it was not inspected for mutation or merged in this planning gate.
 - Phase 5 implementation and Phases 6–9 remain blocked/not started.
@@ -187,11 +202,11 @@ files, and workflows are untouched.
 
 ## NEXT_GATE
 
-First publish and normally merge this planning package through the protected
-GitHub path if authenticated publication becomes available. After that, a new
-bounded session may independently revalidate and start the Actions #396
-Supply-Chain Admission gate. Do not start Phase 5 until Controlled Dependency
-Refresh and final integration are fully closed.
+Complete exact-head checks/review and normally merge PR #412 through the
+protected GitHub path. After that, a new bounded session may independently
+revalidate and start the Actions #396 Supply-Chain Admission gate. Do not start
+Phase 5 until Controlled Dependency Refresh and final integration are fully
+closed.
 
 ## ARCHITECTURE_PLAN
 
@@ -247,7 +262,7 @@ Refresh and final integration are fully closed.
 
 ## PUBLICATION
 
-This packet is append-only planning evidence. A protected merge of the planning
-PR is required before the architecture plan and artifacts are called
-`CANONICAL PLANNING`. The historical HF handoff remains immutable and is not
-replaced by this packet.
+This packet is append-only planning evidence. PR #412 is currently open; a
+protected merge of the planning PR is required before the architecture plan and
+artifacts are called `CANONICAL PLANNING`. The historical HF handoff remains
+immutable and is not replaced by this packet.
