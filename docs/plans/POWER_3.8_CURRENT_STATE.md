@@ -48,13 +48,13 @@ CANONICAL_GOVERNANCE_BRANCH:
 docs/power-3.8-governance-bootstrap
 
 CANONICAL_GOVERNANCE_COMMIT:
-PENDING_PROTECTED_MERGE
+d788825607ae55b9de1142f67ab076f8e533d14d (signed candidate; canonical after protected merge)
 
 CANONICAL_GOVERNANCE_PR:
-PENDING_PR_CREATION
+408 OPEN / PROVISIONAL
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-08T081335Z_governance-bootstrap_pre-hf.md
+artifacts/project-state/handoffs/2026-09-08T082529Z_governance-bootstrap_pre-hf.md
 ```
 
 ## Fresh state anchor
@@ -113,6 +113,22 @@ artifacts/project-state/handoffs/2026-09-08T081335Z_governance-bootstrap_pre-hf.
   unresolved review conversation was reported. The remaining `blocked` reason
   is not inferred from those facts and remains subject to the protected merge
   admission test.
+
+## Governance candidate #408
+
+- Branch: `docs/power-3.8-governance-bootstrap`.
+- PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
+  `OPEN`, `merged=false`.
+- Candidate head:
+  `d788825607ae55b9de1142f67ab076f8e533d14d`.
+- Candidate tree:
+  `380cba0de80d622e4db109be168f642eaaddd1ea`.
+- Candidate parent:
+  `119d5c39aa2c22734ca72c351f8a70790371678f`.
+- GitHub commit verification: `verified=true`, `reason=valid` at
+  `2026-09-08T08:23:57Z`.
+- The candidate contains only the seven governance/handoff files listed in
+  the PR body; remote required checks are pending for this new head.
 - Intended target: `huggingface-hub 1.30.0`.
 - Maintained specifier: `>=1.30.0,<1.31.0`.
 - PR diff is limited to `pyproject.toml`,
@@ -142,8 +158,10 @@ bypass or retry loop.
 The pre-HF canonical governance bootstrap has started from live `main`:
 
 - Governance branch: `docs/power-3.8-governance-bootstrap`.
-- Governance commit: pending the exact locally signed candidate object.
-- Governance PR: pending creation after local validation.
+- Governance commit: `d788825607ae55b9de1142f67ab076f8e533d14d`, locally and
+  GitHub-verified signed candidate.
+- Governance PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
+  open/provisional until protected merge.
 - The prior `docs/power-3.8-premerge-state-publication` branch remains
   provisional evidence and is retained as source material; it is not replaced
   or deleted.
