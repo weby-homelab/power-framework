@@ -659,7 +659,7 @@ wheels = [
 
 [[package]]
 name = "huggingface-hub"
-version = "1.25.1"
+version = "1.30.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -672,9 +672,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4b/50/db3771a6e4fad4bd28fb055d4363b51cb0ae98c1aa504b79d41fdcab5483/huggingface_hub-1.25.1.tar.gz", hash = "sha256:21129595ca7a753be479b319913e22cc8808361ac118bd76cc413db831b28a99", size = 928426, upload-time = "2026-07-27T09:24:10.117Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/97/2eb4abaa5b969ed385066a0496a3823b3ff467fc1082e2202955f1867d60/huggingface_hub-1.30.0.tar.gz", hash = "sha256:e6a6120bc8c8e2723d03648434ee247088cceb55ba7067e7d34d692cad5fdb57", size = 964291, upload-time = "2026-09-03T10:05:14.053Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/3f/21e816831c6d16f88a6c784974413fa0421ce8a5d04380c2666ed5b503e5/huggingface_hub-1.25.1-py3-none-any.whl", hash = "sha256:004d4e70350517e24c68a7dbb7dc5e40b2b6aefef8f94bf7a85f6f9835102ea5", size = 774909, upload-time = "2026-07-27T09:24:08.079Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/0e/3e45bbe0dd48f4e56b1d46649d342de853cd1c7e815323472ab62687f153/huggingface_hub-1.30.0-py3-none-any.whl", hash = "sha256:96ae0a8e99a234374a6fe43e989ebd21c04640b91ab2927e7e5773ba1131ca59", size = 796795, upload-time = "2026-09-03T10:05:12.21Z" },
 ]
 
 [[package]]
@@ -1567,9 +1567,9 @@ requires-dist = [
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115.0" },
     { name = "fastembed", marker = "extra == 'rerank'", specifier = ">=0.5.0,<1.0.0" },
-    { name = "huggingface-hub", marker = "extra == 'gpu'", specifier = ">=0.20.0" },
-    { name = "huggingface-hub", marker = "extra == 'rerank'", specifier = ">=0.20.0" },
-    { name = "huggingface-hub", marker = "extra == 'semantic'", specifier = ">=0.20.0" },
+    { name = "huggingface-hub", marker = "extra == 'gpu'", specifier = ">=1.30.0,<1.31.0" },
+    { name = "huggingface-hub", marker = "extra == 'rerank'", specifier = ">=1.30.0,<1.31.0" },
+    { name = "huggingface-hub", marker = "extra == 'semantic'", specifier = ">=1.30.0,<1.31.0" },
     { name = "itsdangerous", marker = "extra == 'web'", specifier = ">=2.2.0" },
     { name = "jinja2", marker = "extra == 'web'", specifier = ">=3.1.4" },
     { name = "markdown", marker = "extra == 'web'", specifier = ">=3.6.0" },
