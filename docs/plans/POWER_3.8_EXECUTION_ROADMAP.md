@@ -30,7 +30,8 @@ Controlled Dependency Refresh
         ├── Pre-HF governance snapshot — CLOSED / PR #408 MERGED
         ├── Python admission — DONE
         ├── WEB-01 / WEB-05 — DONE
-        ├── HF admission PR #406 — REFRESH REQUIRED / NEW EPOCH
+        ├── CI admission repair PR #410 — CLOSED / MERGED
+        ├── HF admission PR #406 — CLOSED / MERGED
         ├── Actions admission PR #396 — NEXT AFTER HF / HOLD / NOT STARTED
         └── Final integration admission — BLOCKED
         ↓
@@ -62,7 +63,8 @@ NO-GO
 | Python refresh | DONE | Prior controlled admission |
 | WEB-01 / WEB-05 | DONE | Closed through security PR #405 |
 | Pre-HF governance snapshot | CLOSED | PR #408 protected merge is on `main` |
-| HF refresh | REFRESH REQUIRED | PR #406 remains open on the pre-governance base |
+| CI admission repair | CLOSED | PR #410 protected merge is on `main` |
+| HF refresh | CLOSED | PR #406 protected merge and post-merge checks are on `main` |
 | Actions #396 | NEXT AFTER HF / HOLD | Do not inspect or modify in this gate |
 | Final integration | BLOCKED BY HF | Requires separate admissions |
 | Phase 5 | BLOCKED / NOT STARTED | No implementation authorized |
@@ -77,14 +79,14 @@ dependency update:
 1. **Python admission — complete.** Preserve its merged evidence.
 2. **WEB-01 / WEB-05 — complete.** Security boundaries are closed through PR
    #405 and must not be reopened as part of HF work.
-3. **HF admission — current refresh gate.** PR #406 retains an exact prior
-   tuple, but governance PR #408 advanced `main`. Merge current `main` into the
-   HF branch or create a replacement, then record a new candidate epoch and
-   recompute all evidence. Old evidence is stale input, not a reason to
-   terminate the gate.
-4. **Actions admission — next gate only after HF.** PR #396 remains on hold;
+3. **CI admission repair — complete.** PR #410 fixed the missing PR-associated
+   Docs `build` context for dependency-only changes and was normally merged.
+4. **HF admission — complete.** PR #406 was refreshed through three candidate
+   epochs, passed exact dependency/security/CI admission, and was normally
+   merged. Its final merge is recorded below.
+5. **Actions admission — next gate only after HF.** PR #396 remains on hold;
    no Actions dependency or workflow changes are authorized here.
-5. **Final integration admission — later gate.** It requires independent exact
+6. **Final integration admission — later gate.** It requires independent exact
    evidence for every dependency surface and normal protected merges.
 
 The controlled refresh does not authorize a public version bump, tag, release,
@@ -94,13 +96,19 @@ Phase 5, or any later phase.
 
 ```text
 BASE_SHA:
-119d5c39aa2c22734ca72c351f8a70790371678f
+7ed70766904e394d9717fe3fb7e18ed079e1887b
 
 HEAD_SHA:
-201da2e0e78d1bbf860c98dc653008c0fb4984cd
+c385073583dc00dc7752169eb36f66ecdd7f4361
 
 HEAD_TREE:
-c8d66c9bf65c54b09bb9990380313737af63c932
+a5f63eb671d3d57dd304d497cef4c03c52ed340b
+
+HEAD_PARENTS:
+75f3d7dad242566887fe77b5c64cd5b64aaa0576, 7ed70766904e394d9717fe3fb7e18ed079e1887b
+
+MERGE_SHA:
+2d8058854ffbfae8526095af9809ab2c6f9c04f6
 
 TARGET:
 huggingface-hub 1.30.0
@@ -109,13 +117,13 @@ SPECIFIER:
 >=1.30.0,<1.31.0
 
 LIVE_PR_STATE:
-OPEN / NOT MERGED / STALE BASE
+MERGED / CLOSED
 
 LIVE_MERGEABILITY:
-mergeable=null; mergeable_state=unknown while GitHub recalculates after main advance
+N/A after merge; pre-merge exact state was mergeable=true / mergeable_state=clean
 
 ADMISSION:
-NEW CANDIDATE EPOCH REQUIRED / NORMAL-MERGE TEST NOT ATTEMPTED
+CLOSED / POST-MERGE VERIFIED
 ```
 
 `mergeable_state` alone is neither merge authorization nor an automatic stop.
@@ -196,4 +204,4 @@ Actions #396 or Phase 5 before the HF gate is closed.
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)
+- [Latest HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
