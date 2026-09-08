@@ -1,0 +1,1771 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json",
+    "title": "POWER 3.8 Context and Retrieval Planning Contracts",
+    "description": "Versioned pre-implementation contracts. This schema is not consumed by the current runtime.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schema_version",
+        "implementation_status",
+        "planning_status",
+        "phase_status",
+        "contract",
+        "payload"
+    ],
+    "properties": {
+        "schema_version": {
+            "const": "power.context-retrieval-contracts.v1"
+        },
+        "implementation_status": {
+            "const": "planned"
+        },
+        "planning_status": {
+            "enum": [
+                "approved_planning_direction",
+                "canonical_planning",
+                "superseded"
+            ]
+        },
+        "phase_status": {
+            "enum": [
+                "blocked",
+                "not_started",
+                "implemented",
+                "validated",
+                "superseded"
+            ]
+        },
+        "contract": {
+            "enum": [
+                "QueryIntent",
+                "RetrievalBudget",
+                "SearchScope",
+                "DomainMatch",
+                "RetrievalStage",
+                "RetrievalPlan",
+                "NoiseAssessment",
+                "ContextItem",
+                "ContextPack",
+                "IndexWorkItem",
+                "IndexCostEstimate",
+                "MemoryDisposition",
+                "MemoryAction"
+            ]
+        },
+        "payload": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/QueryIntent"
+                },
+                {
+                    "$ref": "#/$defs/RetrievalBudget"
+                },
+                {
+                    "$ref": "#/$defs/SearchScope"
+                },
+                {
+                    "$ref": "#/$defs/DomainMatch"
+                },
+                {
+                    "$ref": "#/$defs/RetrievalStage"
+                },
+                {
+                    "$ref": "#/$defs/RetrievalPlan"
+                },
+                {
+                    "$ref": "#/$defs/NoiseAssessment"
+                },
+                {
+                    "$ref": "#/$defs/ContextItem"
+                },
+                {
+                    "$ref": "#/$defs/ContextPack"
+                },
+                {
+                    "$ref": "#/$defs/IndexWorkItem"
+                },
+                {
+                    "$ref": "#/$defs/IndexCostEstimate"
+                },
+                {
+                    "$ref": "#/$defs/MemoryDisposition"
+                },
+                {
+                    "$ref": "#/$defs/MemoryAction"
+                }
+            ]
+        }
+    },
+    "allOf": [
+        {
+            "oneOf": [
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "QueryIntent"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/QueryIntent"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "RetrievalBudget"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/RetrievalBudget"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "SearchScope"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/SearchScope"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "DomainMatch"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/DomainMatch"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "RetrievalStage"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/RetrievalStage"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "RetrievalPlan"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/RetrievalPlan"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "NoiseAssessment"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/NoiseAssessment"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "ContextItem"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/ContextItem"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "ContextPack"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/ContextPack"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "IndexWorkItem"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/IndexWorkItem"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "IndexCostEstimate"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/IndexCostEstimate"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "MemoryDisposition"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/MemoryDisposition"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": {
+                            "const": "MemoryAction"
+                        },
+                        "payload": {
+                            "$ref": "#/$defs/MemoryAction"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "$defs": {
+        "Identifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+        },
+        "SourceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^(?!/)(?![A-Za-z]:)(?![Ff][Ii][Ll][Ee]:)(?![Hh][Tt][Tt][Pp][Ss]?:)(?![Dd][Aa][Tt][Aa]:)(?![Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:%2e|%2E))(?!.*(?:%2f|%2F|%5c|%5C))(?!.*(?:%3a|%3A))(?!.*[\\u0000-\\u001F])(?!.*://).+$"
+        },
+        "ShortText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+        },
+        "Confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+        },
+        "Authority": {
+            "type": "string",
+            "enum": [
+                "canonical",
+                "verified",
+                "curated",
+                "proposed",
+                "unverified",
+                "unknown"
+            ]
+        },
+        "TrustState": {
+            "type": "string",
+            "enum": [
+                "RAW",
+                "PROPOSED",
+                "CURATED",
+                "VERIFIED",
+                "CANONICAL",
+                "SUPERSEDED",
+                "ARCHIVED",
+                "QUARANTINED",
+                "NOISE"
+            ]
+        },
+        "BudgetClass": {
+            "type": "string",
+            "enum": ["FAST", "BALANCED", "DEEP"]
+        },
+        "IndexPriority": {
+            "type": "string",
+            "enum": ["HOT", "WARM", "COLD"]
+        },
+        "RetrievalStage": {
+            "type": "string",
+            "enum": [
+                "project_state",
+                "metadata",
+                "fts",
+                "tf",
+                "semantic",
+                "graph_assisted",
+                "rrf",
+                "temporal",
+                "noise_gate",
+                "rerank",
+                "raw_fallback",
+                "materialized_view"
+            ]
+        },
+        "TemporalBoundary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["as_of", "include_historical"],
+            "properties": {
+                "as_of": {
+                    "type": "string",
+                    "format": "date"
+                },
+                "include_historical": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "QueryIntent": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["query", "intent", "budget_class"],
+            "properties": {
+                "query": {
+                    "$ref": "#/$defs/ShortText"
+                },
+                "intent": {
+                    "type": "string",
+                    "enum": [
+                        "lookup",
+                        "project_state",
+                        "decision",
+                        "task",
+                        "code",
+                        "infrastructure",
+                        "research",
+                        "governance",
+                        "conversation",
+                        "log",
+                        "cross_domain",
+                        "unknown"
+                    ]
+                },
+                "budget_class": {
+                    "$ref": "#/$defs/BudgetClass"
+                },
+                "domain_hints": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "project_ids": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "temporal_boundary": {
+                    "$ref": "#/$defs/TemporalBoundary"
+                },
+                "include_archived": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "include_quarantine": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "max_tokens": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30000
+                }
+            }
+        },
+        "RetrievalBudget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "class",
+                "max_candidates",
+                "max_tokens",
+                "max_domains",
+                "max_graph_hops",
+                "stages",
+                "model_load",
+                "dense_allowed",
+                "reranker_allowed",
+                "graph_allowed",
+                "deep_expansion_allowed",
+                "raw_fallback_allowed"
+            ],
+            "properties": {
+                "class": {
+                    "$ref": "#/$defs/BudgetClass"
+                },
+                "max_candidates": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                },
+                "max_tokens": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000
+                },
+                "max_domains": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                },
+                "max_graph_hops": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 8
+                },
+                "stages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/RetrievalStage"
+                    }
+                },
+                "model_load": {
+                    "type": "string",
+                    "enum": [
+                        "forbidden",
+                        "selected_domain_only",
+                        "explicit_request_or_escalation"
+                    ]
+                },
+                "dense_allowed": {
+                    "type": "boolean"
+                },
+                "reranker_allowed": {
+                    "type": "boolean"
+                },
+                "graph_allowed": {
+                    "type": "boolean"
+                },
+                "deep_expansion_allowed": {
+                    "type": "boolean"
+                },
+                "raw_fallback_allowed": {
+                    "type": "boolean"
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "class": {
+                                "const": "FAST"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "max_candidates": {
+                                "maximum": 40
+                            },
+                            "max_tokens": {
+                                "maximum": 4000
+                            },
+                            "model_load": {
+                                "const": "forbidden"
+                            },
+                            "max_domains": {
+                                "maximum": 3
+                            },
+                            "max_graph_hops": {
+                                "const": 0
+                            },
+                            "dense_allowed": {
+                                "const": false
+                            },
+                            "reranker_allowed": {
+                                "const": false
+                            },
+                            "graph_allowed": {
+                                "const": false
+                            },
+                            "deep_expansion_allowed": {
+                                "const": false
+                            },
+                            "raw_fallback_allowed": {
+                                "const": false
+                            },
+                            "stages": {
+                                "not": {
+                                    "contains": {
+                                        "enum": [
+                                            "semantic",
+                                            "graph_assisted",
+                                            "rerank",
+                                            "raw_fallback"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "class": {
+                                "const": "BALANCED"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "max_candidates": {
+                                "maximum": 120
+                            },
+                            "max_tokens": {
+                                "maximum": 12000
+                            },
+                            "model_load": {
+                                "const": "selected_domain_only"
+                            },
+                            "max_domains": {
+                                "maximum": 4
+                            },
+                            "max_graph_hops": {
+                                "const": 0
+                            },
+                            "dense_allowed": {
+                                "const": true
+                            },
+                            "reranker_allowed": {
+                                "const": true
+                            },
+                            "graph_allowed": {
+                                "const": false
+                            },
+                            "deep_expansion_allowed": {
+                                "const": false
+                            },
+                            "raw_fallback_allowed": {
+                                "const": false
+                            },
+                            "stages": {
+                                "not": {
+                                    "contains": {
+                                        "enum": [
+                                            "graph_assisted",
+                                            "raw_fallback"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "class": {
+                                "const": "DEEP"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "max_candidates": {
+                                "maximum": 400
+                            },
+                            "max_tokens": {
+                                "maximum": 30000
+                            },
+                            "model_load": {
+                                "const": "explicit_request_or_escalation"
+                            },
+                            "max_domains": {
+                                "maximum": 16
+                            },
+                            "max_graph_hops": {
+                                "maximum": 3
+                            },
+                            "dense_allowed": {
+                                "const": true
+                            },
+                            "reranker_allowed": {
+                                "const": true
+                            },
+                            "graph_allowed": {
+                                "const": true
+                            },
+                            "deep_expansion_allowed": {
+                                "const": true
+                            },
+                            "raw_fallback_allowed": {
+                                "const": true
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "SearchScope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "domain_ids",
+                "path_prefixes",
+                "source_types",
+                "trust_states",
+                "temporal_boundary",
+                "project_ids",
+                "include_archived",
+                "include_quarantine"
+            ],
+            "properties": {
+                "domain_ids": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "path_prefixes": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512,
+                        "pattern": "^(?!/)(?![A-Za-z]:)(?![Ff][Ii][Ll][Ee]:)(?![Hh][Tt][Tt][Pp][Ss]?:)(?![Dd][Aa][Tt][Aa]:)(?![Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt]:)(?!.*://)(?!.*(?:%3a|%3A))(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:%2e|%2E))(?!.*(?:%2f|%2F|%5c|%5C))(?!.*[\\u0000-\\u001F]).+$"
+                    }
+                },
+                "source_types": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "trust_states": {
+                    "type": "array",
+                    "maxItems": 9,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/TrustState"
+                    }
+                },
+                "temporal_boundary": {
+                    "$ref": "#/$defs/TemporalBoundary"
+                },
+                "project_ids": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "include_archived": {
+                    "type": "boolean"
+                },
+                "include_quarantine": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "DomainMatch": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["domain", "score", "reasons"],
+            "properties": {
+                "domain": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "score": {
+                    "$ref": "#/$defs/Confidence"
+                },
+                "reasons": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/ShortText"
+                    }
+                }
+            }
+        },
+        "RetrievalPlan": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "planner_revision",
+                "stages",
+                "attempted_stages",
+                "skipped_stages",
+                "domain_matches",
+                "scope",
+                "budget",
+                "escalation_reason"
+            ],
+            "properties": {
+                "planner_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "stages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/RetrievalStage"
+                    }
+                },
+                "attempted_stages": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/RetrievalStage"
+                    }
+                },
+                "skipped_stages": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/RetrievalStage"
+                    }
+                },
+                "domain_matches": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                        "$ref": "#/$defs/DomainMatch"
+                    }
+                },
+                "scope": {
+                    "$ref": "#/$defs/SearchScope"
+                },
+                "budget": {
+                    "$ref": "#/$defs/RetrievalBudget"
+                },
+                "escalation_reason": {
+                    "type": "string",
+                    "maxLength": 2048
+                }
+            }
+        },
+        "NoiseAssessment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "action",
+                "layers",
+                "reasons",
+                "confidence",
+                "source_preserved",
+                "trust_state"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "INCLUDE",
+                        "DOWNRANK",
+                        "EXCLUDE_FROM_RETRIEVAL",
+                        "QUARANTINE"
+                    ]
+                },
+                "layers": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "deterministic_cheap",
+                            "semantic",
+                            "unsafe_quarantine"
+                        ]
+                    }
+                },
+                "reasons": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/ShortText"
+                    }
+                },
+                "confidence": {
+                    "$ref": "#/$defs/Confidence"
+                },
+                "source_preserved": {
+                    "const": true
+                },
+                "trust_state": {
+                    "$ref": "#/$defs/TrustState"
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "layers": {
+                                "contains": {
+                                    "const": "unsafe_quarantine"
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "action": {
+                                "const": "QUARANTINE"
+                            },
+                            "trust_state": {
+                                "const": "QUARANTINED"
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "Provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source_refs", "source_revision", "authority_basis"],
+            "properties": {
+                "source_refs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/SourceReference"
+                    }
+                },
+                "source_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "event_ids": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "authority_basis": {
+                    "type": "string",
+                    "enum": [
+                        "canonical_ledger",
+                        "verified_projection",
+                        "curated_note",
+                        "proposal",
+                        "raw_capture",
+                        "unknown"
+                    ]
+                }
+            }
+        },
+        "Freshness": {
+            "type": "string",
+            "enum": ["current", "stale", "expired", "future", "unknown"]
+        },
+        "ContradictionState": {
+            "type": "string",
+            "enum": [
+                "none",
+                "unresolved",
+                "conflicted",
+                "superseded",
+                "invalidated",
+                "unknown"
+            ]
+        },
+        "NoiseState": {
+            "type": "string",
+            "enum": [
+                "clean",
+                "downranked",
+                "excluded",
+                "quarantined",
+                "unknown"
+            ]
+        },
+        "ContextItem": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "domain is the primary membership and must be present in domains; runtime validation must enforce that relationship.",
+            "required": [
+                "source_id",
+                "source_type",
+                "authority",
+                "trust_state",
+                "domain",
+                "domains",
+                "score",
+                "retrieval_stage",
+                "provenance",
+                "freshness",
+                "contradiction_state",
+                "noise_state",
+                "token_cost",
+                "excerpt",
+                "content_kind",
+                "redaction_status"
+            ],
+            "properties": {
+                "source_id": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "source_type": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "authority": {
+                    "$ref": "#/$defs/Authority"
+                },
+                "trust_state": {
+                    "$ref": "#/$defs/TrustState"
+                },
+                "domain": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "domains": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "score": {
+                    "type": "number"
+                },
+                "retrieval_stage": {
+                    "$ref": "#/$defs/RetrievalStage"
+                },
+                "provenance": {
+                    "$ref": "#/$defs/Provenance"
+                },
+                "freshness": {
+                    "$ref": "#/$defs/Freshness"
+                },
+                "contradiction_state": {
+                    "$ref": "#/$defs/ContradictionState"
+                },
+                "noise_state": {
+                    "$ref": "#/$defs/NoiseState"
+                },
+                "token_cost": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                },
+                "excerpt": {
+                    "type": "string",
+                    "maxLength": 12000
+                },
+                "content_kind": {
+                    "type": "string",
+                    "enum": ["excerpt", "reference"]
+                },
+                "redaction_status": {
+                    "type": "string",
+                    "enum": ["not_applicable", "redacted", "verified_safe"]
+                }
+            },
+            "allOf": [
+                {
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "const": "RAW"
+                                },
+                                "authority": {
+                                    "enum": [
+                                        "unknown",
+                                        "proposed",
+                                        "unverified"
+                                    ]
+                                },
+                                "redaction_status": {
+                                    "enum": ["redacted", "verified_safe"]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "const": "QUARANTINED"
+                                },
+                                "authority": {
+                                    "enum": [
+                                        "unknown",
+                                        "proposed",
+                                        "unverified"
+                                    ]
+                                },
+                                "noise_state": {
+                                    "const": "quarantined"
+                                },
+                                "redaction_status": {
+                                    "enum": ["redacted", "verified_safe"]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "const": "CANONICAL"
+                                },
+                                "authority": {
+                                    "const": "canonical"
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "const": "VERIFIED"
+                                },
+                                "authority": {
+                                    "enum": ["verified", "canonical"]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "const": "CURATED"
+                                },
+                                "authority": {
+                                    "enum": ["curated", "verified", "canonical"]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "const": "PROPOSED"
+                                },
+                                "authority": {
+                                    "enum": [
+                                        "proposed",
+                                        "unverified",
+                                        "unknown"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "enum": ["SUPERSEDED", "ARCHIVED"]
+                                },
+                                "authority": {
+                                    "enum": [
+                                        "canonical",
+                                        "verified",
+                                        "curated",
+                                        "proposed",
+                                        "unverified",
+                                        "unknown"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "trust_state": {
+                                    "const": "NOISE"
+                                },
+                                "authority": {
+                                    "enum": [
+                                        "unknown",
+                                        "proposed",
+                                        "unverified"
+                                    ]
+                                },
+                                "noise_state": {
+                                    "enum": ["excluded", "downranked"]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "authority": {
+                                "const": "canonical"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "provenance": {
+                                "properties": {
+                                    "authority_basis": {
+                                        "enum": [
+                                            "canonical_ledger",
+                                            "verified_projection",
+                                            "curated_note"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "authority": {
+                                "const": "verified"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "provenance": {
+                                "properties": {
+                                    "authority_basis": {
+                                        "enum": [
+                                            "canonical_ledger",
+                                            "verified_projection"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "authority": {
+                                "const": "curated"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "provenance": {
+                                "properties": {
+                                    "authority_basis": {
+                                        "enum": [
+                                            "curated_note",
+                                            "verified_projection"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "authority": {
+                                "enum": ["proposed", "unverified", "unknown"]
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "provenance": {
+                                "properties": {
+                                    "authority_basis": {
+                                        "enum": [
+                                            "proposal",
+                                            "raw_capture",
+                                            "unknown"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "ExcludedItem": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source_id", "reason"],
+            "properties": {
+                "source_id": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "reason": {
+                    "$ref": "#/$defs/ShortText"
+                }
+            }
+        },
+        "ContextBudget": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Runtime must reject consumed_tokens greater than max_tokens; the standard 2020-12 vocabulary cannot compare two arbitrary instance numbers.",
+            "required": [
+                "max_tokens",
+                "consumed_tokens",
+                "dense_used",
+                "reranker_used",
+                "index_work_triggered",
+                "budget_satisfied"
+            ],
+            "properties": {
+                "max_tokens": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30000
+                },
+                "consumed_tokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 30000
+                },
+                "dense_used": {
+                    "type": "boolean"
+                },
+                "reranker_used": {
+                    "type": "boolean"
+                },
+                "index_work_triggered": {
+                    "const": false
+                },
+                "budget_satisfied": {
+                    "const": true
+                }
+            }
+        },
+        "Explainability": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["summary", "decisions", "source_revisions"],
+            "properties": {
+                "summary": {
+                    "$ref": "#/$defs/ShortText"
+                },
+                "decisions": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                        "$ref": "#/$defs/ShortText"
+                    }
+                },
+                "source_revisions": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                }
+            }
+        },
+        "AccessPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "origin",
+                "actor",
+                "raw_access",
+                "quarantine_access",
+                "redaction",
+                "capability_id",
+                "expires_at"
+            ],
+            "properties": {
+                "origin": {
+                    "const": "authorization_boundary"
+                },
+                "actor": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "raw_access": {
+                    "type": "string",
+                    "enum": ["none", "privileged"]
+                },
+                "quarantine_access": {
+                    "type": "string",
+                    "enum": ["none", "privileged"]
+                },
+                "redaction": {
+                    "const": "mandatory"
+                },
+                "capability_id": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "approval_ref": {
+                    "$ref": "#/$defs/SourceReference"
+                }
+            },
+            "anyOf": [
+                {
+                    "properties": {
+                        "raw_access": {
+                            "const": "none"
+                        },
+                        "quarantine_access": {
+                            "const": "none"
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "raw_access": {
+                            "const": "privileged"
+                        }
+                    },
+                    "required": ["approval_ref"]
+                },
+                {
+                    "properties": {
+                        "quarantine_access": {
+                            "const": "privileged"
+                        }
+                    },
+                    "required": ["approval_ref"]
+                }
+            ]
+        },
+        "ContextPack": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Server-derived output. Runtime must enforce profile flags, aggregate token/byte/item limits, and consumed_tokens <= max_tokens before emitting a valid pack.",
+            "required": [
+                "request_id",
+                "query",
+                "intent",
+                "budget_class",
+                "domains",
+                "retrieval_plan",
+                "items",
+                "excluded",
+                "budget",
+                "explainability",
+                "retrieval_status",
+                "fallback_reason",
+                "policy_revision",
+                "generation_revision",
+                "implementation_status",
+                "access_policy"
+            ],
+            "properties": {
+                "request_id": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "query": {
+                    "$ref": "#/$defs/ShortText"
+                },
+                "intent": {
+                    "type": "string",
+                    "maxLength": 256
+                },
+                "budget_class": {
+                    "$ref": "#/$defs/BudgetClass"
+                },
+                "domains": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                        "$ref": "#/$defs/DomainMatch"
+                    }
+                },
+                "retrieval_plan": {
+                    "$ref": "#/$defs/RetrievalPlan"
+                },
+                "items": {
+                    "type": "array",
+                    "maxItems": 1000,
+                    "items": {
+                        "$ref": "#/$defs/ContextItem"
+                    }
+                },
+                "excluded": {
+                    "type": "array",
+                    "maxItems": 1000,
+                    "items": {
+                        "$ref": "#/$defs/ExcludedItem"
+                    }
+                },
+                "budget": {
+                    "$ref": "#/$defs/ContextBudget"
+                },
+                "explainability": {
+                    "$ref": "#/$defs/Explainability"
+                },
+                "retrieval_status": {
+                    "type": "string",
+                    "enum": ["complete", "partial", "degraded", "failed"]
+                },
+                "fallback_reason": {
+                    "type": "string",
+                    "maxLength": 2048
+                },
+                "policy_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "generation_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "implementation_status": {
+                    "const": "planned"
+                },
+                "access_policy": {
+                    "$ref": "#/$defs/AccessPolicy"
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "retrieval_status": {
+                                "enum": ["degraded", "failed"]
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "fallback_reason": {
+                                "minLength": 1
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "items": {
+                                "contains": {
+                                    "properties": {
+                                        "trust_state": {
+                                            "const": "RAW"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "access_policy": {
+                                "properties": {
+                                    "raw_access": {
+                                        "const": "privileged"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "items": {
+                                "contains": {
+                                    "properties": {
+                                        "trust_state": {
+                                            "const": "QUARANTINED"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "access_policy": {
+                                "properties": {
+                                    "quarantine_access": {
+                                        "const": "privileged"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "IndexWorkItem": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "source_id",
+                "source_revision",
+                "domain_ids",
+                "chunk_ids",
+                "priority",
+                "reason",
+                "embedding_model_revision",
+                "estimated_work",
+                "created_at",
+                "queue_state",
+                "retry_count",
+                "idempotency_key"
+            ],
+            "properties": {
+                "source_id": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "source_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "domain_ids": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "chunk_ids": {
+                    "type": "array",
+                    "maxItems": 10000,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Identifier"
+                    }
+                },
+                "chunk_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "priority": {
+                    "$ref": "#/$defs/IndexPriority"
+                },
+                "reason": {
+                    "$ref": "#/$defs/ShortText"
+                },
+                "embedding_model_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "estimated_work": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000000
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "queue_state": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "running",
+                        "deferred",
+                        "complete",
+                        "failed",
+                        "dead_letter"
+                    ]
+                },
+                "retry_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "idempotency_key": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "last_error": {
+                    "type": "string",
+                    "maxLength": 2048
+                },
+                "deferred_until": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "lease_id": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "lease_expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "queue_state": {
+                                "const": "deferred"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": ["deferred_until"]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "queue_state": {
+                                "const": "running"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": ["lease_id", "lease_expires_at"]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "queue_state": {
+                                "enum": ["failed", "dead_letter"]
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": ["last_error"],
+                        "properties": {
+                            "last_error": {
+                                "minLength": 1
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "IndexCostEstimate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "affected_sources",
+                "affected_chunks",
+                "model_required",
+                "priority",
+                "estimated_memory_class",
+                "estimated_cpu_class",
+                "full_rebuild",
+                "reason"
+            ],
+            "properties": {
+                "affected_sources": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                },
+                "affected_chunks": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000000
+                },
+                "model_required": {
+                    "type": "boolean"
+                },
+                "priority": {
+                    "$ref": "#/$defs/IndexPriority"
+                },
+                "estimated_memory_class": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "unknown"]
+                },
+                "estimated_cpu_class": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "unknown"]
+                },
+                "full_rebuild": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "$ref": "#/$defs/ShortText"
+                }
+            }
+        },
+        "MemoryDisposition": {
+            "type": "string",
+            "enum": [
+                "NOOP",
+                "RAW_ONLY",
+                "SESSION",
+                "WORKING",
+                "DURABLE_PROPOSAL",
+                "CORRECTION_PROPOSAL",
+                "QUARANTINE",
+                "ARCHIVE_CANDIDATE"
+            ]
+        },
+        "MemoryAction": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "action",
+                "signal",
+                "domain",
+                "trust_state",
+                "confidence",
+                "reason",
+                "origin",
+                "policy_revision",
+                "server_derived"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "NOOP",
+                        "INDEX_FTS",
+                        "QUEUE_DENSE",
+                        "REFRESH_DOMAIN",
+                        "RUN_DENSE",
+                        "RUN_RERANK",
+                        "PROMOTE_TO_WORKING",
+                        "PROPOSE_DURABLE_MEMORY",
+                        "PROPOSE_CORRECTION",
+                        "REQUEST_APPROVAL",
+                        "RUN_MAINTENANCE",
+                        "REBUILD_PROJECTION",
+                        "DEFER",
+                        "QUARANTINE",
+                        "QUEUE_NEW_REVISION"
+                    ]
+                },
+                "signal": {
+                    "$ref": "#/$defs/ShortText"
+                },
+                "domain": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "trust_state": {
+                    "$ref": "#/$defs/TrustState"
+                },
+                "authority": {
+                    "$ref": "#/$defs/Authority"
+                },
+                "confidence": {
+                    "$ref": "#/$defs/Confidence"
+                },
+                "reason": {
+                    "$ref": "#/$defs/ShortText"
+                },
+                "origin": {
+                    "const": "policy_engine"
+                },
+                "policy_revision": {
+                    "$ref": "#/$defs/Identifier"
+                },
+                "server_derived": {
+                    "const": true
+                }
+            }
+        }
+    }
+}

@@ -18,22 +18,28 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-HF ADMISSION CLOSED / POST-HF VERIFICATION COMPLETE
+HF ADMISSION CLOSED / CONTEXT-MEMORY-RETRIEVAL ARCHITECTURE PLAN RECORDED
 
-STATE_BASE_SHA:
-2d8058854ffbfae8526095af9809ab2c6f9c04f6
+STATE_SNAPSHOT_BASE_SHA:
+d8b704f6125347ff9f9c39981193807d2160b135
 
-CURRENT_MAIN_SHA:
-2d8058854ffbfae8526095af9809ab2c6f9c04f6
+OBSERVED_MAIN_SHA_AT_PLAN_START:
+d8b704f6125347ff9f9c39981193807d2160b135
+
+LIVE_MAIN_REVALIDATION_REQUIRED:
+YES
 
 ACTIVE_GATE:
 Controlled Dependency Refresh — Actions #396 supply-chain admission
+
+ACTIONS_396:
+NEXT ACTIVE IMPLEMENTATION GATE / HOLD / NOT STARTED
 
 LAST_CLOSED_GATE:
 HF #406 Admission — protected normal merge and post-merge verification
 
 LAST_MERGED_PR:
-406
+411
 
 HF_PR:
 406 MERGED / POST-MERGE VERIFIED
@@ -41,20 +47,38 @@ HF_PR:
 PHASE_5:
 BLOCKED / NOT STARTED
 
+PHASE_5_IMPLEMENTATION:
+BLOCKED / NOT STARTED
+
 RELEASE_3_8_0:
 NO-GO
 
 CANONICAL_GOVERNANCE_BRANCH:
-docs/power-3.8-governance-bootstrap (merged; remote ref auto-deleted)
+docs/power-3.8-post-hf-state (merged; remote ref auto-deleted)
 
 CANONICAL_GOVERNANCE_COMMIT:
-4b49e00c75866fa57f71e7bef61547915f7e01db (protected merge; GitHub-verified)
+d8b704f6125347ff9f9c39981193807d2160b135 (protected merge; GitHub-verified)
 
 CANONICAL_GOVERNANCE_PR:
-408 MERGED
+411 MERGED
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md
+artifacts/project-state/handoffs/2026-09-08T140647Z_context-memory-architecture_planned.md
+
+CONTEXT_MEMORY_ARCHITECTURE_PLAN:
+docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
+
+PLANNING_CONTRACTS:
+artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json
+
+INDEX_COST_POLICY:
+artifacts/project-state/planning/index-cost-policy-v1.json
+
+PHASE_ACCEPTANCE_GATES:
+artifacts/project-state/planning/phase5-9-acceptance-gates.md
+
+ARCHITECTURE_STATUS:
+APPROVED PLANNING DIRECTION / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -68,8 +92,11 @@ artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md
 - HF_MERGE_OBSERVED_AT_UTC: `2026-09-08T09:53:10Z`.
 - The pre-governance verified base anchor was
   `119d5c39aa2c22734ca72c351f8a70790371678f`.
-- Current protected `main` is
-  `2d8058854ffbfae8526095af9809ab2c6f9c04f6`.
+- The fresh protected `main` observed when this planning snapshot started was
+  `d8b704f6125347ff9f9c39981193807d2160b135`.
+- `STATE_SNAPSHOT_BASE_SHA` and `OBSERVED_MAIN_SHA_AT_PLAN_START` are immutable
+  snapshot anchors. They are not a mutable substitute for a fresh live-main
+  read.
 - Governance merge tree:
   `da33bef8fd4ecd5eafa68e04bb7db21246fb42b4`.
 - Governance merge parents:
@@ -91,6 +118,7 @@ artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md
 - Phase 2: **CLOSED / FROZEN**.
 - Phase 3: **CLOSED / FROZEN**.
 - Phase 4: **CLOSED / FROZEN**.
+- Context / Memory / Retrieval architecture: **APPROVED PLANNING DIRECTION / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED**.
 - Phase 5: **BLOCKED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
@@ -105,7 +133,7 @@ artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md
 | CI admission repair | CLOSED | PR #410 protected merge on `main` |
 | HF admission | CLOSED | PR #406 protected merge and post-merge checks |
 | Actions #396 | HOLD / NOT STARTED | Must not begin in this gate |
-| Final integration | BLOCKED / NEXT AFTER ACTIONS | Requires the Actions admission |
+| Final integration | BLOCKED BY ACTIONS ADMISSION / FINAL INTEGRATION DEPENDENCY | Requires the Actions admission and separate exact evidence |
 
 ## HF #406 exact objects
 
@@ -166,6 +194,8 @@ artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md
   `7ed70766904e394d9717fe3fb7e18ed079e1887b`.
 - HF PR #406 merge:
   `2d8058854ffbfae8526095af9809ab2c6f9c04f6`.
+- Post-HF governance publication PR #411 merge:
+  `d8b704f6125347ff9f9c39981193807d2160b135`.
 
 ## Gate decision and blockers
 
@@ -224,4 +254,7 @@ The governance bootstrap is canonical on protected `main`:
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
+- [Architecture planning](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
+- [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
+- [Latest architecture handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T140647Z_context-memory-architecture_planned.md)
+- [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
