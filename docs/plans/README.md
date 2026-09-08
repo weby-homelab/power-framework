@@ -6,19 +6,19 @@ commits, branch protection, or authoritative phase reports.
 
 ## ACTIVE GOVERNANCE
 
-The following files are the active **post-governance HF-refresh projection** in
-the canonical `main` tree:
+The following files are the active **post-HF next-gate projection** in the
+canonical `main` tree:
 
 - [POWER 3.8 — Current State](POWER_3.8_CURRENT_STATE.md)
 - [POWER 3.8 — Execution Roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [POWER 3.8 — Development Protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)
+- [Latest HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
 
-> Governance PR #408 is merged on protected `main`; the HF gate remains open
-> and requires a new candidate epoch because its old base is stale. These paths
-> are canonical memory for the recorded governance merge, not HF merge or
-> release evidence.
+> Governance PR #408, state PR #409, CI repair PR #410, and HF PR #406 are
+> merged on protected `main`. Actions #396 is the next gate and remains HOLD;
+> these paths are canonical memory for the merged dependency state, not release
+> authorization.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -31,13 +31,13 @@ To recover the current POWER 3.8 state:
 2. Read `POWER_3.8_EXECUTION_ROADMAP.md`.
 3. Read `POWER_3.8_DEVELOPMENT_PROTOCOL.md`.
 4. Read the latest append-only handoff.
-5. Fetch current GitHub `main`, HF PR #406, and the merged governance PR #408
-   independently through authenticated REST API.
+5. Fetch current GitHub `main`, merged PRs #408/#409/#410/#406, and the open
+   Actions PR #396 independently through authenticated REST API.
 6. Verify every documented SHA and mutable status, including each candidate's
    exact head, required checks, reviews, and protected-branch policy, before
-   acting or attempting a governance merge.
-7. Work only on the current HF admission gate; do not start Actions #396 or
-   Phase 5.
+   acting or attempting a new gate action.
+7. Treat HF #406 as `MERGED MAIN` evidence. Work only on the next Actions #396
+   admission gate in a later bounded session; do not start it from this handoff.
 
 ## HISTORICAL PLAN
 
@@ -61,9 +61,9 @@ They are not a substitute for current-state projection or live GitHub truth:
 - [Phase 4 verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-4/PHASE_4_REPORT.md)
 - [Dependency refresh ledger](https://github.com/weby-homelab/power-framework/blob/main/artifacts/repository-cleanup/dependency-refresh-ledger.md)
 
-HF #406 remote checks and exact commit evidence remain attached to the PR and
-commit links in the latest handoff. They are `REMOTE EXACT-HEAD`, not `MERGED
-MAIN`, evidence.
+HF #406 remote checks and exact merge evidence remain attached to the PR and
+commit links in the latest handoff. The final dependency evidence is
+`MERGED MAIN`; Actions #396 remains `HOLD / NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
 
@@ -83,5 +83,6 @@ EVIDENCE
 ADR
 ```
 
-This publication branch is **EVIDENCE** for the blocked HF gate. It does not
-authorize any dependency, phase, version, tag, release, or governance merge.
+This canonical projection records the closed HF gate and the next Actions
+admission. It does not authorize Actions #396, any later phase, version bump,
+tag, release, or `POWER 3.8.0` publication.

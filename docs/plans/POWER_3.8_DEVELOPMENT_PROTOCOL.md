@@ -101,8 +101,9 @@ One bounded chat handles one major gate. Do not automatically chain:
 HF → Actions #396 → Final Integration → Phase 5
 ```
 
-The current gate is HF #406 admission. Actions #396 and Phase 5 must remain
-untouched until a later independent session starts from fresh repository state.
+The HF #406 admission is closed. The current next gate is Actions #396, but it
+must remain untouched until a later independent session starts from fresh
+repository state and explicitly revalidates its policy.
 
 ## GitHub publication policy
 
@@ -217,23 +218,21 @@ Maximum retry discipline:
 
 ## Current operational state
 
-Current state after the protected governance merge and before the HF candidate
-refresh:
+Current state after the protected governance and HF merges:
 
 ```text
-HF ADMISSION: REFRESH REQUIRED / OLD CANDIDATE STALE
-CANONICAL GOVERNANCE: YES / PR #408 MERGED
+HF ADMISSION: CLOSED / PR #406 MERGED
+CANONICAL GOVERNANCE: YES / PR #408, #409, #410 MERGED
 ACTIONS #396: HOLD / NOT STARTED
 PHASE 5: BLOCKED / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The old HF tuple remains retained evidence only. Merge current `main` into the
-HF branch or create a replacement, record a new candidate epoch, recompute the
-full required evidence, and continue through the ordinary protected merge
-path. Do not start Actions #396, Phase 5–9, version bumps, tags, releases,
-release images, or final release notes.
+The HF candidate epochs and merge receipt are now retained `MERGED MAIN`
+evidence. Actions #396 is the next bounded gate but remains HOLD / NOT STARTED;
+do not start it, Phase 5–9, version bumps, tags, releases, release images, or
+final release notes from this handoff.
 
 ## Cross-links
 
@@ -241,4 +240,4 @@ release images, or final release notes.
 - [Execution roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)
+- [Latest HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
