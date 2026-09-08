@@ -1,0 +1,184 @@
+# PLANNING EXAMPLE ONLY
+# NOT CONSUMED BY CURRENT RUNTIME
+# This illustrates a backward-compatible Domain Policy v2 direction. It is not
+# a deployment configuration and does not authorize domain migration.
+
+version: 2
+status: planned
+implementation_status: planned
+planning_status: approved_planning_direction
+phase_status: not_started
+
+compatibility:
+  v1_registry_remains_supported: true
+  absent_registry_behavior: legacy_para
+  unknown_fields: reject_when_runtime_schema_is_adopted
+
+domains:
+  - name: projects
+    selectors:
+      paths:
+        - 01_Projects/**
+      tags:
+        - project
+      types:
+        - Project
+        - Decision
+    retrieval:
+      stages:
+        - project_state
+        - fts
+        - semantic
+        - rerank
+      max_candidates: 60
+      rerank_top_k: 15
+      budget_class: BALANCED
+      escalation:
+        budget_class: DEEP
+        stages:
+          - graph_assisted
+    traversal:
+      - project_state
+      - tasks
+      - decisions
+      - semantic_entities
+      - event_history
+      - documentation_fallback
+    index:
+      priority: HOT
+      dense: eager
+    noise:
+      suppress:
+        - superseded
+        - trivial
+        - duplicate
+      unsafe_action: quarantine
+    authority:
+      prefer:
+        - canonical
+        - verified
+        - proposed
+
+  - name: research
+    selectors:
+      paths:
+        - 03_Resources/research/**
+      tags:
+        - research
+        - paper
+      types:
+        - Resource
+    retrieval:
+      stages:
+        - fts
+        - semantic
+        - rrf
+        - rerank
+      max_candidates: 120
+      rerank_top_k: 20
+      budget_class: BALANCED
+    traversal:
+      - lexical_match
+      - dense_match
+      - candidate_fusion
+      - citation_or_relation_expansion
+    index:
+      priority: WARM
+      dense: batched
+    noise:
+      suppress:
+        - duplicate
+        - low_information_density
+        - stale
+      unsafe_action: quarantine
+    authority:
+      prefer:
+        - verified
+        - curated
+        - proposed
+
+  - name: agent_conversations
+    selectors:
+      paths:
+        - 06_Daily_Logs/agent-conversations/**
+      tags:
+        - agent-session
+        - conversation
+      types:
+        - Daily Log
+    retrieval:
+      stages:
+        - metadata
+        - fts
+        - semantic
+        - noise_gate
+        - rerank
+      max_candidates: 40
+      rerank_top_k: 12
+      budget_class: BALANCED
+      escalation:
+        budget_class: DEEP
+        stages:
+          - raw_fallback
+    traversal:
+      - session_metadata
+      - extracted_entities
+      - summary
+      - relevant_turns
+      - raw_transcript_fallback
+    index:
+      priority: WARM
+      dense: deferred
+    noise:
+      suppress:
+        - heartbeat
+        - tool_boilerplate
+        - temporary_progress
+        - repeated_system_prompt
+      unsafe_action: quarantine
+    authority:
+      prefer:
+        - canonical
+        - verified
+        - curated
+        - proposed
+      raw_capture_default: RAW_ONLY
+
+  - name: logs
+    selectors:
+      paths:
+        - 06_Daily_Logs/**
+      tags:
+        - log
+        - operational
+      types:
+        - Daily Log
+      temporal: required
+    retrieval:
+      stages:
+        - metadata
+        - fts
+        - temporal
+        - noise_gate
+      max_candidates: 40
+      rerank_top_k: 0
+      budget_class: FAST
+    traversal:
+      - time_range
+      - structured_fields
+      - lexical_match
+    index:
+      priority: COLD
+      dense: on_demand
+    noise:
+      suppress:
+        - status_spam
+        - generated_catalog
+        - temporary_progress
+      unsafe_action: quarantine
+    authority:
+      prefer:
+        - canonical
+        - verified
+        - curated
+      include_archived_by_default: false

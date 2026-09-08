@@ -4,12 +4,18 @@ Handoffs are concise, timestamped, append-only evidence packets for one POWER
 3.8 gate. They allow a new agent to resume from repository-visible evidence
 without relying on an old chat transcript.
 
-## Publication status
+## Publication model
 
-The repository may publish a **pre-HF governance snapshot** before HF #406 is
-merged. Until its protected PR merges, that branch/PR is provisional; after the
-protected merge, the same paths are canonical for that snapshot. A later
-post-HF update is still required and must not rewrite this packet.
+A handoff may describe a governance gate, an architecture-planning gate, an
+implementation gate, or a validation/release gate. Until its protected PR
+merges, the packet and its branch are provisional. After the protected merge,
+the packet is canonical evidence for the exact snapshot it names; mutable
+GitHub facts still require fresh live verification.
+
+Architecture handoffs use the explicit labels `APPROVED PLANNING DIRECTION`,
+`CANONICAL PLANNING`, and `NOT IMPLEMENTED`. A canonical planning handoff is
+not phase evidence, runtime completion, or authorization to start the next
+implementation gate.
 
 ## Naming
 
@@ -24,6 +30,7 @@ Examples:
 ```text
 2026-09-07T234142Z_hf-406_pre-merge-blocked.md
 2026-09-08T081335Z_governance-bootstrap_pre-hf.md
+2026-09-08T140647Z_context-memory-architecture_planned.md
 ```
 
 The filename records when the gate was executed, not when a later reader opens
@@ -77,6 +84,22 @@ NEXT_GATE
 AUTHORIZED
 NOT_AUTHORIZED
 PUBLICATION
+ARCHITECTURE_PLAN
+PLANNING_CONTRACTS
+PLANNING_STATUS
+IMPLEMENTATION_STATUS
+PHASE_STATUS
+PUBLICATION_STATUS
+INDEX_POLICY
+LATEST_ARCHITECTURE_HANDOFF
+ARCHITECTURE_STATUS
+PHASE_5
+CURRENT_STATE
+ROADMAP
+DEVELOPMENT_PROTOCOL
+DOMAIN_POLICY
+ACCEPTANCE_GATES
+PLANNING_STATUS_POINTER
 ```
 
 `CANDIDATE_EPOCH` identifies the exact tuple and reason for any rebuild:
@@ -92,10 +115,11 @@ reason to stop by itself.
 
 ## Recovery order
 
-1. Read the current state, roadmap, and development protocol from the
-   repository [planning index](https://github.com/weby-homelab/power-framework/blob/main/docs/plans/README.md).
+1. Read the current state, roadmap, development protocol, architecture plan,
+   and planning artifacts from the repository [planning index](https://github.com/weby-homelab/power-framework/blob/main/docs/plans/README.md).
 2. Read the latest handoff by timestamp and classify older packets as
-   historical evidence.
+   historical evidence. Do not treat a planning packet as implementation or
+   phase evidence.
 3. Fetch live GitHub state through authenticated REST and independently verify
    the documented SHA anchors, checks, reviews, conversations, branch policy,
    queue, and deployments before any action.

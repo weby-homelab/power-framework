@@ -1,0 +1,232 @@
+{
+    "schema_version": "power.index-cost-policy.v1",
+    "status": "planned",
+    "implementation_status": "planned",
+    "planning_status": "approved_planning_direction",
+    "phase_status": "not_started",
+    "planning_only": true,
+    "note": "Profiles and limits are planning defaults. Phase 5 and later benchmark gates must validate or revise them before runtime consumption.",
+    "precedence": {
+        "order": [
+            "structural_contract_maximums",
+            "server_selected_effective_profile",
+            "declared_domain_policy",
+            "caller_request_hints"
+        ],
+        "composition": "effective_limit = min(schema_maximum, profile_cap, domain_limit); caller hints may only request a lower bounded value",
+        "rules": [
+            "effective_profile_caps_override_caller_budget_class_and_limits",
+            "structural_schema_maximums_are_hard_ceilings",
+            "domain_stages_must_be_subset_of_effective_profile_or_explicit_escalation",
+            "incompatible_flags_are_rejected_or_deferred; never silently clamped"
+        ]
+    },
+    "budget_profiles": {
+        "FAST": {
+            "stages": [
+                "project_state",
+                "metadata",
+                "fts",
+                "tf",
+                "temporal",
+                "noise_gate",
+                "materialized_view"
+            ],
+            "max_candidates": 40,
+            "max_tokens": 4000,
+            "max_domains": 3,
+            "max_graph_hops": 0,
+            "dense_allowed": false,
+            "reranker_allowed": false,
+            "graph_allowed": false,
+            "deep_expansion_allowed": false,
+            "raw_fallback_allowed": false,
+            "model_load": "forbidden"
+        },
+        "BALANCED": {
+            "stages": [
+                "project_state",
+                "metadata",
+                "fts",
+                "tf",
+                "temporal",
+                "noise_gate",
+                "materialized_view",
+                "rrf",
+                "semantic",
+                "rerank"
+            ],
+            "max_candidates": 120,
+            "max_tokens": 12000,
+            "max_domains": 4,
+            "max_graph_hops": 0,
+            "dense_allowed": true,
+            "reranker_allowed": true,
+            "graph_allowed": false,
+            "deep_expansion_allowed": false,
+            "raw_fallback_allowed": false,
+            "model_load": "selected_domain_only"
+        },
+        "DEEP": {
+            "stages": [
+                "project_state",
+                "metadata",
+                "fts",
+                "tf",
+                "semantic",
+                "graph_assisted",
+                "rrf",
+                "temporal",
+                "noise_gate",
+                "rerank",
+                "raw_fallback"
+            ],
+            "max_candidates": 400,
+            "max_tokens": 30000,
+            "max_domains": 16,
+            "max_graph_hops": 3,
+            "dense_allowed": true,
+            "reranker_allowed": true,
+            "graph_allowed": true,
+            "deep_expansion_allowed": true,
+            "raw_fallback_allowed": true,
+            "model_load": "explicit_request_or_escalation"
+        }
+    },
+    "index_priority": {
+        "HOT": {
+            "dense_policy": "eager_or_high_priority",
+            "queue_priority": "high",
+            "default_retrieval": "eligible_for_balanced"
+        },
+        "WARM": {
+            "dense_policy": "batched_or_deferred",
+            "queue_priority": "normal",
+            "default_retrieval": "eligible_for_balanced_when_selected"
+        },
+        "COLD": {
+            "dense_policy": "on_demand_only",
+            "queue_priority": "low",
+            "default_retrieval": "fts_first"
+        }
+    },
+    "rebuild_triggers": [
+        "embedding_model_revision_changed",
+        "embedding_dimension_changed",
+        "chunker_schema_or_revision_changed",
+        "dense_index_schema_changed",
+        "explicit_migration_or_force_rebuild",
+        "proven_dense_index_corruption"
+    ],
+    "ordinary_edit_policy": {
+        "source_edit_is_full_rebuild_trigger": false,
+        "required_action": "dirty_chunk_set",
+        "queue_action": "QUEUE",
+        "stale_dense_behavior": "label_pending_or_stale; never present as current",
+        "global_manifest_clear_on_single_source_edit": "forbidden_as_normal_path"
+    },
+    "queue_lifecycle": {
+        "states": [
+            "pending",
+            "running",
+            "deferred",
+            "complete",
+            "failed",
+            "dead_letter"
+        ],
+        "transitions": [
+            "pending -> running with a lease",
+            "running -> complete after exact coverage verification",
+            "running -> deferred with deferred_until when resource policy defers",
+            "running -> failed with redacted last_error on retryable failure",
+            "deferred -> pending when deferred_until expires and the source revision is unchanged",
+            "running -> pending after an expired lease is fenced and the source revision is rechecked",
+            "failed -> pending while retry_count remains within policy",
+            "failed -> dead_letter after retry exhaustion",
+            "dead_letter -> pending only after explicit review of the source revision"
+        ],
+        "lease_policy": "expired running leases are recoverable without duplicate embedding",
+        "fencing_policy": "a worker may publish only while its lease is current; expired work is requeued after a revision check",
+        "idempotency_policy": "source revision, chunk revision, model revision, and idempotency key must match"
+    },
+    "defer_rules": [
+        {
+            "when": "estimated_memory_class=high and priority!=HOT",
+            "result": "DEFER"
+        },
+        {
+            "when": "model_required=true and budget_class=FAST",
+            "result": "DEFER"
+        },
+        {
+            "when": "full_rebuild=true and no_explicit_migration_request",
+            "result": "REQUIRE_EXPLICIT_DEEP_SYNC"
+        },
+        {
+            "when": "queue_backpressure_limit_reached",
+            "result": "DEFER"
+        },
+        {
+            "when": "source_revision_changed_before_apply",
+            "result": "QUEUE_NEW_REVISION"
+        }
+    ],
+    "policy_outputs": [
+        "RUN_NOW",
+        "QUEUE",
+        "DEFER",
+        "REQUIRE_EXPLICIT_DEEP_SYNC",
+        "QUEUE_NEW_REVISION"
+    ],
+    "metrics": {
+        "required": [
+            "fts_sync_time",
+            "dense_queue_length",
+            "dirty_chunks",
+            "embedded_chunks_per_run",
+            "reembed_amplification",
+            "index_disk_size",
+            "model_load_time",
+            "peak_ram",
+            "cpu_time",
+            "query_p50",
+            "query_p95",
+            "dense_p50",
+            "dense_p95",
+            "reranker_p50",
+            "reranker_p95",
+            "dense_escalation_ratio",
+            "rerank_escalation_ratio",
+            "fts_only_resolution_ratio"
+        ],
+        "reembed_amplification": {
+            "definition": "embedded_chunks / logically_changed_chunks",
+            "ordinary_edit_target": "approximately 1.0",
+            "full_migration_rebuilds": "reported separately and excluded from ordinary-edit numerator"
+        }
+    },
+    "resource_guards": {
+        "cpu_policy": "at most 50% of host CPU capacity and at most 2 workers on PRXMX-01",
+        "max_workers": 2,
+        "queue_policy": "bounded with backpressure and restart recovery",
+        "max_queue_items": 100000,
+        "max_chunks_per_item": 10000,
+        "max_retries_per_item": 100,
+        "max_aggregate_estimated_work": 10000000,
+        "token_policy": "consumed_tokens must not exceed max_tokens",
+        "max_context_items": 1000,
+        "raw_capture_policy": "append-only, privacy-bounded, and never embedded by default",
+        "overflow_behavior": "reject_or_defer_with_explicit_reason; never clamp silently"
+    },
+    "vector_backend_policy": {
+        "external_ann_required": false,
+        "order_of_evaluation": [
+            "scope_pushdown",
+            "incremental_indexing",
+            "hot_warm_cold",
+            "candidate_reduction",
+            "real_benchmark"
+        ],
+        "future_backend": "requires a separate VectorIndexBackend contract, ADR, supply-chain review, and benchmark evidence"
+    }
+}

@@ -71,15 +71,21 @@ head tree SHA
 head parent(s)
 ```
 
-For HF #406 the inspected tuple is:
+The following retained tuple is the first historical HF #406 candidate epoch;
+it is not the current main state and must not be reused for a future gate:
 
 ```text
-PR: 406
+PR: 406 (historical candidate epoch 1)
 BASE: 119d5c39aa2c22734ca72c351f8a70790371678f
 HEAD: 201da2e0e78d1bbf860c98dc653008c0fb4984cd
 TREE: c8d66c9bf65c54b09bb9990380313737af63c932
 PARENT: 119d5c39aa2c22734ca72c351f8a70790371678f
 ```
+
+The final HF #406 admitted tuple is retained in the current-state and
+post-merge handoff documents. The fresh planning snapshot anchor is
+`d8b704f6125347ff9f9c39981193807d2160b135`; it is an observation of `main` at
+planning start, not a promise about a future merge SHA.
 
 Any change to the PR, base, head, tree, parent, diff, or relevant policy
 invalidates the evidence for that candidate epoch. A repair, compatibility
@@ -101,8 +107,9 @@ One bounded chat handles one major gate. Do not automatically chain:
 HF → Actions #396 → Final Integration → Phase 5
 ```
 
-The current gate is HF #406 admission. Actions #396 and Phase 5 must remain
-untouched until a later independent session starts from fresh repository state.
+The HF #406 admission is closed. The current next gate is Actions #396, but it
+must remain untouched until a later independent session starts from fresh
+repository state and explicitly revalidates its policy.
 
 ## GitHub publication policy
 
@@ -130,6 +137,13 @@ not observable, stop; do not ask an agent to guess or bypass the missing policy.
 ## Merge policy
 
 The required merge method is a **normal merge commit** when a gate is admitted.
+
+For POWER 3.8 governance, dependency, architecture, and release gates, this
+gate-specific exact-head rule takes precedence over the generic
+`CONTRIBUTING.md` preference for squash merges. It preserves the documented
+merge parents and exact candidate tuple. It does not override GitHub branch
+protection: if the live protected policy accepts only another method, record
+that policy conflict as a blocker and do not bypass or weaken protection.
 
 - Revalidate PR, base, head, tree, checks, reviews, policy, and mergeability
   immediately before one merge attempt.
@@ -162,8 +176,9 @@ The governance publication has two bounded stages:
    canonical; a PR or unsigned REST Contents commit remains provisional.
 
 The retained `docs/power-3.8-premerge-state-publication` PR is historical
-provisional evidence/source material. A fresh signed governance branch is the
-current publication candidate; its exact branch/PR/head must be verified live.
+provisional evidence/source material. The post-HF state is now canonical through
+PR #411 and merge `d8b704f`. A future planning branch is a separate candidate
+gate and must not be confused with that merged state.
 
 ## GPG and commit integrity
 
@@ -194,6 +209,121 @@ exact SHAs, state labels, evidence links, blockers, and the next authorized gate
 it must not paste secrets or unbounded logs. Historical handoffs are retained as
 historical snapshots and are never silently rewritten as current state.
 
+## Context / memory / retrieval architecture rules
+
+The POWER 3.8 architecture plan and its versioned planning artifacts are
+binding design direction only. They are not runtime implementation or phase
+evidence. The following rules apply when the owning future phase is authorized.
+
+### Source and authority hierarchy
+
+```text
+raw source / canonical ledger
+        > curated semantic projection
+        > materialized views
+        > indexes / embeddings / caches
+```
+
+Indexes, views, embeddings, reranker scores, and `ContextPack` objects are
+derived and rebuildable. Index corruption may never rewrite source truth.
+
+### Orthogonal data axes
+
+Semantic domain and trust/lifecycle are separate fields:
+
+```text
+domain: project_state | projects | decisions | tasks | code | infrastructure
+        | research | documentation | operations | agent_conversations | logs
+
+trust/lifecycle: RAW | PROPOSED | CURATED | VERIFIED | CANONICAL | SUPERSEDED
+                 | ARCHIVED | QUARANTINED | NOISE
+```
+
+`domain != authority`, `domain != lifecycle`, `path != trust`, and `archive` is
+not a semantic domain. Chat evidence can be promoted only through explicit
+provenance and policy; it is neither permanently untrusted nor automatically
+canonical.
+
+### Reuse-first and unambiguous naming
+
+Reuse `search_vault` executors, `DomainRegistry`, `SemanticChunker`,
+`BGEM3OnnxManager`, `BGEM3Reranker`, `ProjectStateService`, PSE, TaskService,
+DecisionService, memory proposal/apply, maintenance, and generation index.
+Do not create a parallel search engine, semantic compiler, domain registry,
+canonical memory database, task/decision store, mutation path, or PSE authority.
+
+The Phase 3 role is **ProjectSemanticCompiler** (currently exposed by the
+source class `SemanticCompiler` in `semantic_compiler.py`); it produces typed
+candidates and proposals. The Phase 5 role is **ContextPackCompiler**; it
+selects existing knowledge and assembles bounded context. Do not introduce a
+generic `SemanticCompiler` or `ContextCompiler` that overlaps these roles.
+
+### Retrieval and scope
+
+Use `DomainMatch[]`, not single-domain routing. Resolve `SearchScope` before
+FTS/TF/dense/graph candidate generation. Candidate generation must be bounded
+by domain, path, source type, trust, temporal, and project scope; post-filtering
+alone does not satisfy the contract.
+
+Use progressive budgets:
+
+```text
+FAST     = state/metadata/FTS/TF/temporal/noise_gate/views; no model load
+BALANCED = FAST + selected-domain semantic + small rerank pool
+DEEP     = multi-domain semantic/graph_assisted/temporal/rerank/raw fallback by escalation
+```
+
+Cheap retrieval precedes expensive retrieval. A query must not trigger a
+global reindex. The normal source-edit path must not require global
+re-embedding.
+
+The effective bounded value is
+`min(schema_maximum, profile_cap, domain_limit)`; caller hints may only lower
+that value. Profile flags and model-load policy are server-selected. An
+incompatible stage/flag combination is rejected or explicitly escalated, never
+silently clamped.
+
+### Noise and capture
+
+Noise actions are only `INCLUDE`, `DOWNRANK`, `EXCLUDE_FROM_RETRIEVAL`, or
+`QUARANTINE`; there is no `DELETE_SOURCE` action. Raw capture is append-only,
+privacy-bounded, idempotent, restart-safe, and backpressured. Do not promote or
+embed every agent message automatically.
+
+### Model authority and repair
+
+LLM output is untrusted input. A model may classify, rank, extract a proposal,
+prepare repair, or explain. It may not mark output canonical, approve a
+Decision, complete Task authority, advance PSE, or bypass governed mutation.
+
+Repair is classed as deterministic derived repair, semantic repair, or
+authority/security repair. Semantic repair always follows:
+
+```text
+detect → evidence → proposal → approval policy → apply → verify → receipt
+```
+
+Existing memory proposal/apply and maintenance boundaries remain the owners of
+mutation. Caller-supplied booleans are not a substitute for the future human
+approval proof decision.
+
+### Dense cost and external vector policy
+
+Track global model/chunker/schema identity separately from per-source/per-chunk
+validity. Use a bounded `IndexWorkQueue`, HOT/WARM/COLD priorities, and an
+`IndexCostEstimate` before expensive work. Full dense rebuild is reserved for
+model/dimension/chunker/schema change, explicit migration, or proven corruption.
+
+Qdrant, Milvus, or another vector database is not mandatory. Any future ANN or
+external backend requires scope/index benchmarks, a separate ADR, supply-chain
+review, and explicit approval.
+
+### Shadow requirement
+
+The new planner runs in shadow while legacy retrieval remains served. Default
+retrieval changes only after quality, determinism, token, latency, resource,
+noise, and index-cost evidence passes the acceptance artifact.
+
 ## Plan → Act → Validate
 
 Each bounded action follows PAV:
@@ -217,28 +347,30 @@ Maximum retry discipline:
 
 ## Current operational state
 
-Current state after the protected governance merge and before the HF candidate
-refresh:
+Current state after the protected governance and HF merges:
 
 ```text
-HF ADMISSION: REFRESH REQUIRED / OLD CANDIDATE STALE
-CANONICAL GOVERNANCE: YES / PR #408 MERGED
+HF ADMISSION: CLOSED / PR #406 MERGED
+CANONICAL GOVERNANCE: YES / PR #408, #409, #410, #411 MERGED
+CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: APPROVED PLANNING DIRECTION / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED
 ACTIONS #396: HOLD / NOT STARTED
 PHASE 5: BLOCKED / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The old HF tuple remains retained evidence only. Merge current `main` into the
-HF branch or create a replacement, record a new candidate epoch, recompute the
-full required evidence, and continue through the ordinary protected merge
-path. Do not start Actions #396, Phase 5–9, version bumps, tags, releases,
-release images, or final release notes.
+The HF candidate epochs and merge receipt are now retained `MERGED MAIN`
+evidence. Actions #396 is the next bounded gate but remains HOLD / NOT STARTED;
+do not start it, Phase 5–9, version bumps, tags, releases, release images, or
+final release notes from this handoff.
 
 ## Cross-links
 
 - [Current state](POWER_3.8_CURRENT_STATE.md)
 - [Execution roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [Planning index](README.md)
+- [Context / memory / retrieval architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
+- [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)
+- [Latest architecture handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T140647Z_context-memory-architecture_planned.md)
+- [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
