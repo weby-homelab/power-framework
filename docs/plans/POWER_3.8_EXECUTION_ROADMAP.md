@@ -196,4 +196,4 @@ Actions #396 or Phase 5 before the HF gate is closed.
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)

@@ -13,7 +13,7 @@ current publication candidate:
 - [POWER 3.8 — Execution Roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [POWER 3.8 — Development Protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)
 
 > These documents are published for recovery while the HF gate is blocked.
 > Before a protected merge they are provisional; after a protected merge they
@@ -31,8 +31,11 @@ To recover the current POWER 3.8 state:
 2. Read `POWER_3.8_EXECUTION_ROADMAP.md`.
 3. Read `POWER_3.8_DEVELOPMENT_PROTOCOL.md`.
 4. Read the latest append-only handoff.
-5. Fetch current GitHub `main` and PR #406 independently through REST API.
-6. Verify every documented SHA and mutable status before acting.
+5. Fetch current GitHub `main`, PR #406, and governance PR #408 independently
+   through authenticated REST API.
+6. Verify every documented SHA and mutable status, including each candidate's
+   exact head, required checks, reviews, and protected-branch policy, before
+   acting or attempting a governance merge.
 7. Work only on the current HF admission gate; do not start Actions #396 or
    Phase 5.
 

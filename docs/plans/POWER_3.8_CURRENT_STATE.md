@@ -54,7 +54,7 @@ CANONICAL_GOVERNANCE_PR:
 408 OPEN / PROVISIONAL
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md
+artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md
 ```
 
 ## Fresh state anchor
@@ -63,6 +63,7 @@ artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2
 - State was read from GitHub REST during this session. Every future agent must
   fetch and revalidate the mutable values below before acting.
 - OBSERVED_AT_UTC: `2026-09-08T08:13:35Z`.
+- GOVERNANCE_POLICY_OBSERVED_AT_UTC: `2026-09-08T08:45:01Z`.
 - The local verified base anchor is
   `119d5c39aa2c22734ca72c351f8a70790371678f`.
 - A document SHA is a state anchor, not a substitute for live GitHub verification.
@@ -113,6 +114,14 @@ artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2
   unresolved review conversation was reported. The remaining `blocked` reason
   is not inferred from those facts and remains subject to the protected merge
   admission test.
+- Intended target: `huggingface-hub 1.30.0`.
+- Maintained specifier: `>=1.30.0,<1.31.0`.
+- PR #406 dependency diff is limited to `pyproject.toml`,
+  `release/web-runtime.requirements.txt`, and `uv.lock`.
+- `uv.lock` SHA-256:
+  `d8a7456d53bdfc79090f4b3a3b9279664e2662c4f7343100a68db734c167485a`.
+- Web export SHA-256:
+  `4001e0b073acb7c6eb40bab6047bcb13adedbca3d2a6ebdf23e1b28687b435c3`.
 
 ## Governance candidate #408
 
@@ -120,27 +129,20 @@ artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2
 - PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
   `OPEN`, `merged=false`.
 - Candidate head:
-  `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`.
+  `3166244bcbc7d6e6757e6b45dbde82b2be4ccbc5`.
 - Candidate tree:
-  `f9046c678191fa97a9a4a9f29db32cc87b23a164`.
+  `15bd0f743d1a77bfdcdeed03fc61833229dd1e03`.
 - Candidate parent:
-  `d788825607ae55b9de1142f67ab076f8e533d14d`.
+  `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`.
 - GitHub commit verification: `verified=true`, `reason=valid` at
-  `2026-09-08T08:28:42Z`.
-- The candidate contains only the seven governance/handoff files listed in
-  the PR body; remote required checks were in progress at the observation.
+  `2026-09-08T08:37:42Z`.
+- The candidate contains only governance/handoff paths: nine files total,
+  including the seven imported source-material files and two append-only
+  governance handoffs.
 - Previous governance epoch: head
-  `d788825607ae55b9de1142f67ab076f8e533d14d`, tree
-  `380cba0de80d622e4db109be168f642eaaddd1ea`; it remains retained evidence,
+  `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`, tree
+  `f9046c678191fa97a9a4a9f29db32cc87b23a164`; it remains retained evidence,
   not the current PR head.
-- Intended target: `huggingface-hub 1.30.0`.
-- Maintained specifier: `>=1.30.0,<1.31.0`.
-- PR diff is limited to `pyproject.toml`,
-  `release/web-runtime.requirements.txt`, and `uv.lock`.
-- `uv.lock` SHA-256:
-  `d8a7456d53bdfc79090f4b3a3b9279664e2662c4f7343100a68db734c167485a`.
-- Web export SHA-256:
-  `4001e0b073acb7c6eb40bab6047bcb13adedbca3d2a6ebdf23e1b28687b435c3`.
 
 ## Gate decision and blockers
 
@@ -162,7 +164,7 @@ bypass or retry loop.
 The pre-HF canonical governance bootstrap has started from live `main`:
 
 - Governance branch: `docs/power-3.8-governance-bootstrap`.
-- Governance commit: `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`, locally and
+- Governance commit: `3166244bcbc7d6e6757e6b45dbde82b2be4ccbc5`, locally and
   GitHub-verified signed candidate.
 - Governance PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
   open/provisional until protected merge.
@@ -203,4 +205,4 @@ The pre-HF canonical governance bootstrap has started from live `main`:
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)

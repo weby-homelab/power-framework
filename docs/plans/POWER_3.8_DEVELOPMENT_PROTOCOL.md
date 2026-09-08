@@ -239,4 +239,4 @@ final release notes.
 - [Execution roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)
