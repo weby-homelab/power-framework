@@ -6,19 +6,19 @@ commits, branch protection, or authoritative phase reports.
 
 ## ACTIVE GOVERNANCE
 
-The following files are the active **pre-HF governance projection** in the
-current publication candidate:
+The following files are the active **post-governance HF-refresh projection** in
+the canonical `main` tree:
 
 - [POWER 3.8 — Current State](POWER_3.8_CURRENT_STATE.md)
 - [POWER 3.8 — Execution Roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [POWER 3.8 — Development Protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)
 
-> These documents are published for recovery while the HF gate is blocked.
-> Before a protected merge they are provisional; after a protected merge they
-> become repository-native canonical memory for the recorded snapshot. They
-> must never be called `MERGED MAIN` evidence for a commit that has not merged.
+> Governance PR #408 is merged on protected `main`; the HF gate remains open
+> and requires a new candidate epoch because its old base is stale. These paths
+> are canonical memory for the recorded governance merge, not HF merge or
+> release evidence.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -31,8 +31,8 @@ To recover the current POWER 3.8 state:
 2. Read `POWER_3.8_EXECUTION_ROADMAP.md`.
 3. Read `POWER_3.8_DEVELOPMENT_PROTOCOL.md`.
 4. Read the latest append-only handoff.
-5. Fetch current GitHub `main`, PR #406, and governance PR #408 independently
-   through authenticated REST API.
+5. Fetch current GitHub `main`, HF PR #406, and the merged governance PR #408
+   independently through authenticated REST API.
 6. Verify every documented SHA and mutable status, including each candidate's
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a governance merge.

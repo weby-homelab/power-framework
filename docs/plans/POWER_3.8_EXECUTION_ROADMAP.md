@@ -27,10 +27,10 @@ Phase 4
 CLOSED / FROZEN
         ↓
 Controlled Dependency Refresh
-        ├── Pre-HF governance snapshot — IN PROGRESS / protected review
+        ├── Pre-HF governance snapshot — CLOSED / PR #408 MERGED
         ├── Python admission — DONE
         ├── WEB-01 / WEB-05 — DONE
-        ├── HF admission PR #406 — BLOCKED / DIAGNOSIS IN PROGRESS
+        ├── HF admission PR #406 — REFRESH REQUIRED / NEW EPOCH
         ├── Actions admission PR #396 — NEXT AFTER HF / HOLD / NOT STARTED
         └── Final integration admission — BLOCKED
         ↓
@@ -61,8 +61,8 @@ NO-GO
 | Phases 0–4 | DONE / FROZEN | No reopening in this gate |
 | Python refresh | DONE | Prior controlled admission |
 | WEB-01 / WEB-05 | DONE | Closed through security PR #405 |
-| Pre-HF governance snapshot | IN PROGRESS | Fresh signed branch from live `main`; may merge before HF |
-| HF refresh | BLOCKED / DIAGNOSE | PR #406 is open; exact head is not merged; current state is not terminal |
+| Pre-HF governance snapshot | CLOSED | PR #408 protected merge is on `main` |
+| HF refresh | REFRESH REQUIRED | PR #406 remains open on the pre-governance base |
 | Actions #396 | NEXT AFTER HF / HOLD | Do not inspect or modify in this gate |
 | Final integration | BLOCKED BY HF | Requires separate admissions |
 | Phase 5 | BLOCKED / NOT STARTED | No implementation authorized |
@@ -77,11 +77,11 @@ dependency update:
 1. **Python admission — complete.** Preserve its merged evidence.
 2. **WEB-01 / WEB-05 — complete.** Security boundaries are closed through PR
    #405 and must not be reopened as part of HF work.
-3. **HF admission — current blocked gate.** PR #406 starts with an exact
-   authorized base, head, tree, and parent. A repair, compatibility fix, lock
-   regeneration, or merge of current `main` may create a new candidate epoch;
-   old evidence then becomes stale and must be recomputed, not treated as a
-   reason to terminate the gate.
+3. **HF admission — current refresh gate.** PR #406 retains an exact prior
+   tuple, but governance PR #408 advanced `main`. Merge current `main` into the
+   HF branch or create a replacement, then record a new candidate epoch and
+   recompute all evidence. Old evidence is stale input, not a reason to
+   terminate the gate.
 4. **Actions admission — next gate only after HF.** PR #396 remains on hold;
    no Actions dependency or workflow changes are authorized here.
 5. **Final integration admission — later gate.** It requires independent exact
@@ -109,13 +109,13 @@ SPECIFIER:
 >=1.30.0,<1.31.0
 
 LIVE_PR_STATE:
-OPEN / NOT MERGED
+OPEN / NOT MERGED / STALE BASE
 
 LIVE_MERGEABILITY:
-mergeable=true; mergeable_state=blocked (diagnostic observation)
+mergeable=null; mergeable_state=unknown while GitHub recalculates after main advance
 
 ADMISSION:
-PENDING REQUIRED-POLICY DIAGNOSIS / NORMAL-MERGE TEST
+NEW CANDIDATE EPOCH REQUIRED / NORMAL-MERGE TEST NOT ATTEMPTED
 ```
 
 `mergeable_state` alone is neither merge authorization nor an automatic stop.
@@ -174,8 +174,8 @@ Treat the following as remediation inputs rather than automatic stops:
 
 - HF base, head, tree, parent, diff, or PR state changes after authorization;
   start a new candidate epoch and recompute evidence.
-- `mergeable_state=unstable` or `blocked`; diagnose the concrete required
-  check/policy cause and retry admission only after remediation.
+- `mergeable_state=unstable`, `blocked`, or `unknown`; diagnose the concrete
+  required check/policy cause and retry admission only after remediation.
 - A required check fails; inspect its logs, apply a minimal related fix, and
   rerun the bounded gate.
 - Required policy is not observable through one interface; use the approved
@@ -196,4 +196,4 @@ Actions #396 or Phase 5 before the HF gate is closed.
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)

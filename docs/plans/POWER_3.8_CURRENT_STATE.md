@@ -18,25 +18,25 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PRE-HF GOVERNANCE CANDIDATE / HF BLOCKED
+GOVERNANCE CANONICAL / HF REFRESH REQUIRED
 
 STATE_BASE_SHA:
-119d5c39aa2c22734ca72c351f8a70790371678f
+4b49e00c75866fa57f71e7bef61547915f7e01db
 
 CURRENT_MAIN_SHA:
-119d5c39aa2c22734ca72c351f8a70790371678f
+4b49e00c75866fa57f71e7bef61547915f7e01db
 
 ACTIVE_GATE:
-Controlled Dependency Refresh — HF #406 exact-head admission
+Controlled Dependency Refresh — HF #406 new candidate epoch
 
 LAST_CLOSED_GATE:
-Controlled Dependency Refresh — WEB-01 / WEB-05 security closure
+Pre-HF Governance Snapshot — PR #408 protected merge
 
 LAST_MERGED_PR:
-405
+408
 
 HF_PR:
-406 OPEN / NOT MERGED
+406 OPEN / STALE BASE / REFRESH REQUIRED
 
 PHASE_5:
 BLOCKED / NOT STARTED
@@ -45,16 +45,16 @@ RELEASE_3_8_0:
 NO-GO
 
 CANONICAL_GOVERNANCE_BRANCH:
-docs/power-3.8-governance-bootstrap
+docs/power-3.8-governance-bootstrap (merged; remote ref auto-deleted)
 
 CANONICAL_GOVERNANCE_COMMIT:
-98f90b36e73e0e43ac77dce3dcf895c9caec1ef9 (signed candidate; canonical after protected merge)
+4b49e00c75866fa57f71e7bef61547915f7e01db (protected merge; GitHub-verified)
 
 CANONICAL_GOVERNANCE_PR:
-408 OPEN / PROVISIONAL
+408 MERGED
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md
+artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md
 ```
 
 ## Fresh state anchor
@@ -62,10 +62,18 @@ artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3
 - Repository: [weby-homelab/power-framework](https://github.com/weby-homelab/power-framework).
 - State was read from GitHub REST during this session. Every future agent must
   fetch and revalidate the mutable values below before acting.
-- OBSERVED_AT_UTC: `2026-09-08T08:13:35Z`.
+- PRE_GOVERNANCE_OBSERVED_AT_UTC: `2026-09-08T08:13:35Z`.
 - GOVERNANCE_POLICY_OBSERVED_AT_UTC: `2026-09-08T08:45:01Z`.
-- The local verified base anchor is
+- POST_GOVERNANCE_OBSERVED_AT_UTC: `2026-09-08T09:14:03Z`.
+- The pre-governance verified base anchor was
   `119d5c39aa2c22734ca72c351f8a70790371678f`.
+- Current protected `main` is
+  `4b49e00c75866fa57f71e7bef61547915f7e01db`.
+- Governance merge tree:
+  `da33bef8fd4ecd5eafa68e04bb7db21246fb42b4`.
+- Governance merge parents:
+  `119d5c39aa2c22734ca72c351f8a70790371678f` and
+  `b6f54b0c04da545ba1fe3cd9fa932638d2ff8815`.
 - A document SHA is a state anchor, not a substitute for live GitHub verification.
 
 ## Public and phase state
@@ -87,7 +95,8 @@ artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3
 |---|---|---|
 | Python admission | CLOSED | Prior merged repository evidence |
 | WEB-01 / WEB-05 | CLOSED | Security PR #405 and merge on `main` |
-| HF admission | BLOCKED / NOT MERGED | PR #406, exact head below |
+| Pre-HF governance snapshot | CLOSED | PR #408 protected merge on `main` |
+| HF admission | REFRESH REQUIRED | PR #406 remains open but its base is behind current `main` |
 | Actions #396 | HOLD / NOT STARTED | Must not begin in this gate |
 | Final integration | BLOCKED | Requires all dependency admissions |
 
@@ -95,8 +104,11 @@ artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3
 
 - PR: [#406](https://github.com/weby-homelab/power-framework/pull/406),
   `OPEN`, `merged=false`.
-- Authorized base and current base:
+- Original authorized base:
   `119d5c39aa2c22734ca72c351f8a70790371678f`.
+- Current `main` is
+  `4b49e00c75866fa57f71e7bef61547915f7e01db`; the candidate base is stale and
+  must be refreshed before normal admission.
 - Authorized head:
   `201da2e0e78d1bbf860c98dc653008c0fb4984cd`.
 - Authorized head tree:
@@ -104,16 +116,14 @@ artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3
 - Authorized head parent:
   `119d5c39aa2c22734ca72c351f8a70790371678f`.
 - GitHub commit verification: `verified=true`, `reason=valid`.
-- GitHub reports `mergeable=true`, `mergeable_state=blocked` at the observation
-  above. This field is diagnostic, not a standalone authorization or terminal
-  failure: required checks, review requirements, unresolved conversations,
-  branch freshness, rulesets, queue, and deployment policy must be diagnosed
-  before one normal protected-merge attempt.
-- At this observation, all 11 published required contexts for #406 were
-  successful, branch protection required zero approving reviews, and no
-  unresolved review conversation was reported. The remaining `blocked` reason
-  is not inferred from those facts and remains subject to the protected merge
-  admission test.
+- Before the governance merge, GitHub reported `mergeable=true` and
+  `mergeable_state=blocked`; after `main` advanced, the live API returned
+  `mergeable=null`, `mergeable_state=unknown` while recalculating the open PR.
+  These fields are diagnostic, not standalone authorization or terminal
+  failure. Branch freshness and all required checks must be recomputed for a
+  new candidate epoch.
+- The old exact-head required contexts were successful, but they are not
+  admission evidence for a candidate based on the new `main`.
 - Intended target: `huggingface-hub 1.30.0`.
 - Maintained specifier: `>=1.30.0,<1.31.0`.
 - PR #406 dependency diff is limited to `pyproject.toml`,
@@ -123,76 +133,77 @@ artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3
 - Web export SHA-256:
   `4001e0b073acb7c6eb40bab6047bcb13adedbca3d2a6ebdf23e1b28687b435c3`.
 
-## Governance candidate #408
+## Governance merge #408
 
 - Branch: `docs/power-3.8-governance-bootstrap`.
 - PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
-  `OPEN`, `merged=false`.
+  `MERGED`, `merged=true`.
 - Candidate head:
-  `3166244bcbc7d6e6757e6b45dbde82b2be4ccbc5`.
+  `b6f54b0c04da545ba1fe3cd9fa932638d2ff8815`.
 - Candidate tree:
-  `15bd0f743d1a77bfdcdeed03fc61833229dd1e03`.
+  `da33bef8fd4ecd5eafa68e04bb7db21246fb42b4`.
 - Candidate parent:
-  `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`.
+  `3166244bcbc7d6e6757e6b45dbde82b2be4ccbc5`.
 - GitHub commit verification: `verified=true`, `reason=valid` at
-  `2026-09-08T08:37:42Z`.
-- The candidate contains only governance/handoff paths: nine files total,
-  including the seven imported source-material files and two append-only
-  governance handoffs.
+  `2026-09-08T08:54:20Z`.
+- Protected merge SHA:
+  `4b49e00c75866fa57f71e7bef61547915f7e01db`.
+- Protected merge parents are
+  `119d5c39aa2c22734ca72c351f8a70790371678f` and
+  `b6f54b0c04da545ba1fe3cd9fa932638d2ff8815`.
+- The merged tree contains only governance/handoff paths: nine files total,
+  including seven imported source-material files and two append-only handoffs.
 - Previous governance epoch: head
   `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`, tree
-  `f9046c678191fa97a9a4a9f29db32cc87b23a164`; it remains retained evidence,
-  not the current PR head.
+  `f9046c678191fa97a9a4a9f29db32cc87b23a164`; it remains retained evidence.
 
 ## Gate decision and blockers
 
 ```text
-HF MERGE = PENDING POLICY DIAGNOSIS / ADMISSION
-NORMAL MERGE = NOT YET ATTEMPTED FOR THIS OBSERVATION
-FRESH CHATGPT AUDIT REQUIRED
+GOVERNANCE MERGE = CLOSED / PR #408 MERGED
+HF MERGE = BLOCKED / NEW CANDIDATE EPOCH REQUIRED
+HF NORMAL MERGE = NOT YET ATTEMPTED FOR CURRENT MAIN
 ```
 
-The exact authorization text supplied for PR #406 does not override fresh
-GitHub state. Authenticated REST inspection is available and shows the
-required-check and review-policy values above; `mergeable_state=blocked` still
-requires diagnosis, not a magic-string stop. A normal merge attempt must use
-the exact current head guard, at most once for this candidate epoch, with no
-bypass or retry loop.
+The governance PR was accepted through one normal protected merge after fresh
+required-check and policy diagnosis. The HF authorization for its old base is
+now stale because `main` advanced. Refreshing #406 or creating a replacement is
+repair work: record the new tuple, recompute the diff/hashes/tests/security/CI,
+and then apply the one-normal-merge-attempt rule to the current candidate.
 
 ## Canonical governance status
 
-The pre-HF canonical governance bootstrap has started from live `main`:
+The pre-HF canonical governance bootstrap is canonical on protected `main`:
 
 - Governance branch: `docs/power-3.8-governance-bootstrap`.
-- Governance commit: `3166244bcbc7d6e6757e6b45dbde82b2be4ccbc5`, locally and
-  GitHub-verified signed candidate.
+- Governance merge: `4b49e00c75866fa57f71e7bef61547915f7e01db`, with GitHub
+  `verified=true`, `reason=valid`.
 - Governance PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
-  open/provisional until protected merge.
+  merged by one ordinary protected merge.
 - The prior `docs/power-3.8-premerge-state-publication` branch remains
   provisional evidence and is retained as source material; it is not replaced
   or deleted.
-- A governance merge before HF is permitted when GitHub's protected normal
-  merge policy accepts it. If `main` advances, #406 must be revalidated as a
-  new candidate epoch rather than treated as failed evidence.
+- HF #406 must now be revalidated as a new candidate epoch against current
+  `main`; its old evidence is retained but cannot authorize a merge.
 
 ## Next authorized work
 
-1. Validate and publish this pre-HF governance candidate through a normal
-   protected PR.
-2. Revalidate `main`, #406, required checks, reviews, conversations, rulesets,
-   queue/deployment requirements, and exact Git objects immediately before any
-   normal merge attempt.
-3. If governance merges first, record the new `main` and rebuild or merge it
-   into the HF candidate as a new candidate epoch; old evidence becomes stale,
-   not fatal.
-4. Admit HF #406 only after its current exact tuple and protected policy pass.
-5. After HF post-merge verification, publish a new governance state update.
+1. Publish this post-governance state update through a normal protected PR.
+2. Merge current `main` into the HF branch or create a verified replacement,
+   recording the new base/head/tree/parent tuple and preserving a three-file HF
+   diff from current `main`.
+3. Recompute lock/export hashes, targeted/full tests, security matrix, remote
+   checks, reviews, branch policy, and exact mergeability for the new epoch.
+4. Admit and normally merge HF #406 only after its current protected policy
+   accepts the exact head.
+5. After HF post-merge verification, publish the required post-HF governance
+   update.
 
 ## Do not start
 
-- Do not mutate the HF branch without recording a new candidate epoch and
-  recomputing its exact base/head/tree/parent, diff, hashes, tests, security,
-  CI, and policy evidence.
+- HF branch mutation is permitted only as a new candidate epoch with recomputed
+  exact base/head/tree/parent, diff, hashes, tests, security, CI, and policy
+  evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
 - Do not start Actions #396, Phase 5, or later phases.
 - Do not bump the public version, create a tag, create a release, or publish
@@ -205,4 +216,4 @@ The pre-HF canonical governance bootstrap has started from live `main`:
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)
