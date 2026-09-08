@@ -215,23 +215,25 @@ Maximum retry discipline:
 - one CI rerun for a proven external infrastructure failure;
 - no repeated commands that add no evidence.
 
-## Current stop condition
+## Current operational state
 
-Current operational state until a fresh guard closes the HF gate:
+Current state after the protected governance merge and before the HF candidate
+refresh:
 
 ```text
-HF ADMISSION: BLOCKED / NOT MERGED
-CANONICAL GOVERNANCE: NOT STARTED
+HF ADMISSION: REFRESH REQUIRED / OLD CANDIDATE STALE
+CANONICAL GOVERNANCE: YES / PR #408 MERGED
 ACTIONS #396: HOLD / NOT STARTED
 PHASE 5: BLOCKED / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The governance line changes to `PRE-HF CANDIDATE / IN PROGRESS` while its
-protected PR is under review, and to `CANONICAL` only after merge. Do not start
-Actions #396, Phase 5–9, version bumps, tags, releases, release images, or
-final release notes.
+The old HF tuple remains retained evidence only. Merge current `main` into the
+HF branch or create a replacement, record a new candidate epoch, recompute the
+full required evidence, and continue through the ordinary protected merge
+path. Do not start Actions #396, Phase 5–9, version bumps, tags, releases,
+release images, or final release notes.
 
 ## Cross-links
 
@@ -239,4 +241,4 @@ final release notes.
 - [Execution roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T084501Z_governance-bootstrap_epoch-3.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T091401Z_governance-post-merge_pre-hf.md)
