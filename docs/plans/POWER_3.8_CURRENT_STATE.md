@@ -48,13 +48,13 @@ CANONICAL_GOVERNANCE_BRANCH:
 docs/power-3.8-governance-bootstrap
 
 CANONICAL_GOVERNANCE_COMMIT:
-d788825607ae55b9de1142f67ab076f8e533d14d (signed candidate; canonical after protected merge)
+98f90b36e73e0e43ac77dce3dcf895c9caec1ef9 (signed candidate; canonical after protected merge)
 
 CANONICAL_GOVERNANCE_PR:
 408 OPEN / PROVISIONAL
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-08T082529Z_governance-bootstrap_pre-hf.md
+artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md
 ```
 
 ## Fresh state anchor
@@ -120,15 +120,19 @@ artifacts/project-state/handoffs/2026-09-08T082529Z_governance-bootstrap_pre-hf.
 - PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
   `OPEN`, `merged=false`.
 - Candidate head:
-  `d788825607ae55b9de1142f67ab076f8e533d14d`.
+  `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`.
 - Candidate tree:
-  `380cba0de80d622e4db109be168f642eaaddd1ea`.
+  `f9046c678191fa97a9a4a9f29db32cc87b23a164`.
 - Candidate parent:
-  `119d5c39aa2c22734ca72c351f8a70790371678f`.
+  `d788825607ae55b9de1142f67ab076f8e533d14d`.
 - GitHub commit verification: `verified=true`, `reason=valid` at
-  `2026-09-08T08:23:57Z`.
+  `2026-09-08T08:28:42Z`.
 - The candidate contains only the seven governance/handoff files listed in
-  the PR body; remote required checks are pending for this new head.
+  the PR body; remote required checks were in progress at the observation.
+- Previous governance epoch: head
+  `d788825607ae55b9de1142f67ab076f8e533d14d`, tree
+  `380cba0de80d622e4db109be168f642eaaddd1ea`; it remains retained evidence,
+  not the current PR head.
 - Intended target: `huggingface-hub 1.30.0`.
 - Maintained specifier: `>=1.30.0,<1.31.0`.
 - PR diff is limited to `pyproject.toml`,
@@ -158,7 +162,7 @@ bypass or retry loop.
 The pre-HF canonical governance bootstrap has started from live `main`:
 
 - Governance branch: `docs/power-3.8-governance-bootstrap`.
-- Governance commit: `d788825607ae55b9de1142f67ab076f8e533d14d`, locally and
+- Governance commit: `98f90b36e73e0e43ac77dce3dcf895c9caec1ef9`, locally and
   GitHub-verified signed candidate.
 - Governance PR: [#408](https://github.com/weby-homelab/power-framework/pull/408),
   open/provisional until protected merge.
@@ -199,4 +203,4 @@ The pre-HF canonical governance bootstrap has started from live `main`:
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T081335Z_governance-bootstrap_pre-hf.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md)

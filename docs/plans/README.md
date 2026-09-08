@@ -13,7 +13,7 @@ current publication candidate:
 - [POWER 3.8 — Execution Roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [POWER 3.8 — Development Protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T081335Z_governance-bootstrap_pre-hf.md)
+- [Latest governance handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T082844Z_governance-bootstrap_epoch-2.md)
 
 > These documents are published for recovery while the HF gate is blocked.
 > Before a protected merge they are provisional; after a protected merge they
