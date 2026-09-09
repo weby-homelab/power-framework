@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import select
 import sqlite3
 import subprocess
@@ -20,10 +21,14 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from power_framework.core import __version__
 from power_framework.core.capabilities import manifest
+from power_framework.core.mutation import run_blocking
 from power_framework.core.parser import validate_metadata
 from power_framework.mcp import power_server
 from power_framework.mcp.contract import canonical_tool_catalog
 from power_framework.mcp.power_server import (
+    _MCP_REQUEST_ID,
+    _mcp_context,
+    _safe_mcp_error_text,
     apply_memory_change,
     archive_notes,
     ensure_sub_index,
@@ -233,6 +238,23 @@ async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
     assert not (sample_vault / ".power").exists()
 
 
+async def test_mcp_discovery_ignores_external_search_db_override(
+    sample_vault: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Read-only MCP discovery observes only the configured vault namespace."""
+    external = tmp_path / "external-discovery.db"
+    external.write_text("external sentinel", encoding="utf-8")
+    monkeypatch.setenv("POWER_SEARCH_DB", str(external))
+
+    result = json.loads(await get_server_info(vault_path=str(sample_vault)))
+
+    database_path = result["vault"].get("database_path")
+    assert database_path is None or str(external) != database_path
+    assert external.read_text(encoding="utf-8") == "external sentinel"
+
+
 async def test_get_server_info_can_request_the_no_download_provider_probe(
     sample_vault: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -351,6 +373,59 @@ async def test_destructive_mcp_tools_require_explicit_approval(sample_vault: Pat
         await heal_frontmatter_tool(dry_run=False, vault_path=str(sample_vault))
 
     assert not (sample_vault / "04_Archive").exists()
+
+
+def test_mcp_error_text_is_bounded_and_secret_free() -> None:
+    """MCP errors do not reflect secret-bearing or unbounded exception text."""
+    error = RuntimeError("password=super-secret token=another-secret " + ("x" * 2048))
+
+    safe = _safe_mcp_error_text(error)
+
+    assert len(safe) <= 512
+    assert "super-secret" not in safe
+    assert "another-secret" not in safe
+    assert "<redacted>" in safe
+
+
+async def test_mcp_call_carries_bounded_request_correlation(sample_vault: Path) -> None:
+    """Native MCP results carry the server-generated request identity in metadata."""
+    result = await power_server.mcp.call_tool(
+        "search_vault_tool",
+        {"query": "", "vault_path": str(sample_vault)},
+    )
+
+    assert result.is_error is True
+    assert result.meta is not None
+    request_id = result.meta.get("power.request_id")
+    assert isinstance(request_id, str)
+    assert re.fullmatch(r"[a-f0-9]{32}", request_id)
+
+
+async def test_mcp_request_correlation_survives_blocking_offload() -> None:
+    """The worker receives the outer MCP request ID instead of minting another one."""
+    token = _MCP_REQUEST_ID.set("mcp-correlated-request")
+    try:
+        observed = await run_blocking(lambda: _mcp_context().request_id)
+    finally:
+        _MCP_REQUEST_ID.reset(token)
+
+    assert observed == "mcp-correlated-request"
+
+
+async def test_mcp_write_tools_require_explicit_approval(sample_vault: Path) -> None:
+    """Caller metadata is not enough to authorize non-destructive writes."""
+    with pytest.raises(ToolError, match="explicit approved=True"):
+        await generate_index(vault_path=str(sample_vault))
+    with pytest.raises(ToolError, match="explicit approved=True"):
+        await ingest_note(
+            name="01_Projects/RejectedMcpNote.md",
+            note_type="Project",
+            title="Rejected MCP note",
+            description="Must not be written",
+            content="No write",
+            vault_path=str(sample_vault),
+        )
+    assert not (sample_vault / "01_Projects" / "RejectedMcpNote.md").exists()
 
 
 async def test_mcp_read_tools_ignore_caller_selected_search_database(
@@ -490,7 +565,7 @@ def test_power_mcp_startup_keeps_stdout_protocol_only(sample_vault: Path) -> Non
 
 
 async def test_read_sub_index_existing_category(sample_vault: Path) -> None:
-    await ensure_sub_index(category="01_Projects", vault_path=str(sample_vault))
+    await ensure_sub_index(category="01_Projects", vault_path=str(sample_vault), approved=True)
     result = await read_sub_index(category="01_Projects", vault_path=str(sample_vault))
     assert "Test Project" in result
 
@@ -576,7 +651,9 @@ async def test_ensure_sub_index_can_return_requested_page(
 
     monkeypatch.setattr(application, "run_generate_sub_index", fake_generate)
 
-    result = await ensure_sub_index(category="01_Projects", page=2, vault_path=str(sample_vault))
+    result = await ensure_sub_index(
+        category="01_Projects", page=2, vault_path=str(sample_vault), approved=True
+    )
 
     assert result.startswith("Generated test catalog")
     assert "Page 2 of 2" in result
@@ -814,7 +891,7 @@ async def test_lint_vault_on_sample(sample_vault: Path) -> None:
 
 
 async def test_generate_index_tool(sample_vault: Path) -> None:
-    result = await generate_index(vault_path=str(sample_vault))
+    result = await generate_index(vault_path=str(sample_vault), approved=True)
     assert "hierarchical index" in result
     assert (sample_vault / "index.md").exists()
 
@@ -830,6 +907,7 @@ async def test_ingest_note_tool(sample_vault: Path) -> None:
         description="Created via MCP server tool",
         content="Hello world",
         vault_path=str(sample_vault),
+        approved=True,
     )
     assert "successfully ingested" in result
 
@@ -854,6 +932,7 @@ async def test_ingest_note_tool(sample_vault: Path) -> None:
             description="Created via MCP server tool",
             content="Hello world",
             vault_path=str(sample_vault),
+            approved=True,
         )
 
 
@@ -864,7 +943,7 @@ async def test_mcp_write_search_loop_survives_a_fresh_process(
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     marker = "mcp-fresh-process-acceptance-7f3c"
 
-    await sync_vault(fts_only=True, vault_path=str(sample_vault))
+    await sync_vault(fts_only=True, vault_path=str(sample_vault), approved=True)
     await ingest_note(
         name="03_Resources/fresh-process-probe",
         note_type="Resource",
@@ -872,6 +951,7 @@ async def test_mcp_write_search_loop_survives_a_fresh_process(
         description=f"A restart acceptance note carrying {marker}",
         content=f"# Probe\n\nThe body contains {marker}.\n",
         vault_path=str(sample_vault),
+        approved=True,
     )
 
     before = json.loads(
@@ -913,17 +993,18 @@ async def test_sync_vault_fails_closed_and_can_explicitly_allow_partial(
     sample_vault: Path,
 ) -> None:
     """Coverage omissions are an explicit MCP error, never an implied success."""
-    await sync_vault(fts_only=True, vault_path=str(sample_vault))
+    await sync_vault(fts_only=True, vault_path=str(sample_vault), approved=True)
     invalid = sample_vault / "03_Resources" / "broken-sync-note.md"
     invalid.write_text("# no OKF frontmatter\n", encoding="utf-8")
 
     with pytest.raises(ToolError, match=r"failed closed.*broken-sync-note\.md"):
-        await sync_vault(fts_only=True, vault_path=str(sample_vault))
+        await sync_vault(fts_only=True, vault_path=str(sample_vault), approved=True)
 
     report = await sync_vault(
         fts_only=True,
         allow_partial=True,
         vault_path=str(sample_vault),
+        approved=True,
     )
     assert "Notes excluded (invalid metadata): 1" in report
     assert "- 03_Resources/broken-sync-note.md: invalid_metadata" in report
@@ -939,9 +1020,14 @@ async def test_sync_vault_dense_loss_requires_explicit_acceptance(
     monkeypatch.setattr(power_server._index_limiter, "is_allowed", lambda _: True)
     monkeypatch.setattr(generation_index, "active_dense_chunk_count", lambda _: 3)
     with pytest.raises(ToolError, match=r"Refusing --fts-only.*3 chunks"):
-        await sync_vault(fts_only=True, vault_path=str(sample_vault))
+        await sync_vault(fts_only=True, vault_path=str(sample_vault), approved=True)
 
-    report = await sync_vault(fts_only=True, accept_dense_loss=True, vault_path=str(sample_vault))
+    report = await sync_vault(
+        fts_only=True,
+        accept_dense_loss=True,
+        vault_path=str(sample_vault),
+        approved=True,
+    )
     assert "Mode: FTS only" in report
 
 
@@ -957,11 +1043,16 @@ async def test_synthesize_session_serializes_write_and_stores_candidate_triplets
         description="A synthesis created through the MCP write queue.",
         content="POWER is a knowledge management framework.",
         vault_path=str(sample_vault),
+        approved=True,
     )
 
     assert "synthesized and ingested" in result
     assert (sample_vault / "06_Daily_Logs" / "McpSynthesis.md").exists()
-    with closing(sqlite3.connect(db_path)) as conn:
+    assert not db_path.exists()
+    from power_framework.core.vault_storage import vault_cache_dir
+
+    canonical_db = vault_cache_dir(sample_vault) / "search.db"
+    with closing(sqlite3.connect(canonical_db)) as conn:
         rows = conn.execute(
             "SELECT source_path, relation, status FROM relation_candidates WHERE source_path = ?",
             ("06_Daily_Logs/McpSynthesis.md",),
@@ -987,6 +1078,7 @@ async def test_mcp_write_tools_reject_path_traversal(
                 description="Must be rejected",
                 content="unsafe",
                 vault_path=str(sample_vault),
+                approved=True,
             )
     else:
         with pytest.raises(ToolError, match="Invalid note path"):
@@ -996,6 +1088,7 @@ async def test_mcp_write_tools_reject_path_traversal(
                 description="Must be rejected",
                 content="unsafe",
                 vault_path=str(sample_vault),
+                approved=True,
             )
 
     assert sentinel.read_text(encoding="utf-8") == "do not modify"

@@ -182,10 +182,14 @@ def existing_vault_db_path(
     return cache_dir / "search.db" if cache_dir is not None else None
 
 
-def vault_db_path(vault_dir: Path | None = None) -> Path:
-    """Resolve an isolated search database, honoring the explicit test override."""
+def vault_db_path(
+    vault_dir: Path | None = None,
+    *,
+    allow_search_db_override: bool = True,
+) -> Path:
+    """Resolve an isolated search database with an explicit override policy."""
     override = os.getenv("POWER_SEARCH_DB")
-    if override:
+    if allow_search_db_override and override:
         return Path(override)
     if vault_dir is None:
         raise ValueError("A vault path is required when POWER_SEARCH_DB is not set")

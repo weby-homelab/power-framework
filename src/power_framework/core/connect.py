@@ -375,7 +375,7 @@ def build_connect_plan(
 
 def apply_connect_plan(plan: dict[str, Any], *, approved: bool) -> dict[str, Any]:
     """Apply one unchanged approved plan and return a content-free receipt."""
-    if not approved:
+    if type(approved) is not bool or not approved:
         raise PermissionError("connect apply requires explicit approval")
     if plan.get("schema_version") != CONNECT_SCHEMA_VERSION:
         raise ValueError("unsupported connect plan schema")

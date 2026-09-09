@@ -10,13 +10,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import math
 import re
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
 from .application_models import (
     SourceListRequest,
@@ -24,6 +27,7 @@ from .application_models import (
 )
 from .capabilities import manifest
 from .decision_service import DecisionService
+from .errors import ConflictError
 from .healer import heal_vault
 from .indexer import run_generate_hierarchical_index, run_generate_sub_index, scan_folder_notes
 from .linter import archive_stale_notes, run_lint_report
@@ -37,6 +41,7 @@ from .memory_api import (
 from .models import PARA_FOLDERS, MemoryKind, MemoryMetadata, NoteType, OKFMetadata, WritePolicy
 from .mutation import execute_vault_mutation
 from .parser import build_frontmatter
+from .principal import Principal
 from .searcher import (
     DEFAULT_SEARCH_MODE,
     format_untrusted_search_envelope,
@@ -56,7 +61,47 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
 
+logger = logging.getLogger(__name__)
+
+
 ApplicationAuthority = Literal["read-only", "propose", "apply"]
+FailureOutcome = Literal[
+    "rejected_before_start",
+    "cancelled",
+    "failed",
+    "completed_after_deadline",
+    "completed_after_budget",
+]
+FailureCode = Literal[
+    "permission_denied",
+    "invalid_request",
+    "not_found",
+    "conflict",
+    "deadline_exceeded",
+    "cancelled",
+    "completed_after_deadline",
+    "result_budget_exceeded",
+    "internal_error",
+]
+
+MAX_RESULT_BYTES = 1_000_000
+_EMPTY_RESULT_SHA256 = hashlib.sha256(b"").hexdigest()
+
+
+class DeadlineExceededError(TimeoutError):
+    """A request deadline was already exhausted or a read exceeded its budget."""
+
+
+class CompletedAfterDeadlineError(TimeoutError):
+    """A synchronous operation finished after its deadline and may have committed."""
+
+
+class ResultBudgetExceededError(ValueError):
+    """A serialized application result exceeded the caller-lower-only ceiling."""
+
+
+class CompletedAfterBudgetError(ResultBudgetExceededError):
+    """A mutation completed before its result was found to exceed the budget."""
 
 
 @dataclass(frozen=True)
@@ -68,6 +113,9 @@ class RequestContext:
     idempotency_key: str | None = None
     deadline_ms: int | None = None
     request_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    principal: Principal | None = field(default_factory=Principal.local_cli)
+    deadline_at: float | None = None
+    max_result_bytes: int = MAX_RESULT_BYTES
 
     def __post_init__(self) -> None:
         if not isinstance(self.actor, str) or not self.actor.strip():
@@ -80,6 +128,29 @@ class RequestContext:
             raise ValueError("deadline_ms must be positive")
         if not isinstance(self.request_id, str) or not _TOKEN_PATTERN.fullmatch(self.request_id):
             raise ValueError("request_id must be a safe token")
+        if self.principal is None or not isinstance(self.principal, Principal):
+            raise ValueError("principal binding is required")
+        if self.deadline_at is not None and (
+            not isinstance(self.deadline_at, (int, float)) or not math.isfinite(self.deadline_at)
+        ):
+            raise ValueError("deadline_at must be a finite monotonic timestamp")
+        if (
+            isinstance(self.max_result_bytes, bool)
+            or not isinstance(self.max_result_bytes, int)
+            or not 1 <= self.max_result_bytes <= MAX_RESULT_BYTES
+        ):
+            raise ValueError(f"max_result_bytes must be between 1 and {MAX_RESULT_BYTES}")
+        if self.deadline_ms is not None and self.deadline_at is None:
+            object.__setattr__(
+                self,
+                "deadline_at",
+                time.monotonic() + (self.deadline_ms / 1000),
+            )
+
+    @property
+    def result_budget_bytes(self) -> int:
+        """Compatibility name for the bounded serialized-result budget."""
+        return self.max_result_bytes
 
 
 @dataclass(frozen=True)
@@ -93,9 +164,15 @@ class AuditReceipt:
     idempotency_key: str | None
     data_sha256: str
     duration_ms: int
+    outcome: str = "completed"
+    principal_ref: str | None = None
+    principal_binding: str | None = None
+    error_code: str | None = None
+    budget_ms: int | None = None
+    result_budget_bytes: int | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "schema_version": self.schema_version,
             "operation": self.operation,
             "status": self.status,
@@ -104,6 +181,20 @@ class AuditReceipt:
             "data_sha256": self.data_sha256,
             "duration_ms": self.duration_ms,
         }
+        # Keep the successful power.receipt.v1 wire shape stable. Failure and
+        # late-completion receipts opt into the additional bounded evidence.
+        if self.status != "ok" or self.outcome != "completed":
+            payload.update(
+                {
+                    "outcome": self.outcome,
+                    "principal_ref": self.principal_ref,
+                    "principal_binding": self.principal_binding,
+                    "error_code": self.error_code,
+                    "budget_ms": self.budget_ms,
+                    "result_budget_bytes": self.result_budget_bytes,
+                }
+            )
+        return payload
 
 
 @dataclass(frozen=True)
@@ -127,6 +218,8 @@ class ApplicationEnvelope:
             "data": self.data,
             "receipt": self.receipt.as_dict(),
             "request_id": self.receipt.request_id,
+            "principal_ref": self.receipt.principal_ref,
+            "principal_binding": self.receipt.principal_binding,
             "actual_capability": self.actual_capability,
             "source_revision": self.source_revision,
             "degraded_reason": self.degraded_reason,
@@ -199,7 +292,7 @@ class ApplicationService:
     ) -> None:
         self.vault_dir = Path(vault_dir).expanduser().resolve()
         self._audit_hook = audit_hook
-        self._search_fn = search_fn or search_vault
+        self._search_fn = search_fn or partial(search_vault, allow_search_db_override=False)
         self.task_service = task_service or TaskService(self.vault_dir, create_vault=False)
         self.decision_service = DecisionService(self.vault_dir, task_service=self.task_service)
 
@@ -223,10 +316,18 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Retrieve untrusted, provenance-bearing source material."""
-        if not query.strip():
-            raise ValueError("Search query cannot be empty")
-        if not 1 <= max_results <= 100:
-            raise ValueError("max_results must be between 1 and 100")
+        if not isinstance(query, str) or not query.strip():
+            self._reject_request("retrieve", context, ValueError("Search query cannot be empty"))
+        if (
+            isinstance(max_results, bool)
+            or not isinstance(max_results, int)
+            or not 1 <= max_results <= 100
+        ):
+            self._reject_request(
+                "retrieve",
+                context,
+                ValueError("max_results must be between 1 and 100"),
+            )
 
         def execute() -> dict[str, object]:
             results = self._search_fn(
@@ -262,9 +363,24 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Persist a reviewable proposal, never the target note."""
-        request = context or RequestContext(authority="propose")
+        request = self._mutation_context(context, operation="propose")
         if request.authority not in {"propose", "apply"}:
-            raise PermissionError("proposal requires propose authority")
+            self._reject_mutation(
+                "propose", context, PermissionError("proposal requires propose authority")
+            )
+        if not isinstance(rel_path, str) or not isinstance(content, str):
+            self._reject_request(
+                "propose",
+                request,
+                ValueError("proposal path and content must be strings"),
+            )
+        estimated_result_bytes = len(content.encode("utf-8")) + 1024
+        if estimated_result_bytes > request.max_result_bytes:
+            error = ResultBudgetExceededError(
+                "proposal result exceeds the application result budget"
+            )
+            self._emit_failure_receipt("propose", request, error, duration_ms=0)
+            raise error
         return self._run(
             "propose",
             request,
@@ -274,6 +390,7 @@ class ApplicationService:
                 content,
                 idempotency_key=request.idempotency_key,
             ),
+            mutation=True,
         )
 
     def apply(
@@ -284,9 +401,13 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Apply a proposal only with explicit approval authority."""
-        request = context or RequestContext(authority="apply")
-        if not approved or request.authority != "apply":
-            raise PermissionError("apply requires explicit approved=True and apply authority")
+        request = self._mutation_context(context, operation="apply", require_apply=True)
+        if type(approved) is not bool or not approved or request.authority != "apply":
+            self._reject_mutation(
+                "apply",
+                context,
+                PermissionError("apply requires explicit approved=True and apply authority"),
+            )
         return self._run(
             "apply",
             request,
@@ -296,6 +417,7 @@ class ApplicationService:
                 approved=True,
                 idempotency_key=request.idempotency_key,
             ),
+            mutation=True,
         )
 
     def apply_proposal(
@@ -306,9 +428,13 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Apply a durable content-addressed proposal by ID only."""
-        request = context or RequestContext(authority="apply")
-        if not approved or request.authority != "apply":
-            raise PermissionError("apply requires explicit approved=True and apply authority")
+        request = self._mutation_context(context, operation="apply", require_apply=True)
+        if type(approved) is not bool or not approved or request.authority != "apply":
+            self._reject_mutation(
+                "apply",
+                context,
+                PermissionError("apply requires explicit approved=True and apply authority"),
+            )
         return self._run(
             "apply",
             request,
@@ -318,19 +444,69 @@ class ApplicationService:
                 approved=True,
                 idempotency_key=request.idempotency_key,
             ),
+            mutation=True,
         )
 
-    @staticmethod
-    def _mutation_context(context: RequestContext | None) -> RequestContext:
-        """Require an explicit application authority for a write use case."""
-        request = context or RequestContext(authority="apply")
-        if request.authority not in {"propose", "apply"}:
-            raise PermissionError("mutation requires propose or apply authority")
-        return request
+    def _reject_request(
+        self,
+        operation: str,
+        context: RequestContext | None,
+        error: Exception,
+    ) -> NoReturn:
+        """Emit bounded evidence for an admission failure before re-raising it."""
+        self._emit_failure_receipt(operation, context, error, duration_ms=0)
+        raise error
+
+    def _reject_mutation(
+        self,
+        operation: str,
+        context: RequestContext | None,
+        error: PermissionError,
+    ) -> NoReturn:
+        """Reject a mutation while preserving a bounded failure receipt."""
+        self._reject_request(operation, context, error)
+
+    def _mutation_context(
+        self,
+        context: RequestContext | None,
+        *,
+        operation: str,
+        require_apply: bool = False,
+    ) -> RequestContext:
+        """Require an explicit, currently valid application mutation context."""
+        if context is None:
+            self._reject_mutation(
+                operation,
+                None,
+                PermissionError("mutation requires an explicit RequestContext"),
+            )
+        if context.principal is None or not context.principal.is_valid():
+            self._reject_mutation(
+                operation,
+                context,
+                PermissionError("mutation requires a valid, non-expired principal binding"),
+            )
+        if context.authority not in {"propose", "apply"}:
+            self._reject_mutation(
+                operation,
+                context,
+                PermissionError("mutation requires propose or apply authority"),
+            )
+        if require_apply and context.authority != "apply":
+            self._reject_mutation(
+                operation,
+                context,
+                PermissionError("mutation requires apply authority"),
+            )
+        return context
 
     def generate_index(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
         """Regenerate the hierarchical index under the canonical vault lock."""
-        request = self._mutation_context(context)
+        request = self._mutation_context(
+            context,
+            operation="index.generate",
+            require_apply=True,
+        )
         return self._run(
             "index.generate",
             request,
@@ -339,6 +515,7 @@ class ApplicationService:
                     self.vault_dir, lambda: run_generate_hierarchical_index(self.vault_dir)
                 )
             },
+            mutation=True,
         )
 
     def ensure_sub_index(
@@ -349,15 +526,31 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Generate and return one bounded P.A.R.A. catalog page."""
-        request = self._mutation_context(context)
+        request = self._mutation_context(
+            context,
+            operation="index.ensure-sub-index",
+            require_apply=True,
+        )
         if category not in PARA_FOLDERS:
-            raise ValueError(
-                f"Invalid category: {category}. Must be one of: {', '.join(PARA_FOLDERS)}"
+            self._reject_request(
+                "index.ensure-sub-index",
+                request,
+                ValueError(
+                    f"Invalid category: {category}. Must be one of: {', '.join(PARA_FOLDERS)}"
+                ),
             )
         if not (self.vault_dir / category).is_dir():
-            raise ValueError(f"Category folder not found: {category}")
+            self._reject_request(
+                "index.ensure-sub-index",
+                request,
+                ValueError(f"Category folder not found: {category}"),
+            )
         if isinstance(page, bool) or not isinstance(page, int) or page < 1:
-            raise ValueError("page must be a positive integer starting at 1")
+            self._reject_request(
+                "index.ensure-sub-index",
+                request,
+                ValueError("page must be a positive integer starting at 1"),
+            )
 
         def execute() -> dict[str, object]:
             notes = scan_folder_notes(self.vault_dir).get(category, [])
@@ -371,7 +564,7 @@ class ApplicationService:
 
             return execute_vault_mutation(self.vault_dir, mutate)
 
-        return self._run("index.ensure-sub-index", request, execute)
+        return self._run("index.ensure-sub-index", request, execute, mutation=True)
 
     def sync_vault(
         self,
@@ -383,7 +576,7 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Publish an atomic search generation through the application boundary."""
-        request = self._mutation_context(context)
+        request = self._mutation_context(context, operation="index.sync", require_apply=True)
 
         def build() -> dict[str, object]:
             from .generation_index import (
@@ -448,6 +641,7 @@ class ApplicationService:
             "index.sync",
             request,
             lambda: execute_vault_mutation(self.vault_dir, build),
+            mutation=True,
         )
 
     def ingest_note(
@@ -463,18 +657,36 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Create one validated note and publish all required projections."""
-        request = self._mutation_context(context)
+        request = self._mutation_context(
+            context,
+            operation="memory.ingest-note",
+            require_apply=True,
+        )
+        if not isinstance(name, str) or not isinstance(content, str):
+            self._reject_request(
+                "memory.ingest-note",
+                request,
+                ValueError("note name and content must be strings"),
+            )
         note_name = name if name.endswith(".md") else f"{name}.md"
         try:
             target_file = resolve_path_in_vault(
                 self.vault_dir, note_name, allowed_directories=PARA_FOLDERS
             )
-        except ValueError as exc:
-            raise ValueError(
-                "Invalid note path; use an existing PARA directory and a Markdown filename."
-            ) from exc
-        if target_file.exists():
-            raise FileExistsError(f"Note already exists at {note_name}")
+        except ValueError:
+            self._reject_request(
+                "memory.ingest-note",
+                request,
+                ValueError(
+                    "Invalid note path; use an existing PARA directory and a Markdown filename."
+                ),
+            )
+        if target_file.exists() and request.idempotency_key is None:
+            self._reject_request(
+                "memory.ingest-note",
+                request,
+                FileExistsError(f"Note already exists at {note_name}"),
+            )
 
         metadata = OKFMetadata(
             type=NoteType(note_type),
@@ -492,6 +704,21 @@ class ApplicationService:
             timestamp=datetime.now(UTC),
         )
         full_content = f"{build_frontmatter(metadata)}\n\n{content}\n"
+        idempotency_fingerprint = hashlib.sha256(
+            json.dumps(
+                {
+                    "name": name,
+                    "note_type": note_type,
+                    "title": title,
+                    "description": description,
+                    "content": content,
+                    "resource": resource,
+                    "tags": tags or [],
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
 
         def execute() -> dict[str, object]:
             date_str = datetime.now(UTC).strftime("%Y-%m-%d")
@@ -508,6 +735,10 @@ class ApplicationService:
                 allowed_directories=PARA_FOLDERS,
                 operation="mcp.ingest_note",
                 log_entry=log_entry,
+                idempotency_key=request.idempotency_key,
+                idempotency_fingerprint=(
+                    idempotency_fingerprint if request.idempotency_key is not None else None
+                ),
             )
             lint_result = run_lint_report(self.vault_dir)
             return {
@@ -522,7 +753,7 @@ class ApplicationService:
                 "receipt": receipt,
             }
 
-        return self._run("memory.ingest-note", request, execute)
+        return self._run("memory.ingest-note", request, execute, mutation=True)
 
     def synthesize_session(
         self,
@@ -538,14 +769,28 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Create a governed session artifact through the core ingest workflow."""
-        request = self._mutation_context(context)
+        request = self._mutation_context(
+            context,
+            operation="synthesize.session",
+            require_apply=True,
+        )
+        if not isinstance(name, str) or not isinstance(content, str):
+            self._reject_request(
+                "synthesize.session",
+                request,
+                ValueError("session name and content must be strings"),
+            )
         note_name = name if name.endswith(".md") else f"{name}.md"
         try:
             resolve_path_in_vault(self.vault_dir, note_name, allowed_directories=PARA_FOLDERS)
-        except ValueError as exc:
-            raise ValueError(
-                "Invalid note path; use an existing PARA directory and a Markdown filename."
-            ) from exc
+        except ValueError:
+            self._reject_request(
+                "synthesize.session",
+                request,
+                ValueError(
+                    "Invalid note path; use an existing PARA directory and a Markdown filename."
+                ),
+            )
         return self._run(
             "synthesize.session",
             request,
@@ -560,8 +805,10 @@ class ApplicationService:
                     related=related,
                     owner=owner,
                     vault_path=self.vault_dir,
+                    idempotency_key=request.idempotency_key,
                 )
             },
+            mutation=True,
         )
 
     def archive_notes(
@@ -571,7 +818,15 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Preview or apply stale-note archival through the core boundary."""
-        request = context if dry_run else self._mutation_context(context)
+        request = (
+            context or RequestContext()
+            if dry_run
+            else self._mutation_context(
+                context,
+                operation="maintenance.archive-notes",
+                require_apply=True,
+            )
+        )
         return self._run(
             "maintenance.archive-notes",
             request,
@@ -585,6 +840,7 @@ class ApplicationService:
                     )
                 )
             },
+            mutation=not dry_run,
         )
 
     def heal_frontmatter(
@@ -594,7 +850,15 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Preview or apply frontmatter healing through the core boundary."""
-        request = context if dry_run else self._mutation_context(context)
+        request = (
+            context or RequestContext()
+            if dry_run
+            else self._mutation_context(
+                context,
+                operation="maintenance.heal-frontmatter",
+                require_apply=True,
+            )
+        )
         return self._run(
             "maintenance.heal-frontmatter",
             request,
@@ -608,6 +872,7 @@ class ApplicationService:
                     )
                 )
             },
+            mutation=not dry_run,
         )
 
     def task(
@@ -619,7 +884,15 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Compatibility facade over the canonical TaskService v2 lifecycle."""
-        request = context or RequestContext()
+        request = (
+            self._mutation_context(
+                context,
+                operation="task",
+                require_apply=action == "advance",
+            )
+            if action in {"create", "advance"}
+            else context or RequestContext()
+        )
         values = dict(values or {})
 
         def execute() -> dict[str, object] | list[dict[str, object]]:
@@ -638,6 +911,9 @@ class ApplicationService:
                 task_authority = str(values.get("authority", request.authority))
                 if task_authority not in {"read-only", "propose", "apply"}:
                     raise ValueError("unsupported task authority")
+                authority_rank = {"read-only": 0, "propose": 1, "apply": 2}
+                if authority_rank[task_authority] > authority_rank[request.authority]:
+                    raise PermissionError("task authority cannot exceed request authority")
                 objective = str(values.get("objective", ""))
                 return self.task_service.create_task(
                     task_id=task_id,
@@ -670,13 +946,21 @@ class ApplicationService:
                 if not new_state:
                     raise ValueError("task advance requires new_state or a supported legacy action")
                 expected_revision = values.pop("expected_revision", None)
-                if expected_revision is None:
-                    raise ValueError("task advance requires expected_revision")
+                if (
+                    expected_revision is None
+                    or isinstance(expected_revision, bool)
+                    or not isinstance(expected_revision, int)
+                    or expected_revision < 1
+                ):
+                    raise ValueError("task advance requires a positive expected_revision")
 
                 current = self.task_service.get_task(task_id)
                 if current is None:
                     raise FileNotFoundError(f"Task {task_id} not found")
-                approved = bool(values.pop("approved", False))
+                approved_value = values.pop("approved", False)
+                if not isinstance(approved_value, bool):
+                    raise ValueError("approved must be a boolean")
+                approved = approved_value
                 blocker = values.pop("blocker", None)
                 required_approval = values.pop("required_approval", None)
                 changed_artifacts = values.pop("changed_artifacts", None)
@@ -720,7 +1004,7 @@ class ApplicationService:
                     task_id,
                     new_state=cast("Any", new_state),
                     actor=request.actor,
-                    expected_revision=cast("int", expected_revision),
+                    expected_revision=expected_revision,
                     receipt_id=cast("str | None", values.pop("receipt_id", None)),
                     completion_postcondition=cast(
                         "str | None", values.pop("completion_postcondition", None)
@@ -734,7 +1018,12 @@ class ApplicationService:
                 ).model_dump()
             raise ValueError(f"unsupported task action: {action}")
 
-        return self._run("task", request, execute)
+        return self._run(
+            "task",
+            request,
+            execute,
+            mutation=action in {"create", "advance"},
+        )
 
     def fleet_status(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
         """Expose the optional fleet capability without a broken endpoint."""
@@ -756,8 +1045,12 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Read bounded, content-free transaction receipts through the boundary."""
-        if not 1 <= limit <= 1000:
-            raise ValueError("receipt limit must be between 1 and 1000")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            self._reject_request(
+                "receipt",
+                context,
+                ValueError("receipt limit must be between 1 and 1000"),
+            )
         return self._run(
             "receipt",
             context,
@@ -785,7 +1078,10 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Read a note securely with path containment and ETag."""
-        req = SourceReadRequest(rel_path=rel_path, max_bytes=max_bytes)
+        try:
+            req = SourceReadRequest(rel_path=rel_path, max_bytes=max_bytes)
+        except (TypeError, ValueError) as error:
+            self._reject_request("source.read", context, error)
         return self._run(
             "source.read",
             context,
@@ -839,9 +1135,13 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Create a typed decision gate bound to one Task v2 revision."""
-        request = context or RequestContext(authority="propose")
+        request = self._mutation_context(context, operation="decision.create")
         if request.authority not in {"propose", "apply"}:
-            raise PermissionError("decision creation requires propose authority")
+            self._reject_mutation(
+                "decision.create",
+                context,
+                PermissionError("decision creation requires propose authority"),
+            )
         return self._run(
             "decision.create",
             request,
@@ -860,6 +1160,7 @@ class ApplicationService:
                 response_schema=cast("Any", response_schema),
                 expires_at=expires_at,
             ).model_dump(),
+            mutation=True,
         )
 
     def decision_list(
@@ -910,9 +1211,13 @@ class ApplicationService:
         context: RequestContext | None = None,
     ) -> ApplicationEnvelope:
         """Resolve a decision with actor/authority and binding checks."""
-        request = context or RequestContext(authority="apply")
+        request = self._mutation_context(context, operation="decision.resolve")
         if request.authority not in {"propose", "apply"}:
-            raise PermissionError("decision resolution requires proposal authority")
+            self._reject_mutation(
+                "decision.resolve",
+                context,
+                PermissionError("decision resolution requires proposal authority"),
+            )
 
         def execute() -> dict[str, object]:
             decision, receipt = self.decision_service.resolve_decision(
@@ -926,7 +1231,7 @@ class ApplicationService:
             )
             return {"decision": decision.model_dump(), "receipt": receipt.model_dump()}
 
-        return self._run("decision.resolve", request, execute)
+        return self._run("decision.resolve", request, execute, mutation=True)
 
     def task_create(
         self,
@@ -943,9 +1248,13 @@ class ApplicationService:
         **kwargs: Any,
     ) -> ApplicationEnvelope:
         """Create a durable Task v2."""
-        request = context or RequestContext(authority="propose")
+        request = self._mutation_context(context, operation="task.create")
         if request.authority not in {"propose", "apply"}:
-            raise PermissionError("task creation requires propose authority")
+            self._reject_mutation(
+                "task.create",
+                context,
+                PermissionError("task creation requires propose authority"),
+            )
         return self._run(
             "task.create",
             request,
@@ -962,6 +1271,7 @@ class ApplicationService:
                 idempotency_key=request.idempotency_key,
                 **kwargs,
             ).model_dump(),
+            mutation=True,
         )
 
     def task_transition(
@@ -976,9 +1286,26 @@ class ApplicationService:
         **kwargs: Any,
     ) -> ApplicationEnvelope:
         """Advance a Task v2 state."""
-        request = context or RequestContext(authority="apply")
+        request = self._mutation_context(
+            context,
+            operation="task.transition",
+            require_apply=True,
+        )
         if request.authority != "apply":
-            raise PermissionError("task transition requires apply authority")
+            self._reject_mutation(
+                "task.transition",
+                context,
+                PermissionError("task transition requires apply authority"),
+            )
+        if (
+            expected_revision is None
+            or isinstance(expected_revision, bool)
+            or not isinstance(expected_revision, int)
+            or expected_revision < 1
+        ):
+            error = ValueError("task transition requires a positive expected_revision")
+            self._emit_failure_receipt("task.transition", request, error, duration_ms=0)
+            raise error
         return self._run(
             "task.transition",
             request,
@@ -992,6 +1319,7 @@ class ApplicationService:
                 idempotency_key=request.idempotency_key,
                 **kwargs,
             ).model_dump(),
+            mutation=True,
         )
 
     def task_list(
@@ -1049,6 +1377,83 @@ class ApplicationService:
             ],
         )
 
+    @staticmethod
+    def _failure_code(error: Exception) -> FailureCode:
+        """Map internal exceptions to a bounded, non-content error category."""
+        if isinstance(error, CompletedAfterDeadlineError):
+            return "completed_after_deadline"
+        if isinstance(error, DeadlineExceededError):
+            return "deadline_exceeded"
+        if isinstance(error, PermissionError):
+            return "permission_denied"
+        if isinstance(error, FileNotFoundError):
+            return "not_found"
+        if isinstance(error, (FileExistsError, ConflictError)):
+            return "conflict"
+        if isinstance(error, ResultBudgetExceededError):
+            return "result_budget_exceeded"
+        if isinstance(error, (ValueError, TypeError)):
+            return "invalid_request"
+        if isinstance(error, TimeoutError):
+            return "deadline_exceeded"
+        return "internal_error"
+
+    def _emit_failure_receipt(
+        self,
+        operation: str,
+        context: RequestContext | None,
+        error: Exception,
+        *,
+        duration_ms: int,
+        outcome: FailureOutcome | None = None,
+    ) -> AuditReceipt:
+        """Send bounded failure evidence to the configured audit sink."""
+        principal = context.principal if context is not None else None
+        failure_outcome = outcome or (
+            "completed_after_deadline"
+            if isinstance(error, CompletedAfterDeadlineError)
+            else "completed_after_budget"
+            if isinstance(error, CompletedAfterBudgetError)
+            else "rejected_before_start"
+            if isinstance(error, DeadlineExceededError) and "before operation started" in str(error)
+            else "failed"
+        )
+        receipt = AuditReceipt(
+            schema_version="power.receipt.v1",
+            operation=operation,
+            status=failure_outcome,
+            request_id=context.request_id if context is not None else uuid.uuid4().hex,
+            idempotency_key=context.idempotency_key if context is not None else None,
+            data_sha256=_EMPTY_RESULT_SHA256,
+            duration_ms=max(0, duration_ms),
+            outcome=failure_outcome,
+            principal_ref=principal.ref if principal is not None else None,
+            principal_binding=principal.binding if principal is not None else None,
+            error_code=self._failure_code(error),
+            budget_ms=context.deadline_ms if context is not None else None,
+            result_budget_bytes=context.max_result_bytes if context is not None else None,
+        )
+        if self._audit_hook is not None:
+            self._notify_audit_hook(receipt)
+        return receipt
+
+    def _notify_audit_hook(self, receipt: AuditReceipt) -> None:
+        """Notify the optional sink without changing the operation outcome."""
+        if self._audit_hook is None:
+            return
+        try:
+            self._audit_hook(receipt)
+        except Exception as error:  # pragma: no cover - defensive sink boundary
+            logger.error(
+                "Application audit hook failed operation=%s exception_type=%s",
+                receipt.operation,
+                type(error).__name__,
+            )
+
+    def _deadline_expired(self, request: RequestContext) -> bool:
+        """Check an absolute monotonic deadline without starting the action."""
+        return request.deadline_at is not None and time.monotonic() >= request.deadline_at
+
     def _run(
         self,
         operation: str,
@@ -1056,50 +1461,136 @@ class ApplicationService:
         action: Callable[[], Any],
         *,
         status: Literal["ok", "unavailable"] = "ok",
+        mutation: bool = False,
     ) -> ApplicationEnvelope:
+        if mutation and context is None:
+            error = PermissionError("mutation requires an explicit RequestContext")
+            self._emit_failure_receipt(operation, None, error, duration_ms=0)
+            raise error
         request = context or RequestContext()
         started = time.perf_counter()
-        data = action()
-        if request.deadline_ms is not None:
+        if mutation and request.authority == "read-only":
+            authority_error = PermissionError("mutation requires propose or apply authority")
+            self._emit_failure_receipt(operation, context, authority_error, duration_ms=0)
+            raise authority_error
+        if mutation and (request.principal is None or not request.principal.is_valid()):
+            principal_error = PermissionError(
+                "mutation requires a valid, non-expired principal binding"
+            )
+            self._emit_failure_receipt(operation, context, principal_error, duration_ms=0)
+            raise principal_error
+        if self._deadline_expired(request):
+            deadline_error = DeadlineExceededError(
+                "application deadline exceeded before operation started"
+            )
+            self._emit_failure_receipt(
+                operation,
+                context,
+                deadline_error,
+                duration_ms=0,
+                outcome="rejected_before_start",
+            )
+            raise deadline_error
+
+        receipt_emitted = False
+        try:
+            data = action()
             elapsed_ms = (time.perf_counter() - started) * 1000
-            if elapsed_ms > request.deadline_ms:
-                raise TimeoutError(
-                    f"application deadline exceeded after {elapsed_ms:.1f} ms "
-                    f"(budget {request.deadline_ms} ms)"
+            deadline_elapsed = request.deadline_ms is not None and elapsed_ms > request.deadline_ms
+            deadline_absolute = self._deadline_expired(request)
+            if deadline_elapsed or deadline_absolute:
+                if mutation:
+                    late_error = CompletedAfterDeadlineError(
+                        f"application completed after deadline ({elapsed_ms:.1f} ms)"
+                    )
+                    self._emit_failure_receipt(
+                        operation,
+                        request,
+                        late_error,
+                        duration_ms=int(elapsed_ms),
+                        outcome="completed_after_deadline",
+                    )
+                    receipt_emitted = True
+                    raise late_error
+                deadline_error = DeadlineExceededError(
+                    f"application deadline exceeded after {elapsed_ms:.1f} ms"
                 )
-        if not isinstance(data, dict):
-            data = {"items": data}
-        serializable = json.loads(json.dumps(data, ensure_ascii=False, sort_keys=True, default=str))
-        digest = hashlib.sha256(
-            json.dumps(serializable, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        ).hexdigest()
-        receipt = AuditReceipt(
-            schema_version="power.receipt.v1",
-            operation=operation,
-            status=status,
-            request_id=request.request_id,
-            idempotency_key=request.idempotency_key,
-            data_sha256=digest,
-            duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
-        )
-        if self._audit_hook is not None:
-            self._audit_hook(receipt)
-        actual_capability = str(
-            serializable.get("actual_capability", serializable.get("actual_mode", operation))
-        )
-        raw_source_revision = serializable.get("source_revision")
-        source_revision = str(raw_source_revision) if raw_source_revision is not None else None
-        raw_degraded_reason = serializable.get("degraded_reason")
-        degraded_reason = str(raw_degraded_reason) if raw_degraded_reason is not None else None
-        return ApplicationEnvelope(
-            operation=operation,
-            status=status,
-            data=serializable,
-            receipt=receipt,
-            actual_capability=actual_capability,
-            source_revision=source_revision,
-            degraded_reason=degraded_reason,
-        )
+                self._emit_failure_receipt(
+                    operation,
+                    request,
+                    deadline_error,
+                    duration_ms=int(elapsed_ms),
+                    outcome="failed",
+                )
+                receipt_emitted = True
+                raise deadline_error
+            if not isinstance(data, dict):
+                data = {"items": data}
+            encoded = json.dumps(
+                data,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            ).encode("utf-8")
+            if len(encoded) > request.max_result_bytes:
+                if mutation:
+                    raise CompletedAfterBudgetError(
+                        f"application result budget exceeded ({len(encoded)} bytes)"
+                    )
+                raise ResultBudgetExceededError(
+                    f"application result budget exceeded ({len(encoded)} bytes)"
+                )
+            serializable = json.loads(encoded.decode("utf-8"))
+            digest = hashlib.sha256(encoded).hexdigest()
+            receipt = AuditReceipt(
+                schema_version="power.receipt.v1",
+                operation=operation,
+                status=status,
+                request_id=request.request_id,
+                idempotency_key=request.idempotency_key,
+                data_sha256=digest,
+                duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
+                principal_ref=request.principal.ref if request.principal else None,
+                principal_binding=request.principal.binding if request.principal else None,
+                budget_ms=request.deadline_ms,
+                result_budget_bytes=request.max_result_bytes,
+            )
+            self._notify_audit_hook(receipt)
+            actual_capability = str(
+                serializable.get("actual_capability", serializable.get("actual_mode", operation))
+            )
+            raw_source_revision = serializable.get("source_revision")
+            source_revision = str(raw_source_revision) if raw_source_revision is not None else None
+            raw_degraded_reason = serializable.get("degraded_reason")
+            degraded_reason = str(raw_degraded_reason) if raw_degraded_reason is not None else None
+            return ApplicationEnvelope(
+                operation=operation,
+                status=status,
+                data=serializable,
+                receipt=receipt,
+                actual_capability=actual_capability,
+                source_revision=source_revision,
+                degraded_reason=degraded_reason,
+            )
+        except Exception as error:
+            if not receipt_emitted:
+                self._emit_failure_receipt(
+                    operation,
+                    request,
+                    error,
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                )
+            raise
 
 
-__all__ = ["ApplicationEnvelope", "ApplicationService", "AuditReceipt", "RequestContext"]
+__all__ = [
+    "MAX_RESULT_BYTES",
+    "ApplicationEnvelope",
+    "ApplicationService",
+    "AuditReceipt",
+    "CompletedAfterBudgetError",
+    "CompletedAfterDeadlineError",
+    "DeadlineExceededError",
+    "RequestContext",
+    "ResultBudgetExceededError",
+]

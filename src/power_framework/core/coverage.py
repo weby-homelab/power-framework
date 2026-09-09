@@ -16,7 +16,11 @@ from .vault_storage import existing_vault_db_path
 logger = logging.getLogger(__name__)
 
 
-def get_index_coverage(vault_dir: Path) -> tuple[int, int]:
+def get_index_coverage(
+    vault_dir: Path,
+    *,
+    allow_search_db_override: bool = True,
+) -> tuple[int, int]:
     """Return ``(indexed_files, total_files)`` for a vault.
 
     Coverage is observational only.  Search never starts a worker or changes
@@ -40,7 +44,10 @@ def get_index_coverage(vault_dir: Path) -> tuple[int, int]:
     # migration. The legacy search.db fallback is valid only for vaults that
     # have not been migrated yet; reading it first makes a successful sync
     # appear as 0 indexed notes in doctor/search coverage receipts.
-    db_path = resolve_active_generation_path(root) or existing_vault_db_path(root)
+    db_path = resolve_active_generation_path(root) or existing_vault_db_path(
+        root,
+        allow_search_db_override=allow_search_db_override,
+    )
     if db_path is None or not db_path.exists():
         return indexed, total
     try:

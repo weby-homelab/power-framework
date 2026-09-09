@@ -117,6 +117,7 @@ async def create_task_action(
             priority=priority,
             authority=authority,
         ),
+        mutation=True,
     )
 
     return RedirectResponse(
@@ -184,6 +185,7 @@ async def transition_task_action(
             expected_revision=expected_revision,
             next_action=next_action,
         ),
+        mutation=True,
     )
 
     return RedirectResponse(

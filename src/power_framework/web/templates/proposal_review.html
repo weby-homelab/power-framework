@@ -38,7 +38,10 @@
     name="proposal_id"
     value="{{ proposal.get('proposal_id', '') }}"
   />
-  <input type="hidden" name="approved" value="true" />
+  <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px">
+    <input type="checkbox" name="approved" value="true" required />
+    Я підтверджую явне застосування цієї пропозиції.
+  </label>
 
   <div style="margin-bottom: 16px">
     <h3 style="font-size: 1rem; margin-bottom: 8px">

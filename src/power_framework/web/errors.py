@@ -10,6 +10,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from power_framework.core.application import (
+    CompletedAfterBudgetError,
+    CompletedAfterDeadlineError,
+    DeadlineExceededError,
+    ResultBudgetExceededError,
+)
 from power_framework.core.errors import ConflictError
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -17,6 +23,14 @@ _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 class PowerCallTimeoutError(TimeoutError):
     """A bounded synchronous POWER call exceeded its request deadline."""
+
+
+class PowerCallCompletedAfterDeadlineError(TimeoutError):
+    """A mutation worker was joined and completed after the caller deadline."""
+
+
+class PowerCallCompletedAfterCancellationError(TimeoutError):
+    """A canceled mutation worker was joined and its outcome is now known."""
 
 
 class PublicError(BaseModel):
@@ -75,6 +89,32 @@ def _exception_mapping(exc: BaseException) -> tuple[int, str, str]:
         default_code, message = domain_messages[domain_status]
         code = domain_code if isinstance(domain_code, str) else default_code
         return domain_status, code, message
+    if isinstance(exc, PowerCallCompletedAfterDeadlineError):
+        return 504, "completed_after_deadline", "The POWER operation completed after its deadline."
+    if isinstance(exc, PowerCallCompletedAfterCancellationError):
+        return (
+            499,
+            "completed_after_cancellation",
+            "The POWER operation completed after cancellation.",
+        )
+    if isinstance(exc, CompletedAfterDeadlineError):
+        return 504, "completed_after_deadline", "The POWER operation completed after its deadline."
+    if isinstance(exc, DeadlineExceededError):
+        if "before operation started" in str(exc):
+            return (
+                408,
+                "rejected_before_start",
+                "The POWER operation was rejected before it started.",
+            )
+        return 408, "deadline_exceeded", "The POWER operation exceeded its deadline."
+    if isinstance(exc, CompletedAfterBudgetError):
+        return (
+            413,
+            "completed_after_budget",
+            "The POWER operation completed beyond its response budget.",
+        )
+    if isinstance(exc, ResultBudgetExceededError):
+        return 413, "result_budget_exceeded", "The POWER result exceeded its response budget."
     if isinstance(exc, (PowerCallTimeoutError, TimeoutError)):
         return 504, "timeout", "The POWER service did not complete the request in time."
     if isinstance(exc, FileNotFoundError):
@@ -106,6 +146,26 @@ def public_http_exception(exc: BaseException) -> HTTPException:
 def _http_mapping(exc: StarletteHTTPException) -> tuple[int, str, str]:
     """Map framework HTTP failures without reflecting their detail field."""
     status_code = exc.status_code
+    if status_code == 504 and exc.detail == "completed_after_deadline":
+        return 504, "completed_after_deadline", "The POWER operation completed after its deadline."
+    if status_code == 499 and exc.detail == "completed_after_cancellation":
+        return (
+            499,
+            "completed_after_cancellation",
+            "The POWER operation completed after cancellation.",
+        )
+    if status_code == 408 and exc.detail == "rejected_before_start":
+        return 408, "rejected_before_start", "The POWER operation was rejected before it started."
+    if status_code == 408 and exc.detail == "deadline_exceeded":
+        return 408, "deadline_exceeded", "The POWER operation exceeded its deadline."
+    if status_code == 413 and exc.detail == "result_budget_exceeded":
+        return 413, "result_budget_exceeded", "The POWER result exceeded its response budget."
+    if status_code == 413 and exc.detail == "completed_after_budget":
+        return (
+            413,
+            "completed_after_budget",
+            "The POWER operation completed beyond its response budget.",
+        )
     known = {
         400: ("invalid_request", "The request is invalid."),
         401: ("authentication_required", "Authentication is required."),
@@ -162,6 +222,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 __all__ = [
+    "PowerCallCompletedAfterCancellationError",
+    "PowerCallCompletedAfterDeadlineError",
     "PowerCallTimeoutError",
     "PublicError",
     "PublicErrorResponse",

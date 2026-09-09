@@ -38,10 +38,10 @@ Controlled Dependency Refresh
          └── Final integration admission — CLOSED / VERIFIED
           ↓
 Pre-Phase-5 Foundation Hardening
-PLANNED / NOT STARTED / NEXT RUNTIME GATE
-          ↓
+ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / PROTECTED MERGE REQUIRED
+           ↓
 Phase 5A–5H — Retrieval contracts, router, scope, planner, shadow, dense validity, MCP, closure
-BLOCKED / NOT STARTED
+READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED
          ↓
 Phase 6 — Agent Capture & Integrations
 NOT STARTED
@@ -74,8 +74,8 @@ NO-GO
 | PR #402 | DEFERRED / CLOSED WITHOUT MERGE | Broad unsafe maintenance bundle; future updates require bounded split admissions |
 | PR #407 | SUPERSEDED / CLOSED WITHOUT MERGE | Historical pre-HF evidence retained for auditability |
 | Final integration | CLOSED / FINAL INTEGRATION VERIFIED | Current main dependency graph, security, package, upgrade, frozen regression, Docs, and CodeQL evidence passed |
-| Foundation Hardening | PLANNED / NOT STARTED / NEXT RUNTIME GATE | F1–F5 authority, principal, retrieval boundary, receipt, and deadline contract |
-| Phase 5 | BLOCKED / NOT STARTED | No implementation authorized |
+| Foundation Hardening | ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED | F1–F5 authority, principal, retrieval boundary, receipt, and deadline contract; protected merge still required |
+| Phase 5 | READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED | No implementation authorized in this gate |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
@@ -101,8 +101,9 @@ dependency update:
 8. **Final integration admission — complete.** Current main dependency,
    security, package, upgrade, frozen-regression, Docs, and CodeQL evidence
    passed on the exact protected main.
-9. **Foundation Hardening — next runtime gate.** It is planned/not started and
-   must be admitted before Phase 5.
+9. **Foundation Hardening — current implementation candidate.** It is locally
+   verified and closes only through its protected normal merge; Phase 5 remains
+   separately gated.
 
 The controlled refresh does not authorize a public version bump, tag, release,
 Phase 5, or any later phase.

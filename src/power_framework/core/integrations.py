@@ -160,7 +160,7 @@ def build_skill_check_plan(target: str | Path) -> dict[str, Any]:
 
 def apply_skill_install_plan(plan: dict[str, Any], *, approved: bool) -> dict[str, Any]:
     """Atomically install a missing Skill tree after an explicit approval."""
-    if not approved:
+    if type(approved) is not bool or not approved:
         raise PermissionError("skill install requires explicit approved=True")
     if plan.get("schema") != SKILL_SCHEMA_VERSION:
         raise ValueError("unsupported Skill plan schema")
@@ -802,7 +802,7 @@ def apply_native_install_plan(
     no_deps: bool = False,
 ) -> dict[str, Any]:
     """Build, verify, and atomically activate one unified POWER release slot."""
-    if not approved:
+    if type(approved) is not bool or not approved:
         raise PermissionError("native install requires explicit approved=True")
     if no_deps:
         raise ValueError("native install refuses the insecure no_deps bypass")

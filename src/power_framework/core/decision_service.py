@@ -242,8 +242,12 @@ class DecisionService:
             raise ValueError(f"Malformed decision receipt {receipt_id}") from exc
 
     def _ensure_dirs(self) -> None:
-        self.decisions_dir.mkdir(parents=True, exist_ok=True)
-        self.receipts_dir.mkdir(parents=True, exist_ok=True)
+        for directory in (self.decisions_dir, self.receipts_dir):
+            if directory.is_symlink():
+                raise ValueError(f"decision state directory must not be a symlink: {directory}")
+            directory.mkdir(parents=True, exist_ok=True)
+            if directory.is_symlink() or not directory.is_dir():
+                raise ValueError(f"decision state directory is not safe: {directory}")
 
     def _decision_file(self, decision_id: str) -> Path:
         Decision.validate_decision_id(decision_id)

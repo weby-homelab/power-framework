@@ -17,16 +17,17 @@ REST verification:
 - [POWER 3.8 — Context / Memory / Retrieval Architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
-- [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
+- [Latest Foundation Hardening handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T163501Z_pre-phase5-foundation-hardening.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
 
 > Controlled Dependency Refresh is **CLOSED / FINAL INTEGRATION VERIFIED**.
 > PR #402 is **DEFERRED / CLOSED WITHOUT MERGE** and PR #407 is
 > **SUPERSEDED HISTORICAL EVIDENCE / CLOSED WITHOUT MERGE**. The
-> context/memory/retrieval package is **CANONICAL PLANNING V2** only after this
-> governance package is protected-merged. Pre-Phase-5 Foundation Hardening is
-> the next runtime gate; Actions #396 is already closed/merged, while Phase 5
-> and all later runtime work are not started by this snapshot.
+> context/memory/retrieval package is **CANONICAL PLANNING V2**. Foundation
+> Hardening is **IMPLEMENTED / LOCALLY VERIFIED / PROTECTED-MERGE CANDIDATE**;
+> it becomes `MERGED MAIN` only after the exact protected normal merge. Actions
+> #396 is already closed/merged, while Phase 5A and all later runtime work are
+> not started by this snapshot.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -49,8 +50,8 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. The next bounded session audits only
-   Pre-Phase-5 Foundation Hardening; it must not start Phase 5.
+   mutable operational truth. Finish the protected Foundation merge/readback,
+   then prepare only the separate Phase 5A admission; do not start Phase 5A here.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -81,7 +82,7 @@ phase report, release artifact, or authorization to start Phase 5.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Foundation Hardening |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Foundation protected merge; then Phase 5A |
 
 ## HISTORICAL PLAN
 
@@ -108,8 +109,9 @@ They are not a substitute for current-state projection or live GitHub truth:
 HF #406, Actions #396, and final-integration checks remain attached to their PR,
 commit, and handoff evidence. The context/memory/retrieval files under
 `artifacts/project-state/planning/` are pre-implementation planning contracts,
-not phase evidence. The final dependency evidence is `MERGED MAIN`; the next
-runtime gate is Foundation Hardening and Phase 5 remains `BLOCKED / NOT STARTED`.
+not phase evidence. The final dependency evidence is `MERGED MAIN`; Foundation
+Hardening is the current protected-merge candidate and Phase 5A remains
+`NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
 

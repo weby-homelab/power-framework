@@ -61,6 +61,7 @@ async def resolve_decision_action(
         action=action,
         input_data={"value": input_value} if action == "provide_input" else None,
         idempotency_key=key_for("resolve", decision_id=decision_id, decision_action=action),
+        mutation=True,
     )
 
     return RedirectResponse(url="/decisions", status_code=303)
