@@ -42,7 +42,7 @@ LAST_CLOSED_GATE:
 Controlled Dependency Refresh — Final Integration
 
 NEXT_GATE:
-Pre-Phase-5 Foundation Hardening Admission
+Foundation Hardening Protected Normal Merge and Post-Merge Verification
 
 ACTIONS_396:
 CLOSED / MERGED
@@ -78,7 +78,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-09T162533Z_pre-phase5-foundation-hardening.md
+artifacts/project-state/handoffs/2026-09-09T163501Z_pre-phase5-foundation-hardening.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
