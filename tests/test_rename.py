@@ -173,3 +173,39 @@ def test_cli_rename_command(tmp_path: Path):
     # References in Note A should be updated on disk
     content = read_file_content(note_a)
     assert "02_Areas/NoteB_new.md" in content
+
+
+@pytest.mark.parametrize("unsafe_target", ["../outside.md", "absolute-outside.md"])
+def test_cli_rename_rejects_paths_outside_vault(tmp_path: Path, unsafe_target: str) -> None:
+    """Physical rename targets must stay inside the configured vault."""
+    projects = tmp_path / "01_Projects"
+    projects.mkdir()
+    source = projects / "source.md"
+    source.write_text("source", encoding="utf-8")
+    outside = tmp_path.parent / "outside.md"
+    outside.write_text("sentinel", encoding="utf-8")
+    if unsafe_target == "absolute-outside.md":
+        unsafe_target = str(tmp_path.parent / unsafe_target)
+
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "rename",
+                str(tmp_path),
+                "--old",
+                "01_Projects/source.md",
+                "--new",
+                unsafe_target,
+                "--no-dry-run",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 1
+    assert source.read_text(encoding="utf-8") == "source"
+    assert outside.read_text(encoding="utf-8") == "sentinel"

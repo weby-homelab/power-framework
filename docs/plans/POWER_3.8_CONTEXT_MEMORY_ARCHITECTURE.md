@@ -1185,7 +1185,7 @@ Phase 5 is currently `BLOCKED / NOT STARTED`; every item below is
 
 The Controlled Dependency Refresh is already closed at final integration in the
 current governance snapshot. No Foundation or 5A–5H gate authorizes Actions
-#396, capture, migration, a release, or a version bump by itself.
+`#396`, capture, migration, a release, or a version bump by itself.
 
 ## 27. Phase 6 Work Breakdown
 

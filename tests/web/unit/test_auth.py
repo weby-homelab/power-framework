@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from power_framework.web.auth.csrf import generate_csrf_token, verify_csrf_token
 from power_framework.web.auth.session import SessionManager
 
@@ -14,6 +16,10 @@ def test_session_manager_lifecycle() -> None:
 
     user = mgr.verify_session(raw_session, max_age_seconds=60)
     assert user == "user_admin"
+    verified = mgr.verify_session_details(raw_session, max_age_seconds=60)
+    assert verified is not None
+    assert verified[0] == "user_admin"
+    assert verified[1] > datetime.now(UTC)
 
 
 def test_session_manager_tamper_and_expiry() -> None:

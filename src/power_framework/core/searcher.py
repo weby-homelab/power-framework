@@ -71,6 +71,19 @@ logger = logging.getLogger(__name__)
 _SOURCE_READ_CONTEXT: ContextVar[SourceReadContext | None] = ContextVar(
     "power_source_read_context", default=None
 )
+_SEARCH_DB_OVERRIDE_POLICY: ContextVar[bool | None] = ContextVar(
+    "power_search_db_override_policy", default=None
+)
+
+
+@contextlib.contextmanager
+def search_db_override_policy(allowed: bool):
+    """Temporarily bind the legacy DB override policy to one local call."""
+    token = _SEARCH_DB_OVERRIDE_POLICY.set(allowed)
+    try:
+        yield
+    finally:
+        _SEARCH_DB_OVERRIDE_POLICY.reset(token)
 
 
 def get_embedding_manager() -> Any:
@@ -147,7 +160,11 @@ def _get_reranker() -> RerankerProtocol:
 
 def _db_path(vault_dir: Path | None = None) -> Path:
     """Resolve the isolated DB for a vault, honoring POWER_SEARCH_DB in tests."""
-    return vault_db_path(vault_dir)
+    policy = _SEARCH_DB_OVERRIDE_POLICY.get()
+    return vault_db_path(
+        vault_dir,
+        allow_search_db_override=True if policy is None else policy,
+    )
 
 
 def _read_db_path(vault_dir: Path) -> Path | None:

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import json
 import logging
 from pathlib import Path
 
@@ -41,6 +42,7 @@ def synthesize_session_ingest(
     owner: str | None = None,
     vault_path: str | str | Path = ".",
     timestamp: datetime.datetime | None = None,
+    idempotency_key: str | None = None,
 ) -> str:
     """Create a session synthesis note with auto-classified OKF metadata + ingest.
 
@@ -59,7 +61,7 @@ def synthesize_session_ingest(
         name += ".md"
 
     target_file = resolve_path_in_vault(vault, name)
-    if target_file.exists():
+    if target_file.exists() and idempotency_key is None:
         raise FileExistsError(f"Note already exists at {name}")
 
     ts = timestamp or datetime.datetime.now(_DEFAULT_TZ)
@@ -82,6 +84,22 @@ def synthesize_session_ingest(
 
     frontmatter = build_frontmatter(metadata)
     full_content = f"{frontmatter}\n\n{content}\n"
+    idempotency_fingerprint = hashlib.sha256(
+        json.dumps(
+            {
+                "name": name,
+                "title": title,
+                "description": description,
+                "content": content,
+                "note_type": note_type,
+                "tags": tags,
+                "related": related,
+                "owner": owner,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
 
     date_str = ts.strftime("%Y-%m-%d")
     log_entry = (
@@ -98,14 +116,18 @@ def synthesize_session_ingest(
         require_absent=True,
         operation="synthesize.session",
         log_entry=log_entry,
+        idempotency_key=idempotency_key,
+        idempotency_fingerprint=(idempotency_fingerprint if idempotency_key is not None else None),
     )
 
     # Graph extraction is deliberately an optional projection.  A failure here
     # must not invalidate the already verified Markdown/search transaction.
     try:
+        from power_framework.core.searcher import search_db_override_policy
         from power_framework.experimental.graph_extraction import store_note_triplets
 
-        store_note_triplets(vault, name, content)
+        with search_db_override_policy(False):
+            store_note_triplets(vault, name, content)
     except Exception as exc:
         logger.warning("Triplet extraction failed for %s: %s", name, exc)
 

@@ -13,8 +13,11 @@ from fastapi import HTTPException, Request
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from power_framework.core.principal import Principal
+
 from .auth.csrf import verify_csrf_token
 from .auth.session import SessionManager
+from .errors import request_id_for
 
 if TYPE_CHECKING:
     from .clients.power import PowerClient
@@ -114,7 +117,14 @@ def get_client(request: Request) -> PowerClient:
     from .clients.power import PowerClient
 
     settings: Settings = get_settings(request)
-    return PowerClient(settings.vault_path)
+    principal = getattr(request.state, "principal", None)
+    if not isinstance(principal, Principal):
+        raise HTTPException(status_code=403, detail="A bound application principal is required")
+    return PowerClient(
+        settings.vault_path,
+        principal=principal,
+        request_id=request_id_for(request),
+    )
 
 
 def require_mutation_enabled(request: Request) -> None:

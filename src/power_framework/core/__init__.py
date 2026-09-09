@@ -17,7 +17,17 @@ from __future__ import annotations
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-from .application import ApplicationEnvelope, ApplicationService, AuditReceipt, RequestContext
+from .application import (
+    MAX_RESULT_BYTES,
+    ApplicationEnvelope,
+    ApplicationService,
+    AuditReceipt,
+    CompletedAfterBudgetError,
+    CompletedAfterDeadlineError,
+    DeadlineExceededError,
+    RequestContext,
+    ResultBudgetExceededError,
+)
 from .chunker import SemanticChunker
 from .connect import ConnectPlan, apply_connect_plan, build_connect_plan
 from .control_plane import (
@@ -110,6 +120,7 @@ from .parser import (
     read_file_content,
     validate_metadata,
 )
+from .principal import Principal, PrincipalBinding
 from .provenance import (
     PROVENANCE_SCHEMA_VERSION,
     EvidenceCapture,
@@ -230,6 +241,7 @@ __all__ = [
     "CANONICAL_SEARCH_MODES",
     "DEFAULT_SEARCH_MODE",
     "MAX_DESCRIPTION_LENGTH",
+    "MAX_RESULT_BYTES",
     "MAX_TITLE_LENGTH",
     "NOTE_TYPE_ORDER",
     "PARA_FOLDERS",
@@ -241,9 +253,12 @@ __all__ = [
     "ApplicationEnvelope",
     "ApplicationService",
     "AuditReceipt",
+    "CompletedAfterBudgetError",
+    "CompletedAfterDeadlineError",
     "ConnectPlan",
     "ContentDedupDetector",
     "ContradictionDetector",
+    "DeadlineExceededError",
     "EmbeddingManager",
     "EvidenceCapture",
     "FreshnessScorer",
@@ -267,6 +282,8 @@ __all__ = [
     "NoteStatus",
     "NoteType",
     "OKFMetadata",
+    "Principal",
+    "PrincipalBinding",
     "ProvenanceError",
     "ProvenanceRecord",
     "QueryExpander",
@@ -275,6 +292,7 @@ __all__ = [
     "RelationSuggestion",
     "RequestContext",
     "RerankerManager",
+    "ResultBudgetExceededError",
     "SearchResult",
     "SemanticChunker",
     "Sensitivity",

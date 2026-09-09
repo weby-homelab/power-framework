@@ -27,7 +27,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from collections.abc import Callable
+from contextvars import ContextVar
 from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
@@ -43,6 +45,7 @@ from power_framework.core import (
     DEFAULT_SEARCH_MODE,
     PARA_FOLDERS,
     ApplicationService,
+    Principal,
     RateLimiter,
     RequestContext,
     __version__,
@@ -84,6 +87,11 @@ _MCP_ANNOTATION_ALIASES = {
 }
 _ToolCallable = TypeVar("_ToolCallable", bound=Callable[..., Any])
 _ABSOLUTE_PATH_RE = re.compile(r"(?<![\w])/(?:[^\s'\"`,;)]*)+")
+_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?i)(\b(?:api[_-]?key|authorization|cookie|password|secret|token)\b\s*[:=]\s*)[^\s,;]+"
+)
+_BEARER_RE = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
+_MCP_REQUEST_ID: ContextVar[str | None] = ContextVar("power_mcp_request_id", default=None)
 
 
 def _normalize_tool_annotations(
@@ -99,12 +107,38 @@ def _normalize_tool_annotations(
 
 
 def _safe_mcp_error_text(error: Exception) -> str:
-    """Return actionable MCP error text without absolute paths or tracebacks."""
+    """Return bounded MCP error text without paths, secrets, or tracebacks."""
     message = str(error).strip()
     if not message or "Traceback (most recent call last)" in message:
         return "POWER MCP tool failed; inspect the server log for details."
+    message = _SECRET_ASSIGNMENT_RE.sub(r"\1<redacted>", message)
+    message = _BEARER_RE.sub("Bearer <redacted>", message)
+    if "secret" in message.casefold() and "<redacted>" not in message:
+        return "POWER MCP tool failed; inspect the server log for details."
     message = _ABSOLUTE_PATH_RE.sub("<path>", message)
-    return message[:512]
+    return message[:509] + "..." if len(message) > 512 else message
+
+
+def _mcp_context(
+    *,
+    actor: str = "mcp",
+    authority: Literal["read-only", "propose", "apply"] = "read-only",
+    idempotency_key: str | None = None,
+) -> RequestContext:
+    """Build context from the trusted local stdio process, not tool input."""
+    return RequestContext(
+        actor=actor,
+        authority=authority,
+        idempotency_key=idempotency_key,
+        request_id=_MCP_REQUEST_ID.get() or uuid.uuid4().hex,
+        principal=Principal.local_mcp_stdio(),
+    )
+
+
+def _require_explicit_approval(approved: bool, operation: str) -> None:
+    """Require a real boolean true rather than truthy transport coercion."""
+    if type(approved) is not bool or not approved:
+        raise ToolError(f"{operation} requires explicit approved=True")
 
 
 class PowerMCPServer(MCPServer):
@@ -138,15 +172,30 @@ class PowerMCPServer(MCPServer):
         context: Any = None,
     ) -> CallToolResult | InputRequiredResult:
         """Execute a tool and convert SDK execution errors to safe results."""
+        request_token = _MCP_REQUEST_ID.set(uuid.uuid4().hex)
+        request_id = _MCP_REQUEST_ID.get()
         try:
-            result = await super().call_tool(name, arguments, context)
-        except ToolError as exc:
-            logger.info("MCP tool execution failed: %s", name)
-            return CallToolResult(
-                content=[TextContent(type="text", text=_safe_mcp_error_text(exc))],
-                is_error=True,
-            )
-        return result
+            try:
+                result = await super().call_tool(name, arguments, context)
+            except ToolError as exc:
+                logger.info("MCP tool execution failed: %s", name)
+                return CallToolResult(
+                    content=[TextContent(type="text", text=_safe_mcp_error_text(exc))],
+                    is_error=True,
+                    _meta={"power.request_id": request_id},
+                )
+            except Exception as exc:
+                logger.info("MCP tool execution failed: %s", name)
+                return CallToolResult(
+                    content=[TextContent(type="text", text=_safe_mcp_error_text(exc))],
+                    is_error=True,
+                    _meta={"power.request_id": request_id},
+                )
+            metadata = dict(result.meta or {})
+            metadata["power.request_id"] = request_id
+            return result.model_copy(update={"meta": metadata})
+        finally:
+            _MCP_REQUEST_ID.reset(request_token)
 
     def run(self, transport: str = "stdio", **kwargs: Any) -> None:
         """Run the official SDK over the one supported native stdio transport."""
@@ -307,7 +356,15 @@ async def get_server_info(
     """
     path = _get_vault_path(vault_path)
     report = json.loads(
-        await run_blocking(lambda: report_as_json(run_doctor(path, probe_embedding=probe_provider)))
+        await run_blocking(
+            lambda: report_as_json(
+                run_doctor(
+                    path,
+                    probe_embedding=probe_provider,
+                    allow_search_db_override=False,
+                )
+            )
+        )
     )
     tools = await mcp.list_tools()
     report["mcp"] = mcp_discovery_contract(tools)
@@ -339,8 +396,9 @@ async def lint_vault(vault_path: str | None = None) -> str:
     },
     meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
 )
-async def generate_index(vault_path: str | None = None) -> str:
+async def generate_index(vault_path: str | None = None, approved: bool = False) -> str:
     """Compile the vault hierarchical index: a summary index.md plus per-folder _index.md files."""
+    _require_explicit_approval(approved, "generate_index")
     if not _index_limiter.is_allowed("generate_index"):
         remaining = _index_limiter.remaining("generate_index")
         raise ToolError(
@@ -349,9 +407,8 @@ async def generate_index(vault_path: str | None = None) -> str:
 
     path = _get_vault_path(vault_path)
     envelope = await run_blocking(
-        lambda: ApplicationService(path).generate_index(
-            context=RequestContext(actor="mcp", authority="apply")
-        )
+        lambda: ApplicationService(path).generate_index(context=_mcp_context(authority="apply")),
+        mutation=True,
     )
     return str(envelope.data["result"])
 
@@ -371,6 +428,7 @@ async def sync_vault(
     force_rebuild: bool = False,
     allow_partial: bool = False,
     vault_path: str | None = None,
+    approved: bool = False,
 ) -> str:
     """Publish an atomic search-index generation for the configured vault.
 
@@ -386,6 +444,7 @@ async def sync_vault(
     When ``fts_only=True`` would discard an active dense index, the call fails
     closed unless ``accept_dense_loss=True`` is explicit.
     """
+    _require_explicit_approval(approved, "sync_vault")
     if not _index_limiter.is_allowed("sync_vault"):
         remaining = _index_limiter.remaining("sync_vault")
         raise ToolError(
@@ -400,8 +459,9 @@ async def sync_vault(
                 accept_dense_loss=accept_dense_loss,
                 force_rebuild=force_rebuild,
                 allow_partial=allow_partial,
-                context=RequestContext(actor="mcp", authority="apply"),
-            )
+                context=_mcp_context(authority="apply"),
+            ),
+            mutation=True,
         )
     except (
         FileExistsError,
@@ -411,7 +471,7 @@ async def sync_vault(
         ValueError,
         OSError,
     ) as exc:
-        raise ToolError(str(exc)) from exc
+        raise ToolError(_safe_mcp_error_text(exc)) from exc
     return str(envelope.data["result"])
 
 
@@ -452,8 +512,14 @@ async def read_sub_index(category: str, vault_path: str | None = None, page: int
     },
     meta={"power.risk": {"local_only": True, "egress": "none", "approval": "caller"}},
 )
-async def ensure_sub_index(category: str, vault_path: str | None = None, page: int = 1) -> str:
+async def ensure_sub_index(
+    category: str,
+    vault_path: str | None = None,
+    page: int = 1,
+    approved: bool = False,
+) -> str:
     """Generate and read one bounded page of a P.A.R.A. sub-index."""
+    _require_explicit_approval(approved, "ensure_sub_index")
     path = _get_vault_path(vault_path)
     page = _validate_catalog_page(page)
     try:
@@ -461,8 +527,9 @@ async def ensure_sub_index(category: str, vault_path: str | None = None, page: i
             lambda: ApplicationService(path).ensure_sub_index(
                 category,
                 page=page,
-                context=RequestContext(actor="mcp", authority="apply"),
-            )
+                context=_mcp_context(authority="apply"),
+            ),
+            mutation=True,
         )
     except (
         FileExistsError,
@@ -472,7 +539,7 @@ async def ensure_sub_index(category: str, vault_path: str | None = None, page: i
         ValueError,
         OSError,
     ) as exc:
-        raise ToolError(str(exc)) from exc
+        raise ToolError(_safe_mcp_error_text(exc)) from exc
     result = str(envelope.data["result"])
     content = str(envelope.data.get("content", ""))
     return f"{result}\n\n{content}" if content else result
@@ -496,8 +563,11 @@ async def ingest_note(
     resource: str | None = None,
     tags: list[str] | None = None,
     vault_path: str | None = None,
+    approved: bool = False,
+    idempotency_key: str | None = None,
 ) -> str:
     """Create a new note with strict OKF metadata frontmatter, regenerate the index, and log the change."""
+    _require_explicit_approval(approved, "ingest_note")
     if not _write_limiter.is_allowed("ingest"):
         remaining = _write_limiter.remaining("ingest")
         raise ToolError(
@@ -515,8 +585,12 @@ async def ingest_note(
                 content=content,
                 resource=resource,
                 tags=tags,
-                context=RequestContext(actor="mcp", authority="apply"),
-            )
+                context=_mcp_context(
+                    authority="apply",
+                    idempotency_key=idempotency_key,
+                ),
+            ),
+            mutation=True,
         )
     except (
         FileExistsError,
@@ -530,7 +604,7 @@ async def ingest_note(
             raise ToolError(
                 "Invalid note path; use an existing PARA directory and a Markdown filename."
             ) from exc
-        raise ToolError(str(exc)) from exc
+        raise ToolError(_safe_mcp_error_text(exc)) from exc
     return str(envelope.data["result"])
 
 
@@ -567,8 +641,9 @@ async def propose_memory_change(path: str, content: str, vault_path: str | None 
         lambda: ApplicationService(root).propose(
             path,
             content,
-            context=RequestContext(actor="mcp", authority="propose"),
-        )
+            context=_mcp_context(authority="propose"),
+        ),
+        mutation=True,
     )
     return json.dumps(envelope.data, sort_keys=True)
 
@@ -586,17 +661,19 @@ async def apply_memory_change(
     proposal: dict[str, str], approved: bool, vault_path: str | None = None
 ) -> str:
     """Apply only an explicitly approved memory proposal."""
+    _require_explicit_approval(approved, "apply_memory_change")
     root = _get_vault_path(vault_path)
     try:
         receipt = await run_blocking(
             lambda: ApplicationService(root).apply(
                 proposal,
                 approved=approved,
-                context=RequestContext(actor="mcp", authority="apply"),
-            )
+                context=_mcp_context(authority="apply"),
+            ),
+            mutation=True,
         )
     except (PermissionError, RuntimeError, ValueError, OSError) as exc:
-        raise ToolError(str(exc)) from exc
+        raise ToolError(_safe_mcp_error_text(exc)) from exc
     return json.dumps(receipt.data, sort_keys=True)
 
 
@@ -627,7 +704,7 @@ async def validate_memory_state(vault_path: str | None = None) -> bool:
 async def read_memory_history(vault_path: str | None = None) -> str:
     """Read append-only transaction receipts without note content."""
     root = _get_vault_path(vault_path)
-    envelope = await run_blocking(lambda: ApplicationService(root).receipt())
+    envelope = await run_blocking(lambda: ApplicationService(root).receipt(context=_mcp_context()))
     return json.dumps(envelope.data["receipts"], sort_keys=True)
 
 
@@ -701,20 +778,25 @@ async def handoff_work(
                                 else None
                             ),
                         },
-                        context=RequestContext(
+                        context=_mcp_context(
                             actor=actor,
                             authority="propose",
                             idempotency_key=idempotency_key,
                         ),
                     ).data
-                )
+                ),
+                mutation=True,
             )
         elif action == "list":
-            result = await run_blocking(lambda: {"packets": service.task(action="list").data})
+            result = await run_blocking(
+                lambda: {"packets": service.task(action="list", context=_mcp_context()).data}
+            )
         elif action == "show":
             if not task_id:
                 raise ToolError("show requires task_id")
-            result = await run_blocking(lambda: service.task(action="read", task_id=task_id).data)
+            result = await run_blocking(
+                lambda: service.task(action="read", task_id=task_id, context=_mcp_context()).data
+            )
         else:
             if not task_id or not idempotency_key or expected_revision is None:
                 raise ToolError(
@@ -739,13 +821,14 @@ async def handoff_work(
                             "completion_postcondition": completion_postcondition,
                             "completion_artifact_refs": changed_artifacts,
                         },
-                        context=RequestContext(
+                        context=_mcp_context(
                             actor=actor,
                             authority="apply",
                             idempotency_key=idempotency_key,
                         ),
                     ).data
-                )
+                ),
+                mutation=True,
             )
     except ToolError:
         raise
@@ -757,7 +840,7 @@ async def handoff_work(
         ValueError,
         OSError,
     ) as exc:
-        raise ToolError(str(exc)) from exc
+        raise ToolError(_safe_mcp_error_text(exc)) from exc
     return json.dumps(result, ensure_ascii=False, sort_keys=True)
 
 
@@ -798,7 +881,7 @@ async def search_vault_tool(
         temporal_view = normalize_temporal_view(temporal_view).value
         normalized_as_of = normalize_as_of(as_of).isoformat()
     except (ValueError, DomainConfigError) as exc:
-        raise ToolError(str(exc)) from exc
+        raise ToolError(_safe_mcp_error_text(exc)) from exc
 
     def _do_search() -> str:
         try:
@@ -812,7 +895,7 @@ async def search_vault_tool(
                 temporal_view=temporal_view,
                 as_of=normalized_as_of,
                 domain=domain,
-                context=RequestContext(actor="mcp"),
+                context=_mcp_context(),
             )
         except RuntimeError as exc:
             from power_framework.core.generation_index import ActiveGenerationError
@@ -820,7 +903,7 @@ async def search_vault_tool(
 
             if not isinstance(exc, (ActiveGenerationError, DenseIndexUnavailableError)):
                 raise
-            raise ToolError(str(exc)) from exc
+            raise ToolError(_safe_mcp_error_text(exc)) from exc
         return json.dumps(envelope.data, ensure_ascii=False, sort_keys=True)
 
     return await run_blocking(_do_search)
@@ -845,6 +928,8 @@ async def synthesize_session(
     related: list[str] | None = None,
     owner: str | None = None,
     vault_path: str | None = None,
+    approved: bool = False,
+    idempotency_key: str | None = None,
 ) -> str:
     """
     Create a new session synthesis note with auto-classified OKF frontmatter,
@@ -854,6 +939,7 @@ async def synthesize_session(
     session automatically generates a persistent knowledge artifact with
     governance metadata.
     """
+    _require_explicit_approval(approved, "synthesize_session")
     if not _write_limiter.is_allowed("synthesize"):
         remaining = _write_limiter.remaining("synthesize")
         raise ToolError(
@@ -872,8 +958,12 @@ async def synthesize_session(
                 tags=tags,
                 related=related,
                 owner=owner,
-                context=RequestContext(actor="mcp", authority="apply"),
-            )
+                context=_mcp_context(
+                    authority="apply",
+                    idempotency_key=idempotency_key,
+                ),
+            ),
+            mutation=True,
         )
     except (
         FileExistsError,
@@ -887,7 +977,7 @@ async def synthesize_session(
             raise ToolError(
                 "Invalid note path; use an existing PARA directory and a Markdown filename."
             ) from exc
-        raise ToolError(str(exc)) from exc
+        raise ToolError(_safe_mcp_error_text(exc)) from exc
     return str(envelope.data["result"])
 
 
@@ -921,8 +1011,8 @@ async def rot_audit(
     """
     if (allow_link_rot or allow_remote_llm) and not extended:
         raise ToolError("remote ROT capabilities require extended=True")
-    if (allow_link_rot or allow_remote_llm) and not approved:
-        raise ToolError("remote ROT capabilities require explicit approved=True")
+    if allow_link_rot or allow_remote_llm:
+        _require_explicit_approval(approved, "remote ROT capabilities")
     path = _get_vault_path(vault_path)
     return await run_blocking(
         lambda: run_rot_report(
@@ -949,14 +1039,15 @@ async def archive_notes(
     vault_path: str | None = None,
 ) -> str:
     """Move stale/expired notes to 04_Archive. Use dry_run=True (default) to preview first."""
-    if not dry_run and not approved:
-        raise ToolError("archive_notes apply requires explicit approved=True")
+    if not dry_run:
+        _require_explicit_approval(approved, "archive_notes apply")
     path = _get_vault_path(vault_path)
     envelope = await run_blocking(
         lambda: ApplicationService(path).archive_notes(
             dry_run=dry_run,
-            context=RequestContext(actor="mcp", authority="apply") if not dry_run else None,
-        )
+            context=_mcp_context(authority="apply") if not dry_run else None,
+        ),
+        mutation=not dry_run,
     )
     return str(envelope.data["result"])
 
@@ -1009,14 +1100,15 @@ async def heal_frontmatter_tool(
     vault_path: str | None = None,
 ) -> str:
     """Scan and heal missing/invalid frontmatter fields across vault notes. Use dry_run=True (default) to preview first."""
-    if not dry_run and not approved:
-        raise ToolError("heal_frontmatter_tool apply requires explicit approved=True")
+    if not dry_run:
+        _require_explicit_approval(approved, "heal_frontmatter_tool apply")
     path = _get_vault_path(vault_path)
     envelope = await run_blocking(
         lambda: ApplicationService(path).heal_frontmatter(
             dry_run=dry_run,
-            context=RequestContext(actor="mcp", authority="apply") if not dry_run else None,
-        )
+            context=_mcp_context(authority="apply") if not dry_run else None,
+        ),
+        mutation=not dry_run,
     )
     return str(envelope.data["result"])
 

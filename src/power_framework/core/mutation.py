@@ -36,6 +36,12 @@ from .utils import vault_control_dir
 _registry_guard = threading.Lock()
 _vault_locks: dict[Path, threading.RLock] = {}
 _compatibility_lock = threading.RLock()
+_blocking_worker_limit = max(1, (os.cpu_count() or 4) // 2)
+_blocking_slots = threading.BoundedSemaphore(_blocking_worker_limit)
+_blocking_executor = ThreadPoolExecutor(
+    max_workers=_blocking_worker_limit,
+    thread_name_prefix="power-blocking",
+)
 
 
 def _lock_descriptor(descriptor: int) -> None:
@@ -102,24 +108,57 @@ def execute_vault_mutation[T](vault_dir: Path, operation: Callable[[], T]) -> T:
         return operation()
 
 
-async def run_blocking[T](sync_fn: Callable[[], T]) -> T:
-    """Run a blocking operation and join its executor before returning.
+async def run_blocking[T](sync_fn: Callable[[], T], *, mutation: bool = False) -> T:
+    """Run a blocking operation through the bounded process-wide worker.
 
     Polling the submitted future avoids a Python 3.13 runtime deadlock seen
     when ``asyncio`` waits for an executor callback after file-backed work.
-    The work still runs in the bounded executor; only completion observation is
-    kept on the event loop.
+    Reads may be abandoned on cancellation because they have no write effect;
+    mutations keep observing the future until the outcome is known.
     """
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(sync_fn)
-        while not future.done():
+    while not _blocking_slots.acquire(blocking=False):
+        try:
             await asyncio.sleep(0.01)
-        return future.result()
+        except asyncio.CancelledError:
+            # No worker has been admitted, so a canceled queued operation has
+            # no write effect to recover.
+            raise
+
+    try:
+        future = _blocking_executor.submit(_run_with_blocking_slot, sync_fn)
+    except Exception:
+        _blocking_slots.release()
+        raise
+    cancellation_requested = False
+    while not future.done():
+        try:
+            await asyncio.sleep(0.01)
+        except asyncio.CancelledError:
+            if not mutation:
+                if future.cancel():
+                    _blocking_slots.release()
+                raise
+            # A thread running a mutation cannot be safely killed. Keep the
+            # caller suspended until the worker has a truthful outcome.
+            cancellation_requested = True
+            continue
+    result = future.result()
+    if cancellation_requested:
+        raise asyncio.CancelledError
+    return result
+
+
+def _run_with_blocking_slot[T](sync_fn: Callable[[], T]) -> T:
+    """Run one admitted callback and release its global worker slot."""
+    try:
+        return sync_fn()
+    finally:
+        _blocking_slots.release()
 
 
 async def run_vault_mutation[T](vault_dir: Path, operation: Callable[[], T]) -> T:
     """Run a synchronous mutation under per-vault locks without blocking asyncio."""
-    return await run_blocking(lambda: execute_vault_mutation(vault_dir, operation))
+    return await run_blocking(lambda: execute_vault_mutation(vault_dir, operation), mutation=True)
 
 
 async def enqueue_compatibility_write[T](sync_fn: Callable[[], T]) -> T:
@@ -128,7 +167,7 @@ async def enqueue_compatibility_write[T](sync_fn: Callable[[], T]) -> T:
     Production CLI/MCP paths use :func:`run_vault_mutation`; this fallback is
     intentionally process-local and has no worker task or active-vault state.
     """
-    return await run_blocking(lambda: _run_compatibility_write(sync_fn))
+    return await run_blocking(lambda: _run_compatibility_write(sync_fn), mutation=True)
 
 
 def _run_compatibility_write[T](sync_fn: Callable[[], T]) -> T:

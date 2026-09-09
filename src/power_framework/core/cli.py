@@ -83,6 +83,7 @@ from .memory_api import (
 from .models import VAULT_STRUCTURE, NoteType, OKFMetadata
 from .mutation import execute_vault_mutation
 from .parser import build_frontmatter, read_file_content
+from .principal import Principal
 from .searcher import (
     CANONICAL_SEARCH_MODES,
     DEFAULT_SEARCH_MODE,
@@ -90,7 +91,13 @@ from .searcher import (
 )
 from .state_migration import build_state_migration_plan
 from .synthesize import synthesize_session_ingest
-from .utils import __version__, atomic_write, enforce_cpu_throttling_env, iter_vault_markdown_files
+from .utils import (
+    __version__,
+    atomic_write,
+    enforce_cpu_throttling_env,
+    iter_vault_markdown_files,
+    resolve_path_in_vault,
+)
 
 logger = logging.getLogger("power")
 
@@ -134,6 +141,21 @@ def _resolve_path(path_str: str) -> Path:
     if env_val:
         return Path(env_val).resolve()
     return Path.cwd().resolve()
+
+
+def _cli_context(
+    *,
+    actor: str,
+    authority: str = "read-only",
+    idempotency_key: str | None = None,
+) -> RequestContext:
+    """Bind CLI calls to the local process while retaining actor attribution."""
+    return RequestContext(
+        actor=actor,
+        authority=authority,  # type: ignore[arg-type]
+        idempotency_key=idempotency_key,
+        principal=Principal.local_cli(),
+    )
 
 
 def _positive_int(value: str) -> int:
@@ -433,7 +455,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
         temporal_view=args.temporal_view,
         as_of=args.as_of,
         domain=args.domain,
-        context=RequestContext(actor="cli"),
+        context=_cli_context(actor="cli"),
     )
     if args.envelope:
         print(json.dumps(envelope.as_dict(), ensure_ascii=False, sort_keys=True))
@@ -722,8 +744,12 @@ def _cmd_rename(args: argparse.Namespace) -> int:
     new_rel = args.new
     dry_run = not args.no_dry_run
 
-    old_file = vault_dir / old_rel
-    new_file = vault_dir / new_rel
+    try:
+        old_file = resolve_path_in_vault(vault_dir, old_rel)
+        new_file = resolve_path_in_vault(vault_dir, new_rel)
+    except ValueError as exc:
+        logger.error("Invalid rename path: %s", exc)
+        return 1
 
     if not old_file.exists() or not old_file.is_file():
         logger.error("Source note not found: %s", old_file)
@@ -1003,7 +1029,7 @@ def _cmd_memory(args: argparse.Namespace) -> int:
                     .propose(
                         args.note_path,
                         content,
-                        context=RequestContext(actor="cli", authority="propose"),
+                        context=_cli_context(actor="cli", authority="propose"),
                     )
                     .data,
                     sort_keys=True,
@@ -1031,7 +1057,7 @@ def _cmd_memory(args: argparse.Namespace) -> int:
                     .apply(
                         proposal,
                         approved=args.approved,
-                        context=RequestContext(actor="cli", authority="apply"),
+                        context=_cli_context(actor="cli", authority="apply"),
                     )
                     .data,
                     sort_keys=True,
@@ -1077,7 +1103,7 @@ def _cmd_handoff(args: argparse.Namespace) -> int:
                         else None
                     ),
                 },
-                context=RequestContext(
+                context=_cli_context(
                     actor=args.actor,
                     authority="propose",
                     idempotency_key=args.idempotency_key,
@@ -1105,7 +1131,7 @@ def _cmd_handoff(args: argparse.Namespace) -> int:
                     "completion_postcondition": args.completion_postcondition,
                     "completion_artifact_refs": args.changed_artifacts,
                 },
-                context=RequestContext(
+                context=_cli_context(
                     actor=args.actor,
                     authority="apply",
                     idempotency_key=args.idempotency_key,
@@ -1162,7 +1188,7 @@ def _cmd_task(args: argparse.Namespace) -> int:
                 next_action=args.next_action,
                 open_gates=args.open_gates,
                 due_at=args.due_at,
-                context=RequestContext(
+                context=_cli_context(
                     actor=args.actor,
                     authority="propose",
                     idempotency_key=args.idempotency_key,
@@ -1180,7 +1206,7 @@ def _cmd_task(args: argparse.Namespace) -> int:
                 error_ref=args.error_ref,
                 completion_postcondition=args.completion_postcondition,
                 completion_artifact_refs=args.completion_artifacts,
-                context=RequestContext(
+                context=_cli_context(
                     actor=args.actor,
                     authority="apply",
                     idempotency_key=args.idempotency_key,

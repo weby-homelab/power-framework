@@ -207,6 +207,8 @@ def advance_work_packet(
         _validate_token(receipt_id, "receipt_id")
     if not isinstance(actor, str) or not actor.strip():
         raise ValueError("actor must be a non-empty string")
+    if type(approved) is not bool:
+        raise ValueError("approved must be a boolean")
     if phase is not None and phase not in _MAINTENANCE_PHASES:
         raise ValueError("unknown maintenance phase")
 

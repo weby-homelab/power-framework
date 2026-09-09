@@ -261,7 +261,11 @@ def _unprobed_embedding_status() -> tuple[dict[str, Any], list[dict[str, str]]]:
     return embedding, issues
 
 
-def _probe_vault(vault_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
+def _probe_vault(
+    vault_dir: Path,
+    *,
+    allow_search_db_override: bool = True,
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Inspect a vault and its search state without creating cache or index files."""
     root = Path(vault_dir).expanduser().resolve()
     vault: dict[str, Any] = {
@@ -335,7 +339,10 @@ def _probe_vault(vault_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]
         legacy: Path | None = None
         if vault["index_state"] != "unreadable":
             try:
-                legacy = existing_vault_db_path(root)
+                legacy = existing_vault_db_path(
+                    root,
+                    allow_search_db_override=allow_search_db_override,
+                )
             except (OSError, ValueError) as exc:
                 vault["index_state"] = "unreadable"
                 issues.append(
@@ -379,7 +386,10 @@ def _probe_vault(vault_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]
         )
 
     try:
-        indexed, scanned = get_index_coverage(root)
+        indexed, scanned = get_index_coverage(
+            root,
+            allow_search_db_override=allow_search_db_override,
+        )
         vault["indexed_notes"] = (
             indexed if vault["indexed_notes"] is None else vault["indexed_notes"]
         )
@@ -438,7 +448,12 @@ def _probe_vault(vault_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]
     return vault, issues
 
 
-def run_doctor(vault_dir: Path | None = None, *, probe_embedding: bool = False) -> dict[str, Any]:
+def run_doctor(
+    vault_dir: Path | None = None,
+    *,
+    probe_embedding: bool = False,
+    allow_search_db_override: bool = True,
+) -> dict[str, Any]:
     """Build the versioned, read-only doctor report.
 
     The default is lightweight discovery: it reports configuration and vault
@@ -482,7 +497,10 @@ def run_doctor(vault_dir: Path | None = None, *, probe_embedding: bool = False) 
     report["embedding"] = embedding
     issues.extend(embedding_issues)
     if vault_dir is not None:
-        vault, vault_issues = _probe_vault(vault_dir)
+        vault, vault_issues = _probe_vault(
+            vault_dir,
+            allow_search_db_override=allow_search_db_override,
+        )
         report["vault"] = vault
         issues.extend(vault_issues)
     report["issues"] = issues

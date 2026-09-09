@@ -112,6 +112,28 @@ def vault_control_dir(vault_root: Path, *, create: bool = False) -> Path:
     return control_dir
 
 
+def vault_control_subdir(
+    vault_root: Path,
+    name: str,
+    *,
+    create: bool = False,
+) -> Path:
+    """Resolve one non-symlink child directory of the vault control root."""
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        raise ValueError("control subdirectory name is not safe")
+    control_dir = vault_control_dir(vault_root, create=create)
+    child = control_dir / name
+    if child.is_symlink():
+        raise ValueError(f"vault control subdirectory must not be a symlink: {name}")
+    if child.exists() and not child.is_dir():
+        raise NotADirectoryError(f"vault control subdirectory is not a directory: {name}")
+    if create:
+        child.mkdir(parents=False, exist_ok=True)
+        if child.is_symlink() or not child.is_dir():
+            raise ValueError(f"vault control subdirectory is not safe: {name}")
+    return child
+
+
 def resolve_vault_path(
     arguments: dict[str, Any],
     env_var: str = "POWER_VAULT_DIR",

@@ -50,6 +50,7 @@ DEFAULT_FLEET_TOPOLOGY: list[dict[str, Any]] = [
         "vault_id_type": "mounted",
     },
 ]
+_MAX_FEDERATION_NODES = 16
 
 
 def _get_fleet_topology(settings: Settings) -> list[dict[str, Any]]:
@@ -57,17 +58,40 @@ def _get_fleet_topology(settings: Settings) -> list[dict[str, Any]]:
     if settings.federation_nodes:
         try:
             parsed = json.loads(settings.federation_nodes)
-            if isinstance(parsed, list) and all(isinstance(item, dict) for item in parsed):
-                return parsed
+            if not isinstance(parsed, list) or len(parsed) > _MAX_FEDERATION_NODES:
+                raise ValueError("federation topology exceeds its node limit")
+            validated: list[dict[str, Any]] = []
+            for item in parsed:
+                if not isinstance(item, dict):
+                    raise ValueError("federation topology entries must be objects")
+                host = item.get("host", "127.0.0.1")
+                port = item.get("port", 8080)
+                if (
+                    not isinstance(host, str)
+                    or not host.strip()
+                    or len(host) > 253
+                    or any(char.isspace() for char in host)
+                    or "://" in host
+                    or not isinstance(port, int)
+                    or isinstance(port, bool)
+                    or not 1 <= port <= 65535
+                ):
+                    raise ValueError("federation topology contains an invalid host or port")
+                validated.append({**item, "host": host, "port": port})
+            return validated
         except Exception as exc:
-            logger.warning("Failed to parse POWER_WEB_FEDERATION_NODES: %s", exc)
+            logger.warning(
+                "Ignoring invalid POWER_WEB_FEDERATION_NODES configuration exception_type=%s",
+                type(exc).__name__,
+            )
     return DEFAULT_FLEET_TOPOLOGY
 
 
 async def _probe_node(node: dict[str, Any], vault_id: str, total_notes: int) -> dict[str, Any]:
     """Asynchronously probe TCP port with low timeout and measure latency."""
     host = str(node.get("host", "127.0.0.1"))
-    port = int(node.get("port", 8080))
+    raw_port = node.get("port", 8080)
+    port = raw_port if isinstance(raw_port, int) and not isinstance(raw_port, bool) else 8080
     t0 = time.perf_counter()
     status = "unreachable"
     latency_ms: float | None = None
@@ -112,9 +136,18 @@ async def federation_view(
     )
     topology = _get_fleet_topology(settings)
 
-    # Parallel asynchronous health probing across the configured fleet topology
-    nodes = await asyncio.gather(
-        *(_probe_node(n, vault_id=stats.vault_id, total_notes=stats.total_notes) for n in topology)
+    # Parallel probing remains bounded both by node count and active probes.
+    probe_limiter = asyncio.Semaphore(
+        min(_MAX_FEDERATION_NODES, settings.power_call_max_concurrency)
+    )
+
+    async def bounded_probe(node: dict[str, Any]) -> dict[str, Any]:
+        async with probe_limiter:
+            return await _probe_node(node, vault_id=stats.vault_id, total_notes=stats.total_notes)
+
+    nodes = await asyncio.wait_for(
+        asyncio.gather(*(bounded_probe(node) for node in topology)),
+        timeout=settings.power_call_timeout_seconds,
     )
 
     return templates.TemplateResponse(

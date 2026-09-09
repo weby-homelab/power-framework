@@ -192,7 +192,7 @@ def apply_maintenance_plan(
     root = Path(vault_dir).expanduser().resolve()
     if str(root) != plan.vault:
         raise ValueError("maintenance plan belongs to a different vault")
-    if not approved:
+    if type(approved) is not bool or not approved:
         raise PermissionError("maintenance apply requires explicit approved=True")
     if any(action.action_class != "safe_auto" for action in plan.actions):
         raise PermissionError("plan contains approval-required or plan-only actions")

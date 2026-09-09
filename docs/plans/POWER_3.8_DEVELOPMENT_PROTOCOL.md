@@ -395,19 +395,20 @@ Current state after the protected governance and HF merges:
 CONTROLLED DEPENDENCY REFRESH: CLOSED / FINAL INTEGRATION VERIFIED
 PR #402: CLOSED WITHOUT MERGE / DEFERRED
 PR #407: CLOSED WITHOUT MERGE / SUPERSEDED HISTORICAL EVIDENCE
-CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: PROVISIONAL PLANNING V2 / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED
-FOUNDATION HARDENING: NEXT RUNTIME GATE / NOT STARTED
+CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: CANONICAL PLANNING V2 / NOT IMPLEMENTED
+FOUNDATION HARDENING: ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / PROTECTED MERGE REQUIRED
 ACTIONS #396: CLOSED / MERGED
-PHASE 5: BLOCKED / NOT STARTED
+PHASE 5: READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
 The HF and Actions merge receipts are retained `MERGED MAIN` evidence. Their
 candidate epochs are retained `REMOTE EXACT-HEAD`/historical evidence and are
-not themselves merged-main proof. Do not start Foundation Hardening or Phase 5–9, version bumps,
-tags, releases, release images, or final release notes from this snapshot;
-Foundation Hardening requires its own bounded admission.
+not themselves merged-main proof. Do not start Phase 5A–9, version bumps, tags,
+releases, release images, or final release notes from this snapshot. Foundation
+Hardening is locally implemented here but becomes `MERGED MAIN` only after the
+protected normal merge and independent post-merge verification.
 
 ## Cross-links
 

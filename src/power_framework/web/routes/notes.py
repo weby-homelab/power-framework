@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from ..auth.csrf import validate_csrf
@@ -141,6 +141,7 @@ async def propose_note_view(
         path,
         content,
         idempotency_key=key_for("propose", path=path, content=content),
+        mutation=True,
     )
 
     return templates.TemplateResponse(
@@ -162,17 +163,20 @@ async def propose_note_view(
 async def apply_note_view(
     request: Request,
     proposal_id: str = Form(..., max_length=128),
-    approved: bool = Form(True),
+    approved: str = Form(..., max_length=5),
     client: PowerClient = Depends(get_client),
 ) -> RedirectResponse:
     """Apply an approved proposal with explicit authority and postcondition check."""
+    if approved != "true":
+        raise HTTPException(status_code=403, detail="Apply requires an explicit true approval")
     settings = get_settings(request)
     envelope = await run_power_call(
         request,
         settings,
         client.apply,
         proposal_id,
-        approved=approved,
+        approved=True,
+        mutation=True,
     )
 
     path = envelope.data.get("path", "") if isinstance(envelope.data, dict) else ""

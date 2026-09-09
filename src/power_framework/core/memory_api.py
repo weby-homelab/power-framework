@@ -26,11 +26,16 @@ from .utils import (
     iter_vault_markdown_files,
     resolve_path_in_vault,
     vault_control_dir,
+    vault_control_subdir,
 )
 from .vault_storage import existing_vault_cache_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+MAX_HISTORY_BYTES = 2_000_000
+MAX_HISTORY_LINE_BYTES = 64_000
 
 
 @dataclass(frozen=True)
@@ -79,6 +84,14 @@ def propose_change(
         }
         proposal_id = _proposal_id(payload)
         proposal_path = _proposal_path(vault_dir, proposal_id)
+        if idempotency_key is not None:
+            for existing_path in sorted(proposal_path.parent.glob("*.json")):
+                existing = _read_proposal_file(existing_path)
+                if _proposal_idempotency_key(existing) != idempotency_key:
+                    continue
+                if _proposal_payload(existing) != payload:
+                    raise ConflictError("idempotency key was already used for a different proposal")
+                return _public_proposal(existing)
         if proposal_path.exists():
             existing = _read_proposal_file(proposal_path)
             if _proposal_payload(existing) != payload:
@@ -111,6 +124,7 @@ def commit_note_change(
     log_entry: str | None = None,
     proposal_id: str | None = None,
     idempotency_key: str | None = None,
+    idempotency_fingerprint: str | None = None,
 ) -> dict[str, str]:
     """Commit one note through the shared write → verify → publish workflow."""
 
@@ -118,8 +132,17 @@ def commit_note_change(
         target = resolve_path_in_vault(vault_dir, rel_path, allowed_directories)
         if idempotency_key is not None:
             _validate_idempotency_key(idempotency_key)
+            if idempotency_fingerprint is not None and not _is_sha256(idempotency_fingerprint):
+                raise ValueError("idempotency_fingerprint must be a SHA-256 hex digest")
             prior_receipt = _find_idempotent_receipt(vault_dir, idempotency_key)
             if prior_receipt is not None:
+                if (
+                    idempotency_fingerprint is not None
+                    and prior_receipt.get("idempotency_fingerprint") == idempotency_fingerprint
+                    and prior_receipt.get("operation") == operation
+                    and prior_receipt.get("path") == rel_path
+                ):
+                    return prior_receipt
                 expected_after = hashlib.sha256(content.encode()).hexdigest()
                 if (
                     prior_receipt.get("operation") == operation
@@ -165,6 +188,8 @@ def commit_note_change(
             receipt["proposal_id"] = proposal_id
         if idempotency_key is not None:
             receipt["idempotency_key"] = idempotency_key
+        if idempotency_fingerprint is not None:
+            receipt["idempotency_fingerprint"] = idempotency_fingerprint
 
         store = TaskStore(vault_dir)
         try:
@@ -271,7 +296,7 @@ def apply_change(
     idempotency_key: str | None = None,
 ) -> dict[str, str]:
     """Apply an approved proposal through the shared mutation boundary."""
-    if not approved:
+    if type(approved) is not bool or not approved:
         raise PermissionError("proposal requires explicit approved=True")
     if not isinstance(proposal, dict):
         raise ValueError("proposal must be an object")
@@ -374,7 +399,7 @@ def _proposal_id(payload: dict[str, str]) -> str:
 
 def _proposal_path(vault_dir: Path, proposal_id: str) -> Path:
     """Return the safe durable path for a validated proposal ID."""
-    return vault_control_dir(vault_dir, create=True) / "proposals" / f"{proposal_id}.json"
+    return vault_control_subdir(vault_dir, "proposals", create=True) / f"{proposal_id}.json"
 
 
 def _read_proposal_file(path: Path) -> dict[str, object]:
@@ -543,4 +568,31 @@ def read_history(vault_dir: Path) -> list[dict[str, str]]:
         raise ValueError("memory history must not be a symlink")
     if not history.exists():
         return []
-    return [json.loads(line) for line in history.read_text(encoding="utf-8").splitlines() if line]
+    try:
+        if history.stat().st_size > MAX_HISTORY_BYTES:
+            raise RuntimeError("memory history exceeds its bounded receipt size")
+        lines = history.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise RuntimeError("memory history is unreadable") from exc
+
+    records: list[dict[str, str]] = []
+    for line in lines:
+        if not line:
+            continue
+        if len(line.encode("utf-8")) > MAX_HISTORY_LINE_BYTES:
+            raise RuntimeError("memory history contains an oversized receipt")
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("memory history contains invalid JSON") from exc
+        if not isinstance(record, dict) or any(
+            not isinstance(key, str)
+            or not isinstance(value, str)
+            or key in {"content", "body", "exception", "traceback"}
+            or len(key) > 128
+            or len(value) > MAX_HISTORY_LINE_BYTES
+            for key, value in record.items()
+        ):
+            raise RuntimeError("memory history contains non-content-free receipt data")
+        records.append(record)
+    return records

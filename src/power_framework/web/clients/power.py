@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+import uuid
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -16,27 +18,64 @@ from power_framework.core.application_models import (
     TaskDTO,
     TaskEventDTO,
 )
+from power_framework.core.principal import Principal
 from power_framework.core.searcher import search_vault
 
 
 class PowerClient:
     """Client port interacting with POWER core exclusively through ApplicationService boundary."""
 
-    def __init__(self, vault_path: Path) -> None:
+    def __init__(
+        self,
+        vault_path: Path,
+        *,
+        principal: Principal | None = None,
+        request_id: str | None = None,
+    ) -> None:
         self.vault_path = Path(vault_path).expanduser().resolve()
+        self.principal = principal or Principal.local_cli()
+        self.request_id = request_id or uuid.uuid4().hex
+        self._deadline_at: float | None = None
+        self._deadline_ms: int | None = None
         self._service = ApplicationService(
             self.vault_path,
             search_fn=partial(search_vault, allow_search_db_override=False),
         )
 
+    def bind_request_budget(self, request_id: str, timeout_seconds: float) -> None:
+        """Bind one Web request correlation ID and absolute execution budget."""
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
+        self.request_id = request_id
+        self._deadline_at = time.monotonic() + timeout_seconds
+        self._deadline_ms = max(1, int(timeout_seconds * 1000))
+
+    def _context(
+        self,
+        *,
+        actor: str,
+        authority: str = "read-only",
+        idempotency_key: str | None = None,
+    ) -> RequestContext:
+        """Create a context with server-bound principal and request metadata."""
+        return RequestContext(
+            actor=actor,
+            authority=authority,  # type: ignore[arg-type]
+            idempotency_key=idempotency_key,
+            request_id=self.request_id,
+            principal=self.principal,
+            deadline_at=self._deadline_at,
+            deadline_ms=self._deadline_ms,
+        )
+
     def discover(self, actor: str = "web") -> ApplicationEnvelope:
         """Fetch system capability manifest."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         return self._service.discover(context=ctx)
 
     def get_source_stats(self, actor: str = "web") -> SourceStatsResponse:
         """Fetch aggregated vault statistics."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.source_stats(context=ctx)
         return SourceStatsResponse.model_validate(env.data)
 
@@ -54,7 +93,7 @@ class PowerClient:
         req = SourceListRequest(
             prefix=prefix, category=category, tag=tag, limit=limit, cursor=cursor
         )
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.source_list(req, context=ctx)
         return SourceListResponse.model_validate(env.data)
 
@@ -62,7 +101,7 @@ class PowerClient:
         self, rel_path: str, max_bytes: int = 2_000_000, actor: str = "web"
     ) -> SourceReadResponse:
         """Read a note securely."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.source_read(rel_path, max_bytes=max_bytes, context=ctx)
         return SourceReadResponse.model_validate(env.data)
 
@@ -74,7 +113,7 @@ class PowerClient:
         actor: str = "web",
     ) -> GraphProjectionResponse:
         """Fetch knowledge graph projection."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.source_graph(
             max_nodes=max_nodes,
             focus_path=focus_path,
@@ -92,7 +131,7 @@ class PowerClient:
         actor: str = "web",
     ) -> ApplicationEnvelope:
         """Search the vault."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         return self._service.retrieve(query, mode=mode, max_results=max_results, context=ctx)
 
     def list_tasks(
@@ -106,7 +145,7 @@ class PowerClient:
         actor: str = "web",
     ) -> list[TaskDTO]:
         """List Task v2 items."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.task_list(
             state=state, owner=owner, assignee=assignee, limit=limit, offset=offset, context=ctx
         )
@@ -117,7 +156,7 @@ class PowerClient:
 
     def get_task(self, task_id: str, actor: str = "web") -> TaskDTO:
         """Read a single Task v2."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.task_read(task_id, context=ctx)
         return TaskDTO.model_validate(env.data)
 
@@ -137,7 +176,11 @@ class PowerClient:
         **kwargs: Any,
     ) -> TaskDTO:
         """Create a new Task v2."""
-        ctx = RequestContext(actor=actor, authority="propose", idempotency_key=idempotency_key)
+        ctx = self._context(
+            actor=actor,
+            authority="propose",
+            idempotency_key=idempotency_key,
+        )
         env = self._service.task_create(
             task_id=task_id,
             title=title,
@@ -165,7 +208,11 @@ class PowerClient:
         **kwargs: Any,
     ) -> TaskDTO:
         """Transition Task v2 state."""
-        ctx = RequestContext(actor=actor, authority="apply", idempotency_key=idempotency_key)
+        ctx = self._context(
+            actor=actor,
+            authority="apply",
+            idempotency_key=idempotency_key,
+        )
         env = self._service.task_transition(
             task_id=task_id,
             new_state=new_state,
@@ -181,7 +228,7 @@ class PowerClient:
         self, task_id: str, since_sequence: int = 0, actor: str = "web"
     ) -> list[TaskEventDTO]:
         """Fetch task event stream."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.task_events(task_id, since_sequence=since_sequence, context=ctx)
         raw_items = env.data.get("items", []) if isinstance(env.data, dict) else env.data
         if isinstance(raw_items, list):
@@ -196,25 +243,34 @@ class PowerClient:
         idempotency_key: str | None = None,
     ) -> ApplicationEnvelope:
         """Create a proposal for a note modification."""
-        ctx = RequestContext(actor=actor, authority="propose", idempotency_key=idempotency_key)
+        ctx = self._context(
+            actor=actor,
+            authority="propose",
+            idempotency_key=idempotency_key,
+        )
         return self._service.propose(rel_path, content, context=ctx)
 
     def apply(
         self,
         proposal_id: str,
-        approved: bool = True,
+        *,
+        approved: bool,
         actor: str = "web",
         idempotency_key: str | None = None,
     ) -> ApplicationEnvelope:
         """Apply a durable proposal by content-addressed ID only."""
-        ctx = RequestContext(actor=actor, authority="apply", idempotency_key=idempotency_key)
+        ctx = self._context(
+            actor=actor,
+            authority="apply",
+            idempotency_key=idempotency_key,
+        )
         if not proposal_id.strip():
             raise ValueError("proposal_id is required")
         return self._service.apply_proposal(proposal_id, approved=approved, context=ctx)
 
     def list_decisions(self, actor: str = "web") -> list[dict[str, Any]]:
         """Read canonical DecisionService projections."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.decision_list(context=ctx)
         raw = env.data.get("items", []) if isinstance(env.data, dict) else env.data
         return raw if isinstance(raw, list) else []
@@ -230,7 +286,11 @@ class PowerClient:
         idempotency_key: str | None = None,
     ) -> ApplicationEnvelope:
         """Resolve a canonical decision through ApplicationService."""
-        ctx = RequestContext(actor=actor, authority="apply", idempotency_key=idempotency_key)
+        ctx = self._context(
+            actor=actor,
+            authority="apply",
+            idempotency_key=idempotency_key,
+        )
         return self._service.decision_resolve(
             decision_id,
             action=action,
@@ -241,7 +301,7 @@ class PowerClient:
 
     def get_receipts(self, limit: int = 100, actor: str = "web") -> list[dict[str, Any]]:
         """Fetch audit receipts."""
-        ctx = RequestContext(actor=actor, authority="read-only")
+        ctx = self._context(actor=actor)
         env = self._service.receipt(limit=limit, context=ctx)
         receipts = env.data.get("receipts", [])
         if isinstance(receipts, list):

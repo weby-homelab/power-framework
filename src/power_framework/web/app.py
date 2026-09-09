@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import logging
 import threading
 import uuid
@@ -19,6 +20,7 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import pass_context
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from power_framework.core.principal import Principal
 from power_framework.core.utils import __version__
 
 if TYPE_CHECKING:
@@ -30,6 +32,7 @@ from .config import Settings, get_global_settings
 from .errors import (
     http_exception_handler,
     make_public_error_response,
+    request_id_for,
     request_validation_handler,
     unhandled_exception_handler,
 )
@@ -49,6 +52,17 @@ from .routes import (
 POWER_VERSION = __version__
 APPLICATION_SCHEMA = "power.application.v2"
 ERROR_LOGGER = logging.getLogger("power_framework.web.errors")
+
+
+def _is_loopback_bind(host: str) -> bool:
+    """Return whether a Web listener is restricted to the local machine."""
+    normalized = host.strip().strip("[]").casefold()
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
 
 
 def jinja_csrf_token(context: dict[str, Any]) -> str:
@@ -159,40 +173,72 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Authentication, Language & Theme guard middleware
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
+        if not getattr(request.state, "request_id", None):
+            request.state.request_id = uuid.uuid4().hex
         lang = get_request_lang(request)
         theme = get_request_theme(request)
         request.state.lang = lang
         request.state.theme = theme
 
         is_auth = False
-        if not app_settings.auth_enabled:
+        principal: Principal | None = None
+        request.state.session_subject = None
+        path = request.url.path
+        public_paths = {
+            "/login",
+            "/healthz",
+            "/readiness",
+            "/set-lang",
+            "/set-theme",
+        }
+        if not app_settings.auth_enabled and _is_loopback_bind(app_settings.host):
+            # This is a local-process trust rule, not anonymous remote access.
             is_auth = True
+            principal = Principal.local_cli()
+        elif not app_settings.auth_enabled:
+            if path in public_paths or path.startswith("/static/"):
+                response = await call_next(request)
+                _maybe_set_csrf_cookie(request, response, app_settings)
+                return response
+            request.state.is_authenticated = False
+            request.state.principal = None
+            return make_public_error_response(
+                request,
+                403,
+                "authentication_required",
+                "Authentication is required.",
+            )
         else:
             cookie = request.cookies.get(app_settings.session_cookie_name)
             if cookie:
                 session_mgr = SessionManager(app_settings.secret_key)
-                user_id = session_mgr.verify_session(cookie)
-                if user_id:
+                verified_session = session_mgr.verify_session_details(
+                    cookie,
+                    max_age_seconds=app_settings.session_max_age_seconds,
+                )
+                if verified_session is not None:
+                    user_id, session_expires_at = verified_session
                     is_auth = True
+                    request.state.session_subject = user_id
+                    principal = Principal.web_signed_session(
+                        user_id,
+                        expires_at=session_expires_at,
+                    )
 
         request.state.is_authenticated = is_auth
+        request.state.principal = principal
 
         if app_settings.auth_enabled:
-            path = request.url.path
             # Allow public assets, login, language switch, theme switch, and healthcheck
-            if path in {
-                "/login",
-                "/healthz",
-                "/readiness",
-                "/set-lang",
-                "/set-theme",
-            } or path.startswith("/static/"):
+            if path in public_paths or path.startswith("/static/"):
                 response = await call_next(request)
                 _maybe_set_csrf_cookie(request, response, app_settings)
                 return response
 
             if not is_auth:
-                return RedirectResponse(url="/login", status_code=303)
+                response = RedirectResponse(url="/login", status_code=303)
+                response.headers["X-Request-ID"] = request_id_for(request)
+                return response
 
         response = await call_next(request)
         _maybe_set_csrf_cookie(request, response, app_settings)
@@ -249,6 +295,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             issues.append("configured vault is missing")
         if settings.auth_enabled and not (settings.admin_password or settings.admin_password_hash):
             issues.append("authentication is enabled without credentials")
+        local_trust = _is_loopback_bind(settings.host)
+        if not settings.auth_enabled and not local_trust:
+            issues.append("auth-disabled mode requires a loopback bind")
         vault_identity = hashlib.sha256(
             str(settings.vault_path.expanduser().resolve()).encode("utf-8")
         ).hexdigest()[:16]
@@ -262,8 +311,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "exists": settings.vault_path.is_dir(),
                 "identity": vault_identity,
             },
-            "auth_configured": not settings.auth_enabled
-            or bool(settings.admin_password or settings.admin_password_hash),
+            "auth_configured": (
+                local_trust
+                if not settings.auth_enabled
+                else bool(settings.admin_password or settings.admin_password_hash)
+            ),
             "issues": issues,
         }
         return JSONResponse(payload, status_code=200 if not issues else 503)

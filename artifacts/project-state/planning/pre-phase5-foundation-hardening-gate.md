@@ -1,10 +1,10 @@
 # POWER 3.8 Pre-Phase-5 Foundation Hardening Gate
 
-> **Status:** PLANNED / NOT STARTED / NEXT RUNTIME GATE
+> **Status:** ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / PROTECTED MERGE REQUIRED
 >
 > **Publication class:** planning-only acceptance contract
 >
-> **Implementation status:** NOT IMPLEMENTED
+> **Implementation status:** IMPLEMENTED ON THE FOUNDATION CANDIDATE; MERGED-MAIN STATUS REQUIRES THE PROTECTED NORMAL MERGE
 >
 > **Scope boundary:** this gate is an integration admission before Phase 5. It
 > does not reopen or rewrite Phase 0–4 evidence and it does not implement Phase
@@ -148,8 +148,8 @@ The Foundation Hardening candidate must provide:
 ## Admission decision
 
 ```text
-FOUNDATION_HARDENING: PLANNED / NOT STARTED
-PHASE_5: BLOCKED / NOT STARTED
+FOUNDATION_HARDENING: ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / PROTECTED MERGE REQUIRED
+PHASE_5: READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED
 PHASES_0_4: CLOSED / FROZEN
-NEXT_RUNTIME_GATE: FOUNDATION HARDENING ADMISSION
+NEXT_RUNTIME_GATE: PROTECTED NORMAL MERGE AND POST-MERGE FOUNDATION VERIFICATION
 ```
