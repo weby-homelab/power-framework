@@ -549,7 +549,9 @@ access policy
         ↓
 authority policy
         ↓
-temporal validity / supersession
+temporal validity
+        ↓
+supersession
         ↓
 contradiction state
         ↓

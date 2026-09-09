@@ -311,7 +311,7 @@ silently clamped. Host-specific facts belong to deployment profiles and
 benchmark evidence, not framework invariants.
 
 For authority-sensitive `project_state`, `decision`, `task`, and `governance`
-intents, ordering is access policy → authority policy → temporal validity and
+intents, ordering is access policy → authority policy → temporal validity →
 supersession → contradiction state → semantic relevance → reranking →
 diversity/token packing. A semantically similar raw chat must not outrank a
 canonical authority record merely because its floating-point score is higher.
@@ -403,8 +403,9 @@ PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF and Actions candidate epochs and merge receipts are retained `MERGED
-MAIN` evidence. Do not start Foundation Hardening or Phase 5–9, version bumps,
+The HF and Actions merge receipts are retained `MERGED MAIN` evidence. Their
+candidate epochs are retained `REMOTE EXACT-HEAD`/historical evidence and are
+not themselves merged-main proof. Do not start Foundation Hardening or Phase 5–9, version bumps,
 tags, releases, release images, or final release notes from this snapshot;
 Foundation Hardening requires its own bounded admission.
 

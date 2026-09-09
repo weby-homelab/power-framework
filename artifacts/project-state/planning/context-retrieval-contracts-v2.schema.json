@@ -32,13 +32,7 @@
             ]
         },
         "phase_status": {
-            "enum": [
-                "blocked",
-                "not_started",
-                "implemented",
-                "validated",
-                "superseded"
-            ]
+            "enum": ["blocked", "not_started"]
         },
         "contract": {
             "enum": [
@@ -244,7 +238,7 @@
                 },
                 "expires_at": { "$ref": "#/$defs/DateTime" },
                 "audit_metadata_retained": { "const": true },
-                "policy_revision": { "$ref": "#/$defs/Identifier" },
+                "policy_revision": { "$ref": "#/$defs/OpaqueReference" },
                 "noise_disposition": {
                     "enum": [
                         "INCLUDE",
@@ -294,10 +288,11 @@
                 "payload_eligibility_proof",
                 "audit_metadata_retained",
                 "noise_never_deletes_source",
+                "reason",
                 "reason_is_secret_free"
             ],
             "properties": {
-                "receipt_id": { "$ref": "#/$defs/Identifier" },
+                "receipt_id": { "$ref": "#/$defs/OpaqueReference" },
                 "receipt_kind": { "enum": ["TOMBSTONE", "DELETION"] },
                 "source_ref": { "$ref": "#/$defs/OpaqueReference" },
                 "source_revision": { "$ref": "#/$defs/Digest" },
@@ -308,7 +303,7 @@
                 "metadata_digest": { "$ref": "#/$defs/Digest" },
                 "observed_at": { "$ref": "#/$defs/DateTime" },
                 "recorded_at": { "$ref": "#/$defs/DateTime" },
-                "policy_revision": { "$ref": "#/$defs/Identifier" },
+                "policy_revision": { "$ref": "#/$defs/OpaqueReference" },
                 "authorization_ref": { "$ref": "#/$defs/OpaqueReference" },
                 "sensitivity_class": {
                     "enum": [
@@ -327,7 +322,12 @@
                 },
                 "audit_metadata_retained": { "const": true },
                 "noise_never_deletes_source": { "const": true },
-                "reason": { "type": "string", "maxLength": 1024 },
+                "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/-]{0,255}$"
+                },
                 "reason_is_secret_free": { "const": true }
             },
             "allOf": [
@@ -343,6 +343,21 @@
                             "payload_action": { "const": "DELETED" }
                         }
                     }
+                },
+                {
+                    "if": {
+                        "required": ["receipt_kind"],
+                        "properties": {
+                            "receipt_kind": { "const": "TOMBSTONE" }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "payload_action": {
+                                "enum": ["RETAINED", "EXPIRED"]
+                            }
+                        }
+                    }
                 }
             ]
         },
@@ -355,7 +370,7 @@
                 "recorded_at": { "$ref": "#/$defs/DateTime" },
                 "valid_from": { "$ref": "#/$defs/DateTime" },
                 "valid_to": { "$ref": "#/$defs/DateTime" },
-                "correction_of": { "$ref": "#/$defs/Identifier" },
+                "correction_of": { "$ref": "#/$defs/OpaqueReference" },
                 "delayed_capture": { "type": "boolean" },
                 "correction_reason": { "type": "string", "maxLength": 1024 }
             },
@@ -384,12 +399,13 @@
                 },
                 "ordered_stages": {
                     "type": "array",
-                    "maxItems": 7,
-                    "minItems": 7,
+                    "maxItems": 8,
+                    "minItems": 8,
                     "prefixItems": [
                         { "const": "access_policy" },
                         { "const": "authority_policy" },
-                        { "const": "temporal_validity_supersession" },
+                        { "const": "temporal_validity" },
+                        { "const": "supersession" },
                         { "const": "contradiction_state" },
                         { "const": "semantic_relevance" },
                         { "const": "reranking" },
@@ -400,17 +416,17 @@
                 "authority_sensitive": { "type": "boolean" },
                 "authority_rank": {
                     "type": "array",
-                    "uniqueItems": true,
-                    "items": {
-                        "enum": [
-                            "canonical",
-                            "verified",
-                            "curated",
-                            "proposed",
-                            "raw",
-                            "unknown"
-                        ]
-                    }
+                    "minItems": 6,
+                    "maxItems": 6,
+                    "prefixItems": [
+                        { "const": "canonical" },
+                        { "const": "verified" },
+                        { "const": "curated" },
+                        { "const": "proposed" },
+                        { "const": "raw" },
+                        { "const": "unknown" }
+                    ],
+                    "items": false
                 },
                 "semantic_relevance_may_override_authority": { "const": false },
                 "supersession_precedes_relevance": { "const": true },
@@ -525,10 +541,26 @@
                         "caller_hint"
                     ]
                 },
-                "max_candidates": { "type": "integer", "minimum": 1 },
-                "max_tokens": { "type": "integer", "minimum": 1 },
-                "max_domains": { "type": "integer", "minimum": 1 },
-                "max_graph_hops": { "type": "integer", "minimum": 0 },
+                "max_candidates": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                },
+                "max_tokens": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                },
+                "max_domains": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 256
+                },
+                "max_graph_hops": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                },
                 "lower_only": { "type": "boolean" }
             }
         },
@@ -544,10 +576,26 @@
                 "numeric_default_is_hypothesis"
             ],
             "properties": {
-                "max_candidates": { "type": "integer", "minimum": 1 },
-                "max_tokens": { "type": "integer", "minimum": 1 },
-                "max_domains": { "type": "integer", "minimum": 1 },
-                "max_graph_hops": { "type": "integer", "minimum": 0 },
+                "max_candidates": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                },
+                "max_tokens": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                },
+                "max_domains": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 256
+                },
+                "max_graph_hops": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                },
                 "model_load": {
                     "enum": [
                         "forbidden",
@@ -567,7 +615,8 @@
                 "domain_policy_cap",
                 "caller_hint",
                 "effective_limit_rule",
-                "defaults_calibration"
+                "defaults_calibration",
+                "profiles"
             ],
             "properties": {
                 "structural_absolute_safety_ceiling": {
@@ -667,9 +716,21 @@
                         "strategy": {
                             "enum": ["exponential", "bounded_exponential"]
                         },
-                        "initial_delay_ms": { "type": "integer", "minimum": 0 },
-                        "multiplier": { "type": "number", "minimum": 1 },
-                        "max_delay_ms": { "type": "integer", "minimum": 0 },
+                        "initial_delay_ms": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 300000
+                        },
+                        "multiplier": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 8
+                        },
+                        "max_delay_ms": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 3600000
+                        },
                         "jitter": { "type": "boolean" }
                     }
                 },
@@ -738,7 +799,9 @@
                 "ground_truth_provenance",
                 "no_tuning_on_holdout",
                 "real_vault_ingestion",
-                "holdout_access_audit"
+                "holdout_access_audit",
+                "split_relation",
+                "no_shared_query_ids"
             ],
             "properties": {
                 "dataset_schema_version": {
@@ -788,7 +851,9 @@
                 },
                 "no_tuning_on_holdout": { "const": true },
                 "real_vault_ingestion": { "const": false },
-                "holdout_access_audit": { "$ref": "#/$defs/OpaqueReference" }
+                "holdout_access_audit": { "$ref": "#/$defs/OpaqueReference" },
+                "split_relation": { "const": "disjoint" },
+                "no_shared_query_ids": { "const": true }
             }
         }
     }

@@ -17,7 +17,9 @@
         "ground_truth_provenance",
         "no_tuning_on_holdout",
         "real_vault_ingestion",
-        "access_audit_ref"
+        "holdout_access_audit",
+        "split_relation",
+        "no_shared_query_ids"
     ],
     "properties": {
         "dataset_schema_version": {
@@ -86,7 +88,13 @@
         "real_vault_ingestion": {
             "const": false
         },
-        "access_audit_ref": {
+        "split_relation": {
+            "const": "disjoint"
+        },
+        "no_shared_query_ids": {
+            "const": true
+        },
+        "holdout_access_audit": {
             "$ref": "#/$defs/OpaqueReference"
         },
         "sealed_artifact_ref": {
