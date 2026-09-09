@@ -150,7 +150,15 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 256,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$",
+            "description": "Governance identifier; never dereference as a path, URL, URI, or shell fragment without an explicit boundary contract."
+        },
+        "OpaqueReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$",
+            "description": "Opaque identifier only; it is never a path, URL, URI, or shell fragment."
         },
         "Digest": {
             "type": "string",
@@ -203,7 +211,9 @@
                 "sensitivity_class",
                 "payload_action",
                 "audit_metadata_retained",
-                "policy_revision"
+                "policy_revision",
+                "noise_disposition",
+                "source_delete_requires_explicit_policy"
             ],
             "properties": {
                 "retention_class": {
@@ -278,12 +288,18 @@
                 "observed_at",
                 "recorded_at",
                 "policy_revision",
-                "audit_metadata_retained"
+                "authorization_ref",
+                "sensitivity_class",
+                "redaction_policy_revision",
+                "payload_eligibility_proof",
+                "audit_metadata_retained",
+                "noise_never_deletes_source",
+                "reason_is_secret_free"
             ],
             "properties": {
                 "receipt_id": { "$ref": "#/$defs/Identifier" },
                 "receipt_kind": { "enum": ["TOMBSTONE", "DELETION"] },
-                "source_ref": { "$ref": "#/$defs/Identifier" },
+                "source_ref": { "$ref": "#/$defs/OpaqueReference" },
                 "source_revision": { "$ref": "#/$defs/Digest" },
                 "payload_action": {
                     "enum": ["RETAINED", "EXPIRED", "DELETED"]
@@ -293,11 +309,42 @@
                 "observed_at": { "$ref": "#/$defs/DateTime" },
                 "recorded_at": { "$ref": "#/$defs/DateTime" },
                 "policy_revision": { "$ref": "#/$defs/Identifier" },
-                "authorization_ref": { "$ref": "#/$defs/Identifier" },
+                "authorization_ref": { "$ref": "#/$defs/OpaqueReference" },
+                "sensitivity_class": {
+                    "enum": [
+                        "PUBLIC",
+                        "INTERNAL",
+                        "SENSITIVE",
+                        "RESTRICTED",
+                        "SECRET"
+                    ]
+                },
+                "redaction_policy_revision": {
+                    "$ref": "#/$defs/OpaqueReference"
+                },
+                "payload_eligibility_proof": {
+                    "$ref": "#/$defs/OpaqueReference"
+                },
                 "audit_metadata_retained": { "const": true },
                 "noise_never_deletes_source": { "const": true },
-                "reason": { "type": "string", "maxLength": 1024 }
-            }
+                "reason": { "type": "string", "maxLength": 1024 },
+                "reason_is_secret_free": { "const": true }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "required": ["receipt_kind"],
+                        "properties": {
+                            "receipt_kind": { "const": "DELETION" }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "payload_action": { "const": "DELETED" }
+                        }
+                    }
+                }
+            ]
         },
         "BitemporalEvidence": {
             "type": "object",
@@ -321,6 +368,7 @@
                 "intent_class",
                 "ordered_stages",
                 "authority_sensitive",
+                "authority_rank",
                 "semantic_relevance_may_override_authority",
                 "score_model"
             ],
@@ -336,21 +384,18 @@
                 },
                 "ordered_stages": {
                     "type": "array",
-                    "minItems": 7,
                     "maxItems": 7,
-                    "uniqueItems": true,
-                    "items": {
-                        "enum": [
-                            "access_policy",
-                            "authority_policy",
-                            "temporal_validity",
-                            "supersession",
-                            "contradiction_state",
-                            "semantic_relevance",
-                            "reranking",
-                            "diversity_token_packing"
-                        ]
-                    }
+                    "minItems": 7,
+                    "prefixItems": [
+                        { "const": "access_policy" },
+                        { "const": "authority_policy" },
+                        { "const": "temporal_validity_supersession" },
+                        { "const": "contradiction_state" },
+                        { "const": "semantic_relevance" },
+                        { "const": "reranking" },
+                        { "const": "diversity_token_packing" }
+                    ],
+                    "items": false
                 },
                 "authority_sensitive": { "type": "boolean" },
                 "authority_rank": {
@@ -370,7 +415,28 @@
                 "semantic_relevance_may_override_authority": { "const": false },
                 "supersession_precedes_relevance": { "const": true },
                 "score_model": { "const": "separate-explainable-stages" }
-            }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "intent_class": {
+                                "enum": [
+                                    "project_state",
+                                    "decision",
+                                    "task",
+                                    "governance"
+                                ]
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "authority_sensitive": { "const": true }
+                        }
+                    }
+                }
+            ]
         },
         "ResourceProfile": {
             "type": "object",
@@ -424,7 +490,7 @@
                 "framework_invariants_excluded"
             ],
             "properties": {
-                "profile_id": { "$ref": "#/$defs/Identifier" },
+                "profile_id": { "$ref": "#/$defs/OpaqueReference" },
                 "resource_profile": {
                     "enum": [
                         "LOW_RESOURCE",
@@ -433,7 +499,7 @@
                         "CUSTOM"
                     ]
                 },
-                "deployment_profile_ref": { "$ref": "#/$defs/Identifier" },
+                "deployment_profile_ref": { "$ref": "#/$defs/OpaqueReference" },
                 "cpu_class": { "type": "string", "maxLength": 128 },
                 "memory_class": { "type": "string", "maxLength": 128 },
                 "model_capabilities": {
@@ -441,7 +507,7 @@
                     "items": { "type": "string", "maxLength": 128 },
                     "uniqueItems": true
                 },
-                "benchmark_evidence_ref": { "$ref": "#/$defs/Identifier" },
+                "benchmark_evidence_ref": { "$ref": "#/$defs/OpaqueReference" },
                 "framework_invariants_excluded": { "const": true }
             },
             "description": "Machine facts belong to deployment configuration and benchmark evidence, not framework architecture invariants."
@@ -466,6 +532,32 @@
                 "lower_only": { "type": "boolean" }
             }
         },
+        "BudgetProfile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "max_candidates",
+                "max_tokens",
+                "max_domains",
+                "max_graph_hops",
+                "model_load",
+                "numeric_default_is_hypothesis"
+            ],
+            "properties": {
+                "max_candidates": { "type": "integer", "minimum": 1 },
+                "max_tokens": { "type": "integer", "minimum": 1 },
+                "max_domains": { "type": "integer", "minimum": 1 },
+                "max_graph_hops": { "type": "integer", "minimum": 0 },
+                "model_load": {
+                    "enum": [
+                        "forbidden",
+                        "selected_domain_only",
+                        "explicit_request_or_escalation"
+                    ]
+                },
+                "numeric_default_is_hypothesis": { "const": true }
+            }
+        },
         "RetrievalBudgetPolicy": {
             "type": "object",
             "additionalProperties": false,
@@ -479,13 +571,51 @@
             ],
             "properties": {
                 "structural_absolute_safety_ceiling": {
-                    "$ref": "#/$defs/ProfileBudgetLayer"
+                    "allOf": [
+                        { "$ref": "#/$defs/ProfileBudgetLayer" },
+                        {
+                            "properties": {
+                                "source": {
+                                    "const": "structural_absolute_safety_ceiling"
+                                }
+                            }
+                        }
+                    ]
                 },
                 "resource_profile_default": {
-                    "$ref": "#/$defs/ProfileBudgetLayer"
+                    "allOf": [
+                        { "$ref": "#/$defs/ProfileBudgetLayer" },
+                        {
+                            "properties": {
+                                "source": {
+                                    "const": "resource_profile_default"
+                                }
+                            }
+                        }
+                    ]
                 },
-                "domain_policy_cap": { "$ref": "#/$defs/ProfileBudgetLayer" },
-                "caller_hint": { "$ref": "#/$defs/ProfileBudgetLayer" },
+                "domain_policy_cap": {
+                    "allOf": [
+                        { "$ref": "#/$defs/ProfileBudgetLayer" },
+                        {
+                            "properties": {
+                                "source": { "const": "domain_policy_cap" }
+                            }
+                        }
+                    ]
+                },
+                "caller_hint": {
+                    "allOf": [
+                        { "$ref": "#/$defs/ProfileBudgetLayer" },
+                        {
+                            "required": ["source", "lower_only"],
+                            "properties": {
+                                "source": { "const": "caller_hint" },
+                                "lower_only": { "const": true }
+                            }
+                        }
+                    ]
+                },
                 "effective_limit_rule": {
                     "const": "min(structural_ceiling, resource_default, domain_cap, caller_hint_when_present)"
                 },
@@ -498,9 +628,9 @@
                     "additionalProperties": false,
                     "required": ["FAST", "BALANCED", "DEEP"],
                     "properties": {
-                        "FAST": { "type": "object" },
-                        "BALANCED": { "type": "object" },
-                        "DEEP": { "type": "object" }
+                        "FAST": { "$ref": "#/$defs/BudgetProfile" },
+                        "BALANCED": { "$ref": "#/$defs/BudgetProfile" },
+                        "DEEP": { "$ref": "#/$defs/BudgetProfile" }
                     }
                 }
             }
@@ -513,7 +643,9 @@
                 "backoff",
                 "dead_letter_after_exhaustion",
                 "explicit_review_before_requeue",
-                "no_unbounded_retries"
+                "requeue_requires_revision_check",
+                "no_unbounded_retries",
+                "secret_free_error_receipt"
             ],
             "properties": {
                 "max_automatic_retries": {
@@ -548,15 +680,26 @@
                 "secret_free_error_receipt": { "const": true }
             }
         },
-        "EvaluationSplit": {
+        "DevelopmentSplit": {
             "type": "object",
             "additionalProperties": false,
             "required": ["name", "digest", "query_count", "tuning_allowed"],
             "properties": {
-                "name": { "enum": ["development", "holdout"] },
+                "name": { "const": "development" },
                 "digest": { "$ref": "#/$defs/Digest" },
                 "query_count": { "type": "integer", "minimum": 1 },
-                "tuning_allowed": { "type": "boolean" }
+                "tuning_allowed": { "const": true }
+            }
+        },
+        "HoldoutSplit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "digest", "query_count", "tuning_allowed"],
+            "properties": {
+                "name": { "const": "holdout" },
+                "digest": { "$ref": "#/$defs/Digest" },
+                "query_count": { "type": "integer", "minimum": 1 },
+                "tuning_allowed": { "const": false }
             }
         },
         "GroundTruthProvenance": {
@@ -569,7 +712,7 @@
                 "provenance_digest"
             ],
             "properties": {
-                "source_ref": { "$ref": "#/$defs/Identifier" },
+                "source_ref": { "$ref": "#/$defs/OpaqueReference" },
                 "method": {
                     "enum": [
                         "human_adjudicated",
@@ -577,7 +720,7 @@
                         "synthetic_fixture"
                     ]
                 },
-                "reviewed": { "type": "boolean" },
+                "reviewed": { "const": true },
                 "provenance_digest": { "$ref": "#/$defs/Digest" }
             }
         },
@@ -588,12 +731,14 @@
                 "dataset_schema_version",
                 "dataset_digest",
                 "query_set_digest",
+                "language_mix",
                 "required_categories",
                 "development_split",
                 "holdout_split",
                 "ground_truth_provenance",
                 "no_tuning_on_holdout",
-                "real_vault_ingestion"
+                "real_vault_ingestion",
+                "holdout_access_audit"
             ],
             "properties": {
                 "dataset_schema_version": {
@@ -601,6 +746,12 @@
                 },
                 "dataset_digest": { "$ref": "#/$defs/Digest" },
                 "query_set_digest": { "$ref": "#/$defs/Digest" },
+                "language_mix": {
+                    "type": "array",
+                    "minItems": 3,
+                    "uniqueItems": true,
+                    "items": { "enum": ["UA", "EN", "MIXED_UA_EN"] }
+                },
                 "required_categories": {
                     "type": "array",
                     "minItems": 18,
@@ -628,8 +779,8 @@
                         ]
                     }
                 },
-                "development_split": { "$ref": "#/$defs/EvaluationSplit" },
-                "holdout_split": { "$ref": "#/$defs/EvaluationSplit" },
+                "development_split": { "$ref": "#/$defs/DevelopmentSplit" },
+                "holdout_split": { "$ref": "#/$defs/HoldoutSplit" },
                 "ground_truth_provenance": {
                     "type": "array",
                     "minItems": 1,
@@ -637,7 +788,7 @@
                 },
                 "no_tuning_on_holdout": { "const": true },
                 "real_vault_ingestion": { "const": false },
-                "holdout_access_audit": { "type": "string", "maxLength": 1024 }
+                "holdout_access_audit": { "$ref": "#/$defs/OpaqueReference" }
             }
         }
     }

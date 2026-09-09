@@ -92,10 +92,17 @@ dependency update:
 4. **HF admission — complete.** PR #406 was refreshed through three candidate
    epochs, passed exact dependency/security/CI admission, and was normally
    merged. Its final merge is recorded below.
-5. **Actions admission — next gate.** PR #396 remains on hold; no Actions
-   dependency or workflow changes are authorized here.
-6. **Final integration admission — later gate.** It requires independent exact
-   evidence for every dependency surface and normal protected merges.
+5. **Actions admission — complete.** PR #396 is protected-merged; its exact
+   candidate and merge/tree relationship are retained above.
+6. **PR #402 — deferred.** The broad maintenance bundle is closed without
+   merge; future updates require bounded compatibility/security admissions.
+7. **PR #407 — superseded.** The historical pre-HF evidence PR is closed
+   without merge and retained for auditability.
+8. **Final integration admission — complete.** Current main dependency,
+   security, package, upgrade, frozen-regression, Docs, and CodeQL evidence
+   passed on the exact protected main.
+9. **Foundation Hardening — next runtime gate.** It is planned/not started and
+   must be admitted before Phase 5.
 
 The controlled refresh does not authorize a public version bump, tag, release,
 Phase 5, or any later phase.

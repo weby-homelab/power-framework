@@ -6,6 +6,7 @@
     "type": "object",
     "additionalProperties": false,
     "required": [
+        "planning_only",
         "dataset_schema_version",
         "dataset_digest",
         "query_set_digest",
@@ -15,11 +16,15 @@
         "holdout_split",
         "ground_truth_provenance",
         "no_tuning_on_holdout",
-        "real_vault_ingestion"
+        "real_vault_ingestion",
+        "access_audit_ref"
     ],
     "properties": {
         "dataset_schema_version": {
             "const": "power.retrieval-eval.v1"
+        },
+        "planning_only": {
+            "const": true
         },
         "dataset_digest": {
             "$ref": "#/$defs/Digest"
@@ -81,22 +86,25 @@
         "real_vault_ingestion": {
             "const": false
         },
-        "sealed_artifact_ref": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512,
-            "description": "Optional later reference to a separately governed sealed artifact; no corpus belongs in this planning PR."
-        },
         "access_audit_ref": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512
+            "$ref": "#/$defs/OpaqueReference"
+        },
+        "sealed_artifact_ref": {
+            "$ref": "#/$defs/OpaqueReference",
+            "description": "Optional later reference to a separately governed sealed artifact; no corpus belongs in this planning PR."
         }
     },
     "$defs": {
         "Digest": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+        },
+        "OpaqueReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$",
+            "description": "Opaque identifier only; it is never a path, URL, URI, or shell fragment."
         },
         "Split": {
             "type": "object",
@@ -149,9 +157,7 @@
             ],
             "properties": {
                 "source_ref": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 512
+                    "$ref": "#/$defs/OpaqueReference"
                 },
                 "method": {
                     "enum": [
@@ -160,9 +166,7 @@
                         "synthetic_fixture"
                     ]
                 },
-                "reviewed": {
-                    "type": "boolean"
-                },
+                "reviewed": { "const": true },
                 "provenance_digest": {
                     "$ref": "#/$defs/Digest"
                 }

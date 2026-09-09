@@ -106,7 +106,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / NOT IMPLEMENTED
+PROVISIONAL PLANNING V2 / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -143,7 +143,7 @@ CANONICAL PLANNING V2 / NOT IMPLEMENTED
 - Phase 2: **CLOSED / FROZEN**.
 - Phase 3: **CLOSED / FROZEN**.
 - Phase 4: **CLOSED / FROZEN**.
-- Context / Memory / Retrieval architecture: **CANONICAL PLANNING V2 / NOT IMPLEMENTED**.
+- Context / Memory / Retrieval architecture: **PROVISIONAL PLANNING V2 / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED**.
 - Phase 5: **BLOCKED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.

@@ -32,6 +32,38 @@ Controlled Dependency Refresh — Final Integration and Course-Correction Govern
 
 `a386858a45489eb5db213d42ffe773db9134ff88`
 
+## GOVERNANCE_PR
+
+`#413`
+
+## CANDIDATE_EPOCH_AT_HANDOFF_CREATION
+
+```text
+PR: #413
+BASE_SHA: a386858a45489eb5db213d42ffe773db9134ff88
+HEAD_SHA: d0728d28898fd590b9aaa9d9b82289ebfa553b66
+HEAD_TREE: 3d54b3d605ea102c945ffc76c6cb83b9770a3775
+HEAD_PARENT: a386858a45489eb5db213d42ffe773db9134ff88
+GPG: verified=true / reason=valid
+```
+
+The handoff is part of the candidate tree, so a later correction creates a new
+candidate epoch. `GOVERNANCE_HEAD` below intentionally resolves from the live
+PR rather than fabricating the self-referential future commit SHA.
+
+## CANDIDATE_EPOCH_REPAIR
+
+```text
+PREVIOUS_HEAD: d0728d28898fd590b9aaa9d9b82289ebfa553b66
+PREVIOUS_TREE: 3d54b3d605ea102c945ffc76c6cb83b9770a3775
+REASON: independent governance/security review tightened planning-only schema invariants and stale-state labels
+NEW_HEAD: RESOLVE_FROM_GITHUB
+```
+
+The repair does not change source/runtime/dependency/workflow scope. It creates
+a fresh exact-head evidence epoch; all prior checks remain historical evidence
+until the new head receives its own checks.
+
 ## GOVERNANCE_HEAD
 
 `RESOLVE_FROM_GITHUB`

@@ -83,9 +83,11 @@ PARENT: 119d5c39aa2c22734ca72c351f8a70790371678f
 ```
 
 The final HF #406 admitted tuple is retained in the current-state and
-post-merge handoff documents. The fresh planning snapshot anchor is
-`d8b704f6125347ff9f9c39981193807d2160b135`; it is an observation of `main` at
-planning start, not a promise about a future merge SHA.
+post-merge handoff documents. The earlier planning-start observation
+`d8b704f6125347ff9f9c39981193807d2160b135` is historical evidence only. The
+current final-integration snapshot base is
+`a386858a45489eb5db213d42ffe773db9134ff88`; it is an immutable snapshot anchor,
+not a promise about a future governance merge SHA.
 
 Any change to the PR, base, head, tree, parent, diff, or relevant policy
 invalidates the evidence for that candidate epoch. A repair, compatibility
@@ -393,7 +395,7 @@ Current state after the protected governance and HF merges:
 CONTROLLED DEPENDENCY REFRESH: CLOSED / FINAL INTEGRATION VERIFIED
 PR #402: CLOSED WITHOUT MERGE / DEFERRED
 PR #407: CLOSED WITHOUT MERGE / SUPERSEDED HISTORICAL EVIDENCE
-CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: CANONICAL PLANNING V2 / NOT IMPLEMENTED
+CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: PROVISIONAL PLANNING V2 / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED
 FOUNDATION HARDENING: NEXT RUNTIME GATE / NOT STARTED
 ACTIONS #396: CLOSED / MERGED
 PHASE 5: BLOCKED / NOT STARTED

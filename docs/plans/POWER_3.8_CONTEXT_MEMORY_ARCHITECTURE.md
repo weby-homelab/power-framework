@@ -639,8 +639,10 @@ acceptance gate.
 ## 15. ContextPack Contract
 
 Future retrieval output is a bounded `ContextPack`, not an untyped
-`list[SearchResult]`. The machine-readable planning schema is
-`artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json`.
+`list[SearchResult]`. The active machine-readable planning contract is
+`artifacts/project-state/planning/context-retrieval-contracts-v2.schema.json`.
+The v1 schema remains retained historical evidence and is not the future
+implementation contract.
 
 Minimum pack fields:
 
@@ -787,7 +789,7 @@ payload eligibility decision
         ↓
 bounded payload action
         ↓
-TombstoneReceipt / DeletionReceipt
+TombstoneReceipt (`receipt_kind=DELETION` for deletion)
         ↓
 retained, secret-free audit metadata
 ```

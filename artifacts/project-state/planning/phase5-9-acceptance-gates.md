@@ -501,7 +501,7 @@ memory, and indexing boundaries.
 
 - Lossless raw capture and declared redaction/retention receipts.
 - RetentionClass, SensitivityClass, PayloadRetentionPolicy, and bounded
-  TombstoneReceipt/DeletionReceipt tests across raw, working, durable, cache,
+  TombstoneReceipt tests (`receipt_kind=DELETION` for deletion) across raw, working, durable, cache,
   index, view, and backup copies.
 - Bitemporal `observed_at`/`recorded_at` behavior with optional
   `valid_from`/`valid_to`, delayed capture, correction, and supersession tests.
