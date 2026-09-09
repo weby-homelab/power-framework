@@ -6,10 +6,10 @@ objects, signed commits, branch protection, or authoritative phase reports.
 
 ## ACTIVE GOVERNANCE
 
-The following files form the active **post-HF next-gate and architecture
-planning projection**. The post-HF state files are canonical on `main`; the
-new architecture package is provisional on this branch and becomes canonical
-planning only after its protected merge:
+The following files form the active **post-final-integration governance and
+next-gate projection**. The snapshot is canonical on `main` only after this
+governance PR is protected-merged; mutable GitHub values always require fresh
+REST verification:
 
 - [POWER 3.8 — Current State](POWER_3.8_CURRENT_STATE.md)
 - [POWER 3.8 — Execution Roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
@@ -17,15 +17,16 @@ planning only after its protected merge:
 - [POWER 3.8 — Context / Memory / Retrieval Architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
-- [Latest architecture handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T140647Z_context-memory-architecture_planned.md)
+- [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
 
-> Governance PRs #408, #409, #410, #411, and HF PR #406 are merged on
-> protected `main`. The context/memory/retrieval package has **APPROVED
-> PLANNING DIRECTION** on this candidate branch and becomes **CANONICAL
-> PLANNING** only after its protected merge. Actions #396 is the next
-> independent gate and remains HOLD. None of these paths authorizes a release
-> or runtime implementation.
+> Controlled Dependency Refresh is **CLOSED / FINAL INTEGRATION VERIFIED**.
+> PR #402 is **DEFERRED / CLOSED WITHOUT MERGE** and PR #407 is
+> **SUPERSEDED HISTORICAL EVIDENCE / CLOSED WITHOUT MERGE**. The
+> context/memory/retrieval package is **CANONICAL PLANNING V2** only after this
+> governance package is protected-merged. Pre-Phase-5 Foundation Hardening is
+> the next runtime gate; Actions #396, Phase 5, and all later runtime work are
+> not started by this snapshot.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -41,30 +42,46 @@ To recover the current POWER 3.8 state:
    README.
 5. Read the latest append-only architecture handoff; classify the HF handoff as
    historical evidence.
-6. Fetch current GitHub `main`, merged PRs #408/#409/#410/#411/#406, and the
-   open Actions PR #396 independently through authenticated REST API.
-7. Verify every documented SHA and mutable status, including each candidate's
+6. Fetch current GitHub `main`, the closed gate dispositions, required checks,
+   reviews, rulesets, and protected-branch policy independently through the
+   authenticated REST API.
+7. Verify every documented SHA and mutable status, including any candidate's
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
-8. Treat HF #406 and post-HF governance as `MERGED MAIN` evidence. Work only on
-   the next Actions #396 admission gate in a later bounded session; do not start
-   it from this handoff.
+8. Treat this snapshot as repository governance memory and live GitHub as
+   mutable operational truth. The next bounded session audits only
+   Pre-Phase-5 Foundation Hardening; it must not start Phase 5.
 
-## ACTIVE ARCHITECTURE PLANNING
+## CURRENT PLANNING CONTRACTS
 
-The following package is the active POWER 3.8 context, memory, and retrieval
-planning direction:
+The following package is the active POWER 3.8 context, memory, retrieval, and
+evaluation planning direction:
 
 - [Human-readable architecture plan](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Planning artifacts README](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
-- [Context/retrieval contracts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json)
-- [Index cost policy](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/index-cost-policy-v1.json)
+- [Context/retrieval contracts v2](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v2.schema.json)
+- [Retrieval evaluation manifest v1](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/retrieval-eval-v1.schema.json)
+- [Pre-Phase-5 Foundation Hardening gate](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/pre-phase5-foundation-hardening-gate.md)
 - [Domain Policy v2 example](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/domain-policy-v2.example.yaml)
 - [Phase 5–9 acceptance gates](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/phase5-9-acceptance-gates.md)
 
-These files are **PLANNED**, not implemented runtime behavior. A planning
-contract is not a phase report, a release artifact, or authorization to start
-Phase 5.
+These files are **PLANNED**, not implemented runtime behavior. The v1 context
+schema and v1 index-cost policy remain retained historical/canonical planning
+evidence and are not the active future implementation contract once v2 is
+validated through the protected governance gate. No planning contract is a
+phase report, release artifact, or authorization to start Phase 5.
+
+## CONTRACT STATUS MAP
+
+| Classification | Meaning | Current examples |
+|---|---|---|
+| ACTIVE GOVERNANCE | Current repository-state projection | Current state, roadmap, protocol |
+| CURRENT PLANNING | Active future design, not runtime | Architecture plan, v2 contracts |
+| SUPERSEDED PLANNING CONTRACT | Retained v1 evidence; not future implementation authority | v1 context schema, v1 index policy |
+| HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
+| PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
+| ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Foundation Hardening |
 
 ## HISTORICAL PLAN
 
@@ -88,11 +105,11 @@ They are not a substitute for current-state projection or live GitHub truth:
 - [Phase 4 verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-4/PHASE_4_REPORT.md)
 - [Dependency refresh ledger](https://github.com/weby-homelab/power-framework/blob/main/artifacts/repository-cleanup/dependency-refresh-ledger.md)
 
-HF #406 remote checks and exact merge evidence remain attached to the PR and
-commit links in the historical HF handoff. The context/memory/retrieval files
-under `artifacts/project-state/planning/` are pre-implementation planning
-contracts, not phase evidence. The final dependency evidence is `MERGED MAIN`;
-Actions #396 remains `HOLD / NOT STARTED`.
+HF #406, Actions #396, and final-integration checks remain attached to their PR,
+commit, and handoff evidence. The context/memory/retrieval files under
+`artifacts/project-state/planning/` are pre-implementation planning contracts,
+not phase evidence. The final dependency evidence is `MERGED MAIN`; the next
+runtime gate is Foundation Hardening and Phase 5 remains `BLOCKED / NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
 
@@ -131,7 +148,7 @@ example is a publication alias for the pre-implementation package. It does not
 override or replace the three explicit namespaces above.
 
 `PLANNED != IMPLEMENTED`: a merged architecture document is canonical planning,
-not runtime completion. This canonical projection records the closed HF gate,
-the merged post-HF governance state, and the next Actions admission. It does
-not authorize Actions #396, any later phase, version bump, tag, release, or
-`POWER 3.8.0` publication.
+not runtime completion. This canonical projection records the closed
+Controlled Dependency Refresh, the v2 planning successor, and the next
+Foundation Hardening admission. It does not authorize Actions #396, Phase 5,
+any later phase, version bump, tag, release, or `POWER 3.8.0` publication.

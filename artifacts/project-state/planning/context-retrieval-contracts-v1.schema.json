@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json",
     "title": "POWER 3.8 Context and Retrieval Planning Contracts",
-    "description": "Versioned pre-implementation contracts. This schema is not consumed by the current runtime.",
+    "description": "Retained historical v1 planning evidence. SUPERSEDED FOR FUTURE IMPLEMENTATION BY context-retrieval-contracts-v2.schema.json after the protected governance admission. Field meanings are preserved and this schema is not consumed by the current runtime.",
     "type": "object",
     "additionalProperties": false,
     "required": [

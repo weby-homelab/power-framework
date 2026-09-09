@@ -1,0 +1,644 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v2.schema.json",
+    "title": "POWER 3.8 Context, Memory, and Retrieval Planning Contracts v2",
+    "description": "Planning-only v2 contracts. This schema is not consumed by the current runtime and does not authorize Phase 5 implementation.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schema_version",
+        "planning_only",
+        "implementation_status",
+        "planning_status",
+        "phase_status",
+        "contract",
+        "payload"
+    ],
+    "properties": {
+        "schema_version": {
+            "const": "power.context-retrieval-contracts.v2"
+        },
+        "planning_only": {
+            "const": true
+        },
+        "implementation_status": {
+            "const": "planned"
+        },
+        "planning_status": {
+            "enum": [
+                "approved_planning_direction",
+                "canonical_planning",
+                "superseded"
+            ]
+        },
+        "phase_status": {
+            "enum": [
+                "blocked",
+                "not_started",
+                "implemented",
+                "validated",
+                "superseded"
+            ]
+        },
+        "contract": {
+            "enum": [
+                "RetentionClass",
+                "SensitivityClass",
+                "PayloadRetentionPolicy",
+                "TombstoneReceipt",
+                "BitemporalEvidence",
+                "EvidenceOrderingPolicy",
+                "ResourceProfile",
+                "HostCapabilityProfile",
+                "RetrievalBudgetPolicy",
+                "RetryPolicy",
+                "EvaluationCorpusManifest"
+            ]
+        },
+        "payload": {
+            "oneOf": [
+                { "$ref": "#/$defs/RetentionClass" },
+                { "$ref": "#/$defs/SensitivityClass" },
+                { "$ref": "#/$defs/PayloadRetentionPolicy" },
+                { "$ref": "#/$defs/TombstoneReceipt" },
+                { "$ref": "#/$defs/BitemporalEvidence" },
+                { "$ref": "#/$defs/EvidenceOrderingPolicy" },
+                { "$ref": "#/$defs/ResourceProfile" },
+                { "$ref": "#/$defs/HostCapabilityProfile" },
+                { "$ref": "#/$defs/RetrievalBudgetPolicy" },
+                { "$ref": "#/$defs/RetryPolicy" },
+                { "$ref": "#/$defs/EvaluationCorpusManifest" }
+            ]
+        }
+    },
+    "allOf": [
+        {
+            "oneOf": [
+                {
+                    "properties": {
+                        "contract": { "const": "RetentionClass" },
+                        "payload": { "$ref": "#/$defs/RetentionClass" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "SensitivityClass" },
+                        "payload": { "$ref": "#/$defs/SensitivityClass" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "PayloadRetentionPolicy" },
+                        "payload": { "$ref": "#/$defs/PayloadRetentionPolicy" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "TombstoneReceipt" },
+                        "payload": { "$ref": "#/$defs/TombstoneReceipt" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "BitemporalEvidence" },
+                        "payload": { "$ref": "#/$defs/BitemporalEvidence" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "EvidenceOrderingPolicy" },
+                        "payload": { "$ref": "#/$defs/EvidenceOrderingPolicy" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "ResourceProfile" },
+                        "payload": { "$ref": "#/$defs/ResourceProfile" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "HostCapabilityProfile" },
+                        "payload": { "$ref": "#/$defs/HostCapabilityProfile" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "RetrievalBudgetPolicy" },
+                        "payload": { "$ref": "#/$defs/RetrievalBudgetPolicy" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "RetryPolicy" },
+                        "payload": { "$ref": "#/$defs/RetryPolicy" }
+                    }
+                },
+                {
+                    "properties": {
+                        "contract": { "const": "EvaluationCorpusManifest" },
+                        "payload": {
+                            "$ref": "#/$defs/EvaluationCorpusManifest"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "$defs": {
+        "Identifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+        },
+        "Digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "DateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Runtime must validate timezone-aware timestamps; schema format alone is not runtime validation."
+        },
+        "RetentionClass": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value"],
+            "properties": {
+                "value": {
+                    "enum": [
+                        "EPHEMERAL",
+                        "SESSION",
+                        "WORKING",
+                        "DURABLE",
+                        "AUDIT_METADATA"
+                    ]
+                },
+                "description": { "type": "string", "maxLength": 512 }
+            }
+        },
+        "SensitivityClass": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value"],
+            "properties": {
+                "value": {
+                    "enum": [
+                        "PUBLIC",
+                        "INTERNAL",
+                        "SENSITIVE",
+                        "RESTRICTED",
+                        "SECRET"
+                    ]
+                },
+                "description": { "type": "string", "maxLength": 512 }
+            }
+        },
+        "PayloadRetentionPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "retention_class",
+                "sensitivity_class",
+                "payload_action",
+                "audit_metadata_retained",
+                "policy_revision"
+            ],
+            "properties": {
+                "retention_class": {
+                    "enum": [
+                        "EPHEMERAL",
+                        "SESSION",
+                        "WORKING",
+                        "DURABLE",
+                        "AUDIT_METADATA"
+                    ]
+                },
+                "sensitivity_class": {
+                    "enum": [
+                        "PUBLIC",
+                        "INTERNAL",
+                        "SENSITIVE",
+                        "RESTRICTED",
+                        "SECRET"
+                    ]
+                },
+                "payload_action": {
+                    "enum": [
+                        "RETAIN",
+                        "EXPIRE",
+                        "DELETE_AFTER_ELIGIBILITY",
+                        "LEGAL_HOLD"
+                    ]
+                },
+                "expires_at": { "$ref": "#/$defs/DateTime" },
+                "audit_metadata_retained": { "const": true },
+                "policy_revision": { "$ref": "#/$defs/Identifier" },
+                "noise_disposition": {
+                    "enum": [
+                        "INCLUDE",
+                        "DOWNRANK",
+                        "EXCLUDE_FROM_RETRIEVAL",
+                        "QUARANTINE"
+                    ]
+                },
+                "source_delete_requires_explicit_policy": { "const": true },
+                "description": { "type": "string", "maxLength": 1024 }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "required": ["noise_disposition"],
+                        "properties": {
+                            "noise_disposition": { "const": "QUARANTINE" }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "payload_action": {
+                                "enum": ["RETAIN", "EXPIRE", "LEGAL_HOLD"]
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "TombstoneReceipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "receipt_id",
+                "receipt_kind",
+                "source_ref",
+                "source_revision",
+                "payload_action",
+                "payload_digest",
+                "metadata_digest",
+                "observed_at",
+                "recorded_at",
+                "policy_revision",
+                "audit_metadata_retained"
+            ],
+            "properties": {
+                "receipt_id": { "$ref": "#/$defs/Identifier" },
+                "receipt_kind": { "enum": ["TOMBSTONE", "DELETION"] },
+                "source_ref": { "$ref": "#/$defs/Identifier" },
+                "source_revision": { "$ref": "#/$defs/Digest" },
+                "payload_action": {
+                    "enum": ["RETAINED", "EXPIRED", "DELETED"]
+                },
+                "payload_digest": { "$ref": "#/$defs/Digest" },
+                "metadata_digest": { "$ref": "#/$defs/Digest" },
+                "observed_at": { "$ref": "#/$defs/DateTime" },
+                "recorded_at": { "$ref": "#/$defs/DateTime" },
+                "policy_revision": { "$ref": "#/$defs/Identifier" },
+                "authorization_ref": { "$ref": "#/$defs/Identifier" },
+                "audit_metadata_retained": { "const": true },
+                "noise_never_deletes_source": { "const": true },
+                "reason": { "type": "string", "maxLength": 1024 }
+            }
+        },
+        "BitemporalEvidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["observed_at", "recorded_at"],
+            "properties": {
+                "observed_at": { "$ref": "#/$defs/DateTime" },
+                "recorded_at": { "$ref": "#/$defs/DateTime" },
+                "valid_from": { "$ref": "#/$defs/DateTime" },
+                "valid_to": { "$ref": "#/$defs/DateTime" },
+                "correction_of": { "$ref": "#/$defs/Identifier" },
+                "delayed_capture": { "type": "boolean" },
+                "correction_reason": { "type": "string", "maxLength": 1024 }
+            },
+            "description": "valid_from and valid_to are optional and must be omitted when the information has no meaningful validity interval."
+        },
+        "EvidenceOrderingPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "intent_class",
+                "ordered_stages",
+                "authority_sensitive",
+                "semantic_relevance_may_override_authority",
+                "score_model"
+            ],
+            "properties": {
+                "intent_class": {
+                    "enum": [
+                        "project_state",
+                        "decision",
+                        "task",
+                        "governance",
+                        "other"
+                    ]
+                },
+                "ordered_stages": {
+                    "type": "array",
+                    "minItems": 7,
+                    "maxItems": 7,
+                    "uniqueItems": true,
+                    "items": {
+                        "enum": [
+                            "access_policy",
+                            "authority_policy",
+                            "temporal_validity",
+                            "supersession",
+                            "contradiction_state",
+                            "semantic_relevance",
+                            "reranking",
+                            "diversity_token_packing"
+                        ]
+                    }
+                },
+                "authority_sensitive": { "type": "boolean" },
+                "authority_rank": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                        "enum": [
+                            "canonical",
+                            "verified",
+                            "curated",
+                            "proposed",
+                            "raw",
+                            "unknown"
+                        ]
+                    }
+                },
+                "semantic_relevance_may_override_authority": { "const": false },
+                "supersession_precedes_relevance": { "const": true },
+                "score_model": { "const": "separate-explainable-stages" }
+            }
+        },
+        "ResourceProfile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "profile_class",
+                "calibration_status",
+                "numeric_defaults_are_hypotheses",
+                "host_specific_facts_are_not_framework_invariants"
+            ],
+            "properties": {
+                "profile_class": {
+                    "enum": [
+                        "LOW_RESOURCE",
+                        "STANDARD",
+                        "PERFORMANCE",
+                        "CUSTOM"
+                    ]
+                },
+                "calibration_status": {
+                    "const": "phase5_shadow_benchmark_required"
+                },
+                "numeric_defaults_are_hypotheses": { "const": true },
+                "host_specific_facts_are_not_framework_invariants": {
+                    "const": true
+                },
+                "default_max_workers": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                },
+                "default_memory_class": {
+                    "enum": ["LOW", "STANDARD", "HIGH", "UNKNOWN"]
+                },
+                "default_model_policy": {
+                    "enum": [
+                        "NO_MODEL_LOAD",
+                        "OPTIONAL_LOCAL",
+                        "PROFILE_SELECTED"
+                    ]
+                }
+            }
+        },
+        "HostCapabilityProfile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "profile_id",
+                "resource_profile",
+                "deployment_profile_ref",
+                "framework_invariants_excluded"
+            ],
+            "properties": {
+                "profile_id": { "$ref": "#/$defs/Identifier" },
+                "resource_profile": {
+                    "enum": [
+                        "LOW_RESOURCE",
+                        "STANDARD",
+                        "PERFORMANCE",
+                        "CUSTOM"
+                    ]
+                },
+                "deployment_profile_ref": { "$ref": "#/$defs/Identifier" },
+                "cpu_class": { "type": "string", "maxLength": 128 },
+                "memory_class": { "type": "string", "maxLength": 128 },
+                "model_capabilities": {
+                    "type": "array",
+                    "items": { "type": "string", "maxLength": 128 },
+                    "uniqueItems": true
+                },
+                "benchmark_evidence_ref": { "$ref": "#/$defs/Identifier" },
+                "framework_invariants_excluded": { "const": true }
+            },
+            "description": "Machine facts belong to deployment configuration and benchmark evidence, not framework architecture invariants."
+        },
+        "ProfileBudgetLayer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "lower_only"],
+            "properties": {
+                "source": {
+                    "enum": [
+                        "structural_absolute_safety_ceiling",
+                        "resource_profile_default",
+                        "domain_policy_cap",
+                        "caller_hint"
+                    ]
+                },
+                "max_candidates": { "type": "integer", "minimum": 1 },
+                "max_tokens": { "type": "integer", "minimum": 1 },
+                "max_domains": { "type": "integer", "minimum": 1 },
+                "max_graph_hops": { "type": "integer", "minimum": 0 },
+                "lower_only": { "type": "boolean" }
+            }
+        },
+        "RetrievalBudgetPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "structural_absolute_safety_ceiling",
+                "resource_profile_default",
+                "domain_policy_cap",
+                "caller_hint",
+                "effective_limit_rule",
+                "defaults_calibration"
+            ],
+            "properties": {
+                "structural_absolute_safety_ceiling": {
+                    "$ref": "#/$defs/ProfileBudgetLayer"
+                },
+                "resource_profile_default": {
+                    "$ref": "#/$defs/ProfileBudgetLayer"
+                },
+                "domain_policy_cap": { "$ref": "#/$defs/ProfileBudgetLayer" },
+                "caller_hint": { "$ref": "#/$defs/ProfileBudgetLayer" },
+                "effective_limit_rule": {
+                    "const": "min(structural_ceiling, resource_default, domain_cap, caller_hint_when_present)"
+                },
+                "defaults_calibration": {
+                    "const": "phase5_shadow_benchmark_required"
+                },
+                "numeric_defaults_are_not_product_constants": { "const": true },
+                "profiles": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["FAST", "BALANCED", "DEEP"],
+                    "properties": {
+                        "FAST": { "type": "object" },
+                        "BALANCED": { "type": "object" },
+                        "DEEP": { "type": "object" }
+                    }
+                }
+            }
+        },
+        "RetryPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "max_automatic_retries",
+                "backoff",
+                "dead_letter_after_exhaustion",
+                "explicit_review_before_requeue",
+                "no_unbounded_retries"
+            ],
+            "properties": {
+                "max_automatic_retries": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                },
+                "backoff": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "strategy",
+                        "initial_delay_ms",
+                        "multiplier",
+                        "max_delay_ms",
+                        "jitter"
+                    ],
+                    "properties": {
+                        "strategy": {
+                            "enum": ["exponential", "bounded_exponential"]
+                        },
+                        "initial_delay_ms": { "type": "integer", "minimum": 0 },
+                        "multiplier": { "type": "number", "minimum": 1 },
+                        "max_delay_ms": { "type": "integer", "minimum": 0 },
+                        "jitter": { "type": "boolean" }
+                    }
+                },
+                "dead_letter_after_exhaustion": { "const": true },
+                "explicit_review_before_requeue": { "const": true },
+                "requeue_requires_revision_check": { "const": true },
+                "no_unbounded_retries": { "const": true },
+                "secret_free_error_receipt": { "const": true }
+            }
+        },
+        "EvaluationSplit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "digest", "query_count", "tuning_allowed"],
+            "properties": {
+                "name": { "enum": ["development", "holdout"] },
+                "digest": { "$ref": "#/$defs/Digest" },
+                "query_count": { "type": "integer", "minimum": 1 },
+                "tuning_allowed": { "type": "boolean" }
+            }
+        },
+        "GroundTruthProvenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "source_ref",
+                "method",
+                "reviewed",
+                "provenance_digest"
+            ],
+            "properties": {
+                "source_ref": { "$ref": "#/$defs/Identifier" },
+                "method": {
+                    "enum": [
+                        "human_adjudicated",
+                        "canonical_record",
+                        "synthetic_fixture"
+                    ]
+                },
+                "reviewed": { "type": "boolean" },
+                "provenance_digest": { "$ref": "#/$defs/Digest" }
+            }
+        },
+        "EvaluationCorpusManifest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "dataset_schema_version",
+                "dataset_digest",
+                "query_set_digest",
+                "required_categories",
+                "development_split",
+                "holdout_split",
+                "ground_truth_provenance",
+                "no_tuning_on_holdout",
+                "real_vault_ingestion"
+            ],
+            "properties": {
+                "dataset_schema_version": {
+                    "const": "power.retrieval-eval.v1"
+                },
+                "dataset_digest": { "$ref": "#/$defs/Digest" },
+                "query_set_digest": { "$ref": "#/$defs/Digest" },
+                "required_categories": {
+                    "type": "array",
+                    "minItems": 18,
+                    "uniqueItems": true,
+                    "items": {
+                        "enum": [
+                            "UA",
+                            "EN",
+                            "MIXED_UA_EN",
+                            "EXACT_LOOKUP",
+                            "PROJECT_STATE",
+                            "DECISION",
+                            "TASK",
+                            "CODE",
+                            "INFRASTRUCTURE",
+                            "RESEARCH",
+                            "CROSS_DOMAIN",
+                            "HISTORICAL_STALE",
+                            "SUPERSEDED",
+                            "CONTRADICTION",
+                            "NOISE",
+                            "PROMPT_INJECTION",
+                            "HARD_NEGATIVE",
+                            "AUTHORITY_CONFLICT"
+                        ]
+                    }
+                },
+                "development_split": { "$ref": "#/$defs/EvaluationSplit" },
+                "holdout_split": { "$ref": "#/$defs/EvaluationSplit" },
+                "ground_truth_provenance": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "$ref": "#/$defs/GroundTruthProvenance" }
+                },
+                "no_tuning_on_holdout": { "const": true },
+                "real_vault_ingestion": { "const": false },
+                "holdout_access_audit": { "type": "string", "maxLength": 1024 }
+            }
+        }
+    }
+}
