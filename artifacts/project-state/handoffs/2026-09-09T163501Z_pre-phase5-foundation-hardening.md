@@ -109,6 +109,34 @@ The final documentation/handoff commit creates a new exact candidate epoch.
 Its live `HEAD`, tree, and parent are intentionally resolved from GitHub after
 publication rather than fabricated in this self-referential file.
 
+### EPOCH_2 — documentation candidate
+
+```text
+BASE: 95f8cadd7e90ef4b16773b3c45bbc9ab40569e7a
+HEAD: 9b04bbea6d42d700ae9c28534ce87277afafe2da
+TREE: 9a380020ad9b6356f69f6681d0b10aa921c832a0
+PARENTS: 77eb706a9794eb04b570c53520a5a891b96335c6
+WHY_HEAD_CHANGED: candidate state clarification and append-only handoff
+GPG: local git verify-commit GOOD / primary 2D49E810C7F2527E
+REMOTE_CI: all required contexts PASS
+```
+
+### EPOCH_3 — review remediation candidate
+
+```text
+BASE: 9b04bbea6d42d700ae9c28534ce87277afafe2da
+HEAD: 5d81a2dfb04c12b4fc18e499f198fe06823a9c07
+TREE: b911cddf3fdc9dfa92a1ca0b247305caff45e6c9
+PARENTS: 9b04bbea6d42d700ae9c28534ce87277afafe2da
+WHY_HEAD_CHANGED: bounded history replay, context propagation, truthful budget mapping, safe rename destination validation, and review regression tests
+GPG: local git verify-commit GOOD / primary 2D49E810C7F2527E
+TARGETED_TESTS_AT_EPOCH: 233 passed
+REMOTE_CI: pending until this epoch is published
+```
+
+The final documentation update below creates another exact candidate epoch;
+all remote approval evidence must attach to that later exact head.
+
 ## FILES CHANGED
 
 ```text
@@ -148,7 +176,7 @@ AUTO_MERGE: NO
 ## CANDIDATE / MERGE POINTERS
 
 ```text
-FOUNDATION_PR: RESOLVE_FROM_GITHUB
+FOUNDATION_PR: #414
 FINAL_CANDIDATE_HEAD: RESOLVE_FROM_GITHUB
 FINAL_CANDIDATE_TREE: RESOLVE_FROM_GITHUB
 FINAL_CANDIDATE_PARENTS: RESOLVE_FROM_GITHUB
