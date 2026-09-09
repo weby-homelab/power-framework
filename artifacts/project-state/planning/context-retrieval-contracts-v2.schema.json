@@ -689,6 +689,8 @@
             "additionalProperties": false,
             "required": [
                 "max_automatic_retries",
+                "max_total_requeues",
+                "max_manual_requeues",
                 "backoff",
                 "dead_letter_after_exhaustion",
                 "explicit_review_before_requeue",
@@ -698,6 +700,16 @@
             ],
             "properties": {
                 "max_automatic_retries": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                },
+                "max_total_requeues": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
+                },
+                "max_manual_requeues": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 3
@@ -801,7 +813,10 @@
                 "real_vault_ingestion",
                 "holdout_access_audit",
                 "split_relation",
-                "no_shared_query_ids"
+                "no_shared_query_ids",
+                "sealed_artifact_ref",
+                "disjointness_proof_ref",
+                "disjointness_proof_digest"
             ],
             "properties": {
                 "dataset_schema_version": {
@@ -852,6 +867,9 @@
                 "no_tuning_on_holdout": { "const": true },
                 "real_vault_ingestion": { "const": false },
                 "holdout_access_audit": { "$ref": "#/$defs/OpaqueReference" },
+                "sealed_artifact_ref": { "$ref": "#/$defs/OpaqueReference" },
+                "disjointness_proof_ref": { "$ref": "#/$defs/OpaqueReference" },
+                "disjointness_proof_digest": { "$ref": "#/$defs/Digest" },
                 "split_relation": { "const": "disjoint" },
                 "no_shared_query_ids": { "const": true }
             }

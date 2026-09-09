@@ -25,8 +25,8 @@ REST verification:
 > **SUPERSEDED HISTORICAL EVIDENCE / CLOSED WITHOUT MERGE**. The
 > context/memory/retrieval package is **CANONICAL PLANNING V2** only after this
 > governance package is protected-merged. Pre-Phase-5 Foundation Hardening is
-> the next runtime gate; Actions #396, Phase 5, and all later runtime work are
-> not started by this snapshot.
+> the next runtime gate; Actions #396 is already closed/merged, while Phase 5
+> and all later runtime work are not started by this snapshot.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.

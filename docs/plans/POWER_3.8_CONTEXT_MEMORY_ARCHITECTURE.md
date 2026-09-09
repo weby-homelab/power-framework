@@ -1029,11 +1029,12 @@ retry policy is exhausted it enters `dead_letter` and requires explicit review
 before requeue.
 
 The retry policy is deliberately small and bounded: automatic retries use
-exponential/backoff where applicable, dead-letter after exhaustion, and require
-explicit review plus a source-revision check before requeue. High retry counts
-are not safe defaults and retry storms are a gate failure. Phase 5 may prove a
-minimum dirty-set/index-validity substrate; persistent `IndexWorkQueue` is the
-primary Phase 6 owner unless a Phase 5 benchmark and ADR prove earlier need.
+exponential/backoff where applicable, total requeues and manual requeues have
+separate finite caps, dead-letter follows exhaustion, and explicit review plus
+a source-revision check is required before requeue. High retry counts are not
+safe defaults and retry storms are a gate failure. Phase 5 may prove a minimum
+dirty-set/index-validity substrate; persistent `IndexWorkQueue` is the primary
+Phase 6 owner unless a Phase 5 benchmark and ADR prove earlier need.
 
 ## 23. HOT / WARM / COLD
 

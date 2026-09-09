@@ -19,7 +19,10 @@
         "real_vault_ingestion",
         "holdout_access_audit",
         "split_relation",
-        "no_shared_query_ids"
+        "no_shared_query_ids",
+        "sealed_artifact_ref",
+        "disjointness_proof_ref",
+        "disjointness_proof_digest"
     ],
     "properties": {
         "dataset_schema_version": {
@@ -99,7 +102,13 @@
         },
         "sealed_artifact_ref": {
             "$ref": "#/$defs/OpaqueReference",
-            "description": "Optional later reference to a separately governed sealed artifact; no corpus belongs in this planning PR."
+            "description": "Reference to a separately governed sealed artifact; no corpus belongs in this planning PR."
+        },
+        "disjointness_proof_ref": {
+            "$ref": "#/$defs/OpaqueReference"
+        },
+        "disjointness_proof_digest": {
+            "$ref": "#/$defs/Digest"
         }
     },
     "$defs": {
