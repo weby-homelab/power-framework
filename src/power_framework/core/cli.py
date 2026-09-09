@@ -746,7 +746,7 @@ def _cmd_rename(args: argparse.Namespace) -> int:
 
     try:
         old_file = resolve_path_in_vault(vault_dir, old_rel)
-        new_file = resolve_path_in_vault(vault_dir, new_rel)
+        new_file = resolve_path_in_vault(vault_dir, new_rel, allow_missing_parent=True)
     except ValueError as exc:
         logger.error("Invalid rename path: %s", exc)
         return 1

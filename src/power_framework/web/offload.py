@@ -82,14 +82,13 @@ async def run_power_call[R](
 
 async def _join_worker[R](worker: asyncio.Task[R]) -> R:
     """Observe a worker to completion without abandoning a mutation."""
-    while not worker.done():
+    while True:
         try:
-            await asyncio.sleep(0.01)
+            return await asyncio.shield(worker)
         except asyncio.CancelledError:
             # Keep the mutation joined; the cancellation is re-raised by the
             # caller after the worker's outcome is known.
             continue
-    return worker.result()
 
 
 def _consume_worker_result[R](worker: asyncio.Task[R]) -> None:

@@ -21,10 +21,13 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from power_framework.core import __version__
 from power_framework.core.capabilities import manifest
+from power_framework.core.mutation import run_blocking
 from power_framework.core.parser import validate_metadata
 from power_framework.mcp import power_server
 from power_framework.mcp.contract import canonical_tool_catalog
 from power_framework.mcp.power_server import (
+    _MCP_REQUEST_ID,
+    _mcp_context,
     _safe_mcp_error_text,
     apply_memory_change,
     archive_notes,
@@ -396,6 +399,17 @@ async def test_mcp_call_carries_bounded_request_correlation(sample_vault: Path) 
     request_id = result.meta.get("power.request_id")
     assert isinstance(request_id, str)
     assert re.fullmatch(r"[a-f0-9]{32}", request_id)
+
+
+async def test_mcp_request_correlation_survives_blocking_offload() -> None:
+    """The worker receives the outer MCP request ID instead of minting another one."""
+    token = _MCP_REQUEST_ID.set("mcp-correlated-request")
+    try:
+        observed = await run_blocking(lambda: _mcp_context().request_id)
+    finally:
+        _MCP_REQUEST_ID.reset(token)
+
+    assert observed == "mcp-correlated-request"
 
 
 async def test_mcp_write_tools_require_explicit_approval(sample_vault: Path) -> None:

@@ -209,3 +209,35 @@ def test_cli_rename_rejects_paths_outside_vault(tmp_path: Path, unsafe_target: s
     assert exc.value.code == 1
     assert source.read_text(encoding="utf-8") == "source"
     assert outside.read_text(encoding="utf-8") == "sentinel"
+
+
+def test_cli_rename_allows_a_valid_missing_destination_parent(tmp_path: Path) -> None:
+    """A contained rename may create its validated destination directory."""
+    projects = tmp_path / "01_Projects"
+    projects.mkdir()
+    source = projects / "source.md"
+    source.write_text("source", encoding="utf-8")
+    destination = tmp_path / "02_Areas" / "nested" / "destination.md"
+
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "power",
+                "rename",
+                str(tmp_path),
+                "--old",
+                "01_Projects/source.md",
+                "--new",
+                "02_Areas/nested/destination.md",
+                "--no-dry-run",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 0
+    assert destination.read_text(encoding="utf-8") == "source"
+    assert not source.exists()

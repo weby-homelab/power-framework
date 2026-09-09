@@ -195,13 +195,16 @@ def resolve_path_in_vault(
     vault_root: Path,
     untrusted_relative_path: str,
     allowed_directories: tuple[str, ...] | None = None,
+    *,
+    allow_missing_parent: bool = False,
 ) -> Path:
     """Resolve a Markdown file path without allowing it to escape a vault root.
 
     The supplied path is intentionally treated as untrusted input: absolute and
     Windows-drive paths, traversal components, control characters, backslashes,
     non-Markdown targets, and symlink escapes are rejected.  The parent must
-    already exist so callers do not create an attacker-selected directory tree.
+    already exist unless a caller explicitly validates a new destination parent;
+    existing ancestors remain required to be inside the vault and non-symlinked.
     """
     root = validate_vault_path(str(vault_root))
     raw_path = str(untrusted_relative_path)
@@ -226,8 +229,22 @@ def resolve_path_in_vault(
 
     candidate = root.joinpath(*path_parts)
     try:
-        parent = candidate.parent.resolve(strict=True)
-        parent.relative_to(root)
+        if allow_missing_parent:
+            existing_parent = candidate.parent
+            while not existing_parent.exists() and existing_parent != root:
+                existing_parent = existing_parent.parent
+            parent = candidate.parent.resolve(strict=False)
+            parent.relative_to(root)
+            current = candidate.parent
+            while current != existing_parent:
+                if current.is_symlink():
+                    raise ValueError("Target parent must not contain a symlink")
+                current = current.parent
+            if existing_parent.is_symlink():
+                raise ValueError("Target parent must not contain a symlink")
+        else:
+            parent = candidate.parent.resolve(strict=True)
+            parent.relative_to(root)
     except (FileNotFoundError, ValueError) as exc:
         raise ValueError("Target parent is outside the vault or does not exist") from exc
 

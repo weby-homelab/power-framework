@@ -95,6 +95,7 @@ def synthesize_session_ingest(
                 "tags": tags,
                 "related": related,
                 "owner": owner,
+                "timestamp": timestamp.isoformat() if timestamp is not None else None,
             },
             ensure_ascii=False,
             sort_keys=True,

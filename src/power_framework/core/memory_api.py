@@ -521,23 +521,11 @@ def _append_receipt(history: Path, receipt: dict[str, str]) -> None:
 
 def _find_idempotent_receipt(vault_dir: Path, idempotency_key: str) -> dict[str, str] | None:
     """Find one prior receipt without treating malformed history as success."""
-    history = vault_control_dir(vault_dir) / "memory-history.jsonl"
-    if history.is_symlink():
-        raise RuntimeError("memory history is a symlink; refusing idempotent replay")
-    if not history.exists():
-        return None
     try:
-        lines = history.read_text(encoding="utf-8").splitlines()
-        records = [json.loads(line) for line in lines if line]
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        records = read_history(vault_dir)
+    except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
         raise RuntimeError("memory history is unreadable; refusing idempotent replay") from exc
     for record in records:
-        if not isinstance(record, dict):
-            raise RuntimeError("memory history contains an invalid receipt")
-        if not all(
-            isinstance(key, str) and isinstance(value, str) for key, value in record.items()
-        ):
-            raise RuntimeError("memory history contains a non-content-free receipt")
         if record.get("idempotency_key") != idempotency_key:
             continue
         return record

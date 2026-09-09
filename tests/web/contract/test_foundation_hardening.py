@@ -14,6 +14,7 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
+from power_framework.core.application import CompletedAfterBudgetError, DeadlineExceededError
 from power_framework.core.principal import Principal
 from power_framework.web.app import create_app
 from power_framework.web.clients.power import PowerClient
@@ -21,6 +22,7 @@ from power_framework.web.config import Settings
 from power_framework.web.errors import (
     PowerCallCompletedAfterCancellationError,
     PowerCallCompletedAfterDeadlineError,
+    public_error_details,
 )
 from power_framework.web.offload import run_power_call
 
@@ -182,9 +184,21 @@ def test_federation_config_rejects_unbounded_or_url_like_nodes(web_vault: Path) 
         federation_nodes=json.dumps(too_many),
     )
     assert _get_fleet_topology(settings) == DEFAULT_FLEET_TOPOLOGY
-
     settings.federation_nodes = json.dumps([{"host": "http://127.0.0.1", "port": 8080}])
     assert _get_fleet_topology(settings) == DEFAULT_FLEET_TOPOLOGY
+
+
+def test_web_error_mapping_preserves_execution_outcome_categories() -> None:
+    """Web public errors distinguish pre-start, late-budget, and late-cancel outcomes."""
+    assert public_error_details(DeadlineExceededError("before operation started"))[0] == (
+        "rejected_before_start"
+    )
+    assert public_error_details(CompletedAfterBudgetError("budget"))[0] == (
+        "completed_after_budget"
+    )
+    assert public_error_details(PowerCallCompletedAfterCancellationError())[0] == (
+        "completed_after_cancellation"
+    )
 
 
 @pytest.mark.asyncio

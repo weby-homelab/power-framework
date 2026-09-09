@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from power_framework.core.application import (
+    CompletedAfterBudgetError,
     CompletedAfterDeadlineError,
     DeadlineExceededError,
     ResultBudgetExceededError,
@@ -106,6 +107,12 @@ def _exception_mapping(exc: BaseException) -> tuple[int, str, str]:
                 "The POWER operation was rejected before it started.",
             )
         return 408, "deadline_exceeded", "The POWER operation exceeded its deadline."
+    if isinstance(exc, CompletedAfterBudgetError):
+        return (
+            413,
+            "completed_after_budget",
+            "The POWER operation completed beyond its response budget.",
+        )
     if isinstance(exc, ResultBudgetExceededError):
         return 413, "result_budget_exceeded", "The POWER result exceeded its response budget."
     if isinstance(exc, (PowerCallTimeoutError, TimeoutError)):
@@ -153,6 +160,12 @@ def _http_mapping(exc: StarletteHTTPException) -> tuple[int, str, str]:
         return 408, "deadline_exceeded", "The POWER operation exceeded its deadline."
     if status_code == 413 and exc.detail == "result_budget_exceeded":
         return 413, "result_budget_exceeded", "The POWER result exceeded its response budget."
+    if status_code == 413 and exc.detail == "completed_after_budget":
+        return (
+            413,
+            "completed_after_budget",
+            "The POWER operation completed beyond its response budget.",
+        )
     known = {
         400: ("invalid_request", "The request is invalid."),
         401: ("authentication_required", "Authentication is required."),

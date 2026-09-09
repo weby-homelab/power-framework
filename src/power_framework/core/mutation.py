@@ -13,6 +13,7 @@ import contextlib
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import Context, copy_context
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -125,7 +126,8 @@ async def run_blocking[T](sync_fn: Callable[[], T], *, mutation: bool = False) -
             raise
 
     try:
-        future = _blocking_executor.submit(_run_with_blocking_slot, sync_fn)
+        caller_context = copy_context()
+        future = _blocking_executor.submit(_run_with_blocking_slot, caller_context, sync_fn)
     except Exception:
         _blocking_slots.release()
         raise
@@ -148,10 +150,10 @@ async def run_blocking[T](sync_fn: Callable[[], T], *, mutation: bool = False) -
     return result
 
 
-def _run_with_blocking_slot[T](sync_fn: Callable[[], T]) -> T:
+def _run_with_blocking_slot[T](caller_context: Context, sync_fn: Callable[[], T]) -> T:
     """Run one admitted callback and release its global worker slot."""
     try:
-        return sync_fn()
+        return caller_context.run(sync_fn)
     finally:
         _blocking_slots.release()
 
