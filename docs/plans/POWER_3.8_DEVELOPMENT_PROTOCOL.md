@@ -83,9 +83,11 @@ PARENT: 119d5c39aa2c22734ca72c351f8a70790371678f
 ```
 
 The final HF #406 admitted tuple is retained in the current-state and
-post-merge handoff documents. The fresh planning snapshot anchor is
-`d8b704f6125347ff9f9c39981193807d2160b135`; it is an observation of `main` at
-planning start, not a promise about a future merge SHA.
+post-merge handoff documents. The earlier planning-start observation
+`d8b704f6125347ff9f9c39981193807d2160b135` is historical evidence only. The
+current final-integration snapshot base is
+`a386858a45489eb5db213d42ffe773db9134ff88`; it is an immutable snapshot anchor,
+not a promise about a future governance merge SHA.
 
 Any change to the PR, base, head, tree, parent, diff, or relevant policy
 invalidates the evidence for that candidate epoch. A repair, compatibility
@@ -104,12 +106,13 @@ workflow condition.
 One bounded chat handles one major gate. Do not automatically chain:
 
 ```text
-HF → Actions #396 → Final Integration → Phase 5
+Foundation Hardening → Phase 5A–5H → Phase 6 → Phase 7 → Phase 8 → Phase 9
 ```
 
-The HF #406 admission is closed. The current next gate is Actions #396, but it
-must remain untouched until a later independent session starts from fresh
-repository state and explicitly revalidates its policy.
+The Controlled Dependency Refresh, including Actions #396 and final
+integration, is closed in the current governance snapshot. The next bounded
+runtime gate is Foundation Hardening; it must be independently revalidated from
+fresh live state and must not be silently chained into Phase 5.
 
 ## GitHub publication policy
 
@@ -165,20 +168,41 @@ that policy conflict as a blocker and do not bypass or weaken protection.
 
 ## Governance publication boundary
 
-The governance publication has two bounded stages:
+Repository governance is a canonical snapshot memory; live GitHub is mutable
+operational truth. At a meaningful gate boundary, the publication sequence is:
 
-1. A pre-HF governance snapshot may be created from live `main`, reviewed, and
-   normally merged before HF. It records HF as open/blocked and does not start
-   Actions #396 or Phase 5.
-2. After HF is normally merged, prove the HF head is an ancestor of `main`, run
-   post-HF regression/dependency/CI/docs/CodeQL/security gates, and publish a
-   new governance update. Only the protected merge makes the snapshot
-   canonical; a PR or unsigned REST Contents commit remains provisional.
+```text
+read governance snapshot
+        ↓
+read latest append-only handoff
+        ↓
+fetch live main and policy through REST
+        ↓
+verify snapshot ancestry and exact gate evidence
+        ↓
+publish one consolidated governance reconciliation
+```
 
-The retained `docs/power-3.8-premerge-state-publication` PR is historical
-provisional evidence/source material. The post-HF state is now canonical through
-PR #411 and merge `d8b704f`. A future planning branch is a separate candidate
-gate and must not be confused with that merged state.
+The current reconciliation records the closed Controlled Dependency Refresh,
+the deferred/closed #402 bundle, the superseded/closed #407 historical PR, and
+the next Foundation Hardening gate. Only the protected normal merge makes this
+snapshot canonical; an open PR or unsigned REST Contents commit remains
+provisional. Historical handoffs and evidence branches are retained and never
+rewritten to look current.
+
+## Governance churn rule
+
+Do not create a governance PR after every implementation commit. Publish
+repository-state reconciliation only at a meaningful gate boundary or when
+stale state would materially mislead the next agent. The default model is:
+
+```text
+bounded implementation PR
+        +
+PR closure receipt
+        +
+consolidated governance update at a major boundary
+```
 
 ## GPG and commit integrity
 
@@ -277,11 +301,20 @@ Cheap retrieval precedes expensive retrieval. A query must not trigger a
 global reindex. The normal source-edit path must not require global
 re-embedding.
 
-The effective bounded value is
-`min(schema_maximum, profile_cap, domain_limit)`; caller hints may only lower
-that value. Profile flags and model-load policy are server-selected. An
+The effective bounded value is layered as structural absolute safety ceiling →
+`ResourceProfile` default → domain policy cap → caller-lower-only hint. The
+caller may only lower a server-selected cap. FAST/BALANCED/DEEP numeric
+defaults are planning hypotheses and must be calibrated in the Phase 5 shadow
+benchmark. Profile flags and model-load policy are server-selected. An
 incompatible stage/flag combination is rejected or explicitly escalated, never
-silently clamped.
+silently clamped. Host-specific facts belong to deployment profiles and
+benchmark evidence, not framework invariants.
+
+For authority-sensitive `project_state`, `decision`, `task`, and `governance`
+intents, ordering is access policy → authority policy → temporal validity →
+supersession → contradiction state → semantic relevance → reranking →
+diversity/token packing. A semantically similar raw chat must not outrank a
+canonical authority record merely because its floating-point score is higher.
 
 ### Noise and capture
 
@@ -289,6 +322,13 @@ Noise actions are only `INCLUDE`, `DOWNRANK`, `EXCLUDE_FROM_RETRIEVAL`, or
 `QUARANTINE`; there is no `DELETE_SOURCE` action. Raw capture is append-only,
 privacy-bounded, idempotent, restart-safe, and backpressured. Do not promote or
 embed every agent message automatically.
+
+Retention class and sensitivity class are separate from trust/lifecycle. An
+append-only audit/tombstone receipt is not indefinite payload retention. A
+retention action may expire eligible payload while retaining bounded,
+secret-free evidence. Noise classification alone never deletes source. Where
+applicable, delayed capture distinguishes `observed_at` and `recorded_at`, while
+`valid_from`/`valid_to` remain optional.
 
 ### Model authority and repair
 
@@ -310,13 +350,15 @@ approval proof decision.
 ### Dense cost and external vector policy
 
 Track global model/chunker/schema identity separately from per-source/per-chunk
-validity. Use a bounded `IndexWorkQueue`, HOT/WARM/COLD priorities, and an
-`IndexCostEstimate` before expensive work. Full dense rebuild is reserved for
+validity. Phase 5 proves only the minimum dirty-set/index-validity substrate,
+HOT/WARM/COLD priorities, and an `IndexCostEstimate` before expensive work.
+Persistent `IndexWorkQueue` is the primary Phase 6 owner unless a Phase 5
+benchmark and ADR prove earlier need. Full dense rebuild is reserved for
 model/dimension/chunker/schema change, explicit migration, or proven corruption.
 
 Qdrant, Milvus, or another vector database is not mandatory. Any future ANN or
 external backend requires scope/index benchmarks, a separate ADR, supply-chain
-review, and explicit approval.
+admission, operational cost proof, and explicit approval.
 
 ### Shadow requirement
 
@@ -350,19 +392,22 @@ Maximum retry discipline:
 Current state after the protected governance and HF merges:
 
 ```text
-HF ADMISSION: CLOSED / PR #406 MERGED
-CANONICAL GOVERNANCE: YES / PR #408, #409, #410, #411 MERGED
-CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: APPROVED PLANNING DIRECTION / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED
-ACTIONS #396: HOLD / NOT STARTED
+CONTROLLED DEPENDENCY REFRESH: CLOSED / FINAL INTEGRATION VERIFIED
+PR #402: CLOSED WITHOUT MERGE / DEFERRED
+PR #407: CLOSED WITHOUT MERGE / SUPERSEDED HISTORICAL EVIDENCE
+CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: PROVISIONAL PLANNING V2 / CANONICAL AFTER PROTECTED MERGE / NOT IMPLEMENTED
+FOUNDATION HARDENING: NEXT RUNTIME GATE / NOT STARTED
+ACTIONS #396: CLOSED / MERGED
 PHASE 5: BLOCKED / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF candidate epochs and merge receipt are now retained `MERGED MAIN`
-evidence. Actions #396 is the next bounded gate but remains HOLD / NOT STARTED;
-do not start it, Phase 5–9, version bumps, tags, releases, release images, or
-final release notes from this handoff.
+The HF and Actions merge receipts are retained `MERGED MAIN` evidence. Their
+candidate epochs are retained `REMOTE EXACT-HEAD`/historical evidence and are
+not themselves merged-main proof. Do not start Foundation Hardening or Phase 5–9, version bumps,
+tags, releases, release images, or final release notes from this snapshot;
+Foundation Hardening requires its own bounded admission.
 
 ## Cross-links
 
@@ -372,5 +417,5 @@ final release notes from this handoff.
 - [Context / memory / retrieval architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest architecture handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T140647Z_context-memory-architecture_planned.md)
+- [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

@@ -1,0 +1,193 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/retrieval-eval-v1.schema.json",
+    "title": "POWER 3.8 Retrieval Evaluation Corpus Manifest",
+    "description": "Planning-only manifest contract. It defines evaluation integrity and does not contain or ingest a real vault corpus.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "planning_only",
+        "dataset_schema_version",
+        "dataset_digest",
+        "query_set_digest",
+        "language_mix",
+        "required_categories",
+        "development_split",
+        "holdout_split",
+        "ground_truth_provenance",
+        "no_tuning_on_holdout",
+        "real_vault_ingestion",
+        "holdout_access_audit",
+        "split_relation",
+        "no_shared_query_ids",
+        "sealed_artifact_ref",
+        "disjointness_proof_ref",
+        "disjointness_proof_digest"
+    ],
+    "properties": {
+        "dataset_schema_version": {
+            "const": "power.retrieval-eval.v1"
+        },
+        "planning_only": {
+            "const": true
+        },
+        "dataset_digest": {
+            "$ref": "#/$defs/Digest"
+        },
+        "query_set_digest": {
+            "$ref": "#/$defs/Digest"
+        },
+        "language_mix": {
+            "type": "array",
+            "minItems": 3,
+            "uniqueItems": true,
+            "items": {
+                "enum": ["UA", "EN", "MIXED_UA_EN"]
+            }
+        },
+        "required_categories": {
+            "type": "array",
+            "minItems": 18,
+            "uniqueItems": true,
+            "items": {
+                "enum": [
+                    "EXACT_LOOKUP",
+                    "PROJECT_STATE",
+                    "DECISION",
+                    "TASK",
+                    "CODE",
+                    "INFRASTRUCTURE",
+                    "RESEARCH",
+                    "CROSS_DOMAIN",
+                    "HISTORICAL_STALE",
+                    "SUPERSEDED",
+                    "CONTRADICTION",
+                    "NOISE",
+                    "PROMPT_INJECTION",
+                    "HARD_NEGATIVE",
+                    "AUTHORITY_CONFLICT",
+                    "UA",
+                    "EN",
+                    "MIXED_UA_EN"
+                ]
+            }
+        },
+        "development_split": {
+            "$ref": "#/$defs/Split"
+        },
+        "holdout_split": {
+            "$ref": "#/$defs/HoldoutSplit"
+        },
+        "ground_truth_provenance": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "$ref": "#/$defs/Provenance"
+            }
+        },
+        "no_tuning_on_holdout": {
+            "const": true
+        },
+        "real_vault_ingestion": {
+            "const": false
+        },
+        "split_relation": {
+            "const": "disjoint"
+        },
+        "no_shared_query_ids": {
+            "const": true
+        },
+        "holdout_access_audit": {
+            "$ref": "#/$defs/OpaqueReference"
+        },
+        "sealed_artifact_ref": {
+            "$ref": "#/$defs/OpaqueReference",
+            "description": "Reference to a separately governed sealed artifact; no corpus belongs in this planning PR."
+        },
+        "disjointness_proof_ref": {
+            "$ref": "#/$defs/OpaqueReference"
+        },
+        "disjointness_proof_digest": {
+            "$ref": "#/$defs/Digest"
+        }
+    },
+    "$defs": {
+        "Digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "OpaqueReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$",
+            "description": "Opaque identifier only; it is never a path, URL, URI, or shell fragment."
+        },
+        "Split": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "digest", "query_count", "tuning_allowed"],
+            "properties": {
+                "name": {
+                    "const": "development"
+                },
+                "digest": {
+                    "$ref": "#/$defs/Digest"
+                },
+                "query_count": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "tuning_allowed": {
+                    "const": true
+                }
+            }
+        },
+        "HoldoutSplit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "digest", "query_count", "tuning_allowed"],
+            "properties": {
+                "name": {
+                    "const": "holdout"
+                },
+                "digest": {
+                    "$ref": "#/$defs/Digest"
+                },
+                "query_count": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "tuning_allowed": {
+                    "const": false
+                }
+            }
+        },
+        "Provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "source_ref",
+                "method",
+                "reviewed",
+                "provenance_digest"
+            ],
+            "properties": {
+                "source_ref": {
+                    "$ref": "#/$defs/OpaqueReference"
+                },
+                "method": {
+                    "enum": [
+                        "human_adjudicated",
+                        "canonical_record",
+                        "synthetic_fixture"
+                    ]
+                },
+                "reviewed": { "const": true },
+                "provenance_digest": {
+                    "$ref": "#/$defs/Digest"
+                }
+            }
+        }
+    }
+}

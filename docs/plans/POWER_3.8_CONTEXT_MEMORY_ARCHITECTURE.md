@@ -15,10 +15,10 @@ not a Phase 5 implementation report. It records what already exists, what must
 be reused, what must be built later, which phase owns each capability, and the
 evidence required before a phase can advance.
 
-The plan starts from the freshly observed protected `main` SHA
-`d8b704f6125347ff9f9c39981193807d2160b135` on 2026-09-08. Mutable GitHub
-state, PR status, branch policy, and check results must be revalidated by every
-future agent before action.
+The plan records a governance snapshot based on protected `main` SHA
+`a386858a45489eb5db213d42ffe773db9134ff88` observed during the final
+integration gate on 2026-09-09. Mutable GitHub state, PR status, branch policy,
+and check results must be revalidated by every future agent before action.
 
 ## 1. Executive Summary
 
@@ -44,9 +44,34 @@ The architecture has four non-negotiable properties:
    not source existence. Raw evidence is append-only, privacy-bounded, and
    recoverable according to an explicit retention policy.
 
-The immediate gate remains the independent Actions #396 Supply-Chain
-Admission. This plan does not start that gate, Phase 5, capture, migration, a
-release, or a public version change.
+The Controlled Dependency Refresh is closed at final integration. The next
+runtime gate is Pre-Phase-5 Foundation Hardening; it is planned and not
+started. This plan does not start Foundation Hardening, Actions #396, Phase 5,
+capture, migration, a release, or a public version change.
+
+## 1A. Course-correction reconciliation
+
+This section is a planning contract, not runtime evidence. The corrections are
+explicit so a future agent cannot infer implementation from the architecture
+diagram:
+
+| Correction | Previous planning risk | Current planning rule | Implemented? |
+|---|---|---|---|
+| Retention | Audit metadata could be confused with indefinite payload retention | `RetentionClass`, `SensitivityClass`, `PayloadRetentionPolicy`, and bounded tombstone/deletion receipts separate payload action from append-only audit evidence | PLANNING ONLY |
+| Time | One timestamp could conflate delayed capture and validity | Keep `observed_at` and `recorded_at` distinct; add optional `valid_from`/`valid_to` only when meaningful | PLANNING ONLY |
+| Evidence ordering | Semantic similarity could outrank canonical authority | Apply access, authority, temporal/supersession, contradiction, relevance, reranking, then diversity/token packing as explainable stages | PLANNING ONLY |
+| Resources | PRXMX-01 or another host could become a framework invariant | Use abstract `ResourceProfile`/`HostCapabilityProfile`; machine facts belong to deployment and benchmark evidence | PLANNING ONLY |
+| Budgets | FAST/BALANCED/DEEP numbers could become eternal constants | Use structural ceilings, resource defaults, domain caps, and caller-lower-only hints; calibrate in Phase 5 shadow | PLANNING ONLY |
+| Retries | High retry counts could create retry storms | Use a small bounded retry budget, exponential/backoff, dead-letter, and explicit review before requeue | PLANNING ONLY |
+| Evaluation | Tuning and holdout integrity were underspecified | Freeze a versioned manifest with category coverage, digests, provenance, development/holdout splits, and no holdout tuning | PLANNING ONLY |
+| Queue ownership | A diagram could make a persistent queue a Phase 5 prerequisite | Phase 5 proves only the minimum dirty-set/index-validity substrate; Phase 6 owns persistent `IndexWorkQueue` unless an ADR proves earlier need | PLANNING ONLY |
+| Broker | A façade could be built for its own sake | Context Broker is optional and requires multiple real consumers demonstrating orchestration value beyond existing compiler/service/views | PLANNING ONLY |
+
+The machine-readable v2 contract is
+`artifacts/project-state/planning/context-retrieval-contracts-v2.schema.json`.
+The evaluation manifest contract is
+`artifacts/project-state/planning/retrieval-eval-v1.schema.json`. Both are
+planning-only and not consumed by the current runtime.
 
 ## 2. Scope / Non-Scope
 
@@ -108,7 +133,7 @@ different.
 | Raw evidence | `src/power_framework/core/project_ingestion.py` | IMPLEMENTED for selected privacy modes | Reuse redaction, local permissions, idempotency, TTL, and path containment | Define append-only capture event storage, backpressure, session identity, and retention policy |
 | Materialized source projection | `src/power_framework/core/source_projection.py`, `project_ingestion.py` | IMPLEMENTED as derived projection | Reuse rebuildable source metadata/links and generation identity | Add broker-owned view contracts without a parallel source of truth |
 | MCP surfaces | `src/power_framework/mcp/power_server.py` | IMPLEMENTED for existing search/memory/maintenance surfaces | Extend through `ApplicationService` and a small number of typed tools | Add context/explainability/index-cost read surfaces only after Phase 5 contracts |
-| Vector database / ANN | No mandatory component in the current tree | NOT REQUIRED | Benchmark existing SQLite/scope/dirty-set path first | A future `VectorIndexBackend` requires a separate ADR and benchmark evidence |
+| Vector database / ANN | No mandatory component in the current tree | NOT REQUIRED | Benchmark existing SQLite/scope/dirty-set path first | A future `VectorIndexBackend` requires benchmark, ADR, supply-chain admission, and operational-cost proof |
 
 Important source-name clarification: the Phase 3 contract describes the
 **Project Semantic Compiler** role, while the current Python class is named
@@ -122,11 +147,11 @@ These are planning inputs, not authorization to fix source code in this gate.
 
 ### P0 — blockers to a safe future implementation
 
-1. **No versioned Phase 5 context contract exists yet.** Without explicit
-   fields for authority, trust, provenance, budget, and digest, a retrieved
-   excerpt can be mistaken for canonical state.
-2. **The current gate is not Phase 5.** Actions #396 remains the next
-   independent execution gate and Phase 5 implementation remains
+1. **The v2 runtime contract is not implemented yet.** The planning v2 schema
+   now names authority, retention, bitemporal, resource, retry, budget, and
+   evaluation boundaries; runtime validation remains a future Phase 5A task.
+2. **The current gate is not Phase 5.** Pre-Phase-5 Foundation Hardening is the
+   next runtime admission and Phase 5 implementation remains
    `BLOCKED / NOT STARTED`.
 3. **Authority must remain separate from integrity.** Canonical ledger
    membership, model extraction, caller approval, and retrieved evidence cannot
@@ -484,20 +509,63 @@ Every request resolves to one of three planning profiles.
 
 Budgets are caps, not suggestions. They bound candidate count, reranker pool,
 tokens, graph hops, domains, raw fallback, and index work. `DEEP` is not a
-silent default.
+silent default. Numeric FAST/BALANCED/DEEP defaults are planning hypotheses,
+not eternal product constants.
 
 The effective profile is selected and enforced at the server/application
-boundary. For every bounded dimension, the effective limit is
-`min(schema_maximum, profile_cap, domain_limit)`; caller hints may only request
-a lower value and may never raise a cap. Profile flags override caller hints and
-domain-policy requests. A domain stage that is not allowed by the effective
-profile must be rejected or represented as explicit escalation, never silently
-clamped or run anyway.
+boundary through four separate layers:
+
+```text
+structural absolute safety ceiling
+        ↓
+ResourceProfile calibrated default
+        ↓
+domain policy cap
+        ↓
+caller hint (lower-only)
+```
+
+For every bounded dimension, the effective limit is the minimum of the
+applicable layers. Caller hints may only lower a cap and may never raise it.
+Profile flags override caller hints and domain-policy requests. A domain stage
+that is not allowed by the effective profile must be rejected or represented as
+explicit escalation, never silently clamped or run anyway. FAST/BALANCED/DEEP
+defaults must be calibrated in the Phase 5 shadow benchmark for the declared
+resource profile.
 
 Each effective `RetrievalBudget` carries its ordered allowed stages, model-load
 policy, candidate/token/domain/hop caps, and dense/rerank/graph/raw flags. The
 structural contract and the cost policy are admission guards; they are not
 caller-controlled permission to exceed the server-selected profile.
+
+## 12A. Evidence ordering and authority-sensitive retrieval
+
+For `project_state`, `decision`, `task`, and `governance` intents, retrieval
+must not collapse authority and semantic relevance into one opaque score. The
+planning order is:
+
+```text
+access policy
+        ↓
+authority policy
+        ↓
+temporal validity
+        ↓
+supersession
+        ↓
+contradiction state
+        ↓
+semantic relevance
+        ↓
+reranking
+        ↓
+diversity / token packing
+```
+
+Canonical authority may therefore outrank a more semantically similar raw chat.
+Each stage must remain explainable in the future `ContextPack`; cosine, RRF, or
+reranker scores cannot erase an authority or supersession decision. The v2
+`EvidenceOrderingPolicy` remains planning-only.
 
 ## 13. Retrieval Escalation
 
@@ -573,8 +641,10 @@ acceptance gate.
 ## 15. ContextPack Contract
 
 Future retrieval output is a bounded `ContextPack`, not an untyped
-`list[SearchResult]`. The machine-readable planning schema is
-`artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json`.
+`list[SearchResult]`. The active machine-readable planning contract is
+`artifacts/project-state/planning/context-retrieval-contracts-v2.schema.json`.
+The v1 schema remains retained historical evidence and is not the future
+implementation contract.
 
 Minimum pack fields:
 
@@ -708,6 +778,44 @@ IndexWorkQueue
 Capture must be lossless with respect to the declared privacy/retention
 contract. Redaction and retention are policy transformations with evidence;
 they are not permission to silently drop source events.
+
+### Retention, sensitivity, and deletion evidence
+
+Retention is not one indefinite payload switch. Future planning uses separate
+`RetentionClass`, `SensitivityClass`, and `PayloadRetentionPolicy` values. An
+append-only audit metadata record may remain after an eligible payload expires
+or is deleted; audit metadata retention is not indefinite payload retention.
+
+```text
+payload eligibility decision
+        ↓
+bounded payload action
+        ↓
+TombstoneReceipt (`receipt_kind=DELETION` for deletion)
+        ↓
+retained, secret-free audit metadata
+```
+
+Noise classification alone never authorizes source deletion. Any deletion or
+expiry must use an explicit policy revision, preserve a bounded digest-bound
+receipt, and respect sensitivity/authorization controls.
+
+### Bitemporal evidence
+
+Applicable evidence distinguishes:
+
+```text
+observed_at  — when the fact was observed
+recorded_at  — when POWER recorded it
+valid_from   — optional beginning of a meaningful validity interval
+valid_to     — optional end of a meaningful validity interval
+```
+
+`valid_from`/`valid_to` are omitted when a fact has no meaningful validity
+interval. Delayed capture and correction use the observation/recording pair and
+an explicit correction/supersession reference; they must not overwrite the
+original observation as if it had been recorded on time. The v2 bitemporal
+contract is planning-only and does not add fields to current runtime models.
 
 Promotion path:
 
@@ -920,6 +1028,14 @@ or receipt exposes it. A failed item must carry a bounded error; after the
 retry policy is exhausted it enters `dead_letter` and requires explicit review
 before requeue.
 
+The retry policy is deliberately small and bounded: automatic retries use
+exponential/backoff where applicable, total requeues and manual requeues have
+separate finite caps, dead-letter follows exhaustion, and explicit review plus
+a source-revision check is required before requeue. High retry counts are not
+safe defaults and retry storms are a gate failure. Phase 5 may prove a minimum
+dirty-set/index-validity substrate; persistent `IndexWorkQueue` is the primary
+Phase 6 owner unless a Phase 5 benchmark and ADR prove earlier need.
+
 ## 23. HOT / WARM / COLD
 
 | Tier | Content | Dense policy |
@@ -1030,33 +1146,52 @@ and must not trigger unplanned global indexing.
 
 ## 26. Phase 5 Work Breakdown
 
-Phase number remains unchanged. The refined title is:
+Phase number remains unchanged. The refined read-first order is:
 
 ```text
-Phase 5 — Retrieval Planner, ContextPack Compiler & MCP
+Pre-Phase-5 Foundation Hardening
+        ↓
+Phase 5A — Runtime contracts v2 + frozen evaluation corpus
+        ↓
+Phase 5B — Deterministic multi-domain router
+        ↓
+Phase 5C — Search scope pushdown
+        ↓
+Phase 5D — RetrievalPlanner + ContextPack read-only vertical slice
+        ↓
+Phase 5E — Shadow benchmark / legacy comparison
+        ↓
+Phase 5F — Incremental dense validity / dirty-set behavior
+        ↓
+Phase 5G — Small MCP read/explainability surfaces
+        ↓
+Phase 5H — Phase closure / default decision
 ```
 
-Phase 5 is currently `BLOCKED / NOT STARTED`; all gates below are
-`NOT IMPLEMENTED`.
+Phase 5 is currently `BLOCKED / NOT STARTED`; every item below is
+`PLANNED / NOT IMPLEMENTED`.
 
 | Gate | Planned scope | Required evidence before advancing |
 |---|---|---|
-| 5A — Retrieval / Context Contracts | Implement only the approved typed contracts, validation, versioning, and deterministic digest rules | Contract/schema tests, closed enums, bounded numbers, no source/mutation changes |
-| 5B — Domain Policy v2 + Multi-domain Router | Backward-compatible policy evolution, `DomainMatch[]`, traversal stages, authority/noise/index policy | v1 compatibility, routing benchmark, explainable reasons, no domain/trust conflation |
-| 5C — Search Scope Pushdown | Pass `SearchScope` into FTS, TF, dense, graph, temporal, and source selection | Scope enters candidate generation; domain recall and cost evidence; post-filter-only implementation fails |
-| 5D — Incremental Dense Index v2 + IndexWorkQueue | Per-source/per-chunk validity, dirty sets, queue persistence, migration triggers, low-RAM policy | One ordinary edit avoids vault-wide re-embedding; crash/restart, exact coverage, model migration evidence |
-| 5E — Noise Policy + Hierarchical RetrievalPlanner | Cheap/semantic/unsafe noise assessment and FAST→BALANCED→DEEP escalation | Non-destructive evidence retention, bounded escalation, injection/quarantine tests, cost metrics |
-| 5F — ContextPackCompiler | Read-only assembly of existing evidence with provenance, authority, freshness, contradictions, noise, and token budget | Determinism, bounded bytes/tokens, no writes, source revision/digest, direct/MCP parity |
-| 5G — MCP context/explainability surfaces | Small typed surfaces: `compile_context`, `explain_context`, `retrieval_plan`, `index_status`, `index_cost` | ApplicationService boundary, read-only annotations, auth/path checks, no new network plane, tool-count discipline |
-| 5H — Shadow validation and Phase 5 closure | Legacy/new comparison, acceptance report, rollback/default decision | Shadow PASS, quality non-regression, resource bounds, remote CI, signed closure evidence |
+| Foundation | Explicit mutation authority, principal/session semantics, retrieval boundary, failure receipts, and actual deadline/budget behavior | `pre-phase5-foundation-hardening-gate.md`, source-bound security tests, PSE/Task/Decision/crash regression, protected admission |
+| 5A — Runtime contracts v2 + frozen evaluation corpus | Typed v2 retention, bitemporal, ordering, resource, budget, retry, and evaluation boundaries | v2 schema tests, v1 compatibility evidence, digests/provenance, development/holdout isolation, no source/mutation changes outside the bounded runtime PR |
+| 5B — Deterministic multi-domain router | Backward-compatible policy evolution, `DomainMatch[]`, traversal stages, authority/noise/index policy | v1 compatibility, routing benchmark, explainable reasons, deterministic tie handling, no domain/trust conflation |
+| 5C — Search scope pushdown | Pass `SearchScope` into FTS, TF, dense, graph, temporal, archive, and quarantine selection | Scope enters candidate generation; privileged override tests; recall/cost evidence; post-filter-only implementation fails |
+| 5D — RetrievalPlanner + ContextPack | Read-only authority-aware planner, noise gate, bounded escalation, provenance, redaction, and pack assembly | Determinism, authority-vs-relevance, bounded bytes/tokens, no writes, archive/quarantine policy, direct/MCP parity |
+| 5E — Shadow benchmark / legacy comparison | Run the planner in shadow while legacy retrieval remains served | Frozen development/holdout corpus, no holdout tuning, quality/resource/authority non-regression, rollback receipt |
+| 5F — Incremental dense validity / dirty-set behavior | Per-source/per-chunk validity and minimum dirty-set substrate; persistent queue only with evidence/ADR | Ordinary edit avoids vault-wide re-embedding; crash/restart, exact coverage, model migration, low-RAM evidence |
+| 5G — Small MCP read/explainability surfaces | `compile_context`, `explain_context`, `retrieval_plan`, `index_status`, and `index_cost` or a reviewed bounded combination | ApplicationService boundary, read-only annotations, auth/path checks, no new network plane, tool-count discipline |
+| 5H — Phase closure / default decision | Acceptance report, rollback/default decision, and signed closure | Shadow PASS, holdout integrity, quality non-regression, resource bounds, remote CI, signed closure evidence |
 
-Dependencies: the controlled dependency refresh must be fully admitted before
-Phase 5 starts. No 5A–5H gate authorizes Actions #396, capture, migration, a
-release, or a version bump by itself.
+The Controlled Dependency Refresh is already closed at final integration in the
+current governance snapshot. No Foundation or 5A–5H gate authorizes Actions
+#396, capture, migration, a release, or a version bump by itself.
 
 ## 27. Phase 6 Work Breakdown
 
-Phase 6 is `NOT STARTED` and is not authorized by this plan.
+Phase 6 is **Agent Capture & Integrations**, `NOT STARTED`, and is not
+authorized by this plan. It is the primary owner for persistent continuous
+capture/index work, including `IndexWorkQueue`.
 
 Target sequence:
 
@@ -1081,16 +1216,22 @@ IndexWorkQueue
 ```
 
 Required architecture: backpressure, bounded queues, idempotent session
-identity, adapter isolation, restart recovery, privacy/redaction, retention,
-and no automatic canonical promotion. Capture adapters must call existing
-project ingestion and governed memory boundaries rather than inventing a second
-event store.
+identity, adapter isolation, restart recovery, privacy/redaction, retention and
+sensitivity classes, bitemporal metadata, `MemoryDisposition`, promotion
+proposal, and no automatic canonical promotion. Capture adapters must call
+existing project ingestion and governed memory boundaries rather than inventing
+a second event store. Every message is not canonical memory and every message
+is not an embedding.
 
 ## 28. Phase 7 Work Breakdown
 
-Phase 7 is `NOT STARTED`.
+Phase 7 is `NOT STARTED`. A Context Broker façade is optional, not a mandatory
+implementation milestone.
 
-The target is a read-oriented **Context Broker** over existing authorities:
+The optional target is a read-oriented **Context Broker** over existing
+authorities, created only if multiple real consumers demonstrate orchestration
+value beyond `ContextPackCompiler`, `ApplicationService`, and materialized
+views:
 
 ```text
 Context Broker
@@ -1293,11 +1434,14 @@ label it as provisional.
 - [Development protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [Planning index](README.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
-- [Latest architecture handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T140647Z_context-memory-architecture_planned.md)
+- [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 
 ### Machine-readable planning contracts
 
-- [Context/retrieval contracts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json)
+- [Context/retrieval contracts v2](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v2.schema.json)
+- [Retrieval evaluation manifest v1](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/retrieval-eval-v1.schema.json)
+- [Pre-Phase-5 Foundation Hardening gate](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/pre-phase5-foundation-hardening-gate.md)
+- [Retained v1 context contract](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v1.schema.json)
 - [Index cost policy](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/index-cost-policy-v1.json)
 - [Domain Policy v2 example](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/domain-policy-v2.example.yaml)
 - [Phase 5–9 acceptance gates](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/phase5-9-acceptance-gates.md)

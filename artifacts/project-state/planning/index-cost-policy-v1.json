@@ -2,10 +2,10 @@
     "schema_version": "power.index-cost-policy.v1",
     "status": "planned",
     "implementation_status": "planned",
-    "planning_status": "approved_planning_direction",
+    "planning_status": "superseded",
     "phase_status": "not_started",
     "planning_only": true,
-    "note": "Profiles and limits are planning defaults. Phase 5 and later benchmark gates must validate or revise them before runtime consumption.",
+    "note": "Retained historical v1 planning evidence. SUPERSEDED FOR FUTURE IMPLEMENTATION BY context-retrieval-contracts-v2.schema.json after the protected governance admission. Profiles and limits remain planning defaults and are not runtime consumption evidence.",
     "precedence": {
         "order": [
             "structural_contract_maximums",

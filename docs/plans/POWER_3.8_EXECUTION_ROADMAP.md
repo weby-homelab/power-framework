@@ -27,21 +27,26 @@ Phase 4
 CLOSED / FROZEN
         ↓
 Controlled Dependency Refresh
-        ├── Pre-HF governance snapshot — CLOSED / PR #408 MERGED
-        ├── Python admission — DONE
-        ├── WEB-01 / WEB-05 — DONE
-        ├── CI admission repair PR #410 — CLOSED / MERGED
-        ├── HF admission PR #406 — CLOSED / MERGED
-        ├── Actions admission PR #396 — NEXT ACTIVE GATE / HOLD / NOT STARTED
-        └── Final integration admission — BLOCKED BY ACTIONS ADMISSION
-         ↓
-Phase 5 — Retrieval Planner, ContextPack Compiler & MCP
+         ├── Pre-HF governance snapshot — CLOSED / PR #408 MERGED
+         ├── Python admission — DONE
+         ├── WEB-01 / WEB-05 — DONE
+         ├── CI admission repair PR #410 — CLOSED / MERGED
+         ├── HF admission PR #406 — CLOSED / MERGED
+         ├── Actions admission PR #396 — CLOSED / MERGED
+         ├── PR #402 — DEFERRED / CLOSED WITHOUT MERGE
+         ├── PR #407 — SUPERSEDED / CLOSED WITHOUT MERGE
+         └── Final integration admission — CLOSED / VERIFIED
+          ↓
+Pre-Phase-5 Foundation Hardening
+PLANNED / NOT STARTED / NEXT RUNTIME GATE
+          ↓
+Phase 5A–5H — Retrieval contracts, router, scope, planner, shadow, dense validity, MCP, closure
 BLOCKED / NOT STARTED
          ↓
 Phase 6 — Agent Capture & Integrations
 NOT STARTED
          ↓
-Phase 7 — Context Broker, Materialized Views & Web
+Phase 7 — Optional Context Broker, Materialized Views & Web
 NOT STARTED
         ↓
 Phase 8 — Security / Reliability / Performance
@@ -65,8 +70,11 @@ NO-GO
 | Pre-HF governance snapshot | CLOSED | PR #408 protected merge is on `main` |
 | CI admission repair | CLOSED | PR #410 protected merge is on `main` |
 | HF refresh | CLOSED | PR #406 protected merge and post-merge checks are on `main` |
-| Actions #396 | NEXT ACTIVE IMPLEMENTATION GATE / HOLD / NOT STARTED | Do not inspect or modify in this gate |
-| Final integration | BLOCKED BY ACTIONS ADMISSION / FINAL INTEGRATION DEPENDENCY | Requires the Actions admission and separate exact evidence |
+| Actions #396 | CLOSED | Exact candidate and protected merge are preserved as immutable evidence |
+| PR #402 | DEFERRED / CLOSED WITHOUT MERGE | Broad unsafe maintenance bundle; future updates require bounded split admissions |
+| PR #407 | SUPERSEDED / CLOSED WITHOUT MERGE | Historical pre-HF evidence retained for auditability |
+| Final integration | CLOSED / FINAL INTEGRATION VERIFIED | Current main dependency graph, security, package, upgrade, frozen regression, Docs, and CodeQL evidence passed |
+| Foundation Hardening | PLANNED / NOT STARTED / NEXT RUNTIME GATE | F1–F5 authority, principal, retrieval boundary, receipt, and deadline contract |
 | Phase 5 | BLOCKED / NOT STARTED | No implementation authorized |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
@@ -84,10 +92,17 @@ dependency update:
 4. **HF admission — complete.** PR #406 was refreshed through three candidate
    epochs, passed exact dependency/security/CI admission, and was normally
    merged. Its final merge is recorded below.
-5. **Actions admission — next gate.** PR #396 remains on hold; no Actions
-   dependency or workflow changes are authorized here.
-6. **Final integration admission — later gate.** It requires independent exact
-   evidence for every dependency surface and normal protected merges.
+5. **Actions admission — complete.** PR #396 is protected-merged; its exact
+   candidate and merge/tree relationship are retained above.
+6. **PR #402 — deferred.** The broad maintenance bundle is closed without
+   merge; future updates require bounded compatibility/security admissions.
+7. **PR #407 — superseded.** The historical pre-HF evidence PR is closed
+   without merge and retained for auditability.
+8. **Final integration admission — complete.** Current main dependency,
+   security, package, upgrade, frozen-regression, Docs, and CodeQL evidence
+   passed on the exact protected main.
+9. **Foundation Hardening — next runtime gate.** It is planned/not started and
+   must be admitted before Phase 5.
 
 The controlled refresh does not authorize a public version bump, tag, release,
 Phase 5, or any later phase.
@@ -154,22 +169,24 @@ This is a new candidate audit epoch, not a workflow stop condition.
 ## Phase 5–9 boundaries
 
 Phase 5 may eventually cover retrieval planning, ContextPacks, governed context
-assembly, and MCP context/explainability surfaces. It begins only after the
-full controlled dependency refresh is admitted and separately authorized.
+assembly, and MCP context/explainability surfaces. It begins only after
+Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
+Controlled Dependency Refresh is already closed in this snapshot.
 
 ### Phase 5 internal gates
 
-All of the following remain `NOT IMPLEMENTED` until Phase 5 is authorized:
+All of the following remain `PLANNED / NOT IMPLEMENTED` until Foundation
+Hardening and Phase 5 are authorized:
 
 ```text
-5A — Retrieval / Context Contracts
-5B — Domain Policy v2 + Multi-domain Router
-5C — Search Scope Pushdown
-5D — Incremental Dense Index v2 + IndexWorkQueue
-5E — Noise Policy + Hierarchical Retrieval Planner
-5F — ContextPackCompiler
-5G — MCP context/explainability surfaces
-5H — Shadow-mode validation and Phase 5 closure
+5A — Runtime contracts v2 + frozen evaluation corpus
+5B — Deterministic multi-domain router
+5C — Search scope pushdown
+5D — RetrievalPlanner + ContextPack read-only vertical slice
+5E — Shadow benchmark / legacy comparison
+5F — Incremental dense validity / dirty-set behavior
+5G — Small MCP read/explainability surfaces
+5H — Phase closure / default decision
 ```
 
 The phase title is intentionally **Retrieval Planner, ContextPack Compiler &
@@ -177,24 +194,36 @@ MCP**. The existing Phase 3 Project Semantic Compiler remains the candidate
 and proposal producer; it is not a context assembler. No generic
 `SemanticCompiler` or `ContextCompiler` parallel subsystem is authorized.
 
+### Pre-Phase-5 Foundation Hardening
+
+The next runtime gate is the explicit F1–F5 contract at
+`artifacts/project-state/planning/pre-phase5-foundation-hardening-gate.md`.
+It must close implicit mutation authority, principal/session semantics,
+retrieval boundary overrides, bounded secret-free failure receipts, and actual
+deadline/cancellation/budget behavior. It is an integration admission before
+Phase 5, not a reopening of Phase 0–4.
+
 ### Phase 6 architecture scope
 
 Phase 6 is **Agent Capture & Integrations** and remains `NOT STARTED`. Its
 planned order is adapter → append-only raw event → session segmentation →
 cheap noise gate → ProjectSemanticCompiler → domain membership →
-`MemoryDisposition` → `IndexWorkQueue`. Backpressure, idempotency, restart
-recovery, privacy, adapter isolation, and non-destructive retention are
-prerequisites. Automatic canonical promotion and automatic embedding of every
-message are anti-goals.
+`MemoryDisposition` → persistent `IndexWorkQueue`. Backpressure, idempotency,
+restart recovery, session identity, privacy/sensitivity, retention/bitemporal
+metadata, adapter isolation, and non-destructive retention are prerequisites.
+Automatic canonical promotion and automatic embedding of every message are
+anti-goals.
 
 ### Phase 7 architecture scope
 
-Phase 7 is **Context Broker, Materialized Views & Web** and remains
-`NOT STARTED`. It will expose rebuildable current-project, issue, decision,
-task, change, hot-knowledge, session, domain, contradiction, and repair views
-over existing PSE, TaskService, DecisionService, memory, source, and index
-boundaries. It must not create a second source of truth or silently retain the
-legacy `.power/tasks` / `.power/work-packets` ambiguity.
+Phase 7 is **Optional Context Broker, Materialized Views & Web** and remains
+`NOT STARTED`. A broker façade is created only if multiple real consumers show
+orchestration value beyond `ContextPackCompiler`, `ApplicationService`, and
+materialized views. Rebuildable current-project, issue, decision, task, change,
+hot-knowledge, session, domain, contradiction, and repair views use existing
+PSE, TaskService, DecisionService, memory, source, and index boundaries. The
+phase must not create a second source of truth or silently retain the legacy
+`.power/tasks` / `.power/work-packets` ambiguity.
 
 ### Phase 8 architecture scope
 
@@ -249,9 +278,9 @@ Stop only when a human-only approval/permission is objectively required after
 the reviewer/request path is exhausted, a secret is lawfully unavailable, a
 security remediation remains impossible after three meaningful cycles, or a
 history/data-loss risk is demonstrated. Do not use admin bypass, protection
-disablement, fake approval, or force merge. A later agent must not start
- Actions #396 or Phase 5 before the controlled dependency refresh and final
- integration gates are closed.
+disablement, fake approval, or force merge. A later agent must independently
+admit Foundation Hardening before starting Phase 5 and must not treat this
+planning snapshot as runtime implementation evidence.
 
 ## Cross-links
 
@@ -261,5 +290,5 @@ disablement, fake approval, or force merge. A later agent must not start
 - [Context / memory / retrieval architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Latest architecture handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T140647Z_context-memory-architecture_planned.md)
+- [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
