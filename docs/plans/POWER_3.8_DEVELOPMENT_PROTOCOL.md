@@ -109,10 +109,10 @@ One bounded chat handles one major gate. Do not automatically chain:
 Foundation Hardening → Phase 5A–5H → Phase 6 → Phase 7 → Phase 8 → Phase 9
 ```
 
-The Controlled Dependency Refresh, including Actions #396 and final
-integration, is closed in the current governance snapshot. The next bounded
-runtime gate is Foundation Hardening; it must be independently revalidated from
-fresh live state and must not be silently chained into Phase 5.
+The Controlled Dependency Refresh, Foundation Hardening (PR #414), including
+Actions #396 and final integration, is closed in the current governance
+snapshot. The next bounded runtime gate is Phase 5A; it must be independently
+admitted from fresh live state and must not be silently chained into Phase 5B.
 
 ## GitHub publication policy
 
@@ -184,11 +184,11 @@ publish one consolidated governance reconciliation
 ```
 
 The current reconciliation records the closed Controlled Dependency Refresh,
-the deferred/closed #402 bundle, the superseded/closed #407 historical PR, and
-the next Foundation Hardening gate. Only the protected normal merge makes this
-snapshot canonical; an open PR or unsigned REST Contents commit remains
-provisional. Historical handoffs and evidence branches are retained and never
-rewritten to look current.
+the closed Foundation Hardening PR #414, the deferred/closed #402 bundle, the
+superseded/closed #407 historical PR, and the next Phase 5A gate. Only the
+protected normal merge makes this snapshot canonical; an open PR or unsigned
+REST Contents commit remains provisional. Historical handoffs and evidence
+branches are retained and never rewritten to look current.
 
 ## Governance churn rule
 
@@ -396,19 +396,21 @@ CONTROLLED DEPENDENCY REFRESH: CLOSED / FINAL INTEGRATION VERIFIED
 PR #402: CLOSED WITHOUT MERGE / DEFERRED
 PR #407: CLOSED WITHOUT MERGE / SUPERSEDED HISTORICAL EVIDENCE
 CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: CANONICAL PLANNING V2 / NOT IMPLEMENTED
-FOUNDATION HARDENING: ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / PROTECTED MERGE REQUIRED
+FOUNDATION HARDENING: CLOSED / IMPLEMENTED / VERIFIED
 ACTIONS #396: CLOSED / MERGED
-PHASE 5: READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED
+PHASE 5: IN PROGRESS / 5A ADMISSION CANDIDATE
+PHASE 5A: IMPLEMENTED / LOCALLY VERIFIED / PROTECTED EXACT-HEAD MERGE REQUIRED
+PHASE 5B: BLOCKED / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
 The HF and Actions merge receipts are retained `MERGED MAIN` evidence. Their
 candidate epochs are retained `REMOTE EXACT-HEAD`/historical evidence and are
-not themselves merged-main proof. Do not start Phase 5A–9, version bumps, tags,
-releases, release images, or final release notes from this snapshot. Foundation
-Hardening is locally implemented here but becomes `MERGED MAIN` only after the
-protected normal merge and independent post-merge verification.
+not themselves merged-main proof. Phase 5A is the only active implementation
+gate in this snapshot; do not start Phase 5B–9, version bumps, tags, releases,
+release images, or final release notes. Phase 5A becomes `MERGED MAIN` only
+after its protected normal merge and independent post-merge verification.
 
 ## Cross-links
 
