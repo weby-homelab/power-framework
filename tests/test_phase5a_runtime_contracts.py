@@ -440,12 +440,20 @@ def test_memory_action_is_policy_engine_issued_not_caller_authority() -> None:
     action = MemoryActionDecision._from_policy_engine(**data)
     assert action.server_derived is True
     assert action.origin == "policy_engine"
+    with pytest.raises(ValidationError):
+        MemoryActionDecision.model_validate_json(action.to_canonical_json())
 
     with pytest.raises(ValidationError):
         RuntimeContractEnvelope(
             schema_version="power.context-runtime.v2",
             contract=ContractName.MEMORY_ACTION,
             payload=data,
+        )
+    with pytest.raises(ValidationError):
+        RuntimeContractEnvelope(
+            schema_version="power.context-runtime.v2",
+            contract=ContractName.MEMORY_ACTION,
+            payload=action.model_copy(update={"reason": "forged"}),
         )
 
 

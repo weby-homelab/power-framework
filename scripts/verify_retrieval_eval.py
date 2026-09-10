@@ -65,6 +65,12 @@ def main(argv: list[str] | None = None) -> int:
                     raise EvaluationIntegrityError(
                         "receipt_parent", "receipt output directory is missing"
                     )
+                resolved_output = output.resolve()
+                if resolved_output == root or root in resolved_output.parents:
+                    raise EvaluationIntegrityError(
+                        "receipt_output",
+                        "receipt output must not overwrite frozen corpus artifacts",
+                    )
                 with tempfile.NamedTemporaryFile(
                     mode="wb", dir=output.parent, prefix=".phase5a-receipt-", delete=False
                 ) as temporary:

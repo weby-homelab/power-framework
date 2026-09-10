@@ -55,6 +55,7 @@ _FORBIDDEN_SYNTHETIC_MARKERS = (
     "aws_secret_access_key",
 )
 FROZEN_PHASE5A_DIGESTS = {
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
     "dataset_digest": "179ac7ee8d2e8ec0d5e0924cb322d32783da8ae1fdff379ecb0bfa7e0afc53b0",
     "query_set_digest": "7e2c0aaf8e0b3940bfa97c949781ade43fc4d67709634f2fcf3f08016fe1b086",
     "development_digest": "29b4ff596a2a125cfb2a3be54a17570cc10a88051bf5b379d5e2472c481e9289",
@@ -726,6 +727,12 @@ def _check_pinned_manifest(manifest: EvaluationCorpusManifest) -> None:
         raise EvaluationIntegrityError("manifest_pin", "holdout split is not admitted")
     if manifest.disjointness_proof_digest != expected["disjointness_digest"]:
         raise EvaluationIntegrityError("manifest_pin", "disjointness proof is not admitted")
+    if (
+        manifest.holdout_access_audit != "holdout-access-receipt-v1"
+        or manifest.sealed_artifact_ref != "power38-holdout-v1-sealed"
+        or manifest.disjointness_proof_ref != "disjointness-proof-v1"
+    ):
+        raise EvaluationIntegrityError("manifest_pin", "manifest references are not admitted")
     if manifest.development_split.query_count != FROZEN_PHASE5A_COUNTS["development_queries"]:
         raise EvaluationIntegrityError("manifest_pin", "development count is not admitted")
     if manifest.holdout_split.query_count != FROZEN_PHASE5A_COUNTS["holdout_queries"]:
@@ -911,6 +918,10 @@ def _split_digest(queries: list[EvaluationQuery], ground_truth: list[EvaluationG
     )
 
 
+def _source_corpus_digest(entries: list[dict[str, Any]]) -> str:
+    return canonical_sha256({"corpus_files": entries})
+
+
 def _query_set_digest(development: list[EvaluationQuery], holdout: list[EvaluationQuery]) -> str:
     return canonical_sha256(
         {
@@ -945,6 +956,7 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
     if (
         receipt.dataset_revision != manifest.dataset_digest
         or receipt.query_set_digest != manifest.query_set_digest
+        or receipt.tool_revision != "verify-retrieval-eval-v1"
     ):
         raise EvaluationIntegrityError(
             "holdout_receipt_binding", "holdout receipt is not bound to the manifest"
@@ -964,6 +976,7 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
             "holdout_receipt_budget", "holdout receipt byte evidence is invalid"
         )
     entries = _source_entries(root, source_rows)
+    source_corpus_digest = _source_corpus_digest(entries)
     dataset_digest = canonical_sha256(
         {
             "corpus_files": entries,
@@ -1002,6 +1015,7 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
     return {
         "status": "PASS",
         "dataset_digest": dataset_digest,
+        "source_corpus_digest": source_corpus_digest,
         "query_set_digest": query_set_digest,
         "development_digest": development_digest,
         "holdout_digest": holdout_digest,
@@ -1026,6 +1040,11 @@ def load_development_for_tuning(root: Path) -> list[EvaluationQuery]:
             EvaluationSourceMetadata.model_validate(row)
             for row in _read_jsonl(_fixture_path(root, "source_metadata.jsonl"))
         ]
+        source_entries = _source_entries(root, source_rows)
+        if _source_corpus_digest(source_entries) != FROZEN_PHASE5A_DIGESTS["source_corpus_digest"]:
+            raise EvaluationIntegrityError(
+                "source_digest_mismatch", "development tuning source corpus is not frozen"
+            )
         development = [
             EvaluationQuery.model_validate(row)
             for row in _read_jsonl(_fixture_path(root, "queries.development.jsonl"))

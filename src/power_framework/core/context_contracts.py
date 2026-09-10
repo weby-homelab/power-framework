@@ -11,9 +11,10 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+from copy import deepcopy
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Annotated, Any, Literal, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
 
 from pydantic import (
     AfterValidator,
@@ -31,6 +32,9 @@ from pydantic import (
 )
 
 from .canonical_json import canonical_json_bytes
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
@@ -96,6 +100,8 @@ def _require_datetime(value: object) -> datetime:
     if isinstance(value, datetime):
         return value
     if isinstance(value, str):
+        if "T" not in value or not (value.endswith("Z") or re.search(r"[+-]\d{2}:\d{2}$", value)):
+            raise ValueError("timestamps must use RFC3339 date-time syntax")
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError as exc:
@@ -110,6 +116,19 @@ def _normalize_datetime(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamps must be timezone-aware")
     return value.astimezone(UTC)
+
+
+def _require_date(value: object) -> date:
+    if isinstance(value, datetime):
+        raise ValueError("temporal boundary must be a date without time")
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        try:
+            return date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("temporal boundary must be a valid ISO date") from exc
+    raise ValueError("temporal boundary must be a date or ISO date string")
 
 
 def _finite(value: float) -> float:
@@ -472,6 +491,17 @@ class RuntimeModel(BaseModel):
                 raise ValueError(f"{field_name} must be omitted rather than null")
         return self
 
+    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
+        """Revalidate copies and revoke server-issued private authority markers."""
+        data = self.model_dump(mode="python", exclude_none=True)
+        if deep:
+            data = deepcopy(data)
+        if update:
+            data.update(update)
+        if hasattr(self, "_issuer_token"):
+            return type(self).model_construct(**data)
+        return type(self).model_validate(data)
+
     def to_canonical_dict(self) -> dict[str, Any]:
         dumped = self.model_dump(mode="python", exclude_none=True)
         result = _canonicalize(dumped)
@@ -492,6 +522,8 @@ class RuntimeModel(BaseModel):
 class TemporalBoundary(RuntimeModel):
     as_of: date
     include_historical: StrictBool
+
+    _strict_as_of = field_validator("as_of", mode="before")(_require_date)
 
 
 class QueryIntent(RuntimeModel):
@@ -559,6 +591,8 @@ class RetrievalBudget(RuntimeModel):
         if self.budget_class is BudgetClass.BALANCED:
             if self.model_load is not ModelLoadPolicy.SELECTED_DOMAIN_ONLY:
                 raise ValueError("BALANCED budget requires selected-domain model policy")
+            if not self.dense_allowed or not self.reranker_allowed:
+                raise ValueError("BALANCED budget requires dense and reranker flags")
             if self.graph_allowed or self.deep_expansion_allowed or self.raw_fallback_allowed:
                 raise ValueError("BALANCED budget cannot enable deep graph/raw fallback")
             if (
@@ -571,6 +605,16 @@ class RetrievalBudget(RuntimeModel):
             and self.model_load is not ModelLoadPolicy.EXPLICIT_REQUEST_OR_ESCALATION
         ):
             raise ValueError("DEEP budget requires explicit escalation model policy")
+        if self.budget_class is BudgetClass.DEEP and not all(
+            (
+                self.dense_allowed,
+                self.reranker_allowed,
+                self.graph_allowed,
+                self.deep_expansion_allowed,
+                self.raw_fallback_allowed,
+            )
+        ):
+            raise ValueError("DEEP budget requires all escalation flags")
         return self
 
 
@@ -629,6 +673,14 @@ class RetrievalPlan(RuntimeModel):
             raise ValueError("a stage cannot be both attempted and skipped")
         if attempted | skipped != planned:
             raise ValueError("every planned stage must be attempted or skipped")
+        if RetrievalStage.SEMANTIC in planned and not self.budget.dense_allowed:
+            raise ValueError("semantic stage requires dense permission")
+        if RetrievalStage.RERANK in planned and not self.budget.reranker_allowed:
+            raise ValueError("rerank stage requires reranker permission")
+        if RetrievalStage.GRAPH_ASSISTED in planned and not self.budget.graph_allowed:
+            raise ValueError("graph stage requires graph permission")
+        if RetrievalStage.RAW_FALLBACK in planned and not self.budget.raw_fallback_allowed:
+            raise ValueError("raw fallback stage requires raw fallback permission")
         return self
 
 
@@ -743,6 +795,8 @@ class ContextItem(RuntimeModel):
             and self.redaction_status == "not_applicable"
         ):
             raise ValueError("raw or quarantined evidence requires redaction metadata")
+        if self.content_kind == "excerpt" and self.excerpt and self.token_cost == 0:
+            raise ValueError("non-empty excerpts require a positive token cost")
         return self
 
 
@@ -879,7 +933,7 @@ class IndexWorkItem(RuntimeModel):
     queue_state: QueueState
     retry_count: Annotated[StrictInt, Field(ge=0, le=100)]
     idempotency_key: Identifier
-    last_error: str | None = Field(default=None, max_length=2_048)
+    last_error: ReasonText | None = None
     deferred_until: AwareDateTime | None = None
     lease_id: Identifier | None = None
     lease_expires_at: AwareDateTime | None = None
@@ -1201,6 +1255,10 @@ class RetryPolicy(RuntimeModel):
     def validate_retry_relationships(self) -> Self:
         if self.max_total_requeues < self.max_automatic_retries + self.max_manual_requeues:
             raise ValueError("total requeues must cover automatic and manual requeues")
+        if self.max_automatic_retries and (
+            self.backoff.initial_delay_ms < 1 or self.backoff.max_delay_ms < 1
+        ):
+            raise ValueError("automatic retries require a positive bounded backoff")
         return self
 
 

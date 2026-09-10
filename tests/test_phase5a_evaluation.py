@@ -22,6 +22,7 @@ from power_framework.core.evaluation_contracts import (
 
 ROOT = Path(__file__).parents[1] / "benchmarks" / "power38" / "retrieval_eval" / "v1"
 EXPECTED = {
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
     "dataset_digest": "179ac7ee8d2e8ec0d5e0924cb322d32783da8ae1fdff379ecb0bfa7e0afc53b0",
     "query_set_digest": "7e2c0aaf8e0b3940bfa97c949781ade43fc4d67709634f2fcf3f08016fe1b086",
     "development_digest": "29b4ff596a2a125cfb2a3be54a17570cc10a88051bf5b379d5e2472c481e9289",
@@ -57,6 +58,7 @@ def test_frozen_corpus_verifies_with_reproducible_digests() -> None:
     assert first["source_count"] == 20
     assert first["development_query_count"] == 20
     assert first["holdout_query_count"] == 20
+    assert first["source_corpus_digest"] == EXPECTED["source_corpus_digest"]
     assert first["holdout_policy"] == "SEALED_NOT_SECRET_NO_TUNING"
 
 
