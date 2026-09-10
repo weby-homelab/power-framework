@@ -1298,10 +1298,8 @@ def resolve_budget_caps(policy: RetrievalBudgetPolicy, budget_class: BudgetClass
 
 
 def _runtime_contract_models() -> dict[str, type[Any] | Any]:
-    """Return the discriminator registry without importing evaluation at module load."""
-    from .evaluation_contracts import EvaluationCorpusManifest
-
-    return {
+    """Return the discriminator registry without creating import cycles."""
+    registry: dict[str, type[Any] | Any] = {
         ContractName.QUERY_INTENT.value: QueryIntent,
         ContractName.RETRIEVAL_BUDGET.value: RetrievalBudget,
         ContractName.SEARCH_SCOPE.value: SearchScope,
@@ -1325,8 +1323,19 @@ def _runtime_contract_models() -> dict[str, type[Any] | Any]:
         ContractName.HOST_CAPABILITY_PROFILE.value: HostCapabilityProfile,
         ContractName.RETRIEVAL_BUDGET_POLICY.value: RetrievalBudgetPolicy,
         ContractName.RETRY_POLICY.value: RetryPolicy,
-        ContractName.EVALUATION_CORPUS_MANIFEST.value: EvaluationCorpusManifest,
     }
+    registry.update(_RUNTIME_CONTRACT_EXTENSIONS)
+    return registry
+
+
+_RUNTIME_CONTRACT_EXTENSIONS: dict[str, type[Any] | Any] = {}
+
+
+def register_runtime_contract(name: str, model: type[Any]) -> None:
+    """Register an optional contract module after its own import completes."""
+    if name in _RUNTIME_CONTRACT_EXTENSIONS:
+        raise RuntimeError(f"runtime contract already registered: {name}")
+    _RUNTIME_CONTRACT_EXTENSIONS[name] = model
 
 
 class RuntimeContractEnvelope(RuntimeModel):
@@ -1396,7 +1405,6 @@ __all__ = [
     "AccessPolicy",
     "Authority",
     "AuthorityBasis",
-    "AwareDateTime",
     "BackoffPolicy",
     "BitemporalEvidence",
     "BudgetClass",
@@ -1450,6 +1458,7 @@ __all__ = [
     "TrustState",
     "canonical_bytes",
     "canonical_sha256",
+    "register_runtime_contract",
     "resolve_budget_caps",
     "validate_trust_authority",
 ]

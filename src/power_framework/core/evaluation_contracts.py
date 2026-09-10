@@ -41,6 +41,7 @@ from .context_contracts import (
     TrustState,
     canonical_bytes,
     canonical_sha256,
+    register_runtime_contract,
     validate_trust_authority,
 )
 
@@ -1112,6 +1113,7 @@ def reject_holdout_tuning(split: str) -> None:
 
 EvaluationCorpusManifest.model_rebuild()
 HoldoutAccessReceipt.model_rebuild()
+register_runtime_contract("EvaluationCorpusManifest", EvaluationCorpusManifest)
 
 
 __all__ = [

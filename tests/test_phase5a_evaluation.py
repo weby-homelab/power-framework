@@ -12,13 +12,14 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-import power_framework.core.evaluation_contracts as evaluation_contracts
 from power_framework.core.evaluation_contracts import (
     EvaluationIntegrityError,
     load_development_for_tuning,
     reject_holdout_tuning,
     verify_evaluation_corpus,
 )
+
+evaluation_contracts = sys.modules[EvaluationIntegrityError.__module__]
 
 ROOT = Path(__file__).parents[1] / "benchmarks" / "power38" / "retrieval_eval" / "v1"
 EXPECTED = {
