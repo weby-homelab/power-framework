@@ -17,7 +17,7 @@ REST verification:
 - [POWER 3.8 — Context / Memory / Retrieval Architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
-- [Latest Phase 5A candidate handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T150005Z_phase5a-runtime-contracts-evaluation.md)
+- [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
 
 > Controlled Dependency Refresh is **CLOSED / FINAL INTEGRATION VERIFIED**.
@@ -25,8 +25,9 @@ REST verification:
 > **SUPERSEDED HISTORICAL EVIDENCE / CLOSED WITHOUT MERGE**. The
 > context/memory/retrieval package is **CANONICAL PLANNING V2**. Foundation
 > Hardening is **CLOSED / IMPLEMENTED / VERIFIED** after protected PR #414.
-> Phase 5A is **IMPLEMENTED / LOCALLY VERIFIED / ADMISSION CANDIDATE**; Phase
-> 5B and all later runtime work remain blocked/not started by this snapshot.
+> Phase 5A runtime contracts are **CLOSED / MERGED / VERIFIED** through PR #415;
+> Phase 5A.1 is the current semantic-correction candidate. Phase 5B and all
+> later runtime work remain blocked/not started by this snapshot.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -81,7 +82,7 @@ phase report, release artifact, or authorization to start Phase 5B.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5A protected merge; then Phase 5B |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5A.1 protected merge; then Phase 5B |
 
 ## HISTORICAL PLAN
 
@@ -109,7 +110,8 @@ HF #406, Actions #396, final-integration checks, and Foundation PR #414 remain
 attached to their PR, commit, and handoff evidence. The context/memory/retrieval
 files under `artifacts/project-state/planning/` remain planning contracts, not
 runtime dependencies. The final dependency and Foundation evidence is `MERGED
-MAIN`; Phase 5A is the current protected-merge candidate and Phase 5B remains
+MAIN`; Phase 5A runtime contracts are merged, the Phase 5A.1 semantic
+correction is the current protected-merge candidate, and Phase 5B remains
 `NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
@@ -149,7 +151,8 @@ example is a publication alias for the pre-implementation package. It does not
 override or replace the three explicit namespaces above.
 
 `PLANNED != IMPLEMENTED`: a merged architecture document is canonical planning,
-not runtime completion. This canonical projection records the closed
-Controlled Dependency Refresh, the v2 planning successor, and the next
-Foundation Hardening admission. It does not authorize Actions #396, Phase 5,
-any later phase, version bump, tag, release, or `POWER 3.8.0` publication.
+not runtime completion. This canonical projection records the closed Controlled
+Dependency Refresh, the v2 planning successor, the closed Phase 5A runtime
+contracts, and the current Phase 5A.1 correction admission. It does not
+authorize Actions #396, Phase 5B, any later phase, version bump, tag, release,
+or `POWER 3.8.0` publication.

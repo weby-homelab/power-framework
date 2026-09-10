@@ -197,6 +197,59 @@ contract diverges from this version without a new version/ADR.
 
 5B–5H and all later phases.
 
+## Gate 5A.1 — Retrieval evaluation corpus semantic integrity correction
+
+### Objective
+
+Audit every development/holdout query against the primary synthetic fixtures,
+correct proven semantic defects without tuning to an implementation, preserve
+historical v1, and admit one explicit corrected corpus revision before 5B.
+
+### Required evidence
+
+- Phase 5A runtime contracts are closed on protected `main` and are not
+  reopened or behaviorally changed.
+- All 40 query/ground-truth pairs and all 20 source fixtures are reviewed for
+  literal goal, intent, categories, scenario family, metadata, authority,
+  temporal expectation, provenance, relevant/excluded sources, and disposition.
+- Two independent semantic reviews are recorded before orchestrator
+  adjudication; disagreements use primary fixture evidence, not voting or
+  algorithm output.
+- Historical `v1/` remains byte-identical, structurally verifiable, and
+  explicitly marked historical/superseded for future evaluation.
+- New `v1.1/` has an explicit manifest identity, semantic-adjudication evidence,
+  source/query/development/holdout/disjointness/provenance digests, and the
+  semantic evidence is bound into `dataset_digest`.
+- Source-corpus bytes and source metadata are unchanged unless a separate
+  source correction is explicitly admitted.
+- Query IDs, scenario families, normalized query text, language strata,
+  category coverage, and no-holdout-tuning invariants remain valid.
+- Both historical and corrected revisions pass the offline integrity verifier;
+  targeted/full tests, security, Docs, CodeQL, GPG, required contexts, and
+  protected normal merge are independently read back.
+
+### Metric
+
+Adjudicated query count, unresolved semantic defects, v1 byte/inventory
+deviations, digest reproducibility, split overlap counts, and holdout-tuning
+violations.
+
+### PASS condition
+
+All 40 rows have a reviewable semantic PASS, the corrected revision is explicit
+and reproducible, v1 is preserved, no implementation result influenced curation,
+and the exact candidate is normally merged under current protection.
+
+### FAIL condition
+
+Any query remains semantically unresolved, v1 changes, semantic evidence is not
+digest-bound, holdout tuning or algorithm-specific correction is observed, or
+the protected exact-head admission/readback is missing.
+
+### What it blocks
+
+Phase 5B–5H, routing/retrieval metrics, and all later implementation gates.
+
 ## Gate 5B — Domain Policy v2 and Multi-domain Router
 
 ### Objective
@@ -208,6 +261,8 @@ similarity tie-breaker.
 
 ### Required evidence
 
+- `ACTIVE_EVALUATION_REVISION_SEMANTICALLY_ADJUDICATED = PASS` for the
+  explicitly selected corpus revision; structural digests alone are not enough.
 - Domain v1 fixtures remain valid and retain legacy P.A.R.A. behavior when no
   v2 policy is present.
 - `DomainMatch[]` fixtures with top, secondary, and low-confidence domains.
@@ -340,6 +395,8 @@ shadow mode before any default-selection decision.
 
 ### Required evidence
 
+- `ACTIVE_EVALUATION_REVISION_SEMANTICALLY_ADJUDICATED = PASS` before any 5B or
+  5E routing/retrieval metric is treated as admission evidence.
 - Frozen evaluation manifest with dataset/query-set digests, category coverage,
   ground-truth provenance, development/tuning split, and sealed holdout split.
 - Explicit proof that no tuning, threshold choice, prompt change, or profile
@@ -672,6 +729,9 @@ These invariants apply to every gate:
 - LLM output is untrusted and cannot directly mutate canonical state.
 - Authority policy precedes semantic relevance for authority-sensitive intents;
   no single opaque score may erase that ordering.
+- Authority ordering does not erase query intent: determine the eligible answer
+  set first, then apply authority/temporal/supersession/contradiction policy
+  inside that set.
 - Evaluation holdout data is never used for tuning, threshold calibration, or
   profile selection.
 - PSE, TaskService, DecisionService, memory proposal/apply, and generation

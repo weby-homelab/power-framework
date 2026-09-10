@@ -41,8 +41,11 @@ Pre-Phase-5 Foundation Hardening
 CLOSED / IMPLEMENTED / VERIFIED
             ↓
 Phase 5A — Runtime contracts v2 + frozen evaluation corpus
-ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / PROTECTED MERGE REQUIRED
-            ↓
+CLOSED / MERGED / VERIFIED (PR #415)
+             ↓
+Phase 5A.1 — Evaluation corpus semantic integrity correction
+CURRENT CORRECTION CANDIDATE / PROTECTED MERGE REQUIRED
+             ↓
 Phase 5B–5H — Router, scope, planner, shadow, dense validity, MCP, closure
 BLOCKED / NOT STARTED
          ↓
@@ -78,7 +81,9 @@ NO-GO
 | PR #407 | SUPERSEDED / CLOSED WITHOUT MERGE | Historical pre-HF evidence retained for auditability |
 | Final integration | CLOSED / FINAL INTEGRATION VERIFIED | Current main dependency graph, security, package, upgrade, frozen regression, Docs, and CodeQL evidence passed |
 | Foundation Hardening | CLOSED / IMPLEMENTED / VERIFIED | PR #414 protected merge and post-merge checks are on `main` |
-| Phase 5A | ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED | Runtime contracts v2 and frozen synthetic evaluation corpus; protected merge still required |
+| Phase 5A runtime contracts | CLOSED / MERGED / VERIFIED | PR #415 protected merge and post-merge checks |
+| Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; v1.1 is the future active revision |
+| Phase 5A.1 | CORRECTION CANDIDATE / LOCALLY VERIFIED | Semantic adjudication and corrected v1.1 corpus; protected merge required |
 | Phase 5B | BLOCKED / NOT STARTED | Domain Policy v2 and router are not implemented |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
@@ -107,9 +112,11 @@ dependency update:
    passed on the exact protected main.
 9. **Foundation Hardening — closed.** PR #414 is protected-merged with
    post-merge CI, Docs, and CodeQL verification.
-10. **Phase 5A — current implementation candidate.** It is locally verified
-    and closes only through its protected exact-head normal merge; Phase 5B
-    remains separately gated.
+10. **Phase 5A runtime contracts — closed.** PR #415 is protected-merged with
+     independent post-merge verification.
+11. **Phase 5A.1 — current correction candidate.** The corrected v1.1 corpus is
+     locally verified and closes only through its protected exact-head normal
+     merge; Phase 5B remains separately gated.
 
 The controlled refresh and Foundation closure do not authorize a public version
 bump, tag, release, Phase 5B, or any later phase.
@@ -178,15 +185,17 @@ This is a new candidate audit epoch, not a workflow stop condition.
 Phase 5 may eventually cover retrieval planning, ContextPacks, governed context
 assembly, and MCP context/explainability surfaces. It begins only after
 Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
-Controlled Dependency Refresh is already closed in this snapshot.
+Controlled Dependency Refresh and Phase 5A runtime contracts are already closed
+in this snapshot; the current bounded gate is the Phase 5A.1 corpus correction.
 
 ### Phase 5 internal gates
 
-All of the following remain `PLANNED / NOT IMPLEMENTED` until Foundation
-Hardening and Phase 5 are authorized:
+Phase 5A is closed. The following future runtime gates remain
+`PLANNED / NOT IMPLEMENTED` until their own evidence and protected admission;
+Phase 5A.1 is the current correction gate:
 
 ```text
-5A — Runtime contracts v2 + frozen evaluation corpus
+5A.1 — Evaluation corpus semantic integrity correction (current)
 5B — Deterministic multi-domain router
 5C — Search scope pushdown
 5D — RetrievalPlanner + ContextPack read-only vertical slice
@@ -203,11 +212,11 @@ and proposal producer; it is not a context assembler. No generic
 
 ### Pre-Phase-5 Foundation Hardening
 
-The next runtime gate is the explicit F1–F5 contract at
+The historical prerequisite was the explicit F1–F5 contract at
 `artifacts/project-state/planning/pre-phase5-foundation-hardening-gate.md`.
-It must close implicit mutation authority, principal/session semantics,
+It closed implicit mutation authority, principal/session semantics,
 retrieval boundary overrides, bounded secret-free failure receipts, and actual
-deadline/cancellation/budget behavior. It is an integration admission before
+deadline/cancellation/budget behavior. It was an integration admission before
 Phase 5, not a reopening of Phase 0–4.
 
 ### Phase 6 architecture scope
@@ -297,5 +306,8 @@ planning snapshot as runtime implementation evidence.
 - [Context / memory / retrieval architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
+- [Phase 5A.1 semantic-correction report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/PHASE_5A_1_REPORT.md)
+- [Evaluation v1 erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
+- [Latest Phase 5A.1 handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
