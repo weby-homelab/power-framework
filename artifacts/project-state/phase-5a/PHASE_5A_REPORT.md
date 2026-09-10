@@ -145,7 +145,7 @@ confidentiality or arbitrary manual-read auditing is made.
 | Benchmark integrity | `114 passed, 1 skipped` |
 | Upgrade matrix | `PASS` |
 | Full hermetic suite | `1868 passed, 4 skipped, 17 deselected` |
-| Coverage | `83.33%` (threshold 70%) |
+| Coverage | `83.34%` (threshold 70%) |
 | Ruff / format / MyPy | `PASS` |
 | `uv lock --check`, locked sync, pip check | `PASS` |
 | Doc drift / strict MkDocs | `PASS` (existing non-fatal nav/deprecation warnings) |
@@ -166,11 +166,27 @@ resource-warning, or unraisable-exception gate failed.
 | 3 | `3d6c456…` | `4e487f5…` | `744d68b…` | governance mapping/state reconciliation | docs/lint clean |
 | 4 | `b584df0…` | `6a3657d…` | `3d6c456…` | first adversarial repair: split GT/pinning/integrity | targeted/full gates passed |
 | 5 | `3d7752e…` | `3ce28e8…` | `b584df0…` | issuer, aggregate bounds, flags, retry/source hardening | 55 targeted passed |
-| 6 | `RESOLVE_FROM_GITHUB` | `RESOLVE_FROM_GITHUB` | `3d7752e…` | this report/handoff evidence epoch | pending remote admission |
+| 6 | `a1823ca…` | `15a947a…` | `3d7752e…` | report/handoff evidence epoch | local gates passed |
+| 7 | `fec487d…` | `f4b776a…` | `7ec9403…` | CodeQL-clean registry and review hardening | exact-head remote CodeQL PASS |
+| 8 | `RESOLVE_FROM_GITHUB` | `RESOLVE_FROM_GITHUB` | `fec487d…` | final evidence update | pending remote admission |
 
 Every maintainer commit in these epochs is locally GPG-signed with primary
 fingerprint `2D49E810C7F2527E`; GitHub verification remains a remote exact-head
 gate.
+
+## Review classifications
+
+- CodeQL findings on historical head `a1823ca…` (undefined explicit export and
+  static import cycle) were valid and repaired in `7ec9403…`; the new exact-head
+  CodeQL run reported no new alerts.
+- CodeRabbit comments claiming holdout q06/q11/q16 mismatched their queries
+  were checked against exact query text and ground truth: q06 asks for current
+  infrastructure policy, q11 asks for the current project rather than the
+  distractor, and q16 asks for curated rather than unverified research. These
+  three findings are non-actionable false classifications.
+- Receipt snapshot accounting, RFC3339 grammar, and mutable ContextPack
+  collection findings were valid and repaired in the subsequent candidate
+  epoch. Optional bot docstring-coverage warnings are not repository gates.
 
 ## Explicit scope proof
 
