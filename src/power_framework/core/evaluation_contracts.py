@@ -104,25 +104,25 @@ ACTIVE_V11_ROOT_FILE_SHA256 = {
     "disjointness-proof.json": "1a648120b8d7fb245d590a2c0a106f331777bd3413a2c0a2c09ed62bbe465643",
     "ground_truth.development.jsonl": "470420a4441c6f707704a77938416ae06821a10b8eafcd34820eeca51c47d48b",
     "ground_truth.holdout.jsonl": "ed6d1e78bc24582302574d8940ee5b5a89eab1d61060cdaeefeb2a5ee134ea6d",
-    "holdout-access-receipt.json": "e0ecf2220e0db401c83366d0980b04b948596fe344794e871acc791f0207a997",
-    "manifest.json": "f464c952124c5f2892e915a0ec8a349e57a4337246d275acfb1862fbfd535979",
+    "holdout-access-receipt.json": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
+    "manifest.json": "550f7d61ca3c2df84dd3a9ed996fa33cecff7d0aa583da59ac4e33106699cc40",
     "queries.development.jsonl": "f4e3adcd0d99e578bca5092eb6f36f70b3f5de72dfd33295ca6465409f1eec9d",
     "queries.holdout.jsonl": "701cb69e5d4045a6134cf7f83725eab736f32d85ec90ff9396c08a50e91974c2",
-    "semantic-adjudication.json": "7c1b91e7136fbe1b322ce73c01c72b1e2c794346aa8cbbeb75b5d627416dd5de",
-    "semantic-adjudication.md": "7ee822bdb11db3497bf0057fe1df3a4aa9eb5ddfa44ce1e5db191bf5f3f24c60",
-    "semantic-review-a-v1.1.json": "8d19e3c56ee2d85062ccebcbb6397dd0a8de7ec62c4a1df14d0a3630b15dc158",
+    "semantic-adjudication.json": "f4dbebdf99479e1281c2afc8e03a8e67a7cbd7d901308bb4b7655c5093348198",
+    "semantic-adjudication.md": "b8156291d55b36d6c561c0f0f226e38a3a33dd9c6007ea8b071f9b95ed3614c5",
+    "semantic-review-a-v1.1.json": "fd506348b4862d2194015cf0661027d98262a3d380b4208b8d1624070aa2c985",
     "semantic-review-b-v1.1.json": "14a4549f67b6efc40489a5e708fd0eafa35f464f94e5aa7d1153969db783c7b7",
     "source_metadata.jsonl": "6b6d43f0ad3a63a0b4bd4b98f23c4bb74e700b4c3f480ad207dc622294be67c9",
 }
 ACTIVE_PHASE5A1_DIGESTS = {
     "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
-    "dataset_digest": "d3e9f0c0697e18572d9149a9c38bf6b02b72b44927d0fab481bd9cd74203fc4d",
+    "dataset_digest": "5d8f2d7e68b62b3a2385c7a534a492083e1ff1b9f68973d4cbe8bf64461521fc",
     "query_set_digest": "b3fdf772c6b744495a503651c5ceecc0302bd3d34c00e1f12e2f014c5797be3e",
     "development_digest": "4bcd6c464b212e771517e71d3fdb7d696efbf0ec5521117dc7e8e7ce9ddaeb95",
     "holdout_digest": "61aa9d85ab0804308c008635814cb79218b7e6cc3c78d331ca4b8d4656b5f551",
     "disjointness_digest": "cf8054395040f17e4d21a005e248b7804fd515cc555b12b52b0afca0f32376d4",
-    "semantic_adjudication_digest": "0c1c2b32cb6ad84413dddfc93fe73777a37ba735468614a49afd97fc11784c48",
-    "holdout_access_receipt_digest": "e0ecf2220e0db401c83366d0980b04b948596fe344794e871acc791f0207a997",
+    "semantic_adjudication_digest": "106d3e220d01cc325ada3ffc3e551ebd4111be5c3fc5aebf62d22b0d45516218",
+    "holdout_access_receipt_digest": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
 }
 EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
     "v1": {
@@ -156,8 +156,8 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
             "provenance_source_ref": "power38-ground-truth-v1.1",
             "provenance_method": "human_adjudicated",
             "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
-            "semantic_adjudication_markdown_digest": "7ee822bdb11db3497bf0057fe1df3a4aa9eb5ddfa44ce1e5db191bf5f3f24c60",
-            "holdout_access_receipt_digest": "e0ecf2220e0db401c83366d0980b04b948596fe344794e871acc791f0207a997",
+            "semantic_adjudication_markdown_digest": "b8156291d55b36d6c561c0f0f226e38a3a33dd9c6007ea8b071f9b95ed3614c5",
+            "holdout_access_receipt_digest": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
             "planning_only": True,
             "supersedes_revision": "v1",
             "semantic_adjudication_ref": "semantic-adjudication-v1.1",
@@ -1148,7 +1148,13 @@ def _check_semantic_adjudication(
             raise EvaluationIntegrityError(
                 "semantic_adjudication", "independent review receipt failed validation"
             ) from exc
-        expected_counts = (28, 4, 8) if receipt_ref.endswith("a-v1.1") else (27, 5, 8)
+        reviewer_field = "reviewer_a" if ref_field == "reviewer_a_receipt_ref" else "reviewer_b"
+        derived_counts = {
+            status: sum(
+                1 for record in artifact.records if getattr(record, reviewer_field) == status
+            )
+            for status in ("PASS", "DEFECT", "AMBIGUOUS")
+        }
         if (
             review_receipt.reviewer_id != receipt_ref
             or review_receipt.input_revision != "v1"
@@ -1161,7 +1167,11 @@ def _check_semantic_adjudication(
                 review_receipt.defect_count,
                 review_receipt.ambiguous_count,
             )
-            != expected_counts
+            != (
+                derived_counts["PASS"],
+                derived_counts["DEFECT"],
+                derived_counts["AMBIGUOUS"],
+            )
         ):
             raise EvaluationIntegrityError(
                 "semantic_adjudication", "independent review receipt is not bound to the audit"

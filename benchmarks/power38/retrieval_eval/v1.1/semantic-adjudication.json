@@ -1,7 +1,7 @@
 {
   "algorithm_output_used": false,
   "dataset_revision": "v1.1",
-  "reviewer_a_receipt_digest": "8d19e3c56ee2d85062ccebcbb6397dd0a8de7ec62c4a1df14d0a3630b15dc158",
+  "reviewer_a_receipt_digest": "fd506348b4862d2194015cf0661027d98262a3d380b4208b8d1624070aa2c985",
   "reviewer_a_receipt_ref": "semantic-review-a-v1.1",
   "reviewer_b_receipt_digest": "14a4549f67b6efc40489a5e708fd0eafa35f464f94e5aa7d1153969db783c7b7",
   "reviewer_b_receipt_ref": "semantic-review-b-v1.1",

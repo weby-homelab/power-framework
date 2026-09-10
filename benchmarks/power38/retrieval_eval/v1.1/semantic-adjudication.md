@@ -10,7 +10,7 @@ is included in the active `dataset_digest` through that JSON artifact.
   records, all 20 source bodies, source metadata, scenario families, and the
   Phase 5 planning contracts. They did not see each other's verdicts.
 - Their bounded input receipts are `semantic-review-a-v1.1.json` (SHA-256
-  `8d19e3c56ee2d85062ccebcbb6397dd0a8de7ec62c4a1df14d0a3630b15dc158`) and
+  `fd506348b4862d2194015cf0661027d98262a3d380b4208b8d1624070aa2c985`) and
   `semantic-review-b-v1.1.json` (SHA-256
   `14a4549f67b6efc40489a5e708fd0eafa35f464f94e5aa7d1153969db783c7b7`).
 - The orchestrator then compared both reports with the primary fixtures. A
