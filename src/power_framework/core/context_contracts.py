@@ -43,6 +43,9 @@ _IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
 _OPAQUE_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"
 _DIGEST_PATTERN = r"^[a-f0-9]{64}$"
 _SECRET_FREE_REASON_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9 ._:/-]{0,255}$"  # noqa: S105
+_RFC3339_DATETIME = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+)
 _POLICY_ENGINE_TOKEN = object()
 _AUTHORIZATION_BOUNDARY_TOKEN = object()
 MAX_CONTEXT_PACK_BYTES = 2_000_000
@@ -100,7 +103,7 @@ def _require_datetime(value: object) -> datetime:
     if isinstance(value, datetime):
         return value
     if isinstance(value, str):
-        if "T" not in value or not (value.endswith("Z") or re.search(r"[+-]\d{2}:\d{2}$", value)):
+        if not _RFC3339_DATETIME.fullmatch(value):
             raise ValueError("timestamps must use RFC3339 date-time syntax")
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -871,10 +874,10 @@ class ContextPack(RuntimeModel):
     query: ShortText
     intent: QueryIntentKind
     budget_class: BudgetClass
-    domains: list[DomainMatch] = Field(max_length=64)
+    domains: tuple[DomainMatch, ...] = Field(max_length=64)
     retrieval_plan: RetrievalPlan
-    items: list[ContextItem] = Field(max_length=1_000)
-    excluded: list[ExcludedItem] = Field(max_length=1_000)
+    items: tuple[ContextItem, ...] = Field(max_length=1_000)
+    excluded: tuple[ExcludedItem, ...] = Field(max_length=1_000)
     budget: ContextBudget
     explainability: Explainability
     retrieval_status: Literal["complete", "partial", "degraded", "failed"]

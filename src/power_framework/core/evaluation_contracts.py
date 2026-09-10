@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import unicodedata
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -377,6 +378,16 @@ class EvaluationIntegrityError(ValueError):
         super().__init__(message)
 
 
+@dataclass(frozen=True)
+class EvaluationVerificationSnapshot:
+    """Verified integrity result plus counters captured during that read."""
+
+    summary: dict[str, Any]
+    manifest: EvaluationCorpusManifest
+    holdout_rows_read: int
+    holdout_bytes_read: int
+
+
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -431,7 +442,7 @@ def _read_json(path: Path) -> Any:
         ) from exc
 
 
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+def _read_jsonl_with_size(path: Path) -> tuple[list[dict[str, Any]], int]:
     try:
         data = path.read_bytes()
     except OSError as exc:
@@ -472,7 +483,11 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             raise EvaluationIntegrityError(
                 "too_many_records", "evaluation JSONL exceeds the row bound"
             )
-    return rows
+    return rows, len(data)
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return _read_jsonl_with_size(path)[0]
 
 
 def _fixture_path(root: Path, reference: str) -> Path:
@@ -507,6 +522,8 @@ def _parse_models(
     list[EvaluationGroundTruth],
     DisjointnessProof,
     HoldoutAccessReceipt,
+    int,
+    int,
 ]:
     try:
         manifest = EvaluationCorpusManifest.model_validate(
@@ -520,17 +537,19 @@ def _parse_models(
             EvaluationQuery.model_validate(row)
             for row in _read_jsonl(_fixture_path(root, "queries.development.jsonl"))
         ]
-        holdout = [
-            EvaluationQuery.model_validate(row)
-            for row in _read_jsonl(_fixture_path(root, "queries.holdout.jsonl"))
-        ]
+        holdout_rows, holdout_query_bytes = _read_jsonl_with_size(
+            _fixture_path(root, "queries.holdout.jsonl")
+        )
+        holdout = [EvaluationQuery.model_validate(row) for row in holdout_rows]
         ground_truth_development = [
             EvaluationGroundTruth.model_validate(row)
             for row in _read_jsonl(_fixture_path(root, "ground_truth.development.jsonl"))
         ]
+        ground_truth_holdout_rows, ground_truth_holdout_bytes = _read_jsonl_with_size(
+            _fixture_path(root, "ground_truth.holdout.jsonl")
+        )
         ground_truth_holdout = [
-            EvaluationGroundTruth.model_validate(row)
-            for row in _read_jsonl(_fixture_path(root, "ground_truth.holdout.jsonl"))
+            EvaluationGroundTruth.model_validate(row) for row in ground_truth_holdout_rows
         ]
         ground_truth = ground_truth_development + ground_truth_holdout
         proof = DisjointnessProof.model_validate(
@@ -543,7 +562,17 @@ def _parse_models(
         raise EvaluationIntegrityError(
             "schema_mismatch", "evaluation record failed strict validation"
         ) from exc
-    return manifest, source_rows, development, holdout, ground_truth, proof, receipt
+    return (
+        manifest,
+        source_rows,
+        development,
+        holdout,
+        ground_truth,
+        proof,
+        receipt,
+        holdout_query_bytes + ground_truth_holdout_bytes,
+        len(ground_truth_holdout),
+    )
 
 
 def _source_entries(
@@ -937,7 +966,9 @@ def _query_set_digest(development: list[EvaluationQuery], holdout: list[Evaluati
     )
 
 
-def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
+def verify_evaluation_corpus(
+    root: Path, *, return_snapshot: bool = False
+) -> dict[str, Any] | EvaluationVerificationSnapshot:
     """Verify the frozen corpus and return bounded, provenance-free summary data."""
     root = root.resolve()
     (
@@ -948,6 +979,8 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
         ground_truth,
         proof,
         receipt,
+        holdout_bytes_read,
+        holdout_ground_truth_count,
     ) = _parse_models(root)
     _check_pinned_manifest(manifest)
     _check_manifest_provenance(manifest)
@@ -962,17 +995,12 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
         raise EvaluationIntegrityError(
             "holdout_receipt_binding", "holdout receipt is not bound to the manifest"
         )
-    if receipt.max_rows < len(holdout) or receipt.rows_read != len(holdout):
+    holdout_rows_read = len(holdout) + holdout_ground_truth_count
+    if receipt.max_rows < holdout_rows_read or receipt.rows_read != holdout_rows_read:
         raise EvaluationIntegrityError(
             "holdout_receipt_budget", "holdout receipt row evidence is invalid"
         )
-    try:
-        holdout_bytes = _fixture_path(root, "queries.holdout.jsonl").stat().st_size
-    except OSError as exc:
-        raise EvaluationIntegrityError(
-            "missing_artifact", "holdout query artifact is not statable"
-        ) from exc
-    if receipt.max_bytes < holdout_bytes or receipt.bytes_read != holdout_bytes:
+    if receipt.max_bytes < holdout_bytes_read or receipt.bytes_read != holdout_bytes_read:
         raise EvaluationIntegrityError(
             "holdout_receipt_budget", "holdout receipt byte evidence is invalid"
         )
@@ -1013,7 +1041,7 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
         raise EvaluationIntegrityError(
             "query_count_mismatch", "manifest split counts do not match JSONL"
         )
-    return {
+    summary = {
         "status": "PASS",
         "dataset_digest": dataset_digest,
         "source_corpus_digest": source_corpus_digest,
@@ -1026,6 +1054,14 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
         "holdout_query_count": len(holdout),
         "holdout_policy": "SEALED_NOT_SECRET_NO_TUNING",
     }
+    if return_snapshot:
+        return EvaluationVerificationSnapshot(
+            summary=summary,
+            manifest=manifest,
+            holdout_rows_read=holdout_rows_read,
+            holdout_bytes_read=holdout_bytes_read,
+        )
+    return summary
 
 
 def load_development_for_tuning(root: Path) -> list[EvaluationQuery]:
@@ -1128,6 +1164,7 @@ __all__ = [
     "EvaluationLanguage",
     "EvaluationQuery",
     "EvaluationSourceMetadata",
+    "EvaluationVerificationSnapshot",
     "GroundTruthMethod",
     "GroundTruthProvenance",
     "HoldoutAccessReceipt",

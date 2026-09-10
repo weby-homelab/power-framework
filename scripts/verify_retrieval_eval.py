@@ -11,8 +11,8 @@ import tempfile
 from pathlib import Path
 
 from power_framework.core.evaluation_contracts import (
-    EvaluationCorpusManifest,
     EvaluationIntegrityError,
+    EvaluationVerificationSnapshot,
     build_holdout_access_receipt,
     load_development_for_tuning,
     reject_holdout_tuning,
@@ -48,19 +48,20 @@ def main(argv: list[str] | None = None) -> int:
                 "receipt_mode", "receipt output is available only for integrity verification"
             )
         if args.mode == "integrity":
-            result = verify_evaluation_corpus(args.root)
-            if args.receipt_out is not None:
-                root = args.root.resolve()
-                manifest = EvaluationCorpusManifest.model_validate(
-                    json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            verified = verify_evaluation_corpus(args.root, return_snapshot=True)
+            if not isinstance(verified, EvaluationVerificationSnapshot):
+                raise EvaluationIntegrityError(
+                    "verifier_state", "integrity snapshot was not returned"
                 )
-                holdout_path = root / "queries.holdout.jsonl"
+            result = dict(verified.summary)
+            if args.receipt_out is not None:
                 receipt = build_holdout_access_receipt(
-                    manifest,
-                    rows_read=int(result["holdout_query_count"]),
-                    bytes_read=holdout_path.stat().st_size,
+                    verified.manifest,
+                    rows_read=verified.holdout_rows_read,
+                    bytes_read=verified.holdout_bytes_read,
                 )
                 output = args.receipt_out
+                root = args.root.resolve()
                 if not output.parent.is_dir():
                     raise EvaluationIntegrityError(
                         "receipt_parent", "receipt output directory is missing"

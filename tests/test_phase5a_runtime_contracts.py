@@ -278,6 +278,8 @@ def test_valid_v1_structural_contracts_are_typed_and_frozen() -> None:
 
     assert query_intent.model_config["frozen"] is True
     assert pack.budget.index_work_triggered is False
+    with pytest.raises(AttributeError):
+        pack.items.append(item)  # type: ignore[attr-defined]
     assert work_item.queue_state == "pending"
     assert cost.affected_chunks == 1
     with pytest.raises(ValidationError):
@@ -721,6 +723,9 @@ def test_nonfinite_and_non_datetime_timestamp_inputs_fail_closed() -> None:
             observed_at="2026-01-01T00:00:00",
             recorded_at=NOW,
         )
+    for malformed in ("20260910T120000+00:00", "2026-W37-4T12:00:00+00:00"):
+        with pytest.raises(ValidationError):
+            BitemporalEvidence(observed_at=malformed, recorded_at=NOW)
     with pytest.raises(ValidationError):
         BitemporalEvidence(observed_at=0, recorded_at=NOW)
 
