@@ -1121,12 +1121,17 @@ def _check_semantic_adjudication(
             "semantic_adjudication", "semantic adjudication digest mismatch"
         )
     receipt_expectations = (
-        ("reviewer_a_receipt_ref", "reviewer_a_receipt_digest", "semantic-review-a-v1.1"),
-        ("reviewer_b_receipt_ref", "reviewer_b_receipt_digest", "semantic-review-b-v1.1"),
+        ("reviewer_a_receipt_ref", "reviewer_a_receipt_digest", "reviewer_a"),
+        ("reviewer_b_receipt_ref", "reviewer_b_receipt_digest", "reviewer_b"),
     )
-    for ref_field, digest_field, expected_ref in receipt_expectations:
+    for ref_field, digest_field, reviewer_field in receipt_expectations:
+        expected_ref = spec["refs"].get(ref_field)
+        if not isinstance(expected_ref, str):
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "independent review receipt reference is not configured"
+            )
         receipt_ref = getattr(artifact, ref_field)
-        if receipt_ref != expected_ref or receipt_ref != spec["refs"][ref_field]:
+        if receipt_ref != expected_ref:
             raise EvaluationIntegrityError(
                 "semantic_adjudication", "independent review receipt reference is not admitted"
             )
@@ -1148,7 +1153,6 @@ def _check_semantic_adjudication(
             raise EvaluationIntegrityError(
                 "semantic_adjudication", "independent review receipt failed validation"
             ) from exc
-        reviewer_field = "reviewer_a" if ref_field == "reviewer_a_receipt_ref" else "reviewer_b"
         derived_counts = {
             status: sum(
                 1 for record in artifact.records if getattr(record, reviewer_field) == status

@@ -50,8 +50,8 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. Verify the Phase 5A candidate and its exact
-   protected merge/readback; then stop before Phase 5B.
+   mutable operational truth. Verify the Phase 5A.1 correction candidate and
+   its exact protected merge/readback; then stop before Phase 5B.
 
 ## CURRENT PLANNING CONTRACTS
 
