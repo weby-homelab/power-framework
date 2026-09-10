@@ -18,7 +18,7 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-FOUNDATION HARDENING CANDIDATE / F1-F5 IMPLEMENTED / V2 PLANNING RECORDED
+FOUNDATION HARDENING CLOSED / F1-F5 IMPLEMENTED / PHASE 5A ADMISSION CANDIDATE
 
 SNAPSHOT_BASE_SHA:
 95f8cadd7e90ef4b16773b3c45bbc9ab40569e7a
@@ -39,10 +39,10 @@ LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-Controlled Dependency Refresh — Final Integration
+Pre-Phase-5 Foundation Hardening
 
 NEXT_GATE:
-Foundation Hardening Protected Normal Merge and Post-Merge Verification
+Phase 5A — Runtime Contracts v2 + Frozen Evaluation Corpus Admission
 
 ACTIONS_396:
 CLOSED / MERGED
@@ -51,13 +51,13 @@ HF_PR:
 406 MERGED / POST-MERGE VERIFIED
 
 PHASE_5:
-BLOCKED / NOT STARTED
+IN PROGRESS / 5A ADMISSION CANDIDATE
 
 PHASE_5_IMPLEMENTATION:
-BLOCKED / NOT STARTED
+5A IMPLEMENTED / LOCALLY VERIFIED / CLOSED ONLY BY PROTECTED EXACT-HEAD MERGE
 
 FOUNDATION_HARDENING:
-ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / CLOSED ONLY WHEN THIS EXACT PR IS PROTECTED-MERGED
+CLOSED / IMPLEMENTED / VERIFIED
 
 PHASES_0_4:
 CLOSED / FROZEN
@@ -106,7 +106,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / NOT IMPLEMENTED
+CANONICAL PLANNING V2 / PHASE 5A RUNTIME CONTRACTS IMPLEMENTED LOCALLY
 ```
 
 ## Fresh state anchor
@@ -144,8 +144,10 @@ CANONICAL PLANNING V2 / NOT IMPLEMENTED
 - Phase 3: **CLOSED / FROZEN**.
 - Phase 4: **CLOSED / FROZEN**.
 - Context / Memory / Retrieval architecture: **CANONICAL PLANNING V2 / NOT IMPLEMENTED**.
-- Foundation Hardening: **IMPLEMENTED / LOCALLY VERIFIED / PROTECTED-MERGE ADMISSION CANDIDATE**.
-- Phase 5: **READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED**.
+- Foundation Hardening: **CLOSED / IMPLEMENTED / VERIFIED**.
+- Phase 5: **IN PROGRESS / 5A ADMISSION CANDIDATE**.
+- Phase 5A: **IMPLEMENTED / LOCALLY VERIFIED / CLOSED ONLY BY PROTECTED EXACT-HEAD MERGE**.
+- Phase 5B: **BLOCKED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
 
@@ -162,7 +164,8 @@ CANONICAL PLANNING V2 / NOT IMPLEMENTED
 | PR #402 | DEFERRED / CLOSED WITHOUT MERGE | Broad maintenance bundle; split future admissions required |
 | PR #407 | SUPERSEDED / CLOSED WITHOUT MERGE | Historical pre-HF evidence retained for auditability |
 | Final integration | CLOSED / FINAL INTEGRATION VERIFIED | Current main graph, locks/exports, tests, security, package, upgrade, Docs, and CodeQL passed |
-| Foundation Hardening | ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED | F1–F5 contract; closed only by protected normal merge of the exact Foundation PR |
+| Foundation Hardening | CLOSED / IMPLEMENTED / VERIFIED | PR #414 protected normal merge and post-merge checks are on `main` |
+| Phase 5A | ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED | Runtime contracts v2 and frozen synthetic evaluation corpus; protected merge required |
 
 ## Actions #396 exact objects
 
@@ -277,20 +280,22 @@ CONTROLLED DEPENDENCY REFRESH = CLOSED / FINAL INTEGRATION VERIFIED
 PR #402 = CLOSED WITHOUT MERGE / DEFERRED
 PR #407 = CLOSED WITHOUT MERGE / SUPERSEDED HISTORICAL EVIDENCE
 ACTIONS #396 = CLOSED / MERGED
-FOUNDATION HARDENING = ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / CLOSED ONLY WHEN EXACT PR IS PROTECTED-MERGED
-PHASE 5 = READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED
+FOUNDATION HARDENING = CLOSED / IMPLEMENTED / VERIFIED
+PHASE 5 = IN PROGRESS / 5A ADMISSION CANDIDATE
+PHASE 5A = IMPLEMENTED / LOCALLY VERIFIED / CLOSED ONLY BY PROTECTED EXACT-HEAD MERGE
+PHASE 5B = BLOCKED / NOT STARTED
 ```
 
-The dependency surfaces and Actions admission were accepted through normal
-protected merges or explicit bounded deferral after fresh required-check,
-security, package, regression, and policy diagnosis. The current next gate is
-Foundation Hardening. POWER 3.8.0 cannot be released from this state.
+The dependency surfaces, Foundation Hardening, and Actions admission were
+accepted through normal protected merges or explicit bounded deferral after
+fresh required-check, security, package, regression, and policy diagnosis. The
+current next gate is Phase 5A. POWER 3.8.0 cannot be released from this state.
 
 ## Canonical governance status
 
-The prior governance and dependency merges are canonical on protected `main`;
-the Foundation Hardening candidate below becomes closed only after its protected
-normal merge:
+The prior governance, dependency, and Foundation Hardening merges are canonical
+on protected `main`; the Phase 5A candidate below remains provisional until its
+protected normal merge:
 
 - Governance branch: `docs/power-3.8-final-integration-course-correction`.
 - Prior governance bootstrap merge: `4b49e00c75866fa57f71e7bef61547915f7e01db`,
@@ -308,10 +313,10 @@ normal merge:
 ## Next authorized work
 
 1. Protected normal merge and independent post-merge verification of the
-   Foundation Hardening candidate.
-2. Then create a fresh bounded Phase 5A candidate from the then-current
-   protected `main`; do not start Phase 5A in this gate.
-3. Keep Phase 5B–9 runtime work, version bumps, tags, releases, and POWER 3.8.0
+   Phase 5A candidate.
+2. Then prepare a separate Phase 5B candidate from the then-current protected
+   `main`; do not start Phase 5B in this gate.
+3. Keep Phase 5B–9 runtime work beyond this gate, version bumps, tags, releases, and POWER 3.8.0
    publication blocked until each declared gate is independently closed.
 
 ## Do not start
@@ -320,7 +325,7 @@ normal merge:
   dependency candidate must record its exact base/head/tree/parent, diff,
   hashes, tests, security, CI, and policy evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
-- Do not start Phase 5A implementation or later phases in this gate.
+- Do not start Phase 5B implementation or later phases in this gate.
 - Do not bump the public version, create a tag, create a release, or publish
   `POWER 3.8.0`.
 - Do not treat candidate or evidence-branch documents as `MERGED MAIN` evidence.

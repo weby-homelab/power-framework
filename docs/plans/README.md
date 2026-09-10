@@ -24,10 +24,9 @@ REST verification:
 > PR #402 is **DEFERRED / CLOSED WITHOUT MERGE** and PR #407 is
 > **SUPERSEDED HISTORICAL EVIDENCE / CLOSED WITHOUT MERGE**. The
 > context/memory/retrieval package is **CANONICAL PLANNING V2**. Foundation
-> Hardening is **IMPLEMENTED / LOCALLY VERIFIED / PROTECTED-MERGE CANDIDATE**;
-> it becomes `MERGED MAIN` only after the exact protected normal merge. Actions
-> #396 is already closed/merged, while Phase 5A and all later runtime work are
-> not started by this snapshot.
+> Hardening is **CLOSED / IMPLEMENTED / VERIFIED** after protected PR #414.
+> Phase 5A is **IMPLEMENTED / LOCALLY VERIFIED / ADMISSION CANDIDATE**; Phase
+> 5B and all later runtime work remain blocked/not started by this snapshot.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -50,8 +49,8 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. Finish the protected Foundation merge/readback,
-   then prepare only the separate Phase 5A admission; do not start Phase 5A here.
+   mutable operational truth. Verify the Phase 5A candidate and its exact
+   protected merge/readback; then stop before Phase 5B.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -66,11 +65,11 @@ evaluation planning direction:
 - [Domain Policy v2 example](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/domain-policy-v2.example.yaml)
 - [Phase 5–9 acceptance gates](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/phase5-9-acceptance-gates.md)
 
-These files are **PLANNED**, not implemented runtime behavior. The v1 context
-schema and v1 index-cost policy remain retained historical/canonical planning
-evidence and are not the active future implementation contract once v2 is
-validated through the protected governance gate. No planning contract is a
-phase report, release artifact, or authorization to start Phase 5.
+These files remain **PLANNING EVIDENCE** and are not production runtime
+dependencies. Phase 5A has an independent installable runtime contract layer
+and frozen synthetic evaluation corpus; the v1 context schema and v1 index-cost
+policy remain retained historical planning evidence. No planning contract is a
+phase report, release artifact, or authorization to start Phase 5B.
 
 ## CONTRACT STATUS MAP
 
@@ -82,7 +81,7 @@ phase report, release artifact, or authorization to start Phase 5.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Foundation protected merge; then Phase 5A |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5A protected merge; then Phase 5B |
 
 ## HISTORICAL PLAN
 
@@ -106,11 +105,11 @@ They are not a substitute for current-state projection or live GitHub truth:
 - [Phase 4 verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-4/PHASE_4_REPORT.md)
 - [Dependency refresh ledger](https://github.com/weby-homelab/power-framework/blob/main/artifacts/repository-cleanup/dependency-refresh-ledger.md)
 
-HF #406, Actions #396, and final-integration checks remain attached to their PR,
-commit, and handoff evidence. The context/memory/retrieval files under
-`artifacts/project-state/planning/` are pre-implementation planning contracts,
-not phase evidence. The final dependency evidence is `MERGED MAIN`; Foundation
-Hardening is the current protected-merge candidate and Phase 5A remains
+HF #406, Actions #396, final-integration checks, and Foundation PR #414 remain
+attached to their PR, commit, and handoff evidence. The context/memory/retrieval
+files under `artifacts/project-state/planning/` remain planning contracts, not
+runtime dependencies. The final dependency and Foundation evidence is `MERGED
+MAIN`; Phase 5A is the current protected-merge candidate and Phase 5B remains
 `NOT STARTED`.
 
 ## ARCHITECTURAL DECISION

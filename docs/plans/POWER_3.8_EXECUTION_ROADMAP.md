@@ -38,10 +38,13 @@ Controlled Dependency Refresh
          └── Final integration admission — CLOSED / VERIFIED
           ↓
 Pre-Phase-5 Foundation Hardening
+CLOSED / IMPLEMENTED / VERIFIED
+            ↓
+Phase 5A — Runtime contracts v2 + frozen evaluation corpus
 ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED / PROTECTED MERGE REQUIRED
-           ↓
-Phase 5A–5H — Retrieval contracts, router, scope, planner, shadow, dense validity, MCP, closure
-READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED
+            ↓
+Phase 5B–5H — Router, scope, planner, shadow, dense validity, MCP, closure
+BLOCKED / NOT STARTED
          ↓
 Phase 6 — Agent Capture & Integrations
 NOT STARTED
@@ -74,8 +77,9 @@ NO-GO
 | PR #402 | DEFERRED / CLOSED WITHOUT MERGE | Broad unsafe maintenance bundle; future updates require bounded split admissions |
 | PR #407 | SUPERSEDED / CLOSED WITHOUT MERGE | Historical pre-HF evidence retained for auditability |
 | Final integration | CLOSED / FINAL INTEGRATION VERIFIED | Current main dependency graph, security, package, upgrade, frozen regression, Docs, and CodeQL evidence passed |
-| Foundation Hardening | ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED | F1–F5 authority, principal, retrieval boundary, receipt, and deadline contract; protected merge still required |
-| Phase 5 | READY FOR SEPARATE PHASE 5A ADMISSION / NOT STARTED | No implementation authorized in this gate |
+| Foundation Hardening | CLOSED / IMPLEMENTED / VERIFIED | PR #414 protected merge and post-merge checks are on `main` |
+| Phase 5A | ADMISSION CANDIDATE / IMPLEMENTED / LOCALLY VERIFIED | Runtime contracts v2 and frozen synthetic evaluation corpus; protected merge still required |
+| Phase 5B | BLOCKED / NOT STARTED | Domain Policy v2 and router are not implemented |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
@@ -101,12 +105,14 @@ dependency update:
 8. **Final integration admission — complete.** Current main dependency,
    security, package, upgrade, frozen-regression, Docs, and CodeQL evidence
    passed on the exact protected main.
-9. **Foundation Hardening — current implementation candidate.** It is locally
-   verified and closes only through its protected normal merge; Phase 5 remains
-   separately gated.
+9. **Foundation Hardening — closed.** PR #414 is protected-merged with
+   post-merge CI, Docs, and CodeQL verification.
+10. **Phase 5A — current implementation candidate.** It is locally verified
+    and closes only through its protected exact-head normal merge; Phase 5B
+    remains separately gated.
 
-The controlled refresh does not authorize a public version bump, tag, release,
-Phase 5, or any later phase.
+The controlled refresh and Foundation closure do not authorize a public version
+bump, tag, release, Phase 5B, or any later phase.
 
 ## HF #406 admission anchor
 

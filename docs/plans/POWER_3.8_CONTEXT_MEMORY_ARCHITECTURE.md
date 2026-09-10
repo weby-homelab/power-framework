@@ -44,10 +44,11 @@ The architecture has four non-negotiable properties:
    not source existence. Raw evidence is append-only, privacy-bounded, and
    recoverable according to an explicit retention policy.
 
-The Controlled Dependency Refresh is closed at final integration. The next
-runtime gate is Pre-Phase-5 Foundation Hardening; it is planned and not
-started. This plan does not start Foundation Hardening, Actions #396, Phase 5,
-capture, migration, a release, or a public version change.
+The Controlled Dependency Refresh and Pre-Phase-5 Foundation Hardening are
+closed on protected `main`. The active runtime gate is Phase 5A; its separate
+candidate contains the typed runtime contracts and frozen synthetic corpus.
+This planning document does not start Phase 5B, capture, migration, a release,
+or a public version change.
 
 ## 1A. Course-correction reconciliation
 
@@ -147,12 +148,12 @@ These are planning inputs, not authorization to fix source code in this gate.
 
 ### P0 — blockers to a safe future implementation
 
-1. **The v2 runtime contract is not implemented yet.** The planning v2 schema
-   now names authority, retention, bitemporal, resource, retry, budget, and
-   evaluation boundaries; runtime validation remains a future Phase 5A task.
-2. **The current gate is not Phase 5.** Pre-Phase-5 Foundation Hardening is the
-   next runtime admission and Phase 5 implementation remains
-   `BLOCKED / NOT STARTED`.
+1. **The v2 runtime contract is a separate Phase 5A candidate.** The planning
+   v2 schema remains governance evidence; typed runtime validation, canonical
+   serialization, and the synthetic evaluation substrate are implemented in
+   the bounded Phase 5A candidate and are not yet merged-main evidence.
+2. **The current gate is Phase 5A.** Phase 5B and later retrieval behavior
+   remain `BLOCKED / NOT STARTED`.
 3. **Authority must remain separate from integrity.** Canonical ledger
    membership, model extraction, caller approval, and retrieved evidence cannot
    be collapsed into one boolean or one domain field.
@@ -1168,8 +1169,9 @@ Phase 5G — Small MCP read/explainability surfaces
 Phase 5H — Phase closure / default decision
 ```
 
-Phase 5 is currently `BLOCKED / NOT STARTED`; every item below is
-`PLANNED / NOT IMPLEMENTED`.
+Phase 5A is currently `ADMISSION CANDIDATE / IMPLEMENTED LOCALLY`; Phase 5B–5H
+remain `BLOCKED / NOT STARTED`. The architecture below remains planning
+direction and is not a runtime dependency.
 
 | Gate | Planned scope | Required evidence before advancing |
 |---|---|---|
@@ -1183,9 +1185,10 @@ Phase 5 is currently `BLOCKED / NOT STARTED`; every item below is
 | 5G — Small MCP read/explainability surfaces | `compile_context`, `explain_context`, `retrieval_plan`, `index_status`, and `index_cost` or a reviewed bounded combination | ApplicationService boundary, read-only annotations, auth/path checks, no new network plane, tool-count discipline |
 | 5H — Phase closure / default decision | Acceptance report, rollback/default decision, and signed closure | Shadow PASS, holdout integrity, quality non-regression, resource bounds, remote CI, signed closure evidence |
 
-The Controlled Dependency Refresh is already closed at final integration in the
-current governance snapshot. No Foundation or 5A–5H gate authorizes Actions
-`#396`, capture, migration, a release, or a version bump by itself.
+The Controlled Dependency Refresh and Foundation Hardening are closed at final
+integration in the current governance snapshot. No 5A–5H gate authorizes
+Actions `#396`, capture, migration, a release, or a version bump by itself;
+Phase 5A specifically does not authorize Phase 5B behavior.
 
 ## 27. Phase 6 Work Breakdown
 
