@@ -18,6 +18,7 @@ import pytest
 from pydantic import ValidationError
 
 from power_framework.core.context_contracts import (
+    AccessPolicy,
     Authority,
     BackoffPolicy,
     BitemporalEvidence,
@@ -46,6 +47,7 @@ from power_framework.core.context_contracts import (
     ResourceProfile,
     ResourceProfileClass,
     RetentionClass,
+    RetentionClassContract,
     RetrievalBudget,
     RetrievalBudgetPolicy,
     RetrievalPlan,
@@ -239,15 +241,15 @@ def test_valid_v1_structural_contracts_are_typed_and_frozen() -> None:
         policy_revision="policy-v2",
         generation_revision="generation-1",
         implementation_status="planned",
-        access_policy={
-            "origin": "authorization_boundary",
-            "actor": "server",
-            "raw_access": "none",
-            "quarantine_access": "none",
-            "redaction": "mandatory",
-            "capability_id": "cap-read-only",
-            "expires_at": NOW + timedelta(hours=1),
-        },
+        access_policy=AccessPolicy._from_authorization_boundary(
+            origin="authorization_boundary",
+            actor="server",
+            raw_access="none",
+            quarantine_access="none",
+            redaction="mandatory",
+            capability_id="cap-read-only",
+            expires_at=NOW + timedelta(hours=1),
+        ),
     )
     work_item = IndexWorkItem(
         source_id="source-power38-current",
@@ -312,6 +314,12 @@ def test_closed_enums_and_wrong_discriminator_fail_closed() -> None:
             schema_version="power.context-runtime.v2",
             contract=ContractName.CONTEXT_PACK,
             payload=valid_query,
+        )
+    with pytest.raises(ValidationError):
+        RuntimeContractEnvelope(
+            schema_version="power.context-runtime.v2",
+            contract=ContractName.SENSITIVITY_CLASS,
+            payload=RetentionClassContract(value=RetentionClass.DURABLE),
         )
     with pytest.raises(ValidationError):
         RuntimeContractEnvelope(
@@ -427,7 +435,9 @@ def test_memory_action_is_policy_engine_issued_not_caller_authority() -> None:
     }
     with pytest.raises(ValidationError):
         MemoryActionDecision.model_validate(data)
-    action = MemoryActionDecision.from_policy_engine(**data)
+    with pytest.raises(ValidationError):
+        MemoryActionDecision.model_validate(data, context={"policy_engine": True})
+    action = MemoryActionDecision._from_policy_engine(**data)
     assert action.server_derived is True
     assert action.origin == "policy_engine"
 
@@ -436,6 +446,39 @@ def test_memory_action_is_policy_engine_issued_not_caller_authority() -> None:
             schema_version="power.context-runtime.v2",
             contract=ContractName.MEMORY_ACTION,
             payload=data,
+        )
+
+
+def test_access_policy_cannot_be_forged_as_caller_input() -> None:
+    with pytest.raises(ValidationError):
+        AccessPolicy(
+            origin="authorization_boundary",
+            actor="caller",
+            raw_access="privileged",
+            quarantine_access="none",
+            redaction="mandatory",
+            capability_id="fake-capability",
+            approval_ref="fake-approval",
+            expires_at=NOW + timedelta(hours=1),
+        )
+
+
+def test_forged_preconstructed_memory_action_is_rejected_by_envelope() -> None:
+    issued = MemoryActionDecision._from_policy_engine(
+        action=MemoryActionKind.NOOP,
+        signal="none",
+        domain="governance",
+        trust_state=TrustState.CURATED,
+        confidence=0.5,
+        reason="synthetic",
+        policy_revision="policy-1",
+    )
+    forged = MemoryActionDecision.model_construct(**issued.model_dump())
+    with pytest.raises(ValidationError):
+        RuntimeContractEnvelope(
+            schema_version="power.context-runtime.v2",
+            contract=ContractName.MEMORY_ACTION,
+            payload=forged,
         )
 
 
@@ -561,6 +604,25 @@ def test_retry_policy_is_bounded_and_does_not_create_a_worker() -> None:
             jitter=False,
         )
 
+    with pytest.raises(ValidationError):
+        __import__("power_framework.core.context_contracts", fromlist=["RetryPolicy"]).RetryPolicy(
+            max_automatic_retries=2,
+            max_total_requeues=2,
+            max_manual_requeues=1,
+            backoff=BackoffPolicy(
+                strategy="exponential",
+                initial_delay_ms=0,
+                multiplier=1.0,
+                max_delay_ms=0,
+                jitter=False,
+            ),
+            dead_letter_after_exhaustion=True,
+            explicit_review_before_requeue=True,
+            requeue_requires_revision_check=True,
+            no_unbounded_retries=True,
+            secret_free_error_receipt=True,
+        )
+
 
 def test_caller_can_only_lower_server_budget_caps() -> None:
     effective = resolve_budget_caps(valid_policy(), BudgetClass.FAST)
@@ -604,6 +666,55 @@ def test_contract_construction_has_no_filesystem_or_model_side_effects(tmp_path:
     QueryIntent(query="read only", intent=QueryIntentKind.LOOKUP, budget_class=BudgetClass.FAST)
     after = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
     assert before == after == []
+
+
+def test_numeric_collection_and_null_bounds_fail_closed() -> None:
+    with pytest.raises(ValidationError):
+        QueryIntent(
+            query="x",
+            intent=QueryIntentKind.LOOKUP,
+            budget_class=BudgetClass.FAST,
+            max_tokens=0,
+        )
+    with pytest.raises(ValidationError):
+        QueryIntent(
+            query="x",
+            intent=QueryIntentKind.LOOKUP,
+            budget_class=BudgetClass.FAST,
+            domain_hints=[f"domain-{index}" for index in range(33)],
+        )
+    with pytest.raises(ValidationError):
+        IndexCostEstimate(
+            affected_sources=-1,
+            affected_chunks=0,
+            model_required=False,
+            priority=IndexPriority.COLD,
+            estimated_memory_class="low",
+            estimated_cpu_class="low",
+            full_rebuild=False,
+            reason="invalid",
+        )
+    with pytest.raises(ValidationError):
+        QueryIntent(
+            query="x",
+            intent=QueryIntentKind.LOOKUP,
+            budget_class=BudgetClass.FAST,
+            project_ids=None,
+        )
+
+
+def test_nonfinite_and_non_datetime_timestamp_inputs_fail_closed() -> None:
+    with pytest.raises(ValidationError):
+        DomainMatch(domain="x", score=float("nan"), reasons=["bad"])
+    with pytest.raises(ValidationError):
+        DomainMatch(domain="x", score=float("inf"), reasons=["bad"])
+    with pytest.raises(ValidationError):
+        BitemporalEvidence(
+            observed_at="2026-01-01T00:00:00",
+            recorded_at=NOW,
+        )
+    with pytest.raises(ValidationError):
+        BitemporalEvidence(observed_at=0, recorded_at=NOW)
 
 
 def test_contract_import_does_not_load_neural_or_network_runtime() -> None:

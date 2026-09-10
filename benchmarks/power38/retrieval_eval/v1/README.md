@@ -12,8 +12,10 @@ private vault, chat history, production log, credential, or model output.
   metadata; it is benchmark truth, not current production state.
 - `queries.development.jsonl` — 20 development queries.
 - `queries.holdout.jsonl` — 20 content-sealed holdout queries.
-- `ground_truth.jsonl` — deterministic synthetic graded evidence and bounded
-  authority/disposition expectations for every query.
+- `ground_truth.development.jsonl` — development-only deterministic synthetic
+  graded evidence.
+- `ground_truth.holdout.jsonl` — holdout-only graded evidence; tuning tooling
+  never reads this file.
 - `manifest.json` — runtime `power.retrieval-eval.v1` manifest.
 - `disjointness-proof.json` — machine-readable exact split proof without raw
   query text.
@@ -67,13 +69,18 @@ public repository; sealing means immutable/content-addressed/governed after
 admission, not cryptographic secrecy.
 
 - Integrity verification may read holdout metadata and records and must emit a
-  bounded `holdout-access-receipt.json`-shaped receipt.
+  bounded `holdout-access-receipt.json`-shaped receipt when invoked with the
+  receipt-output option.
 - Tuning tooling must load only development queries. The official helper
   rejects a holdout tuning request before loading it.
 - `no_tuning_on_holdout=true`, `real_vault_ingestion=false`, and shared source
   corpus mode are explicit manifest invariants.
 - The verifier proves disjoint query IDs, scenario families, and normalized
   exact query text. Shared source document IDs are allowed and expected.
+- The verifier pins the admitted dataset/query/split/proof digests in its
+  versioned code. Any intentional corpus change therefore requires a new
+  evaluation revision and candidate epoch; coordinated local re-hashing alone
+  cannot make a changed fixture pass.
 
 ## Verification
 
@@ -81,7 +88,8 @@ From the repository root:
 
 ```bash
 uv run --offline python scripts/verify_retrieval_eval.py \
-  benchmarks/power38/retrieval_eval/v1
+  benchmarks/power38/retrieval_eval/v1 \
+  --receipt-out /tmp/power38-holdout-integrity-receipt.json
 ```
 
 Valid fixtures exit `0`. Digest mismatch, schema mismatch, missing source,

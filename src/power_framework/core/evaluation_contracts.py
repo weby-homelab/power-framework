@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import unicodedata
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, cast
@@ -40,6 +41,7 @@ from .context_contracts import (
     TrustState,
     canonical_bytes,
     canonical_sha256,
+    validate_trust_authority,
 )
 
 MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -52,6 +54,14 @@ _FORBIDDEN_SYNTHETIC_MARKERS = (
     "github_release_token=",
     "aws_secret_access_key",
 )
+FROZEN_PHASE5A_DIGESTS = {
+    "dataset_digest": "179ac7ee8d2e8ec0d5e0924cb322d32783da8ae1fdff379ecb0bfa7e0afc53b0",
+    "query_set_digest": "7e2c0aaf8e0b3940bfa97c949781ade43fc4d67709634f2fcf3f08016fe1b086",
+    "development_digest": "29b4ff596a2a125cfb2a3be54a17570cc10a88051bf5b379d5e2472c481e9289",
+    "holdout_digest": "ef6f122eefe9f4482d016a05a35422e11f0b120be2a64ad08d7ce661bad6721a",
+    "disjointness_digest": "554ca3a962beb09c2f7e9afe0bebea19ca79b62d77378959082ab1cfc5ad4275",
+}
+FROZEN_PHASE5A_COUNTS = {"sources": 20, "development_queries": 20, "holdout_queries": 20}
 
 
 class EvaluationLanguage(StrEnum):
@@ -142,6 +152,20 @@ def _unique(values: list[Any] | None) -> list[Any] | None:
     return values
 
 
+def _unique_sorted(values: list[Any] | None) -> list[Any] | None:
+    values = _unique(values)
+    if values is None:
+        return None
+    return sorted(values, key=lambda value: value.value if isinstance(value, StrEnum) else value)
+
+
+def _sort_grades(values: list[GroundTruthGrade]) -> list[GroundTruthGrade]:
+    source_ids = [value.source_id for value in values]
+    if len(source_ids) != len(set(source_ids)):
+        raise ValueError("ground-truth source grades must be unique")
+    return sorted(values, key=lambda value: value.source_id)
+
+
 class EvaluationCorpusManifest(RuntimeModel):
     """Runtime form of the frozen ``power.retrieval-eval.v1`` manifest."""
 
@@ -216,7 +240,22 @@ class EvaluationSourceMetadata(RuntimeModel):
     source_preserved: Literal[True]
     source_origin: Literal["repository_synthetic"]
 
-    _unique_domains = field_validator("domains", "superseded_by")(_unique)
+    _unique_domains = field_validator("domains", "superseded_by")(_unique_sorted)
+
+    @model_validator(mode="after")
+    def validate_source_axes(self) -> Self:
+        validate_trust_authority(self.trust_state, self.authority)
+        if (
+            self.noise_disposition is NoiseDisposition.QUARANTINE
+            and self.trust_state is not TrustState.QUARANTINED
+        ):
+            raise ValueError("quarantine disposition requires QUARANTINED trust")
+        if (
+            self.trust_state is TrustState.QUARANTINED
+            and self.noise_disposition is not NoiseDisposition.QUARANTINE
+        ):
+            raise ValueError("QUARANTINED source requires quarantine disposition")
+        return self
 
 
 class EvaluationQuery(RuntimeModel):
@@ -228,7 +267,7 @@ class EvaluationQuery(RuntimeModel):
     categories: list[EvaluationCategory] = Field(min_length=1, max_length=8)
     intent: QueryIntentKind | None = None
 
-    _unique_categories = field_validator("categories")(_unique)
+    _unique_categories = field_validator("categories")(_unique_sorted)
 
     @model_validator(mode="after")
     def validate_id_shape(self) -> Self:
@@ -260,7 +299,9 @@ class EvaluationGroundTruth(RuntimeModel):
 
     _unique_source_ids = field_validator(
         "expected_relevant_source_ids", "expected_exclusion_source_ids"
-    )(_unique)
+    )(_unique_sorted)
+
+    _sorted_grades = field_validator("graded_relevance")(_sort_grades)
 
     @model_validator(mode="after")
     def validate_grades(self) -> Self:
@@ -316,6 +357,8 @@ class HoldoutAccessReceipt(RuntimeModel):
     raw_content_egress: Literal[False]
     max_rows: Annotated[StrictInt, Field(ge=1, le=MAX_JSONL_RECORDS)]
     max_bytes: Annotated[StrictInt, Field(ge=1, le=MAX_FILE_BYTES)]
+    rows_read: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
+    bytes_read: Annotated[StrictInt, Field(ge=0, le=MAX_FILE_BYTES)]
 
 
 def normalize_query_text(value: str) -> str:
@@ -351,6 +394,14 @@ def _reject_json_constant(value: str) -> Any:
     )
 
 
+def _reject_forbidden_markers(data: bytes) -> None:
+    lowered = data.lower()
+    if any(marker.encode("ascii") in lowered for marker in _FORBIDDEN_SYNTHETIC_MARKERS):
+        raise EvaluationIntegrityError(
+            "real_vault_marker", "evaluation artifacts contain a forbidden marker"
+        )
+
+
 def _read_json(path: Path) -> Any:
     try:
         data = path.read_bytes()
@@ -362,6 +413,7 @@ def _read_json(path: Path) -> Any:
         raise EvaluationIntegrityError(
             "artifact_too_large", "evaluation artifact exceeds the byte bound"
         )
+    _reject_forbidden_markers(data)
     try:
         text = data.decode("utf-8")
         return json.loads(
@@ -388,6 +440,7 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         raise EvaluationIntegrityError(
             "artifact_too_large", "JSONL artifact exceeds the byte bound"
         )
+    _reject_forbidden_markers(data)
     rows: list[dict[str, Any]] = []
     for line_number, raw_line in enumerate(data.splitlines(), start=1):
         if not raw_line.strip():
@@ -426,10 +479,13 @@ def _fixture_path(root: Path, reference: str) -> Path:
             "unsafe_reference", "fixture reference escapes the corpus root"
         )
     raw_candidate = root / reference
-    if raw_candidate.is_symlink():
-        raise EvaluationIntegrityError(
-            "symlink_reference", "evaluation fixtures must not be symlinks"
-        )
+    for parent in (raw_candidate, *raw_candidate.parents):
+        if parent == root:
+            break
+        if parent.is_symlink():
+            raise EvaluationIntegrityError(
+                "symlink_reference", "evaluation fixtures must not be symlinks"
+            )
     candidate = raw_candidate.resolve()
     resolved_root = root.resolve()
     if resolved_root != candidate and resolved_root not in candidate.parents:
@@ -466,10 +522,15 @@ def _parse_models(
             EvaluationQuery.model_validate(row)
             for row in _read_jsonl(_fixture_path(root, "queries.holdout.jsonl"))
         ]
-        ground_truth = [
+        ground_truth_development = [
             EvaluationGroundTruth.model_validate(row)
-            for row in _read_jsonl(_fixture_path(root, "ground_truth.jsonl"))
+            for row in _read_jsonl(_fixture_path(root, "ground_truth.development.jsonl"))
         ]
+        ground_truth_holdout = [
+            EvaluationGroundTruth.model_validate(row)
+            for row in _read_jsonl(_fixture_path(root, "ground_truth.holdout.jsonl"))
+        ]
+        ground_truth = ground_truth_development + ground_truth_holdout
         proof = DisjointnessProof.model_validate(
             _read_json(_fixture_path(root, "disjointness-proof.json"))
         )
@@ -486,12 +547,42 @@ def _parse_models(
 def _source_entries(
     root: Path, source_rows: list[EvaluationSourceMetadata]
 ) -> list[dict[str, Any]]:
+    if len(source_rows) != FROZEN_PHASE5A_COUNTS["sources"]:
+        raise EvaluationIntegrityError("source_count", "source count is not admitted")
+    corpus_dir = root / "corpus"
+    if corpus_dir.is_symlink() or not corpus_dir.is_dir():
+        raise EvaluationIntegrityError("corpus_inventory", "corpus directory is missing or unsafe")
+    try:
+        corpus_files = list(corpus_dir.iterdir())
+    except OSError as exc:
+        raise EvaluationIntegrityError(
+            "corpus_inventory", "corpus directory is unreadable"
+        ) from exc
+    actual_paths: set[str] = set()
+    for path in corpus_files:
+        if path.is_symlink() or not path.is_file() or path.suffix != ".md":
+            raise EvaluationIntegrityError(
+                "corpus_inventory", "corpus contains an unlisted or non-Markdown artifact"
+            )
+        actual_paths.add(path.relative_to(root).as_posix())
+    if not actual_paths:
+        raise EvaluationIntegrityError("corpus_inventory", "corpus must contain source fixtures")
     entries: list[dict[str, Any]] = []
     seen: set[str] = set()
+    declared_paths: set[str] = set()
     for source in source_rows:
         if source.source_id in seen:
             raise EvaluationIntegrityError("duplicate_source_id", "source IDs must be unique")
         seen.add(source.source_id)
+        source_reference = Path(source.path)
+        if source_reference.parent != Path("corpus") or source_reference.suffix != ".md":
+            raise EvaluationIntegrityError(
+                "corpus_inventory", "source metadata must reference a direct corpus Markdown file"
+            )
+        declared_path = source_reference.as_posix()
+        if declared_path in declared_paths:
+            raise EvaluationIntegrityError("duplicate_source_path", "source paths must be unique")
+        declared_paths.add(declared_path)
         source_path = _fixture_path(root, source.path)
         try:
             content = source_path.read_bytes()
@@ -507,7 +598,21 @@ def _source_entries(
             raise EvaluationIntegrityError(
                 "source_digest_mismatch", "source metadata digest does not match bytes"
             )
-        lowered = content.decode("utf-8", errors="replace").lower()
+        try:
+            decoded = content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise EvaluationIntegrityError(
+                "invalid_source_encoding", "source fixture is not valid UTF-8"
+            ) from exc
+        if (
+            not decoded.startswith("---\n")
+            or "\ntype:" not in decoded
+            or "\ntimestamp:" not in decoded
+        ):
+            raise EvaluationIntegrityError(
+                "source_format", "source fixture must be Markdown with basic OKF frontmatter"
+            )
+        lowered = decoded.lower()
         if any(marker in lowered for marker in _FORBIDDEN_SYNTHETIC_MARKERS):
             raise EvaluationIntegrityError(
                 "real_vault_marker", "synthetic corpus contains a forbidden marker"
@@ -518,6 +623,10 @@ def _source_entries(
                 "content_sha256": source.sha256,
                 "content_bytes": source.byte_size,
             }
+        )
+    if declared_paths != actual_paths:
+        raise EvaluationIntegrityError(
+            "corpus_inventory", "source metadata does not exactly enumerate corpus Markdown files"
         )
     return sorted(entries, key=lambda item: item["source_id"])
 
@@ -601,13 +710,53 @@ def _check_coverage(
         )
 
 
+def _check_pinned_manifest(manifest: EvaluationCorpusManifest) -> None:
+    expected = FROZEN_PHASE5A_DIGESTS
+    if manifest.dataset_digest != expected["dataset_digest"]:
+        raise EvaluationIntegrityError(
+            "manifest_pin", "manifest is not bound to the admitted dataset"
+        )
+    if manifest.query_set_digest != expected["query_set_digest"]:
+        raise EvaluationIntegrityError(
+            "manifest_pin", "manifest is not bound to the admitted query set"
+        )
+    if manifest.development_split.digest != expected["development_digest"]:
+        raise EvaluationIntegrityError("manifest_pin", "development split is not admitted")
+    if manifest.holdout_split.digest != expected["holdout_digest"]:
+        raise EvaluationIntegrityError("manifest_pin", "holdout split is not admitted")
+    if manifest.disjointness_proof_digest != expected["disjointness_digest"]:
+        raise EvaluationIntegrityError("manifest_pin", "disjointness proof is not admitted")
+    if manifest.development_split.query_count != FROZEN_PHASE5A_COUNTS["development_queries"]:
+        raise EvaluationIntegrityError("manifest_pin", "development count is not admitted")
+    if manifest.holdout_split.query_count != FROZEN_PHASE5A_COUNTS["holdout_queries"]:
+        raise EvaluationIntegrityError("manifest_pin", "holdout count is not admitted")
+
+
+def _check_manifest_provenance(manifest: EvaluationCorpusManifest) -> None:
+    if len(manifest.ground_truth_provenance) != 1:
+        raise EvaluationIntegrityError("provenance", "frozen corpus requires one provenance record")
+    provenance = manifest.ground_truth_provenance[0]
+    if (
+        provenance.source_ref != "power38-ground-truth-v1"
+        or provenance.method is not GroundTruthMethod.SYNTHETIC_FIXTURE
+        or provenance.provenance_digest
+        != canonical_sha256(
+            {"source_ref": provenance.source_ref, "method": provenance.method.value}
+        )
+    ):
+        raise EvaluationIntegrityError(
+            "provenance", "ground-truth provenance is not bound to the fixture"
+        )
+
+
 def _check_ground_truth(
     source_rows: list[EvaluationSourceMetadata],
     development: list[EvaluationQuery],
     holdout: list[EvaluationQuery],
     ground_truth: list[EvaluationGroundTruth],
 ) -> dict[str, list[EvaluationGroundTruth]]:
-    source_ids = {item.source_id for item in source_rows}
+    source_by_id = {item.source_id: item for item in source_rows}
+    source_ids = set(source_by_id)
     query_ids = {item.query_id for item in development + holdout}
     if len(ground_truth) != len(query_ids):
         raise EvaluationIntegrityError(
@@ -634,6 +783,59 @@ def _check_ground_truth(
             raise EvaluationIntegrityError(
                 "unknown_ground_truth_source", "ground truth references an unknown source"
             )
+        relevant_ids = set(record.expected_relevant_source_ids)
+        excluded_ids = set(record.expected_exclusion_source_ids)
+        if relevant_ids & excluded_ids:
+            raise EvaluationIntegrityError(
+                "ground_truth_overlap", "a source cannot be both relevant and excluded"
+            )
+        grade_by_source = {grade.source_id: grade for grade in record.graded_relevance}
+        if not grade_by_source:
+            raise EvaluationIntegrityError(
+                "empty_ground_truth", "every ground-truth record needs bounded judgments"
+            )
+        if not relevant_ids <= set(grade_by_source):
+            raise EvaluationIntegrityError(
+                "ground_truth_grade", "relevant sources need graded relevance"
+            )
+        for source_id in relevant_ids:
+            if grade_by_source[source_id].relevance < 1:
+                raise EvaluationIntegrityError(
+                    "ground_truth_grade", "relevant sources need a positive relevance grade"
+                )
+        for source_id in excluded_ids:
+            if grade_by_source[source_id].relevance != 0:
+                raise EvaluationIntegrityError(
+                    "ground_truth_grade", "excluded sources must have zero relevance"
+                )
+        for grade in grade_by_source.values():
+            if grade.relevance == 0 and grade.authority_outcome not in {
+                AuthorityOutcome.EXCLUDE,
+                AuthorityOutcome.QUARANTINE,
+            }:
+                raise EvaluationIntegrityError(
+                    "ground_truth_grade", "zero-relevance sources need an exclusion outcome"
+                )
+        if record.expected_authority_winner is not None and (
+            record.expected_authority_winner not in relevant_ids
+            or record.expected_authority_winner in excluded_ids
+        ):
+            raise EvaluationIntegrityError(
+                "ground_truth_winner", "authority winner must be a relevant non-excluded source"
+            )
+        if record.expected_disposition is NoiseDisposition.QUARANTINE:
+            if relevant_ids or not excluded_ids:
+                raise EvaluationIntegrityError(
+                    "ground_truth_disposition", "quarantine ground truth must exclude a source"
+                )
+            if any(
+                source_by_id[source_id].noise_disposition is not NoiseDisposition.QUARANTINE
+                for source_id in excluded_ids
+            ):
+                raise EvaluationIntegrityError(
+                    "ground_truth_disposition",
+                    "quarantine expectation must reference quarantined source",
+                )
         by_split[query_split[record.query_id]].append(record)
     return by_split
 
@@ -649,6 +851,30 @@ def _check_proof(
     if set(proof.development_query_ids) != dev_ids or set(proof.holdout_query_ids) != ho_ids:
         raise EvaluationIntegrityError(
             "proof_query_ids", "disjointness proof query IDs do not match"
+        )
+    if proof.development_query_ids != sorted(proof.development_query_ids):
+        raise EvaluationIntegrityError(
+            "proof_order", "development proof IDs must be canonical-sorted"
+        )
+    if proof.holdout_query_ids != sorted(proof.holdout_query_ids):
+        raise EvaluationIntegrityError("proof_order", "holdout proof IDs must be canonical-sorted")
+    if proof.development_scenario_families != sorted(proof.development_scenario_families):
+        raise EvaluationIntegrityError(
+            "proof_order", "development proof families must be canonical-sorted"
+        )
+    if proof.holdout_scenario_families != sorted(proof.holdout_scenario_families):
+        raise EvaluationIntegrityError(
+            "proof_order", "holdout proof families must be canonical-sorted"
+        )
+    if proof.development_normalized_query_digests != sorted(
+        proof.development_normalized_query_digests
+    ):
+        raise EvaluationIntegrityError(
+            "proof_order", "development normalized-query proof must be sorted"
+        )
+    if proof.holdout_normalized_query_digests != sorted(proof.holdout_normalized_query_digests):
+        raise EvaluationIntegrityError(
+            "proof_order", "holdout normalized-query proof must be sorted"
         )
     if (
         set(proof.development_scenario_families) != dev_families
@@ -711,6 +937,11 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
         proof,
         receipt,
     ) = _parse_models(root)
+    _check_pinned_manifest(manifest)
+    _check_manifest_provenance(manifest)
+    _check_coverage(manifest, development, holdout)
+    _check_proof(proof, development, holdout)
+    ground_truth_by_split = _check_ground_truth(source_rows, development, holdout, ground_truth)
     if (
         receipt.dataset_revision != manifest.dataset_digest
         or receipt.query_set_digest != manifest.query_set_digest
@@ -718,17 +949,20 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
         raise EvaluationIntegrityError(
             "holdout_receipt_binding", "holdout receipt is not bound to the manifest"
         )
-    if receipt.max_rows < len(holdout):
+    if receipt.max_rows < len(holdout) or receipt.rows_read != len(holdout):
         raise EvaluationIntegrityError(
-            "holdout_receipt_budget", "holdout receipt row budget is too small"
+            "holdout_receipt_budget", "holdout receipt row evidence is invalid"
         )
-    if receipt.max_bytes < ((_fixture_path(root, "queries.holdout.jsonl")).stat().st_size):
+    try:
+        holdout_bytes = _fixture_path(root, "queries.holdout.jsonl").stat().st_size
+    except OSError as exc:
         raise EvaluationIntegrityError(
-            "holdout_receipt_budget", "holdout receipt byte budget is too small"
+            "missing_artifact", "holdout query artifact is not statable"
+        ) from exc
+    if receipt.max_bytes < holdout_bytes or receipt.bytes_read != holdout_bytes:
+        raise EvaluationIntegrityError(
+            "holdout_receipt_budget", "holdout receipt byte evidence is invalid"
         )
-    _check_coverage(manifest, development, holdout)
-    ground_truth_by_split = _check_ground_truth(source_rows, development, holdout, ground_truth)
-    _check_proof(proof, development, holdout)
     entries = _source_entries(root, source_rows)
     dataset_digest = canonical_sha256(
         {
@@ -781,12 +1015,73 @@ def verify_evaluation_corpus(root: Path) -> dict[str, Any]:
 
 def load_development_for_tuning(root: Path) -> list[EvaluationQuery]:
     """Load only development queries; holdout is not a tuning input surface."""
-    manifest_data = _read_json(_fixture_path(root.resolve(), "manifest.json"))
-    EvaluationCorpusManifest.model_validate(manifest_data)
-    return [
-        EvaluationQuery.model_validate(row)
-        for row in _read_jsonl(_fixture_path(root.resolve(), "queries.development.jsonl"))
-    ]
+    root = root.resolve()
+    try:
+        manifest = EvaluationCorpusManifest.model_validate(
+            _read_json(_fixture_path(root, "manifest.json"))
+        )
+        _check_pinned_manifest(manifest)
+        _check_manifest_provenance(manifest)
+        source_rows = [
+            EvaluationSourceMetadata.model_validate(row)
+            for row in _read_jsonl(_fixture_path(root, "source_metadata.jsonl"))
+        ]
+        development = [
+            EvaluationQuery.model_validate(row)
+            for row in _read_jsonl(_fixture_path(root, "queries.development.jsonl"))
+        ]
+        ground_truth = [
+            EvaluationGroundTruth.model_validate(row)
+            for row in _read_jsonl(_fixture_path(root, "ground_truth.development.jsonl"))
+        ]
+        _check_ground_truth(source_rows, development, [], ground_truth)
+        digest = _split_digest(development, ground_truth)
+        if (
+            digest != manifest.development_split.digest
+            or digest != FROZEN_PHASE5A_DIGESTS["development_digest"]
+        ):
+            raise EvaluationIntegrityError(
+                "development_digest_mismatch", "development tuning input is not frozen"
+            )
+        if len(development) != manifest.development_split.query_count:
+            raise EvaluationIntegrityError(
+                "query_count_mismatch", "development tuning count does not match manifest"
+            )
+        return development
+    except EvaluationIntegrityError:
+        raise
+    except ValidationError as exc:
+        raise EvaluationIntegrityError(
+            "schema_mismatch", "development tuning input failed strict validation"
+        ) from exc
+
+
+def build_holdout_access_receipt(
+    manifest: EvaluationCorpusManifest,
+    *,
+    rows_read: int,
+    bytes_read: int,
+    tool_revision: str = "verify-retrieval-eval-v1",
+    accessed_at: datetime | None = None,
+) -> HoldoutAccessReceipt:
+    """Create bounded metadata for one official integrity-only holdout read."""
+    if accessed_at is None:
+        accessed_at = datetime.now(UTC)
+    return HoldoutAccessReceipt(
+        schema_version="power.retrieval-holdout-access.v1",
+        purpose="integrity_verification",
+        split="holdout",
+        dataset_revision=manifest.dataset_digest,
+        query_set_digest=manifest.query_set_digest,
+        accessed_at=accessed_at,
+        tool_revision=tool_revision,
+        tuning_capability=False,
+        raw_content_egress=False,
+        max_rows=MAX_JSONL_RECORDS,
+        max_bytes=MAX_FILE_BYTES,
+        rows_read=rows_read,
+        bytes_read=bytes_read,
+    )
 
 
 def reject_holdout_tuning(split: str) -> None:
@@ -801,6 +1096,8 @@ HoldoutAccessReceipt.model_rebuild()
 
 
 __all__ = [
+    "FROZEN_PHASE5A_COUNTS",
+    "FROZEN_PHASE5A_DIGESTS",
     "DevelopmentSplit",
     "DisjointnessProof",
     "EvaluationCategory",
@@ -814,6 +1111,7 @@ __all__ = [
     "GroundTruthProvenance",
     "HoldoutAccessReceipt",
     "HoldoutSplit",
+    "build_holdout_access_receipt",
     "load_development_for_tuning",
     "normalize_query_text",
     "reject_holdout_tuning",

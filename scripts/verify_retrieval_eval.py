@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 from power_framework.core.evaluation_contracts import (
+    EvaluationCorpusManifest,
     EvaluationIntegrityError,
+    build_holdout_access_receipt,
     load_development_for_tuning,
     reject_holdout_tuning,
     verify_evaluation_corpus,
@@ -31,11 +35,43 @@ def main(argv: list[str] | None = None) -> int:
         default="development",
         help="split requested by tuning mode",
     )
+    parser.add_argument(
+        "--receipt-out",
+        type=Path,
+        help="optional exact output path for a bounded integrity-read receipt",
+    )
     args = parser.parse_args(argv)
 
     try:
+        if args.receipt_out is not None and args.mode != "integrity":
+            raise EvaluationIntegrityError(
+                "receipt_mode", "receipt output is available only for integrity verification"
+            )
         if args.mode == "integrity":
             result = verify_evaluation_corpus(args.root)
+            if args.receipt_out is not None:
+                root = args.root.resolve()
+                manifest = EvaluationCorpusManifest.model_validate(
+                    json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+                )
+                holdout_path = root / "queries.holdout.jsonl"
+                receipt = build_holdout_access_receipt(
+                    manifest,
+                    rows_read=int(result["holdout_query_count"]),
+                    bytes_read=holdout_path.stat().st_size,
+                )
+                output = args.receipt_out
+                if not output.parent.is_dir():
+                    raise EvaluationIntegrityError(
+                        "receipt_parent", "receipt output directory is missing"
+                    )
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", dir=output.parent, prefix=".phase5a-receipt-", delete=False
+                ) as temporary:
+                    temporary.write(receipt.to_canonical_bytes() + b"\n")
+                    temporary_path = Path(temporary.name)
+                os.replace(temporary_path, output)
+                result = {**result, "receipt_generated": True, "receipt_digest": receipt.digest()}
         else:
             reject_holdout_tuning(args.split)
             records = load_development_for_tuning(args.root)

@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import jsonschema
 import pytest
 
+import power_framework.core.evaluation_contracts as evaluation_contracts
 from power_framework.core.evaluation_contracts import (
     EvaluationIntegrityError,
     load_development_for_tuning,
@@ -18,10 +22,10 @@ from power_framework.core.evaluation_contracts import (
 
 ROOT = Path(__file__).parents[1] / "benchmarks" / "power38" / "retrieval_eval" / "v1"
 EXPECTED = {
-    "dataset_digest": "b902fb658df371b24335cec9813afd197995fda5de228dfb6957b85cc6fba3a1",
-    "query_set_digest": "0b7596a4da4f21096ca3720712a65d45a5f426f046c6b3aabfde15d52fb70e68",
-    "development_digest": "629a7ef0c88694ad53ee04b66bf8b8fd00ecf036166983cefb41dc821ce179a2",
-    "holdout_digest": "2fefbb94b9ddf63b50b6226df862b033c41c16838f2ca72d675594f28dc4cedb",
+    "dataset_digest": "179ac7ee8d2e8ec0d5e0924cb322d32783da8ae1fdff379ecb0bfa7e0afc53b0",
+    "query_set_digest": "7e2c0aaf8e0b3940bfa97c949781ade43fc4d67709634f2fcf3f08016fe1b086",
+    "development_digest": "29b4ff596a2a125cfb2a3be54a17570cc10a88051bf5b379d5e2472c481e9289",
+    "holdout_digest": "ef6f122eefe9f4482d016a05a35422e11f0b120be2a64ad08d7ce661bad6721a",
     "disjointness_digest": "554ca3a962beb09c2f7e9afe0bebea19ca79b62d77378959082ab1cfc5ad4275",
 }
 
@@ -91,9 +95,9 @@ def test_duplicate_query_id_across_splits_fails_closed(tmp_path: Path) -> None:
     fixture = copied_fixture(tmp_path)
     holdout_path = fixture / "queries.holdout.jsonl"
     rows = read_jsonl(holdout_path)
-    rows[0]["query_id"] = "p38-dev-q01"
+    rows[1]["query_id"] = "p38-ho-q01"
     write_jsonl(holdout_path, rows)
-    with pytest.raises(EvaluationIntegrityError, match="strict validation"):
+    with pytest.raises(EvaluationIntegrityError, match="query IDs"):
         verify_evaluation_corpus(fixture)
 
 
@@ -119,7 +123,7 @@ def test_normalized_query_overlap_fails_closed(tmp_path: Path) -> None:
 
 def test_nonexistent_ground_truth_source_fails_closed(tmp_path: Path) -> None:
     fixture = copied_fixture(tmp_path)
-    path = fixture / "ground_truth.jsonl"
+    path = fixture / "ground_truth.development.jsonl"
     rows = read_jsonl(path)
     rows[0]["expected_relevant_source_ids"] = ["p38-src-does-not-exist"]
     rows[0]["graded_relevance"][0]["source_id"] = "p38-src-does-not-exist"  # type: ignore[index]
@@ -136,6 +140,105 @@ def test_unknown_query_field_fails_closed(tmp_path: Path) -> None:
     write_jsonl(path, rows)
     with pytest.raises(EvaluationIntegrityError, match="strict validation"):
         verify_evaluation_corpus(fixture)
+
+
+def test_duplicate_json_key_fails_closed(tmp_path: Path) -> None:
+    fixture = copied_fixture(tmp_path)
+    manifest = json.loads((fixture / "manifest.json").read_text(encoding="utf-8"))
+    digest = manifest["dataset_digest"]
+    (fixture / "manifest.json").write_text(
+        '{"dataset_digest":"' + digest + '","dataset_digest":"' + "0" * 64 + '"}',
+        encoding="utf-8",
+    )
+    with pytest.raises(EvaluationIntegrityError, match="duplicate JSON"):
+        verify_evaluation_corpus(fixture)
+
+
+def test_extra_corpus_artifact_fails_closed(tmp_path: Path) -> None:
+    fixture = copied_fixture(tmp_path)
+    (fixture / "corpus" / "extra.md").write_text("not admitted", encoding="utf-8")
+    with pytest.raises(EvaluationIntegrityError, match="enumerate"):
+        verify_evaluation_corpus(fixture)
+
+
+def test_symlinked_corpus_artifact_fails_closed(tmp_path: Path) -> None:
+    fixture = copied_fixture(tmp_path)
+    try:
+        (fixture / "corpus" / "link.md").symlink_to(
+            fixture / "corpus" / "p38-src-project-current.md"
+        )
+    except OSError:
+        pytest.skip("symlinks unavailable in this environment")
+    with pytest.raises(EvaluationIntegrityError, match=r"non-Markdown|symlink"):
+        verify_evaluation_corpus(fixture)
+
+
+def test_tuning_loader_validates_only_pinned_development_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = copied_fixture(tmp_path)
+    original = evaluation_contracts._read_jsonl
+
+    def no_holdout_read(path: Path) -> list[dict[str, object]]:
+        assert "holdout" not in path.name
+        return original(path)
+
+    monkeypatch.setattr(evaluation_contracts, "_read_jsonl", no_holdout_read)
+    assert len(load_development_for_tuning(fixture)) == 20
+
+
+def test_tuning_loader_rejects_changed_development_bytes(tmp_path: Path) -> None:
+    fixture = copied_fixture(tmp_path)
+    path = fixture / "queries.development.jsonl"
+    rows = read_jsonl(path)
+    rows[0]["query"] = "changed development query"
+    write_jsonl(path, rows)
+    with pytest.raises(EvaluationIntegrityError, match="not frozen"):
+        load_development_for_tuning(fixture)
+
+
+def test_ground_truth_relevant_and_excluded_overlap_fails_closed(tmp_path: Path) -> None:
+    fixture = copied_fixture(tmp_path)
+    path = fixture / "ground_truth.development.jsonl"
+    rows = read_jsonl(path)
+    rows[0]["expected_exclusion_source_ids"] = rows[0]["expected_relevant_source_ids"]
+    write_jsonl(path, rows)
+    with pytest.raises(EvaluationIntegrityError, match="both relevant and excluded"):
+        verify_evaluation_corpus(fixture)
+
+
+def test_receipt_row_tampering_fails_closed(tmp_path: Path) -> None:
+    fixture = copied_fixture(tmp_path)
+    path = fixture / "holdout-access-receipt.json"
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    receipt["rows_read"] = 19
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(EvaluationIntegrityError, match="row evidence"):
+        verify_evaluation_corpus(fixture)
+
+
+def test_canonical_datetime_serialization_matches_across_processes() -> None:
+    code = (
+        "from datetime import UTC, datetime, timezone; "
+        "from power_framework.core.context_contracts import BitemporalEvidence; "
+        "item=BitemporalEvidence(observed_at=datetime(2026,1,1,tzinfo=UTC), "
+        "recorded_at=datetime(2026,1,1,2,tzinfo=timezone.utc)); "
+        "print(item.to_canonical_json()); print(item.digest())"
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path(__file__).parents[1] / "src")
+    outputs = []
+    for seed in ("1", "2"):
+        process = subprocess.run(  # noqa: S603 -- fixed interpreter and source.
+            [sys.executable, "-c", code],
+            env={**env, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert process.returncode == 0, process.stderr
+        outputs.append(process.stdout)
+    assert outputs[0] == outputs[1]
 
 
 def test_holdout_receipt_is_bounded_and_digest_bound() -> None:

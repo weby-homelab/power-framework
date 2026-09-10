@@ -18,6 +18,7 @@ from typing import Annotated, Any, Literal, Self, cast
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     PrivateAttr,
@@ -25,7 +26,6 @@ from pydantic import (
     StrictFloat,
     StrictInt,
     StrictStr,
-    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -39,6 +39,9 @@ _IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
 _OPAQUE_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"
 _DIGEST_PATTERN = r"^[a-f0-9]{64}$"
 _SECRET_FREE_REASON_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9 ._:/-]{0,255}$"  # noqa: S105
+_POLICY_ENGINE_TOKEN = object()
+_AUTHORIZATION_BOUNDARY_TOKEN = object()
+MAX_CONTEXT_PACK_BYTES = 2_000_000
 
 
 def _validate_identifier(value: str) -> str:
@@ -87,6 +90,20 @@ def _validate_reason(value: str) -> str:
     if not re.fullmatch(_SECRET_FREE_REASON_PATTERN, value):
         raise ValueError("reason must be bounded and secret-free")
     return value
+
+
+def _require_datetime(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("timestamps must be valid RFC3339 datetimes") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("timestamps must be timezone-aware")
+        return parsed
+    raise ValueError("timestamps must be datetime or RFC3339 string values")
 
 
 def _normalize_datetime(value: datetime) -> datetime:
@@ -174,7 +191,11 @@ type ReasonText = Annotated[
     Field(min_length=1, max_length=256),
     AfterValidator(_validate_reason),
 ]
-type AwareDateTime = Annotated[datetime, AfterValidator(_normalize_datetime)]
+type AwareDateTime = Annotated[
+    datetime,
+    BeforeValidator(_require_datetime),
+    AfterValidator(_normalize_datetime),
+]
 type FiniteFloat = Annotated[StrictFloat, AfterValidator(_finite)]
 type BoundedScore = Annotated[
     StrictFloat, Field(ge=-1_000_000_000, le=1_000_000_000), AfterValidator(_finite)
@@ -441,6 +462,7 @@ class RuntimeModel(BaseModel):
         strict=False,
         validate_assignment=True,
         use_enum_values=False,
+        revalidate_instances="never",
     )
 
     @model_validator(mode="after")
@@ -605,6 +627,8 @@ class RetrievalPlan(RuntimeModel):
             raise ValueError("attempted and skipped stages must be planned")
         if attempted & skipped:
             raise ValueError("a stage cannot be both attempted and skipped")
+        if attempted | skipped != planned:
+            raise ValueError("every planned stage must be attempted or skipped")
         return self
 
 
@@ -750,7 +774,7 @@ class Explainability(RuntimeModel):
     _unique_revisions = field_validator("source_revisions")(_unique)
 
 
-class AccessPolicy(RuntimeModel):
+class _AccessPolicyPayload(RuntimeModel):
     origin: Literal["authorization_boundary"]
     actor: Identifier
     raw_access: Literal["none", "privileged"]
@@ -767,6 +791,25 @@ class AccessPolicy(RuntimeModel):
         ) and self.approval_ref is None:
             raise ValueError("privileged access requires an explicit approval reference")
         return self
+
+
+class AccessPolicy(_AccessPolicyPayload):
+    """Server-issued access output, never a caller-supplied authority token."""
+
+    _issuer_token: object | None = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def require_authorization_boundary(self) -> Self:
+        if self._issuer_token is not _AUTHORIZATION_BOUNDARY_TOKEN:
+            raise ValueError("AccessPolicy must be issued by the authorization boundary")
+        return self
+
+    @classmethod
+    def _from_authorization_boundary(cls, **data: Any) -> Self:
+        validated = _AccessPolicyPayload.model_validate(data)
+        instance = cls.model_construct(**validated.model_dump(exclude_none=True))
+        instance._issuer_token = _AUTHORIZATION_BOUNDARY_TOKEN
+        return instance
 
 
 class ContextPack(RuntimeModel):
@@ -789,8 +832,26 @@ class ContextPack(RuntimeModel):
 
     @model_validator(mode="after")
     def validate_pack_access(self) -> Self:
+        if self.access_policy._issuer_token is not _AUTHORIZATION_BOUNDARY_TOKEN:
+            raise ValueError("ContextPack requires a server-issued access policy")
         if self.retrieval_status in {"degraded", "failed"} and not self.fallback_reason:
             raise ValueError("degraded or failed packs require a bounded fallback reason")
+        if self.budget_class is not self.retrieval_plan.budget.budget_class:
+            raise ValueError("pack budget class must match its retrieval plan")
+        if self.budget.max_tokens > self.retrieval_plan.budget.max_tokens:
+            raise ValueError("pack token ceiling cannot exceed the retrieval budget")
+        if len(self.items) > self.retrieval_plan.budget.max_candidates:
+            raise ValueError("pack item count cannot exceed candidate budget")
+        actual_tokens = sum(item.token_cost for item in self.items)
+        if actual_tokens != self.budget.consumed_tokens:
+            raise ValueError("consumed_tokens must equal the bounded item token cost")
+        actual_bytes = sum(len(item.excerpt.encode("utf-8")) for item in self.items)
+        if actual_bytes > MAX_CONTEXT_PACK_BYTES:
+            raise ValueError("context pack exceeds the aggregate byte ceiling")
+        if self.budget.dense_used and not self.retrieval_plan.budget.dense_allowed:
+            raise ValueError("dense usage is not allowed by the retrieval budget")
+        if self.budget.reranker_used and not self.retrieval_plan.budget.reranker_allowed:
+            raise ValueError("reranker usage is not allowed by the retrieval budget")
         if (
             any(item.trust_state is TrustState.RAW for item in self.items)
             and self.access_policy.raw_access != "privileged"
@@ -849,6 +910,27 @@ class IndexCostEstimate(RuntimeModel):
     reason: ShortText
 
 
+class _MemoryActionPayload(RuntimeModel):
+    action: MemoryActionKind
+    signal: ShortText
+    domain: Identifier
+    trust_state: TrustState
+    authority: Authority | None = None
+    confidence: Annotated[StrictFloat, Field(ge=0.0, le=1.0), AfterValidator(_finite)]
+    reason: ShortText
+    policy_revision: Identifier
+
+    @model_validator(mode="after")
+    def validate_payload_axes(self) -> Self:
+        if self.trust_state in {
+            TrustState.RAW,
+            TrustState.QUARANTINED,
+            TrustState.NOISE,
+        } and self.authority in {Authority.CANONICAL, Authority.VERIFIED}:
+            raise ValueError("untrusted memory action cannot claim canonical authority")
+        return self
+
+
 class MemoryActionDecision(RuntimeModel):
     """Server-derived policy output; it is not a caller input authority."""
 
@@ -862,26 +944,25 @@ class MemoryActionDecision(RuntimeModel):
     origin: Literal["policy_engine"]
     policy_revision: Identifier
     server_derived: Literal[True]
-    _issued_by_policy: bool = PrivateAttr(default=False)
+    _issuer_token: object | None = PrivateAttr(default=None)
 
     @model_validator(mode="after")
-    def require_policy_context(self, info: ValidationInfo) -> Self:
-        if not (info.context and info.context.get("policy_engine") is True):
+    def require_policy_issuer(self) -> Self:
+        if self._issuer_token is not _POLICY_ENGINE_TOKEN:
             raise ValueError("MemoryAction is server-derived and cannot be caller-created")
-        if self.trust_state in {
-            TrustState.RAW,
-            TrustState.QUARANTINED,
-            TrustState.NOISE,
-        } and self.authority in {Authority.CANONICAL, Authority.VERIFIED}:
-            raise ValueError("untrusted memory action cannot claim canonical authority")
         return self
 
     @classmethod
-    def from_policy_engine(cls, **data: Any) -> Self:
-        payload = dict(data)
-        payload["origin"] = "policy_engine"
-        payload["server_derived"] = True
-        return cls.model_validate(payload, context={"policy_engine": True})
+    def _from_policy_engine(cls, **data: Any) -> Self:
+        payload = {
+            key: value for key, value in data.items() if key not in {"origin", "server_derived"}
+        }
+        validated = _MemoryActionPayload.model_validate(payload)
+        instance = cls.model_construct(
+            **validated.model_dump(exclude_none=True), origin="policy_engine", server_derived=True
+        )
+        instance._issuer_token = _POLICY_ENGINE_TOKEN
+        return instance
 
 
 class RetentionClassContract(RuntimeModel):
@@ -1118,10 +1199,8 @@ class RetryPolicy(RuntimeModel):
 
     @model_validator(mode="after")
     def validate_retry_relationships(self) -> Self:
-        if self.max_total_requeues < self.max_automatic_retries:
-            raise ValueError("total requeues must cover automatic retries")
-        if self.max_total_requeues < self.max_manual_requeues:
-            raise ValueError("total requeues must cover manual requeues")
+        if self.max_total_requeues < self.max_automatic_retries + self.max_manual_requeues:
+            raise ValueError("total requeues must cover automatic and manual requeues")
         return self
 
 
@@ -1218,12 +1297,12 @@ class RuntimeContractEnvelope(RuntimeModel):
         payload = data["payload"]
         parsed: Any
         if isinstance(expected, type) and issubclass(expected, RuntimeModel):
-            if isinstance(payload, expected):
-                parsed = payload
-            else:
-                if expected is MemoryActionDecision:
-                    raise ValueError("MemoryAction payload must be issued by the policy engine")
-                parsed = expected.model_validate(payload)
+            if expected is MemoryActionDecision and (
+                not isinstance(payload, expected)
+                or payload._issuer_token is not _POLICY_ENGINE_TOKEN
+            ):
+                raise ValueError("MemoryAction payload must be issued by the policy engine")
+            parsed = payload if isinstance(payload, expected) else expected.model_validate(payload)
         elif isinstance(expected, type) and issubclass(expected, StrEnum):
             if isinstance(payload, expected):
                 parsed = payload
