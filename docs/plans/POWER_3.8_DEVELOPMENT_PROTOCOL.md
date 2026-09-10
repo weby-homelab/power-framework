@@ -110,9 +110,10 @@ Foundation Hardening → Phase 5A–5H → Phase 6 → Phase 7 → Phase 8 → P
 ```
 
 The Controlled Dependency Refresh, Foundation Hardening (PR #414), including
-Actions #396 and final integration, is closed in the current governance
-snapshot. The next bounded runtime gate is Phase 5A; it must be independently
-admitted from fresh live state and must not be silently chained into Phase 5B.
+Actions #396 and final integration, and Phase 5A runtime contracts (PR #415) are
+closed in the current governance snapshot. The next bounded gate is Phase 5A.1;
+it must be independently admitted from fresh live state and must not be silently
+chained into Phase 5B.
 
 ## GitHub publication policy
 
@@ -184,11 +185,12 @@ publish one consolidated governance reconciliation
 ```
 
 The current reconciliation records the closed Controlled Dependency Refresh,
-the closed Foundation Hardening PR #414, the deferred/closed #402 bundle, the
-superseded/closed #407 historical PR, and the next Phase 5A gate. Only the
-protected normal merge makes this snapshot canonical; an open PR or unsigned
-REST Contents commit remains provisional. Historical handoffs and evidence
-branches are retained and never rewritten to look current.
+the closed Foundation Hardening PR #414, the closed Phase 5A runtime contracts
+PR #415, the deferred/closed #402 bundle, the superseded/closed #407 historical
+PR, and the current Phase 5A.1 gate. Only the protected normal merge makes this
+snapshot canonical; an open PR or unsigned REST Contents commit remains
+provisional. Historical handoffs and evidence branches are retained and never
+rewritten to look current.
 
 ## Governance churn rule
 
@@ -398,19 +400,21 @@ PR #407: CLOSED WITHOUT MERGE / SUPERSEDED HISTORICAL EVIDENCE
 CONTEXT/MEMORY/RETRIEVAL ARCHITECTURE: CANONICAL PLANNING V2 / NOT IMPLEMENTED
 FOUNDATION HARDENING: CLOSED / IMPLEMENTED / VERIFIED
 ACTIONS #396: CLOSED / MERGED
-PHASE 5: IN PROGRESS / 5A ADMISSION CANDIDATE
-PHASE 5A: IMPLEMENTED / LOCALLY VERIFIED / PROTECTED EXACT-HEAD MERGE REQUIRED
+PHASE 5: IN PROGRESS
+PHASE 5A RUNTIME CONTRACTS: CLOSED / MERGED / VERIFIED
+PHASE 5A.1 EVALUATION CORRECTION: CANDIDATE / PROTECTED EXACT-HEAD MERGE REQUIRED
 PHASE 5B: BLOCKED / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF and Actions merge receipts are retained `MERGED MAIN` evidence. Their
-candidate epochs are retained `REMOTE EXACT-HEAD`/historical evidence and are
-not themselves merged-main proof. Phase 5A is the only active implementation
-gate in this snapshot; do not start Phase 5B–9, version bumps, tags, releases,
-release images, or final release notes. Phase 5A becomes `MERGED MAIN` only
-after its protected normal merge and independent post-merge verification.
+The HF, Actions, and Phase 5A runtime-contract merge receipts are retained
+`MERGED MAIN` evidence. Their candidate epochs are retained `REMOTE EXACT-HEAD`/
+historical evidence and are not themselves merged-main proof. Phase 5A.1 is the
+only active implementation gate in this snapshot; do not start Phase 5B–9,
+version bumps, tags, releases, release images, or final release notes. Phase
+5A.1 becomes `MERGED MAIN` only after its protected normal merge and independent
+post-merge verification.
 
 ## Cross-links
 
@@ -421,4 +425,6 @@ after its protected normal merge and independent post-merge verification.
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
+- [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
+- [Phase 5A.1 evaluation erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

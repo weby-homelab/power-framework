@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from power_framework.core.evaluation_contracts import (
+    ACTIVE_EVALUATION_REVISION,
     EvaluationIntegrityError,
     EvaluationVerificationSnapshot,
     build_holdout_access_receipt,
@@ -22,7 +23,12 @@ from power_framework.core.evaluation_contracts import (
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("root", type=Path, help="frozen retrieval-evaluation v1 directory")
+    parser.add_argument("root", type=Path, help="versioned retrieval-evaluation directory")
+    parser.add_argument(
+        "--expected-revision",
+        choices=("v1", ACTIVE_EVALUATION_REVISION),
+        help="optional explicit revision identity expected in the manifest",
+    )
     parser.add_argument(
         "--mode",
         choices=("integrity", "tuning"),
@@ -48,7 +54,11 @@ def main(argv: list[str] | None = None) -> int:
                 "receipt_mode", "receipt output is available only for integrity verification"
             )
         if args.mode == "integrity":
-            verified = verify_evaluation_corpus(args.root, return_snapshot=True)
+            verified = verify_evaluation_corpus(
+                args.root,
+                expected_revision=args.expected_revision,
+                return_snapshot=True,
+            )
             if not isinstance(verified, EvaluationVerificationSnapshot):
                 raise EvaluationIntegrityError(
                     "verifier_state", "integrity snapshot was not returned"
@@ -81,7 +91,10 @@ def main(argv: list[str] | None = None) -> int:
                 result = {**result, "receipt_generated": True, "receipt_digest": receipt.digest()}
         else:
             reject_holdout_tuning(args.split)
-            records = load_development_for_tuning(args.root)
+            records = load_development_for_tuning(
+                args.root,
+                expected_revision=args.expected_revision,
+            )
             result = {
                 "status": "PASS",
                 "mode": "tuning",

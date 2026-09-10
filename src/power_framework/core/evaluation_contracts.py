@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -65,6 +67,105 @@ FROZEN_PHASE5A_DIGESTS = {
     "disjointness_digest": "554ca3a962beb09c2f7e9afe0bebea19ca79b62d77378959082ab1cfc5ad4275",
 }
 FROZEN_PHASE5A_COUNTS = {"sources": 20, "development_queries": 20, "holdout_queries": 20}
+ACTIVE_EVALUATION_REVISION = "v1.1"
+HISTORICAL_V1_FILE_SHA256 = {
+    "README.md": "b4742b926212d76a156fa0ce74208551554c3ebc4d468688cb0db93e03dddf9c",
+    "corpus/p38-src-code-en.md": "6e2afab08afad604560d02bc0bdac57c2e64561b41e036c33aa97f1ccffc4f3d",
+    "corpus/p38-src-code-ua.md": "78c069eae85f6ddff14a249d05e3f640a1fd0210d0ef5117f8e5fbc63a54c478",
+    "corpus/p38-src-contradiction-canonical.md": "ad26827f1728789f77c645c4a773261b23ccd11987ab50ad76b4a35483305e59",
+    "corpus/p38-src-contradiction-raw.md": "4ab3cda9776457bda38fe49dbed14cfbaffc5332367ac64678b7f336d74f1bc4",
+    "corpus/p38-src-cross-domain.md": "024fead7cfc087304264a29b8ffb1404c0ba732ee035fbac9f0667232d8d55ed",
+    "corpus/p38-src-decision-current.md": "f23e14ca7b3827c5cb1f72f64b3a94b95e3a7d04c81eaea6175ce072df940923",
+    "corpus/p38-src-decision-old.md": "893e9cabd2728942907abec377d46b7cd2303e40bc627b55f12471acfa7bf5c7",
+    "corpus/p38-src-decision-raw.md": "692ec5410735116a9b0137a636932bbe501f89b2ef8bbcda9739c747ea5bb889",
+    "corpus/p38-src-hard-negative.md": "953041221895f577ba835d81a760e3fe4136d62667fc8b4ad6db4b014be6814d",
+    "corpus/p38-src-infra-current.md": "c55d82f3587cd15b25afd8d3666e5ec06eece83410f7e794c3f5baf4f8376fdf",
+    "corpus/p38-src-infra-stale.md": "e76539faafbddf2edda5c65947e4da584bc313e9c61828a3334a72075da04383",
+    "corpus/p38-src-noise-injection.md": "51d2e89657ee0f794d43edefe87dfcc75c3ff1e4991628e193044ac976b8ee59",
+    "corpus/p38-src-project-current-ua.md": "0a2c82a84528dfbbaf5da825bfe4b04bab5ee613adb2ad5497ff12d232c42f49",
+    "corpus/p38-src-project-current.md": "5a5b8fa65a46a6e015026ffefc4e76cc3bb46ab9287917ce2f22460de359c3e8",
+    "corpus/p38-src-project-raw-chat.md": "df8b10e45dd223c819a650373f84917a8b03d8ed949670d228ba4cc76f207f7d",
+    "corpus/p38-src-project-superseded.md": "56c7a6e50f054908410b4acb9a2d9c217a0236ef7e37e2162c3eae98f54d3c00",
+    "corpus/p38-src-research-curated.md": "ce464c98b9d4d40ef3fedb8753683a172a48cafc9f21eaac9c53336f3579116c",
+    "corpus/p38-src-research-unverified.md": "c156396d712146854df8c0b4a11b56054c1aa02df59d398a11a12494b1151995",
+    "corpus/p38-src-task-current.md": "b3f5c0072e4d08baed59a288096c8759f1d64c5df595829466147a799c669512",
+    "corpus/p38-src-task-raw.md": "b2213109a1d8bb18bc6bdeb3f86cf65aeedac397476dafd9ed3c06b713f35fc9",
+    "disjointness-proof.json": "f26234f8c805f4738097f1bde9366440f8bea40541602c94ca4ed12502b912a2",
+    "ground_truth.development.jsonl": "611ef7aeaecbdbfd0d05a35f30a69761506a31d5c5bf387fa43959361de0660e",
+    "ground_truth.holdout.jsonl": "eab969fd51fcdf6639602b387b70a20a9d3c24347d34f4c4d7a89df2d8cbbe8a",
+    "holdout-access-receipt.json": "4bf395636738a01d54d4f50569beb279d3a4a061ef4d26d30740e6b35eaf6e3a",
+    "manifest.json": "b2b3e3412501c6f977b0f5a7accfcdb5d6931adecb889cf610acc9012cea85b5",
+    "queries.development.jsonl": "8ba2d94e187d12919359093b5102b838514a46c9bdd6d74828b0f02ce5d45e44",
+    "queries.holdout.jsonl": "b72143da332e32d96143c21c409000bb630ae460f867849fd47fe3698d33c8a7",
+    "source_metadata.jsonl": "6b6d43f0ad3a63a0b4bd4b98f23c4bb74e700b4c3f480ad207dc622294be67c9",
+}
+ACTIVE_V11_ROOT_FILE_SHA256 = {
+    "README.md": "c9aea87e0be8cad63e3dc69f7606aa302bd4033200e746fffb7da2fa0024fc23",
+    "disjointness-proof.json": "1a648120b8d7fb245d590a2c0a106f331777bd3413a2c0a2c09ed62bbe465643",
+    "ground_truth.development.jsonl": "470420a4441c6f707704a77938416ae06821a10b8eafcd34820eeca51c47d48b",
+    "ground_truth.holdout.jsonl": "ed6d1e78bc24582302574d8940ee5b5a89eab1d61060cdaeefeb2a5ee134ea6d",
+    "holdout-access-receipt.json": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
+    "manifest.json": "550f7d61ca3c2df84dd3a9ed996fa33cecff7d0aa583da59ac4e33106699cc40",
+    "queries.development.jsonl": "f4e3adcd0d99e578bca5092eb6f36f70b3f5de72dfd33295ca6465409f1eec9d",
+    "queries.holdout.jsonl": "701cb69e5d4045a6134cf7f83725eab736f32d85ec90ff9396c08a50e91974c2",
+    "semantic-adjudication.json": "f4dbebdf99479e1281c2afc8e03a8e67a7cbd7d901308bb4b7655c5093348198",
+    "semantic-adjudication.md": "b8156291d55b36d6c561c0f0f226e38a3a33dd9c6007ea8b071f9b95ed3614c5",
+    "semantic-review-a-v1.1.json": "fd506348b4862d2194015cf0661027d98262a3d380b4208b8d1624070aa2c985",
+    "semantic-review-b-v1.1.json": "14a4549f67b6efc40489a5e708fd0eafa35f464f94e5aa7d1153969db783c7b7",
+    "source_metadata.jsonl": "6b6d43f0ad3a63a0b4bd4b98f23c4bb74e700b4c3f480ad207dc622294be67c9",
+}
+ACTIVE_PHASE5A1_DIGESTS = {
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+    "dataset_digest": "5d8f2d7e68b62b3a2385c7a534a492083e1ff1b9f68973d4cbe8bf64461521fc",
+    "query_set_digest": "b3fdf772c6b744495a503651c5ceecc0302bd3d34c00e1f12e2f014c5797be3e",
+    "development_digest": "4bcd6c464b212e771517e71d3fdb7d696efbf0ec5521117dc7e8e7ce9ddaeb95",
+    "holdout_digest": "61aa9d85ab0804308c008635814cb79218b7e6cc3c78d331ca4b8d4656b5f551",
+    "disjointness_digest": "cf8054395040f17e4d21a005e248b7804fd515cc555b12b52b0afca0f32376d4",
+    "semantic_adjudication_digest": "106d3e220d01cc325ada3ffc3e551ebd4111be5c3fc5aebf62d22b0d45516218",
+    "holdout_access_receipt_digest": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
+}
+EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
+    "v1": {
+        "active": False,
+        "digests": FROZEN_PHASE5A_DIGESTS,
+        "semantic_status": "SUPERSEDED_ERRATUM",
+        "refs": {
+            "holdout_access_audit": "holdout-access-receipt-v1",
+            "sealed_artifact_ref": "power38-holdout-v1-sealed",
+            "disjointness_proof_ref": "disjointness-proof-v1",
+            "provenance_source_ref": "power38-ground-truth-v1",
+            "provenance_method": "synthetic_fixture",
+            "source_corpus_digest": None,
+            "semantic_adjudication_markdown_digest": None,
+            "holdout_access_receipt_digest": None,
+            "planning_only": None,
+            "supersedes_revision": None,
+            "semantic_adjudication_ref": None,
+            "reviewer_a_receipt_ref": None,
+            "reviewer_b_receipt_ref": None,
+        },
+    },
+    "v1.1": {
+        "active": True,
+        "digests": ACTIVE_PHASE5A1_DIGESTS,
+        "semantic_status": "PASS",
+        "refs": {
+            "holdout_access_audit": "holdout-access-receipt-v1.1",
+            "sealed_artifact_ref": "power38-holdout-v1.1-sealed",
+            "disjointness_proof_ref": "disjointness-proof-v1.1",
+            "provenance_source_ref": "power38-ground-truth-v1.1",
+            "provenance_method": "human_adjudicated",
+            "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+            "semantic_adjudication_markdown_digest": "b8156291d55b36d6c561c0f0f226e38a3a33dd9c6007ea8b071f9b95ed3614c5",
+            "holdout_access_receipt_digest": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
+            "planning_only": True,
+            "supersedes_revision": "v1",
+            "semantic_adjudication_ref": "semantic-adjudication-v1.1",
+            "reviewer_a_receipt_ref": "semantic-review-a-v1.1",
+            "reviewer_b_receipt_ref": "semantic-review-b-v1.1",
+        },
+    },
+}
 
 
 class EvaluationLanguage(StrEnum):
@@ -173,7 +274,10 @@ class EvaluationCorpusManifest(RuntimeModel):
     """Runtime form of the frozen ``power.retrieval-eval.v1`` manifest."""
 
     dataset_schema_version: Literal["power.retrieval-eval.v1"]
+    evaluation_revision: Literal["v1", "v1.1"] = "v1"
     dataset_digest: Digest
+    source_corpus_digest: Digest | None = None
+    holdout_access_receipt_digest: Digest | None = None
     query_set_digest: Digest
     language_mix: list[EvaluationLanguage] = Field(min_length=3, max_length=3)
     required_categories: list[EvaluationCategory] = Field(min_length=18, max_length=18)
@@ -188,6 +292,11 @@ class EvaluationCorpusManifest(RuntimeModel):
     sealed_artifact_ref: OpaqueReference
     disjointness_proof_ref: OpaqueReference
     disjointness_proof_digest: Digest
+    planning_only: Literal[True] | None = None
+    supersedes_revision: Literal["v1"] | None = None
+    semantic_adjudication_ref: OpaqueReference | None = None
+    semantic_adjudication_digest: Digest | None = None
+    semantic_adjudication_markdown_digest: Digest | None = None
 
     _unique_languages = field_validator("language_mix", "required_categories")(_unique)
 
@@ -316,6 +425,64 @@ class EvaluationGroundTruth(RuntimeModel):
         return self
 
 
+class SemanticAdjudicationRecord(EvaluationRecordModel):
+    """One bounded, reviewable decision in the active corpus audit."""
+
+    action: Literal["KEEP_QUERY_KEEP_GT", "REWRITE_QUERY", "CHANGE_GROUND_TRUTH"]
+    query_id: OpaqueReference
+    rationale_ref: OpaqueReference
+    review_status: Literal["two_independent_reviews_plus_orchestrator"]
+    reviewer_a: Literal["PASS", "DEFECT", "AMBIGUOUS"]
+    reviewer_b: Literal["PASS", "DEFECT", "AMBIGUOUS"]
+    verdict: Literal["PASS"]
+
+
+class SemanticReviewReceipt(EvaluationRecordModel):
+    """Bounded receipt describing one independent semantic review input."""
+
+    algorithm_output_used: Literal[False]
+    ambiguous_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
+    defect_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
+    input_dataset_digest: Digest
+    input_query_set_digest: Digest
+    input_revision: Literal["v1"]
+    pass_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
+    retrieval_metrics_observed: Literal[False]
+    reviewer_id: OpaqueReference
+    scope_query_count: Annotated[StrictInt, Field(ge=1, le=MAX_JSONL_RECORDS)]
+    scope_source_count: Annotated[StrictInt, Field(ge=1, le=MAX_JSONL_RECORDS)]
+    schema_version: Literal["power.retrieval-semantic-review.v1"]
+
+    @model_validator(mode="after")
+    def validate_scope_counts(self) -> Self:
+        if self.pass_count + self.defect_count + self.ambiguous_count != self.scope_query_count:
+            raise ValueError("semantic review counts must cover the declared query scope")
+        return self
+
+
+class SemanticAdjudicationArtifact(EvaluationRecordModel):
+    """Content-addressed semantic evidence bound to one corpus revision."""
+
+    algorithm_output_used: Literal[False]
+    dataset_revision: Literal["v1.1"]
+    records: list[SemanticAdjudicationRecord] = Field(min_length=1, max_length=MAX_JSONL_RECORDS)
+    retrieval_metrics_observed: Literal[False]
+    reviewer_a_receipt_digest: Digest
+    reviewer_a_receipt_ref: OpaqueReference
+    reviewer_b_receipt_digest: Digest
+    reviewer_b_receipt_ref: OpaqueReference
+    review_method: Literal["two_independent_reviews_plus_orchestrator"]
+    router_threshold_existed: Literal[False]
+    schema_version: Literal["power.retrieval-semantic-adjudication.v1"]
+
+    @model_validator(mode="after")
+    def validate_record_ids(self) -> Self:
+        query_ids = [record.query_id for record in self.records]
+        if len(query_ids) != len(set(query_ids)):
+            raise ValueError("semantic adjudication query IDs must be unique")
+        return self
+
+
 class DisjointnessProof(RuntimeModel):
     schema_version: Literal["power.retrieval-disjointness.v1"]
     development_query_ids: list[OpaqueReference] = Field(min_length=1, max_length=MAX_JSONL_RECORDS)
@@ -407,6 +574,42 @@ def _reject_json_constant(value: str) -> Any:
     )
 
 
+def _read_bounded_regular_file(path: Path) -> bytes:
+    """Read a regular artifact through a no-follow, bounded file descriptor."""
+    fd: int | None = None
+    try:
+        fd = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+        )
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise EvaluationIntegrityError(
+                "invalid_artifact", "evaluation artifact must be a regular file"
+            )
+        if info.st_size > MAX_FILE_BYTES:
+            raise EvaluationIntegrityError(
+                "artifact_too_large", "evaluation artifact exceeds the byte bound"
+            )
+        with os.fdopen(fd, "rb") as stream:
+            fd = None
+            data = stream.read(MAX_FILE_BYTES + 1)
+        if len(data) > MAX_FILE_BYTES:
+            raise EvaluationIntegrityError(
+                "artifact_too_large", "evaluation artifact exceeds the byte bound"
+            )
+        return data
+    except EvaluationIntegrityError:
+        raise
+    except OSError as exc:
+        raise EvaluationIntegrityError(
+            "missing_artifact", "evaluation artifact is unreadable"
+        ) from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
 def _reject_forbidden_markers(data: bytes) -> None:
     lowered = data.lower()
     if any(marker.encode("ascii") in lowered for marker in _FORBIDDEN_SYNTHETIC_MARKERS):
@@ -415,18 +618,7 @@ def _reject_forbidden_markers(data: bytes) -> None:
         )
 
 
-def _read_json(path: Path) -> Any:
-    try:
-        data = path.read_bytes()
-    except OSError as exc:
-        raise EvaluationIntegrityError(
-            "missing_artifact", "required evaluation artifact is unreadable"
-        ) from exc
-    if len(data) > MAX_FILE_BYTES:
-        raise EvaluationIntegrityError(
-            "artifact_too_large", "evaluation artifact exceeds the byte bound"
-        )
-    _reject_forbidden_markers(data)
+def _parse_json_bytes(data: bytes, *, error_code: str, error_message: str) -> Any:
     try:
         text = data.decode("utf-8")
         return json.loads(
@@ -437,22 +629,27 @@ def _read_json(path: Path) -> Any:
     except EvaluationIntegrityError:
         raise
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise EvaluationIntegrityError(
-            "invalid_json", "evaluation artifact is not valid UTF-8 JSON"
-        ) from exc
+        raise EvaluationIntegrityError(error_code, error_message) from exc
+
+
+def _read_json(path: Path) -> Any:
+    try:
+        data = _read_bounded_regular_file(path)
+    except EvaluationIntegrityError:
+        raise
+    _reject_forbidden_markers(data)
+    return _parse_json_bytes(
+        data,
+        error_code="invalid_json",
+        error_message="evaluation artifact is not valid UTF-8 JSON",
+    )
 
 
 def _read_jsonl_with_size(path: Path) -> tuple[list[dict[str, Any]], int]:
     try:
-        data = path.read_bytes()
-    except OSError as exc:
-        raise EvaluationIntegrityError(
-            "missing_artifact", "required JSONL artifact is unreadable"
-        ) from exc
-    if len(data) > MAX_FILE_BYTES:
-        raise EvaluationIntegrityError(
-            "artifact_too_large", "JSONL artifact exceeds the byte bound"
-        )
+        data = _read_bounded_regular_file(path)
+    except EvaluationIntegrityError:
+        raise
     _reject_forbidden_markers(data)
     rows: list[dict[str, Any]] = []
     for line_number, raw_line in enumerate(data.splitlines(), start=1):
@@ -522,6 +719,7 @@ def _parse_models(
     list[EvaluationGroundTruth],
     DisjointnessProof,
     HoldoutAccessReceipt,
+    SemanticAdjudicationArtifact | None,
     int,
     int,
 ]:
@@ -551,6 +749,21 @@ def _parse_models(
         ground_truth_holdout = [
             EvaluationGroundTruth.model_validate(row) for row in ground_truth_holdout_rows
         ]
+        _check_query_sets(development, holdout)
+        _check_ground_truth(
+            source_rows,
+            development,
+            [],
+            ground_truth_development,
+            expected_split=EvaluationSplitName.DEVELOPMENT,
+        )
+        _check_ground_truth(
+            source_rows,
+            [],
+            holdout,
+            ground_truth_holdout,
+            expected_split=EvaluationSplitName.HOLDOUT,
+        )
         ground_truth = ground_truth_development + ground_truth_holdout
         proof = DisjointnessProof.model_validate(
             _read_json(_fixture_path(root, "disjointness-proof.json"))
@@ -558,6 +771,11 @@ def _parse_models(
         receipt = HoldoutAccessReceipt.model_validate(
             _read_json(_fixture_path(root, "holdout-access-receipt.json"))
         )
+        semantic_adjudication = None
+        if manifest.evaluation_revision == ACTIVE_EVALUATION_REVISION:
+            semantic_adjudication = SemanticAdjudicationArtifact.model_validate(
+                _read_json(_fixture_path(root, "semantic-adjudication.json"))
+            )
     except ValidationError as exc:
         raise EvaluationIntegrityError(
             "schema_mismatch", "evaluation record failed strict validation"
@@ -570,6 +788,7 @@ def _parse_models(
         ground_truth,
         proof,
         receipt,
+        semantic_adjudication,
         holdout_query_bytes + ground_truth_holdout_bytes,
         len(ground_truth_holdout),
     )
@@ -616,10 +835,10 @@ def _source_entries(
         declared_paths.add(declared_path)
         source_path = _fixture_path(root, source.path)
         try:
-            content = source_path.read_bytes()
-        except OSError as exc:
+            content = _read_bounded_regular_file(source_path)
+        except EvaluationIntegrityError as exc:
             raise EvaluationIntegrityError(
-                "missing_source", "ground-truth source file is missing"
+                exc.code, "ground-truth source file is unreadable"
             ) from exc
         if (
             not content
@@ -660,6 +879,66 @@ def _source_entries(
             "corpus_inventory", "source metadata does not exactly enumerate corpus Markdown files"
         )
     return sorted(entries, key=lambda item: item["source_id"])
+
+
+def _check_historical_v1_bytes(root: Path) -> None:
+    actual: dict[str, str] = {}
+    try:
+        paths = list(root.rglob("*"))
+    except OSError as exc:
+        raise EvaluationIntegrityError(
+            "historical_v1_immutability", "historical v1 inventory is unreadable"
+        ) from exc
+    for path in paths:
+        if path.is_symlink():
+            raise EvaluationIntegrityError(
+                "historical_v1_immutability", "historical v1 contains a symlink"
+            )
+        if path.is_dir():
+            continue
+        try:
+            actual[path.relative_to(root).as_posix()] = _sha256_bytes(
+                _read_bounded_regular_file(path)
+            )
+        except EvaluationIntegrityError as exc:
+            raise EvaluationIntegrityError(
+                "historical_v1_immutability", "historical v1 file is unreadable"
+            ) from exc
+    if actual != HISTORICAL_V1_FILE_SHA256:
+        raise EvaluationIntegrityError(
+            "historical_v1_immutability", "historical v1 bytes or inventory changed"
+        )
+
+
+def _check_active_v11_inventory(root: Path) -> None:
+    actual: dict[str, str] = {}
+    try:
+        paths = list(root.iterdir())
+    except OSError as exc:
+        raise EvaluationIntegrityError(
+            "active_v11_inventory", "active v1.1 inventory is unreadable"
+        ) from exc
+    for path in paths:
+        if path.is_symlink():
+            raise EvaluationIntegrityError("active_v11_inventory", "active v1.1 contains a symlink")
+        if path.is_dir():
+            if path.name != "corpus":
+                raise EvaluationIntegrityError(
+                    "active_v11_inventory", "active v1.1 contains an unlisted directory"
+                )
+            continue
+        try:
+            actual[path.relative_to(root).as_posix()] = _sha256_bytes(
+                _read_bounded_regular_file(path)
+            )
+        except EvaluationIntegrityError as exc:
+            raise EvaluationIntegrityError(
+                "active_v11_inventory", "active v1.1 root artifact is unreadable"
+            ) from exc
+    if actual != ACTIVE_V11_ROOT_FILE_SHA256:
+        raise EvaluationIntegrityError(
+            "active_v11_inventory", "active v1.1 root bytes or inventory changed"
+        )
 
 
 def _check_query_sets(
@@ -741,8 +1020,18 @@ def _check_coverage(
         )
 
 
-def _check_pinned_manifest(manifest: EvaluationCorpusManifest) -> None:
-    expected = FROZEN_PHASE5A_DIGESTS
+def _revision_spec(manifest: EvaluationCorpusManifest) -> dict[str, Any]:
+    try:
+        return EVALUATION_REVISION_REGISTRY[manifest.evaluation_revision]
+    except KeyError as exc:
+        raise EvaluationIntegrityError(
+            "revision_unknown", "evaluation revision is not registered"
+        ) from exc
+
+
+def _check_pinned_manifest(manifest: EvaluationCorpusManifest) -> dict[str, Any]:
+    spec = _revision_spec(manifest)
+    expected = spec["digests"]
     if manifest.dataset_digest != expected["dataset_digest"]:
         raise EvaluationIntegrityError(
             "manifest_pin", "manifest is not bound to the admitted dataset"
@@ -757,25 +1046,40 @@ def _check_pinned_manifest(manifest: EvaluationCorpusManifest) -> None:
         raise EvaluationIntegrityError("manifest_pin", "holdout split is not admitted")
     if manifest.disjointness_proof_digest != expected["disjointness_digest"]:
         raise EvaluationIntegrityError("manifest_pin", "disjointness proof is not admitted")
+    refs = spec["refs"]
     if (
-        manifest.holdout_access_audit != "holdout-access-receipt-v1"
-        or manifest.sealed_artifact_ref != "power38-holdout-v1-sealed"
-        or manifest.disjointness_proof_ref != "disjointness-proof-v1"
+        manifest.holdout_access_audit != refs["holdout_access_audit"]
+        or manifest.sealed_artifact_ref != refs["sealed_artifact_ref"]
+        or manifest.disjointness_proof_ref != refs["disjointness_proof_ref"]
     ):
         raise EvaluationIntegrityError("manifest_pin", "manifest references are not admitted")
     if manifest.development_split.query_count != FROZEN_PHASE5A_COUNTS["development_queries"]:
         raise EvaluationIntegrityError("manifest_pin", "development count is not admitted")
     if manifest.holdout_split.query_count != FROZEN_PHASE5A_COUNTS["holdout_queries"]:
         raise EvaluationIntegrityError("manifest_pin", "holdout count is not admitted")
+    if (
+        manifest.planning_only != refs["planning_only"]
+        or manifest.supersedes_revision != refs["supersedes_revision"]
+        or manifest.semantic_adjudication_ref != refs["semantic_adjudication_ref"]
+        or manifest.source_corpus_digest != refs["source_corpus_digest"]
+        or manifest.semantic_adjudication_markdown_digest
+        != refs["semantic_adjudication_markdown_digest"]
+    ):
+        raise EvaluationIntegrityError("manifest_pin", "revision identity is not admitted")
+    expected_semantic_digest = expected.get("semantic_adjudication_digest")
+    if manifest.semantic_adjudication_digest != expected_semantic_digest:
+        raise EvaluationIntegrityError("manifest_pin", "semantic adjudication is not admitted")
+    return spec
 
 
-def _check_manifest_provenance(manifest: EvaluationCorpusManifest) -> None:
+def _check_manifest_provenance(manifest: EvaluationCorpusManifest, spec: dict[str, Any]) -> None:
     if len(manifest.ground_truth_provenance) != 1:
         raise EvaluationIntegrityError("provenance", "frozen corpus requires one provenance record")
     provenance = manifest.ground_truth_provenance[0]
+    refs = spec["refs"]
     if (
-        provenance.source_ref != "power38-ground-truth-v1"
-        or provenance.method is not GroundTruthMethod.SYNTHETIC_FIXTURE
+        provenance.source_ref != refs["provenance_source_ref"]
+        or provenance.method.value != refs["provenance_method"]
         or provenance.provenance_digest
         != canonical_sha256(
             {"source_ref": provenance.source_ref, "method": provenance.method.value}
@@ -786,11 +1090,157 @@ def _check_manifest_provenance(manifest: EvaluationCorpusManifest) -> None:
         )
 
 
+def _check_semantic_adjudication(
+    root: Path,
+    manifest: EvaluationCorpusManifest,
+    artifact: SemanticAdjudicationArtifact | None,
+    query_ids: set[str],
+) -> str | None:
+    spec = _revision_spec(manifest)
+    expected_digest = spec["digests"].get("semantic_adjudication_digest")
+    if expected_digest is None:
+        if artifact is not None:
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "historical revision must not carry active adjudication"
+            )
+        return None
+    if artifact is None:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "active revision requires semantic adjudication"
+        )
+    if artifact.dataset_revision != manifest.evaluation_revision:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "semantic adjudication revision does not match manifest"
+        )
+    if {record.query_id for record in artifact.records} != query_ids:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "semantic adjudication does not cover every query"
+        )
+    if canonical_sha256(artifact.to_canonical_dict()) != expected_digest:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "semantic adjudication digest mismatch"
+        )
+    receipt_expectations = (
+        ("reviewer_a_receipt_ref", "reviewer_a_receipt_digest", "reviewer_a"),
+        ("reviewer_b_receipt_ref", "reviewer_b_receipt_digest", "reviewer_b"),
+    )
+    for ref_field, digest_field, reviewer_field in receipt_expectations:
+        expected_ref = spec["refs"].get(ref_field)
+        if not isinstance(expected_ref, str):
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "independent review receipt reference is not configured"
+            )
+        receipt_ref = getattr(artifact, ref_field)
+        if receipt_ref != expected_ref:
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "independent review receipt reference is not admitted"
+            )
+        try:
+            receipt_bytes = _read_bounded_regular_file(_fixture_path(root, f"{receipt_ref}.json"))
+        except EvaluationIntegrityError as exc:
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "independent review receipt is unreadable"
+            ) from exc
+        _reject_forbidden_markers(receipt_bytes)
+        receipt_data = _parse_json_bytes(
+            receipt_bytes,
+            error_code="semantic_adjudication",
+            error_message="independent review receipt is invalid JSON",
+        )
+        try:
+            review_receipt = SemanticReviewReceipt.model_validate(receipt_data)
+        except ValidationError as exc:
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "independent review receipt failed validation"
+            ) from exc
+        derived_counts = {
+            status: sum(
+                1 for record in artifact.records if getattr(record, reviewer_field) == status
+            )
+            for status in ("PASS", "DEFECT", "AMBIGUOUS")
+        }
+        if (
+            review_receipt.reviewer_id != receipt_ref
+            or review_receipt.input_revision != "v1"
+            or review_receipt.input_dataset_digest != FROZEN_PHASE5A_DIGESTS["dataset_digest"]
+            or review_receipt.input_query_set_digest != FROZEN_PHASE5A_DIGESTS["query_set_digest"]
+            or review_receipt.scope_query_count != 40
+            or review_receipt.scope_source_count != 20
+            or (
+                review_receipt.pass_count,
+                review_receipt.defect_count,
+                review_receipt.ambiguous_count,
+            )
+            != (
+                derived_counts["PASS"],
+                derived_counts["DEFECT"],
+                derived_counts["AMBIGUOUS"],
+            )
+        ):
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "independent review receipt is not bound to the audit"
+            )
+        if _sha256_bytes(receipt_bytes) != getattr(artifact, digest_field):
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "independent review receipt digest mismatch"
+            )
+    markdown_digest = manifest.semantic_adjudication_markdown_digest
+    if markdown_digest is None:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "active revision requires adjudication rationale evidence"
+        )
+    try:
+        rationale_bytes = _read_bounded_regular_file(
+            _fixture_path(root, "semantic-adjudication.md")
+        )
+    except EvaluationIntegrityError as exc:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "semantic adjudication rationale evidence is unreadable"
+        ) from exc
+    _reject_forbidden_markers(rationale_bytes)
+    if _sha256_bytes(rationale_bytes) != markdown_digest:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "semantic adjudication rationale digest mismatch"
+        )
+    for record in artifact.records:
+        if record.rationale_ref.encode("ascii") not in rationale_bytes:
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "semantic adjudication rationale reference is missing"
+            )
+    return markdown_digest
+
+
+def _check_holdout_receipt_digest(root: Path, manifest: EvaluationCorpusManifest) -> str | None:
+    spec = _revision_spec(manifest)
+    expected_digest = cast("str | None", spec["digests"].get("holdout_access_receipt_digest"))
+    if expected_digest is None:
+        return None
+    try:
+        receipt_bytes = _read_bounded_regular_file(
+            _fixture_path(root, "holdout-access-receipt.json")
+        )
+    except EvaluationIntegrityError as exc:
+        raise EvaluationIntegrityError(
+            "holdout_receipt_binding", "holdout receipt bytes are unreadable"
+        ) from exc
+    if _sha256_bytes(receipt_bytes) != expected_digest:
+        raise EvaluationIntegrityError(
+            "holdout_receipt_binding", "holdout receipt digest is not admitted"
+        )
+    if manifest.holdout_access_receipt_digest != expected_digest:
+        raise EvaluationIntegrityError(
+            "holdout_receipt_binding", "manifest receipt digest is not admitted"
+        )
+    return expected_digest
+
+
 def _check_ground_truth(
     source_rows: list[EvaluationSourceMetadata],
     development: list[EvaluationQuery],
     holdout: list[EvaluationQuery],
     ground_truth: list[EvaluationGroundTruth],
+    *,
+    expected_split: EvaluationSplitName | None = None,
 ) -> dict[str, list[EvaluationGroundTruth]]:
     source_by_id = {item.source_id: item for item in source_rows}
     source_ids = set(source_by_id)
@@ -806,9 +1256,21 @@ def _check_ground_truth(
     by_split: dict[str, list[EvaluationGroundTruth]] = {"development": [], "holdout": []}
     query_split = {item.query_id: item.split.value for item in development + holdout}
     for record in ground_truth:
+        if expected_split is not None:
+            expected_prefix = (
+                "p38-dev-" if expected_split is EvaluationSplitName.DEVELOPMENT else "p38-ho-"
+            )
+            if not record.query_id.startswith(expected_prefix):
+                raise EvaluationIntegrityError(
+                    "ground_truth_split", "ground truth file contains a different split"
+                )
         if record.query_id not in query_ids:
             raise EvaluationIntegrityError(
                 "unknown_ground_truth_query", "ground truth references an unknown query"
+            )
+        if expected_split is not None and query_split[record.query_id] != expected_split.value:
+            raise EvaluationIntegrityError(
+                "ground_truth_split", "ground truth file contains a different split"
             )
         referenced = set(record.expected_relevant_source_ids) | set(
             record.expected_exclusion_source_ids
@@ -875,6 +1337,26 @@ def _check_ground_truth(
                 )
         by_split[query_split[record.query_id]].append(record)
     return by_split
+
+
+def _ground_truth_provenance_digest(record: EvaluationGroundTruth, revision: str) -> str:
+    payload = record.to_canonical_dict()
+    payload.pop("provenance_digest", None)
+    return canonical_sha256({"ground_truth": payload, "revision": revision})
+
+
+def _check_ground_truth_provenance(
+    ground_truth: list[EvaluationGroundTruth], revision: str
+) -> None:
+    if revision != ACTIVE_EVALUATION_REVISION:
+        return
+    if any(
+        record.provenance_digest != _ground_truth_provenance_digest(record, revision)
+        for record in ground_truth
+    ):
+        raise EvaluationIntegrityError(
+            "ground_truth_provenance", "active ground-truth provenance digest mismatch"
+        )
 
 
 def _check_proof(
@@ -967,9 +1449,9 @@ def _query_set_digest(development: list[EvaluationQuery], holdout: list[Evaluati
 
 
 def verify_evaluation_corpus(
-    root: Path, *, return_snapshot: bool = False
+    root: Path, *, expected_revision: str | None = None, return_snapshot: bool = False
 ) -> dict[str, Any] | EvaluationVerificationSnapshot:
-    """Verify the frozen corpus and return bounded, provenance-free summary data."""
+    """Verify one explicitly identified corpus revision offline."""
     root = root.resolve()
     (
         manifest,
@@ -979,14 +1461,27 @@ def verify_evaluation_corpus(
         ground_truth,
         proof,
         receipt,
+        semantic_adjudication,
         holdout_bytes_read,
         holdout_ground_truth_count,
     ) = _parse_models(root)
-    _check_pinned_manifest(manifest)
-    _check_manifest_provenance(manifest)
+    if expected_revision is not None and manifest.evaluation_revision != expected_revision:
+        raise EvaluationIntegrityError(
+            "revision_mismatch", "requested revision is not the manifest"
+        )
+    spec = _check_pinned_manifest(manifest)
+    _check_manifest_provenance(manifest, spec)
     _check_coverage(manifest, development, holdout)
     _check_proof(proof, development, holdout)
     ground_truth_by_split = _check_ground_truth(source_rows, development, holdout, ground_truth)
+    semantic_markdown_digest = _check_semantic_adjudication(
+        root,
+        manifest,
+        semantic_adjudication,
+        {item.query_id for item in development + holdout},
+    )
+    _check_ground_truth_provenance(ground_truth, manifest.evaluation_revision)
+    receipt_digest = _check_holdout_receipt_digest(root, manifest)
     if (
         receipt.dataset_revision != manifest.dataset_digest
         or receipt.query_set_digest != manifest.query_set_digest
@@ -1006,15 +1501,28 @@ def verify_evaluation_corpus(
         )
     entries = _source_entries(root, source_rows)
     source_corpus_digest = _source_corpus_digest(entries)
-    dataset_digest = canonical_sha256(
-        {
-            "corpus_files": entries,
-            "ground_truth": [
-                item.to_canonical_dict()
-                for item in sorted(ground_truth, key=lambda item: item.query_id)
-            ],
-        }
-    )
+    if (
+        manifest.source_corpus_digest is not None
+        and manifest.source_corpus_digest != source_corpus_digest
+    ):
+        raise EvaluationIntegrityError(
+            "source_digest_mismatch", "manifest source corpus digest does not match bytes"
+        )
+    if manifest.evaluation_revision == "v1":
+        _check_historical_v1_bytes(root)
+    elif manifest.evaluation_revision == ACTIVE_EVALUATION_REVISION:
+        _check_active_v11_inventory(root)
+    dataset_payload: dict[str, Any] = {
+        "corpus_files": entries,
+        "ground_truth": [
+            item.to_canonical_dict()
+            for item in sorted(ground_truth, key=lambda item: item.query_id)
+        ],
+    }
+    if semantic_adjudication is not None:
+        dataset_payload["semantic_adjudication"] = semantic_adjudication.to_canonical_dict()
+        dataset_payload["semantic_adjudication_markdown_digest"] = semantic_markdown_digest
+    dataset_digest = canonical_sha256(dataset_payload)
     query_set_digest = _query_set_digest(development, holdout)
     development_digest = _split_digest(development, ground_truth_by_split["development"])
     holdout_digest = _split_digest(holdout, ground_truth_by_split["holdout"])
@@ -1043,6 +1551,8 @@ def verify_evaluation_corpus(
         )
     summary = {
         "status": "PASS",
+        "evaluation_revision": manifest.evaluation_revision,
+        "semantic_adjudication_status": spec["semantic_status"],
         "dataset_digest": dataset_digest,
         "source_corpus_digest": source_corpus_digest,
         "query_set_digest": query_set_digest,
@@ -1054,6 +1564,12 @@ def verify_evaluation_corpus(
         "holdout_query_count": len(holdout),
         "holdout_policy": "SEALED_NOT_SECRET_NO_TUNING",
     }
+    if manifest.semantic_adjudication_digest is not None:
+        summary["semantic_adjudication_digest"] = manifest.semantic_adjudication_digest
+    if semantic_markdown_digest is not None:
+        summary["semantic_adjudication_markdown_digest"] = semantic_markdown_digest
+    if receipt_digest is not None:
+        summary["holdout_access_receipt_digest"] = receipt_digest
     if return_snapshot:
         return EvaluationVerificationSnapshot(
             summary=summary,
@@ -1064,21 +1580,28 @@ def verify_evaluation_corpus(
     return summary
 
 
-def load_development_for_tuning(root: Path) -> list[EvaluationQuery]:
+def load_development_for_tuning(
+    root: Path, *, expected_revision: str | None = None
+) -> list[EvaluationQuery]:
     """Load only development queries; holdout is not a tuning input surface."""
     root = root.resolve()
     try:
         manifest = EvaluationCorpusManifest.model_validate(
             _read_json(_fixture_path(root, "manifest.json"))
         )
-        _check_pinned_manifest(manifest)
-        _check_manifest_provenance(manifest)
+        if expected_revision is not None and manifest.evaluation_revision != expected_revision:
+            raise EvaluationIntegrityError(
+                "revision_mismatch", "requested revision is not the manifest"
+            )
+        spec = _check_pinned_manifest(manifest)
+        _check_manifest_provenance(manifest, spec)
         source_rows = [
             EvaluationSourceMetadata.model_validate(row)
             for row in _read_jsonl(_fixture_path(root, "source_metadata.jsonl"))
         ]
         source_entries = _source_entries(root, source_rows)
-        if _source_corpus_digest(source_entries) != FROZEN_PHASE5A_DIGESTS["source_corpus_digest"]:
+        expected = spec["digests"]
+        if _source_corpus_digest(source_entries) != expected["source_corpus_digest"]:
             raise EvaluationIntegrityError(
                 "source_digest_mismatch", "development tuning source corpus is not frozen"
             )
@@ -1092,13 +1615,13 @@ def load_development_for_tuning(root: Path) -> list[EvaluationQuery]:
         ]
         _check_ground_truth(source_rows, development, [], ground_truth)
         digest = _split_digest(development, ground_truth)
-        if (
-            digest != manifest.development_split.digest
-            or digest != FROZEN_PHASE5A_DIGESTS["development_digest"]
-        ):
+        if digest != manifest.development_split.digest or digest != expected["development_digest"]:
             raise EvaluationIntegrityError(
                 "development_digest_mismatch", "development tuning input is not frozen"
             )
+        _check_ground_truth_provenance(ground_truth, manifest.evaluation_revision)
+        if manifest.evaluation_revision == "v1":
+            _check_historical_v1_bytes(root)
         if len(development) != manifest.development_split.query_count:
             raise EvaluationIntegrityError(
                 "query_count_mismatch", "development tuning count does not match manifest"
@@ -1153,6 +1676,9 @@ register_runtime_contract("EvaluationCorpusManifest", EvaluationCorpusManifest)
 
 
 __all__ = [
+    "ACTIVE_EVALUATION_REVISION",
+    "ACTIVE_PHASE5A1_DIGESTS",
+    "EVALUATION_REVISION_REGISTRY",
     "FROZEN_PHASE5A_COUNTS",
     "FROZEN_PHASE5A_DIGESTS",
     "DevelopmentSplit",
@@ -1169,6 +1695,9 @@ __all__ = [
     "GroundTruthProvenance",
     "HoldoutAccessReceipt",
     "HoldoutSplit",
+    "SemanticAdjudicationArtifact",
+    "SemanticAdjudicationRecord",
+    "SemanticReviewReceipt",
     "build_holdout_access_receipt",
     "load_development_for_tuning",
     "normalize_query_text",

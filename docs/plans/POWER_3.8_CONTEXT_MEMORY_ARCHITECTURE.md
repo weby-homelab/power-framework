@@ -44,11 +44,12 @@ The architecture has four non-negotiable properties:
    not source existence. Raw evidence is append-only, privacy-bounded, and
    recoverable according to an explicit retention policy.
 
-The Controlled Dependency Refresh and Pre-Phase-5 Foundation Hardening are
-closed on protected `main`. The active runtime gate is Phase 5A; its separate
-candidate contains the typed runtime contracts and frozen synthetic corpus.
-This planning document does not start Phase 5B, capture, migration, a release,
-or a public version change.
+The Controlled Dependency Refresh, Pre-Phase-5 Foundation Hardening, and Phase
+5A runtime-contract merge are closed on protected `main`. The active bounded
+gate is the Phase 5A.1 semantic correction; its candidate contains a corrected
+evaluation revision while preserving the Phase 5A runtime behavior. This
+planning document does not start Phase 5B, capture, migration, a release, or a
+public version change.
 
 ## 1A. Course-correction reconciliation
 
@@ -567,6 +568,13 @@ Canonical authority may therefore outrank a more semantically similar raw chat.
 Each stage must remain explainable in the future `ContextPack`; cosine, RRF, or
 reranker scores cannot erase an authority or supersession decision. The v2
 `EvidenceOrderingPolicy` remains planning-only.
+
+Authority ordering does not erase query intent. First determine the eligible
+answer set for the user's intent, then apply authority, temporal, supersession,
+and contradiction policy within that set. A diagnostic query may intentionally
+identify stale, hard-negative, unverified, or quarantined evidence without
+promoting it to canonical truth; a current-state query must still prefer the
+authoritative current record.
 
 ## 13. Retrieval Escalation
 
@@ -1154,6 +1162,8 @@ Pre-Phase-5 Foundation Hardening
         ↓
 Phase 5A — Runtime contracts v2 + frozen evaluation corpus
         ↓
+Phase 5A.1 — Evaluation corpus semantic integrity correction
+        ↓
 Phase 5B — Deterministic multi-domain router
         ↓
 Phase 5C — Search scope pushdown
@@ -1169,14 +1179,16 @@ Phase 5G — Small MCP read/explainability surfaces
 Phase 5H — Phase closure / default decision
 ```
 
-Phase 5A is currently `ADMISSION CANDIDATE / IMPLEMENTED LOCALLY`; Phase 5B–5H
-remain `BLOCKED / NOT STARTED`. The architecture below remains planning
-direction and is not a runtime dependency.
+Phase 5A runtime contracts are `CLOSED / MERGED / VERIFIED`; Phase 5A.1 is the
+current `CORRECTION CANDIDATE / PROTECTED MERGE REQUIRED`; Phase 5B–5H remain
+`BLOCKED / NOT STARTED`. The architecture below remains planning direction and
+is not a runtime dependency.
 
 | Gate | Planned scope | Required evidence before advancing |
 |---|---|---|
 | Foundation | Explicit mutation authority, principal/session semantics, retrieval boundary, failure receipts, and actual deadline/budget behavior | `pre-phase5-foundation-hardening-gate.md`, source-bound security tests, PSE/Task/Decision/crash regression, protected admission |
-| 5A — Runtime contracts v2 + frozen evaluation corpus | Typed v2 retention, bitemporal, ordering, resource, budget, retry, and evaluation boundaries | v2 schema tests, v1 compatibility evidence, digests/provenance, development/holdout isolation, no source/mutation changes outside the bounded runtime PR |
+| 5A — Runtime contracts v2 + frozen evaluation corpus | Typed v2 retention, bitemporal, ordering, resource, budget, retry, and evaluation boundaries | CLOSED through PR #415; v1 runtime/corpus evidence retained |
+| 5A.1 — Evaluation corpus semantic integrity correction | Audit all query/GT semantics; preserve v1; admit corrected v1.1 | Two independent reviews, primary-fixture adjudication, semantic digest binding, old-v1 immutability, protected admission |
 | 5B — Deterministic multi-domain router | Backward-compatible policy evolution, `DomainMatch[]`, traversal stages, authority/noise/index policy | v1 compatibility, routing benchmark, explainable reasons, deterministic tie handling, no domain/trust conflation |
 | 5C — Search scope pushdown | Pass `SearchScope` into FTS, TF, dense, graph, temporal, archive, and quarantine selection | Scope enters candidate generation; privileged override tests; recall/cost evidence; post-filter-only implementation fails |
 | 5D — RetrievalPlanner + ContextPack | Read-only authority-aware planner, noise gate, bounded escalation, provenance, redaction, and pack assembly | Determinism, authority-vs-relevance, bounded bytes/tokens, no writes, archive/quarantine policy, direct/MCP parity |
@@ -1438,6 +1450,9 @@ label it as provisional.
 - [Planning index](README.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
+- [Phase 5A.1 semantic-correction report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/PHASE_5A_1_REPORT.md)
+- [Phase 5A.1 evaluation erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
+- [Latest Phase 5A.1 handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 
 ### Machine-readable planning contracts
 

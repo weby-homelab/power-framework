@@ -6,7 +6,6 @@
     "type": "object",
     "additionalProperties": false,
     "required": [
-        "planning_only",
         "dataset_schema_version",
         "dataset_digest",
         "query_set_digest",
@@ -25,11 +24,16 @@
         "disjointness_proof_digest"
     ],
     "properties": {
+        "evaluation_revision": {
+            "enum": ["v1", "v1.1"],
+            "description": "Explicit corpus revision identity; omission is the historical v1 default."
+        },
         "dataset_schema_version": {
             "const": "power.retrieval-eval.v1"
         },
         "planning_only": {
-            "const": true
+            "const": true,
+            "description": "Optional compatibility marker; runtime manifests may omit planning-only metadata."
         },
         "dataset_digest": {
             "$ref": "#/$defs/Digest"
@@ -100,6 +104,9 @@
         "holdout_access_audit": {
             "$ref": "#/$defs/OpaqueReference"
         },
+        "holdout_access_receipt_digest": {
+            "$ref": "#/$defs/Digest"
+        },
         "sealed_artifact_ref": {
             "$ref": "#/$defs/OpaqueReference",
             "description": "Reference to a separately governed sealed artifact; no corpus belongs in this planning PR."
@@ -109,8 +116,43 @@
         },
         "disjointness_proof_digest": {
             "$ref": "#/$defs/Digest"
+        },
+        "supersedes_revision": {
+            "const": "v1"
+        },
+        "semantic_adjudication_ref": {
+            "$ref": "#/$defs/OpaqueReference"
+        },
+        "semantic_adjudication_digest": {
+            "$ref": "#/$defs/Digest"
+        },
+        "semantic_adjudication_markdown_digest": {
+            "$ref": "#/$defs/Digest"
+        },
+        "source_corpus_digest": {
+            "$ref": "#/$defs/Digest"
         }
     },
+    "allOf": [
+        {
+            "if": {
+                "required": ["evaluation_revision"],
+                "properties": {"evaluation_revision": {"const": "v1.1"}}
+            },
+            "then": {
+                "required": [
+                    "evaluation_revision",
+                    "planning_only",
+                    "supersedes_revision",
+                    "semantic_adjudication_ref",
+                    "semantic_adjudication_digest",
+                    "semantic_adjudication_markdown_digest",
+                    "source_corpus_digest",
+                    "holdout_access_receipt_digest"
+                ]
+            }
+        }
+    ],
     "$defs": {
         "Digest": {
             "type": "string",
