@@ -15,6 +15,7 @@ import re
 import stat
 from contextlib import suppress
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,25 +25,6 @@ from .domain_errors import DomainConfigError
 
 if TYPE_CHECKING:
     from collections.abc import Hashable
-
-    from .domain_policy import (
-        DomainAuthorityPolicy,
-        DomainEscalationPolicy,
-        DomainIndexPolicy,
-        DomainNoisePolicy,
-        DomainPolicyRegistry,
-        DomainPolicySpec,
-        DomainQuerySignals,
-        DomainRetrievalPolicy,
-        DomainRoutingPolicy,
-        DomainSourceSelectors,
-        DomainTraversalPolicy,
-        RetrievalDomainRouter,
-        SourceDomainClassifier,
-        SourceDomainMembership,
-        load_domain_policy,
-        route_query_domains,
-    )
 
 SUPPORTED_SEARCH_MODES = frozenset(
     {"fts", "vector", "hybrid", "semantic", "reranked", "graph_assisted"}
@@ -600,24 +582,32 @@ def ensure_domain_placement_path(vault_dir: Path, domain: DomainSpec) -> Path:
     return root / relative
 
 
-# Phase 5B routing is kept in a separate module so the legacy v1 placement
-# surface remains small and auditable.  Re-export the stable public names from
-# this compatibility module for existing callers.
-from .domain_policy import (  # noqa: E402,F401
-    DomainAuthorityPolicy,
-    DomainEscalationPolicy,
-    DomainIndexPolicy,
-    DomainNoisePolicy,
-    DomainPolicyRegistry,
-    DomainPolicySpec,
-    DomainQuerySignals,
-    DomainRetrievalPolicy,
-    DomainRoutingPolicy,
-    DomainSourceSelectors,
-    DomainTraversalPolicy,
-    RetrievalDomainRouter,
-    SourceDomainClassifier,
-    SourceDomainMembership,
-    load_domain_policy,
-    route_query_domains,
+_PHASE5B_EXPORTS = frozenset(
+    {
+        "DomainAuthorityPolicy",
+        "DomainEscalationPolicy",
+        "DomainIndexPolicy",
+        "DomainNoisePolicy",
+        "DomainPolicyRegistry",
+        "DomainPolicySpec",
+        "DomainQuerySignals",
+        "DomainRetrievalPolicy",
+        "DomainRoutingPolicy",
+        "DomainSourceSelectors",
+        "DomainTraversalPolicy",
+        "RetrievalDomainRouter",
+        "SourceDomainClassifier",
+        "SourceDomainMembership",
+        "load_domain_policy",
+        "route_query_domains",
+    }
 )
+
+
+def __getattr__(name: str) -> object:
+    """Lazy-load Phase 5B names without a module-level import cycle."""
+    if name not in _PHASE5B_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(".domain_policy", __package__), name)
+    globals()[name] = value
+    return value
