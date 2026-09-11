@@ -18,6 +18,8 @@ REST verification:
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
+- [Phase 5B domain-policy/router report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
+- [Phase 5B domain-policy/router handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
 
 > Controlled Dependency Refresh is **CLOSED / FINAL INTEGRATION VERIFIED**.
@@ -26,8 +28,9 @@ REST verification:
 > context/memory/retrieval package is **CANONICAL PLANNING V2**. Foundation
 > Hardening is **CLOSED / IMPLEMENTED / VERIFIED** after protected PR #414.
 > Phase 5A runtime contracts are **CLOSED / MERGED / VERIFIED** through PR #415;
-> Phase 5A.1 is the current semantic-correction candidate. Phase 5B and all
-> later runtime work remain blocked/not started by this snapshot.
+> Phase 5A.1 is **CLOSED / MERGED / VERIFIED** through PR #416. Phase 5B is
+> the current bounded candidate; Phase 5C and later runtime work remain
+> blocked/not started by this snapshot.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -50,8 +53,8 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. Verify the Phase 5A.1 correction candidate and
-   its exact protected merge/readback; then stop before Phase 5B.
+   mutable operational truth. Verify the Phase 5B candidate and its exact
+   protected merge/readback; then stop before Phase 5C.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -70,7 +73,7 @@ These files remain **PLANNING EVIDENCE** and are not production runtime
 dependencies. Phase 5A has an independent installable runtime contract layer
 and frozen synthetic evaluation corpus; the v1 context schema and v1 index-cost
 policy remain retained historical planning evidence. No planning contract is a
-phase report, release artifact, or authorization to start Phase 5B.
+phase report, release artifact, or authorization to start Phase 5C.
 
 ## CONTRACT STATUS MAP
 
@@ -82,7 +85,7 @@ phase report, release artifact, or authorization to start Phase 5B.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5A.1 protected merge; then Phase 5B |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5B protected merge; then Phase 5C |
 
 ## HISTORICAL PLAN
 
@@ -110,8 +113,8 @@ HF #406, Actions #396, final-integration checks, and Foundation PR #414 remain
 attached to their PR, commit, and handoff evidence. The context/memory/retrieval
 files under `artifacts/project-state/planning/` remain planning contracts, not
 runtime dependencies. The final dependency and Foundation evidence is `MERGED
-MAIN`; Phase 5A runtime contracts are merged, the Phase 5A.1 semantic
-correction is the current protected-merge candidate, and Phase 5B remains
+MAIN`; Phase 5A runtime contracts and Phase 5A.1 are merged and verified,
+Phase 5B is the current protected-merge candidate, and Phase 5C remains
 `NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
@@ -152,7 +155,7 @@ override or replace the three explicit namespaces above.
 
 `PLANNED != IMPLEMENTED`: a merged architecture document is canonical planning,
 not runtime completion. This canonical projection records the closed Controlled
-Dependency Refresh, the v2 planning successor, the closed Phase 5A runtime
-contracts, and the current Phase 5A.1 correction admission. It does not
-authorize Actions #396, Phase 5B, any later phase, version bump, tag, release,
-or `POWER 3.8.0` publication.
+Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1 gates,
+and the current Phase 5B correction admission. It does not authorize Actions
+#396, Phase 5C, any later phase, version bump, tag, release, or `POWER 3.8.0`
+publication.

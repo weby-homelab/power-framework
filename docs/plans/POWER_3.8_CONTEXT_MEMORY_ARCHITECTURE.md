@@ -44,12 +44,12 @@ The architecture has four non-negotiable properties:
    not source existence. Raw evidence is append-only, privacy-bounded, and
    recoverable according to an explicit retention policy.
 
-The Controlled Dependency Refresh, Pre-Phase-5 Foundation Hardening, and Phase
-5A runtime-contract merge are closed on protected `main`. The active bounded
-gate is the Phase 5A.1 semantic correction; its candidate contains a corrected
-evaluation revision while preserving the Phase 5A runtime behavior. This
-planning document does not start Phase 5B, capture, migration, a release, or a
-public version change.
+The Controlled Dependency Refresh, Pre-Phase-5 Foundation Hardening, Phase 5A
+runtime-contract merge, and Phase 5A.1 semantic correction are closed on
+protected `main`. The active bounded gate is the separate Phase 5B candidate,
+which contains the strict Domain Policy v2 parser and pure deterministic router.
+This planning document does not start Phase 5C, capture, migration, a release,
+or a public version change.
 
 ## 1A. Course-correction reconciliation
 
@@ -90,12 +90,12 @@ planning-only and not consumed by the current runtime.
 
 ### Explicitly out of scope
 
-- Any Phase 5 source implementation or runtime parser.
-- Changes to `src/power_framework/core/searcher.py`, `domains.py`,
-  `index_sync.py`, `generation_index.py`, `chunker.py`, `embeddings.py`,
-  `reranker.py`, or any other source module.
-- Changes to tests, dependencies, lock files, workflows, public version, tags,
-  or releases.
+- Phase 5C–5H source behavior, SearchScope pushdown, ranking, indexing, MCP,
+  capture, or any later runtime gate.
+- Changes to `src/power_framework/core/searcher.py`, `index_sync.py`,
+  `generation_index.py`, `chunker.py`, `embeddings.py`, `reranker.py`, or any
+  other later-phase executor.
+- Dependencies, lock files, workflows, public version, tags, or releases.
 - Modification or merge of Actions #396.
 - Capture adapters, automatic agent capture, conversation bulk ingestion, or a
   production reindex migration.
@@ -121,7 +121,7 @@ different.
 | Local embedding backend | `src/power_framework/experimental/embeddings.py` (`BGEM3OnnxManager`) | IMPLEMENTED, optional and fail-closed | Reuse BGE-M3 direct ONNX Runtime, tokenizer, pinned model policy, hashes, lazy/eager probe, and CPU bounds | Add versioned per-chunk identity and cost-aware queueing; do not add a second loader |
 | Local reranker | `src/power_framework/experimental/reranker.py` (`BGEM3Reranker`) | IMPLEMENTED, optional | Reuse the BGE ONNX reranker, pinned assets, batch bounds, and existing opt-in policy | Make reranking a budgeted planner stage with explicit fallback and telemetry |
 | Semantic chunking | `src/power_framework/core/chunker.py` (`SemanticChunker`) | STRUCTURAL / CONTEXTUAL IMPLEMENTED | Reuse header, paragraph, fixed modes and document context prefixes | Version any future semantic-boundary strategy; do not claim embedding-based segmentation exists |
-| Domain registry | `src/power_framework/core/domains.py`, `.power/domains.yaml` | DOMAIN V1 IMPLEMENTED, opt-in | Evolve `DomainRegistry` backward-compatibly; keep legacy P.A.R.A. behavior when absent | Add multi-match routing, traversal, trust policy, index priority, and pushdown scope |
+| Domain registry | `src/power_framework/core/domains.py`, `.power/domains.yaml` | V1 IMPLEMENTED; Phase 5B v2 candidate | Reuse v1 placement and add strict v2 policy, source membership, and pure `DomainMatch[]` routing | Phase 5C scope pushdown and later traversal execution |
 | Temporal views | `src/power_framework/core/temporal.py` and `searcher.py` | IMPLEMENTED as lifecycle/status views | Reuse deterministic `current`, `historical`, `all`, and `as_of` resolution | Push temporal constraints into candidate selection; do not imply a document version store |
 | Graph-assisted retrieval | `src/power_framework/core/searcher.py`, `src/power_framework/experimental/relations.py` | PARTIAL / EXPERIMENTAL | Reuse persisted source projections where valid and keep graph hops as ranking signals | Replace repeated all-pairs suggestion work with reviewed, bounded, domain-specific traversal |
 | Atomic index generations | `src/power_framework/core/generation_index.py` | IMPLEMENTED | Reuse staged SQLite generations, snapshot validation, integrity checks, atomic pointer publication, and retention | Add per-source/per-chunk validity and an explicit `IndexWorkQueue` |
@@ -149,11 +149,10 @@ These are planning inputs, not authorization to fix source code in this gate.
 
 ### P0 — blockers to a safe future implementation
 
-1. **The v2 runtime contract is a separate Phase 5A candidate.** The planning
-   v2 schema remains governance evidence; typed runtime validation, canonical
-   serialization, and the synthetic evaluation substrate are implemented in
-   the bounded Phase 5A candidate and are not yet merged-main evidence.
-2. **The current gate is Phase 5A.** Phase 5B and later retrieval behavior
+1. **The v2 planning schema is not runtime authority.** Phase 5B has a separate
+   strict runtime policy shape and fixture; planning-only metadata is rejected
+   rather than blindly deserialized.
+2. **The current gate is Phase 5B.** Phase 5C and later retrieval behavior
    remain `BLOCKED / NOT STARTED`.
 3. **Authority must remain separate from integrity.** Canonical ledger
    membership, model extraction, caller approval, and retrieved evidence cannot
@@ -369,9 +368,12 @@ Binding rules:
 
 ## 9. Domain Policy v2
 
-Domain v2 is a planning contract and a backward-compatible evolution, not a
-runtime parser in this gate. The example is in
-`artifacts/project-state/planning/domain-policy-v2.example.yaml`.
+Domain v2 began as a planning contract and is now a bounded Phase 5B runtime
+candidate. The planning example remains non-authoritative at
+`artifacts/project-state/planning/domain-policy-v2.example.yaml`; the closed
+runtime shape is separately represented by
+`artifacts/project-state/phase-5b/domain-policy-v2.runtime.yaml` and parsed by
+`src/power_framework/core/domains.py`.
 
 The planned shape combines:
 
@@ -425,9 +427,10 @@ domains:
         - proposed
 ```
 
-This example is intentionally not consumed by the current runtime. Unknown
-v2 fields, precedence rules, and policy merge semantics remain open decisions
-until the Phase 5 contract gate.
+The planning example is intentionally not consumed by the runtime. Phase 5B
+freezes the bounded lexical/intent/hint router contract and rejects unknown
+runtime fields. Retrieval-stage execution, authority ordering, noise
+suppression, index work, and policy merging remain later-phase behavior.
 
 ## 10. Multi-Domain Routing
 
@@ -453,7 +456,9 @@ allocates work by confidence:
 - top domain: full domain-specific traversal;
 - secondary domains: bounded traversal within the remaining budget;
 - low-confidence domains: cheap probe or skip;
-- no match: legacy global policy, subject to the selected retrieval budget.
+- no match: the pure 5B router returns an empty tuple; any legacy global
+  retrieval fallback remains owned by the pre-existing caller and is not
+  changed until a later retrieval gate.
 
 Routing must not use a path, tag, or model score as a substitute for trust
 state or authority.
@@ -1179,17 +1184,17 @@ Phase 5G — Small MCP read/explainability surfaces
 Phase 5H — Phase closure / default decision
 ```
 
-Phase 5A runtime contracts are `CLOSED / MERGED / VERIFIED`; Phase 5A.1 is the
-current `CORRECTION CANDIDATE / PROTECTED MERGE REQUIRED`; Phase 5B–5H remain
-`BLOCKED / NOT STARTED`. The architecture below remains planning direction and
-is not a runtime dependency.
+Phase 5A runtime contracts and Phase 5A.1 are `CLOSED / MERGED / VERIFIED`;
+Phase 5B is the current `CANDIDATE / IN ADMISSION`; Phase 5C–5H remain
+`BLOCKED / NOT STARTED`. The later architecture below remains planning
+direction and is not a runtime dependency.
 
 | Gate | Planned scope | Required evidence before advancing |
 |---|---|---|
 | Foundation | Explicit mutation authority, principal/session semantics, retrieval boundary, failure receipts, and actual deadline/budget behavior | `pre-phase5-foundation-hardening-gate.md`, source-bound security tests, PSE/Task/Decision/crash regression, protected admission |
 | 5A — Runtime contracts v2 + frozen evaluation corpus | Typed v2 retention, bitemporal, ordering, resource, budget, retry, and evaluation boundaries | CLOSED through PR #415; v1 runtime/corpus evidence retained |
 | 5A.1 — Evaluation corpus semantic integrity correction | Audit all query/GT semantics; preserve v1; admit corrected v1.1 | Two independent reviews, primary-fixture adjudication, semantic digest binding, old-v1 immutability, protected admission |
-| 5B — Deterministic multi-domain router | Backward-compatible policy evolution, `DomainMatch[]`, traversal stages, authority/noise/index policy | v1 compatibility, routing benchmark, explainable reasons, deterministic tie handling, no domain/trust conflation |
+| 5B — Deterministic multi-domain router | **Candidate implemented**: backward-compatible policy evolution, `DomainMatch[]`, inert traversal/authority/noise/index metadata | v1 compatibility, routing evidence, explainable reasons, deterministic tie handling, no domain/trust conflation, protected admission |
 | 5C — Search scope pushdown | Pass `SearchScope` into FTS, TF, dense, graph, temporal, archive, and quarantine selection | Scope enters candidate generation; privileged override tests; recall/cost evidence; post-filter-only implementation fails |
 | 5D — RetrievalPlanner + ContextPack | Read-only authority-aware planner, noise gate, bounded escalation, provenance, redaction, and pack assembly | Determinism, authority-vs-relevance, bounded bytes/tokens, no writes, archive/quarantine policy, direct/MCP parity |
 | 5E — Shadow benchmark / legacy comparison | Run the planner in shadow while legacy retrieval remains served | Frozen development/holdout corpus, no holdout tuning, quality/resource/authority non-regression, rollback receipt |
@@ -1415,8 +1420,12 @@ POWER 3.8 must not:
 
 These are intentionally open; the plan does not fabricate answers.
 
-1. **Domain v2 precedence:** how explicit domain membership, path, tags, note
-   type, and model hints combine when they disagree.
+1. **Domain v2 precedence — resolved for Phase 5B:** source path/tags/types
+   belong only to `SourceDomainClassifier`; query keywords, validated intent,
+   and caller hints are separate weighted signals. Ties use policy order then
+   domain ID. Authority/lifecycle remain orthogonal and are not reordered by
+   this router. Later phases may define additional evidence precedence without
+   changing this bounded router contract.
 2. **ContextPack digest:** exact canonical serialization and whether the digest
    covers model/provider identity in addition to source and policy revisions.
 3. **Partial dense validity:** storage shape for per-chunk pending/stale state

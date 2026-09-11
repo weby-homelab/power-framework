@@ -30,7 +30,8 @@ from typing import TYPE_CHECKING, Any
 from .application_models import SourceReadRequest
 from .constants import DENSE_INDEX_SCHEMA_VERSION, is_catalog_filename
 from .db import _init_db
-from .domains import DomainConfigError, resolve_search_policy
+from .domain_errors import DomainConfigError
+from .domains import resolve_search_policy
 from .generation_index import (
     ActiveGenerationError,
     _state_db_path,

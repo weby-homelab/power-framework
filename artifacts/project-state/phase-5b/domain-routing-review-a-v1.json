@@ -1,0 +1,25 @@
+{
+  "schema_version": "power.domain-routing-review.v1",
+  "evaluation_revision": "v1.1",
+  "reviewer_id": "phase5b-routing-review-a",
+  "review_mode": "independent_read_only_semantic_review",
+  "router_output_used": false,
+  "retrieval_metrics_observed": false,
+  "scope_query_count": 40,
+  "scope_source_count": 20,
+  "input_digests": {
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+    "dataset_digest": "5d8f2d7e68b62b3a2385c7a534a492083e1ff1b9f68973d4cbe8bf64461521fc",
+    "query_set_digest": "b3fdf772c6b744495a503651c5ceecc0302bd3d34c00e1f12e2f014c5797be3e",
+    "semantic_adjudication_digest": "106d3e220d01cc325ada3ffc3e551ebd4111be5c3fc5aebf62d22b0d45516218"
+  },
+  "review_basis": [
+    "query text",
+    "query intent and category",
+    "v1.1 source fixtures and metadata",
+    "approved domain semantics",
+    "scenario family and cross-domain meaning"
+  ],
+  "independent_from": "phase5b-routing-review-b",
+  "output_status": "returned_to_orchestrator_before_router_evaluation"
+}

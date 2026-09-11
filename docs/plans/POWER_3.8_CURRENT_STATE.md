@@ -18,31 +18,31 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5A RUNTIME CONTRACTS CLOSED / PHASE 5A.1 SEMANTIC CORRECTION CANDIDATE
+PHASE 5A / 5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
 
 SNAPSHOT_BASE_SHA:
-95f8cadd7e90ef4b16773b3c45bbc9ab40569e7a
+dde1e1369c2d79d8f01b9fce21ae1fb55834a814
 
 SNAPSHOT_BASE_TREE:
-28f99fc71d6e163a242d7782ae87040805e79faf
+194d8c80dabb816bf8027ff097abc1b016dad317
 
 SNAPSHOT_LAST_INCLUDED_PR:
-413
+416
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-413
+416
 
 CURRENT_LIVE_MAIN:
-RESOLVE_FROM_GITHUB
+dde1e1369c2d79d8f01b9fce21ae1fb55834a814
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-Phase 5A — Runtime Contracts v2 and frozen corpus (PR #415)
+Phase 5A.1 — Evaluation corpus semantic integrity correction (PR #416)
 
 NEXT_GATE:
-Phase 5A.1 — Retrieval Evaluation Corpus Semantic Integrity Correction
+Phase 5B — Domain Policy v2 and deterministic multi-domain router
 
 ACTIONS_396:
 CLOSED / MERGED
@@ -60,10 +60,13 @@ EVALUATION_CORPUS_V1:
 SUPERSEDED FOR FUTURE EVALUATION / RETAINED AS HISTORICAL ERRATUM EVIDENCE
 
 ACTIVE_EVALUATION_REVISION:
-v1.1 / SEMANTICALLY ADJUDICATED / CORRECTION CANDIDATE
+v1.1 / SEMANTICALLY ADJUDICATED / ACTIVE
 
 PHASE_5A_1:
-CORRECTION CANDIDATE / NOT CLOSED UNTIL PROTECTED MERGE
+CLOSED / MERGED / VERIFIED / PR #416
+
+PHASE_5B:
+CANDIDATE / IN ADMISSION
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -87,7 +90,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md
+artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -121,7 +124,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / PHASE 5A RUNTIME CONTRACTS MERGED / PHASE 5A.1 CORRECTION CANDIDATE
+CANONICAL PLANNING V2 / PHASE 5A–5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
 ```
 
 ## Fresh state anchor
@@ -163,9 +166,9 @@ CANONICAL PLANNING V2 / PHASE 5A RUNTIME CONTRACTS MERGED / PHASE 5A.1 CORRECTIO
 - Phase 5: **IN PROGRESS**.
 - Phase 5A runtime contracts: **CLOSED / MERGED / VERIFIED** through protected PR #415.
 - Evaluation corpus v1: **HISTORICAL / RETAINED / SEMANTIC ERRATUM**.
-- Phase 5A.1: **CORRECTION CANDIDATE / PROTECTED MERGE REQUIRED**.
-- Active evaluation revision candidate: **v1.1 / SEMANTIC ADJUDICATION PASS**.
-- Phase 5B: **BLOCKED / NOT STARTED**.
+- Phase 5A.1: **CLOSED / MERGED / VERIFIED** through protected PR #416.
+- Active evaluation revision: **v1.1 / SEMANTIC ADJUDICATION PASS / ACTIVE**.
+- Phase 5B: **CANDIDATE / IN ADMISSION**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
 
@@ -185,7 +188,8 @@ CANONICAL PLANNING V2 / PHASE 5A RUNTIME CONTRACTS MERGED / PHASE 5A.1 CORRECTIO
 | Foundation Hardening | CLOSED / IMPLEMENTED / VERIFIED | PR #414 protected normal merge and post-merge checks are on `main` |
 | Phase 5A runtime contracts | CLOSED / MERGED / VERIFIED | PR #415 protected merge and post-merge checks |
 | Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; superseded for future evaluation |
-| Phase 5A.1 | CORRECTION CANDIDATE / LOCALLY VERIFIED | New v1.1 semantic revision; protected merge required |
+| Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
+| Phase 5B | CANDIDATE / IN ADMISSION | Domain Policy v2, separate source classifier, deterministic router |
 
 ## Actions #396 exact objects
 
@@ -303,21 +307,21 @@ ACTIONS #396 = CLOSED / MERGED
 FOUNDATION HARDENING = CLOSED / IMPLEMENTED / VERIFIED
 PHASE 5 = IN PROGRESS
 PHASE 5A RUNTIME CONTRACTS = CLOSED / MERGED / VERIFIED
-PHASE 5A.1 EVALUATION CORRECTION = CANDIDATE / PROTECTED MERGE REQUIRED
-PHASE 5B = BLOCKED / NOT STARTED
+PHASE 5A.1 EVALUATION CORRECTION = CLOSED / MERGED / VERIFIED
+PHASE 5B = CANDIDATE / IN ADMISSION
 ```
 
-The dependency surfaces, Foundation Hardening, Actions admission, and Phase 5A
-runtime contracts were accepted through normal protected merges or explicit
-bounded deferral after fresh required-check, security, package, regression, and
-policy diagnosis. The current next gate is Phase 5A.1. POWER 3.8.0 cannot be
-released from this state.
+The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
+runtime contracts, and Phase 5A.1 semantic correction were accepted through
+normal protected merges and post-merge checks. The current bounded gate is
+Phase 5B. POWER 3.8.0 cannot be released from this state.
 
 ## Canonical governance status
 
-The prior governance, dependency, Foundation Hardening, and Phase 5A runtime
-contract merges are canonical on protected `main`. The Phase 5A.1 correction
-candidate below remains provisional until its protected normal merge:
+The prior governance, dependency, Foundation Hardening, Phase 5A runtime
+contract, and Phase 5A.1 correction merges are canonical on protected `main`.
+The Phase 5B candidate below remains provisional until its protected normal
+merge:
 
 - Governance branch: `docs/power-3.8-final-integration-course-correction`.
 - Prior governance bootstrap merge: `4b49e00c75866fa57f71e7bef61547915f7e01db`,
@@ -329,6 +333,9 @@ candidate below remains provisional until its protected normal merge:
 - Phase 5A runtime contracts PR #415 is protected-merged as
   `0a70ca4e9acc89596acd192931c1d174040ad484`; its final head is
   `09a222b9c39d650d70aa116d9bce727d3cdbfe3b` with valid GitHub GPG verification.
+- Phase 5A.1 correction PR #416 is protected-merged as
+  `dde1e1369c2d79d8f01b9fce21ae1fb55834a814`; its final head is
+  `94e2e08a2d37884b90ac895de35979fa87696bd5` with valid GitHub verification.
 - The prior `docs/power-3.8-premerge-state-publication` branch remains
   provisional evidence and is retained as source material; it is not replaced
   or deleted.
@@ -337,11 +344,10 @@ candidate below remains provisional until its protected normal merge:
 
 ## Next authorized work
 
-1. Protected normal merge and independent post-merge verification of the
-   Phase 5A.1 semantic correction candidate.
-2. Then prepare a separate Phase 5B candidate from the then-current protected
-   `main` and corrected active evaluation revision; do not start Phase 5B in this gate.
-3. Keep Phase 5B–9 runtime work beyond this gate, version bumps, tags, releases, and POWER 3.8.0
+1. Complete the separate Phase 5B candidate from the current protected `main`
+   and active v1.1 evaluation revision through one protected normal merge.
+2. Perform independent exact-head post-merge readback for Phase 5B.
+3. Keep Phase 5C–9 runtime work beyond this gate, version bumps, tags, releases, and POWER 3.8.0
    publication blocked until each declared gate is independently closed.
 
 ## Do not start
@@ -350,7 +356,7 @@ candidate below remains provisional until its protected normal merge:
   dependency candidate must record its exact base/head/tree/parent, diff,
   hashes, tests, security, CI, and policy evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
-- Do not start Phase 5B implementation or later phases in this gate.
+- Do not start Phase 5C implementation or later phases in this gate.
 - Do not bump the public version, create a tag, create a release, or publish
   `POWER 3.8.0`.
 - Do not treat candidate or evidence-branch documents as `MERGED MAIN` evidence.
@@ -366,5 +372,7 @@ candidate below remains provisional until its protected normal merge:
 - [Phase 5A.1 report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/PHASE_5A_1_REPORT.md)
 - [v1 semantic erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
 - [Active evaluation manifest](https://github.com/weby-homelab/power-framework/blob/main/benchmarks/power38/retrieval_eval/v1.1/manifest.json)
+- [Phase 5B report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
+- [Phase 5B routing evaluation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/domain-routing-evaluation-v1.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

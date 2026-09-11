@@ -1,0 +1,94 @@
+{
+  "schema_version": "power.domain-routing-ground-truth.v1",
+  "evaluation_revision": "v1.1",
+  "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+  "dataset_digest": "5d8f2d7e68b62b3a2385c7a534a492083e1ff1b9f68973d4cbe8bf64461521fc",
+  "query_set_digest": "b3fdf772c6b744495a503651c5ceecc0302bd3d34c00e1f12e2f014c5797be3e",
+  "domain_universe": [
+    "project_state",
+    "projects",
+    "decisions",
+    "tasks",
+    "code",
+    "infrastructure",
+    "research",
+    "documentation",
+    "operations",
+    "agent_conversations",
+    "governance",
+    "handoffs",
+    "dependencies",
+    "logs",
+    "knowledge"
+  ],
+  "excluded_domains_rule": "domain_universe minus required_domains and acceptable_secondary_domains",
+  "review": {
+    "method": "two_independent_read_only_semantic_reviews_plus_orchestrator_adjudication",
+    "router_output_used": false,
+    "reviewer_a": {
+      "id": "phase5b-routing-review-a",
+      "receipt_ref": "domain-routing-review-a-v1.json",
+      "receipt_digest": "4c6899732be6b94640154d92e2dfa73bbc6526576971e3351dc3812c6053f65c",
+      "scope": "query text, intent/category, v1.1 source fixtures, metadata, policy semantics, scenario family"
+    },
+    "reviewer_b": {
+      "id": "phase5b-routing-review-b",
+      "receipt_ref": "domain-routing-review-b-v1.json",
+      "receipt_digest": "9fb75e89da11315b3741e4fe1c6880110b970f544c4e6a6b6336ed4764d9037f",
+      "scope": "query text, intent/category, v1.1 source fixtures, metadata, policy semantics, scenario family"
+    },
+    "adjudication": [
+      {
+        "query_ids": ["p38-dev-q09", "p38-dev-q12", "p38-dev-q17", "p38-ho-q09", "p38-ho-q12", "p38-ho-q17"],
+        "disagreement": "whether governance and decisions are both semantic routing domains or only one is primary",
+        "disposition": "retain both as required domains; expected_primary_domain follows the explicit intent and question subject; authority remains a later orthogonal policy"
+      },
+      {
+        "query_ids": ["p38-dev-q15", "p38-ho-q15"],
+        "disagreement": "whether quarantine handling is a governance route",
+        "disposition": "zero semantic domains; quarantine is trust/lifecycle policy, not a domain"
+      },
+      {
+        "query_ids": ["p38-dev-q20", "p38-ho-q20"],
+        "disagreement": "whether the bounded admission package is single-domain or cross-domain",
+        "disposition": "multi-domain; project_state, tasks, and infrastructure are required, governance is acceptable diagnostic context"
+      }
+    ]
+  },
+  "no_float_scores": true,
+  "ground_truth_digest": "434e10ca12d011c1b5cad8cacee086839102a02d3e53703d4ab6aef08a292c06",
+  "splits": {
+    "development": {
+      "digest": "4bcd6c464b212e771517e71d3fdb7d696efbf0ec5521117dc7e8e7ce9ddaeb95",
+      "tuning_allowed": true,
+      "labels": [
+        {"query_id":"p38-dev-q01","required_domains":["project_state"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H1","reason":"current project state"},
+        {"query_id":"p38-dev-q02","required_domains":["project_state"],"acceptable_secondary_domains":["governance","agent_conversations"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H2","reason":"authoritative projection; raw conversation is diagnostic"},
+        {"query_id":"p38-dev-q03","required_domains":["decisions"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"decisions","cardinality":"single","confidence_tier":"H2","reason":"current decision"},
+        {"query_id":"p38-dev-q04","required_domains":["tasks"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"tasks","cardinality":"single","confidence_tier":"H1","reason":"ready verification task"},
+        {"query_id":"p38-dev-q05","required_domains":["code"],"acceptable_secondary_domains":[],"expected_primary_domain":"code","cardinality":"single","confidence_tier":"H1","reason":"serialization contract"},
+        {"query_id":"p38-dev-q06","required_domains":["infrastructure"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"infrastructure","cardinality":"single","confidence_tier":"H2","reason":"current infrastructure policy"},
+        {"query_id":"p38-dev-q07","required_domains":["research"],"acceptable_secondary_domains":[],"expected_primary_domain":"research","cardinality":"single","confidence_tier":"H1","reason":"curated split-integrity practice"},
+        {"query_id":"p38-dev-q08","required_domains":["tasks","infrastructure"],"acceptable_secondary_domains":["governance","project_state"],"expected_primary_domain":"tasks","cardinality":"multi","confidence_tier":"M3","reason":"task verification connected to resource policy"},
+        {"query_id":"p38-dev-q09","required_domains":["governance","decisions"],"acceptable_secondary_domains":["agent_conversations"],"expected_primary_domain":"governance","cardinality":"multi","confidence_tier":"H2","reason":"authority conflict and canonical decision context"},
+        {"query_id":"p38-dev-q10","required_domains":[],"acceptable_secondary_domains":[],"expected_primary_domain":null,"cardinality":"zero","confidence_tier":"S4","reason":"prompt-injection noise is not a routing target"},
+        {"query_id":"p38-dev-q11","required_domains":["project_state"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H2","reason":"current project over hard negative"},
+        {"query_id":"p38-dev-q12","required_domains":["decisions","governance"],"acceptable_secondary_domains":["agent_conversations"],"expected_primary_domain":"decisions","cardinality":"multi","confidence_tier":"H2","reason":"canonical decision versus raw-chat similarity"},
+        {"query_id":"p38-dev-q13","required_domains":["project_state"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H2","reason":"current source supersedes provisional wording"},
+        {"query_id":"p38-dev-q14","required_domains":[],"acceptable_secondary_domains":[],"expected_primary_domain":null,"cardinality":"zero","confidence_tier":"S4","reason":"scope-changing text is inert"},
+        {"query_id":"p38-dev-q15","required_domains":[],"acceptable_secondary_domains":[],"expected_primary_domain":null,"cardinality":"zero","confidence_tier":"S4","reason":"quarantine is lifecycle policy, not a domain"},
+        {"query_id":"p38-dev-q16","required_domains":["research"],"acceptable_secondary_domains":[],"expected_primary_domain":"research","cardinality":"single","confidence_tier":"H2","reason":"curated research over unverified claim"},
+        {"query_id":"p38-dev-q17","required_domains":["governance","decisions"],"acceptable_secondary_domains":["agent_conversations"],"expected_primary_domain":"governance","cardinality":"multi","confidence_tier":"H2","reason":"canonical outcome and contradiction context"},
+        {"query_id":"p38-dev-q18","required_domains":["code"],"acceptable_secondary_domains":[],"expected_primary_domain":"code","cardinality":"single","confidence_tier":"H1","reason":"Ukrainian code contract"},
+        {"query_id":"p38-dev-q19","required_domains":["infrastructure"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"infrastructure","cardinality":"single","confidence_tier":"H1","reason":"host-neutral resource profile"},
+        {"query_id":"p38-dev-q20","required_domains":["project_state","tasks","infrastructure"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"multi","confidence_tier":"M3","reason":"verified cross-domain admission package"}
+      ]
+    },
+    "holdout": {
+      "digest": "61aa9d85ab0804308c008635814cb79218b7e6cc3c78d331ca4b8d4656b5f551",
+      "tuning_allowed": false,
+      "labels_ref": "domain-routing-ground-truth-v1.holdout.json",
+      "labels_digest": "ae3a0a6dcc595a0d6d627661aa2c36012334cac05e149d3aab21fa6ccfb5380d"
+    }
+  }
+}

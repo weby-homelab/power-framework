@@ -1,0 +1,110 @@
+{
+  "schema_version": "power.domain-routing-evaluation.v1",
+  "evaluation_revision": "v1.1",
+  "algorithm_revision": "domain-router-v1",
+  "policy_revision": "phase5b-routing-v1",
+  "normalization_revision": "nfkc-casefold-tokens-v1",
+  "policy_sha256": "f728a27fd8c009c9dd18c01c2afc5399368c3663eb97cc645ec22896efe8f88b",
+  "ground_truth_digest": "434e10ca12d011c1b5cad8cacee086839102a02d3e53703d4ab6aef08a292c06",
+  "active_v1_1_digests": {
+    "evaluation_revision": "v1.1",
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+    "dataset_digest": "5d8f2d7e68b62b3a2385c7a534a492083e1ff1b9f68973d4cbe8bf64461521fc",
+    "query_set_digest": "b3fdf772c6b744495a503651c5ceecc0302bd3d34c00e1f12e2f014c5797be3e",
+    "development_digest": "4bcd6c464b212e771517e71d3fdb7d696efbf0ec5521117dc7e8e7ce9ddaeb95",
+    "holdout_digest": "61aa9d85ab0804308c008635814cb79218b7e6cc3c78d331ca4b8d4656b5f551"
+  },
+  "ground_truth_router_output_used": false,
+  "holdout_discipline": {
+    "no_tuning_on_holdout": true,
+    "development_evaluated_before_freeze": true,
+    "holdout_evaluated_after_freeze": true,
+    "candidate_freeze": {
+      "algorithm_revision": "domain-router-v1",
+      "policy_revision": "phase5b-routing-v1",
+      "normalization_revision": "nfkc-casefold-tokens-v1",
+      "policy_sha256": "f728a27fd8c009c9dd18c01c2afc5399368c3663eb97cc645ec22896efe8f88b",
+      "holdout_tuning": "forbidden"
+    }
+  },
+  "development": {
+    "query_count": 20,
+    "returned_match_count": 25,
+    "required_domain_count": 23,
+    "required_domain_hit_count": 23,
+    "single_domain_case_count": 12,
+    "single_domain_case_hits": 12,
+    "multi_domain_case_count": 5,
+    "multi_domain_case_hits": 5,
+    "zero_match_case_count": 3,
+    "zero_match_case_hits": 3,
+    "routing_precision": 1.0,
+    "routing_recall": 1.0,
+    "top_domain_accuracy_single_domain": 1.0,
+    "required_domain_recall": 1.0,
+    "unexpected_domain_false_positives": 0,
+    "multi_domain_coverage": 1.0,
+    "zero_match_correctness": 1.0,
+    "tie_determinism": true,
+    "explainability_coverage": 1.0,
+    "p50_routing_latency_us": 299.816,
+    "p95_routing_latency_us": 334.073,
+    "maximum_observed_returned_domains": 3,
+    "results_digest": "81b8f675baa667b424e46451cf6c52f3355081e7cacedec48855a70e62eaf09b",
+    "hard_invariants": {
+      "authority_violations": 0,
+      "lifecycle_violations": 0,
+      "non_deterministic_outputs": 0,
+      "unexplained_domain_matches": 0
+    }
+  },
+  "holdout": {
+    "query_count": 20,
+    "returned_match_count": 27,
+    "required_domain_count": 24,
+    "required_domain_hit_count": 24,
+    "single_domain_case_count": 12,
+    "single_domain_case_hits": 12,
+    "multi_domain_case_count": 5,
+    "multi_domain_case_hits": 5,
+    "zero_match_case_count": 3,
+    "zero_match_case_hits": 3,
+    "routing_precision": 1.0,
+    "routing_recall": 1.0,
+    "top_domain_accuracy_single_domain": 1.0,
+    "required_domain_recall": 1.0,
+    "unexpected_domain_false_positives": 0,
+    "multi_domain_coverage": 1.0,
+    "zero_match_correctness": 1.0,
+    "tie_determinism": true,
+    "explainability_coverage": 1.0,
+    "p50_routing_latency_us": 300.813,
+    "p95_routing_latency_us": 332.44,
+    "maximum_observed_returned_domains": 3,
+    "results_digest": "8aa4120a8c01355269cbd3d2cc203ffb0139f0ccd5231458986e8a540e7fa232",
+    "hard_invariants": {
+      "authority_violations": 0,
+      "lifecycle_violations": 0,
+      "non_deterministic_outputs": 0,
+      "unexplained_domain_matches": 0
+    }
+  },
+  "hard_invariants": {
+    "authority_violations": 0,
+    "lifecycle_violations": 0,
+    "vault_boundary_escapes": 0,
+    "non_deterministic_outputs": 0,
+    "unexplained_domain_matches": 0,
+    "holdout_tuning_violations": 0,
+    "legacy_v1_regressions": 0
+  },
+  "verification": {
+    "command": "uv run --offline python scripts/verify_domain_routing.py",
+    "network": false,
+    "models": false,
+    "retrieval_execution": false,
+    "repository_vault_database_mutation": false,
+    "temporary_fixture_io": true,
+    "database_mutation": false
+  }
+}

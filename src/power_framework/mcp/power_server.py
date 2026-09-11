@@ -65,7 +65,7 @@ from power_framework.core import (
 )
 from power_framework.core.constants import SKIP_FILES
 from power_framework.core.doctor import report_as_json, run_doctor
-from power_framework.core.domains import DomainConfigError
+from power_framework.core.domain_errors import DomainConfigError
 from power_framework.core.ignore import should_skip
 from power_framework.core.utils import is_regular_vault_file, iter_vault_markdown_files
 from power_framework.experimental.relations import (

@@ -44,9 +44,12 @@ Phase 5A — Runtime contracts v2 + frozen evaluation corpus
 CLOSED / MERGED / VERIFIED (PR #415)
              ↓
 Phase 5A.1 — Evaluation corpus semantic integrity correction
-CURRENT CORRECTION CANDIDATE / PROTECTED MERGE REQUIRED
-             ↓
-Phase 5B–5H — Router, scope, planner, shadow, dense validity, MCP, closure
+CLOSED / MERGED / VERIFIED (PR #416)
+              ↓
+Phase 5B — Domain Policy v2 and deterministic multi-domain router
+CANDIDATE / IN ADMISSION
+              ↓
+Phase 5C–5H — Scope, planner, shadow, dense validity, MCP, closure
 BLOCKED / NOT STARTED
          ↓
 Phase 6 — Agent Capture & Integrations
@@ -82,9 +85,10 @@ NO-GO
 | Final integration | CLOSED / FINAL INTEGRATION VERIFIED | Current main dependency graph, security, package, upgrade, frozen regression, Docs, and CodeQL evidence passed |
 | Foundation Hardening | CLOSED / IMPLEMENTED / VERIFIED | PR #414 protected merge and post-merge checks are on `main` |
 | Phase 5A runtime contracts | CLOSED / MERGED / VERIFIED | PR #415 protected merge and post-merge checks |
-| Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; v1.1 is the future active revision |
-| Phase 5A.1 | CORRECTION CANDIDATE / LOCALLY VERIFIED | Semantic adjudication and corrected v1.1 corpus; protected merge required |
-| Phase 5B | BLOCKED / NOT STARTED | Domain Policy v2 and router are not implemented |
+| Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; v1.1 is the active revision |
+| Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
+| Phase 5B | CANDIDATE / IN ADMISSION | Domain Policy v2, source membership, and deterministic router |
+| Phase 5C | BLOCKED / NOT STARTED | SearchScope pushdown is not authorized in 5B |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
@@ -114,12 +118,14 @@ dependency update:
    post-merge CI, Docs, and CodeQL verification.
 10. **Phase 5A runtime contracts — closed.** PR #415 is protected-merged with
      independent post-merge verification.
-11. **Phase 5A.1 — current correction candidate.** The corrected v1.1 corpus is
-     locally verified and closes only through its protected exact-head normal
-     merge; Phase 5B remains separately gated.
+11. **Phase 5A.1 — closed.** The corrected v1.1 corpus is protected-merged as
+      PR #416 with independent post-merge CI, Docs, and CodeQL verification.
+12. **Phase 5B — current candidate.** Domain Policy v2 and the deterministic
+      multi-domain router are a separate bounded admission; Phase 5C remains
+      blocked and unstarted.
 
-The controlled refresh and Foundation closure do not authorize a public version
-bump, tag, release, Phase 5B, or any later phase.
+The controlled refresh and prior closures do not authorize a public version
+bump, tag, release, Phase 5C, or any later phase.
 
 ## HF #406 admission anchor
 
@@ -185,18 +191,19 @@ This is a new candidate audit epoch, not a workflow stop condition.
 Phase 5 may eventually cover retrieval planning, ContextPacks, governed context
 assembly, and MCP context/explainability surfaces. It begins only after
 Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
-Controlled Dependency Refresh and Phase 5A runtime contracts are already closed
-in this snapshot; the current bounded gate is the Phase 5A.1 corpus correction.
+Controlled Dependency Refresh, Phase 5A runtime contracts, and Phase 5A.1
+correction are closed in this snapshot; the current bounded gate is the Phase
+5B domain-policy/router candidate.
 
 ### Phase 5 internal gates
 
-Phase 5A is closed. The following future runtime gates remain
+Phase 5A and Phase 5A.1 are closed. The following future runtime gates remain
 `PLANNED / NOT IMPLEMENTED` until their own evidence and protected admission;
-Phase 5A.1 is the current correction gate:
+Phase 5B is the current candidate gate:
 
 ```text
-5A.1 — Evaluation corpus semantic integrity correction (current)
-5B — Deterministic multi-domain router
+5A.1 — Evaluation corpus semantic integrity correction (closed)
+5B — Deterministic multi-domain router (current candidate)
 5C — Search scope pushdown
 5D — RetrievalPlanner + ContextPack read-only vertical slice
 5E — Shadow benchmark / legacy comparison
@@ -306,6 +313,8 @@ planning snapshot as runtime implementation evidence.
 - [Context / memory / retrieval architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
+- [Phase 5B report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
+- [Phase 5B handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
 - [Phase 5A.1 semantic-correction report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/PHASE_5A_1_REPORT.md)
 - [Evaluation v1 erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
 - [Latest Phase 5A.1 handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)

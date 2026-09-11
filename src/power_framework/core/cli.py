@@ -41,10 +41,11 @@ from .control_plane import (
     write_obsidian_base,
 )
 from .doctor import render_doctor, report_as_json, run_doctor
+from .domain_errors import DomainConfigError
 from .domains import (
-    DomainConfigError,
-    domain_template_path,
+    ensure_domain_placement_path,
     load_domain_registry,
+    read_domain_template,
     render_domain_template,
     route_domain,
 )
@@ -287,8 +288,15 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         "Archive": "04_Archive",
         "System Guide": "PROTOCOLS",
     }
-    target_dir = vault_dir / (domain.path if domain else type_dir_map.get(note_type, "00_Inbox"))
-    target_dir.mkdir(parents=True, exist_ok=True)
+    if domain:
+        try:
+            target_dir = ensure_domain_placement_path(vault_dir, domain)
+        except DomainConfigError as exc:
+            logger.error("Invalid domain placement for %s: %s", domain.name, exc)
+            return 1
+    else:
+        target_dir = vault_dir / type_dir_map.get(note_type, "00_Inbox")
+        target_dir.mkdir(parents=True, exist_ok=True)
 
     safe_name = title.lower().replace(" ", "_").replace("/", "-")
     note_path = target_dir / f"{safe_name}.md"
@@ -310,8 +318,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     body = f"{fm}\n\n# {title}\n\n"
     if domain:
         try:
-            template_path = domain_template_path(vault_dir, domain)
-            template = template_path.read_text(encoding="utf-8")
+            template = read_domain_template(vault_dir, domain)
         except (OSError, UnicodeError, DomainConfigError) as exc:
             logger.error("Cannot load template for domain %s: %s", domain.name, exc)
             return 1
