@@ -110,10 +110,10 @@ Foundation Hardening → Phase 5A–5H → Phase 6 → Phase 7 → Phase 8 → P
 ```
 
 The Controlled Dependency Refresh, Foundation Hardening (PR #414), including
-Actions #396 and final integration, and Phase 5A runtime contracts (PR #415) are
-closed in the current governance snapshot. The next bounded gate is Phase 5A.1;
-it must be independently admitted from fresh live state and must not be silently
-chained into Phase 5B.
+Actions #396 and final integration, Phase 5A runtime contracts (PR #415), and
+Phase 5A.1 (PR #416) are closed in the current governance snapshot. The next
+bounded gate is Phase 5B; it must be independently admitted from fresh live
+state and must not be silently chained into Phase 5C.
 
 ## GitHub publication policy
 
@@ -286,10 +286,11 @@ generic `SemanticCompiler` or `ContextCompiler` that overlaps these roles.
 
 ### Retrieval and scope
 
-Use `DomainMatch[]`, not single-domain routing. Resolve `SearchScope` before
-FTS/TF/dense/graph candidate generation. Candidate generation must be bounded
-by domain, path, source type, trust, temporal, and project scope; post-filtering
-alone does not satisfy the contract.
+Phase 5B's pure router uses `DomainMatch[]`, not single-domain query routing.
+It does not execute retrieval. Starting with Phase 5C, resolve `SearchScope`
+before FTS/TF/dense/graph candidate generation. Candidate generation must be
+bounded by domain, path, source type, trust, temporal, and project scope;
+post-filtering alone does not satisfy the 5C contract.
 
 Use progressive budgets:
 
@@ -402,18 +403,19 @@ FOUNDATION HARDENING: CLOSED / IMPLEMENTED / VERIFIED
 ACTIONS #396: CLOSED / MERGED
 PHASE 5: IN PROGRESS
 PHASE 5A RUNTIME CONTRACTS: CLOSED / MERGED / VERIFIED
-PHASE 5A.1 EVALUATION CORRECTION: CANDIDATE / PROTECTED EXACT-HEAD MERGE REQUIRED
-PHASE 5B: BLOCKED / NOT STARTED
+PHASE 5A.1 EVALUATION CORRECTION: CLOSED / MERGED / VERIFIED / PR #416
+PHASE 5B: CANDIDATE / IN ADMISSION
+PHASE 5C: BLOCKED / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF, Actions, and Phase 5A runtime-contract merge receipts are retained
+The HF, Actions, Phase 5A runtime-contract, and Phase 5A.1 merge receipts are retained
 `MERGED MAIN` evidence. Their candidate epochs are retained `REMOTE EXACT-HEAD`/
-historical evidence and are not themselves merged-main proof. Phase 5A.1 is the
-only active implementation gate in this snapshot; do not start Phase 5B–9,
+historical evidence and are not themselves merged-main proof. Phase 5B is the
+only active implementation gate in this snapshot; do not start Phase 5C–9,
 version bumps, tags, releases, release images, or final release notes. Phase
-5A.1 becomes `MERGED MAIN` only after its protected normal merge and independent
+5B becomes `MERGED MAIN` only after its protected normal merge and independent
 post-merge verification.
 
 ## Cross-links
@@ -427,4 +429,5 @@ post-merge verification.
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Phase 5A.1 evaluation erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
+- [Phase 5B domain-policy/router handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

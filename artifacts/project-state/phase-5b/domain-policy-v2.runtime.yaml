@@ -1,0 +1,151 @@
+# POWER 3.8 Phase 5B runtime policy fixture.
+# Unlike the planning example, this file is a closed, bounded runtime shape.
+# Retrieval, traversal, index, noise, and authority fields are inert metadata in
+# Phase 5B; only query_signals are consumed by RetrievalDomainRouter and only
+# selectors are consumed by SourceDomainClassifier.
+version: 2
+policy_revision: phase5b-routing-v1
+normalization_revision: nfkc-casefold-tokens-v1
+routing:
+  score_weights: {keyword: 50, intent: 30, hint: 20}
+  minimum_score: 0.20
+  low_confidence_score: 0.20
+  max_matches: 4
+  tie_policy: policy_order_then_domain_id
+domains:
+  - name: governance
+    selectors: {paths: [PROTOCOLS/**], tags: [governance], types: [System Guide]}
+    query_signals:
+      keywords: [authority, authoritative, holdout policy, raw chat, outcome, canonical winner, tuning access, raw evidence, canonical record]
+      intents: [governance]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: HOT, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}
+  - name: project_state
+    selectors: {paths: [01_Projects/**], tags: [project-state], types: [Project]}
+    query_signals:
+      keywords: [power 3.8, current project, authoritative project, project record, current phase status, project-state, current source, frozen corpus, verified record, cross-domain, cross-domain projection, current gate]
+      intents: [project_state]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: HOT, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified]}
+  - name: decisions
+    selectors: {paths: [01_Projects/**], tags: [decision], types: [Decision]}
+    query_signals:
+      keywords: [tuning, frozen decision, decision, canonical decision, contradiction, contradictory]
+      intents: [decision]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: HOT, dense: deferred}
+    noise: {suppress: [duplicate, superseded], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified]}
+  - name: tasks
+    selectors: {paths: [01_Projects/**], tags: [task], types: [Task]}
+    query_signals:
+      keywords: [task verification, canonical task, task, contract tests, verifier, завдання]
+      intents: [task]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: HOT, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified]}
+  - name: code
+    selectors: {paths: [03_Resources/code/**], tags: [code], types: [Code]}
+    query_signals:
+      keywords: [canonical byte serialization, canonical bytes, digest serializer, utc normalization, serialization, byte serialization]
+      intents: [code]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: WARM, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [verified, canonical]}
+  - name: infrastructure
+    selectors: {paths: [03_Resources/infrastructure/**], tags: [infrastructure], types: [Resource]}
+    query_signals:
+      keywords: [resource profile, infrastructure, host-neutral, current infrastructure, host-specific, deployment evidence, host facts, resource policy, інфраструктурний]
+      intents: [infrastructure]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: WARM, dense: deferred}
+    noise: {suppress: [duplicate, stale], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}
+  - name: research
+    selectors: {paths: [03_Resources/research/**], tags: [research], types: [Resource]}
+    query_signals:
+      keywords: [research, curated research, research source, research record, curated evidence, split integrity, disjointness, дослідницька]
+      intents: [research]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: WARM, dense: deferred}
+    noise: {suppress: [duplicate, stale], unsafe_action: quarantine}
+    authority: {prefer: [curated, verified, canonical]}
+  - name: agent_conversations
+    selectors: {paths: [06_Daily_Logs/agent-conversations/**], tags: [agent-session], types: [Daily Log]}
+    query_signals:
+      keywords: [raw chat, conversation]
+      intents: [conversation]
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: WARM, dense: deferred}
+    noise: {suppress: [tool_boilerplate, temporary_progress], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated, proposed], raw_capture_default: RAW_ONLY}
+  - name: projects
+    selectors: {paths: [01_Projects/**], tags: [project], types: [Project]}
+    query_signals: {keywords: [], intents: []}
+    retrieval: {stages: [metadata, fts], max_candidates: 40, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: WARM, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}
+  - name: documentation
+    selectors: {paths: [docs/**], tags: [documentation], types: [Resource]}
+    query_signals: {keywords: [], intents: []}
+    retrieval: {stages: [metadata], max_candidates: 20, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: COLD, dense: deferred}
+    noise: {suppress: [generated_catalog], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}
+  - name: operations
+    selectors: {paths: [06_Daily_Logs/**], tags: [operational], types: [Daily Log]}
+    query_signals: {keywords: [], intents: []}
+    retrieval: {stages: [metadata], max_candidates: 20, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: COLD, dense: deferred}
+    noise: {suppress: [status_spam, generated_catalog], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}
+  - name: handoffs
+    selectors: {paths: [artifacts/project-state/handoffs/**], tags: [handoff], types: [System Guide]}
+    query_signals: {keywords: [], intents: []}
+    retrieval: {stages: [metadata], max_candidates: 20, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: WARM, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}
+  - name: dependencies
+    selectors: {paths: [artifacts/**], tags: [dependency], types: [Resource]}
+    query_signals: {keywords: [], intents: []}
+    retrieval: {stages: [metadata], max_candidates: 20, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: COLD, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}
+  - name: logs
+    selectors: {paths: [06_Daily_Logs/**], tags: [log], types: [Daily Log]}
+    query_signals: {keywords: [], intents: [log]}
+    retrieval: {stages: [metadata], max_candidates: 20, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: COLD, dense: deferred}
+    noise: {suppress: [generated_catalog, temporary_progress], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated], include_archived_by_default: false}
+  - name: knowledge
+    selectors: {paths: [03_Resources/**], tags: [knowledge], types: [Resource]}
+    query_signals: {keywords: [], intents: []}
+    retrieval: {stages: [metadata], max_candidates: 20, rerank_top_k: 0, budget_class: FAST}
+    traversal: [metadata]
+    index: {priority: COLD, dense: deferred}
+    noise: {suppress: [duplicate], unsafe_action: quarantine}
+    authority: {prefer: [canonical, verified, curated]}

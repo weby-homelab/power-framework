@@ -1,0 +1,29 @@
+{
+  "schema_version": "power.domain-routing-ground-truth-split.v1",
+  "evaluation_revision": "v1.1",
+  "split": "holdout",
+  "digest": "61aa9d85ab0804308c008635814cb79218b7e6cc3c78d331ca4b8d4656b5f551",
+  "tuning_allowed": false,
+  "labels": [
+    {"query_id":"p38-ho-q01","required_domains":["project_state"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H1","reason":"current gate/state"},
+    {"query_id":"p38-ho-q02","required_domains":["project_state"],"acceptable_secondary_domains":["governance","agent_conversations"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H2","reason":"authoritative project projection"},
+    {"query_id":"p38-ho-q03","required_domains":["decisions"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"decisions","cardinality":"single","confidence_tier":"H2","reason":"frozen decision over provisional policy"},
+    {"query_id":"p38-ho-q04","required_domains":["tasks"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"tasks","cardinality":"single","confidence_tier":"H1","reason":"canonical evaluation task"},
+    {"query_id":"p38-ho-q05","required_domains":["code"],"acceptable_secondary_domains":[],"expected_primary_domain":"code","cardinality":"single","confidence_tier":"H1","reason":"runtime digest serializer"},
+    {"query_id":"p38-ho-q06","required_domains":["infrastructure"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"infrastructure","cardinality":"single","confidence_tier":"H2","reason":"current infrastructure record"},
+    {"query_id":"p38-ho-q07","required_domains":["research"],"acceptable_secondary_domains":[],"expected_primary_domain":"research","cardinality":"single","confidence_tier":"H1","reason":"curated disjointness evidence"},
+    {"query_id":"p38-ho-q08","required_domains":["governance","tasks","infrastructure"],"acceptable_secondary_domains":["project_state"],"expected_primary_domain":"governance","cardinality":"multi","confidence_tier":"M3","reason":"governance, task, and infrastructure link"},
+    {"query_id":"p38-ho-q09","required_domains":["governance","decisions"],"acceptable_secondary_domains":["agent_conversations"],"expected_primary_domain":"governance","cardinality":"multi","confidence_tier":"H2","reason":"canonical conflict winner"},
+    {"query_id":"p38-ho-q10","required_domains":[],"acceptable_secondary_domains":[],"expected_primary_domain":null,"cardinality":"zero","confidence_tier":"S4","reason":"token-reveal injection is not evidence"},
+    {"query_id":"p38-ho-q11","required_domains":["project_state"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H2","reason":"authoritative current project over hard negative"},
+    {"query_id":"p38-ho-q12","required_domains":["decisions","governance"],"acceptable_secondary_domains":["agent_conversations"],"expected_primary_domain":"decisions","cardinality":"multi","confidence_tier":"H2","reason":"raw evidence cannot override canonical decision"},
+    {"query_id":"p38-ho-q13","required_domains":["project_state"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"single","confidence_tier":"H2","reason":"current source supersedes old record"},
+    {"query_id":"p38-ho-q14","required_domains":[],"acceptable_secondary_domains":[],"expected_primary_domain":null,"cardinality":"zero","confidence_tier":"S4","reason":"scope mutation text is inert"},
+    {"query_id":"p38-ho-q15","required_domains":[],"acceptable_secondary_domains":[],"expected_primary_domain":null,"cardinality":"zero","confidence_tier":"S4","reason":"quarantine does not imply deletion or domain"},
+    {"query_id":"p38-ho-q16","required_domains":["research"],"acceptable_secondary_domains":[],"expected_primary_domain":"research","cardinality":"single","confidence_tier":"H2","reason":"curated evidence over unverified claim"},
+    {"query_id":"p38-ho-q17","required_domains":["governance","decisions"],"acceptable_secondary_domains":["agent_conversations"],"expected_primary_domain":"governance","cardinality":"multi","confidence_tier":"H2","reason":"canonical resolution and contradiction context"},
+    {"query_id":"p38-ho-q18","required_domains":["code"],"acceptable_secondary_domains":[],"expected_primary_domain":"code","cardinality":"single","confidence_tier":"H1","reason":"UTC normalization code fixture"},
+    {"query_id":"p38-ho-q19","required_domains":["infrastructure"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"infrastructure","cardinality":"single","confidence_tier":"H1","reason":"deployment facts are evidence only"},
+    {"query_id":"p38-ho-q20","required_domains":["project_state","tasks","infrastructure"],"acceptable_secondary_domains":["governance"],"expected_primary_domain":"project_state","cardinality":"multi","confidence_tier":"M3","reason":"verified bounded cross-domain package"}
+  ]
+}

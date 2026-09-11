@@ -14,6 +14,7 @@ import re
 from copy import deepcopy
 from datetime import UTC, date, datetime
 from enum import StrEnum
+from importlib import import_module
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
 
 from pydantic import (
@@ -1327,6 +1328,11 @@ def _runtime_contract_models() -> dict[str, type[Any] | Any]:
         ContractName.RETRIEVAL_BUDGET_POLICY.value: RetrievalBudgetPolicy,
         ContractName.RETRY_POLICY.value: RetryPolicy,
     }
+    if ContractName.EVALUATION_CORPUS_MANIFEST.value not in _RUNTIME_CONTRACT_EXTENSIONS:
+        try:
+            import_module(".evaluation_contracts", __package__)
+        except (ImportError, RuntimeError) as exc:
+            raise ValueError("evaluation corpus contract is unavailable") from exc
     registry.update(_RUNTIME_CONTRACT_EXTENSIONS)
     return registry
 
@@ -1361,7 +1367,9 @@ class RuntimeContractEnvelope(RuntimeModel):
         except (TypeError, ValueError) as exc:
             raise ValueError("unknown runtime contract discriminator") from exc
         registry = _runtime_contract_models()
-        expected = registry[contract.value]
+        expected = registry.get(contract.value)
+        if expected is None:
+            raise ValueError("runtime contract discriminator is unavailable")
         if "payload" not in data:
             raise ValueError("runtime contract envelope requires payload")
         payload = data["payload"]
@@ -1390,7 +1398,9 @@ class RuntimeContractEnvelope(RuntimeModel):
 
     @model_validator(mode="after")
     def verify_discriminator_payload(self) -> Self:
-        expected = _runtime_contract_models()[self.contract.value]
+        expected = _runtime_contract_models().get(self.contract.value)
+        if expected is None:
+            raise ValueError("runtime contract discriminator is unavailable")
         if isinstance(expected, type) and issubclass(expected, RuntimeModel):
             if type(self.payload) is not expected:
                 raise ValueError("payload type does not match contract discriminator")
