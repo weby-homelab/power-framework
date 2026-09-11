@@ -191,8 +191,9 @@ This is a new candidate audit epoch, not a workflow stop condition.
 Phase 5 may eventually cover retrieval planning, ContextPacks, governed context
 assembly, and MCP context/explainability surfaces. It begins only after
 Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
-Controlled Dependency Refresh and Phase 5A runtime contracts are already closed
-in this snapshot; the current bounded gate is the Phase 5A.1 corpus correction.
+Controlled Dependency Refresh, Phase 5A runtime contracts, and Phase 5A.1
+correction are closed in this snapshot; the current bounded gate is the Phase
+5B domain-policy/router candidate.
 
 ### Phase 5 internal gates
 

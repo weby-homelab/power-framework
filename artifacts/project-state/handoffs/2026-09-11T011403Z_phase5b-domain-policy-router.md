@@ -10,7 +10,7 @@
 PROJECT: POWER Framework 3.8
 REPOSITORY: https://github.com/weby-homelab/power-framework
 ACTIVE_NODE: WS
-CHECKOUT: /root/gemma/projects/P.O.W.E.R
+CHECKOUT: repository root on the WS workspace (host-local path intentionally omitted)
 BRANCH: feat/power-3.8-phase5b-domain-policy-router
 PUBLIC_VERSION: 3.7.11
 ```
