@@ -648,7 +648,10 @@ def main() -> int:
         _validate_committed_receipt(evidence)
         print(json.dumps(evidence, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     except (OSError, ValueError, KeyError, TypeError) as exc:
-        print(f"domain-routing verification failed: {type(exc).__name__}", file=sys.stderr)
+        print(
+            f"domain-routing verification failed: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
         return 1
     return 0
 

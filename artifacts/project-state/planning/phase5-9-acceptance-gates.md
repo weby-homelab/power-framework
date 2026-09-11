@@ -263,8 +263,9 @@ similarity tie-breaker.
 
 - Phase 5B candidate report, strict runtime policy fixture, independent routing
   ground truth, and machine-readable development/holdout evaluation are stored
-  under `artifacts/project-state/phase-5b/`; these artifacts must bind the
-  active v1.1 digests and remain separate from immutable v1.1 inputs.
+  under `artifacts/project-state/phase-5b/`; the evidence bundle must bind the
+  active v1.1 digests while the runtime policy remains a separate policy
+  contract and all immutable v1.1 inputs remain unchanged.
 - `ACTIVE_EVALUATION_REVISION_SEMANTICALLY_ADJUDICATED = PASS` for the
   explicitly selected corpus revision; structural digests alone are not enough.
 - Domain v1 fixtures remain valid and retain legacy P.A.R.A. behavior when no
