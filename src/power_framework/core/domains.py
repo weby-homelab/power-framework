@@ -192,8 +192,8 @@ def _read_bounded_text(path: Path, *, label: str, max_bytes: int) -> str:
         if info.st_size > max_bytes:
             raise DomainConfigError(f"{label} exceeds its byte bound")
         with os.fdopen(fd, "r", encoding="utf-8") as handle:
-            fd = None
             content = handle.read(max_bytes + 1)
+        fd = None
         if len(content.encode("utf-8")) > max_bytes:
             raise DomainConfigError(f"{label} exceeds its byte bound")
         return content
@@ -230,8 +230,8 @@ def _read_bounded_vault_text(root: Path, relative: Path, *, label: str, max_byte
         if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
             raise DomainConfigError(f"{label} is not a bounded regular file")
         with os.fdopen(file_fd, "r", encoding="utf-8") as handle:
-            file_fd = None
             content = handle.read(max_bytes + 1)
+        file_fd = None
         if len(content.encode("utf-8")) > max_bytes:
             raise DomainConfigError(f"{label} exceeds its byte bound")
         return content
