@@ -11,24 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .domains import (
-    _CONTROL_CHARACTERS,
-    _SLUG_RE,
-    MAX_DOMAINS,
-    MAX_POLICY_LIST,
-    MAX_POLICY_TEXT,
-    MAX_QUERY_INTENTS,
-    MAX_QUERY_KEYWORDS,
-    MAX_ROUTER_MATCHES,
-    MAX_SELECTOR_VALUES,
-    DomainConfigError,
-    DomainRegistry,
-    _check_keys,
-    _domain_config_path_info,
-    _load_yaml,
-    _vault_root,
-    load_domain_registry,
-)
+from .domain_errors import DomainConfigError
 
 if TYPE_CHECKING:
     from .context_contracts import DomainMatch, QueryIntent, RetrievalBudget
@@ -36,6 +19,25 @@ if TYPE_CHECKING:
 _TOKEN_RE = re.compile(r"[^\W_]+(?:['\u2019\-][^\W_]+)*", re.UNICODE)
 _POLICY_REVISION_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+MAX_DOMAINS = 32
+MAX_SELECTOR_VALUES = 64
+MAX_QUERY_KEYWORDS = 64
+MAX_QUERY_INTENTS = 16
+MAX_POLICY_LIST = 32
+MAX_POLICY_TEXT = 128
+MAX_ROUTER_MATCHES = 16
+
+
+def _check_keys(raw: object, allowed: frozenset[str], context: str) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise DomainConfigError(f"{context} must be a mapping")
+    if set(raw) - allowed:
+        raise DomainConfigError(f"{context} contains unknown fields")
+    return raw
+
+
 _ALLOWED_QUERY_INTENTS = frozenset(
     {
         "lookup",
@@ -628,7 +630,7 @@ def _default_v1_routing() -> DomainRoutingPolicy:
     )
 
 
-def _adapt_v1_registry(registry: DomainRegistry) -> DomainPolicyRegistry:
+def _adapt_v1_registry(registry: Any) -> DomainPolicyRegistry:
     domains: list[DomainPolicySpec] = []
     for domain in registry.domains:
         tags: list[str] = []
@@ -664,6 +666,8 @@ def _adapt_v1_registry(registry: DomainRegistry) -> DomainPolicyRegistry:
 
 def load_domain_policy(vault_dir: Path) -> DomainPolicyRegistry:
     """Load strict v2 policy or an explicit read-only adapter for v1."""
+    from .domains import _domain_config_path_info, _load_yaml, _vault_root, load_domain_registry
+
     root = _vault_root(vault_dir)
     config_path, explicit = _domain_config_path_info(root)
     if not config_path.exists():

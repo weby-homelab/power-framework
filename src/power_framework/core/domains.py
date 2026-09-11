@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from .domain_errors import DomainConfigError
+
 if TYPE_CHECKING:
     from collections.abc import Hashable
 
@@ -72,10 +74,6 @@ MAX_RULE_WEIGHT = 1_000_000.0
 _V1_RULE_FIELDS = frozenset({"keywords", "terms", "contains", "tags", "types", "weight"})
 _V1_DOMAIN_FIELDS = frozenset({"name", "path", "template", "rules", "search_priority"})
 _V1_ROOT_FIELDS = frozenset({"version", "domains"})
-
-
-class DomainConfigError(ValueError):
-    """Raised when a domain registry cannot be trusted."""
 
 
 @dataclass(frozen=True)

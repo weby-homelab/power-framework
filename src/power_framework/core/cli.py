@@ -40,15 +40,15 @@ from .control_plane import (
     write_control_plane,
     write_obsidian_base,
 )
-from .doctor import render_doctor, report_as_json, run_doctor
+from .domain_errors import DomainConfigError
 from .domains import (
-    DomainConfigError,
     ensure_domain_placement_path,
     load_domain_registry,
     read_domain_template,
     render_domain_template,
     route_domain,
 )
+from .doctor import render_doctor, report_as_json, run_doctor
 from .healer import heal_vault_report
 from .ignore import should_skip
 from .importer import (

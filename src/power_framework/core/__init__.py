@@ -37,6 +37,7 @@ from .control_plane import (
     write_control_plane,
     write_obsidian_base,
 )
+from .domain_errors import DomainConfigError
 from .domain_policy import (
     DomainAuthorityPolicy,
     DomainEscalationPolicy,
@@ -56,7 +57,6 @@ from .domain_policy import (
     route_query_domains,
 )
 from .domains import (
-    DomainConfigError,
     DomainRegistry,
     DomainRule,
     DomainSpec,
