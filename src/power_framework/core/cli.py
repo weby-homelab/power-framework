@@ -58,6 +58,7 @@ from .importer import (
     format_import_report,
 )
 from .indexer import generate_log_initial, run_generate_hierarchical_index
+from .infra_models import InfraOperation, InfraRequest, InfraResponseStatus
 from .integrations import (
     apply_mcp_config_integration_plan,
     apply_native_install_plan,
@@ -1233,6 +1234,47 @@ def _cmd_task(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_infra(args: argparse.Namespace) -> int:
+    """Call the constrained local broker; never fall back to direct SSH."""
+    operation_by_command = {
+        "status": InfraOperation.STATUS,
+        "probe": InfraOperation.PROBE,
+        "dry-run": InfraOperation.RSYNC_DRY_RUN,
+        "replicate": InfraOperation.REPLICATE,
+        "verify": InfraOperation.VERIFY,
+    }
+    operation = operation_by_command[args.infra_command]
+    try:
+        request = InfraRequest(
+            operation=operation,
+            target=getattr(args, "target", None),
+            profile=getattr(args, "profile", None),
+            dry_run=operation == InfraOperation.RSYNC_DRY_RUN,
+            idempotency_key=getattr(args, "idempotency_key", None),
+            run_id=getattr(args, "run_id", None),
+            approval_ref=getattr(args, "approval_ref", None),
+            task_id=getattr(args, "task_id", None),
+            expected_revision=getattr(args, "expected_revision", None),
+        )
+        vault_path = _resolve_path(getattr(args, "vault_path", "") or "")
+        context = _cli_context(
+            actor="cli",
+            authority="apply" if operation == InfraOperation.REPLICATE else "read-only",
+            idempotency_key=request.idempotency_key,
+        )
+        response = ApplicationService(vault_path).infra_action(request, context=context)
+    except (TypeError, ValueError):
+        logger.error("Infrastructure broker request rejected: invalid typed request")
+        return 1
+    except (FileNotFoundError, PermissionError, RuntimeError, OSError):
+        logger.error("Infrastructure broker request failed at the local boundary")
+        return 1
+    print(json.dumps(response.model_dump(mode="json"), ensure_ascii=False, sort_keys=True))
+    if operation == InfraOperation.STATUS:
+        return 0
+    return 0 if response.status == InfraResponseStatus.OK else 1
+
+
 def main() -> None:
     """P.O.W.E.R. CLI entry point."""
     enforce_cpu_throttling_env()
@@ -1706,6 +1748,44 @@ def main() -> None:
     p_task_events.add_argument("--task-id", required=True)
     p_task_events.add_argument("--since-sequence", type=_non_negative_int, default=0)
     p_task_events.set_defaults(func=_cmd_task)
+
+    p_infra = subparsers.add_parser(
+        "infra", help="Use the constrained local infrastructure execution broker"
+    )
+    infra_sub = p_infra.add_subparsers(dest="infra_command", required=True)
+    infra_sub.add_parser("status", help="Show local broker capability/profile status").set_defaults(
+        func=_cmd_infra
+    )
+    for infra_command in ("probe", "dry-run"):
+        parser_for_operation = infra_sub.add_parser(
+            infra_command,
+            help=(
+                "Probe an approved target"
+                if infra_command == "probe"
+                else "Run a bounded rsync dry-run"
+            ),
+        )
+        parser_for_operation.add_argument("target")
+        parser_for_operation.add_argument("--profile", required=True)
+        parser_for_operation.add_argument("--vault-path", default=None)
+        parser_for_operation.set_defaults(func=_cmd_infra)
+
+    p_replicate = infra_sub.add_parser("replicate", help="Replicate through an approved profile")
+    p_replicate.add_argument("target")
+    p_replicate.add_argument("--profile", required=True)
+    p_replicate.add_argument("--idempotency-key", required=True)
+    p_replicate.add_argument("--approval-ref", default=None)
+    p_replicate.add_argument("--task-id", default=None)
+    p_replicate.add_argument("--expected-revision", type=_positive_int, default=None)
+    p_replicate.add_argument("--vault-path", default=None)
+    p_replicate.set_defaults(func=_cmd_infra)
+
+    p_verify = infra_sub.add_parser("verify", help="Verify one immutable replication run")
+    p_verify.add_argument("target")
+    p_verify.add_argument("--profile", required=True)
+    p_verify.add_argument("--run-id", required=True)
+    p_verify.add_argument("--vault-path", default=None)
+    p_verify.set_defaults(func=_cmd_infra)
 
     p_sync = subparsers.add_parser(
         "sync", help="Build the search index for the vault (FTS + dense embeddings)"

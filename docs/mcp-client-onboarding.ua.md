@@ -171,9 +171,9 @@ claude mcp add --transport stdio \
 має бути read-only до явного кроку створення proposal:
 
 1. Відкрийте MCP status view клієнта (`/mcp`, якщо підтримується) і перевірте,
-   що `power` підключений та має 20 інструментів.
+   що `power` підключений та має 21 інструмент.
 2. Попросіть агента перелічити tools, resources, resource templates і prompts.
-   POWER має показати 20 tools і не мати resources, templates або prompts.
+   POWER має показати 21 tools і не мати resources, templates або prompts.
 3. Попросіть агента викликати `get_server_info` без аргументів. Перевірте
    версію пакета, налаштований шлях vault і явний стан
    `embedding.binding` перед довірою до retrieval. `probe_provider=true`

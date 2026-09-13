@@ -35,6 +35,10 @@ mcp_version = subprocess.run(
 assert distribution_version in mcp_version.stdout, (
     f"MCP launcher version mismatch: {mcp_version.stdout!r}"
 )
+broker_help = subprocess.run(
+    ["power-infra-broker", "--help"], capture_output=True, check=True, text=True
+)
+assert "serve" in broker_help.stdout, "INFRA-1 broker launcher is not packaged"
 with tempfile.TemporaryDirectory(prefix="power-mcp-smoke-") as directory:
     vault = Path(directory) / "vault"
     vault.mkdir()

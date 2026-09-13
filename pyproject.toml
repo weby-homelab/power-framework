@@ -34,6 +34,7 @@ dependencies = [
 power = "power_framework.core.cli:main"
 power-mcp = "power_framework.mcp.entrypoint:main"
 power-web = "power_framework.web.app:main"
+power-infra-broker = "power_framework.core.infra_broker:broker_main"
 
 [dependency-groups]
 dev = [

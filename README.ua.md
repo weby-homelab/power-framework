@@ -31,7 +31,7 @@ P.O.W.E.R. — це гібридна система, створена для п�
 - **Knowledge Graph** — поле `related` зв'язує нотатки між собою для Graph RAG
 - **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
 - **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
-- **MCP-нативний** — 20 інструментів доступні MCP-сумісним AI-клієнтам через офіційний MCP Python SDK v2
+- **MCP-нативний** — 21 інструмент доступний MCP-сумісним AI-клієнтам через офіційний MCP Python SDK v2
 - **Правдива discovery для агентів** — спочатку викликайте `get_server_info`,
   щоб перевірити версію запущеного пакета, vault boundary, coverage і явний
   стан provider binding; стандартний виклик не завантажує модель і не звертається до мережі
@@ -56,8 +56,8 @@ P.O.W.E.R. створений для роботи як людьми, так і A
   vault, executable acceptance gate, FTS і MCP preflight
 - **[Windows 11 25H2](docs/windows-11-installation.ua.md)** — повне
   PowerShell-встановлення, Visual C++ prerequisite, точні interpreter paths і checks
-- **[CLI reference](docs/cli.md)** — усі 26 команд, flags і реальна exit behavior
-- **[MCP server](docs/mcp-server.md)** — усі 20 governed tools, rate limits,
+- **[CLI reference](docs/cli.md)** — усі 27 команд, flags і реальна exit behavior
+- **[MCP server](docs/mcp-server.md)** — усі 21 governed tools, rate limits,
   configured-vault boundary і untrusted retrieval contract
 - **[Migration guide](docs/migration-guide.ua.md)** — 6-фазна manifest/hash-driven
   міграція з будь-якої Markdown source methodology у canonical POWER vault
@@ -148,8 +148,8 @@ GPU claim. Windows і macOS не мають запланованого release t
 
 | Функція                          | Що робить                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **CLI**                          | 26 команд, включно з `power doctor` для read-only діагностики runtime/index, `power integrations` для generic suite/Skill/launcher plans, `power connect` для conflict-safe local MCP setup, `power cache` для гігієни namespace, `power import` для preflighted Markdown migration, `power memory` для явного proposal/approval, `power handoff` для compatibility workflows та `power task` для canonical Task v2 lifecycle management                                                                                                                                                                                            |
-| **MCP Server**                   | 20 інструментів, включно з керованими операціями memory context, proposal, apply, validation, history та `handoff_work`                                                                                                                                                                                                                                                                                                                                                                              |
+| **CLI**                          | 27 команд, включно з `power doctor` для read-only діагностики runtime/index, `power integrations` для generic suite/Skill/launcher plans, `power connect` для conflict-safe local MCP setup, `power cache` для гігієни namespace, `power import` для preflighted Markdown migration, `power memory` для явного proposal/approval, `power handoff` для compatibility workflows, `power task` для canonical Task v2 lifecycle management та `power infra` для constrained local broker                                                                                                                                                                                            |
+| **MCP Server**                   | 21 інструмент, включно з керованими операціями memory context, proposal, apply, validation, history, `handoff_work` та `infra_action`                                                                                                                                                                                                                                                                                                                                                                              |
 | **OKF Validation**               | Pydantic v2 схеми забезпечують строгі OKF-метадані на кожній нотатці з governance-полями (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                               |
 | **Knowledge Graph (Graph RAG)**  | Поле `related` в OKF frontmatter з підтримкою `TypedRelation` (path, relation, confidence), BFS обходом та експортом підграфів у Mermaid-діаграми (`to_mermaid`)                                                                                                                                                                                                                                                                                                                     |
 | **Freshness Monitoring**         | Лінтер виявляє застарілі нотатки за полем `expiry`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -474,7 +474,7 @@ flowchart TD
     end
 
     subgraph AI ["🤖 AI-Агент (official MCP SDK v2)"]
-        Tools[["🔌 20 асинхронних інструментів MCP (stdio)"]]:::agent
+        Tools[["🔌 21 асинхронний інструмент MCP (stdio)"]]:::agent
         Search[["🔍 Гібридний / Reranked пошук"]]:::agent
         ROT{{"🛠️ Аудит ROT та суперечностей (Semantic/LLM)"}}:::agent
     end
@@ -542,8 +542,8 @@ flowchart TD
 | `core/markdown_checks.py`                 | Перевірки якості Markdown: trailing whitespace, списки, заголовки                                                                                                                                                                                      |
 | `core/constants.py`                       | Централізовані списки виключень та системні константи                                                                                                                                                                                                  |
 | `core/utils.py`                           | Захист від path traversal, атомарний запис, бекапи, rate limiter                                                                                                                                                                                       |
-| `core/cli.py`                             | Командний рядок із 26 командами, включно з read-only doctor diagnostics, generic suite integration plans, conflict-safe MCP connection plans, cache hygiene, preflighted import, transactional memory, compatibility handoff workflows і canonical Task v2 lifecycle management                                                                            |
-| `mcp/power_server.py`                     | Сервер official MCP SDK v2 із 20 async tools через local stdio                                                                                                                                                                                                    |
+| `core/cli.py`                             | Командний рядок із 27 командами, включно з read-only doctor diagnostics, generic suite integration plans, conflict-safe MCP connection plans, cache hygiene, preflighted import, transactional memory, compatibility handoff workflows, canonical Task v2 lifecycle management і constrained `power infra` broker client                                                                            |
+| `mcp/power_server.py`                     | Сервер official MCP SDK v2 із 21 async tools через local stdio                                                                                                                                                                                                    |
 
 Всі компоненти використовують `power_framework.core` як єдине джерело правди.
 

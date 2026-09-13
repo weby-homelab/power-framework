@@ -38,6 +38,8 @@ environment is trustworthy.
 | Canonical source projection to source.read | validated source records | in-vault regular files, invalid Markdown, hidden control material, projection aliases | Containment is necessary but not sufficient; only a current, regular, non-symlink source record may be read. |
 | Read-only retrieval to mutation | search and proposal creation | an agent or caller requesting a change | Proposal creation may write only its content-addressed `.power/proposals/` ledger; it cannot write the target note, catalog, or search. Apply requires explicit `approved=True` and an unchanged pre-image hash. |
 | Agent handoff to workflow execution | validated work-packet state | packet objective, next action, retrieved note text, and caller-supplied metadata | `.power/work-packets/` stores content-free Markdown checkpoints; state transitions are idempotent and approval-gated, and no packet operation executes its `next_action`. |
+| POWER client to INFRA-1 broker | fixed Unix socket, OS peer credentials, typed response | request identifiers and broker response | AF_UNIX only; principal is server-derived; operator profile owns target/paths/credentials; no arbitrary shell, password, key, or rsync option crosses the boundary. |
+| Broker to approved receiver | non-root broker, pinned SSH policy, forced `rrsync` account | network, receiver, host-key changes, bounded source tree | strict host-key pin, no password/agent fallback, bounded immutable run, no delete/prune, secret-free receipt. |
 | Local process to network | local ONNX/FTS/index paths | OpenRouter, non-loopback Ollama, link/ROT HTTP targets | Default deny; an explicit sensitivity-appropriate egress policy is required before contact. |
 | MCP server to client/transport | configured local server | MCP client input | MCP requires a configured vault root and uses local stdio only; no MCP TCP listener or network peer exists. |
 | Repository/CI to dependencies | pinned and reviewed source/dependency policy | packages, model artifacts, GitHub Actions execution | dependency audit, CodeQL, integrity checks, and review gates remain required. |
@@ -72,7 +74,9 @@ environment is trustworthy.
    SQLite/index files, generated catalogs, and atomic note writes.
 4. **Optional external integrations** include non-loopback embedding endpoints,
    OpenRouter query expansion/ROT, and HTTP link checking.
-5. **Supply-chain and release automation** build packages, run dependency
+5. **Constrained infrastructure execution** uses the optional local broker and
+   approved SSH/rsync receiver; it is not a general remote-execution API.
+6. **Supply-chain and release automation** build packages, run dependency
    auditing, execute CI, and publish documentation.
 
 ### Existing controls
@@ -149,6 +153,13 @@ environment is trustworthy.
   reads `.power` state. This is a host authorization concern; do not expose the
   server remotely until the transport has authenticated client identity and
   vault-scoped authorization.
+- A prompt-injected note asks the agent to change host/user/key, disable host
+  checking, add `--delete`, or read a private key. The strict request model
+  rejects those fields before the broker socket; handoff text remains data and
+  cannot mint an execution capability.
+- A caller retries after an SSH timeout. The broker records the exact
+  idempotency request/outcome and refuses a conflicting or blind duplicate;
+  timeout remediation is operator resolution, not an automatic retry.
 
 ## Severity Calibration
 

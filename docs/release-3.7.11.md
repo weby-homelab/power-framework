@@ -10,7 +10,7 @@ clean-install evidence all bind to the same protected-main commit.
   contract, deterministic release slots, atomic activation, rollback checks, and
   managed `power` / `power-mcp` launchers.
 - Made MCP stdio discovery and legacy compatibility explicit while requiring
-  `POWER_VAULT_DIR` and preserving a 20-tool governed contract.
+  `POWER_VAULT_DIR` and preserving a 21-tool governed contract.
 - Added fail-closed vault, SQLite-index, control-state, and Skill boundaries for
   traversal and symlink escape attempts.
 - Hardened external ROT/LLM endpoint handling with explicit egress approval,

@@ -18,31 +18,31 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5A / 5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
+PHASE 5B CLOSED / MERGED / VERIFIED / INFRA-1 CANDIDATE IN ADMISSION
 
 SNAPSHOT_BASE_SHA:
-dde1e1369c2d79d8f01b9fce21ae1fb55834a814
+6a315d5919eeef797bc506ecb216313c20419fc2
 
 SNAPSHOT_BASE_TREE:
-194d8c80dabb816bf8027ff097abc1b016dad317
+a03b90648e1e57c5a579e5834988015192027cb0
 
 SNAPSHOT_LAST_INCLUDED_PR:
-416
+418
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-416
+418
 
 CURRENT_LIVE_MAIN:
-dde1e1369c2d79d8f01b9fce21ae1fb55834a814
+6a315d5919eeef797bc506ecb216313c20419fc2
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-Phase 5A.1 — Evaluation corpus semantic integrity correction (PR #416)
+Phase 5B — Domain Policy v2 and deterministic multi-domain router (PR #418)
 
 NEXT_GATE:
-Phase 5B — Domain Policy v2 and deterministic multi-domain router
+INFRA-1 — Constrained Local Infrastructure Execution Broker
 
 ACTIONS_396:
 CLOSED / MERGED
@@ -66,7 +66,13 @@ PHASE_5A_1:
 CLOSED / MERGED / VERIFIED / PR #416
 
 PHASE_5B:
-CANDIDATE / IN ADMISSION
+CLOSED / MERGED / VERIFIED / PR #418 / merge 6a315d5
+
+INFRA_1:
+ADMISSION CANDIDATE / PROVISIONAL IMPLEMENTATION PR
+
+PHASE_5C:
+READY FOR SEPARATE ADMISSION / BLOCKED UNTIL INFRA-1 CLOSES
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -84,13 +90,13 @@ CANONICAL_GOVERNANCE_BRANCH:
 docs/power-3.8-final-integration-course-correction
 
 CANONICAL_GOVERNANCE_COMMIT:
-95f8cadd7e90ef4b16773b3c45bbc9ab40569e7a
+6a315d5919eeef797bc506ecb216313c20419fc2
 
 CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md
+artifacts/project-state/handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -124,7 +130,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / PHASE 5A–5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
+CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CANDIDATE / PHASE 5C+ NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -141,6 +147,13 @@ CANONICAL PLANNING V2 / PHASE 5A–5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
 - The protected `main` observed for this final-integration snapshot was
   `a386858a45489eb5db213d42ffe773db9134ff88` with tree
   `664f34995961a2990dee00ecde0ebe7c8ed0f5d8`.
+- The fresh INFRA-1 preflight observed protected `main` at
+  `6a315d5919eeef797bc506ecb216313c20419fc2` with tree
+  `a03b90648e1e57c5a579e5834988015192027cb0` and parents
+  `dde1e1369c2d79d8f01b9fce21ae1fb55834a814` and
+  `887f8319b70c4e7be98d503d53924a70ad211c38`; GitHub verification was
+  `verified=true / reason=valid`; INFRA-1 preflight observed at
+  `2026-09-12T20:15:30Z`.
 - `SNAPSHOT_BASE_SHA` and `SNAPSHOT_BASE_TREE` are immutable snapshot anchors.
   They are not a mutable substitute for a fresh live-main read.
 - The governance branch/head/merge objects for this PR are resolved from live
@@ -151,6 +164,17 @@ CANONICAL PLANNING V2 / PHASE 5A–5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
   `7ed70766904e394d9717fe3fb7e18ed079e1887b` and
   `c385073583dc00dc7752169eb36f66ecdd7f4361`.
 - A document SHA is a state anchor, not a substitute for live GitHub verification.
+
+## Phase 5B parent erratum
+
+The historical Phase 5B report and handoff remain append-only evidence. Fresh
+GitHub objects establish the corrected relationship: candidate head
+`887f8319b70c4e7be98d503d53924a70ad211c38` has actual parent
+`12dda70c8badbbff723971d023206574b4130b64`; the protected merge
+`6a315d5919eeef797bc506ecb216313c20419fc2` has parents
+`dde1e1369c2d79d8f01b9fce21ae1fb55834a814` and the candidate head. A prior
+narrative parent SHA is a reporting typo, not a reason to rewrite historical
+evidence.
 
 ## Public and phase state
 
@@ -168,7 +192,9 @@ CANONICAL PLANNING V2 / PHASE 5A–5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
 - Evaluation corpus v1: **HISTORICAL / RETAINED / SEMANTIC ERRATUM**.
 - Phase 5A.1: **CLOSED / MERGED / VERIFIED** through protected PR #416.
 - Active evaluation revision: **v1.1 / SEMANTIC ADJUDICATION PASS / ACTIVE**.
-- Phase 5B: **CANDIDATE / IN ADMISSION**.
+- Phase 5B: **CLOSED / MERGED / VERIFIED** through protected PR #418.
+- INFRA-1: **ADMISSION CANDIDATE**; runtime capability is not yet merged.
+- Phase 5C: **READY FOR SEPARATE ADMISSION / BLOCKED UNTIL INFRA-1 CLOSES**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
 
@@ -189,7 +215,8 @@ CANONICAL PLANNING V2 / PHASE 5A–5A.1 CLOSED / PHASE 5B CANDIDATE IN ADMISSION
 | Phase 5A runtime contracts | CLOSED / MERGED / VERIFIED | PR #415 protected merge and post-merge checks |
 | Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; superseded for future evaluation |
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
-| Phase 5B | CANDIDATE / IN ADMISSION | Domain Policy v2, separate source classifier, deterministic router |
+| Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; merge `6a315d5`; live parent erratum retained above |
+| INFRA-1 | ADMISSION CANDIDATE | Constrained local Unix broker, typed operations, receipts, SSH/rrsync policy |
 
 ## Actions #396 exact objects
 
@@ -308,20 +335,21 @@ FOUNDATION HARDENING = CLOSED / IMPLEMENTED / VERIFIED
 PHASE 5 = IN PROGRESS
 PHASE 5A RUNTIME CONTRACTS = CLOSED / MERGED / VERIFIED
 PHASE 5A.1 EVALUATION CORRECTION = CLOSED / MERGED / VERIFIED
-PHASE 5B = CANDIDATE / IN ADMISSION
+PHASE 5B = CLOSED / MERGED / VERIFIED / PR #418
+INFRA-1 = ADMISSION CANDIDATE / PROVISIONAL IMPLEMENTATION PR
+PHASE 5C = READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED
 ```
 
 The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
-runtime contracts, and Phase 5A.1 semantic correction were accepted through
-normal protected merges and post-merge checks. The current bounded gate is
-Phase 5B. POWER 3.8.0 cannot be released from this state.
+runtime contracts, Phase 5A.1 semantic correction, and Phase 5B router were
+accepted through normal protected merges and post-merge checks. The current
+bounded gate is INFRA-1. POWER 3.8.0 cannot be released from this state.
 
 ## Canonical governance status
 
 The prior governance, dependency, Foundation Hardening, Phase 5A runtime
-contract, and Phase 5A.1 correction merges are canonical on protected `main`.
-The Phase 5B candidate below remains provisional until its protected normal
-merge:
+contract, Phase 5A.1 correction, and Phase 5B merge are canonical on protected
+`main`. INFRA-1 below remains provisional until its protected normal merge:
 
 - Governance branch: `docs/power-3.8-final-integration-course-correction`.
 - Prior governance bootstrap merge: `4b49e00c75866fa57f71e7bef61547915f7e01db`,
@@ -344,9 +372,9 @@ merge:
 
 ## Next authorized work
 
-1. Complete the separate Phase 5B candidate from the current protected `main`
-   and active v1.1 evaluation revision through one protected normal merge.
-2. Perform independent exact-head post-merge readback for Phase 5B.
+1. Complete the INFRA-1 candidate from live protected `main` through one
+   protected normal merge.
+2. Perform independent exact-head post-merge readback for INFRA-1.
 3. Keep Phase 5C–9 runtime work beyond this gate, version bumps, tags, releases, and POWER 3.8.0
    publication blocked until each declared gate is independently closed.
 
@@ -356,6 +384,8 @@ merge:
   dependency candidate must record its exact base/head/tree/parent, diff,
   hashes, tests, security, CI, and policy evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
+- Do not start Phase 5C SearchScope pushdown until INFRA-1 is independently
+  admitted and verified.
 - Do not start Phase 5C implementation or later phases in this gate.
 - Do not bump the public version, create a tag, create a release, or publish
   `POWER 3.8.0`.

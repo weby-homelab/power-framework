@@ -11,6 +11,13 @@ from pathlib import Path
 from typing import Any
 
 CAPABILITIES_SCHEMA_VERSION = 1
+INFRA_CAPABILITY_IDS = (
+    "infra.broker.v1",
+    "infra.ssh.probe.v1",
+    "infra.rsync.dry-run.v1",
+    "infra.rsync.replicate.v1",
+    "infra.rsync.verify.v1",
+)
 
 
 def _package_root() -> Path:
@@ -208,6 +215,14 @@ def manifest() -> dict[str, Any]:
             "cache_root": str(cache_root),
             "database_path_template": str(cache_root / "vaults/<vault-uuid>/search.db"),
             "database_override_env": "POWER_SEARCH_DB",
+        },
+        "infrastructure": {
+            "client_capabilities": list(INFRA_CAPABILITY_IDS),
+            "transport": "unix",
+            "static_client_only": True,
+            "runtime_status": "power infra status",
+            "network_access": False,
+            "credential_access": False,
         },
         "environment": {"variables": _environment_variables()},
         "read_only": True,

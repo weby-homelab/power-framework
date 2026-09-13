@@ -194,7 +194,7 @@ POWER_VAULT_DIR="$POWER_VAULT" "$HOME/.local/share/power/venv/bin/power-mcp" pre
 ```
 
 Після зміни конфігурації або Python environment перезапустіть long-lived
-MCP-клієнт. Повний контракт 20 інструментів і stdio security boundary
+MCP-клієнт. Повний контракт 21 інструменту і stdio security boundary
 описано в [MCP Server](mcp-server.md).
 
 Web UI не є окремим native-продуктом: він постачається тим самим wheel і

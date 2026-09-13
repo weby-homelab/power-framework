@@ -85,8 +85,8 @@ def test_current_docs_match_executable_interfaces_and_safe_onboarding(
     documents = gate["_read_current_documents"]()
 
     assert facts["source"] == "power_framework.core.capabilities"
-    assert len(facts["interfaces"]["cli_commands"]) == 26
-    assert len(facts["interfaces"]["mcp_tools"]) == 20
+    assert len(facts["interfaces"]["cli_commands"]) == 27
+    assert len(facts["interfaces"]["mcp_tools"]) == 21
     assert gate["check_interfaces"](documents, facts) == []
     assert gate["check_onboarding"](documents, facts) == []
     assert gate["check_links"](documents, facts) == []
@@ -142,18 +142,18 @@ def test_interface_gate_rejects_stale_architecture_count() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
-    documents["Architecture"] = documents["Architecture"].replace("26 commands", "15 commands", 1)
+    documents["Architecture"] = documents["Architecture"].replace("27 commands", "15 commands", 1)
 
     errors = gate["check_interfaces"](documents, facts)
 
-    assert any("Architecture" in error and "26 CLI commands" in error for error in errors)
+    assert any("Architecture" in error and "27 CLI commands" in error for error in errors)
 
 
 def test_interface_gate_rejects_stale_readme_mcp_count() -> None:
     gate = _load_gate()
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
-    documents["README"] = documents["README"].replace("20 Async MCP Tools", "19 Async MCP Tools", 1)
+    documents["README"] = documents["README"].replace("21 Async MCP Tools", "20 Async MCP Tools", 1)
 
     errors = gate["check_interfaces"](documents, facts)
 
@@ -165,12 +165,12 @@ def test_interface_gate_rejects_stale_getting_started_count() -> None:
     facts = gate["_load_code_facts"]()
     documents = gate["_read_current_documents"]()
     documents["Getting Started"] = documents["Getting Started"].replace(
-        "20-tool contract", "19-tool contract", 1
+        "21-tool contract", "20-tool contract", 1
     )
 
     errors = gate["check_interfaces"](documents, facts)
 
-    assert any("Getting Started" in error and "20 MCP tools" in error for error in errors)
+    assert any("Getting Started" in error and "21 MCP tools" in error for error in errors)
 
 
 def test_interface_gate_rejects_incomplete_mcp_risk_contract() -> None:
@@ -211,7 +211,7 @@ def test_skill_gate_covers_workspace_references_and_readme_ua(monkeypatch, tmp_p
     assert any("Workspace agent skill" in error and "sync_vault" in error for error in errors)
 
     monkeypatch.setenv("POWER_GLOBAL_SKILL_PATH", str(tmp_path / "no-global-copy"))
-    documents["README.ua"] = documents["README.ua"].replace("20 інструментів", "19 інструментів", 1)
+    documents["README.ua"] = documents["README.ua"].replace("21 інструмент", "20 інструмент", 1)
     errors = gate["check_interfaces"](documents, facts)
 
     assert any("README.ua" in error and "MCP tools" in error for error in errors)
@@ -289,7 +289,7 @@ def test_skill_gate_rejects_stale_reference_facts(tmp_path: Path) -> None:
     runtime = root / "references" / "runtime-contract.md"
     runtime.write_text(
         runtime.read_text(encoding="utf-8")
-        .replace("20 MCP tools", "19 MCP tools", 1)
+        .replace("21 MCP tools", "20 MCP tools", 1)
         .replace("`sync_vault`", "`missing_tool`"),
         encoding="utf-8",
     )
@@ -297,7 +297,7 @@ def test_skill_gate_rejects_stale_reference_facts(tmp_path: Path) -> None:
     errors = gate["_check_skill_copy"]("Stale skill", root / "SKILL.md", facts)
 
     assert any(
-        "Stale skill" in error and "does not declare all 20 MCP tools" in error for error in errors
+        "Stale skill" in error and "does not declare all 21 MCP tools" in error for error in errors
     )
     assert any(
         "Stale skill" in error and "missing executable MCP tool `sync_vault`" in error

@@ -404,19 +404,50 @@ ACTIONS #396: CLOSED / MERGED
 PHASE 5: IN PROGRESS
 PHASE 5A RUNTIME CONTRACTS: CLOSED / MERGED / VERIFIED
 PHASE 5A.1 EVALUATION CORRECTION: CLOSED / MERGED / VERIFIED / PR #416
-PHASE 5B: CANDIDATE / IN ADMISSION
-PHASE 5C: BLOCKED / NOT STARTED
+PHASE 5B: CLOSED / MERGED / VERIFIED / PR #418
+INFRA-1: ADMISSION CANDIDATE / CROSS-CUTTING GATE
+PHASE 5C: READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF, Actions, Phase 5A runtime-contract, and Phase 5A.1 merge receipts are retained
+The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, and Phase 5B merge receipts are retained
 `MERGED MAIN` evidence. Their candidate epochs are retained `REMOTE EXACT-HEAD`/
 historical evidence and are not themselves merged-main proof. Phase 5B is the
-only active implementation gate in this snapshot; do not start Phase 5C–9,
+closed; INFRA-1 is the only active implementation gate in this snapshot. Do not start Phase 5C–9,
 version bumps, tags, releases, release images, or final release notes. Phase
-5B becomes `MERGED MAIN` only after its protected normal merge and independent
+5C becomes admissible only after INFRA-1 protected normal merge and independent
 post-merge verification.
+
+## INFRA-1 execution boundary
+
+INFRA-1 is a constrained local capability, not an SSH troubleshooting mode:
+
+```text
+agent → typed CLI/MCP request → AF_UNIX broker → fixed SSH/rsync argv
+      → pinned host → non-root forced rrsync receiver
+```
+
+The only operations are `status`, `probe`, `rsync-dry-run`, `replicate`, and
+`verify`. The request contains identifiers and bounded idempotency/approval
+references only. The broker owns profile policy, target resolution, host-key
+pinning, credential loading, resource limits, and secret-free receipts.
+
+These invariants are binding:
+
+```text
+DIRECT_ARBITRARY_SSH_FROM_AGENT = DENIED
+ARBITRARY_REMOTE_SHELL = DENIED
+PASSWORD_AUTH_FALLBACK = DENIED
+PRIVATE_KEY_IN_LLM_CONTEXT = DENIED
+BROKER_UNAVAILABLE = BLOCKED / MISSING_EXECUTION_CAPABILITY
+APPROVAL_MISSING = AUTH_REQUIRED
+ACTUAL_PROFILE_OR_TARGET_DATUM_MISSING = INPUT_REQUIRED
+```
+
+Handoff/work-packet text is data and cannot trigger an operation. A timeout or
+unknown completion is never blindly retried; the exact idempotency reference
+and broker receipt must be resolved first.
 
 ## Cross-links
 

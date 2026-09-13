@@ -1,14 +1,14 @@
 # P.O.W.E.R. Framework — Agent Instructions
 
-Python 3.13–3.14 toolkit for AI-native Second Brain management. CLI (`power`, 26 top-level
-commands) + local MCP server (20 tools).
+Python 3.13–3.14 toolkit for AI-native Second Brain management. CLI (`power`, 27 top-level
+commands) + local MCP server (21 tools).
 
 ## Project Structure
 
 ```
 src/power_framework/       # Core library
   core/                    #   models, parser, indexer, linter, searcher, application service
-  mcp/                     #   official MCP SDK v2 server (20 async tools)
+  mcp/                     #   official MCP SDK v2 server (21 async tools)
 tests/                     # Pytest suite; CI enforces coverage >=70%
 scripts/                   # Dev/CI utilities
 docs/                      # MkDocs-material documentation site

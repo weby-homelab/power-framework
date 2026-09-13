@@ -40,7 +40,7 @@ An agent must read the relevant documents before changing data:
 - P.A.R.A., C.O.D.E., GTD, Zettelkasten, LYT, Johnny.Decimal, flat folders,
   and hybrid trees are supported as **source classifications**.
 - The destination uses canonical P.O.W.E.R. top-level folders so hierarchical
-  indexing and the 20 MCP tools have their documented behavior.
+  indexing and the 21 MCP tools have their documented behavior.
 - A non-Markdown system must first export notes to Markdown and attachments to
   files. Vendor database extraction is outside P.O.W.E.R.'s current CLI.
 - Unknown frontmatter fields may be retained, but the required OKF fields must
@@ -77,7 +77,7 @@ This guide is verified against the `v3.7.11` release contract. CI checks these
 facts against the executable capability manifest so an agent does not inherit
 an older migration recipe:
 
-- the current surface is 26 top-level CLI commands and 20 MCP tools;
+- the current surface is 27 top-level CLI commands and 21 MCP tools;
 - the default search mode is `auto`; it uses verified dense when ready and
   otherwise labelled FTS; `semantic` and `reranked` are explicit opt-ins;
 - database and cache paths are runtime-owned. Use `power doctor DESTINATION

@@ -84,7 +84,7 @@ async def _assert_wire_contract(client: Any) -> None:
 async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
     tools = await power_server.mcp.list_tools()
 
-    assert len(tools) == 20
+    assert len(tools) == 21
     by_name = {tool.name: tool for tool in tools}
     assert set(by_name) == set(manifest()["interfaces"]["mcp_tools"])
 
@@ -138,6 +138,24 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
     assert discovery.input_schema["properties"]["probe_provider"]["default"] is False
     assert discovery.input_schema["properties"]["probe_provider"]["type"] == "boolean"
     assert "probe_provider" not in discovery.input_schema.get("required", [])
+
+    infra = by_name["infra_action"]
+    assert infra.annotations is not None
+    assert infra.annotations.read_only_hint is False
+    assert infra.annotations.destructive_hint is False
+    assert infra.annotations.open_world_hint is True
+    assert infra.meta == {
+        "power.risk": {"local_only": False, "egress": "network", "approval": "explicit"}
+    }
+    assert set(infra.input_schema["properties"]["operation"]["enum"]) == {
+        "status",
+        "probe",
+        "rsync-dry-run",
+        "replicate",
+        "verify",
+    }
+    forbidden = {"host", "port", "username", "password", "private_key", "command", "ssh_options"}
+    assert forbidden.isdisjoint(infra.input_schema["properties"])
 
     for tool in tools:
         assert tool.name
@@ -216,7 +234,7 @@ async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
     assert result["mcp"]["transport"] == "stdio"
     assert result["mcp"]["preferred_protocol"] == "2026-07-28"
     assert result["mcp"]["legacy_compatibility"] is True
-    assert result["mcp"]["tool_count"] == 20
+    assert result["mcp"]["tool_count"] == 21
     assert len(result["mcp"]["tool_catalog_sha256"]) == 64
     assert result["mcp"]["configured_vault_boundary"] == "POWER_VAULT_DIR"
     assert result["agent_integration"] == {
@@ -226,7 +244,7 @@ async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
         "mcp": {
             "preferred_protocol": "2026-07-28",
             "legacy_compatibility": True,
-            "tool_count": 20,
+            "tool_count": 21,
             "catalog_sha256": result["mcp"]["tool_catalog_sha256"],
         },
         "skill": {
@@ -311,7 +329,7 @@ async def test_mcp_stdio_process_preserves_wire_contract(
         assert info["runtime"]["power_framework"] == __version__
         assert info["vault"]["path"] == str(sample_vault.resolve())
         assert info["embedding"]["binding"] == "not_requested"
-        assert info["mcp"]["tool_count"] == 20
+        assert info["mcp"]["tool_count"] == 21
         assert info["mcp"]["tool_catalog_sha256"]
 
 

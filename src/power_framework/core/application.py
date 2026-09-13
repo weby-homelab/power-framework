@@ -30,6 +30,14 @@ from .decision_service import DecisionService
 from .errors import ConflictError
 from .healer import heal_vault
 from .indexer import run_generate_hierarchical_index, run_generate_sub_index, scan_folder_notes
+from .infra_broker import InfraBrokerClient, InfraBrokerClientProtocol
+from .infra_models import (
+    InfraCapabilityBlockReceipt,
+    InfraOperation,
+    InfraReasonCode,
+    InfraRequest,
+    InfraResponse,
+)
 from .linter import archive_stale_notes, run_lint_report
 from .memory_api import (
     apply_change,
@@ -289,12 +297,14 @@ class ApplicationService:
         audit_hook: Callable[[AuditReceipt], None] | None = None,
         search_fn: Callable[..., list[Any]] | None = None,
         task_service: TaskService | None = None,
+        infra_broker: InfraBrokerClientProtocol | None = None,
     ) -> None:
         self.vault_dir = Path(vault_dir).expanduser().resolve()
         self._audit_hook = audit_hook
         self._search_fn = search_fn or partial(search_vault, allow_search_db_override=False)
         self.task_service = task_service or TaskService(self.vault_dir, create_vault=False)
         self.decision_service = DecisionService(self.vault_dir, task_service=self.task_service)
+        self.infra_broker = infra_broker or InfraBrokerClient()
 
     def discover(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
         """Return bounded capability metadata without probing optional runtimes."""
@@ -1036,6 +1046,120 @@ class ApplicationService:
                 "safe_fallback": "local_fts",
             },
             status="unavailable",
+        )
+
+    def infra_action(
+        self,
+        request: InfraRequest,
+        *,
+        context: RequestContext | None = None,
+    ) -> InfraResponse:
+        """Execute one typed broker action and optionally project a block to a Task.
+
+        The application boundary deliberately has no SSH/rsync fallback.  A
+        missing broker remains a typed capability block, and a broker receipt
+        may update an explicitly bound Task through the existing state machine.
+        The broker, not the caller-supplied actor, derives the transport
+        principal and evaluates external-write approval.
+        """
+        if not isinstance(request, InfraRequest):
+            raise TypeError("infra_action requires an InfraRequest")
+        if request.task_id:
+            execution_context = self._mutation_context(
+                context,
+                operation=f"infra.{request.operation.value}",
+                require_apply=True,
+            )
+            current_task = self.task_service.get_task(request.task_id)
+            if current_task is None:
+                self._reject_request(
+                    f"infra.{request.operation.value}",
+                    execution_context,
+                    FileNotFoundError(f"Task {request.task_id} not found"),
+                )
+            if current_task.revision != request.expected_revision:
+                self._reject_request(
+                    f"infra.{request.operation.value}",
+                    execution_context,
+                    ConflictError("task revision changed before broker admission"),
+                )
+        elif request.operation == InfraOperation.REPLICATE:
+            execution_context = self._mutation_context(
+                context,
+                operation="infra.replicate",
+                require_apply=True,
+            )
+        else:
+            execution_context = context or RequestContext()
+        response = self.infra_broker.execute(request)
+        if request.task_id and isinstance(response.receipt, InfraCapabilityBlockReceipt):
+            self._project_infra_block(request, response, execution_context)
+        return response
+
+    def _project_infra_block(
+        self,
+        request: InfraRequest,
+        response: InfraResponse,
+        context: RequestContext,
+    ) -> None:
+        """Reference a block receipt through existing Task v2 fields only."""
+        task_id = request.task_id
+        if task_id is None:
+            raise ValueError("task-bound infrastructure block requires task_id")
+        if request.expected_revision is None:
+            raise ValueError("task-bound infrastructure action requires expected_revision")
+        if context.authority != "apply":
+            raise PermissionError("task-bound infrastructure action requires apply authority")
+        receipt = response.receipt
+        if not isinstance(receipt, InfraCapabilityBlockReceipt):
+            return
+        if receipt.reason_code == InfraReasonCode.REQUEST_INPUT_MISSING:
+            new_state = "input-required"
+            required_input: dict[str, Any] | None = {
+                "required_fields": ["target", "profile"],
+                "receipt_id": receipt.receipt_id,
+            }
+            execution_state = "none"
+        elif receipt.reason_code == InfraReasonCode.APPROVAL_REQUIRED:
+            new_state = "auth-required"
+            required_input = None
+            execution_state = "none"
+        else:
+            new_state = "blocked"
+            required_input = None
+            execution_state = (
+                "waiting-network"
+                if receipt.reason_code == InfraReasonCode.NETWORK_UNAVAILABLE
+                else "none"
+            )
+        current = self.task_service.get_task(task_id)
+        if current is None:
+            raise FileNotFoundError(f"Task {task_id} not found")
+        transition_required_input = required_input
+        if transition_required_input is None and current.required_input is not None:
+            transition_required_input = {}
+        open_gates = list(current.open_gates)
+        if receipt.required_capability not in open_gates:
+            open_gates.append(receipt.required_capability)
+        values: dict[str, Any] = {
+            "execution_state": execution_state,
+            "external_refs": {
+                **current.external_refs,
+                "infra_reason_code": receipt.reason_code.value,
+                "infra_broker_status": receipt.broker_status,
+            },
+        }
+        self.task_service.transition_task(
+            task_id,
+            new_state=new_state,  # type: ignore[arg-type]
+            actor=context.actor,
+            expected_revision=request.expected_revision,
+            receipt_id=receipt.receipt_id,
+            idempotency_key=request.idempotency_key,
+            required_input=transition_required_input,
+            open_gates=open_gates,
+            error_ref=receipt.receipt_id,
+            values=values,
         )
 
     def receipt(
