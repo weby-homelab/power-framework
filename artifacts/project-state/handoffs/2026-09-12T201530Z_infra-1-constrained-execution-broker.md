@@ -13,6 +13,7 @@ PUBLIC_VERSION: 3.7.11
 BRANCH: feat/power-3.8-infra-execution-broker
 ACTIVE_GATE: INFRA-1 — Constrained Local Infrastructure Execution Broker
 NEXT_GATE: Phase 5C — SearchScope Pushdown
+TRANSFER_PR: #419 / https://github.com/weby-homelab/power-framework/pull/419
 ```
 
 ```text
@@ -86,10 +87,11 @@ no-delete, and optional stable-source `from=` defense in depth.
 
 ```text
 EPOCH_0_BASE: 6a315d5919eeef797bc506ecb216313c20419fc2
-EPOCH_1_HEAD: RESOLVE_AFTER_COMMIT
-EPOCH_1_TREE: RESOLVE_AFTER_COMMIT
-EPOCH_1_PARENTS: RESOLVE_AFTER_COMMIT
+EPOCH_1_HEAD: dcf27b55e3e5bfeb285fc93ed73a485ce0f707fb
+EPOCH_1_TREE: 85a84c6e9158dc98168dc9e7a1dff03259aba90b
+EPOCH_1_PARENTS: 6a315d5919eeef797bc506ecb216313c20419fc2
 EPOCH_1_WHY: INFRA-1 broker/client/task/MCP/CLI/security/docs implementation
+EPOCH_1_GPG: verified=true / reason=valid / fingerprint=2D49E810C7F2527E
 ```
 
 ## Local evidence at handoff creation
