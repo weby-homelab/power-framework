@@ -62,6 +62,9 @@ VERIFIED / reason=valid
 INFRA_1_REMOTE_CHECKS:
 IN PROGRESS / 11 check-runs observed; deploy=skipped; prior head CodeQL failure is superseded
 
+INFRA_1_REMOTE_ATTEMPT_742:
+COMPLETED / test (3.14)=FAILURE / test (3.13)=CANCELLED / OTHER OBSERVED CONTEXTS=SUCCESS
+
 INFRA_1_LOCAL_BASE_HEAD:
 ace5d6351dd599578491023419140b6a79bd6b7f
 
@@ -281,6 +284,17 @@ evidence:
 The gate remains open until an exact signed candidate tuple is published,
 required remote checks and policy are freshly green, and receiver evidence is
 captured. Phase 5C remains blocked and unstarted.
+
+### Latest remote CI attempt
+
+For candidate head `742d0fb431d78fde5d698ae1aa55589ef0e75c1b` (run
+`34870415055`, attempt 2), GitHub completed CodeQL, security, package smoke,
+build, analyze, benchmark, upgrade, and base-runtime contexts successfully.
+The matrix reported `test (3.14)=failure` and `test (3.13)=cancelled`; the
+failure annotation exposed only process exit code, without a failing test
+name. The exact workflow test gate passes locally on Python 3.14.6, but the
+remote failure remains a protected-check blocker and was not blindly retried
+again. This result is candidate evidence, not merged-main evidence.
 
 ## Actions #396 exact objects
 

@@ -107,10 +107,12 @@ The remaining admission conditions are fresh exact-head protected CI/readback
 and operator evidence for the actual non-root forced `rrsync` receiver. PR #419
 now points to signed candidate head `4dc2db46885ab81e337f398f16ea6a7aac585839`
 with tree `0550327422405aace37a6593abcfc3e836b7c7fc` and parent
-`62323a930189c7afea497a984bdf6858011dfa09`; its required checks were still in
-progress at the latest readback and deploy was skipped. Therefore INFRA-1
-remains `ADMISSION CANDIDATE / PROVISIONAL`, Phase 5C remains blocked/not
-started, and POWER 3.8.0 remains NO-GO.
+`62323a930189c7afea497a984bdf6858011dfa09`; the last completed CI attempt
+reported `test (3.14)=failure` and `test (3.13)=cancelled`, while the other
+observed contexts passed and deploy was skipped. The exact local Python 3.14
+workflow test passes, but remote protected CI remains unresolved. Therefore
+INFRA-1 remains `ADMISSION CANDIDATE / PROVISIONAL`, Phase 5C remains
+blocked/not started, and POWER 3.8.0 remains NO-GO.
 
 ## Controlled Dependency Refresh
 

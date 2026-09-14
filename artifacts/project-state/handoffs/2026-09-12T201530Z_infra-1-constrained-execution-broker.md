@@ -253,3 +253,32 @@ global OpenCode skill/repository runtime-contract mismatch.
 Protected admission is not claimed: required remote checks have not completed,
 receiver/forced-`rrsync` evidence is unavailable, and Phase 5C, release, and
 merge remain blocked.
+
+## Append-only continuation — remote CI attempt result
+
+The first published candidate was checked by GitHub Actions and received one
+allowed failed-job rerun. This records the result without relabeling local
+evidence or treating a rerun as a new code candidate.
+
+```text
+CI_RUN_ID: 34870415055
+CI_ATTEMPT: 2
+CI_HEAD_SHA: 742d0fb431d78fde5d698ae1aa55589ef0e75c1b
+CI_CODEQL: success
+CI_SECURITY: success
+CI_PACKAGE_SMOKE: success
+CI_BUILD: success
+CI_ANALYZE: success
+CI_BENCHMARK_INTEGRITY: success
+CI_UPGRADE_MATRIX: success
+CI_BASE_RUNTIME_SMOKE: success
+CI_TEST_3_14: failure
+CI_TEST_3_13: cancelled
+CI_DEPLOY: skipped
+CI_FAILURE_DETAIL: only process exit-code annotation was available
+LOCAL_PYTHON_3_14_EXACT_TEST_GATE: PASS / 2012 passed, 4 skipped, 17 deselected
+CI_RERUN_POLICY: one failed-job rerun consumed; no blind repeat
+```
+
+The remote test failure/cancellation remains an exact protected-check blocker;
+the receiver evidence and merge/provenance gates remain independently open.

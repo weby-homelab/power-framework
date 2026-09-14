@@ -330,9 +330,10 @@ The local candidate currently reports `2012 passed, 4 skipped, 17 deselected`
 with `82%` coverage. Ruff, MyPy, package smoke, lock, pip, systemd, strict
 MkDocs, and diff checks pass locally, and a fresh read-only review found no
 P0/P1 code blocker. This remains `LOCAL CANDIDATE` evidence because the
-worktree is uncommitted, the real receiver has not been exercised, and PR #419
-has only in-progress checks on its newly published head; the prior head's
-CodeQL failure is superseded and no final protected result exists yet.
+worktree is uncommitted, the real receiver has not been exercised, and the
+latest PR #419 CI attempt reports `test (3.14)=failure` and `test (3.13)=cancelled`;
+the other observed contexts passed, the prior head's CodeQL failure is
+superseded, and no final protected result exists yet.
 
 ### PASS condition
 

@@ -473,8 +473,10 @@ readback observed on `2026-09-14T16:40:21Z` points to head
 `4dc2db46885ab81e337f398f16ea6a7aac585839`, tree
 `0550327422405aace37a6593abcfc3e836b7c7fc`, parent
 `62323a930189c7afea497a984bdf6858011dfa09`, with valid GitHub GPG verification.
-Eleven check-runs were observed, several still in progress, and deploy is
-skipped; the previous head's CodeQL failure is superseded. Real
+The subsequent docs reconciliation is the current PR tip; the last completed
+CI attempt for the implementation candidate reported `test (3.14)=failure` and
+`test (3.13)=cancelled`, while the other observed contexts passed. The prior
+head's CodeQL failure is superseded. Real
 receiver/forced-`rrsync` evidence is unavailable, so protected INFRA-1
 admission and Phase 5C remain blocked.
 
