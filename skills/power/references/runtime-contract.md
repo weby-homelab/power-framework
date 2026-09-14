@@ -6,9 +6,9 @@ sync/doctor правила. Авторитетна правда — `power docto
 
 ## Runtime version
 
-`v3.7.11` — runtime contract: **26 CLI commands** + **20 MCP tools** (official MCP Python SDK v2).
+`v3.7.11` — runtime contract: **27 CLI commands** + **21 MCP tools** (official MCP Python SDK v2).
 
-## CLI (26 команд)
+## CLI (27 команд)
 
 1. `power init <path>` — створити структуру vault
 2. `power lint <path>` — перевірка метаданих, посилань, orphan
@@ -36,8 +36,9 @@ sync/doctor правила. Авторитетна правда — `power docto
 24. `power maintenance <path> [--apply]` — hash-bound preview/apply для reversible repairs
 25. `power migrate-state <path>` — content-free read-only state-plane inventory; apply is fail-closed
 26. `power integrations <doctor|mcp-config|skill-check|skill-install|install>` — generic dry-run-first suite integration and managed native install flows
+27. `power infra <status|probe|dry-run|replicate|verify>` — constrained local broker client; identifiers only, no direct SSH fallback
 
-## MCP Tools (20) — official MCP Python SDK v2
+## MCP Tools (21) — official MCP Python SDK v2
 
 - Discovery: `get_server_info` — versioned runtime, configured vault, coverage,
   and embedding configuration; `probe_provider=true` is an explicit no-download
@@ -51,6 +52,9 @@ sync/doctor правила. Авторитетна правда — `power docto
   `apply_memory_change`, `validate_memory_state`, `read_memory_history`
 - Handoff: `handoff_work` — content-free Markdown packet, checkpoints,
   resume/cancel/input-required semantics та idempotency keys
+- Infrastructure: `infra_action` — typed Unix-broker request for status, probe,
+  rsync dry-run, bounded replicate, or verify; no arbitrary host, command,
+  credential, or rsync option input
 
 `get_server_info` is the MCP equivalent of the CLI doctor discovery contract.
 Its default call is lightweight and does not load ONNX Runtime, open a model

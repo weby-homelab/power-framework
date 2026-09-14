@@ -37,6 +37,7 @@ from power_framework.mcp.power_server import (
     get_server_info,
     handoff_work,
     heal_frontmatter_tool,
+    infra_action,
     ingest_note,
     lint_vault,
     propose_memory_change,
@@ -84,7 +85,7 @@ async def _assert_wire_contract(client: Any) -> None:
 async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
     tools = await power_server.mcp.list_tools()
 
-    assert len(tools) == 20
+    assert len(tools) == 21
     by_name = {tool.name: tool for tool in tools}
     assert set(by_name) == set(manifest()["interfaces"]["mcp_tools"])
 
@@ -139,6 +140,24 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
     assert discovery.input_schema["properties"]["probe_provider"]["type"] == "boolean"
     assert "probe_provider" not in discovery.input_schema.get("required", [])
 
+    infra = by_name["infra_action"]
+    assert infra.annotations is not None
+    assert infra.annotations.read_only_hint is False
+    assert infra.annotations.destructive_hint is False
+    assert infra.annotations.open_world_hint is True
+    assert infra.meta == {
+        "power.risk": {"local_only": False, "egress": "network", "approval": "explicit"}
+    }
+    assert set(infra.input_schema["properties"]["operation"]["enum"]) == {
+        "status",
+        "probe",
+        "rsync-dry-run",
+        "replicate",
+        "verify",
+    }
+    forbidden = {"host", "port", "username", "password", "private_key", "command", "ssh_options"}
+    assert forbidden.isdisjoint(infra.input_schema["properties"])
+
     for tool in tools:
         assert tool.name
         assert tool.description
@@ -167,6 +186,21 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
             assert tool.annotations.destructive_hint is False
         if tool.annotations.destructive_hint:
             assert risk["approval"] == "explicit"
+
+
+async def test_infra_action_is_typed_and_does_not_request_secret_input(
+    sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("POWER_INFRA_SOCKET", str(tmp_path / "missing.sock"))
+
+    result = json.loads(await infra_action(operation="probe", profile="power-vault"))
+
+    assert result["data"]["state"] == "input-required"
+    assert result["data"]["required_input"] == {"target": "target", "profile": "profile"}
+    serialized = json.dumps(result, ensure_ascii=False).casefold()
+    assert "password" not in serialized
+    assert "private_key" not in serialized
+    assert str(sample_vault) not in serialized
 
 
 async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections() -> None:
@@ -216,7 +250,7 @@ async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
     assert result["mcp"]["transport"] == "stdio"
     assert result["mcp"]["preferred_protocol"] == "2026-07-28"
     assert result["mcp"]["legacy_compatibility"] is True
-    assert result["mcp"]["tool_count"] == 20
+    assert result["mcp"]["tool_count"] == 21
     assert len(result["mcp"]["tool_catalog_sha256"]) == 64
     assert result["mcp"]["configured_vault_boundary"] == "POWER_VAULT_DIR"
     assert result["agent_integration"] == {
@@ -226,7 +260,7 @@ async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
         "mcp": {
             "preferred_protocol": "2026-07-28",
             "legacy_compatibility": True,
-            "tool_count": 20,
+            "tool_count": 21,
             "catalog_sha256": result["mcp"]["tool_catalog_sha256"],
         },
         "skill": {
@@ -311,7 +345,7 @@ async def test_mcp_stdio_process_preserves_wire_contract(
         assert info["runtime"]["power_framework"] == __version__
         assert info["vault"]["path"] == str(sample_vault.resolve())
         assert info["embedding"]["binding"] == "not_requested"
-        assert info["mcp"]["tool_count"] == 20
+        assert info["mcp"]["tool_count"] == 21
         assert info["mcp"]["tool_catalog_sha256"]
 
 

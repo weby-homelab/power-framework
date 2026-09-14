@@ -42,6 +42,26 @@ phase_status: blocked | not_started | implemented | validated | superseded
 `status: planned` is retained as a compatibility publication alias for this
 pre-implementation package; it is not a fourth authority or lifecycle axis.
 
+## Current bounded implementation gate: INFRA-1
+
+The planning contracts remain planning-only and are not silently promoted to
+runtime authority. The current implementation gate is **INFRA-1 — Constrained
+Local Infrastructure Execution Broker**. Its implementation and deployment
+artifacts are documented separately and remain provisional until a protected
+normal merge and independent post-merge readback:
+
+- [INFRA-1 broker API](../../../docs/api/infra_broker.md)
+- [INFRA-1 architectural decision](../../../docs/adr/0006-infra-1-constrained-execution-broker.md)
+- [INFRA-1 candidate handoff](../handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+
+The latest local candidate evidence is `LOCAL CANDIDATE` evidence only. The
+hermetic suite passed `2012` tests with `4` skipped and `17` deselected at
+`82%` coverage; Ruff, MyPy, package smoke, lock, systemd, and strict Docs gates
+also passed locally. Real receiver/forced-mode evidence, an immutable signed
+candidate tuple, fresh remote checks, and protected admission are still
+required. These results do not authorize Phase 5C, a release, or a public
+version change.
+
 ## Files
 
 | Artifact | Role |

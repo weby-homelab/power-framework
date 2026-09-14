@@ -17,7 +17,7 @@ from .decision_models import (
 from .errors import ConflictError
 from .task_models import ensure_valid_task_id
 from .task_service import TaskService
-from .utils import atomic_write
+from .utils import atomic_write, read_file_bytes_no_follow
 
 _AUTHORITY_RANK: dict[str, int] = {"read-only": 0, "propose": 1, "apply": 2}
 
@@ -97,7 +97,9 @@ class DecisionService:
         if not decision_file.is_file():
             return None
         try:
-            decision = Decision.model_validate_json(decision_file.read_text(encoding="utf-8"))
+            decision = Decision.model_validate_json(
+                read_file_bytes_no_follow(decision_file).decode("utf-8")
+            )
             return _effective_decision(decision)
         except (OSError, UnicodeError, ValueError) as exc:
             raise ValueError(f"Malformed decision snapshot {decision_id}") from exc
@@ -237,7 +239,12 @@ class DecisionService:
         if not receipt_file.is_file():
             return None
         try:
-            return DecisionReceipt.model_validate_json(receipt_file.read_text(encoding="utf-8"))
+            receipt = DecisionReceipt.model_validate_json(
+                read_file_bytes_no_follow(receipt_file).decode("utf-8")
+            )
+            if receipt.receipt_id != f"dcr_{receipt.response_sha256}":
+                raise ValueError("Decision receipt derivation mismatch")
+            return receipt
         except (OSError, UnicodeError, ValueError) as exc:
             raise ValueError(f"Malformed decision receipt {receipt_id}") from exc
 

@@ -17,6 +17,7 @@ Exposes MCP tools for AI agent interaction with the knowledge vault:
 - suggest_related_tool: Auto-discover knowledge graph connections
 - heal_frontmatter_tool: Auto-fix missing/invalid frontmatter
 - check_markdown_tool: Markdown quality audit
+- infra_action: bounded local infrastructure broker client
 
 Uses the official MCP Python SDK v2. Native POWER integrations use stdio; the
 Web UI is the only supported container HTTP surface.
@@ -45,6 +46,8 @@ from power_framework.core import (
     DEFAULT_SEARCH_MODE,
     PARA_FOLDERS,
     ApplicationService,
+    InfraOperation,
+    InfraRequest,
     Principal,
     RateLimiter,
     RequestContext,
@@ -842,6 +845,59 @@ async def handoff_work(
     ) as exc:
         raise ToolError(_safe_mcp_error_text(exc)) from exc
     return json.dumps(result, ensure_ascii=False, sort_keys=True)
+
+
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+    meta={"power.risk": {"local_only": False, "egress": "network", "approval": "explicit"}},
+)
+async def infra_action(
+    operation: Literal["status", "probe", "rsync-dry-run", "replicate", "verify"],
+    target: str | None = None,
+    profile: str | None = None,
+    dry_run: bool = False,
+    idempotency_key: str | None = None,
+    run_id: str | None = None,
+    approval_ref: str | None = None,
+    task_id: str | None = None,
+    expected_revision: int | None = None,
+    vault_path: str | None = None,
+) -> str:
+    """Call only the configured local INFRA-1 broker; never execute shell text."""
+    path = _get_vault_path(vault_path)
+    try:
+        typed_request = InfraRequest(
+            operation=InfraOperation(operation),
+            target=target,
+            profile=profile,
+            dry_run=dry_run or operation == "rsync-dry-run",
+            idempotency_key=idempotency_key,
+            run_id=run_id,
+            approval_ref=approval_ref,
+            task_id=task_id,
+            expected_revision=expected_revision,
+        )
+        authority = "apply" if operation == "replicate" or task_id else "read-only"
+        envelope = await run_blocking(
+            lambda: ApplicationService(path).infra_action(
+                typed_request,
+                context=_mcp_context(
+                    authority=authority,  # type: ignore[arg-type]
+                    idempotency_key=idempotency_key,
+                ),
+            ),
+            mutation=operation == "replicate" or task_id is not None,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ToolError("Invalid typed infrastructure request") from exc
+    except (FileNotFoundError, PermissionError, RuntimeError, OSError) as exc:
+        raise ToolError("Infrastructure broker boundary unavailable") from exc
+    return json.dumps(envelope.as_dict(), ensure_ascii=False, sort_keys=True)
 
 
 @mcp.tool(

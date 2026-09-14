@@ -1,0 +1,5 @@
+# Deprecated compatibility note: caller authorization is no longer sourced
+# from service environment variables. Install the strict JSON file at
+# /etc/power/infra/callers.json and pass it through the unit's fixed
+# --caller-allowlist argument. Do not use a broad group as an identity
+# substitute; the socket group and broker ACL are separate controls.

@@ -12,6 +12,8 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+import pytest
+
 from power_framework.core.task_service import TaskService
 
 if TYPE_CHECKING:
@@ -109,6 +111,47 @@ def test_committed_leftover_loses_no_data(tmp_path: Path) -> None:
     assert not list(store.tx_dir.iterdir())
 
 
+def test_recovery_rejects_path_escape_and_preserves_manifest(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    svc = TaskService(vault)
+    store = svc.store
+    outside = tmp_path / "outside.txt"
+    outside.write_text("sentinel", encoding="utf-8")
+    _write_manifest(
+        store,
+        "tx_escape",
+        "prepared",
+        [{"label": "snapshot", "rel": "../outside.txt", "preimage_digest": None}],
+    )
+
+    results = store.recover()
+    assert results == []
+    assert outside.read_text(encoding="utf-8") == "sentinel"
+    assert (store.tx_dir / "tx_escape" / "manifest.json").is_file()
+
+
+def test_recovery_rejects_operation_label_mismatch_and_preserves_manifest(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    svc = TaskService(vault)
+    svc.create_task(task_id="T-matrix", title="sentinel")
+    store = svc.store
+    tx_dir = _write_manifest(
+        store,
+        "tx_matrix",
+        "prepared",
+        [{"label": "snapshot", "rel": ".power/tasks/T-matrix.json", "preimage_digest": None}],
+    )
+    manifest_path = tx_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["op"] = "memory_apply"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert store.recover() == []
+    assert store._recovery_blocked is True
+    assert store.get_task("T-matrix") is not None
+    assert manifest_path.is_file()
+
+
 def test_recovery_runs_on_next_process_lock_and_allows_retry(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     svc = TaskService(vault)
@@ -154,3 +197,74 @@ def test_no_manifest_leftover_on_happy_path(tmp_path: Path) -> None:
     assert not list(store.tx_dir.iterdir())
     assert store.get_task("T3").state == "working"
     assert len(store.get_task_events("T3")) == 3
+
+
+def test_failed_rollback_blocks_subsequent_same_process_mutations(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    svc = TaskService(vault)
+    t1 = svc.create_task(task_id="T1", title="initial", idempotency_key="k1")
+    store = svc.store
+    assert store._recovered is True
+    assert store._recovery_blocked is False
+
+    # Force rollback failure by corrupting the preimage backup inside the transaction
+    snap = store._task_file("T1")
+    ev = store._events_file("T1")
+
+    def _trigger_corrupted_rollback() -> None:
+        with store._transaction(
+            "state_transition", "k2", None, [(snap, "snapshot"), (ev, "event")]
+        ):
+            # Locate active tx_dir and corrupt the backup
+            tx_dirs = [d for d in store.tx_dir.iterdir() if d.is_dir()]
+            assert len(tx_dirs) == 1
+            bak_file = tx_dirs[0] / "snapshot.bak"
+            assert bak_file.is_file()
+            bak_file.write_bytes(b"corrupted_preimage_bytes")
+            ev.write_bytes(b"partial_event\n")
+            # Trigger rollback by raising an error
+            raise ValueError("simulated body failure")
+
+    with pytest.raises(
+        RuntimeError, match="task transaction rollback failed; recovery evidence preserved"
+    ):
+        _trigger_corrupted_rollback()
+
+    # In the SAME process, verify _recovery_blocked is True and evidence preserved
+    assert store._recovery_blocked is True
+    tx_dirs = [d for d in store.tx_dir.iterdir() if d.is_dir()]
+    assert len(tx_dirs) == 1
+    manifest_file = tx_dirs[0] / "manifest.json"
+    assert manifest_file.is_file()
+
+    # Attempt a second independent/top-level mutation in the SAME PROCESS
+    with pytest.raises(
+        RuntimeError, match="TaskStore recovery is blocked; repair preserved transaction evidence"
+    ):
+        svc.create_task(task_id="T2", title="should_fail", idempotency_key="k3")
+
+    # Assert no task state changed after recovery was blocked
+    assert svc.get_task("T2") is None
+    assert store.get_task("T1") is not None
+    assert store.get_task("T1").revision == t1.revision
+    assert manifest_file.is_file()
+
+    # A new TaskStore / process on the same vault ALSO remains fail-closed
+    fresh_svc = TaskService(vault)
+    with pytest.raises(
+        RuntimeError, match="TaskStore recovery is blocked; repair preserved transaction evidence"
+    ):
+        fresh_svc.create_task(task_id="T3", title="fresh_process_fail")
+
+    # Preserved recovery evidence remains untouched
+    assert manifest_file.is_file()
+
+    # Normal successful transaction path still works on a clean vault
+    clean_vault = tmp_path / "clean_vault"
+    clean_svc = TaskService(clean_vault)
+    t_clean = clean_svc.create_task(task_id="TC", title="clean_task")
+    assert t_clean.state == "backlog"
+    assert clean_svc.store._recovery_blocked is False
+    assert not list(clean_svc.store.tx_dir.iterdir())

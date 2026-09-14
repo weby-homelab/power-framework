@@ -20,6 +20,9 @@ REST verification:
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Phase 5B domain-policy/router report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
 - [Phase 5B domain-policy/router handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
+- [INFRA-1 constrained execution broker handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+- [INFRA-1 broker API](../api/infra_broker.md)
+- [INFRA-1 architectural decision](../adr/0006-infra-1-constrained-execution-broker.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
 
 > Controlled Dependency Refresh is **CLOSED / FINAL INTEGRATION VERIFIED**.
@@ -29,8 +32,9 @@ REST verification:
 > Hardening is **CLOSED / IMPLEMENTED / VERIFIED** after protected PR #414.
 > Phase 5A runtime contracts are **CLOSED / MERGED / VERIFIED** through PR #415;
 > Phase 5A.1 is **CLOSED / MERGED / VERIFIED** through PR #416. Phase 5B is
-> the current bounded candidate; Phase 5C and later runtime work remain
-> blocked/not started by this snapshot.
+> **CLOSED / MERGED / VERIFIED** through PR #418. INFRA-1 is the current
+> bounded candidate; Phase 5C and later runtime work remain blocked/not started
+> until INFRA-1 closes.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -44,8 +48,8 @@ To recover the current POWER 3.8 state:
 3. Read `POWER_3.8_DEVELOPMENT_PROTOCOL.md`.
 4. Read `POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md` and the planning-artifacts
    README.
-5. Read the latest append-only architecture handoff; classify the HF handoff as
-   historical evidence.
+5. Read the latest append-only INFRA-1 handoff; classify the Phase 5B and HF
+   handoffs as historical evidence.
 6. Fetch current GitHub `main`, the closed gate dispositions, required checks,
    reviews, rulesets, and protected-branch policy independently through the
    authenticated REST API.
@@ -53,7 +57,7 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. Verify the Phase 5B candidate and its exact
+   mutable operational truth. Verify the INFRA-1 candidate and its exact
    protected merge/readback; then stop before Phase 5C.
 
 ## CURRENT PLANNING CONTRACTS
@@ -85,7 +89,7 @@ phase report, release artifact, or authorization to start Phase 5C.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5B protected merge; then Phase 5C |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | INFRA-1 protected merge; then Phase 5C |
 
 ## HISTORICAL PLAN
 
@@ -114,8 +118,9 @@ attached to their PR, commit, and handoff evidence. The context/memory/retrieval
 files under `artifacts/project-state/planning/` remain planning contracts, not
 runtime dependencies. The final dependency and Foundation evidence is `MERGED
 MAIN`; Phase 5A runtime contracts and Phase 5A.1 are merged and verified,
-Phase 5B is the current protected-merge candidate, and Phase 5C remains
-`NOT STARTED`.
+Phase 5B is `CLOSED / MERGED / VERIFIED` through PR #418. INFRA-1 is the
+current cross-cutting protected-merge candidate, and Phase 5C remains
+`READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
 
@@ -155,7 +160,7 @@ override or replace the three explicit namespaces above.
 
 `PLANNED != IMPLEMENTED`: a merged architecture document is canonical planning,
 not runtime completion. This canonical projection records the closed Controlled
-Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1 gates,
-and the current Phase 5B correction admission. It does not authorize Actions
-#396, Phase 5C, any later phase, version bump, tag, release, or `POWER 3.8.0`
+Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B
+gates, and the current INFRA-1 admission. It does not authorize Actions #396,
+Phase 5C, any later phase, version bump, tag, release, or `POWER 3.8.0`
 publication.

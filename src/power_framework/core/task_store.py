@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import re
 import shutil
+import stat
 import threading
 import uuid
 from contextlib import contextmanager, suppress
@@ -14,6 +17,7 @@ from typing import IO, TYPE_CHECKING, Any
 from power_framework.core.lock_tracker import LockHierarchyTracker
 
 from .fault_injection import fault_injector
+from .models import VAULT_STRUCTURE
 from .task_models import (
     PowerTask,
     TaskCompletionReceipt,
@@ -32,6 +36,113 @@ if TYPE_CHECKING:
     from collections.abc import Generator, Iterator
 
 logger = logging.getLogger(__name__)
+_RECOVERY_LABEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+MAX_TASK_STATE_BYTES = 10_000_000
+_RECOVERY_OPERATION_LABELS: dict[str, frozenset[str]] = {
+    "task_created": frozenset({"snapshot", "event", "checkpoint", "receipt"}),
+    "migrated_from_v1": frozenset({"snapshot", "event", "checkpoint", "receipt"}),
+    "state_transition": frozenset({"snapshot", "event", "checkpoint", "receipt"}),
+    "task_event_append": frozenset({"event", "checkpoint"}),
+    "task_snapshot": frozenset({"snapshot"}),
+    "memory_apply": frozenset({"note", "history", "log"}),
+    "decision_create": frozenset({"decision"}),
+    "decision_resolve": frozenset({"decision", "receipt"}),
+}
+
+
+def _assert_no_symlink_components(path: Path) -> None:
+    """Reject symlinked recovery-storage components before opening them."""
+
+    absolute = Path(path).absolute()
+    current = Path(absolute.anchor)
+    for component in absolute.parts[1:]:
+        current /= component
+        try:
+            if current.is_symlink():
+                raise ValueError("recovery storage must not contain symlinks")
+        except OSError as exc:
+            raise ValueError("recovery storage is unavailable") from exc
+
+
+def _open_no_follow(path: Path, *, directory: bool = False) -> int:
+    """Open an absolute path by traversing every component without symlinks."""
+
+    candidate = Path(path).absolute()
+    if not candidate.is_absolute() or any(part in {"", ".", ".."} for part in candidate.parts):
+        raise ValueError("recovery path contains unsafe components")
+    components = candidate.parts
+    if len(components) < 2:
+        raise ValueError("recovery path must name a filesystem entry")
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    parent_fd = os.open(components[0], directory_flags)
+    try:
+        for component in components[1:-1]:
+            child_fd = os.open(component, directory_flags, dir_fd=parent_fd)
+            os.close(parent_fd)
+            parent_fd = child_fd
+        final_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        if directory:
+            final_flags |= getattr(os, "O_DIRECTORY", 0)
+        return os.open(components[-1], final_flags, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
+def _fsync_directory(path: Path) -> None:
+    """Durably publish recovery-state directory entries."""
+
+    _assert_no_symlink_components(path)
+    descriptor = _open_no_follow(path, directory=True)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _read_secure_bytes(path: Path, *, max_bytes: int = MAX_TASK_STATE_BYTES) -> bytes:
+    """Read one bounded regular file without following a final symlink."""
+
+    candidate = Path(path).absolute()
+    _assert_no_symlink_components(candidate)
+    before = candidate.lstat()
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size > max_bytes:
+        raise ValueError("task state file is not a bounded regular file")
+    descriptor = _open_no_follow(candidate)
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            opened.st_dev != before.st_dev
+            or opened.st_ino != before.st_ino
+            or not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+        ):
+            raise ValueError("task state file changed during read")
+        data = os.read(descriptor, max_bytes + 1)
+        if len(data) > max_bytes:
+            raise ValueError("task state file exceeds its size limit")
+        after = os.fstat(descriptor)
+        if (
+            after.st_dev != before.st_dev
+            or after.st_ino != before.st_ino
+            or after.st_size != len(data)
+            or after.st_mtime_ns != before.st_mtime_ns
+            or after.st_ctime_ns != before.st_ctime_ns
+        ):
+            raise ValueError("task state file changed while it was read")
+        return data
+    finally:
+        os.close(descriptor)
+
+
+def _read_secure_text(path: Path, *, max_bytes: int = MAX_TASK_STATE_BYTES) -> str:
+    """Read one bounded UTF-8 recovery/state file through the secure byte reader."""
+
+    return _read_secure_bytes(path, max_bytes=max_bytes).decode("utf-8")
 
 
 class TaskStore:
@@ -60,6 +171,7 @@ class TaskStore:
         self._lock_depth = 0
         self._lock_fd: IO[str] | None = None
         self._recovered = False
+        self._recovery_blocked = False
 
     def _ensure_dirs(self) -> None:
         for directory in (
@@ -69,9 +181,11 @@ class TaskStore:
             self.receipts_dir,
             self.tx_dir,
         ):
+            _assert_no_symlink_components(directory)
             if directory.is_symlink():
                 raise ValueError(f"task state directory must not be a symlink: {directory}")
             directory.mkdir(parents=True, exist_ok=True)
+            _assert_no_symlink_components(directory)
 
     @contextmanager
     def lock(self) -> Generator[None]:
@@ -84,6 +198,10 @@ class TaskStore:
             lock_file = self.tasks_dir / ".lock"
             if lock_file.is_symlink():
                 raise ValueError(f"task lock must not be a symlink: {lock_file}")
+            if self._recovery_blocked:
+                raise RuntimeError(
+                    "TaskStore recovery is blocked; repair preserved transaction evidence"
+                )
             if self._lock_depth == 0:
                 if fcntl is None:
                     raise RuntimeError("Task writer locking is unavailable")
@@ -95,8 +213,19 @@ class TaskStore:
                     raise RuntimeError("Unable to acquire task writer lock") from exc
                 self._lock_fd = lock_handle
                 if not self._recovered:
+                    try:
+                        self.recover()
+                        if self._recovery_blocked:
+                            raise RuntimeError(
+                                "TaskStore recovery is blocked; repair preserved transaction evidence"
+                            )
+                    except Exception:
+                        self._lock_fd = None
+                        with suppress(OSError):
+                            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+                        lock_handle.close()
+                        raise
                     self._recovered = True
-                    self.recover()
             self._lock_depth += 1
             try:
                 yield
@@ -225,7 +354,7 @@ class TaskStore:
     def _read_text(path: Path | None) -> str | None:
         if path is None or not path.is_file():
             return None
-        return path.read_text(encoding="utf-8")
+        return _read_secure_text(path)
 
     @staticmethod
     def _restore_text(path: Path | None, content: str | None) -> None:
@@ -242,7 +371,7 @@ class TaskStore:
         if not tf.is_file():
             return None
         try:
-            raw = json.loads(tf.read_text(encoding="utf-8"))
+            raw = json.loads(_read_secure_text(tf))
             return PowerTask.model_validate(raw)
         except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
             raise ValueError(f"Malformed task snapshot {task_id}") from exc
@@ -253,8 +382,19 @@ class TaskStore:
         if not receipt_file.is_file():
             return None
         try:
-            raw = json.loads(receipt_file.read_text(encoding="utf-8"))
-            return TaskCompletionReceipt.model_validate(raw)
+            raw = json.loads(_read_secure_text(receipt_file))
+            receipt = TaskCompletionReceipt.model_validate(raw)
+            expected_id = TaskCompletionReceipt.derive_receipt_id(
+                task_id=receipt.task_id,
+                task_revision=receipt.task_revision,
+                completion_policy=receipt.completion_policy,
+                postcondition_sha256=receipt.postcondition_sha256,
+                artifact_digests=receipt.artifact_digests,
+                actor=receipt.actor,
+            )
+            if receipt.receipt_id != expected_id:
+                raise ValueError("Task completion receipt derivation mismatch")
+            return receipt
         except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
             raise ValueError(f"Malformed task completion receipt {receipt_id}") from exc
 
@@ -296,32 +436,32 @@ class TaskStore:
         if not ev_file.is_file():
             return []
         events: list[TaskEvent] = []
-        with open(ev_file, encoding="utf-8") as f:
-            expected_sequence = 1
-            previous_digest = ""
-            for line_number, line in enumerate(f, start=1):
-                if not line.strip():
-                    continue
-                try:
-                    ev_dict = json.loads(line)
-                    ev = TaskEvent.model_validate(ev_dict)
-                except (TypeError, ValueError, json.JSONDecodeError) as exc:
-                    raise ValueError(
-                        f"Malformed task event journal {ev_file.name} at line {line_number}"
-                    ) from exc
-                if ev.task_id != task_id:
-                    raise ValueError("Task event task ID does not match its journal")
-                if ev.sequence != expected_sequence:
-                    raise ValueError("Task event journal sequence is not monotonic")
-                expected_previous = previous_digest
-                if ev.prev_event_digest != expected_previous:
-                    raise ValueError("Task event journal hash chain is invalid")
-                if ev.payload_digest != canonical_payload_digest(ev.payload):
-                    raise ValueError("Task event payload digest is invalid")
-                previous_digest = ev.payload_digest
-                expected_sequence += 1
-                if ev.sequence > since_sequence:
-                    events.append(ev)
+        raw_events = _read_secure_text(ev_file)
+        expected_sequence = 1
+        previous_digest = ""
+        for line_number, line in enumerate(raw_events.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                ev_dict = json.loads(line)
+                ev = TaskEvent.model_validate(ev_dict)
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise ValueError(
+                    f"Malformed task event journal {ev_file.name} at line {line_number}"
+                ) from exc
+            if ev.task_id != task_id:
+                raise ValueError("Task event task ID does not match its journal")
+            if ev.sequence != expected_sequence:
+                raise ValueError("Task event journal sequence is not monotonic")
+            expected_previous = previous_digest
+            if ev.prev_event_digest != expected_previous:
+                raise ValueError("Task event journal hash chain is invalid")
+            if ev.payload_digest != canonical_payload_digest(ev.payload):
+                raise ValueError("Task event payload digest is invalid")
+            previous_digest = ev.payload_digest
+            expected_sequence += 1
+            if ev.sequence > since_sequence:
+                events.append(ev)
         return events
 
     def get_last_event_digest(self, task_id: str) -> str:
@@ -345,22 +485,30 @@ class TaskStore:
     @staticmethod
     def _atomic_write_bytes(path: Path, data: bytes) -> None:
         """Write bytes atomically via temp file + rename."""
-        import os
         import tempfile
 
         path = Path(path)
+        _assert_no_symlink_components(path.parent)
         path.parent.mkdir(parents=True, exist_ok=True)
+        _assert_no_symlink_components(path.parent)
+        if path.exists() and path.is_symlink():
+            raise ValueError("recovery target must not be a symlink")
         fd, tmp_path = tempfile.mkstemp(
             dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp"
         )
+        published = False
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, path)
-        except Exception:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-            raise
+            published = True
+            _fsync_directory(path.parent)
+        finally:
+            if not published:
+                with suppress(OSError):
+                    os.unlink(tmp_path)
 
     @staticmethod
     def _write_manifest(tx_dir: Path, manifest: dict[str, Any]) -> None:
@@ -369,8 +517,212 @@ class TaskStore:
             json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8"),
         )
 
+    def _recovery_path(self, value: object) -> Path:
+        """Resolve a manifest path only inside the canonical vault boundary."""
+
+        if (
+            not isinstance(value, str)
+            or not value
+            or "\\" in value
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+        ):
+            raise ValueError("recovery path is invalid")
+        relative = Path(value)
+        if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+            raise ValueError("recovery path must be a safe vault-relative path")
+        current = self.vault_dir
+        for component in relative.parts:
+            current /= component
+            if current.is_symlink():
+                raise ValueError("recovery path must not traverse a symlink")
+        candidate = self.vault_dir / relative
+        if not candidate.is_relative_to(self.vault_dir):
+            raise ValueError("recovery path escaped the vault")
+        return candidate
+
+    def _allowed_recovery_path(
+        self, label: object, value: object, operation: object | None = None
+    ) -> Path:
+        """Restrict recovery artifacts to the exact TaskStore file classes."""
+
+        safe_label = self._recovery_label(label)
+        if not isinstance(operation, str) or safe_label not in _RECOVERY_OPERATION_LABELS.get(
+            operation, frozenset()
+        ):
+            raise ValueError("recovery label is not allowed for this operation")
+        candidate = self._recovery_path(value)
+        vault_relative = candidate.relative_to(self.vault_dir)
+        relative = (
+            candidate.relative_to(self.tasks_dir)
+            if candidate.is_relative_to(self.tasks_dir)
+            else None
+        )
+        task_id = relative.name.removesuffix(".json").removesuffix(".jsonl") if relative else ""
+        if (
+            safe_label == "snapshot"
+            and relative is not None
+            and relative.parent == Path(".")
+            and relative.name.endswith(".json")
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", task_id)
+        ):
+            return candidate
+        if (
+            safe_label == "event"
+            and relative is not None
+            and relative.parent == Path("events")
+            and relative.name.endswith(".jsonl")
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", task_id)
+        ):
+            return candidate
+        if (
+            safe_label == "checkpoint"
+            and relative is not None
+            and relative.parent == Path("checkpoints")
+            and relative.name.endswith(".json")
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}_seq_[0-9]+", task_id)
+        ):
+            return candidate
+        if (
+            safe_label == "receipt"
+            and relative is not None
+            and (
+                (
+                    operation in {"task_created", "migrated_from_v1", "state_transition"}
+                    and relative.parent == Path("receipts")
+                    and re.fullmatch(r"tcr_[0-9a-f]{64}", task_id)
+                )
+                or (
+                    operation == "decision_resolve"
+                    and relative.parent == Path("decisions/receipts")
+                    and re.fullmatch(r"dcr_[0-9a-f]{64}", task_id)
+                )
+            )
+        ):
+            return candidate
+        if (
+            safe_label == "decision"
+            and relative is not None
+            and relative.parent == Path("decisions")
+            and relative.name.endswith(".json")
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", task_id)
+        ):
+            return candidate
+        if safe_label == "history" and vault_relative == Path(".power/memory-history.jsonl"):
+            return candidate
+        if safe_label == "log" and operation == "memory_apply" and vault_relative == Path("log.md"):
+            return candidate
+        if (
+            safe_label == "note"
+            and operation == "memory_apply"
+            and candidate.suffix == ".md"
+            and vault_relative.parts
+            and (len(vault_relative.parts) == 1 or vault_relative.parts[0] in VAULT_STRUCTURE)
+            and not candidate.is_relative_to(self.power_dir)
+        ):
+            return candidate
+        raise ValueError("recovery artifact is outside the TaskStore file classes")
+
+    @staticmethod
+    def _recovery_label(value: object) -> str:
+        """Validate the backup filename stem from a recovery manifest."""
+
+        if not isinstance(value, str) or not _RECOVERY_LABEL_PATTERN.fullmatch(value):
+            raise ValueError("recovery label is invalid")
+        return value
+
+    def _validate_recovery_manifest(self, manifest: object, tx_id: str) -> dict[str, Any]:
+        """Validate untrusted recovery metadata before any filesystem mutation."""
+
+        if not isinstance(manifest, dict):
+            raise ValueError("recovery manifest is not an object")
+        required = {
+            "tx_id",
+            "op",
+            "idempotency_key",
+            "command_sha256",
+            "stage",
+            "created_at",
+            "vault",
+            "touched",
+        }
+        if set(manifest) != required:
+            raise ValueError("recovery manifest schema is invalid")
+        if manifest["tx_id"] != tx_id or manifest["vault"] != self.vault_dir.as_posix():
+            raise ValueError("recovery manifest binding is invalid")
+        if manifest["stage"] not in {"prepared", "committed"}:
+            raise ValueError("recovery manifest stage is invalid")
+        if not isinstance(manifest["op"], str) or manifest["op"] not in _RECOVERY_OPERATION_LABELS:
+            raise ValueError("recovery manifest operation is invalid")
+        if manifest["idempotency_key"] is not None and not isinstance(
+            manifest["idempotency_key"], str
+        ):
+            raise ValueError("recovery manifest idempotency key is invalid")
+        command_sha256 = manifest["command_sha256"]
+        if command_sha256 is not None and (
+            not isinstance(command_sha256, str)
+            or not command_sha256
+            or len(command_sha256) > 128
+            or any(ord(char) < 32 or ord(char) == 127 for char in command_sha256)
+        ):
+            raise ValueError("recovery manifest command digest is invalid")
+        created_at = manifest["created_at"]
+        if not isinstance(created_at, str):
+            raise ValueError("recovery manifest timestamp is invalid")
+        parsed_created_at = datetime.fromisoformat(created_at)
+        if parsed_created_at.tzinfo is None:
+            raise ValueError("recovery manifest timestamp must include timezone")
+        touched = manifest["touched"]
+        if not isinstance(touched, list) or len(touched) > 256:
+            raise ValueError("recovery manifest touched list is invalid")
+        for item in touched:
+            if not isinstance(item, dict) or set(item) not in (
+                {"label", "rel", "preimage_digest"},
+                {"label", "rel", "preimage_digest", "postimage_digest"},
+            ):
+                raise ValueError("recovery manifest entry is invalid")
+            if manifest["stage"] == "committed" and set(item) != {
+                "label",
+                "rel",
+                "preimage_digest",
+                "postimage_digest",
+            }:
+                raise ValueError("committed recovery entry requires a postimage digest")
+            self._recovery_label(item["label"])
+            self._allowed_recovery_path(item["label"], item["rel"], manifest["op"])
+            for field in ("preimage_digest", "postimage_digest"):
+                digest = item.get(field)
+                if digest is not None and (
+                    not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                ):
+                    raise ValueError("recovery manifest image digest is invalid")
+        return manifest
+
     @contextmanager
     def _transaction(
+        self,
+        op: str,
+        idempotency_key: str | None,
+        command_sha256: str | None,
+        touched: list[tuple[Path, str]],
+        *,
+        crash_point: str | None = None,
+    ) -> Iterator[None]:
+        """Run a transaction while holding the canonical TaskStore lock."""
+
+        with (
+            self.lock(),
+            self._transaction_locked(
+                op,
+                idempotency_key,
+                command_sha256,
+                touched,
+                crash_point=crash_point,
+            ),
+        ):
+            yield
+
+    @contextmanager
+    def _transaction_locked(
         self,
         op: str,
         idempotency_key: str | None,
@@ -393,7 +745,10 @@ class TaskStore:
         """
         tx_id = uuid.uuid4().hex
         tx_dir = self.tx_dir / tx_id
+        _assert_no_symlink_components(self.tx_dir)
         tx_dir.mkdir(parents=True, exist_ok=True)
+        _assert_no_symlink_components(tx_dir)
+        _fsync_directory(self.tx_dir)
         manifest: dict[str, Any] = {
             "tx_id": tx_id,
             "op": op,
@@ -407,49 +762,62 @@ class TaskStore:
         for path, label in touched:
             if path is None:
                 continue
-            pre = path.read_bytes() if path.is_file() else None
+            safe_label = self._recovery_label(label)
+            relative_path = path.relative_to(self.vault_dir).as_posix()
+            self._allowed_recovery_path(safe_label, relative_path, op)
+            pre = _read_secure_bytes(path) if path.is_file() else None
             pre_digest = hashlib.sha256(pre).hexdigest() if pre is not None else None
             if pre is not None:
-                with suppress(OSError):
-                    (tx_dir / f"{label}.bak").write_bytes(pre)
+                self._atomic_write_bytes(tx_dir / f"{safe_label}.bak", pre)
             manifest["touched"].append(
                 {
-                    "label": label,
-                    "rel": Path(path).relative_to(self.vault_dir).as_posix(),
+                    "label": safe_label,
+                    "rel": relative_path,
                     "preimage_digest": pre_digest,
                 }
             )
         self._write_manifest(tx_dir, manifest)
         fault_injector.maybe_raise(crash_point or op)
+        cleanup_tx = True
         try:
             yield
             for t in manifest["touched"]:
-                p = self.vault_dir / t["rel"]
-                post = p.read_bytes() if p.is_file() else None
+                p = self._allowed_recovery_path(t["label"], t["rel"], op)
+                post = _read_secure_bytes(p) if p.is_file() else None
                 t["postimage_digest"] = (
                     hashlib.sha256(post).hexdigest() if post is not None else None
                 )
             manifest["stage"] = "committed"
             self._write_manifest(tx_dir, manifest)
         except Exception:
-            with suppress(Exception):
+            try:
                 self._rollback_tx(manifest, tx_dir)
+            except Exception as rollback_error:
+                cleanup_tx = False
+                self._recovery_blocked = True
+                raise RuntimeError(
+                    "task transaction rollback failed; recovery evidence preserved"
+                ) from rollback_error
             raise
         finally:
-            shutil.rmtree(tx_dir, ignore_errors=True)
+            if cleanup_tx:
+                shutil.rmtree(tx_dir, ignore_errors=True)
 
     def _rollback_tx(self, manifest: dict[str, Any], tx_dir: Path) -> None:
         """Restore touched artifacts to their preimage (fail closed on mismatch)."""
         for t in manifest.get("touched", []):
-            p = self.vault_dir / t["rel"]
+            p = self._allowed_recovery_path(t.get("label"), t.get("rel"), manifest.get("op"))
             pre = t.get("preimage_digest")
             if pre is None:
                 p.unlink(missing_ok=True)
             else:
-                bak = tx_dir / f"{t['label']}.bak"
-                if not bak.is_file():
+                label = self._recovery_label(t.get("label"))
+                bak = tx_dir / f"{label}.bak"
+                _assert_no_symlink_components(bak)
+                metadata = bak.lstat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
                     raise RuntimeError(f"recovery backup missing for {t['label']}")
-                data = bak.read_bytes()
+                data = _read_secure_bytes(bak)
                 if hashlib.sha256(data).hexdigest() != pre:
                     raise RuntimeError(f"recovery backup corrupted for {t['label']}")
                 self._atomic_write_bytes(p, data)
@@ -458,8 +826,8 @@ class TaskStore:
         """Classify a leftover manifest and roll back if inconsistent."""
         states: list[str] = []
         for t in manifest.get("touched", []):
-            p = self.vault_dir / t["rel"]
-            cur = p.read_bytes() if p.is_file() else None
+            p = self._allowed_recovery_path(t.get("label"), t.get("rel"), manifest.get("op"))
+            cur = _read_secure_bytes(p) if p.is_file() else None
             cur_digest = hashlib.sha256(cur).hexdigest() if cur is not None else None
             pre = t.get("preimage_digest")
             post = t.get("postimage_digest")
@@ -473,9 +841,10 @@ class TaskStore:
             return "committed"
         if states and all(s == "pre" for s in states):
             return "rolled_back"
-        # Mixed / inconsistent -> deterministically roll back to preimages.
-        self._rollback_tx(manifest, tx_dir)
-        return "reconciled_rollback"
+        if manifest.get("stage") == "prepared":
+            self._rollback_tx(manifest, tx_dir)
+            return "reconciled_rollback"
+        raise RuntimeError("committed task transaction has mixed state; operator recovery required")
 
     def recover(self) -> list[dict[str, Any]]:
         """Reconcile any leftover transaction manifests from a dead process.
@@ -485,19 +854,28 @@ class TaskStore:
         """
         if fcntl is None:
             return []
+        _assert_no_symlink_components(self.tx_dir)
+        _assert_no_symlink_components(self.recovery_log.parent)
+        if self.recovery_log.exists() and self.recovery_log.is_symlink():
+            raise ValueError("recovery log must not be a symlink")
         if not self.tx_dir.is_dir():
             return []
         results: list[dict[str, Any]] = []
         for entry in list(self.tx_dir.iterdir()):
+            if entry.is_symlink():
+                raise ValueError("transaction entry must not be a symlink")
             if not entry.is_dir():
                 continue
             manifest_path = entry / "manifest.json"
+            _assert_no_symlink_components(manifest_path)
             if not manifest_path.is_file():
-                shutil.rmtree(entry, ignore_errors=True)
+                self._recovery_blocked = True
                 continue
             try:
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
+                manifest = json.loads(_read_secure_text(manifest_path))
+                manifest = self._validate_recovery_manifest(manifest, entry.name)
+            except (OSError, TypeError, ValueError):
+                self._recovery_blocked = True
                 self._log_recovery_record(
                     {
                         "tx_id": entry.name,
@@ -506,11 +884,11 @@ class TaskStore:
                         "reason": "corrupt_manifest",
                     }
                 )
-                shutil.rmtree(entry, ignore_errors=True)
                 continue
             try:
                 status = self._reconcile_tx(manifest, entry)
             except Exception as exc:
+                self._recovery_blocked = True
                 self._log_recovery_record(
                     {
                         "tx_id": manifest.get("tx_id", entry.name),
@@ -519,29 +897,41 @@ class TaskStore:
                         "reason": f"reconcile_error:{type(exc).__name__}",
                     }
                 )
-                shutil.rmtree(entry, ignore_errors=True)
                 continue
-            self._log_recovery_record(
+            if not self._log_recovery_record(
                 {
                     "tx_id": manifest.get("tx_id", entry.name),
                     "op": manifest.get("op", "unknown"),
                     "recovered_as": status,
                     "affected": [t.get("rel") for t in manifest.get("touched", [])],
                 }
-            )
+            ):
+                self._recovery_blocked = True
+                continue
             shutil.rmtree(entry, ignore_errors=True)
             results.append({"tx_id": manifest.get("tx_id"), "status": status})
         return results
 
-    def _log_recovery_record(self, record: dict[str, Any]) -> None:
+    def _log_recovery_record(self, record: dict[str, Any]) -> bool:
         """Append a redacted recovery observation (no note/proposal content)."""
         record = dict(record)
         record["ts"] = datetime.now(UTC).isoformat()
         try:
-            with self.recovery_log.open("a", encoding="utf-8") as fh:
+            _assert_no_symlink_components(self.recovery_log)
+            if self.recovery_log.exists():
+                metadata = self.recovery_log.lstat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                    raise ValueError("recovery log must be a single-link regular file")
+            fd = os.open(
+                self.recovery_log,
+                os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+            )
+            with os.fdopen(fd, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
-        except OSError:
-            pass
+            return True
+        except (OSError, ValueError):
+            return False
 
 
 __all__ = ["TaskStore"]

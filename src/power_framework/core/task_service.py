@@ -22,6 +22,7 @@ from .task_models import (
 from .task_store import TaskStore
 
 logger = logging.getLogger(__name__)
+_INFRA_PROJECTION_TOKEN = object()
 
 
 class TaskService:
@@ -57,6 +58,10 @@ class TaskService:
         idempotency_key: str | None = None,
     ) -> PowerTask:
         """Create a new durable PowerTask v2 with initial event."""
+        if state in {"completed", "failed", "canceled", "rejected"}:
+            raise ValueError("Task creation cannot start in a terminal state")
+        if external_refs and any(key.startswith("infra_") for key in external_refs):
+            raise PermissionError("Infrastructure task references require broker projection")
         command_sha256 = _command_fingerprint(
             "create",
             {
@@ -158,6 +163,10 @@ class TaskService:
         required_input: dict[str, Any] | None = None,
         open_gates: list[str] | None = None,
         error_ref: str | None = None,
+        external_ref_updates: dict[str, str] | None = None,
+        required_claim_key: str | None = None,
+        required_claim_intent_digest: str | None = None,
+        _projection_token: object | None = None,
         values: dict[str, Any] | None = None,
     ) -> PowerTask:
         """Advance task state machine with optimistic concurrency and invariant validation."""
@@ -175,6 +184,10 @@ class TaskService:
                 "required_input": required_input,
                 "open_gates": open_gates,
                 "error_ref": error_ref,
+                "external_ref_updates": external_ref_updates,
+                "required_claim_key": required_claim_key,
+                "required_claim_intent_digest": required_claim_intent_digest,
+                "allow_infra_projection": _projection_token is _INFRA_PROJECTION_TOKEN,
                 "values": values,
             },
         )
@@ -191,6 +204,80 @@ class TaskService:
                 raise ConflictError(
                     f"Revision conflict for task {task_id}: expected {expected_revision}, found {task.revision}"
                 )
+            if (required_claim_key is not None or required_claim_intent_digest is not None) and (
+                not required_claim_key
+                or not required_claim_intent_digest
+                or task.external_refs.get("infra_claim_key_ref") != required_claim_key
+                or task.external_refs.get("infra_claim_intent_digest")
+                != required_claim_intent_digest
+            ):
+                raise ConflictError("Task infrastructure claim no longer owns this projection")
+            if (
+                task.external_refs.get("infra_claim_key_ref") is not None
+                and (
+                    (values is not None and "external_refs" in values)
+                    or external_ref_updates is not None
+                )
+                and _projection_token is not _INFRA_PROJECTION_TOKEN
+            ):
+                raise PermissionError(
+                    "Infrastructure task references may only be changed by projection"
+                )
+            if (
+                task.external_refs.get("infra_claim_key_ref") is not None
+                and task.execution_state in {"leased", "running"}
+                and new_state in {"completed", "failed", "canceled", "rejected"}
+                and _projection_token is not _INFRA_PROJECTION_TOKEN
+            ):
+                raise ConflictError(
+                    "Active infrastructure execution must be reconciled before terminal transition"
+                )
+            candidate_external_refs = values.get("external_refs") if values is not None else None
+            if external_ref_updates is not None:
+                candidate_external_refs = {
+                    **task.external_refs,
+                    **external_ref_updates,
+                }
+            if (
+                isinstance(candidate_external_refs, dict)
+                and any(key.startswith("infra_") for key in candidate_external_refs)
+                and _projection_token is not _INFRA_PROJECTION_TOKEN
+            ):
+                raise PermissionError("Infrastructure task references require broker projection")
+            if (
+                new_state == "completed"
+                and task.external_refs.get("infra_claim_key_ref") is not None
+                and task.external_refs.get("infra_operation") == "replicate"
+            ):
+                required_infra_refs = {
+                    "infra_run_id",
+                    "infra_manifest_digest",
+                    "infra_profile_id",
+                    "infra_target_id",
+                    "infra_verify_receipt_id",
+                    "infra_verify_run_id",
+                    "infra_verify_manifest_digest",
+                    "infra_verify_profile_id",
+                    "infra_verify_target_id",
+                }
+                verify_receipt_id = task.external_refs.get("infra_verify_receipt_id")
+                if (
+                    task.external_refs.get("infra_verify_status") != "inventory-matched"
+                    or any(not task.external_refs.get(key) for key in required_infra_refs)
+                    or not verify_receipt_id
+                    or not verify_receipt_id.startswith("ir_")
+                    or task.external_refs.get("infra_verify_run_id")
+                    != task.external_refs.get("infra_run_id")
+                    or task.external_refs.get("infra_verify_manifest_digest")
+                    != task.external_refs.get("infra_manifest_digest")
+                    or task.external_refs.get("infra_verify_profile_id")
+                    != task.external_refs.get("infra_profile_id")
+                    or task.external_refs.get("infra_verify_target_id")
+                    != task.external_refs.get("infra_target_id")
+                ):
+                    raise PermissionError(
+                        "Infrastructure task completion requires a matching verified remote postcondition"
+                    )
 
             completion_receipt = None
             if new_state == "completed":
@@ -258,9 +345,27 @@ class TaskService:
                         "Task update contains immutable or unknown fields: "
                         + ", ".join(sorted(unknown_fields))
                     )
+                if external_ref_updates:
+                    values = {
+                        **values,
+                        "external_refs": {
+                            **task.external_refs,
+                            **external_ref_updates,
+                        },
+                    }
                 candidate = task.model_dump()
                 candidate.update(values)
                 task = PowerTask.model_validate(candidate)
+            elif external_ref_updates:
+                task = PowerTask.model_validate(
+                    {
+                        **task.model_dump(),
+                        "external_refs": {
+                            **task.external_refs,
+                            **external_ref_updates,
+                        },
+                    }
+                )
 
             last_digest = self.store.get_last_event_digest(task_id)
             existing_events = self.store.get_task_events(task_id)

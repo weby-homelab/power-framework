@@ -34,6 +34,9 @@ _NEXT_MAINTENANCE_PHASE = {
     "receipt": "receipt",
 }
 _TERMINAL_STATES = frozenset({"completed", "failed", "canceled"})
+_HANDOFF_ACTIONS = frozenset(
+    {"resume", "checkpoint", "input-required", "complete", "fail", "cancel"}
+)
 
 
 class WorkPacketState(StrEnum):
@@ -202,6 +205,8 @@ def advance_work_packet(
     any actual write.
     """
     _validate_task_id(task_id)
+    if action not in _HANDOFF_ACTIONS:
+        raise ValueError("unknown work-packet action")
     _validate_token(idempotency_key, "idempotency_key")
     if receipt_id is not None:
         _validate_token(receipt_id, "receipt_id")
@@ -280,13 +285,15 @@ def advance_work_packet(
             new_phase = packet.maintenance_phase
             new_blocker = blocker.strip()
             new_approval = None
-        else:  # cancel
+        elif action == "cancel":
             if not approved:
                 raise PermissionError("cancel requires explicit approved=True")
             new_state = WorkPacketState.CANCELED
             new_phase = packet.maintenance_phase
             new_blocker = blocker.strip() if blocker else "canceled by caller"
             new_approval = None
+        else:  # pragma: no cover - the boundary allowlist above is exhaustive
+            raise ValueError("unknown work-packet action")
 
         now = datetime.now(UTC)
         updated_receipts = list(packet.receipt_ids)

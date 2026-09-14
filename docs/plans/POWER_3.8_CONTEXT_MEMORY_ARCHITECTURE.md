@@ -45,11 +45,10 @@ The architecture has four non-negotiable properties:
    recoverable according to an explicit retention policy.
 
 The Controlled Dependency Refresh, Pre-Phase-5 Foundation Hardening, Phase 5A
-runtime-contract merge, and Phase 5A.1 semantic correction are closed on
-protected `main`. The active bounded gate is the separate Phase 5B candidate,
-which contains the strict Domain Policy v2 parser and pure deterministic router.
-This planning document does not start Phase 5C, capture, migration, a release,
-or a public version change.
+runtime-contract merge, Phase 5A.1 semantic correction, and Phase 5B router are
+closed on protected `main`. The active cross-cutting gate is INFRA-1, the
+constrained local infrastructure execution broker. This planning document does
+not start Phase 5C, capture, migration, a release, or a public version change.
 
 ## 1A. Course-correction reconciliation
 
@@ -121,7 +120,7 @@ different.
 | Local embedding backend | `src/power_framework/experimental/embeddings.py` (`BGEM3OnnxManager`) | IMPLEMENTED, optional and fail-closed | Reuse BGE-M3 direct ONNX Runtime, tokenizer, pinned model policy, hashes, lazy/eager probe, and CPU bounds | Add versioned per-chunk identity and cost-aware queueing; do not add a second loader |
 | Local reranker | `src/power_framework/experimental/reranker.py` (`BGEM3Reranker`) | IMPLEMENTED, optional | Reuse the BGE ONNX reranker, pinned assets, batch bounds, and existing opt-in policy | Make reranking a budgeted planner stage with explicit fallback and telemetry |
 | Semantic chunking | `src/power_framework/core/chunker.py` (`SemanticChunker`) | STRUCTURAL / CONTEXTUAL IMPLEMENTED | Reuse header, paragraph, fixed modes and document context prefixes | Version any future semantic-boundary strategy; do not claim embedding-based segmentation exists |
-| Domain registry | `src/power_framework/core/domains.py`, `.power/domains.yaml` | V1 IMPLEMENTED; Phase 5B v2 candidate | Reuse v1 placement and add strict v2 policy, source membership, and pure `DomainMatch[]` routing | Phase 5C scope pushdown and later traversal execution |
+| Domain registry | `src/power_framework/core/domains.py`, `.power/domains.yaml` | V1 IMPLEMENTED; Phase 5B v2 CLOSED / MERGED / VERIFIED | Reuse v1 placement and the admitted strict v2 policy, source membership, and pure `DomainMatch[]` router | Phase 5C scope pushdown and later traversal execution |
 | Temporal views | `src/power_framework/core/temporal.py` and `searcher.py` | IMPLEMENTED as lifecycle/status views | Reuse deterministic `current`, `historical`, `all`, and `as_of` resolution | Push temporal constraints into candidate selection; do not imply a document version store |
 | Graph-assisted retrieval | `src/power_framework/core/searcher.py`, `src/power_framework/experimental/relations.py` | PARTIAL / EXPERIMENTAL | Reuse persisted source projections where valid and keep graph hops as ranking signals | Replace repeated all-pairs suggestion work with reviewed, bounded, domain-specific traversal |
 | Atomic index generations | `src/power_framework/core/generation_index.py` | IMPLEMENTED | Reuse staged SQLite generations, snapshot validation, integrity checks, atomic pointer publication, and retention | Add per-source/per-chunk validity and an explicit `IndexWorkQueue` |
@@ -152,8 +151,8 @@ These are planning inputs, not authorization to fix source code in this gate.
 1. **The v2 planning schema is not runtime authority.** Phase 5B has a separate
    strict runtime policy shape and fixture; planning-only metadata is rejected
    rather than blindly deserialized.
-2. **The current gate is Phase 5B.** Phase 5C and later retrieval behavior
-   remain `BLOCKED / NOT STARTED`.
+2. **The current gate is INFRA-1.** Phase 5C and later retrieval behavior remain
+    `READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED`.
 3. **Authority must remain separate from integrity.** Canonical ledger
    membership, model extraction, caller approval, and retrieved evidence cannot
    be collapsed into one boolean or one domain field.
@@ -369,7 +368,7 @@ Binding rules:
 ## 9. Domain Policy v2
 
 Domain v2 began as a planning contract and is now a bounded Phase 5B runtime
-candidate. The planning example remains non-authoritative at
+contract, closed through protected PR #418. The planning example remains non-authoritative at
 `artifacts/project-state/planning/domain-policy-v2.example.yaml`; the closed
 runtime shape is separately represented by
 `artifacts/project-state/phase-5b/domain-policy-v2.runtime.yaml` and parsed by
@@ -1168,9 +1167,11 @@ Pre-Phase-5 Foundation Hardening
 Phase 5A — Runtime contracts v2 + frozen evaluation corpus
         ↓
 Phase 5A.1 — Evaluation corpus semantic integrity correction
-        ↓
-Phase 5B — Deterministic multi-domain router
-        ↓
+         ↓
+Phase 5B — Deterministic multi-domain router (closed)
+         ↓
+INFRA-1 — Constrained local infrastructure execution broker (cross-cutting)
+         ↓
 Phase 5C — Search scope pushdown
         ↓
 Phase 5D — RetrievalPlanner + ContextPack read-only vertical slice
@@ -1185,16 +1186,18 @@ Phase 5H — Phase closure / default decision
 ```
 
 Phase 5A runtime contracts and Phase 5A.1 are `CLOSED / MERGED / VERIFIED`;
-Phase 5B is the current `CANDIDATE / IN ADMISSION`; Phase 5C–5H remain
-`BLOCKED / NOT STARTED`. The later architecture below remains planning
-direction and is not a runtime dependency.
+Phase 5B is `CLOSED / MERGED / VERIFIED` through PR #418. INFRA-1 is the
+current cross-cutting admission candidate; Phase 5C–5H remain `READY / BLOCKED
+UNTIL INFRA-1 CLOSES / NOT STARTED`. The later architecture below remains
+planning direction and is not a runtime dependency.
 
 | Gate | Planned scope | Required evidence before advancing |
 |---|---|---|
 | Foundation | Explicit mutation authority, principal/session semantics, retrieval boundary, failure receipts, and actual deadline/budget behavior | `pre-phase5-foundation-hardening-gate.md`, source-bound security tests, PSE/Task/Decision/crash regression, protected admission |
 | 5A — Runtime contracts v2 + frozen evaluation corpus | Typed v2 retention, bitemporal, ordering, resource, budget, retry, and evaluation boundaries | CLOSED through PR #415; v1 runtime/corpus evidence retained |
 | 5A.1 — Evaluation corpus semantic integrity correction | Audit all query/GT semantics; preserve v1; admit corrected v1.1 | Two independent reviews, primary-fixture adjudication, semantic digest binding, old-v1 immutability, protected admission |
-| 5B — Deterministic multi-domain router | **Candidate implemented**: backward-compatible policy evolution, `DomainMatch[]`, inert traversal/authority/noise/index metadata | v1 compatibility, routing evidence, explainable reasons, deterministic tie handling, no domain/trust conflation, protected admission |
+| 5B — Deterministic multi-domain router | CLOSED / MERGED / VERIFIED through PR #418; backward-compatible policy evolution, `DomainMatch[]`, inert traversal/authority/noise/index metadata | v1 compatibility, routing evidence, explainable reasons, deterministic tie handling, no domain/trust conflation, protected admission |
+| INFRA-1 — Constrained local infrastructure execution broker | Typed local Unix broker, fixed SSH/rsync transport, credential/host-key isolation, bounded receipts, and Task semantics | protected normal merge, exact candidate epoch, security/CodeQL/package/docs gates, post-merge readback; no Phase 5C implementation |
 | 5C — Search scope pushdown | Pass `SearchScope` into FTS, TF, dense, graph, temporal, archive, and quarantine selection | Scope enters candidate generation; privileged override tests; recall/cost evidence; post-filter-only implementation fails |
 | 5D — RetrievalPlanner + ContextPack | Read-only authority-aware planner, noise gate, bounded escalation, provenance, redaction, and pack assembly | Determinism, authority-vs-relevance, bounded bytes/tokens, no writes, archive/quarantine policy, direct/MCP parity |
 | 5E — Shadow benchmark / legacy comparison | Run the planner in shadow while legacy retrieval remains served | Frozen development/holdout corpus, no holdout tuning, quality/resource/authority non-regression, rollback receipt |

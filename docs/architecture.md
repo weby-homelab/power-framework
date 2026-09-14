@@ -8,7 +8,7 @@ src/power_framework/
 ├── py.typed            # PEP 561 marker
 ├── core/
 │   ├── __init__.py     # Stable core exports; optional exports are lazy
-│   ├── cli.py          # CLI entry point (argparse) — 26 commands
+│   ├── cli.py          # CLI entry point (argparse) — 27 commands
 │   ├── constants.py    # Centralized constants (exclusion lists, skip files, system dirs)
 │   ├── healer.py       # Frontmatter Healer
 │   ├── markdown_checks.py  # Markdown quality checks
@@ -41,7 +41,7 @@ src/power_framework/
     ├── __init__.py     # Package marker
     ├── entrypoint.py   # public power-mcp launcher and preflight
     ├── preflight.py    # dependency-light vault boundary check
-    └── power_server.py # official MCP SDK v2 stdio server (20 tools)
+    └── power_server.py # official MCP SDK v2 stdio server (21 tools)
 └── web/               # optional Web UI adapter shipped in the same wheel
     ├── app.py         # power-web ASGI entry point
     ├── clients/       # ApplicationService adapter

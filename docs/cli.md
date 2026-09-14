@@ -6,7 +6,7 @@ This reference is aligned with the executable P.O.W.E.R. `v3.7.11` parser.
 
 ```text
 power [-h] [-v] [--verbose]
-      {init,lint,index,ingest,import,search,cache,doctor,integrations,connect,memory,handoff,task,sync,rot,archive,status,control-plane,maintenance,migrate-state,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
+      {init,lint,index,ingest,import,search,cache,doctor,integrations,connect,memory,handoff,task,infra,sync,rot,archive,status,control-plane,maintenance,migrate-state,cron,heal,markdown-check,suggest-related,synthesize,rename} ...
 ```
 
 ## Global options
@@ -236,6 +236,31 @@ power task events PATH --task-id ID [--since-sequence N]
 `events` returns events after the supplied sequence, allowing cursor-style
 resume. Completing a task requires either an existing receipt ID or a verified
 postcondition plus one or more vault-relative artifact paths.
+
+### `infra`
+
+Use the opt-in constrained local infrastructure execution broker. The CLI is
+only a client: it never accepts a host, command, SSH key, password, rsync
+option, or direct-SSH fallback. The broker resolves target/profile identifiers
+from operator-owned policy and returns bounded, content-free receipts.
+
+```text
+power infra status
+power infra probe TARGET --profile PROFILE
+power infra dry-run TARGET --profile PROFILE
+power infra replicate TARGET --profile PROFILE --idempotency-key KEY [--approval-ref REF]
+power infra verify TARGET --profile PROFILE --run-id RUN_ID
+                     [--task-id ID --expected-revision N --idempotency-key KEY]
+```
+
+`replicate` also accepts optional `--task-id` and its required paired
+`--expected-revision`, plus `--vault-path`, to reference a blocked/auth-required
+receipt through Task v2. This does not complete the task or treat an infra
+receipt as a canonical Task completion receipt.
+`verify` accepts the same task binding plus an idempotency key when it is used
+to attach the read-only remote postcondition to an existing replicate Task.
+The broker must be installed and enabled by an operator; absence is reported as
+`MISSING_EXECUTION_CAPABILITY`, never remediated with a password or direct SSH.
 
 ### `sync`
 

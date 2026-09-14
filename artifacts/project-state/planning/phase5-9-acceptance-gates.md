@@ -299,6 +299,60 @@ valid v1 registry without a migration decision.
 
 5C–5H and Phase 6 capture routing.
 
+## Gate INFRA-1 — Constrained Local Infrastructure Execution Broker
+
+### Objective
+
+Provide a bounded, opt-in local Unix capability for the closed INFRA operation
+set without exposing arbitrary SSH, shell, credentials, or remote deletion.
+Task, MCP, CLI, receipt, approval, idempotency, timeout, recovery, and
+read-only verification semantics must remain explicit and fail closed.
+
+### Required evidence
+
+- Typed request/response/receipt models and a strict AF_UNIX peer-principal
+  boundary.
+- Operator-owned profile, caller UID/GID allowlist, non-root service, fixed
+  SSH/rsync argv, pinned host key, forced non-root receiver contract, and no
+  password/agent/private-key fallback.
+- Hermetic tests for source snapshot bounds, exact read-only verification,
+  admission/idempotency, prepared/started recovery, timeout classification,
+  receipt durability, Task projection/CAS, and public API boundaries.
+- Exact signed candidate tuple (PR, base, head, tree, parents), fresh remote
+  required checks, protected policy readback, and independent review.
+- Operator evidence for the actual receiver account, forced `rrsync` mode,
+  source/destination permissions, and one approved real verification/replicate
+  exercise. Framework CI doubles do not substitute for this host evidence.
+
+### Current provisional evidence
+
+The local candidate currently reports `2012 passed, 4 skipped, 17 deselected`
+with `82%` coverage. Ruff, MyPy, package smoke, lock, pip, systemd, strict
+MkDocs, and diff checks pass locally, and a fresh read-only review found no
+P0/P1 code blocker. This remains `LOCAL CANDIDATE` evidence because the
+worktree is uncommitted, the real receiver has not been exercised, and the
+latest PR #419 CI attempt reports `test (3.14)=failure` and `test (3.13)=cancelled`;
+the other observed contexts passed, the prior head's CodeQL failure is
+superseded, and no final protected result exists yet.
+
+### PASS condition
+
+All required implementation, security, local quality, exact-head remote, review,
+and receiver evidence is attached to one candidate tuple; the candidate passes
+the protected normal merge; and independent post-merge readback confirms the
+same tree and required contexts.
+
+### FAIL / blocked condition
+
+Missing or stale candidate provenance, any failing required check, absent
+receiver evidence, unknown write outcome without a verify path, arbitrary
+command/credential input, or any false Task completion keeps INFRA-1 open.
+
+### What it blocks
+
+Phase 5C–5H, Phase 6–9 runtime work, public version/tag/release changes, and
+POWER 3.8.0 publication.
+
 ## Gate 5C — Search Scope Pushdown
 
 ### Objective

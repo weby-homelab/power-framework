@@ -38,6 +38,8 @@ environment is trustworthy.
 | Canonical source projection to source.read | validated source records | in-vault regular files, invalid Markdown, hidden control material, projection aliases | Containment is necessary but not sufficient; only a current, regular, non-symlink source record may be read. |
 | Read-only retrieval to mutation | search and proposal creation | an agent or caller requesting a change | Proposal creation may write only its content-addressed `.power/proposals/` ledger; it cannot write the target note, catalog, or search. Apply requires explicit `approved=True` and an unchanged pre-image hash. |
 | Agent handoff to workflow execution | validated work-packet state | packet objective, next action, retrieved note text, and caller-supplied metadata | `.power/work-packets/` stores content-free Markdown checkpoints; state transitions are idempotent and approval-gated, and no packet operation executes its `next_action`. |
+| POWER client to INFRA-1 broker | fixed Unix socket, OS peer credentials, typed response | request identifiers and broker response | AF_UNIX only; principal is server-derived; operator profile owns target/paths/credentials; no arbitrary shell, password, key, or rsync option crosses the boundary. |
+| Broker to approved receiver | non-root broker, pinned SSH policy, forced `rrsync` account | network, receiver, host-key changes, bounded source tree | strict host-key pin, no password/agent fallback, bounded immutable run, no delete/prune, secret-free receipt. |
 | Local process to network | local ONNX/FTS/index paths | OpenRouter, non-loopback Ollama, link/ROT HTTP targets | Default deny; an explicit sensitivity-appropriate egress policy is required before contact. |
 | MCP server to client/transport | configured local server | MCP client input | MCP requires a configured vault root and uses local stdio only; no MCP TCP listener or network peer exists. |
 | Repository/CI to dependencies | pinned and reviewed source/dependency policy | packages, model artifacts, GitHub Actions execution | dependency audit, CodeQL, integrity checks, and review gates remain required. |
@@ -72,7 +74,9 @@ environment is trustworthy.
    SQLite/index files, generated catalogs, and atomic note writes.
 4. **Optional external integrations** include non-loopback embedding endpoints,
    OpenRouter query expansion/ROT, and HTTP link checking.
-5. **Supply-chain and release automation** build packages, run dependency
+5. **Constrained infrastructure execution** uses the optional local broker and
+   approved SSH/rsync receiver; it is not a general remote-execution API.
+6. **Supply-chain and release automation** build packages, run dependency
    auditing, execute CI, and publish documentation.
 
 ### Existing controls
@@ -149,6 +153,43 @@ environment is trustworthy.
   reads `.power` state. This is a host authorization concern; do not expose the
   server remotely until the transport has authenticated client identity and
   vault-scoped authorization.
+- A prompt-injected note asks the agent to change host/user/key, disable host
+  checking, add `--delete`, or read a private key. The strict request model
+  rejects those fields before the broker socket; handoff text remains data and
+  cannot mint an execution capability.
+- A caller retries after an SSH timeout. The broker records the exact
+  idempotency request/outcome and refuses a conflicting or blind duplicate;
+  timeout remediation is operator resolution, not an automatic retry.
+
+### INFRA-1 specific residual boundaries
+
+- The broker snapshots source bytes into a private `StateDirectory` before any
+  rsync call. It rejects source roots overlapping policy, approval, credential,
+  known-host, or broker-state paths and rejects symlinks, hard links, special
+  files, unsafe path components, sensitive credential-like names, depth, file,
+  and byte-limit violations.
+- Each profile has a complete digest. Explicit approvals are reloaded for every
+  replicate and bind operation, target, profile digest, policy revision,
+  server-derived principal, and expiry. Standing approval is an exact
+  operator-installed profile/principal rule. Neither is minted by MCP or a
+  handoff packet.
+- The filesystem socket has a dedicated systemd socket unit with `Accept=no`;
+  the client checks the broker peer UID and the broker checks an explicit caller
+  UID/GID allowlist. Missing or substituted endpoints fail closed. A single
+  request is accepted per connection and every frame is size/deadline/duplicate
+  key bounded.
+- SSH uses one exact dedicated known-host entry, a broker-owned snapshot of that
+  file, and `GlobalKnownHostsFile=/dev/null`; a presented host-key mismatch is
+  a security block and never updates the pin. The receiver must be separately
+  operator-audited; generic CI does not provision or remotely attest it.
+- Remote directory publication is intentionally not claimed to be an atomic
+  filesystem transaction. `-no-overwrite` and `-no-del` make the reference
+  receiver write-once/non-destructive; a partial run remains untrusted until
+  the fixed verify operation passes, and timeout/unknown completion remains
+  reserved for operator reconciliation.
+- systemd uses a non-root account, empty capability sets, `ProtectSystem=strict`,
+  `ProtectHome=yes`, cgroup/process limits, `KillMode=control-group`, and
+  `LoadCredential=`. Manual root execution is refused by the broker entrypoint.
 
 ## Severity Calibration
 

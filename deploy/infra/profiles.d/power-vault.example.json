@@ -1,0 +1,38 @@
+{
+    "schema_version": "power.infra-policy.v1",
+    "profiles": [
+        {
+            "profile_id": "power-vault",
+            "target_id": "prxmx01",
+            "hostname": "prxmx01",
+            "port": 22,
+            "remote_user": "power-receiver",
+            "remote_root": "/srv/power-vault/staging",
+            "allowed_operations": [
+                "status",
+                "probe",
+                "rsync-dry-run",
+                "replicate",
+                "verify"
+            ],
+            "source_roots": ["/srv/power-vault/source"],
+            "known_hosts_file": "/etc/power/infra/known_hosts",
+            "host_key_fingerprint": "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "credential_id": "power-vault-key",
+            "verify_credential_id": "power-vault-verify-key",
+            "allow_plaintext_credential_fallback": false,
+            "max_files": 100000,
+            "max_bytes": 10000000000,
+            "timeout_seconds": 300,
+            "max_output_bytes": 64000,
+            "max_concurrent": 1,
+            "max_retries": 0,
+            "approval_policy": "explicit",
+            "dry_run_policy": "required",
+            "receiver_mode": "rrsync-immutable",
+            "immutable_snapshot": true,
+            "no_delete": true,
+            "policy_revision": "operator-revision-1"
+        }
+    ]
+}

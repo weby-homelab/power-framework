@@ -47,10 +47,13 @@ Phase 5A.1 — Evaluation corpus semantic integrity correction
 CLOSED / MERGED / VERIFIED (PR #416)
               ↓
 Phase 5B — Domain Policy v2 and deterministic multi-domain router
-CANDIDATE / IN ADMISSION
-              ↓
+CLOSED / MERGED / VERIFIED (PR #418 / merge 6a315d5)
+               ↓
+INFRA-1 — Constrained Local Infrastructure Execution Broker
+ADMISSION CANDIDATE / CROSS-CUTTING GATE
+               ↓
 Phase 5C–5H — Scope, planner, shadow, dense validity, MCP, closure
-BLOCKED / NOT STARTED
+READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED
          ↓
 Phase 6 — Agent Capture & Integrations
 NOT STARTED
@@ -87,10 +90,29 @@ NO-GO
 | Phase 5A runtime contracts | CLOSED / MERGED / VERIFIED | PR #415 protected merge and post-merge checks |
 | Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; v1.1 is the active revision |
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
-| Phase 5B | CANDIDATE / IN ADMISSION | Domain Policy v2, source membership, and deterministic router |
-| Phase 5C | BLOCKED / NOT STARTED | SearchScope pushdown is not authorized in 5B |
+| Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; live parent erratum is retained in current state |
+| INFRA-1 | ADMISSION CANDIDATE | Typed Unix broker, task semantics, receipts, SSH/rrsync boundary |
+| Phase 5C | READY / BLOCKED UNTIL INFRA-1 | SearchScope pushdown remains unstarted |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
+
+### INFRA-1 current candidate gate
+
+INFRA-1 has a locally validated provisional implementation, but the gate is
+not closed. Local evidence is `2012 passed, 4 skipped, 17 deselected` at `82%`
+coverage, with Ruff, MyPy, package smoke, lock, pip, systemd, strict MkDocs,
+and diff checks passing. A fresh read-only review found no P0/P1 code blocker.
+
+The remaining admission conditions are fresh exact-head protected CI/readback
+and operator evidence for the actual non-root forced `rrsync` receiver. PR #419
+now points to signed candidate head `4dc2db46885ab81e337f398f16ea6a7aac585839`
+with tree `0550327422405aace37a6593abcfc3e836b7c7fc` and parent
+`62323a930189c7afea497a984bdf6858011dfa09`; the last completed CI attempt
+reported `test (3.14)=failure` and `test (3.13)=cancelled`, while the other
+observed contexts passed and deploy was skipped. The exact local Python 3.14
+workflow test passes, but remote protected CI remains unresolved. Therefore
+INFRA-1 remains `ADMISSION CANDIDATE / PROVISIONAL`, Phase 5C remains
+blocked/not started, and POWER 3.8.0 remains NO-GO.
 
 ## Controlled Dependency Refresh
 
@@ -120,9 +142,12 @@ dependency update:
      independent post-merge verification.
 11. **Phase 5A.1 — closed.** The corrected v1.1 corpus is protected-merged as
       PR #416 with independent post-merge CI, Docs, and CodeQL verification.
-12. **Phase 5B — current candidate.** Domain Policy v2 and the deterministic
-      multi-domain router are a separate bounded admission; Phase 5C remains
-      blocked and unstarted.
+12. **Phase 5B — closed.** Domain Policy v2 and the deterministic multi-domain
+       router were protected-merged as PR #418; the actual candidate parent
+       `12dda70c…` corrects a historical reporting typo.
+13. **INFRA-1 — current candidate.** The constrained local infrastructure
+       execution broker is a cross-cutting gate. Phase 5C remains unstarted and
+       cannot be admitted until INFRA-1 closes.
 
 The controlled refresh and prior closures do not authorize a public version
 bump, tag, release, Phase 5C, or any later phase.
@@ -193,17 +218,19 @@ assembly, and MCP context/explainability surfaces. It begins only after
 Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
 Controlled Dependency Refresh, Phase 5A runtime contracts, and Phase 5A.1
 correction are closed in this snapshot; the current bounded gate is the Phase
-5B domain-policy/router candidate.
+INFRA-1 constrained local infrastructure execution broker candidate.
 
 ### Phase 5 internal gates
 
 Phase 5A and Phase 5A.1 are closed. The following future runtime gates remain
 `PLANNED / NOT IMPLEMENTED` until their own evidence and protected admission;
-Phase 5B is the current candidate gate:
+INFRA-1 is the current cross-cutting candidate gate and Phase 5C remains ready
+but blocked and unstarted:
 
 ```text
 5A.1 — Evaluation corpus semantic integrity correction (closed)
-5B — Deterministic multi-domain router (current candidate)
+5B — Deterministic multi-domain router (closed)
+INFRA-1 — Constrained Local Infrastructure Execution Broker (current candidate)
 5C — Search scope pushdown
 5D — RetrievalPlanner + ContextPack read-only vertical slice
 5E — Shadow benchmark / legacy comparison

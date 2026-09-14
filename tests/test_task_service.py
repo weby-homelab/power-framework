@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from power_framework.core.task_models import TaskEvent
-from power_framework.core.task_service import TaskService
+from power_framework.core.task_service import _INFRA_PROJECTION_TOKEN, TaskService
 from power_framework.core.task_store import TaskStore
 
 if TYPE_CHECKING:
@@ -42,6 +42,50 @@ def test_task_creation_and_events(temp_vault: Path) -> None:
     assert events[0].sequence == 1
     assert events[0].event_type == "task_created"
     assert events[0].payload_digest
+
+
+def test_infrastructure_task_completion_requires_verified_remote_postcondition(
+    temp_vault: Path,
+) -> None:
+    """A replicate task cannot be completed from a local artifact alone."""
+    service = TaskService(temp_vault)
+    (temp_vault / "artifact.txt").write_text("local only\n", encoding="utf-8")
+    service.create_task(
+        task_id="infra_completion_gate",
+        title="Infra completion gate",
+        state="working",
+    )
+    service.transition_task(
+        "infra_completion_gate",
+        "working",
+        expected_revision=1,
+        _projection_token=_INFRA_PROJECTION_TOKEN,
+        values={
+            "external_refs": {
+                "infra_operation": "replicate",
+                "infra_claim_key_ref": "infra-claim-example",
+                "infra_claim_intent_digest": "a" * 64,
+            }
+        },
+    )
+
+    with pytest.raises(PermissionError, match="verified remote postcondition"):
+        service.transition_task(
+            "infra_completion_gate",
+            "completed",
+            expected_revision=2,
+            completion_postcondition="local artifact exists",
+            completion_artifact_refs=["artifact.txt"],
+        )
+
+
+def test_task_creation_rejects_terminal_state_without_completion_receipt(temp_vault: Path) -> None:
+    with pytest.raises(ValueError, match="terminal state"):
+        TaskService(temp_vault).create_task(
+            task_id="terminal_at_create",
+            title="Invalid terminal task",
+            state="completed",
+        )
 
 
 @pytest.mark.parametrize(

@@ -15,6 +15,7 @@ import importlib.metadata
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -35,6 +36,13 @@ mcp_version = subprocess.run(
 assert distribution_version in mcp_version.stdout, (
     f"MCP launcher version mismatch: {mcp_version.stdout!r}"
 )
+broker_help = subprocess.run(
+    [sys.executable, "-m", "power_framework.core.infra_broker", "--help"],
+    capture_output=True,
+    check=True,
+    text=True,
+)
+assert "serve" in broker_help.stdout, "INFRA-1 broker module is not packaged"
 with tempfile.TemporaryDirectory(prefix="power-mcp-smoke-") as directory:
     vault = Path(directory) / "vault"
     vault.mkdir()

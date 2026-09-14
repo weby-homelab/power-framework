@@ -198,6 +198,8 @@ class ProjectStateService:
             if task is None:
                 continue
             for receipt_id in task.receipt_ids:
+                if not receipt_id.startswith("tcr_"):
+                    continue
                 try:
                     receipt = self.task_service.store.get_completion_receipt(receipt_id)
                 except ValueError:
@@ -238,6 +240,8 @@ class ProjectStateService:
                     # expose this as stale/unresolved rather than rewriting it.
                     continue
                 for receipt_id in task_view.receipt_ids:
+                    if not receipt_id.startswith("tcr_"):
+                        continue
                     receipt = self.task_service.store.get_completion_receipt(receipt_id)
                     if (
                         receipt is None

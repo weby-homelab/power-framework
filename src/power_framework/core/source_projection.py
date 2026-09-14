@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, Any
 
 from .constants import SKIP_FILES, is_catalog_filename
 from .ignore import should_skip
-from .parser import read_file_content, validate_metadata
-from .utils import iter_vault_markdown_files
+from .parser import validate_metadata
+from .utils import iter_vault_markdown_files, read_file_bytes_no_follow
 
 if TYPE_CHECKING:
     from .models import OKFMetadata
@@ -140,9 +140,16 @@ def scan_projection(
         if max_sources is not None and scanned_candidates > max_sources:
             break
         try:
-            if max_source_bytes is not None and filepath.stat().st_size > max_source_bytes:
+            raw_content = read_file_bytes_no_follow(
+                filepath, max_bytes=max_source_bytes or 10_000_000
+            )
+            if max_source_bytes is not None and len(raw_content) > max_source_bytes:
                 continue
-            content = read_file_content(filepath)
+            content = (
+                raw_content.decode("utf-8", errors="ignore")
+                .replace("\r\n", "\n")
+                .replace("\r", "\n")
+            )
             metadata = validate_metadata(content)
             if metadata is None:
                 continue
@@ -150,7 +157,7 @@ def scan_projection(
         except (OSError, UnicodeError, ValueError):
             continue
 
-        content_sha256 = hashlib.sha256(filepath.read_bytes()).hexdigest()
+        content_sha256 = hashlib.sha256(raw_content).hexdigest()
         record = SourceRecord(
             rel_path=rel_path,
             title=metadata.title,

@@ -211,7 +211,7 @@ Preflight the exact interpreter and vault before restarting the client:
 ```
 
 Restart long-lived MCP clients after changing their configuration or Python
-environment. See [MCP Server](mcp-server.md) for the 20-tool contract and
+environment. See [MCP Server](mcp-server.md) for the 21-tool contract and
 stdio transport security boundary.
 
 The Web UI is not a second native product. It is shipped by the same wheel and

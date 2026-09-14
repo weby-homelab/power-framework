@@ -64,6 +64,28 @@ The following boundaries are part of the current contract:
 - MCP tool annotations and `power.risk` metadata describe intended risk; they
   are not an authorization mechanism. The caller and its gateway remain
   responsible for enforcing user identity and approval policy.
+
+### POWER 3.8 INFRA-1 candidate boundary (provisional)
+
+The following controls describe the unmerged INFRA-1 candidate in PR #419.
+They are not claims about the frozen public `3.7.11` release until the
+protected merge and release process separately admits them.
+
+- INFRA-1 is an opt-in local Unix-domain broker boundary. The agent-facing
+  client accepts only `status`, `probe`, `rsync-dry-run`, `replicate`, and
+  `verify` identifiers. Hosts, ports, users, source/destination roots,
+  SSH/rsync options, commands, credentials, and approval authority are
+  operator/broker policy, never MCP/CLI input.
+- The broker derives its principal from Unix peer credentials, uses strict
+  operator-owned profiles, pinned `known_hosts`, `BatchMode=yes`, disabled
+  password/keyboard-interactive authentication, `IdentitiesOnly=yes`,
+  `IdentityAgent=none`, and fixed `shell=False` argv. Missing broker/profile/
+  credential/host identity is a bounded block, never a direct-SSH or password
+  fallback.
+- Replication uses bounded source manifests and immutable run/staging paths,
+  requires an idempotency key and dry-run admission, and forbids remote
+  deletion/pruning. The receiver reference uses a non-root forced `rrsync`
+  account with no forwarding or PTY.
 - Memory and other destructive mutations must retain their explicit approval,
   pre-image/concurrency checks, serialization, and atomic-write boundaries.
   A read or diagnostic operation must not silently become a write. Proposal
@@ -119,9 +141,24 @@ CI gates:
 - The MCP server requires a configured vault root, constrains tool paths and
   write targets, rate-limits mutation/index operations, and masks internal
   tracebacks from client responses.
+
+### INFRA-1 candidate implementation controls (provisional)
+
+- The unmerged INFRA-1 broker candidate emits bounded `power.infra-receipt.v1` and
+  `power.infra-block.v1` receipts. Receipts contain IDs, digests, policy and
+  outcome categories only; raw commands, stderr, paths, environment, key bytes,
+  passwords, tokens, and file contents are excluded. The optional systemd
+  service is non-root, capability-empty, `ProtectSystem=strict`, and not
+  enabled by installation.
 - CI runs the test, lint, type, dependency-audit, package-smoke, release-policy,
   and CodeQL gates. The live stdio MCP process contract is tested in addition
   to direct in-process tool tests.
+- The current local INFRA-1 candidate passed the hermetic suite (`2012 passed,
+  4 skipped, 17 deselected`, `82%` coverage), Ruff, MyPy, package smoke, lock,
+  systemd, and strict Docs checks. These are provisional dirty-worktree facts;
+  no real receiver/forced-mode replicate evidence or protected merge has been
+  established, and the public PR candidate remains subject to fresh CodeQL and
+  exact-head verification.
 
 These controls reduce risk but do not make a vault safe from a compromised host,
 malicious same-user process, compromised dependency, or an operator who
@@ -208,6 +245,9 @@ Important current limitations and compensating controls:
   processes and enforce separate OS permissions for separate trust domains.
 - Security metadata on MCP tools is advisory for clients and gateways; it does
   not authorize a caller.
+- INFRA-1 deployment evidence is host/profile specific. Framework CI uses fake
+  local sockets and subprocess doubles and does not require a PRXMX host,
+  receiver, or real credential.
 - Model downloads and optional remote integrations can contact external
   services only under the explicit egress policy. Use offline/pinned model
   assets when confidentiality or reproducibility requires it.

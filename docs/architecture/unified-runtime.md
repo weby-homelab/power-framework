@@ -22,13 +22,18 @@ the current patch runtime boundary is 3.7.11.
       v              v                          v
      CLI         stdio MCP               ApplicationService
       |              |                          |
-      +-------+------+--------------------------+
+       +-------+------+--------------------------+
               |
         ApplicationService
-              |
-        canonical services
-              |
-      Markdown/Git/.power truth
+         |              |
+         v              v
+  canonical services   typed INFRA-1 client
+         |              |
+  Markdown/Git/.power  AF_UNIX only
+                        |
+                 optional non-root broker
+                        |
+                   pinned SSH/rrsync
 ```
 
 ## 2. Canonical Invariants
@@ -52,10 +57,17 @@ the current patch runtime boundary is 3.7.11.
 7. **Docker Role:**
     - Web UI only
     - Non-root user, read-only root filesystem, dropped Linux capabilities
-    - Profile B mounts the canonical `/brain` read-write because governed Web
-      proposal/apply routes persist through `ApplicationService`
-    - Rebuildable Web/search/model cache is mounted separately from canonical
-      `/brain`.
+     - Profile B mounts the canonical `/brain` read-write because governed Web
+       proposal/apply routes persist through `ApplicationService`
+     - Rebuildable Web/search/model cache is mounted separately from canonical
+       `/brain`.
+8. **INFRA-1 constrained execution:**
+   - optional `power-infra-broker` service, never auto-enabled;
+   - Unix-domain socket with OS peer credentials, no TCP/HTTP broker;
+   - typed identifier requests only, operator-owned profile/credential policy;
+   - direct agent SSH, arbitrary remote shell, password auth, and private-key
+     access remain denied;
+   - receiver-side writes are restricted to forced non-root `rrsync` staging.
 
 ## 3. Official deployment profiles
 

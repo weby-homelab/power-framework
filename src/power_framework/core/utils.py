@@ -10,13 +10,14 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import tempfile
 import time
 from collections import defaultdict
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PureWindowsPath
-from typing import TYPE_CHECKING, Any
+from typing import IO, TYPE_CHECKING, Any
 from urllib.parse import unquote
 
 from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES, is_catalog_filename
@@ -82,6 +83,99 @@ def _is_regular_file_in_root(root: Path, candidate: Path) -> bool:
 def is_regular_vault_file(vault_root: Path, candidate: Path) -> bool:
     """Check one candidate without following a symlink out of the vault root."""
     return _is_regular_file_in_root(validate_vault_path(str(vault_root)), candidate)
+
+
+def open_descriptor_no_follow(path: Path) -> int:
+    """Open a file descriptor through descriptor-relative no-follow opens.
+
+    Enforces that:
+    - Path must be absolute.
+    - Every path component is opened with O_NOFOLLOW without traversing symlinks.
+    - Opened descriptor is a regular, single-link file (st_nlink == 1).
+    """
+    candidate = Path(path).absolute()
+    components = candidate.parts
+    if not components or components[0] != "/":
+        raise ValueError("secure file path must be absolute")
+    directory_fd = os.open(
+        "/",
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+    )
+    descriptor = -1
+    try:
+        for component in components[1:-1]:
+            next_fd = os.open(
+                component,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=directory_fd,
+            )
+            os.close(directory_fd)
+            directory_fd = next_fd
+        descriptor = os.open(
+            components[-1],
+            os.O_RDONLY
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=directory_fd,
+        )
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise ValueError("vault source must be a regular single-link file")
+        return descriptor
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
+    finally:
+        os.close(directory_fd)
+
+
+@contextmanager
+def open_file_no_follow(path: Path, *, encoding: str = "utf-8") -> Iterator[IO[str]]:
+    """Open one file for reading through descriptor-relative no-follow opens.
+
+    Yields a text stream that reads the file incrementally without loading the
+    entire file into memory, while maintaining symlink and hardlink protections.
+    """
+    descriptor = open_descriptor_no_follow(path)
+    try:
+        with open(descriptor, encoding=encoding, closefd=False) as stream:
+            yield stream
+    finally:
+        os.close(descriptor)
+
+
+def read_file_bytes_no_follow(path: Path, *, max_bytes: int = 10_000_000) -> bytes:
+    """Read one vault file through descriptor-relative no-follow opens."""
+    descriptor = open_descriptor_no_follow(path)
+    try:
+        before = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        total = 0
+        while total <= max_bytes:
+            chunk = os.read(descriptor, min(64 * 1024, max_bytes + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError("vault source exceeds its size limit")
+        after = os.fstat(descriptor)
+        if (
+            after.st_dev != before.st_dev
+            or after.st_ino != before.st_ino
+            or after.st_size != total
+            or after.st_mtime_ns != before.st_mtime_ns
+            or after.st_ctime_ns != before.st_ctime_ns
+        ):
+            raise ValueError("vault source changed while it was read")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
 
 
 def iter_vault_markdown_files(vault_root: Path) -> Iterator[Path]:
