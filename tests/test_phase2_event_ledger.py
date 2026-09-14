@@ -2662,3 +2662,79 @@ def test_command_validation_failure_leaves_zero_orphan_raw_evidence(vault_root: 
     if evidence_dir.exists():
         files = list(evidence_dir.glob("*.json"))
         assert len(files) == 0, f"Orphan evidence files were created: {files}"
+
+
+def test_project_store_large_ledger_streaming_and_symlink_rejection(tmp_path: Path) -> None:
+    vault_root = tmp_path / "vault"
+    project_id = "prj_large_stream"
+    store = CanonicalProjectEventStore(project_id, vault_root)
+    store.project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build a cryptographic hash-chained ledger exceeding 10,000,000 bytes
+    prev_hash = ""
+    event_count = 105
+    payload_chunk = "x" * 100_000
+
+    with open(store.active_events_file, "w", encoding="utf-8") as f:
+        for seq in range(1, event_count + 1):
+            event_id = f"evt_{project_id}_{seq:06d}"
+            payload = {"idx": seq, "data": payload_chunk}
+            payload_digest = compute_payload_digest(payload)
+            raw_envelope = {
+                "event_id": event_id,
+                "schema_version": "power.project-event.v1",
+                "project_id": project_id,
+                "sequence": seq,
+                "timestamp": "2026-09-14T20:00:00Z",
+                "actor": "user:test",
+                "source": "cli",
+                "session_id": None,
+                "event_type": "artifact.created",
+                "payload": payload,
+                "payload_digest": payload_digest,
+                "prev_event_hash": prev_hash,
+                "artifact_refs": [],
+                "evidence_refs": [],
+                "correlation_id": None,
+                "causation_id": None,
+                "idempotency_key": None,
+            }
+            event_hash = compute_event_hash(raw_envelope)
+            raw_envelope["event_hash"] = event_hash
+            event = ProjectEvent.model_validate(raw_envelope)
+            f.write(canonical_json_dumps(event.model_dump()) + "\n")
+            prev_hash = event_hash
+
+    size = store.active_events_file.stat().st_size
+    assert size > 10_000_000, f"Ledger size {size} must exceed 10MB"
+
+    # 1. Verify succeeds beyond 10MB
+    res = store.verify()
+    assert res.valid is True, f"Verification failed: {res.errors}"
+    assert res.event_count == event_count
+    assert res.last_sequence == event_count
+    assert res.last_event_hash == prev_hash
+
+    # 2. Replay succeeds beyond 10MB with correct sequence and hashes
+    replayed = list(store.replay(from_sequence=1))
+    assert len(replayed) == event_count
+    assert replayed[0].sequence == 1
+    assert replayed[-1].sequence == event_count
+    assert replayed[-1].event_hash == prev_hash
+
+    # 3. Read verified replay succeeds
+    batch = store.read_verified_replay(from_sequence=1)
+    assert batch.receipt.verified is True
+    assert batch.receipt.event_count == event_count
+    assert batch.receipt.head_event_hash == prev_hash
+
+    # 4. Symlinked ledger input is rejected
+    sym_store = CanonicalProjectEventStore("prj_symlink", vault_root)
+    sym_store.project_dir.mkdir(parents=True, exist_ok=True)
+    sym_store.active_events_file.symlink_to(store.active_events_file)
+
+    with pytest.raises((ValueError, OSError)):
+        sym_store.verify()
+
+    with pytest.raises((ValueError, OSError)):
+        list(sym_store.replay())

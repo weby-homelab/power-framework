@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import ValidationError
 
+from power_framework import __version__
+from power_framework.core import infra_broker
 from power_framework.core.application import (
     ApplicationService,
     DeadlineExceededError,
@@ -34,6 +36,7 @@ from power_framework.core.infra_broker import (
     _receive_frame,
     _request_digest,
     _rsync_inventory_is_exact,
+    _rsync_verification_is_clean,
     _run_bounded_process,
     build_ssh_options,
     load_infra_policy,
@@ -307,9 +310,7 @@ def test_response_binding_rejects_ok_status_for_failed_operation_receipt() -> No
 def test_broker_frame_deadline_is_absolute_and_deep_json_is_bounded(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import power_framework.core.infra_broker as broker_module
-
-    monkeypatch.setattr(broker_module, "SERVER_IO_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(infra_broker, "SERVER_IO_TIMEOUT_SECONDS", 0.05)
     server = InfraBrokerServer(
         policy_path=tmp_path / "missing.json",
         state_dir=tmp_path / "state",
@@ -525,8 +526,6 @@ def test_source_snapshot_rejects_a_symlinked_source_root(tmp_path: Path) -> None
 def test_source_snapshot_rejects_a_growing_file_before_writing_past_bound(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import power_framework.core.infra_broker as infra_broker
-
     source = tmp_path / "source.bin"
     source.write_bytes(b"12345")
     destination = tmp_path / "destination.bin"
@@ -674,12 +673,10 @@ def test_process_runner_has_bounded_output_minimal_environment_and_timeout(
 def test_process_runner_classifies_all_popen_failures_as_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import power_framework.core.infra_broker as broker_module
-
     def fail_to_start(*_args: object, **_kwargs: object) -> None:
         raise PermissionError("synthetic launch denial")
 
-    monkeypatch.setattr(broker_module.subprocess, "Popen", fail_to_start)
+    monkeypatch.setattr(infra_broker.subprocess, "Popen", fail_to_start)
     result = _run_bounded_process([sys.executable, "-c", "pass"], 1, 512)
     assert result.category == InfraExitCategory.PROCESS_UNAVAILABLE
     assert result.returncode is None
@@ -1832,7 +1829,7 @@ def test_broker_entrypoint_and_systemd_boundary_are_non_root(
     assert "ExecStartPre=/usr/bin/python3 -E -c" in unit
     assert "raise SystemExit" in unit
     assert " assert " not in unit
-    assert "m.version('power-framework') == '3.7.11'" in unit
+    assert f"m.version('power-framework') == '{__version__}'" in unit
     assert "--socket-activation" in unit
     assert "User=power-infra" in unit
     assert "ProtectHome=yes" in unit
@@ -1847,3 +1844,74 @@ def test_broker_entrypoint_and_systemd_boundary_are_non_root(
     assert "power-infra-callers" in tmpfiles
     allowlist = (systemd / "power-infra-broker-allowlist.conf.example").read_text(encoding="utf-8")
     assert "caller authorization is no longer sourced" in allowlist
+
+
+def test_rsync_verification_detects_exact_itemize_marker_and_clean_output() -> None:
+    # 1. Exact 11-char itemize marker (>f+++++++++) without filename must NOT be clean
+    changed_result = _ProcessResult(
+        returncode=0,
+        stdout_bytes=len(b">f+++++++++\n"),
+        stderr_bytes=0,
+        category=InfraExitCategory.SUCCESS,
+        duration_ms=10,
+        stdout_sample=b">f+++++++++\n",
+        stderr_sample=b"",
+        output_truncated=False,
+    )
+    assert _rsync_verification_is_clean(changed_result) is False
+
+    # 2. Attribute-only change marker (>f.st......) must NOT be clean
+    attr_changed_result = _ProcessResult(
+        returncode=0,
+        stdout_bytes=len(b">f.st......\n"),
+        stderr_bytes=0,
+        category=InfraExitCategory.SUCCESS,
+        duration_ms=10,
+        stdout_sample=b">f.st......\n",
+        stderr_sample=b"",
+        output_truncated=False,
+    )
+    assert _rsync_verification_is_clean(attr_changed_result) is False
+
+    # 3. Clean output with headers and stats must be clean
+    clean_sample = (
+        b"sending incremental file list\n"
+        b"sent 100 bytes  received 20 bytes  240.00 bytes/sec\n"
+        b"total size is 0  speedup is 0.00\n"
+    )
+    clean_result = _ProcessResult(
+        returncode=0,
+        stdout_bytes=len(clean_sample),
+        stderr_bytes=0,
+        category=InfraExitCategory.SUCCESS,
+        duration_ms=10,
+        stdout_sample=clean_sample,
+        stderr_sample=b"",
+        output_truncated=False,
+    )
+    assert _rsync_verification_is_clean(clean_result) is True
+
+    # 4. Truncated output or failure category must never be clean
+    truncated_result = _ProcessResult(
+        returncode=0,
+        stdout_bytes=len(clean_sample),
+        stderr_bytes=0,
+        category=InfraExitCategory.SUCCESS,
+        duration_ms=10,
+        stdout_sample=clean_sample,
+        stderr_sample=b"",
+        output_truncated=True,
+    )
+    assert _rsync_verification_is_clean(truncated_result) is False
+
+    failed_result = _ProcessResult(
+        returncode=1,
+        stdout_bytes=len(clean_sample),
+        stderr_bytes=len(b"error"),
+        category=InfraExitCategory.FAILED,
+        duration_ms=10,
+        stdout_sample=clean_sample,
+        stderr_sample=b"error",
+        output_truncated=False,
+    )
+    assert _rsync_verification_is_clean(failed_result) is False

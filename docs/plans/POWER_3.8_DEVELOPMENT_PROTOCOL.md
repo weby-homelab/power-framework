@@ -122,8 +122,12 @@ authenticated GitHub REST Git-database endpoints for branch publication:
 
 - create the commit locally with `git commit -S`;
 - verify it locally with `git verify-commit HEAD`;
-- publish blobs/trees/commits/refs through GitHub REST without placing a token
+- publish blobs/trees/commits through GitHub REST without placing a token
   in a remote URL, command argument, prompt, log, or repository file;
+- read back the published commit object from GitHub REST to verify its exact SHA,
+  tree, and valid GPG verification signature (`verification.verified == true`)
+  before advancing the branch ref;
+- advance the target branch ref to the verified commit SHA;
 - use authenticated GitHub REST for live state reads, PR/comments, state
   pointers, and the protected normal merge endpoint when authorized.
 

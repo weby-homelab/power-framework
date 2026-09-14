@@ -89,10 +89,10 @@ candidate. New transport operations require explicit capability negotiation.
 
 `ApplicationService.infra_action()` accepts the strict `InfraRequest` model and
 returns the normal `power.application.v2` envelope. Its nested result is a
-closed `InfraResponse` containing only operation/profile identifiers, bounded
-counts, an exact run/manifest digest, and either an `InfraOperationReceipt` or
-an `InfraCapabilityBlockReceipt`. The method applies the normal principal,
-deadline, result-budget, audit-hook, and Task revision checks.
+closed `InfraResponse` containing status, operation, target/profile identifiers,
+task binding, request digest, bounded data payload (`InfraResponseData`), and
+either an `InfraOperationReceipt` or an `InfraCapabilityBlockReceipt`. The method
+applies the normal principal, deadline, result-budget, audit-hook, and Task revision checks.
 
 An infra receipt is not a `power.task-completion.v1` receipt. A caller must run
 the separate fixed `verify` operation and then use the existing governed

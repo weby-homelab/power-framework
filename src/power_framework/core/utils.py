@@ -14,10 +14,10 @@ import stat
 import tempfile
 import time
 from collections import defaultdict
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PureWindowsPath
-from typing import TYPE_CHECKING, Any
+from typing import IO, TYPE_CHECKING, Any
 from urllib.parse import unquote
 
 from .constants import EXCLUDED_DIRS, EXCLUDED_ORPHAN_FILES, is_catalog_filename
@@ -85,9 +85,14 @@ def is_regular_vault_file(vault_root: Path, candidate: Path) -> bool:
     return _is_regular_file_in_root(validate_vault_path(str(vault_root)), candidate)
 
 
-def read_file_bytes_no_follow(path: Path, *, max_bytes: int = 10_000_000) -> bytes:
-    """Read one vault file through descriptor-relative no-follow opens."""
+def open_descriptor_no_follow(path: Path) -> int:
+    """Open a file descriptor through descriptor-relative no-follow opens.
 
+    Enforces that:
+    - Path must be absolute.
+    - Every path component is opened with O_NOFOLLOW without traversing symlinks.
+    - Opened descriptor is a regular, single-link file (st_nlink == 1).
+    """
     candidate = Path(path).absolute()
     components = candidate.parts
     if not components or components[0] != "/":
@@ -117,6 +122,32 @@ def read_file_bytes_no_follow(path: Path, *, max_bytes: int = 10_000_000) -> byt
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
             raise ValueError("vault source must be a regular single-link file")
+        return descriptor
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
+    finally:
+        os.close(directory_fd)
+
+
+@contextmanager
+def open_file_no_follow(path: Path, *, encoding: str = "utf-8") -> Iterator[IO[str]]:
+    """Open one file for reading through descriptor-relative no-follow opens.
+
+    Yields a text stream that reads the file incrementally without loading the
+    entire file into memory, while maintaining symlink and hardlink protections.
+    """
+    descriptor = open_descriptor_no_follow(path)
+    with open(descriptor, encoding=encoding, closefd=True) as stream:
+        yield stream
+
+
+def read_file_bytes_no_follow(path: Path, *, max_bytes: int = 10_000_000) -> bytes:
+    """Read one vault file through descriptor-relative no-follow opens."""
+    descriptor = open_descriptor_no_follow(path)
+    try:
+        before = os.fstat(descriptor)
         chunks: list[bytes] = []
         total = 0
         while total <= max_bytes:
@@ -138,9 +169,7 @@ def read_file_bytes_no_follow(path: Path, *, max_bytes: int = 10_000_000) -> byt
             raise ValueError("vault source changed while it was read")
         return b"".join(chunks)
     finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        os.close(directory_fd)
+        os.close(descriptor)
 
 
 def iter_vault_markdown_files(vault_root: Path) -> Iterator[Path]:

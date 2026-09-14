@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from power_framework import __version__
 from power_framework.core.infra_broker import _load_caller_allowlist, load_infra_policy
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +32,7 @@ def test_systemd_unit_is_non_root_and_not_a_direct_shell_wrapper() -> None:
     assert "sys.version_info" in unit
     assert "raise SystemExit" in unit
     assert " assert " not in unit
-    assert "m.version('power-framework') == '3.7.11'" in unit
+    assert f"m.version('power-framework') == '{__version__}'" in unit
     assert "EnvironmentFile=" not in unit
     assert "sshpass" not in unit
     assert "KillMode=control-group" in unit

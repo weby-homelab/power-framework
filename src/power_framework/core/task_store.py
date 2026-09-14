@@ -198,6 +198,10 @@ class TaskStore:
             lock_file = self.tasks_dir / ".lock"
             if lock_file.is_symlink():
                 raise ValueError(f"task lock must not be a symlink: {lock_file}")
+            if self._recovery_blocked:
+                raise RuntimeError(
+                    "TaskStore recovery is blocked; repair preserved transaction evidence"
+                )
             if self._lock_depth == 0:
                 if fcntl is None:
                     raise RuntimeError("Task writer locking is unavailable")
