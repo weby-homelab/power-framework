@@ -221,3 +221,35 @@ stage the intended diff, create a GPG-signed feature-branch commit, publish via
 the approved GitHub REST/Git channel, re-read the exact PR tuple and required
 checks, and keep Phase 5C, release, and real replication blocked until all gates
 are independently green.
+
+## Append-only continuation — published candidate epoch
+
+The local implementation and governance reconciliation were published to the
+existing feature branch for PR #419. This is a new candidate epoch; prior local
+and remote tuples remain historical evidence and are not silently reused.
+
+```text
+PUBLISHED_OBSERVED_AT_UTC: 2026-09-14T16:40:21Z
+PR: 419
+BASE_SHA: 6a315d5919eeef797bc506ecb216313c20419fc2
+HEAD_SHA: 4dc2db46885ab81e337f398f16ea6a7aac585839
+HEAD_TREE: 0550327422405aace37a6593abcfc3e836b7c7fc
+HEAD_PARENT: 62323a930189c7afea497a984bdf6858011dfa09
+HEAD_GPG: verified=true / reason=valid
+PR_STATE: open / mergeable=true / mergeable_state=unstable
+OBSERVED_CHECK_RUNS: 11; several in_progress; deploy=skipped
+PRIOR_HEAD_CODEQL: failure on 62323a9; superseded by this candidate epoch
+```
+
+The exact candidate contains the INFRA-1 implementation, security/deployment
+artifacts, tests, API/ADR documentation, planning reconciliation, and the
+append-only evidence updates. Local gates remain `2012 passed, 4 skipped, 17
+deselected`, `82%` coverage, repository Ruff/MyPy PASS, package smoke PASS,
+`uv lock --check` PASS, systemd verification PASS, strict MkDocs PASS, and
+`git diff --check` PASS. A fresh read-only review found no P0/P1
+protected-admission code blocker. The doc-drift helper still reports the
+global OpenCode skill/repository runtime-contract mismatch.
+
+Protected admission is not claimed: required remote checks have not completed,
+receiver/forced-`rrsync` evidence is unavailable, and Phase 5C, release, and
+merge remain blocked.

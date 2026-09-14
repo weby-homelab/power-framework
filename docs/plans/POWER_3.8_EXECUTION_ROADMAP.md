@@ -103,13 +103,14 @@ not closed. Local evidence is `2012 passed, 4 skipped, 17 deselected` at `82%`
 coverage, with Ruff, MyPy, package smoke, lock, pip, systemd, strict MkDocs,
 and diff checks passing. A fresh read-only review found no P0/P1 code blocker.
 
-The remaining admission conditions are an immutable GPG-signed candidate tuple,
-fresh exact-head protected CI/readback, and operator evidence for the actual
-non-root forced `rrsync` receiver. PR #419 remains the public transfer
-candidate; its latest observed head/tree are not the current local worktree,
-CodeQL remains failed, and deploy is skipped. Therefore INFRA-1 remains
-`ADMISSION CANDIDATE / PROVISIONAL`, Phase 5C remains blocked/not started, and
-POWER 3.8.0 remains NO-GO.
+The remaining admission conditions are fresh exact-head protected CI/readback
+and operator evidence for the actual non-root forced `rrsync` receiver. PR #419
+now points to signed candidate head `4dc2db46885ab81e337f398f16ea6a7aac585839`
+with tree `0550327422405aace37a6593abcfc3e836b7c7fc` and parent
+`62323a930189c7afea497a984bdf6858011dfa09`; its required checks were still in
+progress at the latest readback and deploy was skipped. Therefore INFRA-1
+remains `ADMISSION CANDIDATE / PROVISIONAL`, Phase 5C remains blocked/not
+started, and POWER 3.8.0 remains NO-GO.
 
 ## Controlled Dependency Refresh
 

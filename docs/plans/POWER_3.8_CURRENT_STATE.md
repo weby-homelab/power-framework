@@ -48,7 +48,19 @@ INFRA_1_CANDIDATE_STATUS:
 LOCAL IMPLEMENTATION COMPLETE / LOCAL VALIDATION COMPLETE / PROTECTED ADMISSION PENDING
 
 INFRA_1_CANDIDATE_PR:
-419 / REMOTE READBACK OBSERVED 2026-09-14 / HEAD 62323a930189c7afea497a984bdf6858011dfa09
+419 / REMOTE READBACK OBSERVED 2026-09-14T16:40:21Z / HEAD 4dc2db46885ab81e337f398f16ea6a7aac585839
+
+INFRA_1_CANDIDATE_TREE:
+0550327422405aace37a6593abcfc3e836b7c7fc
+
+INFRA_1_CANDIDATE_PARENT:
+62323a930189c7afea497a984bdf6858011dfa09
+
+INFRA_1_CANDIDATE_GPG:
+VERIFIED / reason=valid
+
+INFRA_1_REMOTE_CHECKS:
+IN PROGRESS / 11 check-runs observed; deploy=skipped; prior head CodeQL failure is superseded
 
 INFRA_1_LOCAL_BASE_HEAD:
 ace5d6351dd599578491023419140b6a79bd6b7f
@@ -257,12 +269,14 @@ evidence:
   blocker in the current tree.
 - The receiver is still an operator-provisioning reference only; no real
   receiver, forced `rrsync`, or real replicate evidence exists.
-- Remote PR #419 is open. The latest readback observed `2026-09-14` reports
-  head `62323a930189c7afea497a984bdf6858011dfa09`, tree
-  `3529bdb7beb71678daf14865079e1852e6d3c750`, parent
-  `dcf27b55e3e5bfeb285fc93ed73a485ce0f707fb`, `mergeable=true` with
-  `mergeable_state=unstable`, CodeQL failure, and deploy skipped. This remote
-  tuple does not include the current local worktree.
+- Remote PR #419 is open. The latest readback observed
+  `2026-09-14T16:40:21Z` reports candidate head
+  `4dc2db46885ab81e337f398f16ea6a7aac585839`, tree
+  `0550327422405aace37a6593abcfc3e836b7c7fc`, parent
+  `62323a930189c7afea497a984bdf6858011dfa09`, and GPG verification
+  `verified=true / reason=valid`. Eleven check-runs were observed: several are
+  still in progress, `deploy=skipped`, and the prior head's CodeQL failure is
+  superseded; no final protected result exists yet.
 
 The gate remains open until an exact signed candidate tuple is published,
 required remote checks and policy are freshly green, and receiver evidence is

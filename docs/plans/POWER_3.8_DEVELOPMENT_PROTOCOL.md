@@ -467,12 +467,16 @@ The current local candidate evidence is:
   `git diff --check` passed;
 - fresh read-only review found no P0/P1 protected-admission code blocker.
 
-These are local dirty-worktree facts. The candidate has no immutable signed
-commit/tree yet. The latest public PR #419 readback observed on 2026-09-14
-still points to head `62323a930189c7afea497a984bdf6858011dfa09` and tree
-`3529bdb7beb71678daf14865079e1852e6d3c750`; CodeQL is failing and deploy is
-skipped. Real receiver/forced-`rrsync` evidence is unavailable, so protected
-INFRA-1 admission and Phase 5C remain blocked.
+These are local dirty-worktree facts. The latest published candidate is now a
+signed commit, but protected admission is still pending. The public PR #419
+readback observed on `2026-09-14T16:40:21Z` points to head
+`4dc2db46885ab81e337f398f16ea6a7aac585839`, tree
+`0550327422405aace37a6593abcfc3e836b7c7fc`, parent
+`62323a930189c7afea497a984bdf6858011dfa09`, with valid GitHub GPG verification.
+Eleven check-runs were observed, several still in progress, and deploy is
+skipped; the previous head's CodeQL failure is superseded. Real
+receiver/forced-`rrsync` evidence is unavailable, so protected INFRA-1
+admission and Phase 5C remain blocked.
 
 ## Cross-links
 
