@@ -19,6 +19,7 @@ Validates all Phase 2 requirements and gates G2.1 - G2.7:
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 import stat
@@ -2738,3 +2739,14 @@ def test_project_store_large_ledger_streaming_and_symlink_rejection(tmp_path: Pa
 
     with pytest.raises((ValueError, OSError)):
         list(sym_store.replay())
+
+    # 5. FIFO ledger input is rejected promptly without blocking
+    if hasattr(os, "mkfifo"):
+        fifo_store = CanonicalProjectEventStore("prj_fifo", vault_root)
+        fifo_store.project_dir.mkdir(parents=True, exist_ok=True)
+        os.mkfifo(fifo_store.active_events_file)
+        fifo_res = fifo_store.verify()
+        assert fifo_res.valid is False
+        assert any("regular single-link file" in e for e in fifo_res.errors)
+        with pytest.raises(ValueError, match="regular single-link file"):
+            list(fifo_store.replay())

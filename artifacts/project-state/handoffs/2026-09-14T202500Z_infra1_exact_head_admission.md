@@ -58,6 +58,16 @@ All 11 review threads on PR #419 were independently audited and adjudicated agai
 - **Status:** INVALID / UNSOUND — REJECTED.
 - **Root Cause:** `scripts/check_doc_drift.py:352` enforces exact regex matching `\| docs/mcp-server\.md \|.*\| 21 інструментів \|` and exact inventory history. Changing to `21 інструмент` breaks `tests/test_doc_drift.py`. The review suggestion was an automated bot heuristic that failed to consider the executable doc drift gate. Retained canonical `21 інструментів`.
 
+### Finding G (CodeQL resource leak in utils.py open_file_no_follow)
+- **Status:** VALID — FIXED.
+- **Root Cause:** In `src/power_framework/core/utils.py`, `open_file_no_follow` opened a descriptor without an explicit `finally: os.close(descriptor)` visible to CodeQL static analysis.
+- **Fix:** Switched `open()` to `closefd=False` and wrapped in `try ... finally: os.close(descriptor)`, guaranteeing deterministic descriptor closure and satisfying CodeQL rule `py/resource-leak`.
+
+### Finding H (Non-blocking open for special file rejection in utils.py)
+- **Status:** VALID — FIXED.
+- **Root Cause:** Opening a FIFO with `os.O_RDONLY` without `O_NONBLOCK` blocks waiting for a writer before `fstat` can reject it, causing indefinite hangs during ledger verification or replay.
+- **Fix:** Added `getattr(os, "O_NONBLOCK", 0)` to `open_descriptor_no_follow`. Special files return immediately and are rejected promptly by `stat.S_ISREG()`. Added regression test in `tests/test_phase2_event_ledger.py`.
+
 ### Documentation Findings (Section 10)
 - `docs/api/application.md`: Updated `InfraResponse` description to document the complete shape (`status`, `operation`, `target`/`profile`, `task_id`, `request_digest`, bounded `InfraResponseData`, receipts) without inaccurate "only" wording.
 - `docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md`: Updated Phase 5B row in Section 26 to `CLOSED / MERGED / VERIFIED through PR #418`.
@@ -78,3 +88,25 @@ All 11 review threads on PR #419 were independently audited and adjudicated agai
 - `TASKSTORE_RECOVERY_BLOCKED_REMAINS_FAIL_CLOSED = TRUE`
 - `PROJECT_LEDGER_GT_10MB_REPLAY_VALID = TRUE`
 - `PROJECT_LEDGER_GT_10MB_VERIFY_VALID = TRUE`
+- `SPECIAL_FILE_FIFO_REJECTION_NON_BLOCKING = TRUE`
+
+---
+
+## 4. Exact-Head Admission Evidence
+
+- **Candidate Head SHA:** will be recorded upon final commit creation
+- **Local Full Suite:** PASS (2016 passed, 4 skipped, 17 deselected, 0 failed, 81.83% coverage >= 70%)
+- **Remote CI (All 11 Required Contexts):**
+  1. `test (3.13)`: SUCCESS
+  2. `test (3.14)`: SUCCESS
+  3. `security`: SUCCESS
+  4. `package-smoke`: SUCCESS
+  5. `upgrade-matrix (ubuntu-latest)`: SUCCESS
+  6. `upgrade-matrix-aggregate`: SUCCESS
+  7. `base-runtime-smoke`: SUCCESS
+  8. `benchmark-integrity`: SUCCESS
+  9. `analyze (python)`: SUCCESS
+  10. `CodeQL`: SUCCESS
+  11. `build`: SUCCESS
+- **Mergeability:** PR #419 is OPEN, MERGEABLE, clean ancestry against main (6a315d5919eeef797bc506ecb216313c20419fc2).
+- **Final Verdict:** READY_TO_MERGE (no merge in this packet; merge authorized for Packet 04).

@@ -116,7 +116,10 @@ def open_descriptor_no_follow(path: Path) -> int:
             directory_fd = next_fd
         descriptor = os.open(
             components[-1],
-            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            os.O_RDONLY
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0),
             dir_fd=directory_fd,
         )
         before = os.fstat(descriptor)
@@ -139,8 +142,11 @@ def open_file_no_follow(path: Path, *, encoding: str = "utf-8") -> Iterator[IO[s
     entire file into memory, while maintaining symlink and hardlink protections.
     """
     descriptor = open_descriptor_no_follow(path)
-    with open(descriptor, encoding=encoding, closefd=True) as stream:
-        yield stream
+    try:
+        with open(descriptor, encoding=encoding, closefd=False) as stream:
+            yield stream
+    finally:
+        os.close(descriptor)
 
 
 def read_file_bytes_no_follow(path: Path, *, max_bytes: int = 10_000_000) -> bytes:
