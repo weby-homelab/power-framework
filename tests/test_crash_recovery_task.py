@@ -109,6 +109,47 @@ def test_committed_leftover_loses_no_data(tmp_path: Path) -> None:
     assert not list(store.tx_dir.iterdir())
 
 
+def test_recovery_rejects_path_escape_and_preserves_manifest(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    svc = TaskService(vault)
+    store = svc.store
+    outside = tmp_path / "outside.txt"
+    outside.write_text("sentinel", encoding="utf-8")
+    _write_manifest(
+        store,
+        "tx_escape",
+        "prepared",
+        [{"label": "snapshot", "rel": "../outside.txt", "preimage_digest": None}],
+    )
+
+    results = store.recover()
+    assert results == []
+    assert outside.read_text(encoding="utf-8") == "sentinel"
+    assert (store.tx_dir / "tx_escape" / "manifest.json").is_file()
+
+
+def test_recovery_rejects_operation_label_mismatch_and_preserves_manifest(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    svc = TaskService(vault)
+    svc.create_task(task_id="T-matrix", title="sentinel")
+    store = svc.store
+    tx_dir = _write_manifest(
+        store,
+        "tx_matrix",
+        "prepared",
+        [{"label": "snapshot", "rel": ".power/tasks/T-matrix.json", "preimage_digest": None}],
+    )
+    manifest_path = tx_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["op"] = "memory_apply"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert store.recover() == []
+    assert store._recovery_blocked is True
+    assert store.get_task("T-matrix") is not None
+    assert manifest_path.is_file()
+
+
 def test_recovery_runs_on_next_process_lock_and_allows_retry(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     svc = TaskService(vault)

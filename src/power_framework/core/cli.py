@@ -1259,7 +1259,11 @@ def _cmd_infra(args: argparse.Namespace) -> int:
         vault_path = _resolve_path(getattr(args, "vault_path", "") or "")
         context = _cli_context(
             actor="cli",
-            authority="apply" if operation == InfraOperation.REPLICATE else "read-only",
+            authority=(
+                "apply"
+                if operation is InfraOperation.REPLICATE or request.task_id is not None
+                else "read-only"
+            ),
             idempotency_key=request.idempotency_key,
         )
         response = ApplicationService(vault_path).infra_action(request, context=context)
@@ -1269,10 +1273,14 @@ def _cmd_infra(args: argparse.Namespace) -> int:
     except (FileNotFoundError, PermissionError, RuntimeError, OSError):
         logger.error("Infrastructure broker request failed at the local boundary")
         return 1
-    print(json.dumps(response.model_dump(mode="json"), ensure_ascii=False, sort_keys=True))
+    payload = response.as_dict()
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
     if operation == InfraOperation.STATUS:
         return 0
-    return 0 if response.status == InfraResponseStatus.OK else 1
+    data = payload.get("data")
+    infra = data.get("infra") if isinstance(data, dict) else None
+    broker_status = infra.get("status") if isinstance(infra, dict) else None
+    return 0 if broker_status == InfraResponseStatus.OK.value else 1
 
 
 def main() -> None:
@@ -1683,6 +1691,15 @@ def main() -> None:
         "canceled",
         "rejected",
     ]
+    task_create_states = [
+        "backlog",
+        "ready",
+        "submitted",
+        "working",
+        "input-required",
+        "auth-required",
+        "blocked",
+    ]
 
     p_task_list = task_sub.add_parser("list")
     p_task_list.add_argument("path")
@@ -1705,7 +1722,7 @@ def main() -> None:
     p_task_create.add_argument("--objective", default="")
     p_task_create.add_argument("--owner", default="local")
     p_task_create.add_argument("--assignee", default=None)
-    p_task_create.add_argument("--state", choices=task_states, default="backlog")
+    p_task_create.add_argument("--state", choices=task_create_states, default="backlog")
     p_task_create.add_argument(
         "--priority", choices=["low", "normal", "high", "critical"], default="normal"
     )
@@ -1784,6 +1801,9 @@ def main() -> None:
     p_verify.add_argument("target")
     p_verify.add_argument("--profile", required=True)
     p_verify.add_argument("--run-id", required=True)
+    p_verify.add_argument("--idempotency-key", default=None)
+    p_verify.add_argument("--task-id", default=None)
+    p_verify.add_argument("--expected-revision", type=_positive_int, default=None)
     p_verify.add_argument("--vault-path", default=None)
     p_verify.set_defaults(func=_cmd_infra)
 

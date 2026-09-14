@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted for the POWER 3.8 INFRA-1 gate. The broker is opt-in and does not
-change the public version or authorize Phase 5C.
+Accepted as the provisional design for the POWER 3.8 INFRA-1 candidate. The
+broker is opt-in, remains unmerged until protected admission, does not change
+the public version, and does not authorize Phase 5C.
 
 ## Context
 
@@ -27,12 +28,16 @@ operator-owned strict profile. It builds fixed SSH/rsync arguments with
 `IdentitiesOnly`, `IdentityAgent=none`, strict host-key checking, and no
 caller-controlled remote command.
 
-The private key is delivered only through systemd `LoadCredential=` into the
-broker boundary. It never enters a request, Task, receipt, MCP response, CLI
-output, prompt, or vault note. Replication is immutable-run/staging oriented,
-requires an idempotency key, uses bounded manifests and output/time limits,
-requires a dry-run unless standing profile policy says otherwise, and never
-performs remote deletion/pruning.
+The private key is delivered through systemd `LoadCredential=` into the broker
+boundary. An explicitly enabled root/operator-owned plaintext fallback is a
+lower-assurance deployment mode; it is disabled by default. In either mode the
+key never enters a request, Task, receipt, MCP response, CLI output, prompt, or
+vault note. Replication is immutable-run/staging oriented, requires an
+idempotency key, uses a broker-owned snapshot plus bounded manifests and
+output/time limits, requires a dry-run unless standing profile policy says
+otherwise, and never performs remote deletion/pruning. A partial remote run is
+not trusted until the separate verify operation succeeds; the broker never
+silently retries an unknown write.
 
 ## Task and handoff semantics
 
@@ -41,8 +46,8 @@ No new top-level Task state is introduced. Capability absence is `blocked` with
 network failure, and unavailable credentials remain blocked. Missing approval is
 `auth-required`; a genuinely missing target/profile input is `input-required`.
 The broker block receipt is referenced through existing `receipt_ids`,
-`error_ref`, and `open_gates`. Handoff packets remain declarative data and never
-execute `next_action`.
+`error_ref`, and `open_gates`; it is not a canonical Task completion receipt.
+Handoff packets remain declarative data and never execute `next_action`.
 
 ## Alternatives rejected
 

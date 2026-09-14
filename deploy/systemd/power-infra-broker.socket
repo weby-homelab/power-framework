@@ -1,0 +1,16 @@
+[Unit]
+Description=POWER INFRA-1 constrained broker Unix socket
+Documentation=https://github.com/weby-homelab/power-framework/blob/main/deploy/infra/README.md
+ConditionPathIsDirectory=/run/power-infra
+
+[Socket]
+ListenStream=/run/power-infra/broker.sock
+SocketUser=power-infra
+SocketGroup=power-infra-callers
+SocketMode=0660
+DirectoryMode=0750
+Accept=no
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

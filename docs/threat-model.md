@@ -161,6 +161,36 @@ environment is trustworthy.
   idempotency request/outcome and refuses a conflicting or blind duplicate;
   timeout remediation is operator resolution, not an automatic retry.
 
+### INFRA-1 specific residual boundaries
+
+- The broker snapshots source bytes into a private `StateDirectory` before any
+  rsync call. It rejects source roots overlapping policy, approval, credential,
+  known-host, or broker-state paths and rejects symlinks, hard links, special
+  files, unsafe path components, sensitive credential-like names, depth, file,
+  and byte-limit violations.
+- Each profile has a complete digest. Explicit approvals are reloaded for every
+  replicate and bind operation, target, profile digest, policy revision,
+  server-derived principal, and expiry. Standing approval is an exact
+  operator-installed profile/principal rule. Neither is minted by MCP or a
+  handoff packet.
+- The filesystem socket has a dedicated systemd socket unit with `Accept=no`;
+  the client checks the broker peer UID and the broker checks an explicit caller
+  UID/GID allowlist. Missing or substituted endpoints fail closed. A single
+  request is accepted per connection and every frame is size/deadline/duplicate
+  key bounded.
+- SSH uses one exact dedicated known-host entry, a broker-owned snapshot of that
+  file, and `GlobalKnownHostsFile=/dev/null`; a presented host-key mismatch is
+  a security block and never updates the pin. The receiver must be separately
+  operator-audited; generic CI does not provision or remotely attest it.
+- Remote directory publication is intentionally not claimed to be an atomic
+  filesystem transaction. `-no-overwrite` and `-no-del` make the reference
+  receiver write-once/non-destructive; a partial run remains untrusted until
+  the fixed verify operation passes, and timeout/unknown completion remains
+  reserved for operator reconciliation.
+- systemd uses a non-root account, empty capability sets, `ProtectSystem=strict`,
+  `ProtectHome=yes`, cgroup/process limits, `KillMode=control-group`, and
+  `LoadCredential=`. Manual root execution is refused by the broker entrypoint.
+
 ## Severity Calibration
 
 ### Critical

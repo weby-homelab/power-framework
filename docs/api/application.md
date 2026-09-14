@@ -80,9 +80,25 @@ as typed `source_projection_stale` and fails closed; operators must run
 | `source.graph` | supported | not published | not published | supported through `PowerClient` |
 | `retrieve` | supported | supported | supported | supported through `PowerClient` |
 | Task/Decision/Proposal/Receipt | supported | supported adapter paths | supported adapter paths | supported through `PowerClient` |
+| INFRA-1 broker action | supported through `infra_action` | `power infra` | `infra_action` | not exposed |
 
 Unused speculative source CLI/MCP commands are intentionally not frozen in this
 candidate. New transport operations require explicit capability negotiation.
+
+## INFRA-1 action boundary
+
+`ApplicationService.infra_action()` accepts the strict `InfraRequest` model and
+returns the normal `power.application.v2` envelope. Its nested result is a
+closed `InfraResponse` containing only operation/profile identifiers, bounded
+counts, an exact run/manifest digest, and either an `InfraOperationReceipt` or
+an `InfraCapabilityBlockReceipt`. The method applies the normal principal,
+deadline, result-budget, audit-hook, and Task revision checks.
+
+An infra receipt is not a `power.task-completion.v1` receipt. A caller must run
+the separate fixed `verify` operation and then use the existing governed
+TaskService completion flow if a task should become terminal. Missing broker,
+credential, host identity, or network remains `blocked`; missing approval is
+`auth-required`; only missing business/request identifiers are `input-required`.
 
 ## Compatibility
 

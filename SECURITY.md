@@ -64,6 +64,13 @@ The following boundaries are part of the current contract:
 - MCP tool annotations and `power.risk` metadata describe intended risk; they
   are not an authorization mechanism. The caller and its gateway remain
   responsible for enforcing user identity and approval policy.
+
+### POWER 3.8 INFRA-1 candidate boundary (provisional)
+
+The following controls describe the unmerged INFRA-1 candidate in PR #419.
+They are not claims about the frozen public `3.7.11` release until the
+protected merge and release process separately admits them.
+
 - INFRA-1 is an opt-in local Unix-domain broker boundary. The agent-facing
   client accepts only `status`, `probe`, `rsync-dry-run`, `replicate`, and
   `verify` identifiers. Hosts, ports, users, source/destination roots,
@@ -134,7 +141,10 @@ CI gates:
 - The MCP server requires a configured vault root, constrains tool paths and
   write targets, rate-limits mutation/index operations, and masks internal
   tracebacks from client responses.
-- The INFRA-1 broker emits bounded `power.infra-receipt.v1` and
+
+### INFRA-1 candidate implementation controls (provisional)
+
+- The unmerged INFRA-1 broker candidate emits bounded `power.infra-receipt.v1` and
   `power.infra-block.v1` receipts. Receipts contain IDs, digests, policy and
   outcome categories only; raw commands, stderr, paths, environment, key bytes,
   passwords, tokens, and file contents are excluded. The optional systemd
@@ -143,6 +153,12 @@ CI gates:
 - CI runs the test, lint, type, dependency-audit, package-smoke, release-policy,
   and CodeQL gates. The live stdio MCP process contract is tested in addition
   to direct in-process tool tests.
+- The current local INFRA-1 candidate passed the hermetic suite (`2012 passed,
+  4 skipped, 17 deselected`, `82%` coverage), Ruff, MyPy, package smoke, lock,
+  systemd, and strict Docs checks. These are provisional dirty-worktree facts;
+  no real receiver/forced-mode replicate evidence or protected merge has been
+  established, and the public PR candidate remains subject to fresh CodeQL and
+  exact-head verification.
 
 These controls reduce risk but do not make a vault safe from a compromised host,
 malicious same-user process, compromised dependency, or an operator who

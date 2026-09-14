@@ -50,6 +50,7 @@ from power_framework.core.project_models import (
     generate_deterministic_event_id,
     validate_project_id,
 )
+from power_framework.core.utils import read_file_bytes_no_follow
 
 logger = logging.getLogger(__name__)
 
@@ -571,15 +572,15 @@ class ProjectEventStore:
         for file_path in self.list_event_files():
             if not file_path.exists():
                 continue
-            with open(file_path, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    data = json.loads(line)
-                    event = ProjectEvent.model_validate(data)
-                    if event.sequence >= from_sequence:
-                        yield event
+            content = read_file_bytes_no_follow(file_path)
+            for line in content.decode("utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                data = json.loads(line)
+                event = ProjectEvent.model_validate(data)
+                if event.sequence >= from_sequence:
+                    yield event
 
     def read_verified_replay(self, from_sequence: int = 1) -> VerifiedReplayBatch:
         """Read and verify events from the authoritative Phase-2 ledger, returning a verified replay batch."""
@@ -623,73 +624,75 @@ class ProjectEventStore:
             )
 
         for file_path in files:
-            with open(file_path, encoding="utf-8") as f:
-                for line_num, line in enumerate(f, start=1):
-                    raw = line.strip()
-                    if not raw:
-                        continue
+            try:
+                content = read_file_bytes_no_follow(file_path)
+            except (OSError, ValueError, UnicodeError) as exc:
+                errors.append(f"{file_path.name}: Unable to read event file: {exc}")
+                continue
+            for line_num, line in enumerate(content.decode("utf-8").splitlines(), start=1):
+                raw = line.strip()
+                if not raw:
+                    continue
 
-                    event_count += 1
+                event_count += 1
 
-                    # 1. JSON parsing
-                    try:
-                        data = json.loads(raw)
-                    except Exception as exc:
-                        errors.append(f"{file_path.name}:{line_num}: Malformed JSON: {exc}")
-                        continue
+                # 1. JSON parsing
+                try:
+                    data = json.loads(raw)
+                except Exception as exc:
+                    errors.append(f"{file_path.name}:{line_num}: Malformed JSON: {exc}")
+                    continue
 
-                    # 2. Schema validation
-                    try:
-                        event = ProjectEvent.model_validate(data)
-                    except Exception as exc:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Schema validation error: {exc}"
-                        )
-                        continue
+                # 2. Schema validation
+                try:
+                    event = ProjectEvent.model_validate(data)
+                except Exception as exc:
+                    errors.append(f"{file_path.name}:{line_num}: Schema validation error: {exc}")
+                    continue
 
-                    # 3. Project ID match
-                    if event.project_id != self.project_id:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Project ID mismatch: expected '{self.project_id}', got '{event.project_id}'"
-                        )
+                # 3. Project ID match
+                if event.project_id != self.project_id:
+                    errors.append(
+                        f"{file_path.name}:{line_num}: Project ID mismatch: expected '{self.project_id}', got '{event.project_id}'"
+                    )
 
-                    # 4. Duplicate event ID
-                    if event.event_id in seen_event_ids:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Duplicate event_id '{event.event_id}'"
-                        )
-                    seen_event_ids.add(event.event_id)
+                # 4. Duplicate event ID
+                if event.event_id in seen_event_ids:
+                    errors.append(
+                        f"{file_path.name}:{line_num}: Duplicate event_id '{event.event_id}'"
+                    )
+                seen_event_ids.add(event.event_id)
 
-                    # 5. Strict sequence monotonicity
-                    if event.sequence != expected_sequence:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Broken sequence: expected {expected_sequence}, got {event.sequence}"
-                        )
+                # 5. Strict sequence monotonicity
+                if event.sequence != expected_sequence:
+                    errors.append(
+                        f"{file_path.name}:{line_num}: Broken sequence: expected {expected_sequence}, got {event.sequence}"
+                    )
 
-                    # 6. Prev event hash continuity
-                    if event.prev_event_hash != expected_prev_hash:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Broken prev_event_hash: expected '{expected_prev_hash}', got '{event.prev_event_hash}'"
-                        )
+                # 6. Prev event hash continuity
+                if event.prev_event_hash != expected_prev_hash:
+                    errors.append(
+                        f"{file_path.name}:{line_num}: Broken prev_event_hash: expected '{expected_prev_hash}', got '{event.prev_event_hash}'"
+                    )
 
-                    # 7. Payload digest verification
-                    expected_payload_digest = compute_payload_digest(event.payload)
-                    if event.payload_digest != expected_payload_digest:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Payload digest mismatch for {event.event_id}: expected '{expected_payload_digest}', got '{event.payload_digest}'"
-                        )
+                # 7. Payload digest verification
+                expected_payload_digest = compute_payload_digest(event.payload)
+                if event.payload_digest != expected_payload_digest:
+                    errors.append(
+                        f"{file_path.name}:{line_num}: Payload digest mismatch for {event.event_id}: expected '{expected_payload_digest}', got '{event.payload_digest}'"
+                    )
 
-                    # 8. Envelope hash verification
-                    expected_event_hash = compute_event_hash(event.model_dump())
-                    if event.event_hash != expected_event_hash:
-                        errors.append(
-                            f"{file_path.name}:{line_num}: Event hash mismatch for {event.event_id}: expected '{expected_event_hash}', got '{event.event_hash}'"
-                        )
+                # 8. Envelope hash verification
+                expected_event_hash = compute_event_hash(event.model_dump())
+                if event.event_hash != expected_event_hash:
+                    errors.append(
+                        f"{file_path.name}:{line_num}: Event hash mismatch for {event.event_id}: expected '{expected_event_hash}', got '{event.event_hash}'"
+                    )
 
-                    expected_sequence = event.sequence + 1
-                    expected_prev_hash = event.event_hash
-                    last_sequence = event.sequence
-                    last_event_hash = event.event_hash
+                expected_sequence = event.sequence + 1
+                expected_prev_hash = event.event_hash
+                last_sequence = event.sequence
+                last_event_hash = event.event_hash
 
         valid = len(errors) == 0
         return LedgerVerificationResult(

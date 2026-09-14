@@ -96,6 +96,21 @@ NO-GO
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
+### INFRA-1 current candidate gate
+
+INFRA-1 has a locally validated provisional implementation, but the gate is
+not closed. Local evidence is `2012 passed, 4 skipped, 17 deselected` at `82%`
+coverage, with Ruff, MyPy, package smoke, lock, pip, systemd, strict MkDocs,
+and diff checks passing. A fresh read-only review found no P0/P1 code blocker.
+
+The remaining admission conditions are an immutable GPG-signed candidate tuple,
+fresh exact-head protected CI/readback, and operator evidence for the actual
+non-root forced `rrsync` receiver. PR #419 remains the public transfer
+candidate; its latest observed head/tree are not the current local worktree,
+CodeQL remains failed, and deploy is skipped. Therefore INFRA-1 remains
+`ADMISSION CANDIDATE / PROVISIONAL`, Phase 5C remains blocked/not started, and
+POWER 3.8.0 remains NO-GO.
+
 ## Controlled Dependency Refresh
 
 The refresh is a sequence of independent gates, not one undifferentiated

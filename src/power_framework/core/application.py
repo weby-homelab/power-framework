@@ -15,7 +15,7 @@ import math
 import re
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -30,10 +30,13 @@ from .decision_service import DecisionService
 from .errors import ConflictError
 from .healer import heal_vault
 from .indexer import run_generate_hierarchical_index, run_generate_sub_index, scan_folder_notes
-from .infra_broker import InfraBrokerClient, InfraBrokerClientProtocol
+from .infra_broker import InfraBrokerClient, InfraBrokerClientProtocol, _request_digest
 from .infra_models import (
+    CAPABILITY_BY_OPERATION,
     InfraCapabilityBlockReceipt,
+    InfraExitCategory,
     InfraOperation,
+    InfraOperationReceipt,
     InfraReasonCode,
     InfraRequest,
     InfraResponse,
@@ -62,7 +65,8 @@ from .source_service import (
     read_source,
 )
 from .synthesize import synthesize_session_ingest
-from .task_service import TaskService
+from .task_models import PowerTask
+from .task_service import _INFRA_PROJECTION_TOKEN, TaskService
 from .utils import resolve_path_in_vault
 
 if TYPE_CHECKING:
@@ -93,6 +97,7 @@ FailureCode = Literal[
 ]
 
 MAX_RESULT_BYTES = 1_000_000
+MIN_INFRA_RESULT_BUDGET_BYTES = 4_096
 _EMPTY_RESULT_SHA256 = hashlib.sha256(b"").hexdigest()
 
 
@@ -1010,21 +1015,57 @@ class ApplicationService:
                     model_updates["external_refs"] = external_refs
                 if model_updates:
                     values["values"] = model_updates
+                supplied_nested_values = values.get("values")
+                if isinstance(supplied_nested_values, dict) and any(
+                    key.startswith("infra_")
+                    for key in supplied_nested_values
+                    if isinstance(key, str)
+                ):
+                    raise PermissionError(
+                        "Infrastructure task references are not writable through task facade"
+                    )
+                receipt_id_value = cast("str | None", values.pop("receipt_id", None))
+                completion_postcondition_value = cast(
+                    "str | None", values.pop("completion_postcondition", None)
+                )
+                completion_artifact_refs_value = cast(
+                    "list[str] | None",
+                    values.pop("completion_artifact_refs", changed_artifacts),
+                )
+                transition_kwargs: dict[str, Any] = {}
+                public_transition_fields = {
+                    "next_action",
+                    "assignee",
+                    "required_input",
+                    "open_gates",
+                    "error_ref",
+                    "max_attempts",
+                    "retry_at",
+                    "lease_owner",
+                    "lease_expires_at",
+                    "heartbeat_at",
+                    "execution_state",
+                    "dead_letter_reason",
+                    "due_at",
+                    "values",
+                }
+                for field_name in public_transition_fields:
+                    if field_name in values:
+                        transition_kwargs[field_name] = values.pop(field_name)
+                if values:
+                    raise ValueError(
+                        "task transition contains unsupported fields: " + ", ".join(sorted(values))
+                    )
                 return self.task_service.transition_task(
                     task_id,
                     new_state=cast("Any", new_state),
                     actor=request.actor,
                     expected_revision=expected_revision,
-                    receipt_id=cast("str | None", values.pop("receipt_id", None)),
-                    completion_postcondition=cast(
-                        "str | None", values.pop("completion_postcondition", None)
-                    ),
-                    completion_artifact_refs=cast(
-                        "list[str] | None",
-                        values.pop("completion_artifact_refs", changed_artifacts),
-                    ),
+                    receipt_id=receipt_id_value,
+                    completion_postcondition=completion_postcondition_value,
+                    completion_artifact_refs=completion_artifact_refs_value,
                     idempotency_key=request.idempotency_key,
-                    **values,
+                    **transition_kwargs,
                 ).model_dump()
             raise ValueError(f"unsupported task action: {action}")
 
@@ -1053,23 +1094,83 @@ class ApplicationService:
         request: InfraRequest,
         *,
         context: RequestContext | None = None,
-    ) -> InfraResponse:
-        """Execute one typed broker action and optionally project a block to a Task.
+    ) -> ApplicationEnvelope:
+        """Execute one typed broker action through the standard application envelope.
 
-        The application boundary deliberately has no SSH/rsync fallback.  A
-        missing broker remains a typed capability block, and a broker receipt
-        may update an explicitly bound Task through the existing state machine.
-        The broker, not the caller-supplied actor, derives the transport
-        principal and evaluates external-write approval.
+        The application boundary deliberately has no SSH/rsync fallback. A
+        missing broker remains a typed capability block. An optional Task
+        binding is checked against its current revision before the broker call;
+        a broker receipt is recorded as an external reference and never treated
+        as a canonical Task completion receipt.
         """
         if not isinstance(request, InfraRequest):
             raise TypeError("infra_action requires an InfraRequest")
-        if request.task_id:
+        sanitized_context = replace(context, idempotency_key=None) if context is not None else None
+        broker_request = request
+        task_claim_revision: int | None = None
+        new_task_claimed = False
+        if request.task_id and request.operation is InfraOperation.VERIFY:
             execution_context = self._mutation_context(
-                context,
+                sanitized_context,
+                operation="infra.verify",
+                require_apply=True,
+            )
+            execution_context = replace(execution_context, idempotency_key=None)
+            if self._deadline_expired(execution_context):
+                self._reject_request(
+                    "infra.verify",
+                    execution_context,
+                    DeadlineExceededError("application deadline exceeded before task verify"),
+                )
+            current_task = self.task_service.get_task(request.task_id)
+            if current_task is None:
+                self._reject_request(
+                    "infra.verify",
+                    execution_context,
+                    FileNotFoundError(f"Task {request.task_id} not found"),
+                )
+            if current_task.is_terminal():
+                self._reject_request(
+                    "infra.verify",
+                    execution_context,
+                    ConflictError("terminal tasks cannot be verified"),
+                )
+            if (
+                current_task.external_refs.get("infra_operation") != InfraOperation.REPLICATE.value
+                or current_task.external_refs.get("infra_run_id") != request.run_id
+                or current_task.external_refs.get("infra_manifest_digest") in {None, "none"}
+            ):
+                self._reject_request(
+                    "infra.verify",
+                    execution_context,
+                    ConflictError("task verify must bind the active replicate run"),
+                )
+            if current_task.revision != request.expected_revision:
+                self._reject_request(
+                    "infra.verify",
+                    execution_context,
+                    ConflictError("task revision changed before verify admission"),
+                )
+            broker_request = request
+        elif request.task_id:
+            execution_context = self._mutation_context(
+                sanitized_context,
                 operation=f"infra.{request.operation.value}",
                 require_apply=True,
             )
+            execution_context = replace(execution_context, idempotency_key=None)
+            if execution_context.max_result_bytes < MIN_INFRA_RESULT_BUDGET_BYTES:
+                self._reject_request(
+                    f"infra.{request.operation.value}",
+                    execution_context,
+                    ResultBudgetExceededError("infrastructure result budget is too small"),
+                )
+            if self._deadline_expired(execution_context):
+                self._reject_request(
+                    f"infra.{request.operation.value}",
+                    execution_context,
+                    DeadlineExceededError("application deadline exceeded before task claim"),
+                )
             current_task = self.task_service.get_task(request.task_id)
             if current_task is None:
                 self._reject_request(
@@ -1077,90 +1178,794 @@ class ApplicationService:
                     execution_context,
                     FileNotFoundError(f"Task {request.task_id} not found"),
                 )
-            if current_task.revision != request.expected_revision:
+            if current_task.is_terminal():
                 self._reject_request(
                     f"infra.{request.operation.value}",
                     execution_context,
-                    ConflictError("task revision changed before broker admission"),
+                    ConflictError("terminal tasks cannot start infrastructure execution"),
+                )
+            if current_task.state == "backlog":
+                self._reject_request(
+                    f"infra.{request.operation.value}",
+                    execution_context,
+                    ConflictError("task-bound infrastructure action requires a ready task"),
+                )
+            if request.idempotency_key is None:
+                self._reject_request(
+                    f"infra.{request.operation.value}",
+                    execution_context,
+                    ValueError("task-bound infrastructure action requires idempotency_key"),
+                )
+            claim_key = (
+                "infra-claim-" + hashlib.sha256(request.idempotency_key.encode("utf-8")).hexdigest()
+            )
+            intent_digest = _request_digest(request)
+            active_claim_key = current_task.external_refs.get("infra_claim_key_ref")
+            active_claim_intent = current_task.external_refs.get("infra_claim_intent_digest")
+            if (
+                active_claim_key is not None
+                and current_task.execution_state in {"leased", "running"}
+                and (active_claim_key != claim_key or active_claim_intent != intent_digest)
+            ):
+                self._reject_request(
+                    f"infra.{request.operation.value}",
+                    execution_context,
+                    ConflictError("active infrastructure claim requires reconciliation"),
+                )
+            prior_claim = self._find_infra_task_claim(request.task_id, claim_key, intent_digest)
+            if prior_claim is not None:
+                if current_task.revision == prior_claim.revision:
+                    claimed_revision = prior_claim.revision
+                elif (
+                    current_task.revision == prior_claim.revision + 1
+                    and self._last_task_event_is_infra_projection(request.task_id, intent_digest)
+                ):
+                    # The prior call projected a bounded block. Re-admit the
+                    # same intent at the new CAS revision; the broker's own
+                    # idempotency key remains unchanged and excludes Task
+                    # metadata, so this cannot create a second replicate.
+                    claimed_revision = current_task.revision
+                else:
+                    self._reject_request(
+                        f"infra.{request.operation.value}",
+                        execution_context,
+                        ConflictError("task claim has already advanced; reconcile before retry"),
+                    )
+                broker_request = request.model_copy(update={"expected_revision": claimed_revision})
+            else:
+                if current_task.revision != request.expected_revision:
+                    self._reject_request(
+                        f"infra.{request.operation.value}",
+                        execution_context,
+                        ConflictError("task revision changed before broker admission"),
+                    )
+                if self._deadline_expired(execution_context):
+                    self._reject_request(
+                        f"infra.{request.operation.value}",
+                        execution_context,
+                        DeadlineExceededError("application deadline exceeded before task claim"),
+                    )
+                claimed_task = self.task_service.transition_task(
+                    request.task_id,
+                    new_state=current_task.state,
+                    actor=execution_context.actor,
+                    expected_revision=request.expected_revision,
+                    idempotency_key=claim_key,
+                    _projection_token=_INFRA_PROJECTION_TOKEN,
+                    values={
+                        "execution_state": "leased",
+                        "external_refs": {
+                            **{
+                                key: value
+                                for key, value in current_task.external_refs.items()
+                                if not key.startswith("infra_")
+                            },
+                            "infra_operation": request.operation.value,
+                            "infra_claim_key_ref": claim_key,
+                            "infra_claim_intent_digest": intent_digest,
+                        },
+                    },
+                )
+                task_claim_revision = claimed_task.revision
+                new_task_claimed = True
+                if self._deadline_expired(execution_context):
+                    self._release_unstarted_task_claim(
+                        request,
+                        claimed_task.revision,
+                        execution_context,
+                    )
+                    self._reject_request(
+                        f"infra.{request.operation.value}",
+                        execution_context,
+                        DeadlineExceededError("application deadline exceeded during task claim"),
+                    )
+                broker_request = request.model_copy(
+                    update={"expected_revision": claimed_task.revision}
                 )
         elif request.operation == InfraOperation.REPLICATE:
             execution_context = self._mutation_context(
-                context,
+                sanitized_context,
                 operation="infra.replicate",
                 require_apply=True,
             )
+            execution_context = replace(execution_context, idempotency_key=None)
         else:
-            execution_context = context or RequestContext()
-        response = self.infra_broker.execute(request)
-        if request.task_id and isinstance(response.receipt, InfraCapabilityBlockReceipt):
-            self._project_infra_block(request, response, execution_context)
-        return response
+            execution_context = sanitized_context or RequestContext()
+        if (
+            request.task_id is None
+            and execution_context.max_result_bytes < MIN_INFRA_RESULT_BUDGET_BYTES
+        ):
+            self._reject_request(
+                f"infra.{request.operation.value}",
+                execution_context,
+                ResultBudgetExceededError("infrastructure result budget is too small"),
+            )
+
+        def execute() -> dict[str, object]:
+            if new_task_claimed and self._deadline_expired(execution_context):
+                if task_claim_revision is not None:
+                    self._release_unstarted_task_claim(
+                        request,
+                        task_claim_revision,
+                        execution_context,
+                    )
+                raise DeadlineExceededError("application deadline exceeded before broker call")
+            status_method = getattr(self.infra_broker, "status", None)
+            response = (
+                status_method()
+                if broker_request.operation is InfraOperation.STATUS and callable(status_method)
+                else self.infra_broker.execute(broker_request)
+            )
+            if not isinstance(response, InfraResponse):
+                raise ValueError("infra broker returned an invalid response object")
+            if (
+                response.operation is not broker_request.operation
+                or response.target != broker_request.target
+                or response.profile != broker_request.profile
+                or response.task_id != broker_request.task_id
+                or response.request_digest != _request_digest(broker_request)
+            ):
+                raise ValueError("infra broker response is not bound to the request")
+            if new_task_claimed and self._deadline_expired(execution_context):
+                committed = isinstance(
+                    response.receipt, InfraOperationReceipt
+                ) and response.receipt.exit_category in {
+                    InfraExitCategory.SUCCESS,
+                    InfraExitCategory.REPLAY,
+                }
+                uncertain = isinstance(
+                    response.receipt, InfraCapabilityBlockReceipt
+                ) and response.receipt.reason_code in {
+                    InfraReasonCode.UNKNOWN_COMPLETION,
+                    InfraReasonCode.OPERATION_IN_FLIGHT,
+                }
+                if broker_request.operation is InfraOperation.REPLICATE:
+                    if committed or uncertain:
+                        # Let the projection persist the broker evidence; the
+                        # surrounding _run call will then report the late
+                        # mutation as CompletedAfterDeadline.
+                        pass
+                    else:
+                        if task_claim_revision is not None:
+                            self._release_unstarted_task_claim(
+                                request,
+                                task_claim_revision,
+                                execution_context,
+                            )
+                        raise DeadlineExceededError(
+                            "application deadline exceeded before broker result projection"
+                        )
+                else:
+                    if task_claim_revision is not None:
+                        self._release_unstarted_task_claim(
+                            request,
+                            task_claim_revision,
+                            execution_context,
+                        )
+                    raise DeadlineExceededError(
+                        "application deadline exceeded before broker result projection"
+                    )
+            projection: dict[str, object] | None = None
+            if broker_request.task_id:
+                try:
+                    if isinstance(response.receipt, InfraCapabilityBlockReceipt):
+                        projection = self._project_infra_block(
+                            broker_request, response, execution_context
+                        )
+                    else:
+                        projection = self._project_infra_receipt(
+                            broker_request, response, execution_context
+                        )
+                except ConflictError:
+                    projection = (
+                        self._retry_infra_block_projection(
+                            broker_request, response, execution_context
+                        )
+                        if isinstance(response.receipt, InfraCapabilityBlockReceipt)
+                        else self._reconcile_infra_task_projection(
+                            broker_request.task_id, response.receipt.receipt_id
+                        )
+                    )
+            receipt = response.receipt
+            result_state = response.status.value
+            if isinstance(receipt, InfraCapabilityBlockReceipt):
+                if receipt.reason_code is InfraReasonCode.REQUEST_INPUT_MISSING:
+                    result_state = "input-required"
+                elif receipt.reason_code is InfraReasonCode.APPROVAL_REQUIRED:
+                    result_state = "auth-required"
+                else:
+                    result_state = "blocked"
+                execution_outcome = receipt.reason_code.value
+            else:
+                execution_outcome = receipt.exit_category.value
+            if projection is not None:
+                result_state = str(projection["state"])
+            result: dict[str, object] = {
+                "infra": response.model_dump(mode="json"),
+                "state": result_state,
+                "task_state": projection.get("state") if projection is not None else None,
+                "execution_state": (
+                    projection.get("execution_state") if projection is not None else None
+                ),
+                "execution_outcome": execution_outcome,
+                "required_input": (
+                    {"target": "target", "profile": "profile"}
+                    if isinstance(receipt, InfraCapabilityBlockReceipt)
+                    and receipt.reason_code is InfraReasonCode.REQUEST_INPUT_MISSING
+                    else None
+                ),
+                "open_gates": (
+                    [receipt.required_capability]
+                    if isinstance(receipt, InfraCapabilityBlockReceipt)
+                    and receipt.reason_code
+                    not in {
+                        InfraReasonCode.REQUEST_INPUT_MISSING,
+                        InfraReasonCode.UNKNOWN_COMPLETION,
+                        InfraReasonCode.OPERATION_IN_FLIGHT,
+                    }
+                    else []
+                ),
+                "error_ref": (
+                    receipt.receipt_id if isinstance(receipt, InfraCapabilityBlockReceipt) else None
+                ),
+                "receipt_ids": [receipt.receipt_id],
+                "actual_capability": (
+                    receipt.required_capability
+                    if isinstance(receipt, InfraCapabilityBlockReceipt)
+                    else CAPABILITY_BY_OPERATION[broker_request.operation]
+                ),
+                "source_revision": (
+                    receipt.policy_revision
+                    if isinstance(receipt, (InfraCapabilityBlockReceipt, InfraOperationReceipt))
+                    else None
+                ),
+                "degraded_reason": (
+                    receipt.reason_code.value
+                    if isinstance(receipt, InfraCapabilityBlockReceipt)
+                    else None
+                ),
+            }
+            if projection is not None:
+                result["task_projection"] = projection
+            return result
+
+        return self._run(
+            f"infra.{request.operation.value}",
+            execution_context,
+            execute,
+            mutation=request.operation is InfraOperation.REPLICATE or request.task_id is not None,
+        )
+
+    def _release_unstarted_task_claim(
+        self,
+        request: InfraRequest,
+        claimed_revision: int,
+        context: RequestContext,
+    ) -> None:
+        """Clear a lease when the application deadline expires before broker start."""
+
+        task_id = request.task_id
+        if task_id is None:
+            return
+        current = self.task_service.get_task(task_id)
+        if current is None or current.revision != claimed_revision:
+            return
+        cleanup_key = (
+            "infra-deadline-" + hashlib.sha256(_request_digest(request).encode("utf-8")).hexdigest()
+        )
+        self.task_service.transition_task(
+            task_id,
+            new_state=current.state,
+            actor=context.actor,
+            expected_revision=claimed_revision,
+            idempotency_key=cleanup_key,
+            values={
+                "execution_state": "none",
+                "external_refs": {
+                    **current.external_refs,
+                    "infra_claim_aborted": "deadline-before-broker",
+                },
+            },
+            _projection_token=_INFRA_PROJECTION_TOKEN,
+        )
+
+    def _find_infra_task_claim(
+        self, task_id: str, claim_key: str, intent_digest: str
+    ) -> PowerTask | None:
+        """Find a prior deterministic Task claim before comparing the caller revision."""
+
+        for event in reversed(self.task_service.get_events(task_id)):
+            if event.event_type != "state_transition":
+                continue
+            if event.payload.get("idempotency_key") != claim_key:
+                continue
+            result = event.payload.get("result")
+            if not isinstance(result, dict):
+                continue
+            try:
+                candidate = PowerTask.model_validate(result)
+            except (TypeError, ValueError):
+                continue
+            if (
+                candidate.external_refs.get("infra_claim_key_ref") == claim_key
+                and candidate.external_refs.get("infra_claim_intent_digest") == intent_digest
+            ):
+                return candidate
+        return None
+
+    def _last_task_event_is_infra_projection(self, task_id: str, intent_digest: str) -> bool:
+        """Recognize only the adapter's own immediately preceding projection."""
+
+        events = self.task_service.get_events(task_id)
+        if not events:
+            return False
+        result = events[-1].payload.get("result")
+        if not isinstance(result, dict):
+            return False
+        external_refs = result.get("external_refs")
+        return (
+            str(events[-1].payload.get("idempotency_key", "")).startswith(
+                ("infra-result-", "infra-resolve-", "infra-deadline-")
+            )
+            and isinstance(external_refs, dict)
+            and external_refs.get("infra_claim_intent_digest") == intent_digest
+        )
 
     def _project_infra_block(
         self,
         request: InfraRequest,
         response: InfraResponse,
         context: RequestContext,
-    ) -> None:
-        """Reference a block receipt through existing Task v2 fields only."""
+        *,
+        store_lock_fallback: bool = False,
+    ) -> dict[str, object]:
+        """Reference a block receipt without inventing a Task state."""
         task_id = request.task_id
         if task_id is None:
             raise ValueError("task-bound infrastructure block requires task_id")
-        if request.expected_revision is None:
+        if request.expected_revision is None and not store_lock_fallback:
             raise ValueError("task-bound infrastructure action requires expected_revision")
         if context.authority != "apply":
             raise PermissionError("task-bound infrastructure action requires apply authority")
         receipt = response.receipt
         if not isinstance(receipt, InfraCapabilityBlockReceipt):
-            return
+            return {}
+        current = self.task_service.get_task(task_id)
+        if current is None:
+            raise FileNotFoundError(f"Task {task_id} not found")
+        claim_key = (
+            "infra-claim-" + hashlib.sha256(request.idempotency_key.encode("utf-8")).hexdigest()
+            if request.idempotency_key is not None
+            else ""
+        )
+        claim_intent_digest = _request_digest(request)
+        if request.operation is InfraOperation.VERIFY:
+            claim_key = current.external_refs.get("infra_claim_key_ref", "")
+            claim_intent_digest = current.external_refs.get("infra_claim_intent_digest", "")
+            if (
+                current.external_refs.get("infra_operation") != InfraOperation.REPLICATE.value
+                or current.external_refs.get("infra_run_id") != request.run_id
+                or current.external_refs.get("infra_manifest_digest") in {None, "none"}
+            ):
+                return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
+        if store_lock_fallback:
+            if request.idempotency_key is None:
+                return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
+            if (
+                current.external_refs.get("infra_claim_key_ref") != claim_key
+                or current.external_refs.get("infra_claim_intent_digest") != claim_intent_digest
+            ):
+                return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
         if receipt.reason_code == InfraReasonCode.REQUEST_INPUT_MISSING:
-            new_state = "input-required"
+            desired_state = "input-required"
             required_input: dict[str, Any] | None = {
                 "required_fields": ["target", "profile"],
-                "receipt_id": receipt.receipt_id,
             }
             execution_state = "none"
         elif receipt.reason_code == InfraReasonCode.APPROVAL_REQUIRED:
-            new_state = "auth-required"
+            desired_state = "auth-required"
             required_input = None
             execution_state = "none"
+        elif receipt.reason_code in {
+            InfraReasonCode.UNKNOWN_COMPLETION,
+            InfraReasonCode.OPERATION_IN_FLIGHT,
+        }:
+            # The external outcome is unknown; do not falsely say that a
+            # capability is absent or transition a working task to blocked.
+            desired_state = current.state
+            required_input = None
+            execution_state = "leased"
         else:
-            new_state = "blocked"
+            desired_state = "blocked"
             required_input = None
             execution_state = (
                 "waiting-network"
                 if receipt.reason_code == InfraReasonCode.NETWORK_UNAVAILABLE
                 else "none"
             )
-        current = self.task_service.get_task(task_id)
-        if current is None:
-            raise FileNotFoundError(f"Task {task_id} not found")
-        transition_required_input = required_input
-        if transition_required_input is None and current.required_input is not None:
-            transition_required_input = {}
+        intent_digest = _request_digest(request)
+        projection_key = (
+            "infra-result-"
+            + hashlib.sha256(f"{intent_digest}:{receipt.reason_code.value}".encode()).hexdigest()
+        )
+        prior_projection = self._find_infra_task_projection(task_id, projection_key)
+        if prior_projection is not None:
+            if not (
+                receipt.run_id
+                and receipt.source_manifest_digest
+                and current.external_refs.get("infra_run_id") in {None, "none"}
+            ):
+                return prior_projection
+            projection_key = (
+                "infra-resolve-"
+                + hashlib.sha256(
+                    f"{intent_digest}:{receipt.run_id}:{receipt.source_manifest_digest}".encode()
+                ).hexdigest()
+            )
+            prior_resolution = self._find_infra_task_projection(task_id, projection_key)
+            if prior_resolution is not None:
+                return prior_resolution
+        if current.state in {"completed", "failed", "canceled", "rejected"}:
+            return {
+                "task_id": task_id,
+                "state": current.state,
+                "execution_state": current.execution_state,
+                "receipt_id": receipt.receipt_id,
+                "projection": "terminal-task-fenced",
+            }
+        transition_allowed = current.can_transition_to(cast("Any", desired_state))
+        new_state = desired_state if transition_allowed else current.state
         open_gates = list(current.open_gates)
-        if receipt.required_capability not in open_gates:
+        if (
+            isinstance(receipt, InfraCapabilityBlockReceipt)
+            and receipt.reason_code
+            not in {InfraReasonCode.UNKNOWN_COMPLETION, InfraReasonCode.OPERATION_IN_FLIGHT}
+            and receipt.required_capability not in open_gates
+        ):
             open_gates.append(receipt.required_capability)
         values: dict[str, Any] = {
             "execution_state": execution_state,
+            "required_input": required_input,
             "external_refs": {
                 **current.external_refs,
                 "infra_reason_code": receipt.reason_code.value,
                 "infra_broker_status": receipt.broker_status,
+                "infra_run_id": receipt.run_id or "none",
+                "infra_manifest_digest": receipt.source_manifest_digest or "none",
+                "infra_profile_id": request.profile or "none",
+                "infra_target_id": request.target or "none",
+                "infra_block_receipt_id": receipt.receipt_id,
             },
         }
-        self.task_service.transition_task(
-            task_id,
-            new_state=new_state,  # type: ignore[arg-type]
-            actor=context.actor,
-            expected_revision=request.expected_revision,
-            receipt_id=receipt.receipt_id,
-            idempotency_key=request.idempotency_key,
-            required_input=transition_required_input,
-            open_gates=open_gates,
-            error_ref=receipt.receipt_id,
-            values=values,
+        if not transition_allowed and desired_state != current.state:
+            values["external_refs"]["infra_projection_state"] = "state-preserved-illegal-transition"
+        try:
+            self.task_service.transition_task(
+                task_id,
+                new_state=new_state,  # type: ignore[arg-type]
+                actor=context.actor,
+                expected_revision=request.expected_revision,
+                receipt_id=receipt.receipt_id,
+                idempotency_key=projection_key,
+                open_gates=open_gates,
+                error_ref=receipt.receipt_id,
+                _projection_token=_INFRA_PROJECTION_TOKEN,
+                values=values,
+            )
+        except ValueError:
+            prior_projection = self._find_infra_task_projection(task_id, projection_key)
+            if prior_projection is None:
+                raise
+            return prior_projection
+        return {
+            "task_id": task_id,
+            "state": new_state,
+            "execution_state": execution_state,
+            "receipt_id": receipt.receipt_id,
+            "projection": (
+                "state-preserved-illegal-transition"
+                if not transition_allowed and desired_state != current.state
+                else "applied"
+            ),
+        }
+
+    def _reconcile_infra_task_projection(self, task_id: str, receipt_id: str) -> dict[str, object]:
+        """Return a bounded reconciliation marker when Task CAS loses a race."""
+
+        current = self.task_service.get_task(task_id)
+        if current is None:
+            raise FileNotFoundError(f"Task {task_id} not found")
+        return {
+            "task_id": task_id,
+            "state": current.state,
+            "execution_state": current.execution_state,
+            "receipt_id": receipt_id,
+            "projection": "cas-conflict-reconcile-required",
+        }
+
+    def _retry_infra_block_projection(
+        self,
+        request: InfraRequest,
+        response: InfraResponse,
+        context: RequestContext,
+    ) -> dict[str, object]:
+        """Retry a block projection against the latest Task revision before reconciling."""
+
+        task_id = request.task_id
+        if task_id is None:
+            raise ValueError("infra block projection requires task_id")
+        for _attempt in range(3):
+            current = self.task_service.get_task(task_id)
+            if current is None:
+                raise FileNotFoundError(f"Task {task_id} not found")
+            updated_request = request.model_copy(update={"expected_revision": current.revision})
+            try:
+                return self._project_infra_block(updated_request, response, context)
+            except ConflictError:
+                continue
+        current = self.task_service.get_task(task_id)
+        if current is None:
+            raise FileNotFoundError(f"Task {task_id} not found")
+        with self.task_service.store.lock():
+            current = self.task_service.get_task(task_id)
+            if current is None:
+                raise FileNotFoundError(f"Task {task_id} not found")
+            return self._project_infra_block(
+                request.model_copy(update={"expected_revision": current.revision}),
+                response,
+                context,
+                store_lock_fallback=True,
+            )
+
+    def _find_infra_task_projection(
+        self, task_id: str, projection_key: str
+    ) -> dict[str, object] | None:
+        """Replay an adapter projection without creating another Task revision."""
+
+        for event in reversed(self.task_service.get_events(task_id)):
+            if event.event_type != "state_transition":
+                continue
+            if event.payload.get("idempotency_key") != projection_key:
+                continue
+            result = event.payload.get("result")
+            if not isinstance(result, dict):
+                continue
+            try:
+                task = PowerTask.model_validate(result)
+            except (TypeError, ValueError):
+                continue
+            return {
+                "task_id": task_id,
+                "state": task.state,
+                "execution_state": task.execution_state,
+                "receipt_id": next(
+                    (
+                        receipt_id
+                        for receipt_id in reversed(task.receipt_ids)
+                        if receipt_id.startswith(("ibr_", "ir_"))
+                    ),
+                    "unknown",
+                ),
+                "projection": "replay",
+            }
+        return None
+
+    def _project_infra_receipt(
+        self,
+        request: InfraRequest,
+        response: InfraResponse,
+        context: RequestContext,
+    ) -> dict[str, object]:
+        """Attach an infra receipt while leaving Task completion governed."""
+
+        task_id = request.task_id
+        if task_id is None or request.expected_revision is None:
+            raise ValueError("task-bound infrastructure receipt requires task binding")
+        receipt = response.receipt
+        if not isinstance(receipt, InfraOperationReceipt):
+            return {}
+        intent_digest = _request_digest(request)
+        projection_key = (
+            "infra-result-"
+            + hashlib.sha256(
+                f"{intent_digest}:{request.operation.value}:receipt".encode()
+            ).hexdigest()
         )
+        if request.idempotency_key is None:
+            return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
+        claim_key = (
+            "infra-claim-" + hashlib.sha256(request.idempotency_key.encode("utf-8")).hexdigest()
+        )
+        for _attempt in range(3):
+            current = self.task_service.get_task(task_id)
+            if current is None:
+                raise FileNotFoundError(f"Task {task_id} not found")
+            task_claim_key = claim_key
+            task_claim_intent_digest = intent_digest
+            if request.operation is InfraOperation.VERIFY:
+                task_claim_key = current.external_refs.get("infra_claim_key_ref", "")
+                task_claim_intent_digest = current.external_refs.get(
+                    "infra_claim_intent_digest", ""
+                )
+                if (
+                    current.external_refs.get("infra_operation") != InfraOperation.REPLICATE.value
+                    or current.external_refs.get("infra_run_id") != request.run_id
+                    or current.external_refs.get("infra_manifest_digest") in {None, "none"}
+                ):
+                    return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
+            prior_projection = self._find_infra_task_projection(task_id, projection_key)
+            if prior_projection is not None:
+                return prior_projection
+            if (
+                current.external_refs.get("infra_claim_key_ref") != task_claim_key
+                or current.external_refs.get("infra_claim_intent_digest")
+                != task_claim_intent_digest
+            ):
+                return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
+            if current.state in {"completed", "failed", "canceled", "rejected"}:
+                return {
+                    "task_id": task_id,
+                    "state": current.state,
+                    "execution_state": current.execution_state,
+                    "receipt_id": receipt.receipt_id,
+                    "projection": "terminal-task-fenced",
+                }
+            execution_state = "running" if request.operation is InfraOperation.REPLICATE else "none"
+            external_refs = {
+                **current.external_refs,
+                "infra_policy_revision": receipt.policy_revision,
+            }
+            if request.operation is InfraOperation.REPLICATE:
+                external_refs.update(
+                    {
+                        "infra_receipt_id": receipt.receipt_id,
+                        "infra_run_id": receipt.run_id or "none",
+                        "infra_manifest_digest": receipt.source_manifest_digest or "none",
+                        "infra_profile_id": receipt.profile_id or "none",
+                        "infra_target_id": receipt.target_id or "none",
+                    }
+                )
+            elif request.operation is InfraOperation.VERIFY:
+                external_refs.update(
+                    {
+                        "infra_verify_receipt_id": receipt.receipt_id,
+                        "infra_verify_run_id": receipt.run_id or "none",
+                        "infra_verify_manifest_digest": receipt.source_manifest_digest or "none",
+                        "infra_verify_profile_id": receipt.profile_id or "none",
+                        "infra_verify_target_id": receipt.target_id or "none",
+                        "infra_verify_status": receipt.verification_result or "unknown",
+                    }
+                )
+            else:
+                external_refs.update(
+                    {
+                        "infra_receipt_id": receipt.receipt_id,
+                        "infra_run_id": receipt.run_id or "none",
+                        "infra_manifest_digest": receipt.source_manifest_digest or "none",
+                        "infra_profile_id": receipt.profile_id or "none",
+                        "infra_target_id": receipt.target_id or "none",
+                    }
+                )
+            try:
+                updated = self.task_service.transition_task(
+                    task_id,
+                    new_state=current.state,
+                    actor=context.actor,
+                    expected_revision=current.revision,
+                    receipt_id=receipt.receipt_id,
+                    idempotency_key=projection_key,
+                    _projection_token=_INFRA_PROJECTION_TOKEN,
+                    values={"execution_state": execution_state, "external_refs": external_refs},
+                )
+            except ConflictError:
+                continue
+            return {
+                "task_id": task_id,
+                "state": updated.state,
+                "execution_state": updated.execution_state,
+                "receipt_id": receipt.receipt_id,
+                "projection": "applied-after-cas-retry" if _attempt else "applied",
+            }
+        current = self.task_service.get_task(task_id)
+        if current is None:
+            raise FileNotFoundError(f"Task {task_id} not found")
+        task_claim_key = claim_key
+        task_claim_intent_digest = intent_digest
+        if request.operation is InfraOperation.VERIFY:
+            task_claim_key = current.external_refs.get("infra_claim_key_ref", "")
+            task_claim_intent_digest = current.external_refs.get("infra_claim_intent_digest", "")
+        if (
+            current.external_refs.get("infra_claim_key_ref") != task_claim_key
+            or current.external_refs.get("infra_claim_intent_digest") != task_claim_intent_digest
+        ):
+            return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
+        fallback_refs = {
+            "infra_policy_revision": receipt.policy_revision,
+            "infra_projection_state": "applied-under-store-lock",
+        }
+        if request.operation is InfraOperation.REPLICATE:
+            fallback_refs.update(
+                {
+                    "infra_receipt_id": receipt.receipt_id,
+                    "infra_run_id": receipt.run_id or "none",
+                    "infra_manifest_digest": receipt.source_manifest_digest or "none",
+                    "infra_profile_id": receipt.profile_id or "none",
+                    "infra_target_id": receipt.target_id or "none",
+                }
+            )
+        elif request.operation is InfraOperation.VERIFY:
+            fallback_refs.update(
+                {
+                    "infra_verify_receipt_id": receipt.receipt_id,
+                    "infra_verify_run_id": receipt.run_id or "none",
+                    "infra_verify_manifest_digest": receipt.source_manifest_digest or "none",
+                    "infra_verify_profile_id": receipt.profile_id or "none",
+                    "infra_verify_target_id": receipt.target_id or "none",
+                    "infra_verify_status": receipt.verification_result or "unknown",
+                }
+            )
+        else:
+            fallback_refs.update(
+                {
+                    "infra_receipt_id": receipt.receipt_id,
+                    "infra_run_id": receipt.run_id or "none",
+                    "infra_manifest_digest": receipt.source_manifest_digest or "none",
+                    "infra_profile_id": receipt.profile_id or "none",
+                    "infra_target_id": receipt.target_id or "none",
+                }
+            )
+        try:
+            updated = self.task_service.transition_task(
+                task_id,
+                new_state=current.state,
+                actor=context.actor,
+                expected_revision=None,
+                receipt_id=receipt.receipt_id,
+                idempotency_key=projection_key,
+                required_claim_key=task_claim_key,
+                required_claim_intent_digest=task_claim_intent_digest,
+                external_ref_updates=fallback_refs,
+                _projection_token=_INFRA_PROJECTION_TOKEN,
+                values={
+                    "execution_state": (
+                        "running" if request.operation is InfraOperation.REPLICATE else "none"
+                    ),
+                },
+            )
+        except ConflictError:
+            return self._reconcile_infra_task_projection(task_id, receipt.receipt_id)
+        except ValueError:
+            prior_projection = self._find_infra_task_projection(task_id, projection_key)
+            if prior_projection is None:
+                raise
+            return prior_projection
+        return {
+            "task_id": task_id,
+            "state": updated.state,
+            "execution_state": updated.execution_state,
+            "receipt_id": receipt.receipt_id,
+            "projection": "applied-under-store-lock",
+        }
 
     def receipt(
         self,
@@ -1369,7 +2174,14 @@ class ApplicationService:
         priority: str = "normal",
         authority: str = "read-only",
         context: RequestContext | None = None,
-        **kwargs: Any,
+        kind: str = "human",
+        scope: list[str] | None = None,
+        dependencies: list[str] | None = None,
+        source_revision: str = "",
+        next_action: str = "inspect",
+        open_gates: list[str] | None = None,
+        required_input: dict[str, Any] | None = None,
+        due_at: str | None = None,
     ) -> ApplicationEnvelope:
         """Create a durable Task v2."""
         request = self._mutation_context(context, operation="task.create")
@@ -1393,7 +2205,14 @@ class ApplicationService:
                 authority=authority,  # type: ignore[arg-type]
                 actor=request.actor,
                 idempotency_key=request.idempotency_key,
-                **kwargs,
+                kind=kind,  # type: ignore[arg-type]
+                scope=scope,
+                dependencies=dependencies,
+                source_revision=source_revision,
+                next_action=next_action,
+                open_gates=open_gates,
+                required_input=required_input,
+                due_at=due_at,
             ).model_dump(),
             mutation=True,
         )
@@ -1406,8 +2225,14 @@ class ApplicationService:
         expected_revision: int | None = None,
         receipt_id: str | None = None,
         next_action: str | None = None,
+        assignee: str | None = None,
+        open_gates: list[str] | None = None,
+        error_ref: str | None = None,
+        required_input: dict[str, Any] | None = None,
+        completion_postcondition: str | None = None,
+        completion_artifact_refs: list[str] | None = None,
+        values: dict[str, Any] | None = None,
         context: RequestContext | None = None,
-        **kwargs: Any,
     ) -> ApplicationEnvelope:
         """Advance a Task v2 state."""
         request = self._mutation_context(
@@ -1440,8 +2265,14 @@ class ApplicationService:
                 expected_revision=expected_revision,
                 receipt_id=receipt_id,
                 next_action=next_action,
+                assignee=assignee,
+                open_gates=open_gates,
+                error_ref=error_ref,
+                required_input=required_input,
+                completion_postcondition=completion_postcondition,
+                completion_artifact_refs=completion_artifact_refs,
                 idempotency_key=request.idempotency_key,
-                **kwargs,
+                values=values,
             ).model_dump(),
             mutation=True,
         )

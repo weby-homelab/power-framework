@@ -112,3 +112,112 @@ Complete the remaining local security/systemd/Task/MCP regression matrix, run
 the full hermetic quality gate, inspect the complete dual-sided diff, create a
 GPG-signed candidate commit, publish the PR, and admit only the exact head with
 all required protected contexts. Do not start Phase 5C.
+
+## Append-only continuation — local validation, not a candidate epoch
+
+This addendum supersedes no historical evidence and does not claim a published
+candidate. The earlier `EPOCH_1_HEAD` block above is stale for the current local
+worktree and must not be used as provenance for the changes below.
+
+```text
+LOCAL_OBSERVED_AT_UTC: 2026-09-13T23:25:47Z
+LOCAL_WORKTREE: /root/gemma/projects/P.O.W.E.R-INFRA-1
+LOCAL_BASE_HEAD: ace5d6351dd599578491023419140b6a79bd6b7f
+LOCAL_IMPLEMENTATION_EPOCH: uncommitted worktree; no candidate commit published
+LOCAL_DIRTY_ENTRY_COUNT: 55
+REMOTE_READBACK_AT_UTC: 2026-09-13T23:26:08Z
+REMOTE_PR: #419
+REMOTE_BASE_SHA: 6a315d5919eeef797bc506ecb216313c20419fc2
+REMOTE_HEAD_SHA: 62323a930189c7afea497a984bdf6858011dfa09
+REMOTE_HEAD_TREE: 3529bdb7beb71678daf14865079e1852e6d3c750
+REMOTE_HEAD_PARENT: dcf27b55e3e5bfeb285fc93ed73a485ce0f707fb
+REMOTE_HEAD_GPG: verified=true
+REMOTE_PR_STATE: open / mergeable=true / mergeable_state=blocked
+REMOTE_REQUIRED_CHECKS: all green except CodeQL=failure; deploy=skipped
+```
+
+## Continuation validation
+
+The current uncommitted implementation was validated locally with:
+
+```text
+FULL_HERMETIC_GATE: 2004 passed, 4 skipped, 17 deselected, 5 warnings
+COVERAGE: 82%
+TARGETED_INFRA_GATE: 79 passed
+RUFF_CHECK: PASS
+RUFF_FORMAT_CHECK: PASS
+MYPY_SRC: PASS
+UV_LOCK_CHECK: PASS
+UV_SYNC_LOCKED_AND_PIP_CHECK: PASS
+PACKAGE_WHEEL_SDIST_SMOKE: PASS / version=3.7.11 / queries=16
+PIP_AUDIT: no known vulnerabilities; local distribution not on PyPI
+MKDOCS_STRICT: PASS
+DOC_DRIFT: PASS with repository POWER_GLOBAL_SKILL_PATH
+SYSTEMD_ANALYZE_VERIFY: PASS; unrelated xfs CPUAccounting warnings only
+REAL_RECEIVER_EVIDENCE: unavailable
+REAL_REPLICATE: NOT RUN
+```
+
+The code continuation includes durable dry-run receipt gating, type-aware
+read-only verify inventory and digest pulls, prepared-admission recovery and
+expiry rollback, source directory/file bounds, fsync publication, bounded
+connection handling, strict caller JSON ACL, and explicit systemd interpreter
+checks. Publication, remote check refresh, receiver evidence, protected merge,
+and Phase 5C remain blocked.
+
+## Append-only continuation — final local candidate validation
+
+This addendum records the later local implementation and documentation work. It
+does not replace the stale candidate epoch above and does not claim `REMOTE
+EXACT-HEAD` or `MERGED MAIN` status.
+
+```text
+LOCAL_OBSERVED_AT_UTC: 2026-09-14T16:17:31Z
+LOCAL_BASE_HEAD: ace5d6351dd599578491023419140b6a79bd6b7f
+LOCAL_WORKTREE: dirty / uncommitted / 55+ changed-or-untracked entries
+LOCAL_CANDIDATE_PROVENANCE: no signed candidate commit or immutable tuple
+REMOTE_MAIN_SHA: 6a315d5919eeef797bc506ecb216313c20419fc2
+REMOTE_MAIN_TREE: a03b90648e1e57c5a579e5834988015192027cb0
+REMOTE_PR: #419
+REMOTE_PR_HEAD: 62323a930189c7afea497a984bdf6858011dfa09
+REMOTE_PR_TREE: 3529bdb7beb71678daf14865079e1852e6d3c750
+REMOTE_PR_PARENT: dcf27b55e3e5bfeb285fc93ed73a485ce0f707fb
+REMOTE_PR_READBACK: open / mergeable=true / mergeable_state=unstable
+REMOTE_REQUIRED_CHECKS: CodeQL=failure; deploy=skipped; other observed checks successful
+REAL_RECEIVER_EVIDENCE: unavailable
+REAL_REPLICATE: NOT RUN
+```
+
+### Final local evidence
+
+```text
+FULL_HERMETIC_GATE: 2012 passed, 4 skipped, 17 deselected
+COVERAGE: 82%
+TARGETED_BROKER_TASK_RECOVERY_GATES: 120, 142, 189, 299, and 388 passed in separate runs
+RUFF_REPOSITORY: PASS (122 source files)
+MYPY_REPOSITORY: PASS (122 source files)
+PACKAGE_BUILD: wheel + sdist, version 3.7.11
+PACKAGE_SMOKE: PASS / queries=16
+UV_LOCK_CHECK: PASS / 132 packages resolved
+PIP_CHECK: PASS
+PIP_AUDIT: no known vulnerabilities; local distribution skipped as not on PyPI
+SYSTEMD_ANALYZE_VERIFY: PASS; unrelated xfs CPUAccounting warnings only
+MKDOCS_STRICT: PASS; existing nav/deprecation/unrecognized-link warnings remain
+GIT_DIFF_CHECK: PASS
+FRESH_CODE_REVIEW: no P0/P1 protected-admission code blocker found
+DOC_DRIFT: FAIL / global OpenCode skill and repository runtime-contract copies differ;
+  global CLI-count metadata is inconsistent (27 vs 26)
+```
+
+The implementation now includes admission/run owner fencing, fail-closed
+recovery, exact read-only verification, canonical writer receipts, task-bound
+verify/completion rules, repeat-dry-run receipt separation, stable replay
+projection identity, and explicit public Task API boundaries. These facts are
+still local provisional evidence until a signed exact candidate is published
+and passes fresh protected CI/readback plus operator receiver evidence.
+
+The next authorized action is candidate/provenance preparation only: inspect and
+stage the intended diff, create a GPG-signed feature-branch commit, publish via
+the approved GitHub REST/Git channel, re-read the exact PR tuple and required
+checks, and keep Phase 5C, release, and real replication blocked until all gates
+are independently green.

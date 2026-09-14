@@ -10,6 +10,7 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import tempfile
 import time
 from collections import defaultdict
@@ -82,6 +83,64 @@ def _is_regular_file_in_root(root: Path, candidate: Path) -> bool:
 def is_regular_vault_file(vault_root: Path, candidate: Path) -> bool:
     """Check one candidate without following a symlink out of the vault root."""
     return _is_regular_file_in_root(validate_vault_path(str(vault_root)), candidate)
+
+
+def read_file_bytes_no_follow(path: Path, *, max_bytes: int = 10_000_000) -> bytes:
+    """Read one vault file through descriptor-relative no-follow opens."""
+
+    candidate = Path(path).absolute()
+    components = candidate.parts
+    if not components or components[0] != "/":
+        raise ValueError("secure file path must be absolute")
+    directory_fd = os.open(
+        "/",
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+    )
+    descriptor = -1
+    try:
+        for component in components[1:-1]:
+            next_fd = os.open(
+                component,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=directory_fd,
+            )
+            os.close(directory_fd)
+            directory_fd = next_fd
+        descriptor = os.open(
+            components[-1],
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=directory_fd,
+        )
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise ValueError("vault source must be a regular single-link file")
+        chunks: list[bytes] = []
+        total = 0
+        while total <= max_bytes:
+            chunk = os.read(descriptor, min(64 * 1024, max_bytes + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError("vault source exceeds its size limit")
+        after = os.fstat(descriptor)
+        if (
+            after.st_dev != before.st_dev
+            or after.st_ino != before.st_ino
+            or after.st_size != total
+            or after.st_mtime_ns != before.st_mtime_ns
+            or after.st_ctime_ns != before.st_ctime_ns
+        ):
+            raise ValueError("vault source changed while it was read")
+        return b"".join(chunks)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(directory_fd)
 
 
 def iter_vault_markdown_files(vault_root: Path) -> Iterator[Path]:

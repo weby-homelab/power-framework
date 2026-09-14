@@ -1,0 +1,16 @@
+{
+    "schema_version": "power.infra-approvals.v1",
+    "approvals": [
+        {
+            "approval_ref": "apr_replace_with_operator_reference",
+            "operation": "replicate",
+            "target_id": "prxmx01",
+            "profile_id": "power-vault",
+            "policy_revision": "operator-revision-1",
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal_ref": "uid:1000",
+            "expires_at": "2099-01-01T00:00:00+00:00",
+            "one_time": true
+        }
+    ]
+}

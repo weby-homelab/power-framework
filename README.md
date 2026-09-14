@@ -239,7 +239,8 @@ domains:
 Keep domain paths under a cataloged canonical folder, as in the example.
 `power ingest` routes by these rules (or accepts `--domain research`) and uses
 the selected template. `power search ... --mode auto --domain research` follows
-the domain priority and scopes candidates to the domain path. Only retrieval
+the domain priority and applies the domain projection in the current runtime;
+candidate-generation pushdown is reserved for the separate Phase 5C gate. Only retrieval
 modes implemented by POWER are accepted; unsupported providers such as Qdrant
 are rejected instead of being advertised as available. Without a registry,
 legacy P.A.R.A. placement is unchanged; the default `auto` profile uses verified

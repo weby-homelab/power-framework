@@ -94,6 +94,7 @@ from .indexer import (
 from .infra_broker import (
     DEFAULT_APPROVAL_PATH,
     DEFAULT_POLICY_PATH,
+    DEFAULT_RUNTIME_DIR,
     DEFAULT_SOCKET_PATH,
     DEFAULT_STATE_DIR,
     InfraBrokerClient,
@@ -103,8 +104,10 @@ from .infra_broker import (
     build_ssh_options,
     load_infra_approvals,
     load_infra_policy,
+    peer_principal,
 )
 from .infra_models import (
+    CAPABILITY_BY_OPERATION,
     InfraApprovalRecord,
     InfraCapabilityBlockReceipt,
     InfraExitCategory,
@@ -112,9 +115,11 @@ from .infra_models import (
     InfraOperationReceipt,
     InfraPolicyFile,
     InfraProfile,
+    InfraProfileStatus,
     InfraReasonCode,
     InfraRequest,
     InfraResponse,
+    InfraResponseData,
     InfraResponseStatus,
 )
 from .lifecycle import LifecycleAdapter, LifecycleCapability, LifecycleEnvelope, capability_matrix
@@ -298,8 +303,10 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     "CANONICAL_SEARCH_MODES",
+    "CAPABILITY_BY_OPERATION",
     "DEFAULT_APPROVAL_PATH",
     "DEFAULT_POLICY_PATH",
+    "DEFAULT_RUNTIME_DIR",
     "DEFAULT_SEARCH_MODE",
     "DEFAULT_SOCKET_PATH",
     "DEFAULT_STATE_DIR",
@@ -355,9 +362,11 @@ __all__ = [
     "InfraOperationReceipt",
     "InfraPolicyFile",
     "InfraProfile",
+    "InfraProfileStatus",
     "InfraReasonCode",
     "InfraRequest",
     "InfraResponse",
+    "InfraResponseData",
     "InfraResponseStatus",
     "KnowledgeGraph",
     "LifecycleAdapter",
@@ -465,6 +474,7 @@ __all__ = [
     "normalize_search_mode",
     "normalize_temporal_view",
     "parse_frontmatter",
+    "peer_principal",
     "propose_change",
     "prune_backups",
     "read_captured_evidence",

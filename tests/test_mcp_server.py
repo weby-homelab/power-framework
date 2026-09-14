@@ -37,6 +37,7 @@ from power_framework.mcp.power_server import (
     get_server_info,
     handoff_work,
     heal_frontmatter_tool,
+    infra_action,
     ingest_note,
     lint_vault,
     propose_memory_change,
@@ -185,6 +186,21 @@ async def test_mcp_tools_publish_standard_and_power_risk_annotations() -> None:
             assert tool.annotations.destructive_hint is False
         if tool.annotations.destructive_hint:
             assert risk["approval"] == "explicit"
+
+
+async def test_infra_action_is_typed_and_does_not_request_secret_input(
+    sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("POWER_INFRA_SOCKET", str(tmp_path / "missing.sock"))
+
+    result = json.loads(await infra_action(operation="probe", profile="power-vault"))
+
+    assert result["data"]["state"] == "input-required"
+    assert result["data"]["required_input"] == {"target": "target", "profile": "profile"}
+    serialized = json.dumps(result, ensure_ascii=False).casefold()
+    assert "password" not in serialized
+    assert "private_key" not in serialized
+    assert str(sample_vault) not in serialized
 
 
 async def test_mcp_wire_discovery_preserves_tool_contract_and_empty_collections() -> None:

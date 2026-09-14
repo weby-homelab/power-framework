@@ -41,6 +41,43 @@ def test_windows_cli_configures_utf8_streams() -> None:
     assert stderr.calls == [{"encoding": "utf-8", "errors": "replace"}]
 
 
+def test_infra_status_is_a_read_only_local_diagnostic(
+    monkeypatch: pytest.MonkeyPatch, capsys, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("POWER_INFRA_SOCKET", str(tmp_path / "missing.sock"))
+
+    with patch.object(sys, "argv", ["power", "infra", "status"]), pytest.raises(SystemExit) as exc:
+        main()
+
+    assert exc.value.code == 0
+    payload = json.loads(capsys.readouterr().out)
+    infra = payload["data"]["infra"]
+    assert infra["status"] == "blocked"
+    assert infra["receipt"]["reason_code"] == "MISSING_EXECUTION_CAPABILITY"
+
+
+def test_infra_probe_never_falls_back_to_direct_ssh(
+    monkeypatch: pytest.MonkeyPatch, capsys, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("POWER_INFRA_SOCKET", str(tmp_path / "missing.sock"))
+
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["power", "infra", "probe", "prxmx01", "--profile", "power-vault"],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        main()
+
+    assert exc.value.code == 1
+    output = capsys.readouterr().out
+    assert "MISSING_EXECUTION_CAPABILITY" in output
+    assert "sshpass" not in output.casefold()
+    assert "password" not in output.casefold()
+
+
 def test_init_creates_vault(tmp_path: Path) -> None:
     vault = tmp_path / "new_vault"
     with patch.object(sys, "argv", ["power", "init", str(vault)]), pytest.raises(SystemExit) as exc:

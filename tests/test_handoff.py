@@ -246,3 +246,26 @@ def test_list_work_packets_is_read_only_when_no_packets_exist(tmp_path):
     vault.mkdir()
     assert list_work_packets(vault) == []
     assert not (vault / ".power").exists()
+
+
+def test_handoff_unknown_action_is_data_validation_not_cancel(sample_vault):
+    create_work_packet(
+        sample_vault,
+        task_id="handoff-infra-text",
+        objective="A note may mention power infra replicate",
+        owner="human",
+        actor="agent-a",
+        next_action="power infra replicate prxmx01 --profile power-vault",
+    )
+
+    with pytest.raises(ValueError, match="unknown work-packet action"):
+        advance_work_packet(
+            sample_vault,
+            "handoff-infra-text",
+            action="replicate",  # type: ignore[arg-type]
+            idempotency_key="untrusted-action",
+            actor="agent-a",
+            approved=True,
+        )
+
+    assert read_work_packet(sample_vault, "handoff-infra-text")["state"] == "submitted"

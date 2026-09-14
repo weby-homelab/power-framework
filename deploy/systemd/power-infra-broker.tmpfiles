@@ -1,0 +1,2 @@
+# Install only after creating the dedicated service and caller group.
+d /run/power-infra 0750 power-infra power-infra-callers -

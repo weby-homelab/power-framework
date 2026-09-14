@@ -78,6 +78,7 @@ nav:
       - Markdown Checks: api/markdown_checks.md
       - Constants: api/constants.md
       - Application API: api/application.md
+      - INFRA-1 Broker API: api/infra_broker.md
       - ROT Scoring: api/rot_scoring.md
       - Searcher: api/searcher.md
       - Utils: api/utils.md

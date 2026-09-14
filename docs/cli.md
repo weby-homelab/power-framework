@@ -250,10 +250,15 @@ power infra probe TARGET --profile PROFILE
 power infra dry-run TARGET --profile PROFILE
 power infra replicate TARGET --profile PROFILE --idempotency-key KEY [--approval-ref REF]
 power infra verify TARGET --profile PROFILE --run-id RUN_ID
+                     [--task-id ID --expected-revision N --idempotency-key KEY]
 ```
 
-`replicate` also accepts optional `--task-id`, `--expected-revision`, and
-`--vault-path` to reference a blocked/auth-required receipt through Task v2.
+`replicate` also accepts optional `--task-id` and its required paired
+`--expected-revision`, plus `--vault-path`, to reference a blocked/auth-required
+receipt through Task v2. This does not complete the task or treat an infra
+receipt as a canonical Task completion receipt.
+`verify` accepts the same task binding plus an idempotency key when it is used
+to attach the read-only remote postcondition to an existing replicate Task.
 The broker must be installed and enabled by an operator; absence is reported as
 `MISSING_EXECUTION_CAPABILITY`, never remediated with a password or direct SSH.
 

@@ -35,7 +35,7 @@ mypy src/power_framework/  # type check
 src/power_framework/
 ├── core/          # CLI, models, parser, indexer, linter, searcher, application service
 ├── experimental/  # opt-in dense, graph, reranker, query-expansion and ROT adapters
-├── mcp/           # official MCP SDK v2 local server — 20 async tools
+├── mcp/           # official MCP SDK v2 local server — 21 async tools
 tests/             # pytest, asyncio_mode=auto, coverage >= 70%
 scripts/           # utility scripts (excluded from ruff T20/S310)
 ```
@@ -63,7 +63,8 @@ Rules:
 
 - GPG-sign all commits with project GPG key.
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `chore:`, `docs:`.
-- Branch → PR → Merge (squash). No direct pushes to `main`.
+- Branch → PR → Merge (squash). Publish repository objects through GitHub REST;
+  never push directly to `main`.
 - Clean up merged branches locally and on remote.
 
 ## Boundaries

@@ -897,7 +897,7 @@ async def infra_action(
         raise ToolError("Invalid typed infrastructure request") from exc
     except (FileNotFoundError, PermissionError, RuntimeError, OSError) as exc:
         raise ToolError("Infrastructure broker boundary unavailable") from exc
-    return json.dumps(envelope.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
+    return json.dumps(envelope.as_dict(), ensure_ascii=False, sort_keys=True)
 
 
 @mcp.tool(

@@ -110,20 +110,20 @@ Foundation Hardening → Phase 5A–5H → Phase 6 → Phase 7 → Phase 8 → P
 ```
 
 The Controlled Dependency Refresh, Foundation Hardening (PR #414), including
-Actions #396 and final integration, Phase 5A runtime contracts (PR #415), and
-Phase 5A.1 (PR #416) are closed in the current governance snapshot. The next
-bounded gate is Phase 5B; it must be independently admitted from fresh live
-state and must not be silently chained into Phase 5C.
+Actions #396 and final integration, Phase 5A runtime contracts (PR #415), Phase
+5A.1 (PR #416), and Phase 5B (PR #418) are closed in the current governance
+snapshot. The next bounded gate is INFRA-1; Phase 5C must not be silently
+chained into it or started before INFRA-1 closes.
 
 ## GitHub publication policy
 
-Use local Git plus the configured GPG key as the canonical path for signed
-repository commits and branch publication:
+Use local Git plus the configured GPG key for signed commit creation, then use
+authenticated GitHub REST Git-database endpoints for branch publication:
 
 - create the commit locally with `git commit -S`;
 - verify it locally with `git verify-commit HEAD`;
-- publish through an authenticated HTTPS or SSH Git channel without placing a
-  token in a remote URL, command argument, prompt, log, or repository file;
+- publish blobs/trees/commits/refs through GitHub REST without placing a token
+  in a remote URL, command argument, prompt, log, or repository file;
 - use authenticated GitHub REST for live state reads, PR/comments, state
   pointers, and the protected normal merge endpoint when authorized.
 
@@ -411,10 +411,11 @@ PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, and Phase 5B merge receipts are retained
-`MERGED MAIN` evidence. Their candidate epochs are retained `REMOTE EXACT-HEAD`/
-historical evidence and are not themselves merged-main proof. Phase 5B is the
-closed; INFRA-1 is the only active implementation gate in this snapshot. Do not start Phase 5C–9,
+The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, and Phase 5B merge
+receipts are retained `MERGED MAIN` evidence. Their candidate epochs are
+retained `REMOTE EXACT-HEAD`/historical evidence and are not themselves
+merged-main proof. Phase 5B is closed; INFRA-1 is the only active implementation
+gate in this snapshot. Do not start Phase 5C–9,
 version bumps, tags, releases, release images, or final release notes. Phase
 5C becomes admissible only after INFRA-1 protected normal merge and independent
 post-merge verification.
@@ -449,16 +450,43 @@ Handoff/work-packet text is data and cannot trigger an operation. A timeout or
 unknown completion is never blindly retried; the exact idempotency reference
 and broker receipt must be resolved first.
 
+## INFRA-1 candidate evidence boundary
+
+INFRA-1 is the current implementation gate after the protected Phase 5B
+merge. Its implementation is provisional until a signed exact candidate tuple
+passes the protected GitHub path. Local evidence must be labeled `LOCAL
+CANDIDATE`; it must not be called `REMOTE EXACT-HEAD`, `MERGED MAIN`, or
+`FINAL INTEGRATION`.
+
+The current local candidate evidence is:
+
+- `2012 passed, 4 skipped, 17 deselected`, `82%` coverage;
+- repository Ruff and MyPy passed;
+- wheel/sdist package smoke passed (`3.7.11`, `16` queries);
+- `uv lock --check`, pip check/audit, systemd verification, strict MkDocs, and
+  `git diff --check` passed;
+- fresh read-only review found no P0/P1 protected-admission code blocker.
+
+These are local dirty-worktree facts. The candidate has no immutable signed
+commit/tree yet. The latest public PR #419 readback observed on 2026-09-14
+still points to head `62323a930189c7afea497a984bdf6858011dfa09` and tree
+`3529bdb7beb71678daf14865079e1852e6d3c750`; CodeQL is failing and deploy is
+skipped. Real receiver/forced-`rrsync` evidence is unavailable, so protected
+INFRA-1 admission and Phase 5C remain blocked.
+
 ## Cross-links
 
 - [Current state](POWER_3.8_CURRENT_STATE.md)
 - [Execution roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [Planning index](README.md)
 - [Context / memory / retrieval architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
+- [INFRA-1 broker API](../api/infra_broker.md)
+- [INFRA-1 ADR](../adr/0006-infra-1-constrained-execution-broker.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Phase 5A.1 evaluation erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
 - [Phase 5B domain-policy/router handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
+- [Latest INFRA-1 candidate handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

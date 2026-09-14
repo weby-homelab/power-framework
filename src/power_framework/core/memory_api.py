@@ -197,7 +197,7 @@ def commit_note_change(
                 "memory_apply",
                 idempotency_key,
                 None,
-                [(target, "note"), (history, "history")],
+                [(target, "note"), (history, "history"), (log_file, "log")],
                 crash_point="memory.apply",
             ):
                 atomic_write_in_vault(

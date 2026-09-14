@@ -44,14 +44,14 @@ pre-commit run --all-files # Git hooks (ruff + mypy + pip-audit)
 | `core/linter.py`      | Health checks: links, metadata, orphans, stale/expired |
 | `core/searcher.py`    | FTS5/dense/hybrid/reranked search (`auto` default; labelled FTS fallback) |
 | `experimental/embeddings.py` | Optional BGE-M3 ONNX (1024d) + MiniLM fallback       |
-| `mcp/power_server.py` | official MCP SDK v2, 20 async tools over local stdio |
+| `mcp/power_server.py` | official MCP SDK v2, 21 async tools over local stdio |
 
 ## Workflow
 
 1. Branch from `main`: `feature/name` or `fix/name`
 2. Implement with tests (regression coverage required)
 3. Run full gate: `ruff check . && mypy src && pytest tests/ -v`
-4. GPG-signed commit, push, open PR
+4. GPG-signed commit, publish branch through authenticated GitHub REST, open PR
 5. CI must pass (tests, ruff, mypy, CodeQL, coverage >=70%)
 6. Squash-merge after review
 

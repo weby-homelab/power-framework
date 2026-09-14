@@ -235,10 +235,12 @@ def check_retrieval_registry(documents: dict[str, str], facts: dict[str, Any]) -
         "README": (
             "canonical Jina v2 reranker remains the fallback",
             "**`jina-reranker-v2-base-multilingual`** (default)",
+            "scopes candidates to the domain path",
         ),
         "README.ua": (
             "канонічний Jina v2 реранкер залишається fallback",
             "**`jina-reranker-v2-base-multilingual`** (за замовчуванням)",
+            "обмежує кандидатів його шляхом",
         ),
         "Architecture": ("Jina v2 multilingual default",),
         "Searcher API": (

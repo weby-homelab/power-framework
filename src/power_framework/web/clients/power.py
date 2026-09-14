@@ -173,7 +173,14 @@ class PowerClient:
         authority: str = "read-only",
         actor: str = "web",
         idempotency_key: str | None = None,
-        **kwargs: Any,
+        kind: str = "human",
+        scope: list[str] | None = None,
+        dependencies: list[str] | None = None,
+        source_revision: str = "",
+        next_action: str = "inspect",
+        open_gates: list[str] | None = None,
+        required_input: dict[str, Any] | None = None,
+        due_at: str | None = None,
     ) -> TaskDTO:
         """Create a new Task v2."""
         ctx = self._context(
@@ -190,8 +197,15 @@ class PowerClient:
             state=state,
             priority=priority,
             authority=authority,
+            kind=kind,
+            scope=scope,
+            dependencies=dependencies,
+            source_revision=source_revision,
+            next_action=next_action,
+            open_gates=open_gates,
+            required_input=required_input,
+            due_at=due_at,
             context=ctx,
-            **kwargs,
         )
         return TaskDTO.model_validate(env.data)
 
@@ -204,8 +218,14 @@ class PowerClient:
         expected_revision: int | None = None,
         receipt_id: str | None = None,
         next_action: str | None = None,
+        assignee: str | None = None,
+        open_gates: list[str] | None = None,
+        error_ref: str | None = None,
+        required_input: dict[str, Any] | None = None,
+        completion_postcondition: str | None = None,
+        completion_artifact_refs: list[str] | None = None,
+        values: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
-        **kwargs: Any,
     ) -> TaskDTO:
         """Transition Task v2 state."""
         ctx = self._context(
@@ -219,8 +239,14 @@ class PowerClient:
             expected_revision=expected_revision,
             receipt_id=receipt_id,
             next_action=next_action,
+            assignee=assignee,
+            open_gates=open_gates,
+            error_ref=error_ref,
+            required_input=required_input,
+            completion_postcondition=completion_postcondition,
+            completion_artifact_refs=completion_artifact_refs,
+            values=values,
             context=ctx,
-            **kwargs,
         )
         return TaskDTO.model_validate(env.data)
 

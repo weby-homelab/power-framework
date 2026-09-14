@@ -44,6 +44,27 @@ Phase 5B — Domain Policy v2 and deterministic multi-domain router (PR #418)
 NEXT_GATE:
 INFRA-1 — Constrained Local Infrastructure Execution Broker
 
+INFRA_1_CANDIDATE_STATUS:
+LOCAL IMPLEMENTATION COMPLETE / LOCAL VALIDATION COMPLETE / PROTECTED ADMISSION PENDING
+
+INFRA_1_CANDIDATE_PR:
+419 / REMOTE READBACK OBSERVED 2026-09-14 / HEAD 62323a930189c7afea497a984bdf6858011dfa09
+
+INFRA_1_LOCAL_BASE_HEAD:
+ace5d6351dd599578491023419140b6a79bd6b7f
+
+INFRA_1_LOCAL_VALIDATION:
+2012 PASSED / 4 SKIPPED / 17 DESELECTED / COVERAGE 82%
+
+INFRA_1_LOCAL_CODE_REVIEW:
+NO P0/P1 PROTECTED-ADMISSION CODE BLOCKER FOUND
+
+INFRA_1_RECEIVER_EVIDENCE:
+UNAVAILABLE / REAL_REPLICATE_NOT_RUN
+
+INFRA_1_PROVENANCE:
+DIRTY UNCOMMITTED WORKTREE / NO IMMUTABLE CANDIDATE TUPLE
+
 ACTIONS_396:
 CLOSED / MERGED
 
@@ -217,6 +238,35 @@ evidence.
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
 | Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; merge `6a315d5`; live parent erratum retained above |
 | INFRA-1 | ADMISSION CANDIDATE | Constrained local Unix broker, typed operations, receipts, SSH/rrsync policy |
+
+## INFRA-1 candidate evidence (provisional)
+
+INFRA-1 is the current cross-cutting implementation candidate. The following
+facts are **LOCAL CANDIDATE** evidence, not `REMOTE EXACT-HEAD` or `MERGED MAIN`
+evidence:
+
+- Local branch: `feat/power-3.8-infra-execution-broker`.
+- Local base: `ace5d6351dd599578491023419140b6a79bd6b7f`; the worktree is dirty
+  and no signed candidate commit exists yet.
+- Full hermetic result: `2012 passed, 4 skipped, 17 deselected`, `82%` coverage.
+- Ruff and MyPy passed; wheel/sdist package smoke passed with version `3.7.11`
+  and `16` queries; `uv lock --check`, pip check/audit, systemd verification,
+  strict MkDocs, and `git diff --check` passed. The doc-drift helper still
+  reports a global OpenCode skill/repository runtime-contract mismatch.
+- A fresh read-only adversarial review found no P0/P1 protected-admission code
+  blocker in the current tree.
+- The receiver is still an operator-provisioning reference only; no real
+  receiver, forced `rrsync`, or real replicate evidence exists.
+- Remote PR #419 is open. The latest readback observed `2026-09-14` reports
+  head `62323a930189c7afea497a984bdf6858011dfa09`, tree
+  `3529bdb7beb71678daf14865079e1852e6d3c750`, parent
+  `dcf27b55e3e5bfeb285fc93ed73a485ce0f707fb`, `mergeable=true` with
+  `mergeable_state=unstable`, CodeQL failure, and deploy skipped. This remote
+  tuple does not include the current local worktree.
+
+The gate remains open until an exact signed candidate tuple is published,
+required remote checks and policy are freshly green, and receiver evidence is
+captured. Phase 5C remains blocked and unstarted.
 
 ## Actions #396 exact objects
 

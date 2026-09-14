@@ -18,6 +18,8 @@ from power_framework.core.infra_broker import (
     InfraBrokerClient,
     InfraBrokerServer,
     _ProcessResult,
+    _receive_frame,
+    _request_digest,
     build_ssh_options,
     load_infra_policy,
 )
@@ -26,6 +28,7 @@ from power_framework.core.infra_models import (
     InfraExitCategory,
     InfraOperation,
     InfraRequest,
+    canonical_profile_digest,
     ssh_fingerprint_from_blob,
 )
 
@@ -38,17 +41,27 @@ def _send_frame(connection: socket.socket, payload: dict[str, object]) -> None:
     connection.sendall(struct.pack(">I", len(encoded)) + encoded)
 
 
-def _response_payload() -> dict[str, object]:
+def _response_payload(request: InfraRequest) -> dict[str, object]:
     return {
         "schema_version": "power.infra-response.v1",
         "status": "ok",
-        "operation": "status",
-        "data": {"broker_status": "active", "profiles": []},
+        "operation": request.operation.value,
+        "target": request.target,
+        "profile": request.profile,
+        "request_digest": _request_digest(request),
+        "data": {
+            "broker_status": "active",
+            "transport": "unix",
+            "principal_source": "SO_PEERCRED",
+            "profiles": [],
+            "ready": True,
+            "verification": "status",
+        },
         "receipt": {
             "schema_version": "power.infra-receipt.v1",
             "receipt_id": "ir_" + "1" * 64,
             "trace_id": "tr_" + "2" * 32,
-            "operation": "status",
+            "operation": request.operation.value,
             "target_id": None,
             "profile_id": None,
             "policy_revision": "none",
@@ -123,9 +136,7 @@ def test_block_receipt_has_no_secret_or_command_fields() -> None:
 def test_client_without_socket_returns_blocked_receipt(tmp_path: Path) -> None:
     client = InfraBrokerClient(socket_path=tmp_path / "missing.sock")
 
-    response = client.execute(
-        InfraRequest(operation=InfraOperation.STATUS, idempotency_key="status-1")
-    )
+    response = client.execute(InfraRequest(operation=InfraOperation.STATUS))
 
     assert response.status == "blocked"
     assert isinstance(response.receipt, InfraCapabilityBlockReceipt)
@@ -143,35 +154,41 @@ def test_client_uses_bounded_unix_socket_protocol(tmp_path: Path) -> None:
     def serve_once() -> None:
         connection, _ = listener.accept()
         with connection:
-            header = connection.recv(4)
-            (length,) = struct.unpack(">I", header)
-            received.append(json.loads(connection.recv(length).decode("utf-8")))
-            _send_frame(connection, _response_payload())
+            frame = _receive_frame(connection)
+            received.append(frame)
+            _send_frame(
+                connection,
+                {
+                    "schema_version": "power.infra-wire-response.v1",
+                    "nonce": frame["nonce"],
+                    "response": _response_payload(InfraRequest.model_validate(frame["request"])),
+                },
+            )
 
     worker = threading.Thread(target=serve_once)
     worker.start()
     try:
-        response = InfraBrokerClient(socket_path=socket_path).execute(
-            InfraRequest(operation=InfraOperation.STATUS, idempotency_key="status-2")
-        )
+        response = InfraBrokerClient(
+            socket_path=socket_path, expected_broker_uid=os.getuid()
+        ).execute(InfraRequest(operation=InfraOperation.STATUS))
     finally:
         worker.join(timeout=2)
         listener.close()
 
     assert response.status == "ok"
-    assert received == [
-        {
-            "operation": "status",
-            "target": None,
-            "profile": None,
-            "dry_run": False,
-            "idempotency_key": "status-2",
-            "run_id": None,
-            "approval_ref": None,
-            "task_id": None,
-            "expected_revision": None,
-        }
-    ]
+    assert received[0]["schema_version"] == "power.infra-wire.v1"
+    assert isinstance(received[0]["nonce"], str)
+    assert received[0]["request"] == {
+        "operation": "status",
+        "target": None,
+        "profile": None,
+        "dry_run": False,
+        "idempotency_key": None,
+        "run_id": None,
+        "approval_ref": None,
+        "task_id": None,
+        "expected_revision": None,
+    }
 
 
 def test_policy_loader_rejects_unknown_fields_and_symlinks(tmp_path: Path) -> None:
@@ -212,8 +229,8 @@ def test_ssh_options_pin_noninteractive_transport(tmp_path: Path) -> None:
     assert "IdentityAgent=none" in options
     assert "StrictHostKeyChecking=yes" in options
     assert f"UserKnownHostsFile={tmp_path / 'known_hosts'}" in options
+    assert "RemoteCommand=none" in options
     assert "--delete" not in options
-    assert "RemoteCommand" not in options
 
 
 def test_server_principal_is_derived_from_peer_not_payload(tmp_path: Path) -> None:
@@ -248,6 +265,9 @@ def _write_test_profile(tmp_path: Path) -> tuple[Path, Path, Path, list[list[str
     credential = credential_dir / "power-vault"
     credential.write_text("synthetic credential boundary", encoding="utf-8")
     credential.chmod(0o600)
+    verify_credential = credential_dir / "power-vault-verify"
+    verify_credential.write_text("synthetic verify credential boundary", encoding="utf-8")
+    verify_credential.chmod(0o600)
     policy = tmp_path / "policy.json"
     policy.write_text(
         json.dumps(
@@ -272,6 +292,8 @@ def _write_test_profile(tmp_path: Path) -> tuple[Path, Path, Path, list[list[str
                         "known_hosts_file": str(known_hosts),
                         "host_key_fingerprint": ssh_fingerprint_from_blob(key_blob),
                         "credential_id": "power-vault",
+                        "verify_credential_id": "power-vault-verify",
+                        "allow_plaintext_credential_fallback": True,
                         "approval_policy": "standing",
                         "standing_approval_ref": "standing-power-vault",
                         "standing_principal_ref": f"uid:{os.getuid()}",
@@ -316,20 +338,44 @@ def test_replicate_replays_and_conflicts_without_a_second_transfer(tmp_path: Pat
         idempotency_key="replicate-1",
     )
     first = server.handle_request(request, principal_ref=f"uid:{os.getuid()}")
+    repeat_dry_run = server.handle_request(
+        InfraRequest(
+            operation=InfraOperation.RSYNC_DRY_RUN,
+            target="prxmx01",
+            profile="power-vault",
+        ),
+        principal_ref=f"uid:{os.getuid()}",
+    )
+    profile = load_infra_policy(policy).profiles[0]
+    run_id = first.receipt.run_id
+    assert run_id is not None
+    manifest = server._load_snapshot(server._load_run_record(run_id), profile)
+    server._write_or_validate_run_record(
+        manifest,
+        profile,
+        canonical_profile_digest(profile),
+        dry_run_passed=True,
+        write_in_progress=False,
+        reservation_ref=None,
+        replicated=True,
+        receipt_id="ir_" + "e" * 64,
+    )
     replay = server.handle_request(request, principal_ref=f"uid:{os.getuid()}")
     conflict = server.handle_request(
         request.model_copy(update={"dry_run": True}), principal_ref=f"uid:{os.getuid()}"
     )
 
     assert first.status == "ok"
+    assert repeat_dry_run.status == "ok"
+    assert server._load_run_record(run_id).receipt_id == first.receipt.receipt_id
     assert replay.data["replay"] is True
     assert conflict.receipt.reason_code == "IDEMPOTENCY_CONFLICT"
-    assert len(calls) == 2
+    assert len(calls) == 3
     argv_text = " ".join(" ".join(call) for call in calls)
     assert "--delete" not in argv_text
     assert "--rsync-path" not in argv_text
     assert "--remove" not in argv_text
-    assert "RemoteCommand" not in argv_text
+    assert "RemoteCommand=none" in argv_text
 
 
 def test_idempotency_replay_survives_broker_restart(tmp_path: Path) -> None:
@@ -412,8 +458,8 @@ def test_inflight_reservation_blocks_retry_after_execution_crash(tmp_path: Path)
         profile="power-vault",
         idempotency_key="crash-reservation-1",
     )
-    with pytest.raises(RuntimeError, match="simulated broker crash"):
-        first_server.handle_request(request, principal_ref=f"uid:{os.getuid()}")
+    first = first_server.handle_request(request, principal_ref=f"uid:{os.getuid()}")
+    assert first.receipt.reason_code == "UNKNOWN_COMPLETION"
 
     def fail_if_retried(*_args: object) -> _ProcessResult:
         raise AssertionError("an unresolved reservation must not retry")
@@ -428,7 +474,7 @@ def test_inflight_reservation_blocks_retry_after_execution_crash(tmp_path: Path)
     response = second_server.handle_request(request, principal_ref=f"uid:{os.getuid()}")
 
     assert response.status == "blocked"
-    assert response.receipt.reason_code == "OPERATION_IN_FLIGHT"
+    assert response.receipt.reason_code == "UNKNOWN_COMPLETION"
     assert response.receipt.run_id is not None
 
 
@@ -481,19 +527,28 @@ def test_verify_rejects_itemized_diff_even_when_rsync_exits_zero(tmp_path: Path)
         authorized_uids={os.getuid()},
         command_runner=runner,
     )
-    server._known_runs.add("run_" + "a" * 32)
+    dry_run = server.handle_request(
+        InfraRequest(
+            operation=InfraOperation.RSYNC_DRY_RUN,
+            target="prxmx01",
+            profile="power-vault",
+        ),
+        principal_ref=f"uid:{os.getuid()}",
+    )
+    run_id = dry_run.receipt.run_id
+    assert run_id is not None
     response = server.handle_request(
         InfraRequest(
             operation=InfraOperation.VERIFY,
             target="prxmx01",
             profile="power-vault",
-            run_id="run_" + "a" * 32,
+            run_id=run_id,
         ),
         principal_ref=f"uid:{os.getuid()}",
     )
 
     assert response.status == "failed"
-    assert response.receipt.verification_result == "rsync-dry-run-mismatch"
+    assert response.receipt.verification_result == "mismatch"
 
 
 def test_host_key_pin_must_be_bound_to_configured_hostname(tmp_path: Path) -> None:
@@ -534,7 +589,7 @@ def test_host_key_pin_must_be_bound_to_configured_hostname(tmp_path: Path) -> No
         principal_ref=f"uid:{os.getuid()}",
     )
 
-    assert response.receipt.reason_code == "HOST_IDENTITY_UNTRUSTED"
+    assert response.receipt.reason_code == "HOST_IDENTITY_MISMATCH"
     assert calls == []
 
 
@@ -566,12 +621,15 @@ def test_missing_broker_projects_block_receipt_without_required_input(
     )
     task = service.task_service.get_task("infra-task")
 
-    assert response.status == "blocked"
+    assert response.data["state"] == "blocked"
     assert task is not None
     assert task.state == "blocked"
     assert task.required_input is None
-    assert response.receipt.receipt_id in task.receipt_ids
-    assert response.receipt.required_capability in task.open_gates
+    infra = response.data["infra"]
+    assert isinstance(infra, dict)
+    receipt_id = str(infra["receipt"]["receipt_id"])
+    assert receipt_id in task.receipt_ids
+    assert str(infra["receipt"]["required_capability"]) in task.open_gates
 
 
 def test_missing_target_is_input_required_before_socket_connect(tmp_path: Path) -> None:
