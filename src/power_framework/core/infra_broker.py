@@ -5384,7 +5384,15 @@ class InfraBrokerServer:
             InfraReasonCode.UNKNOWN_COMPLETION,
             InfraReasonCode.OPERATION_IN_FLIGHT,
         }
-        degraded = _block_response(
+        if response.status is InfraResponseStatus.BLOCKED and not is_committed_operation:
+            # Case A: Operation never became externally effectful (or already failed closed
+            # with unknown outcome). Preserve primary operational / security rejection;
+            # do not mask it with MISSING_EXECUTION_CAPABILITY or retry unavailable storage.
+            return response
+
+        # Case B: Operation reported success or committed state, but durable receipt cannot
+        # be established. Fail closed and degrade to UNKNOWN_COMPLETION or MISSING_EXECUTION_CAPABILITY.
+        return _block_response(
             request,
             InfraReasonCode.UNKNOWN_COMPLETION
             if is_committed_operation or is_unknown_outcome
@@ -5396,8 +5404,6 @@ class InfraBrokerServer:
             run_id=getattr(receipt, "run_id", None),
             source_manifest_digest=getattr(receipt, "source_manifest_digest", None),
         )
-        self._record_receipt(degraded)
-        return degraded
 
     def _record_receipt(self, response: InfraResponse) -> bool:
         """Persist one bounded receipt without exposing payloads or raw diagnostics."""

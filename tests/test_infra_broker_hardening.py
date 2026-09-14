@@ -56,6 +56,8 @@ from power_framework.core.infra_models import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
 
 def _profile_fixture(
     tmp_path: Path,
@@ -1818,9 +1820,13 @@ def test_application_unknown_completion_does_not_fake_blocked_state(sample_vault
     assert task.external_refs["infra_target_id"] == "prxmx01"
 
 
-def test_broker_entrypoint_and_systemd_boundary_are_non_root() -> None:
-    unit = Path("deploy/systemd/power-infra-broker.service").read_text(encoding="utf-8")
-    socket_unit = Path("deploy/systemd/power-infra-broker.socket").read_text(encoding="utf-8")
+def test_broker_entrypoint_and_systemd_boundary_are_non_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    systemd = _REPO_ROOT / "deploy" / "systemd"
+    monkeypatch.chdir(tmp_path)
+    unit = (systemd / "power-infra-broker.service").read_text(encoding="utf-8")
+    socket_unit = (systemd / "power-infra-broker.socket").read_text(encoding="utf-8")
     assert "ExecStart=/usr/bin/python3 -E -m power_framework.core.infra_broker serve" in unit
     assert "--caller-allowlist /etc/power/infra/callers.json" in unit
     assert "ExecStartPre=/usr/bin/python3 -E -c" in unit
@@ -1837,9 +1843,7 @@ def test_broker_entrypoint_and_systemd_boundary_are_non_root() -> None:
     assert "EnvironmentFile=" not in unit
     assert "Accept=no" in socket_unit
     assert "SocketGroup=power-infra-callers" in socket_unit
-    tmpfiles = Path("deploy/systemd/power-infra-broker.tmpfiles").read_text(encoding="utf-8")
+    tmpfiles = (systemd / "power-infra-broker.tmpfiles").read_text(encoding="utf-8")
     assert "power-infra-callers" in tmpfiles
-    allowlist = Path("deploy/systemd/power-infra-broker-allowlist.conf.example").read_text(
-        encoding="utf-8"
-    )
+    allowlist = (systemd / "power-infra-broker-allowlist.conf.example").read_text(encoding="utf-8")
     assert "caller authorization is no longer sourced" in allowlist

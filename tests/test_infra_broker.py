@@ -28,6 +28,7 @@ from power_framework.core.infra_models import (
     InfraExitCategory,
     InfraOperation,
     InfraRequest,
+    InfraResponse,
     canonical_profile_digest,
     ssh_fingerprint_from_blob,
 )
@@ -298,6 +299,7 @@ def _write_test_profile(tmp_path: Path) -> tuple[Path, Path, Path, list[list[str
                         "standing_approval_ref": "standing-power-vault",
                         "standing_principal_ref": f"uid:{os.getuid()}",
                         "policy_revision": "test-policy-v1",
+                        "max_bytes": 100_000,
                     }
                 ],
             }
@@ -489,6 +491,7 @@ def test_source_symlink_is_blocked_before_runner(tmp_path: Path) -> None:
     server = InfraBrokerServer(
         policy_path=policy,
         credential_dir=credential_dir,
+        state_dir=tmp_path / "state",
         authorized_uids={os.getuid()},
         command_runner=runner,
     )
@@ -505,6 +508,62 @@ def test_source_symlink_is_blocked_before_runner(tmp_path: Path) -> None:
     assert response.status == "blocked"
     assert response.receipt.reason_code == "RESOURCE_LIMIT"
     assert calls == []
+
+
+def test_unsafe_source_symlink_preserves_primary_rejection_when_receipt_persistence_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    policy, credential_dir, source_root, calls = _write_test_profile(tmp_path)
+    (source_root / "escape").symlink_to(tmp_path / "outside")
+
+    def runner(_argv: list[str], _timeout: int, _output_limit: int) -> _ProcessResult:
+        calls.append([])
+        return _ProcessResult(0, 0, 0, InfraExitCategory.SUCCESS, 1)
+
+    server = InfraBrokerServer(
+        policy_path=policy,
+        credential_dir=credential_dir,
+        state_dir=tmp_path / "state",
+        authorized_uids={os.getuid()},
+        command_runner=runner,
+    )
+
+    persistence_attempts = 0
+
+    def fail_record_receipt(_response: InfraResponse) -> bool:
+        nonlocal persistence_attempts
+        persistence_attempts += 1
+        return False
+
+    monkeypatch.setattr(server, "_record_receipt", fail_record_receipt)
+
+    response = server.handle_request(
+        InfraRequest(
+            operation=InfraOperation.RSYNC_DRY_RUN,
+            target="prxmx01",
+            profile="power-vault",
+        ),
+        principal_ref=f"uid:{os.getuid()}",
+    )
+
+    # 1. Primary failure precedence: unsafe source symlink remains RESOURCE_LIMIT
+    assert response.status == "blocked"
+    assert response.receipt.reason_code == "RESOURCE_LIMIT"
+    assert response.receipt.broker_status == "source-invalid"
+    assert response.receipt.remediation_code == "REMOVE_UNSAFE_SOURCE_ENTRY_OR_REPAIR_SOURCE_ROOT"
+
+    # 2. No runner calls, no SSH/rsync execution
+    assert calls == []
+
+    # 3. Exactly one receipt persistence attempt; no duplicate degraded attempt
+    assert persistence_attempts == 1
+
+    # 4. No credential or command exposure
+    serialized = response.model_dump_json()
+    assert "password" not in serialized.casefold()
+    assert "private_key" not in serialized.casefold()
+    assert "synthetic credential boundary" not in serialized
+    assert "ssh" not in serialized.casefold()
 
 
 def test_verify_rejects_itemized_diff_even_when_rsync_exits_zero(tmp_path: Path) -> None:
