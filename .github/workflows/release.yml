@@ -132,7 +132,15 @@ jobs:
           PY
 
           commit_verification="$RUNNER_TEMP/power-release-admission-commit-verification.txt"
-          git verify-commit --raw "$local_tag_target" > "$commit_verification" 2>&1
+          verified_commit="$local_tag_target"
+          if ! git verify-commit --raw "$local_tag_target" > "$commit_verification" 2>&1; then
+            read -r -a merge_parents <<< "$(git show -s --format=%P "$local_tag_target")"
+            test "${#merge_parents[@]}" -eq 2
+            test "$(git show -s --format=%T "$local_tag_target")" = "$(git show -s --format=%T "${merge_parents[1]}")"
+            verified_commit="${merge_parents[1]}"
+            git verify-commit --raw "$verified_commit" > "$commit_verification" 2>&1
+            printf '%s\n' "GitHub merge commit is unsigned; exact-tree signed PR head is admitted" >&2
+          fi
           python3 - "$commit_verification" <<'PY'
           from pathlib import Path
           import sys
@@ -150,7 +158,7 @@ jobs:
               and fields[-1] == expected_primary
           ]
           if len(valid) != 1:
-              raise SystemExit("release tag target commit is not verified by the pinned maintainer key")
+              raise SystemExit("release source commit is not verified by the pinned maintainer key")
           PY
 
           printf 'tag_object=%s\n' "$remote_tag_object" >> "$GITHUB_OUTPUT"
@@ -1204,24 +1212,25 @@ jobs:
           wheel="$readback_dir/power_framework-${version}-py3-none-any.whl"
           sdist="$readback_dir/power_framework-${version}.tar.gz"
           lock="$readback_dir/power-native-requirements.txt"
+          attestation_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}"
           gh attestation verify \
             "$wheel" \
             --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-wheel-attestation.json"
           gh attestation verify \
             "$sdist" \
             --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-sdist-attestation.json"
           gh attestation verify \
             "$lock" \
             --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-dependency-lock-attestation.json"
@@ -1232,7 +1241,7 @@ jobs:
             "oci://${WEB_IMAGE_REF}@${WEB_IMAGE_DIGEST}" \
             --repo "$GITHUB_REPOSITORY" \
             --bundle-from-oci \
-            --signer-workflow .github/workflows/release.yml \
+            --cert-identity "$attestation_identity" \
             --predicate-type https://slsa.dev/provenance/v1 \
             --format json \
             > "$RUNNER_TEMP/power-web-attestation.json"
@@ -1242,7 +1251,7 @@ jobs:
           common_args=(
             --repository "$GITHUB_REPOSITORY"
             --workflow .github/workflows/release.yml
-            --source-revision "$REMOTE_TAG_TARGET"
+            --source-revision "$GITHUB_SHA"
             --event "$GITHUB_EVENT_NAME"
             --ref "$GITHUB_REF"
             --run-id "$GITHUB_RUN_ID"

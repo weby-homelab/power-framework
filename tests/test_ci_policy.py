@@ -36,6 +36,33 @@ def test_ci_defers_non_linux_runtime_smoke_for_3_6_2() -> None:
     assert "runs-on: ubuntu-latest" in ci_text
 
 
+def test_docs_build_covers_release_workflow_changes() -> None:
+    docs_text = (WORKFLOWS_DIR / "docs.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(docs_text)
+
+    assert isinstance(workflow, dict)
+
+    # PyYAML follows YAML 1.1 semantics and may decode the GitHub Actions
+    # unquoted `on` key as boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+
+    assert isinstance(triggers, dict)
+
+    pull_request = triggers["pull_request"]
+    push = triggers["push"]
+
+    assert "main" in pull_request["branches"]
+    assert "release/**" in pull_request["branches"]
+    assert "paths" not in pull_request
+
+    assert "main" in push["branches"]
+    assert "release/**" in push["branches"]
+    assert "paths" in push
+    assert ".github/workflows/release.yml" in push["paths"]
+
+    assert "build" in workflow["jobs"]
+
+
 def test_ci_aggregates_all_supported_ubuntu_reports() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
 
@@ -182,6 +209,10 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     )
     assert 'git verify-tag --raw "$RELEASE_TAG"' in admission_run
     assert 'git verify-commit --raw "$local_tag_target"' in admission_run
+    assert "read -r -a merge_parents" in admission_run
+    assert 'git show -s --format=%P "$local_tag_target"' in admission_run
+    assert 'git show -s --format=%T "$local_tag_target"' in admission_run
+    assert 'verified_commit="${merge_parents[1]}"' in admission_run
     assert 'git cat-file -t "$local_tag_object"' in admission_run
     assert "uv run" not in admission_run
     assert "pytest" not in admission_run
@@ -370,7 +401,8 @@ def test_release_harness_and_publication_guards_are_tag_bound() -> None:
     )
     assert "gh attestation verify" in attestation_step["run"]
     assert "--bundle-from-oci" in attestation_step["run"]
-    assert "--signer-workflow .github/workflows/release.yml" in attestation_step["run"]
+    assert '--cert-identity "$attestation_identity"' in attestation_step["run"]
+    assert '--source-revision "$GITHUB_SHA"' in attestation_step["run"]
     assert "verify_attestation_provenance.py" in attestation_step["run"]
     assert attestation_step["run"].count("power-native-requirements.txt") >= 2
     assert attestation_step["run"].count("verify_attestation_provenance.py") == 4
