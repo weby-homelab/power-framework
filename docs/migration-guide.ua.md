@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.7.12"
+title: "Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.7.13"
 description: "Fail-closed manifest-driven протокол міграції наявної Markdown-бази знань у перевірений P.O.W.E.R. vault без зміни джерела."
 tags: [power, migration, guide, ai-agents, safety, verification]
 timestamp: 2026-08-17T12:00:00+03:00
 ---
 
-# Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.7.12
+# Міграція для AI-агента: будь-яка Markdown-база знань у P.O.W.E.R. v3.7.13
 
 Цей гід є execution contract для будь-якого AI-агента з доступом до файлової
 системи. Він переносить Markdown або Obsidian knowledge base у канонічну
@@ -17,7 +17,7 @@ rollback path.
 [«Початок роботи»](getting-started.ua.md). Для runtime setup на Windows 11 25H2
 спочатку виконайте [Windows-гід](windows-11-installation.ua.md).
 
-Цей гід стосується релізу `v3.7.12`. Обирайте гід чистої
+Цей гід стосується релізу `v3.7.13`. Обирайте гід чистої
 установки, коли destination порожній. Обирайте цей гід, коли потрібно зберегти
 будь-яку наявну нотатку, attachment або configuration. Ніколи не запускайте
 `power init` усередині наявної бази знань.
