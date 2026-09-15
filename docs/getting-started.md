@@ -47,18 +47,18 @@ or relying on `--break-system-packages` for a normal installation.
 On Linux:
 
 ```bash
-POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.12"
 mkdir -p "$POWER_RELEASE_DIR"
-gh release download v3.7.11 --repo weby-homelab/power-framework \
-  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+gh release download v3.7.12 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.12-py3-none-any.whl' \
   --pattern 'power-native-requirements.txt' \
   --pattern 'power-release-manifest.json' \
   --dir "$POWER_RELEASE_DIR"
 
-python3 -m venv "$HOME/.cache/power-3.7.11-venv"
-POWER_PYTHON="$HOME/.cache/power-3.7.11-venv/bin/python"
-POWER_CLI="$HOME/.cache/power-3.7.11-venv/bin/power"
-POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
+python3 -m venv "$HOME/.cache/power-3.7.12-venv"
+POWER_PYTHON="$HOME/.cache/power-3.7.12-venv/bin/python"
+POWER_CLI="$HOME/.cache/power-3.7.12-venv/bin/power"
+POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.12-py3-none-any.whl"
 POWER_LOCK="$POWER_RELEASE_DIR/power-native-requirements.txt"
 POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
 
