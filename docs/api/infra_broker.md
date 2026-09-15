@@ -1,8 +1,8 @@
 # INFRA-1 Broker API
 
-> **Status:** provisional implementation candidate. Local validation is not
-> `REMOTE EXACT-HEAD` or `MERGED MAIN` evidence. Protected admission, signed
-> candidate provenance, and real receiver evidence remain pending.
+> **Status:** CLOSED / MERGED / VERIFIED (PR #419). Local capability and
+> framework contracts are merged on `main`. Real receiver deployment is an
+> operator follow-up.
 
 INFRA-1 is an opt-in Linux capability boundary. The POWER client and MCP
 adapter send only identifiers over a local filesystem Unix socket. The broker

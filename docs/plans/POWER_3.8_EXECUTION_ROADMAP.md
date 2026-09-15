@@ -48,12 +48,12 @@ CLOSED / MERGED / VERIFIED (PR #416)
               ↓
 Phase 5B — Domain Policy v2 and deterministic multi-domain router
 CLOSED / MERGED / VERIFIED (PR #418 / merge 6a315d5)
-               ↓
+        ↓
 INFRA-1 — Constrained Local Infrastructure Execution Broker
-ADMISSION CANDIDATE / CROSS-CUTTING GATE
-               ↓
+CLOSED / MERGED / VERIFIED (PR #419 / merge bfb9688)
+        ↓
 Phase 5C–5H — Scope, planner, shadow, dense validity, MCP, closure
-READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED
+READY FOR SEPARATE ADMISSION / NOT STARTED
          ↓
 Phase 6 — Agent Capture & Integrations
 NOT STARTED
@@ -91,28 +91,34 @@ NO-GO
 | Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; v1.1 is the active revision |
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
 | Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; live parent erratum is retained in current state |
-| INFRA-1 | ADMISSION CANDIDATE | Typed Unix broker, task semantics, receipts, SSH/rrsync boundary |
-| Phase 5C | READY / BLOCKED UNTIL INFRA-1 | SearchScope pushdown remains unstarted |
+| INFRA-1 | CLOSED / MERGED / VERIFIED | PR #419; merge `bfb9688`; framework contract closed; real receiver is operator follow-up |
+| Phase 5C | READY FOR SEPARATE ADMISSION / NOT STARTED | SearchScope pushdown preflight/contract freeze next; unstarted |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
-### INFRA-1 current candidate gate
+### INFRA-1 closed framework gate and governance reconciliation
 
-INFRA-1 has a locally validated provisional implementation, but the gate is
-not closed. Local evidence is `2012 passed, 4 skipped, 17 deselected` at `82%`
-coverage, with Ruff, MyPy, package smoke, lock, pip, systemd, strict MkDocs,
-and diff checks passing. A fresh read-only review found no P0/P1 code blocker.
+INFRA-1 was admitted, reviewed, and merged on `main` via PR #419
+(`bfb968846c0fc41582c2367782a28540498715b4`, tree
+`70dbfd0f9c980672a757be601b72b138e4e3d744`, parents
+`6a315d5919eeef797bc506ecb216313c20419fc2` and
+`d6eaa4f1967178f5ebbf458168c1b7e7fadb524b`, closure comment `5671031312`).
+Pre-merge required checks (11/11) and post-merge CI, Docs, and CodeQL passed.
 
-The remaining admission conditions are fresh exact-head protected CI/readback
-and operator evidence for the actual non-root forced `rrsync` receiver. PR #419
-now points to signed candidate head `4dc2db46885ab81e337f398f16ea6a7aac585839`
-with tree `0550327422405aace37a6593abcfc3e836b7c7fc` and parent
-`62323a930189c7afea497a984bdf6858011dfa09`; the last completed CI attempt
-reported `test (3.14)=failure` and `test (3.13)=cancelled`, while the other
-observed contexts passed and deploy was skipped. The exact local Python 3.14
-workflow test passes, but remote protected CI remains unresolved. Therefore
-INFRA-1 remains `ADMISSION CANDIDATE / PROVISIONAL`, Phase 5C remains
-blocked/not started, and POWER 3.8.0 remains NO-GO.
+Governance reconciliation resolved the contradiction between host-specific
+deployment facts and generic framework invariants:
+
+- Invariant: `HOST-SPECIFIC DEPLOYMENT FACT != FRAMEWORK INVARIANT`.
+- Availability of PRXMX-01, specific IP addresses, individual receiver accounts,
+  or storage mounts belongs to operator deployment validation, not generic
+  framework gate closure.
+- Framework gate proves receiver security contracts, broker behavior, fixed
+  transport argv, hermetic tests, and reference deployment configuration.
+- Security controls are fully preserved: zero arbitrary command surface, zero
+  credential exposure, zero password fallback, zero direct agent SSH, strict
+  receiver lockdown, and secret-free client/agent boundary.
+- Real receiver deployment remains an operator follow-up.
+- Phase 5C is ready for separate admission and remains unstarted.
 
 ## Controlled Dependency Refresh
 
@@ -145,9 +151,10 @@ dependency update:
 12. **Phase 5B — closed.** Domain Policy v2 and the deterministic multi-domain
        router were protected-merged as PR #418; the actual candidate parent
        `12dda70c…` corrects a historical reporting typo.
-13. **INFRA-1 — current candidate.** The constrained local infrastructure
-       execution broker is a cross-cutting gate. Phase 5C remains unstarted and
-       cannot be admitted until INFRA-1 closes.
+13. **INFRA-1 — closed.** The constrained local infrastructure
+       execution broker was protected-merged as PR #419 (merge `bfb9688`).
+       Real receiver deployment is an operator follow-up. Phase 5C remains
+       unstarted and ready for separate preflight admission.
 
 The controlled refresh and prior closures do not authorize a public version
 bump, tag, release, Phase 5C, or any later phase.
@@ -216,22 +223,21 @@ This is a new candidate audit epoch, not a workflow stop condition.
 Phase 5 may eventually cover retrieval planning, ContextPacks, governed context
 assembly, and MCP context/explainability surfaces. It begins only after
 Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
-Controlled Dependency Refresh, Phase 5A runtime contracts, and Phase 5A.1
-correction are closed in this snapshot; the current bounded gate is the Phase
-INFRA-1 constrained local infrastructure execution broker candidate.
+Controlled Dependency Refresh, Phase 5A runtime contracts, Phase 5A.1
+correction, Phase 5B router, and INFRA-1 broker are closed in this snapshot;
+Phase 5C is ready for separate admission and remains unstarted.
 
 ### Phase 5 internal gates
 
-Phase 5A and Phase 5A.1 are closed. The following future runtime gates remain
-`PLANNED / NOT IMPLEMENTED` until their own evidence and protected admission;
-INFRA-1 is the current cross-cutting candidate gate and Phase 5C remains ready
-but blocked and unstarted:
+Phase 5A, Phase 5A.1, Phase 5B, and INFRA-1 are closed. The following future
+runtime gates remain `PLANNED / NOT IMPLEMENTED` until their own evidence and
+protected admission; Phase 5C is ready for separate admission and remains unstarted:
 
 ```text
 5A.1 — Evaluation corpus semantic integrity correction (closed)
 5B — Deterministic multi-domain router (closed)
-INFRA-1 — Constrained Local Infrastructure Execution Broker (current candidate)
-5C — Search scope pushdown
+INFRA-1 — Constrained Local Infrastructure Execution Broker (closed / merged PR #419)
+5C — Search scope pushdown (ready for separate admission / not started)
 5D — RetrievalPlanner + ContextPack read-only vertical slice
 5E — Shadow benchmark / legacy comparison
 5F — Incremental dense validity / dirty-set behavior
