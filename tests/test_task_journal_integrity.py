@@ -262,7 +262,7 @@ def test_web_corrupt_task_degraded_view_and_mutation_block(tmp_path: Path) -> No
     resp_uk = client.get("/tasks/corrupt_web_task?lang=uk")
     assert resp_uk.status_code == 200
     assert "Порушення цілісності журналу подій" in resp_uk.text
-    assert "Snapshot завдання показано лише для читання" in resp_uk.text
+    assert "Знімок стану завдання показано лише для читання" in resp_uk.text
     assert 'action="/tasks/corrupt_web_task/transition"' not in resp_uk.text
 
     # Valid task remains unchanged

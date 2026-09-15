@@ -49,7 +49,7 @@ Thank you for your interest in contributing to the P.O.W.E.R. Framework!
 - All changes go through PRs (no direct pushes to `main`)
 - CI must pass (tests, lint, types)
 - At least one review approval required
-- Squash merge preferred for regular features; POWER gate-specific normal merge policy may override generic squash preference for controlled integration/release gates
+- Squash merge preferred for regular features; admitted POWER gates may require the gate-specific normal-merge policy, which does not override branch protection
 
 ## Maintenance and Backport Policy
 
