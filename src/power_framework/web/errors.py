@@ -20,6 +20,8 @@ class PowerCallTimeoutError(TimeoutError):
 
 
 TASK_JOURNAL_INTEGRITY_CODE = TaskJournalIntegrityError.code
+
+
 class PublicError(BaseModel):
     """Stable public error payload with no exception details."""
 

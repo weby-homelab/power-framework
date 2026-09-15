@@ -301,9 +301,7 @@ class TaskStore:
         try:
             raw_events = ev_file.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
-            raise TaskJournalIntegrityError(
-                f"Malformed task event journal {ev_file.name}"
-            ) from exc
+            raise TaskJournalIntegrityError(f"Malformed task event journal {ev_file.name}") from exc
         if not raw_events.strip() and self._task_file(task_id).is_file() and not allow_missing:
             raise TaskJournalIntegrityError("Task event journal is empty")
         expected_sequence = 1
