@@ -10,4 +10,11 @@ class ConflictError(ValueError, RuntimeError):
     status_code = 409
 
 
-__all__ = ["ConflictError"]
+class TaskJournalIntegrityError(ConflictError):
+    """A task event journal failed its canonical integrity checks."""
+
+    code = "task_journal_integrity"
+    status_code = 409
+
+
+__all__ = ["ConflictError", "TaskJournalIntegrityError"]

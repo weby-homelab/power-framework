@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
+from .errors import TaskJournalIntegrityError
 from .fault_injection import fault_injector
 from .task_models import (
     PowerTask,
@@ -130,6 +131,8 @@ class TaskStore:
             snapshot_file = self._task_file(task.task_id)
             if event is not None and event.task_id != task.task_id:
                 raise ValueError("Task snapshot and event task IDs must match")
+            if snapshot_file.is_file():
+                self.get_task_events(task.task_id)
             event_file = self._events_file(task.task_id)
             checkpoint_file = self._checkpoint_file(event) if event is not None else None
             receipt_file = (
@@ -173,6 +176,8 @@ class TaskStore:
     def append_event(self, event: TaskEvent) -> None:
         """Append an immutable event to the task event journal."""
         with self.lock():
+            if self._task_file(event.task_id).is_file():
+                self.get_task_events(event.task_id)
             ev_file = self._events_file(event.task_id)
             checkpoint_file = self._checkpoint_file(event)
             touched: list[tuple[Path, str]] = [(ev_file, "event")]
@@ -187,7 +192,7 @@ class TaskStore:
         checkpoint_file = self._checkpoint_file(event)
         previous_checkpoint = self._read_text(checkpoint_file)
         try:
-            existing = self.get_task_events(event.task_id)
+            existing = self.get_task_events(event.task_id, allow_missing=True)
             if existing and event.sequence <= existing[-1].sequence:
                 raise ValueError("Task event sequence must be strictly increasing")
             ev_data = event.model_dump()
@@ -283,38 +288,51 @@ class TaskStore:
         results.sort(key=lambda t: t.updated_at, reverse=True)
         return results[offset : offset + limit]
 
-    def get_task_events(self, task_id: str, since_sequence: int = 0) -> list[TaskEvent]:
+    def get_task_events(
+        self, task_id: str, since_sequence: int = 0, *, allow_missing: bool = False
+    ) -> list[TaskEvent]:
         """Retrieve events for a given task starting from since_sequence."""
         ev_file = self._events_file(task_id)
         if not ev_file.is_file():
+            if self._task_file(task_id).is_file() and not allow_missing:
+                raise TaskJournalIntegrityError("Task event journal is missing")
             return []
         events: list[TaskEvent] = []
-        with open(ev_file, encoding="utf-8") as f:
-            expected_sequence = 1
-            previous_digest = ""
-            for line_number, line in enumerate(f, start=1):
-                if not line.strip():
-                    continue
-                try:
-                    ev_dict = json.loads(line)
-                    ev = TaskEvent.model_validate(ev_dict)
-                except (TypeError, ValueError, json.JSONDecodeError) as exc:
-                    raise ValueError(
-                        f"Malformed task event journal {ev_file.name} at line {line_number}"
-                    ) from exc
-                if ev.task_id != task_id:
-                    raise ValueError("Task event task ID does not match its journal")
-                if ev.sequence != expected_sequence:
-                    raise ValueError("Task event journal sequence is not monotonic")
-                expected_previous = previous_digest
-                if ev.prev_event_digest != expected_previous:
-                    raise ValueError("Task event journal hash chain is invalid")
-                if ev.payload_digest != canonical_payload_digest(ev.payload):
-                    raise ValueError("Task event payload digest is invalid")
-                previous_digest = ev.payload_digest
-                expected_sequence += 1
-                if ev.sequence > since_sequence:
-                    events.append(ev)
+        try:
+            raw_events = ev_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise TaskJournalIntegrityError(
+                f"Malformed task event journal {ev_file.name}"
+            ) from exc
+        if not raw_events.strip() and self._task_file(task_id).is_file() and not allow_missing:
+            raise TaskJournalIntegrityError("Task event journal is empty")
+        expected_sequence = 1
+        previous_digest = ""
+        for line_number, line in enumerate(raw_events.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                ev_dict = json.loads(line)
+                ev = TaskEvent.model_validate(ev_dict)
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise TaskJournalIntegrityError(
+                    f"Malformed task event journal {ev_file.name} at line {line_number}"
+                ) from exc
+            if ev.task_id != task_id:
+                raise TaskJournalIntegrityError("Task event task ID does not match its journal")
+            if ev.sequence != expected_sequence:
+                raise TaskJournalIntegrityError("Task event journal sequence is not monotonic")
+            expected_previous = previous_digest
+            if ev.prev_event_digest != expected_previous:
+                raise TaskJournalIntegrityError("Task event journal hash chain is invalid")
+            if ev.payload_digest != canonical_payload_digest(ev.payload):
+                raise TaskJournalIntegrityError("Task event payload digest is invalid")
+            previous_digest = ev.payload_digest
+            expected_sequence += 1
+            if ev.sequence > since_sequence:
+                events.append(ev)
+        if expected_sequence == 1 and self._task_file(task_id).is_file() and not allow_missing:
+            raise TaskJournalIntegrityError("Task event journal is empty")
         return events
 
     def get_last_event_digest(self, task_id: str) -> str:

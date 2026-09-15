@@ -10,11 +10,13 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 
+from power_framework.core.application_models import TaskEventDTO
+
 from ..auth.csrf import validate_csrf
 from ..clients.idempotency import key_for
 from ..clients.power import PowerClient
 from ..config import Settings, get_client, get_settings, require_mutation_enabled
-from ..errors import public_error_details, request_id_for
+from ..errors import TASK_JOURNAL_INTEGRITY_CODE, public_error_details, request_id_for
 from ..offload import run_power_call
 
 if TYPE_CHECKING:
@@ -135,17 +137,33 @@ async def task_detail_view(
     """Render task detail page with timeline, events journal, and actions."""
     templates: Jinja2Templates = request.app.state.templates
 
-    task, events = await asyncio.gather(
+    async def load_events() -> tuple[list[TaskEventDTO], bool]:
+        """Keep a valid task snapshot visible when only its journal is corrupt."""
+        try:
+            return await run_power_call(
+                request,
+                settings,
+                client.get_task_events,
+                task_id,
+            ), False
+        except HTTPException as exc:
+            if exc.status_code != 409 or exc.detail != TASK_JOURNAL_INTEGRITY_CODE:
+                raise
+            return [], True
+
+    task, event_result = await asyncio.gather(
         run_power_call(request, settings, client.get_task, task_id),
-        run_power_call(request, settings, client.get_task_events, task_id),
+        load_events(),
     )
+    events, journal_integrity_error = event_result
 
     return templates.TemplateResponse(
         request=request,
-        name="task_detail.html",
+        name="task_detail_integrity.html" if journal_integrity_error else "task_detail.html",
         context={
             "task": task,
             "events": events,
+            "journal_integrity_error": journal_integrity_error,
             "settings": settings,
         },
     )

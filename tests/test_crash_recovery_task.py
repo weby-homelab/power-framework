@@ -12,6 +12,9 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+import pytest
+
+from power_framework.core.errors import TaskJournalIntegrityError
 from power_framework.core.task_service import TaskService
 
 if TYPE_CHECKING:
@@ -53,7 +56,8 @@ def test_prepared_orphan_snapshot_is_rolled_back(tmp_path: Path) -> None:
     # Simulate a hard kill: snapshot present, event never written.
     store._events_file("T1").unlink(missing_ok=True)
     assert store.get_task("T1") is not None
-    assert len(store.get_task_events("T1")) == 0
+    with pytest.raises(TaskJournalIntegrityError):
+        store.get_task_events("T1")
 
     # Leave a prepared manifest referencing the partial write.
     _write_manifest(
