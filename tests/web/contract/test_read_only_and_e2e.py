@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -56,6 +57,39 @@ def _client(vault: Path, *, read_only: bool = False) -> TestClient:
         read_only_mode=read_only,
     )
     return TestClient(create_app(settings))
+
+
+def test_task_detail_renders_snapshot_when_event_journal_is_corrupt(
+    hermetic_vault: Path,
+) -> None:
+    """A corrupt journal keeps the task snapshot visible and disables mutations."""
+    service = ApplicationService(hermetic_vault)
+    task_id = "corrupt_journal_01"
+    service.task_create(
+        task_id,
+        "Corrupt journal task",
+        context=RequestContext(actor="seed", authority="propose"),
+    )
+    service.task_transition(
+        task_id,
+        "ready",
+        expected_revision=1,
+        context=RequestContext(actor="seed", authority="apply"),
+    )
+
+    event_file = hermetic_vault / ".power" / "tasks" / "events" / f"{task_id}.jsonl"
+    records = [json.loads(line) for line in event_file.read_text(encoding="utf-8").splitlines()]
+    records[1]["sequence"] = 3
+    event_file.write_text(
+        "\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8"
+    )
+
+    response = _client(hermetic_vault).get(f"/tasks/{task_id}")
+
+    assert response.status_code == 200
+    assert "Corrupt journal task" in response.text
+    assert "integrity" in response.text.lower()
+    assert f"/tasks/{task_id}/transition" not in response.text
 
 
 def test_read_only_mode_rejects_mutations_with_405(hermetic_vault: Path) -> None:
