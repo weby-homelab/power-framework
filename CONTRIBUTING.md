@@ -49,7 +49,16 @@ Thank you for your interest in contributing to the P.O.W.E.R. Framework!
 - All changes go through PRs (no direct pushes to `main`)
 - CI must pass (tests, lint, types)
 - At least one review approval required
-- Squash merge preferred
+- Squash merge preferred for regular features; admitted POWER gates may require the gate-specific normal-merge policy, which does not override branch protection
+
+## Maintenance and Backport Policy
+
+- **Main-First Development**: Production bug fixes and active development land on `main` first through standard PR and CI validation.
+- **Maintenance Lines**: `release/*` branches (e.g. `release/3.7`) contain maintenance backports only; they receive no continued feature development.
+- **Provenance-Preserved Backports**: Backports to maintenance lines use `git cherry-pick -x <MAINLINE_COMMIT>` to maintain exact provenance.
+- **Mandatory Gates**: PR and automatic CI are mandatory on both `main` and maintenance branches.
+- **Architectural Gate Policy**: Detailed gate contracts and governance specifications reside in `docs/plans/POWER_3.8_DEVELOPMENT_PROTOCOL.md`.
+
 
 ## Reporting Issues
 

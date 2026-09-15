@@ -36,6 +36,33 @@ def test_ci_defers_non_linux_runtime_smoke_for_3_6_2() -> None:
     assert "runs-on: ubuntu-latest" in ci_text
 
 
+def test_docs_build_covers_release_workflow_changes() -> None:
+    docs_text = (WORKFLOWS_DIR / "docs.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(docs_text)
+
+    assert isinstance(workflow, dict)
+
+    # PyYAML follows YAML 1.1 semantics and may decode the GitHub Actions
+    # unquoted `on` key as boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+
+    assert isinstance(triggers, dict)
+
+    pull_request = triggers["pull_request"]
+    push = triggers["push"]
+
+    assert "main" in pull_request["branches"]
+    assert "release/**" in pull_request["branches"]
+    assert "paths" not in pull_request
+
+    assert "main" in push["branches"]
+    assert "release/**" in push["branches"]
+    assert "paths" in push
+    assert ".github/workflows/release.yml" in push["paths"]
+
+    assert "build" in workflow["jobs"]
+
+
 def test_ci_aggregates_all_supported_ubuntu_reports() -> None:
     ci_text = (WORKFLOWS_DIR / "ci.yml").read_text(encoding="utf-8")
 
