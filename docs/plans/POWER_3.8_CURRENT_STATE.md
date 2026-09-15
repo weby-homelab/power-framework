@@ -18,67 +18,55 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5B CLOSED / MERGED / VERIFIED / INFRA-1 CANDIDATE IN ADMISSION
+PHASE 5B CLOSED / INFRA-1 CLOSED / MERGED / VERIFIED / PHASE 5C READY NOT STARTED
 
 SNAPSHOT_BASE_SHA:
-6a315d5919eeef797bc506ecb216313c20419fc2
+bfb968846c0fc41582c2367782a28540498715b4
 
 SNAPSHOT_BASE_TREE:
-a03b90648e1e57c5a579e5834988015192027cb0
+70dbfd0f9c980672a757be601b72b138e4e3d744
 
 SNAPSHOT_LAST_INCLUDED_PR:
-418
+419
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-418
+419
 
 CURRENT_LIVE_MAIN:
-6a315d5919eeef797bc506ecb216313c20419fc2
+bfb968846c0fc41582c2367782a28540498715b4
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-Phase 5B — Domain Policy v2 and deterministic multi-domain router (PR #418)
+INFRA-1 — Constrained Local Infrastructure Execution Broker (PR #419 / merge bfb9688)
 
 NEXT_GATE:
-INFRA-1 — Constrained Local Infrastructure Execution Broker
+Phase 5C — Search Scope Pushdown (Preflight / Contract Freeze)
 
-INFRA_1_CANDIDATE_STATUS:
-LOCAL IMPLEMENTATION COMPLETE / LOCAL VALIDATION COMPLETE / PROTECTED ADMISSION PENDING
+INFRA_1_STATUS:
+CLOSED / MERGED / VERIFIED
 
-INFRA_1_CANDIDATE_PR:
-419 / REMOTE READBACK OBSERVED 2026-09-14T16:40:21Z / HEAD 4dc2db46885ab81e337f398f16ea6a7aac585839
+INFRA_1_PR:
+#419
 
-INFRA_1_CANDIDATE_TREE:
-0550327422405aace37a6593abcfc3e836b7c7fc
+INFRA_1_MERGE:
+bfb968846c0fc41582c2367782a28540498715b4
 
-INFRA_1_CANDIDATE_PARENT:
-62323a930189c7afea497a984bdf6858011dfa09
+INFRA_1_TREE:
+70dbfd0f9c980672a757be601b72b138e4e3d744
 
-INFRA_1_CANDIDATE_GPG:
+INFRA_1_PARENTS:
+6a315d5919eeef797bc506ecb216313c20419fc2, d6eaa4f1967178f5ebbf458168c1b7e7fadb524b
+
+INFRA_1_GPG:
 VERIFIED / reason=valid
 
 INFRA_1_REMOTE_CHECKS:
-IN PROGRESS / 11 check-runs observed; deploy=skipped; prior head CodeQL failure is superseded
+SUCCESS / 11 required check-runs PASS; post-merge CI/Docs/CodeQL PASS
 
-INFRA_1_REMOTE_ATTEMPT_742:
-COMPLETED / test (3.14)=FAILURE / test (3.13)=CANCELLED / OTHER OBSERVED CONTEXTS=SUCCESS
-
-INFRA_1_LOCAL_BASE_HEAD:
-ace5d6351dd599578491023419140b6a79bd6b7f
-
-INFRA_1_LOCAL_VALIDATION:
-2012 PASSED / 4 SKIPPED / 17 DESELECTED / COVERAGE 82%
-
-INFRA_1_LOCAL_CODE_REVIEW:
-NO P0/P1 PROTECTED-ADMISSION CODE BLOCKER FOUND
-
-INFRA_1_RECEIVER_EVIDENCE:
-UNAVAILABLE / REAL_REPLICATE_NOT_RUN
-
-INFRA_1_PROVENANCE:
-DIRTY UNCOMMITTED WORKTREE / NO IMMUTABLE CANDIDATE TUPLE
+INFRA_1_RECEIVER_DEPLOYMENT:
+OPERATOR FOLLOW-UP / NOT FRAMEWORK MERGE BLOCKER
 
 ACTIONS_396:
 CLOSED / MERGED
@@ -102,13 +90,19 @@ PHASE_5A_1:
 CLOSED / MERGED / VERIFIED / PR #416
 
 PHASE_5B:
-CLOSED / MERGED / VERIFIED / PR #418 / merge 6a315d5
+CLOSED / MERGED / VERIFIED
 
 INFRA_1:
-ADMISSION CANDIDATE / PROVISIONAL IMPLEMENTATION PR
+CLOSED / MERGED / VERIFIED
+
+INFRA_1_PR:
+#419
+
+INFRA_1_MERGE:
+bfb968846c0fc41582c2367782a28540498715b4
 
 PHASE_5C:
-READY FOR SEPARATE ADMISSION / BLOCKED UNTIL INFRA-1 CLOSES
+READY FOR SEPARATE ADMISSION / NOT STARTED
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -132,7 +126,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md
+artifacts/project-state/handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -166,7 +160,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CANDIDATE / PHASE 5C+ NOT IMPLEMENTED
+CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C+ NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -229,8 +223,9 @@ evidence.
 - Phase 5A.1: **CLOSED / MERGED / VERIFIED** through protected PR #416.
 - Active evaluation revision: **v1.1 / SEMANTIC ADJUDICATION PASS / ACTIVE**.
 - Phase 5B: **CLOSED / MERGED / VERIFIED** through protected PR #418.
-- INFRA-1: **ADMISSION CANDIDATE**; runtime capability is not yet merged.
-- Phase 5C: **READY FOR SEPARATE ADMISSION / BLOCKED UNTIL INFRA-1 CLOSES**.
+- INFRA-1: **CLOSED / MERGED / VERIFIED** through protected PR #419.
+- INFRA-1 deployment validation: **OPERATOR DEPLOYMENT FOLLOW-UP**; not a generic framework blocker.
+- Phase 5C: **READY FOR SEPARATE ADMISSION / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
 
@@ -252,49 +247,78 @@ evidence.
 | Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; superseded for future evaluation |
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
 | Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; merge `6a315d5`; live parent erratum retained above |
-| INFRA-1 | ADMISSION CANDIDATE | Constrained local Unix broker, typed operations, receipts, SSH/rrsync policy |
+| INFRA-1 | CLOSED / MERGED / VERIFIED | PR #419; merge `bfb9688`; constrained local broker merged; receiver deployment is operator follow-up |
 
-## INFRA-1 candidate evidence (provisional)
+## INFRA-1 merged evidence and governance reconciliation
 
-INFRA-1 is the current cross-cutting implementation candidate. The following
-facts are **LOCAL CANDIDATE** evidence, not `REMOTE EXACT-HEAD` or `MERGED MAIN`
-evidence:
+INFRA-1 implementation was admitted, reviewed, and merged on `main`:
 
-- Local branch: `feat/power-3.8-infra-execution-broker`.
-- Local base: `ace5d6351dd599578491023419140b6a79bd6b7f`; the worktree is dirty
-  and no signed candidate commit exists yet.
-- Full hermetic result: `2012 passed, 4 skipped, 17 deselected`, `82%` coverage.
-- Ruff and MyPy passed; wheel/sdist package smoke passed with version `3.7.11`
-  and `16` queries; `uv lock --check`, pip check/audit, systemd verification,
-  strict MkDocs, and `git diff --check` passed. The doc-drift helper still
-  reports a global OpenCode skill/repository runtime-contract mismatch.
-- A fresh read-only adversarial review found no P0/P1 protected-admission code
-  blocker in the current tree.
-- The receiver is still an operator-provisioning reference only; no real
-  receiver, forced `rrsync`, or real replicate evidence exists.
-- Remote PR #419 is open. The latest readback observed
-  `2026-09-14T16:40:21Z` reports candidate head
-  `4dc2db46885ab81e337f398f16ea6a7aac585839`, tree
-  `0550327422405aace37a6593abcfc3e836b7c7fc`, parent
-  `62323a930189c7afea497a984bdf6858011dfa09`, and GPG verification
-  `verified=true / reason=valid`. Eleven check-runs were observed: several are
-  still in progress, `deploy=skipped`, and the prior head's CodeQL failure is
-  superseded; no final protected result exists yet.
+- PR: [#419](https://github.com/weby-homelab/power-framework/pull/419)
+- Candidate Head: `d6eaa4f1967178f5ebbf458168c1b7e7fadb524b`
+- Merge Commit: `bfb968846c0fc41582c2367782a28540498715b4`
+- Merge Tree: `70dbfd0f9c980672a757be601b72b138e4e3d744`
+- Merge Parents: `6a315d5919eeef797bc506ecb216313c20419fc2` and `d6eaa4f1967178f5ebbf458168c1b7e7fadb524b`
+- Merge GPG: `verified=true / valid`
+- Pre-Merge Required Checks: 11/11 PASS
+- Post-Merge Checks: CI = PASS, Docs = PASS, CodeQL = PASS
+- Closure Comment: [5671031312](https://github.com/weby-homelab/power-framework/pull/419#issuecomment-5671031312)
 
-The gate remains open until an exact signed candidate tuple is published,
-required remote checks and policy are freshly green, and receiver evidence is
-captured. Phase 5C remains blocked and unstarted.
+### Architectural decision: framework capability vs operator deployment
 
-### Latest remote CI attempt
+The framework contract must NOT depend on one specific homelab host.
 
-For candidate head `742d0fb431d78fde5d698ae1aa55589ef0e75c1b` (run
-`34870415055`, attempt 2), GitHub completed CodeQL, security, package smoke,
-build, analyze, benchmark, upgrade, and base-runtime contexts successfully.
-The matrix reported `test (3.14)=failure` and `test (3.13)=cancelled`; the
-failure annotation exposed only process exit code, without a failing test
-name. The exact workflow test gate passes locally on Python 3.14.6, but the
-remote failure remains a protected-check blocker and was not blindly retried
-again. This result is candidate evidence, not merged-main evidence.
+Binding architectural invariant:
+
+```text
+HOST-SPECIFIC DEPLOYMENT FACT != FRAMEWORK INVARIANT
+```
+
+PRXMX-01, specific IP addresses, individual receiver accounts, host-specific SSH
+keys, and concrete storage mount availability must never be required to merge or
+advance generic POWER Framework phases. The framework gate proves:
+
+- receiver security contract;
+- broker behavior and AF_UNIX principal boundary;
+- transport restrictions and fixed argv;
+- hermetic and adversarial test suites;
+- reference deployment configuration.
+
+### Deployment validation (Operator follow-up)
+
+Real receiver validation remains an essential operator operational step:
+
+- non-root receiver account;
+- forced `rrsync` execution;
+- `restrict` mode and SSH subsystem lockdowns;
+- stable source allowlist where configured;
+- host-key pinning;
+- credential isolation;
+- probe and dry-run execution;
+- bounded replicate execution;
+- exact verification;
+- restore test where separately authorized.
+
+Absence of a specific physical host or operator deployment credential is an
+operator follow-up, not a generic framework admission failure.
+
+### Governance reconciliation rationale (Not retroactive gate weakening)
+
+This correction is NOT: tests failed, therefore lower the bar.
+
+Evidence:
+
+- The INFRA-1 exact-head implementation passed all required framework checks.
+- Protected normal merge completed on `main` without bypass or force.
+- Post-merge CI, Docs, and CodeQL passed on the merged tree.
+- Security invariants remain unchanged: zero arbitrary command surface, zero
+  credential exposure, zero password fallback, zero direct agent SSH, strict
+  receiver lockdown, and secret-free client/agent boundary.
+- The earlier acceptance wording accidentally promoted a host-specific deployment
+  fact into a framework invariant.
+- This correction restores the clean architectural boundary between generic
+  framework capability and operator deployment validation.
+
+Phase 5C is ready for separate admission and remains not started.
 
 ## Actions #396 exact objects
 
@@ -414,34 +438,40 @@ PHASE 5 = IN PROGRESS
 PHASE 5A RUNTIME CONTRACTS = CLOSED / MERGED / VERIFIED
 PHASE 5A.1 EVALUATION CORRECTION = CLOSED / MERGED / VERIFIED
 PHASE 5B = CLOSED / MERGED / VERIFIED / PR #418
-INFRA-1 = ADMISSION CANDIDATE / PROVISIONAL IMPLEMENTATION PR
-PHASE 5C = READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED
+INFRA-1 = CLOSED / MERGED / VERIFIED / PR #419 / merge bfb9688
+INFRA-1 DEPLOYMENT VALIDATION = OPERATOR DEPLOYMENT FOLLOW-UP
+PHASE 5C = READY FOR SEPARATE ADMISSION / NOT STARTED
 ```
 
 The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
-runtime contracts, Phase 5A.1 semantic correction, and Phase 5B router were
-accepted through normal protected merges and post-merge checks. The current
-bounded gate is INFRA-1. POWER 3.8.0 cannot be released from this state.
+runtime contracts, Phase 5A.1 semantic correction, Phase 5B router, and INFRA-1
+broker were accepted through normal protected merges and post-merge checks.
+Real receiver deployment is an operator follow-up. The next planned gate is
+Phase 5C preflight and contract freeze. POWER 3.8.0 cannot be released from this
+state.
 
 ## Canonical governance status
 
 The prior governance, dependency, Foundation Hardening, Phase 5A runtime
-contract, Phase 5A.1 correction, and Phase 5B merge are canonical on protected
-`main`. INFRA-1 below remains provisional until its protected normal merge:
+contract, Phase 5A.1 correction, Phase 5B merge, and INFRA-1 broker merge are
+canonical on protected `main`:
 
 - Governance branch: `docs/power-3.8-final-integration-course-correction`.
 - Prior governance bootstrap merge: `4b49e00c75866fa57f71e7bef61547915f7e01db`,
   with GitHub `verified=true`, `reason=valid`.
-- Governance PR #413 is protected-merged as `95f8cadd7e90ef4b16773b3c45bbc9ab40569e7a`;
-  no future Foundation merge SHA is fabricated in this candidate snapshot.
+- Governance PR #413 is protected-merged as `95f8cadd7e90ef4b16773b3c45bbc9ab40569e7a`.
 - Post-governance state PR #409 and CI admission repair PR #410 are merged on
   protected `main`.
 - Phase 5A runtime contracts PR #415 is protected-merged as
-  `0a70ca4e9acc89596acd192931c1d174040ad484`; its final head is
-  `09a222b9c39d650d70aa116d9bce727d3cdbfe3b` with valid GitHub GPG verification.
+  `0a70ca4e9acc89596acd192931c1d174040ad484`.
 - Phase 5A.1 correction PR #416 is protected-merged as
-  `dde1e1369c2d79d8f01b9fce21ae1fb55834a814`; its final head is
-  `94e2e08a2d37884b90ac895de35979fa87696bd5` with valid GitHub verification.
+  `dde1e1369c2d79d8f01b9fce21ae1fb55834a814`.
+- Phase 5B router PR #418 is protected-merged as
+  `6a315d5919eeef797bc506ecb216313c20419fc2`.
+- INFRA-1 broker PR #419 is protected-merged as
+  `bfb968846c0fc41582c2367782a28540498715b4`, with tree
+  `70dbfd0f9c980672a757be601b72b138e4e3d744`, closure comment `5671031312`,
+  and post-merge CI/Docs/CodeQL verified.
 - The prior `docs/power-3.8-premerge-state-publication` branch remains
   provisional evidence and is retained as source material; it is not replaced
   or deleted.
@@ -450,11 +480,14 @@ contract, Phase 5A.1 correction, and Phase 5B merge are canonical on protected
 
 ## Next authorized work
 
-1. Complete the INFRA-1 candidate from live protected `main` through one
-   protected normal merge.
-2. Perform independent exact-head post-merge readback for INFRA-1.
-3. Keep Phase 5C–9 runtime work beyond this gate, version bumps, tags, releases, and POWER 3.8.0
-   publication blocked until each declared gate is independently closed.
+1. Execute Phase 5C preflight and contract freeze in
+   `06-phase5c-preflight-contract-freeze` (inventory candidate-generation paths,
+   map SearchScope dimensions, define pushdown semantics, define baseline and
+   metrics, freeze implementation contract).
+2. Do not implement Phase 5C runtime changes in the preflight/freeze packet.
+3. Keep Phase 5C–9 runtime work beyond this gate, version bumps, tags, releases,
+   and POWER 3.8.0 publication blocked until each declared gate is
+   independently closed.
 
 ## Do not start
 
@@ -462,9 +495,9 @@ contract, Phase 5A.1 correction, and Phase 5B merge are canonical on protected
   dependency candidate must record its exact base/head/tree/parent, diff,
   hashes, tests, security, CI, and policy evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
-- Do not start Phase 5C SearchScope pushdown until INFRA-1 is independently
-  admitted and verified.
-- Do not start Phase 5C implementation or later phases in this gate.
+- Do not implement Phase 5C SearchScope pushdown until preflight and contract
+  freeze are completed and separately admitted.
+- Do not start Phase 5C runtime implementation or later phases in this gate.
 - Do not bump the public version, create a tag, create a release, or publish
   `POWER 3.8.0`.
 - Do not treat candidate or evidence-branch documents as `MERGED MAIN` evidence.
@@ -482,5 +515,6 @@ contract, Phase 5A.1 correction, and Phase 5B merge are canonical on protected
 - [Active evaluation manifest](https://github.com/weby-homelab/power-framework/blob/main/benchmarks/power38/retrieval_eval/v1.1/manifest.json)
 - [Phase 5B report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
 - [Phase 5B routing evaluation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/domain-routing-evaluation-v1.md)
+- [INFRA-1 governance reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

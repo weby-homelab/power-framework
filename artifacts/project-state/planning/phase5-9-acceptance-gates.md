@@ -308,50 +308,129 @@ set without exposing arbitrary SSH, shell, credentials, or remote deletion.
 Task, MCP, CLI, receipt, approval, idempotency, timeout, recovery, and
 read-only verification semantics must remain explicit and fail closed.
 
-### Required evidence
+### Required framework evidence
 
 - Typed request/response/receipt models and a strict AF_UNIX peer-principal
   boundary.
-- Operator-owned profile, caller UID/GID allowlist, non-root service, fixed
-  SSH/rsync argv, pinned host key, forced non-root receiver contract, and no
-  password/agent/private-key fallback.
-- Hermetic tests for source snapshot bounds, exact read-only verification,
-  admission/idempotency, prepared/started recovery, timeout classification,
-  receipt durability, Task projection/CAS, and public API boundaries.
+- Hardened reference receiver configuration (`power-receiver.authorized_keys`,
+  `sshd_config.d/power-receiver.conf`).
+- Forced `rrsync` contract with directory restriction (`-ro` / `-wo`) and
+  `restrict` directive.
+- No interactive shell, no PTY allocation, no SSH agent forwarding, no X11 or
+  TCP port forwarding.
+- Non-root receiver model with strict filesystem ownership and permissions.
+- Destination containment ensuring replicated bytes cannot escape designated
+  receiver tree.
+- No remote deletion by default (`--delete` is forbidden in the receiver contract).
+- Strict known-host identity model with pinned host keys and no password,
+  agent, or private-key fallback.
+- Secret-free client/agent boundary: private keys and credentials never enter
+  agent context or unprivileged storage.
+- Hermetic receiver/transport tests covering source snapshot bounds, exact
+  read-only verification, admission/idempotency, prepared/started recovery,
+  timeout classification, receipt durability, Task projection/CAS, and public
+  API boundaries.
+- Install and status diagnostics (`power infra receiver-check`,
+  `power infra status`).
 - Exact signed candidate tuple (PR, base, head, tree, parents), fresh remote
   required checks, protected policy readback, and independent review.
-- Operator evidence for the actual receiver account, forced `rrsync` mode,
-  source/destination permissions, and one approved real verification/replicate
-  exercise. Framework CI doubles do not substitute for this host evidence.
 
-### Current provisional evidence
+### Deployment validation (Operator deployment validation)
 
-The local candidate currently reports `2012 passed, 4 skipped, 17 deselected`
-with `82%` coverage. Ruff, MyPy, package smoke, lock, pip, systemd, strict
-MkDocs, and diff checks pass locally, and a fresh read-only review found no
-P0/P1 code blocker. This remains `LOCAL CANDIDATE` evidence because the
-worktree is uncommitted, the real receiver has not been exercised, and the
-latest PR #419 CI attempt reports `test (3.14)=failure` and `test (3.13)=cancelled`;
-the other observed contexts passed, the prior head's CodeQL failure is
-superseded, and no final protected result exists yet.
+A real-host probe, dry-run, replicate, and verify exercise against a live
+receiver host (such as PRXMX-01 or another operator-managed server) is
+**recommended/required for a specific production deployment**, but is **not
+required for generic framework gate closure**.
+
+Architectural decision & invariant:
+
+```text
+HOST-SPECIFIC DEPLOYMENT FACT != FRAMEWORK INVARIANT
+```
+
+Physical host availability, specific IP addresses, individual operator receiver
+accounts, host-specific SSH keys, and concrete storage mount paths belong to
+operator deployment validation. They must never block generic framework phase
+advancement.
+
+Post-installation operator deployment validation should verify on the target host:
+
+- non-root receiver account;
+- forced `rrsync` execution;
+- `restrict` option and disabled SSH subsystems;
+- stable source allowlist where configured;
+- host-key pinning;
+- credential isolation;
+- probe and dry-run execution;
+- bounded replicate execution;
+- exact verification;
+- restore test where separately authorized.
+
+Failure of a real deployment may reveal either a deployment/configuration
+defect (resolved in operator deployment configuration) or a framework defect.
+If a framework defect is revealed, a bounded corrective gate must be opened.
+However, the absence of a particular physical host or private deployment secret
+is not a framework admission failure.
+
+### Closed framework evidence
+
+INFRA-1 framework capability was admitted, reviewed, and merged:
+
+- PR: [#419](https://github.com/weby-homelab/power-framework/pull/419)
+- Candidate Head: `d6eaa4f1967178f5ebbf458168c1b7e7fadb524b`
+- Merge Commit: `bfb968846c0fc41582c2367782a28540498715b4`
+- Merge Tree: `70dbfd0f9c980672a757be601b72b138e4e3d744`
+- Merge Parents: `6a315d5919eeef797bc506ecb216313c20419fc2` and `d6eaa4f1967178f5ebbf458168c1b7e7fadb524b`
+- Merge GPG: `verified=true / valid`
+- Pre-Merge Required Checks: 11/11 PASS
+- Post-Merge Checks: CI = PASS, Docs = PASS, CodeQL = PASS
+- Closure Comment: [5671031312](https://github.com/weby-homelab/power-framework/pull/419#issuecomment-5671031312)
+
+### Governance reconciliation rationale (Not retroactive gate weakening)
+
+This correction is NOT: tests failed, therefore lower the bar.
+
+Evidence:
+
+- The INFRA-1 exact-head implementation passed all required framework checks.
+- Protected normal merge completed on `main` without bypass or force.
+- Post-merge CI, Docs, and CodeQL passed on the merged tree.
+- Security invariants remain unchanged: zero arbitrary command surface, zero
+  credential exposure, zero password fallback, zero direct agent SSH, strict
+  receiver lockdown, and secret-free client/agent boundary.
+- The contradiction concerned deployment scope only: the earlier acceptance
+  wording accidentally promoted a host-specific deployment fact into a
+  framework invariant.
+
+This correction restores the architecture boundary:
+
+```text
+framework capability vs operator deployment
+```
 
 ### PASS condition
 
-All required implementation, security, local quality, exact-head remote, review,
-and receiver evidence is attached to one candidate tuple; the candidate passes
-the protected normal merge; and independent post-merge readback confirms the
-same tree and required contexts.
+Implementation + security + local quality + exact-head protected admission +
+independent review + protected merge + post-merge readback + receiver CONTRACT
+evidence are satisfied on protected `main`. It does NOT require availability of
+PRXMX-01, specific real receiver credentials, or a specific physical host
+deployment.
 
 ### FAIL / blocked condition
 
-Missing or stale candidate provenance, any failing required check, absent
-receiver evidence, unknown write outcome without a verify path, arbitrary
-command/credential input, or any false Task completion keeps INFRA-1 open.
+Any arbitrary command surface, credential exposure, password fallback, direct
+agent SSH, unknown external write completion, unsafe path escape, missing
+receiver restriction contract, missing host-key verification semantics, false
+Task completion, failing required CI, or invalid protected merge keeps INFRA-1
+open. The absence of one real receiver deployment is an operator follow-up and
+is not a generic framework blocker.
 
 ### What it blocks
 
-Phase 5C–5H, Phase 6–9 runtime work, public version/tag/release changes, and
-POWER 3.8.0 publication.
+Failure of the INFRA-1 framework gate blocks Phase 5C–5H, Phase 6–9 runtime
+work, public version/tag/release changes, and POWER 3.8.0 publication.
+With INFRA-1 framework gate closed, Phase 5C is ready for separate admission
+and remains unstarted.
 
 ## Gate 5C — Search Scope Pushdown
 

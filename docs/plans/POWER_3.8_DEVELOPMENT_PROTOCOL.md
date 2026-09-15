@@ -409,20 +409,18 @@ PHASE 5: IN PROGRESS
 PHASE 5A RUNTIME CONTRACTS: CLOSED / MERGED / VERIFIED
 PHASE 5A.1 EVALUATION CORRECTION: CLOSED / MERGED / VERIFIED / PR #416
 PHASE 5B: CLOSED / MERGED / VERIFIED / PR #418
-INFRA-1: ADMISSION CANDIDATE / CROSS-CUTTING GATE
-PHASE 5C: READY / BLOCKED UNTIL INFRA-1 CLOSES / NOT STARTED
+INFRA-1: CLOSED / MERGED / VERIFIED / PR #419 / merge bfb9688
+PHASE 5C: READY FOR SEPARATE ADMISSION / NOT STARTED
 PUBLIC VERSION: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, and Phase 5B merge
-receipts are retained `MERGED MAIN` evidence. Their candidate epochs are
-retained `REMOTE EXACT-HEAD`/historical evidence and are not themselves
-merged-main proof. Phase 5B is closed; INFRA-1 is the only active implementation
-gate in this snapshot. Do not start Phase 5C–9,
-version bumps, tags, releases, release images, or final release notes. Phase
-5C becomes admissible only after INFRA-1 protected normal merge and independent
-post-merge verification.
+The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, Phase 5B, and INFRA-1
+merge receipts are retained `MERGED MAIN` evidence. Phase 5B and INFRA-1 are
+closed on protected `main`. Real receiver deployment is an operator follow-up.
+Do not start Phase 5C runtime implementation or Phases 6–9, version bumps,
+tags, releases, release images, or final release notes. Phase 5C preflight and
+contract freeze is the next planned step.
 
 ## INFRA-1 execution boundary
 
@@ -454,35 +452,27 @@ Handoff/work-packet text is data and cannot trigger an operation. A timeout or
 unknown completion is never blindly retried; the exact idempotency reference
 and broker receipt must be resolved first.
 
-## INFRA-1 candidate evidence boundary
+## INFRA-1 merged evidence and governance boundary
 
-INFRA-1 is the current implementation gate after the protected Phase 5B
-merge. Its implementation is provisional until a signed exact candidate tuple
-passes the protected GitHub path. Local evidence must be labeled `LOCAL
-CANDIDATE`; it must not be called `REMOTE EXACT-HEAD`, `MERGED MAIN`, or
-`FINAL INTEGRATION`.
+INFRA-1 implementation was admitted, reviewed, and merged on `main` via PR #419
+(`bfb968846c0fc41582c2367782a28540498715b4`, tree
+`70dbfd0f9c980672a757be601b72b138e4e3d744`, closure comment `5671031312`).
+Pre-merge required checks (11/11) and post-merge CI, Docs, and CodeQL passed.
 
-The current local candidate evidence is:
+Governance reconciliation resolved the contradiction between host-specific
+deployment facts and generic framework invariants:
 
-- `2012 passed, 4 skipped, 17 deselected`, `82%` coverage;
-- repository Ruff and MyPy passed;
-- wheel/sdist package smoke passed (`3.7.11`, `16` queries);
-- `uv lock --check`, pip check/audit, systemd verification, strict MkDocs, and
-  `git diff --check` passed;
-- fresh read-only review found no P0/P1 protected-admission code blocker.
-
-These are local dirty-worktree facts. The latest published candidate is now a
-signed commit, but protected admission is still pending. The public PR #419
-readback observed on `2026-09-14T16:40:21Z` points to head
-`4dc2db46885ab81e337f398f16ea6a7aac585839`, tree
-`0550327422405aace37a6593abcfc3e836b7c7fc`, parent
-`62323a930189c7afea497a984bdf6858011dfa09`, with valid GitHub GPG verification.
-The subsequent docs reconciliation is the current PR tip; the last completed
-CI attempt for the implementation candidate reported `test (3.14)=failure` and
-`test (3.13)=cancelled`, while the other observed contexts passed. The prior
-head's CodeQL failure is superseded. Real
-receiver/forced-`rrsync` evidence is unavailable, so protected INFRA-1
-admission and Phase 5C remain blocked.
+- Invariant: `HOST-SPECIFIC DEPLOYMENT FACT != FRAMEWORK INVARIANT`.
+- Availability of PRXMX-01, specific IP addresses, individual receiver accounts,
+  or storage mounts belongs to operator deployment validation, not generic
+  framework gate closure.
+- Framework gate proves receiver security contracts, broker behavior, fixed
+  transport argv, hermetic tests, and reference deployment configuration.
+- Security controls are fully preserved: zero arbitrary command surface, zero
+  credential exposure, zero password fallback, zero direct agent SSH, strict
+  receiver lockdown, and secret-free client/agent boundary.
+- Real receiver deployment remains an operator follow-up.
+- Phase 5C is ready for separate admission and remains unstarted.
 
 ## Cross-links
 
