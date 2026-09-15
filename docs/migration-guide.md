@@ -1,12 +1,12 @@
 ---
 type: Resource
-title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.7.12"
+title: "AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.7.13"
 description: "Fail-closed, manifest-driven protocol for migrating an existing Markdown knowledge base to a verified P.O.W.E.R. vault without modifying the source."
 tags: [power, migration, guide, ai-agents, safety, verification]
 timestamp: 2026-08-17T12:00:00+03:00
 ---
 
-# AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.7.12
+# AI Agent Migration Guide: Any Markdown Knowledge Base to P.O.W.E.R. v3.7.13
 
 This guide is written as an execution contract for any AI agent with filesystem
 access. It migrates a Markdown or Obsidian knowledge base into the canonical
@@ -17,7 +17,7 @@ For a new empty vault, stop here and use [Getting Started](getting-started.md).
 For Windows 11 25H2 runtime setup, first use the
 [Windows installation guide](windows-11-installation.md).
 
-This guide targets the `v3.7.12` release. Select the clean-install
+This guide targets the `v3.7.13` release. Select the clean-install
 guide when the destination is empty. Select this guide when any existing note,
 attachment, or configuration must be preserved. Never run `power init` inside
 an existing knowledge base.
