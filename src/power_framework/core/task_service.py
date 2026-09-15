@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from .errors import ConflictError
+from .errors import ConflictError, TaskJournalIntegrityError
 from .task_models import (
     PowerTask,
     TaskAuthority,
@@ -196,7 +196,13 @@ class TaskService:
             if not task:
                 raise FileNotFoundError(f"Task {task_id} not found")
 
-            replay = self._find_idempotent_result(task_id, idempotency_key, command_sha256)
+            existing_events = self.store.get_task_events(task_id)
+            if not existing_events:
+                raise TaskJournalIntegrityError("Task event journal is empty")
+
+            replay = self._find_idempotent_result(
+                task_id, idempotency_key, command_sha256, events=existing_events
+            )
             if replay is not None:
                 return replay
 
@@ -367,9 +373,8 @@ class TaskService:
                     }
                 )
 
-            last_digest = self.store.get_last_event_digest(task_id)
-            existing_events = self.store.get_task_events(task_id)
-            next_seq = existing_events[-1].sequence + 1 if existing_events else 1
+            last_digest = existing_events[-1].payload_digest
+            next_seq = existing_events[-1].sequence + 1
 
             event = TaskEvent.create(
                 task_id=task_id,
@@ -403,10 +408,13 @@ class TaskService:
         task_id: str,
         idempotency_key: str | None,
         command_sha256: str,
+        *,
+        events: list[TaskEvent] | None = None,
     ) -> PowerTask | None:
         if idempotency_key is None:
             return None
-        for event in self.store.get_task_events(task_id):
+        task_events = events if events is not None else self.store.get_task_events(task_id)
+        for event in task_events:
             if event.payload.get("idempotency_key") != idempotency_key:
                 continue
             if event.payload.get("command_sha256") != command_sha256:
@@ -490,6 +498,8 @@ class TaskService:
 
     def get_events(self, task_id: str, since_sequence: int = 0) -> list[TaskEvent]:
         """Get event stream for a task."""
+        if not self.store.get_task(task_id):
+            raise FileNotFoundError(f"Task {task_id} not found")
         return self.store.get_task_events(task_id, since_sequence=since_sequence)
 
     def migrate_v1_work_packets(self) -> dict[str, Any]:
