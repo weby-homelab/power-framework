@@ -82,6 +82,13 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "event_actor": "Actor",
         "event_digest": "Digest",
         "no_events": "No events recorded yet.",
+        "event_journal_integrity_title": "Event journal integrity failure",
+        "event_journal_integrity_detail": (
+            "The task snapshot is shown read-only. Event history is unavailable, "
+            "and transitions are disabled until an authoritative repair is available."
+        ),
+        "event_journal_integrity_events": "Event history is unavailable because its integrity could not be verified.",
+        "event_journal_integrity_actions": "Task actions are disabled while event history integrity is unresolved.",
         # Notes
         "note_browser": "Notes Browser",
         "edit_note": "Edit Note",
@@ -208,6 +215,13 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "event_actor": "Актор",
         "event_digest": "Digest",
         "no_events": "Подій поки що немає.",
+        "event_journal_integrity_title": "Порушення цілісності журналу подій",
+        "event_journal_integrity_detail": (
+            "Snapshot завдання показано лише для читання. Історія подій недоступна, "
+            "а переходи заблоковано до появи авторитетного repair."
+        ),
+        "event_journal_integrity_events": "Історія подій недоступна, оскільки її цілісність не вдалося перевірити.",
+        "event_journal_integrity_actions": "Дії із завданням заблоковано, доки цілісність історії подій не буде відновлена.",
         # Notes
         "note_browser": "Перегляд нотаток",
         "edit_note": "Редагувати нотатку",

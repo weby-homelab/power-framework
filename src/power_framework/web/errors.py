@@ -16,7 +16,7 @@ from power_framework.core.application import (
     DeadlineExceededError,
     ResultBudgetExceededError,
 )
-from power_framework.core.errors import ConflictError
+from power_framework.core.errors import ConflictError, TaskJournalIntegrityError
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
@@ -31,6 +31,9 @@ class PowerCallCompletedAfterDeadlineError(TimeoutError):
 
 class PowerCallCompletedAfterCancellationError(TimeoutError):
     """A canceled mutation worker was joined and its outcome is now known."""
+
+
+TASK_JOURNAL_INTEGRITY_CODE = TaskJournalIntegrityError.code
 
 
 class PublicError(BaseModel):
@@ -77,6 +80,8 @@ def _exception_mapping(exc: BaseException) -> tuple[int, str, str]:
     """Map known domain failures to a safe status, code, and message."""
     domain_status = getattr(exc, "status_code", None)
     domain_code = getattr(exc, "code", None)
+    if isinstance(exc, TaskJournalIntegrityError):
+        return 409, TASK_JOURNAL_INTEGRITY_CODE, "The task event history is unavailable."
     if isinstance(exc, ConflictError):
         return 409, "conflict", "The request conflicts with the current resource state."
     domain_messages = {
@@ -146,6 +151,8 @@ def public_http_exception(exc: BaseException) -> HTTPException:
 def _http_mapping(exc: StarletteHTTPException) -> tuple[int, str, str]:
     """Map framework HTTP failures without reflecting their detail field."""
     status_code = exc.status_code
+    if status_code == 409 and exc.detail == TASK_JOURNAL_INTEGRITY_CODE:
+        return 409, TASK_JOURNAL_INTEGRITY_CODE, "The task event history is unavailable."
     if status_code == 504 and exc.detail == "completed_after_deadline":
         return 504, "completed_after_deadline", "The POWER operation completed after its deadline."
     if status_code == 499 and exc.detail == "completed_after_cancellation":
@@ -222,6 +229,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 __all__ = [
+    "TASK_JOURNAL_INTEGRITY_CODE",
     "PowerCallCompletedAfterCancellationError",
     "PowerCallCompletedAfterDeadlineError",
     "PowerCallTimeoutError",

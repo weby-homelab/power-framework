@@ -1,0 +1,128 @@
+{% extends "base.html" %} {% block title %}{{ t('tasks') }}: {{ task.title }}{%
+endblock %} {% block content %}
+<div
+    style="
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    "
+>
+    <div>
+        <a
+            href="/tasks"
+            style="
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 0.85rem;
+            "
+            >{{ t('back_to_tasks') }}</a
+        >
+        <h1 style="font-size: 1.75rem; font-weight: 700; margin-top: 4px">
+            {{ task.title }}
+        </h1>
+        <div
+            style="
+                font-family: monospace;
+                color: var(--text-secondary);
+                font-size: 0.8rem;
+            "
+        >
+            ID: {{ task.task_id }} &middot; Rev: v{{ task.revision }} &middot;
+            {{ t('created') }}: {{ task.created_at[:19] }}
+        </div>
+    </div>
+    <span class="badge badge-info" style="font-size: 1rem; padding: 6px 12px"
+        >{{ task.state }}</span
+    >
+</div>
+
+<div
+    role="alert"
+    style="
+        margin-bottom: 20px;
+        padding: 14px 16px;
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid var(--danger);
+        border-radius: 6px;
+        color: #fca5a5;
+    "
+>
+    <strong>{{ t('event_journal_integrity_title') }}</strong>
+    <div style="margin-top: 4px">{{ t('event_journal_integrity_detail') }}</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px">
+    <div class="card">
+        <h2 style="font-size: 1.15rem; margin-bottom: 8px">
+            {{ t('task_objective') }}
+        </h2>
+        <div
+            style="
+                color: var(--text-primary);
+                line-height: 1.6;
+                white-space: pre-wrap;
+                font-size: 0.95rem;
+            "
+        >
+            {{ task.objective if task.objective else t('objective_empty') }}
+        </div>
+        <div
+            style="
+                margin-top: 16px;
+                padding-top: 12px;
+                border-top: 1px solid var(--border);
+                font-size: 0.85rem;
+            "
+        >
+            <strong>{{ t('next_action') }}:</strong>
+            <code>{{ task.next_action }}</code>
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <h2 style="font-size: 1.15rem; margin-bottom: 12px">
+                {{ t('event_journal') }}
+            </h2>
+            <p role="alert" style="color: #fca5a5; padding: 8px 0">
+                {{ t('event_journal_integrity_events') }}
+            </p>
+        </div>
+
+        <div class="card">
+            <h2 style="font-size: 1.15rem; margin-bottom: 12px">
+                {{ t('transition_gate') }}
+            </h2>
+            <p role="alert" style="color: #fca5a5; padding: 8px 0">
+                🔒 {{ t('event_journal_integrity_actions') }}
+            </p>
+        </div>
+
+        <div class="card">
+            <h2 style="font-size: 1.15rem; margin-bottom: 12px">
+                {{ t('parameters') }}
+            </h2>
+            <div style="font-size: 0.85rem; line-height: 2">
+                <div><strong>{{ t('owner') }}:</strong> {{ task.owner }}</div>
+                <div>
+                    <strong>{{ t('assignee') }}:</strong> {{ task.assignee or
+                    t('unassigned') }}
+                </div>
+                <div>
+                    <strong>{{ t('priority') }}:</strong>
+                    <span class="badge badge-info">{{ task.priority }}</span>
+                </div>
+                <div>
+                    <strong>{{ t('authority') }}:</strong>
+                    <code>{{ task.authority }}</code>
+                </div>
+                <div>
+                    <strong>{{ t('revision') }}:</strong>
+                    <code>v{{ task.revision }}</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
