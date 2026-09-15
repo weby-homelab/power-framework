@@ -2,7 +2,9 @@
 
 Версіонований виконуваний контракт бази знань P.O.W.E.R. Додаток до
 [SKILL.md](../SKILL.md): тут описані фактичний CLI/MCP інвентар та
-правила взаємодії агента з ваултом.
+sync/doctor правила. Авторитетна правда — `power doctor <path> --json`.
+
+## Runtime version
 
 `v3.7.13` — runtime contract: **26 CLI commands** + **20 MCP tools** (official MCP Python SDK v2).
 
