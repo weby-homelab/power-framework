@@ -52,8 +52,11 @@ CLOSED / MERGED / VERIFIED (PR #418 / merge 6a315d5)
 INFRA-1 — Constrained Local Infrastructure Execution Broker
 CLOSED / MERGED / VERIFIED (PR #419 / merge bfb9688)
         ↓
-Phase 5C–5H — Scope, planner, shadow, dense validity, MCP, closure
+Phase 5C — Search scope pushdown
 READY FOR SEPARATE ADMISSION / NOT STARTED
+        ↓
+Phase 5D–5H — Planner, shadow, dense validity, MCP, closure
+PLANNED / NOT STARTED
          ↓
 Phase 6 — Agent Capture & Integrations
 NOT STARTED
@@ -93,6 +96,7 @@ NO-GO
 | Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; live parent erratum is retained in current state |
 | INFRA-1 | CLOSED / MERGED / VERIFIED | PR #419; merge `bfb9688`; framework contract closed; real receiver is operator follow-up |
 | Phase 5C | READY FOR SEPARATE ADMISSION / NOT STARTED | SearchScope pushdown preflight/contract freeze next; unstarted |
+| Phase 5D–5H | PLANNED / NOT STARTED | Gated by predecessor closures (5C → 5D → 5E → 5F → 5G → 5H); unstarted |
 | Phases 6–9 | NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
@@ -238,11 +242,11 @@ protected admission; Phase 5C is ready for separate admission and remains unstar
 5B — Deterministic multi-domain router (closed)
 INFRA-1 — Constrained Local Infrastructure Execution Broker (closed / merged PR #419)
 5C — Search scope pushdown (ready for separate admission / not started)
-5D — RetrievalPlanner + ContextPack read-only vertical slice
-5E — Shadow benchmark / legacy comparison
-5F — Incremental dense validity / dirty-set behavior
-5G — Small MCP read/explainability surfaces
-5H — Phase closure / default decision
+5D — RetrievalPlanner + ContextPack read-only vertical slice (planned / not started)
+5E — Shadow benchmark / legacy comparison (planned / not started)
+5F — Incremental dense validity / dirty-set behavior (planned / not started)
+5G — Small MCP read/explainability surfaces (planned / not started)
+5H — Phase closure / default decision (planned / not started)
 ```
 
 The phase title is intentionally **Retrieval Planner, ContextPack Compiler &

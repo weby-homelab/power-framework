@@ -54,7 +54,8 @@ FACT != FRAMEWORK INVARIANT`).
 
 - [INFRA-1 broker API](../../../docs/api/infra_broker.md)
 - [INFRA-1 architectural decision](../../../docs/adr/0006-infra-1-constrained-execution-broker.md)
-- [INFRA-1 candidate handoff](../handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+- [INFRA-1 original implementation handoff](../handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+- [INFRA-1 governance reconciliation handoff](../handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md)
 
 Real receiver deployment validation is classified as an operator follow-up and
 does not block generic framework gates. Phase 5C SearchScope pushdown is ready

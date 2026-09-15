@@ -418,8 +418,14 @@ deployment.
 
 ### FAIL / blocked condition
 
-Any arbitrary command surface, credential exposure, password fallback, direct
-agent SSH, unknown external write completion, unsafe path escape, missing
+Missing, stale, contradictory, or unverified required framework evidence keeps
+the framework gate open. Missing any required framework evidence keeps INFRA-1
+open, including without limitation the exact candidate tuple, fresh required
+checks, protected-policy observation, independent review, receiver contract
+evidence, security evidence, or post-merge verification where required.
+
+In addition, any arbitrary command surface, credential exposure, password fallback,
+direct agent SSH, unknown external write completion, unsafe path escape, missing
 receiver restriction contract, missing host-key verification semantics, false
 Task completion, failing required CI, or invalid protected merge keeps INFRA-1
 open. The absence of one real receiver deployment is an operator follow-up and
