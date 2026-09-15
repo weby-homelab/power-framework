@@ -60,6 +60,7 @@ are explicitly preserved as v1.6 historical snapshots.
 - [Architecture](architecture.md)
 - [Application API v2 and source read model](api/application.md)
 - [Security threat model](threat-model.md)
+- [POWER 3.7.12 patch release notes](release-3.7.12.md)
 - [POWER 3.7.11 patch release notes](release-3.7.11.md)
 - [POWER 3.7.9 historical release notes](release-3.7.9.md)
 - [POWER 3.6.3 historical release notes](release-3.6.3.md)
