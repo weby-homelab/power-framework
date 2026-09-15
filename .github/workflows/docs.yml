@@ -13,14 +13,6 @@ on:
       - ".github/workflows/release.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "docs/**"
-      - "mkdocs.yml"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "release/web-runtime.requirements.txt"
-      - ".github/workflows/docs.yml"
-      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
