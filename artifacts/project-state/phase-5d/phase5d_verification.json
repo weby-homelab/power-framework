@@ -1,0 +1,90 @@
+{
+  "schema": "power.phase5d-verification.v1",
+  "evidence_identity": "phase5d_verification",
+  "created_at_utc": "2026-09-16T16:45:00Z",
+  "base_sha": "b8ee40ab1286c12ad12a78f28877bc9da924ebf4",
+  "pr_boundary": "PR-5D-B",
+  "target": "P38-WP02 / Phase 5D Multi-Domain RetrievalPlanner + ContextPack Read-Only Vertical Slice",
+  "commands": [
+    "python3 -m ruff check src/power_framework/core/__init__.py src/power_framework/core/application.py src/power_framework/core/context_contracts.py src/power_framework/core/retrieval_planner.py src/power_framework/core/context_compiler.py tests/test_phase5d_retrieval_planner.py tests/test_phase5d_context_compiler.py tests/test_phase5d_authority_security.py tests/test_phase5d_application_service.py",
+    "python3 -m ruff format --check src/power_framework/core/__init__.py src/power_framework/core/application.py src/power_framework/core/context_contracts.py src/power_framework/core/retrieval_planner.py src/power_framework/core/context_compiler.py tests/test_phase5d_retrieval_planner.py tests/test_phase5d_context_compiler.py tests/test_phase5d_authority_security.py tests/test_phase5d_application_service.py",
+    "pytest tests/test_phase5d_retrieval_planner.py tests/test_phase5d_context_compiler.py tests/test_phase5d_authority_security.py tests/test_phase5d_application_service.py -o addopts=\"\"",
+    "pytest tests/test_phase5a_runtime_contracts.py -o addopts=\"\""
+  ],
+  "python_version": "3.13.5",
+  "test_matrix": {
+    "test_phase5d_retrieval_planner": {
+      "file": "tests/test_phase5d_retrieval_planner.py",
+      "count": 10,
+      "status": "PASS"
+    },
+    "test_phase5d_context_compiler": {
+      "file": "tests/test_phase5d_context_compiler.py",
+      "count": 11,
+      "status": "PASS"
+    },
+    "test_phase5d_authority_security": {
+      "file": "tests/test_phase5d_authority_security.py",
+      "count": 14,
+      "status": "PASS"
+    },
+    "test_phase5d_application_service": {
+      "file": "tests/test_phase5d_application_service.py",
+      "count": 15,
+      "status": "PASS"
+    },
+    "total_phase5d_tests": 50,
+    "phase5a_regression_tests": 35,
+    "all_passed": true
+  },
+  "invariants": {
+    "CALLER_CANNOT_FORGE_RUNTIME_CONTEXTPACK": {
+      "status": "PASS",
+      "proof": "ContextPack._issuer_token is _CONTEXT_COMPILER_TOKEN verified in validate_pack_access and RuntimeContractEnvelope.bind_discriminator"
+    },
+    "AUTHORITY_GREATER_THAN_SEMANTIC_SIMILARITY": {
+      "status": "PASS",
+      "proof": "Canonical tasks and decisions strictly outrank high semantic score items for authority-sensitive queries; runtime audit raises RuntimeError on violation"
+    },
+    "DOMAIN_NOT_EQUAL_AUTHORITY": {
+      "status": "PASS",
+      "proof": "DomainRouter partitions query space; authority is evaluated independently by provenance and canonical store verification"
+    },
+    "RETRIEVED_TEXT_IS_UNTRUSTED": {
+      "status": "PASS",
+      "proof": "Retrieved text cannot elevate trust_state or grant Truth/Action authority; spoofed claims are forced to RAW/UNVERIFIED"
+    },
+    "PROMPT_INJECTION_QUARANTINE": {
+      "status": "PASS",
+      "proof": "Injections are quarantined with TrustState.QUARANTINED and excluded for unprivileged callers"
+    },
+    "SECRET_REDACTION": {
+      "status": "PASS",
+      "proof": "ghp_ tokens, AddMax13$, and private keys are redacted to [REDACTED_SECRET] non-destructively"
+    },
+    "AUTHORITY_SPOOF_DOWNRANKING": {
+      "status": "PASS",
+      "proof": "Unbacked canonical claims in raw text forced to RAW and excluded for unprivileged callers"
+    },
+    "CALLER_CANNOT_ESCALATE_BUDGET_CAPS": {
+      "status": "PASS",
+      "proof": "CallerBudgetEscalationError raised when caller_hint attempts to exceed server-selected budget caps"
+    },
+    "QUERY_SIDE_WRITES_ZERO": {
+      "status": "PASS",
+      "proof": "SHA-256 tree of entire vault checked before and after 5 diverse compile_context queries; 0 mutations, additions, or deletions"
+    },
+    "PRINCIPAL_BINDING_PARITY": {
+      "status": "PASS",
+      "proof": "Principal.local_cli() and Principal.local_mcp_stdio() produce structurally identical ContextPacks"
+    },
+    "ZERO_NEW_PUBLIC_MCP_TOOLS": {
+      "status": "PASS",
+      "proof": "Zero new tools registered in FastMCP server in Phase 5D; public tools deferred to Phase 5G"
+    },
+    "LEGACY_RETRIEVAL_DEFAULT": {
+      "status": "PASS",
+      "proof": "ApplicationService.retrieve() remains legacy default; compile_context is a separate opt-in operation"
+    }
+  }
+}

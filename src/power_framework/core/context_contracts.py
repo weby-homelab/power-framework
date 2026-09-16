@@ -49,6 +49,7 @@ _RFC3339_DATETIME = re.compile(
 )
 _POLICY_ENGINE_TOKEN = object()
 _AUTHORIZATION_BOUNDARY_TOKEN = object()
+_CONTEXT_COMPILER_TOKEN = object()
 MAX_CONTEXT_PACK_BYTES = 2_000_000
 
 
@@ -885,13 +886,19 @@ class ContextPack(RuntimeModel):
     fallback_reason: str = Field(max_length=2_048)
     policy_revision: Identifier
     generation_revision: Identifier
-    implementation_status: Literal["planned"]
+    implementation_status: Literal["planned", "compiled"]
     access_policy: AccessPolicy
+    _issuer_token: object | None = PrivateAttr(default=None)
 
     @model_validator(mode="after")
     def validate_pack_access(self) -> Self:
         if self.access_policy._issuer_token is not _AUTHORIZATION_BOUNDARY_TOKEN:
             raise ValueError("ContextPack requires a server-issued access policy")
+        if (
+            self.implementation_status == "compiled"
+            and self._issuer_token is not _CONTEXT_COMPILER_TOKEN
+        ):
+            raise ValueError("compiled ContextPack must be server-issued by ContextPackCompiler")
         if self.retrieval_status in {"degraded", "failed"} and not self.fallback_reason:
             raise ValueError("degraded or failed packs require a bounded fallback reason")
         if self.budget_class is not self.retrieval_plan.budget.budget_class:
@@ -921,6 +928,26 @@ class ContextPack(RuntimeModel):
         ):
             raise ValueError("quarantine context requires privileged access policy")
         return self
+
+    def model_copy(self, *args: Any, **kwargs: Any) -> Self:
+        copied = super().model_copy(*args, **kwargs)
+        copied._issuer_token = None
+        if copied.implementation_status == "compiled":
+            raise ValueError("cannot copy or mutate a server-issued ContextPack")
+        return copied
+
+    @classmethod
+    def _from_compiler(cls, **data: Any) -> Self:
+        payload = dict(data)
+        payload["implementation_status"] = "planned"
+        validated = cls.model_validate(payload)
+        fields = {
+            k: getattr(validated, k) for k in cls.model_fields if k != "implementation_status"
+        }
+        fields["implementation_status"] = "compiled"
+        instance = cls.model_construct(**fields)
+        object.__setattr__(instance, "_issuer_token", _CONTEXT_COMPILER_TOKEN)
+        return instance
 
 
 class IndexWorkItem(RuntimeModel):
@@ -1229,6 +1256,81 @@ class RetrievalBudgetPolicy(RuntimeModel):
                 raise ValueError(f"{name} has an incompatible budget layer source")
         return self
 
+    @classmethod
+    def default(cls, caller_hint: ProfileBudgetLayer | BudgetProfile | None = None) -> Self:
+        caller_kwargs: dict[str, Any] = {
+            "source": BudgetLayerSource.CALLER_HINT,
+            "lower_only": True,
+        }
+        if caller_hint is not None:
+            if caller_hint.max_candidates is not None:
+                caller_kwargs["max_candidates"] = caller_hint.max_candidates
+            if caller_hint.max_tokens is not None:
+                caller_kwargs["max_tokens"] = caller_hint.max_tokens
+            if caller_hint.max_domains is not None:
+                caller_kwargs["max_domains"] = caller_hint.max_domains
+            if caller_hint.max_graph_hops is not None:
+                caller_kwargs["max_graph_hops"] = caller_hint.max_graph_hops
+        caller_layer = ProfileBudgetLayer(**caller_kwargs)
+        return cls(
+            structural_absolute_safety_ceiling=ProfileBudgetLayer(
+                source=BudgetLayerSource.STRUCTURAL_ABSOLUTE_SAFETY_CEILING,
+                lower_only=False,
+                max_candidates=100,
+                max_tokens=30_000,
+                max_domains=4,
+                max_graph_hops=3,
+            ),
+            resource_profile_default=ProfileBudgetLayer(
+                source=BudgetLayerSource.RESOURCE_PROFILE_DEFAULT,
+                lower_only=False,
+                max_candidates=80,
+                max_tokens=20_000,
+                max_domains=3,
+                max_graph_hops=2,
+            ),
+            domain_policy_cap=ProfileBudgetLayer(
+                source=BudgetLayerSource.DOMAIN_POLICY_CAP,
+                lower_only=False,
+                max_candidates=60,
+                max_tokens=15_000,
+                max_domains=2,
+                max_graph_hops=1,
+            ),
+            caller_hint=caller_layer,
+            effective_limit_rule=(
+                "min(structural_ceiling, resource_default, domain_cap, caller_hint_when_present)"
+            ),
+            defaults_calibration="phase5_shadow_benchmark_required",
+            numeric_defaults_are_not_product_constants=True,
+            profiles=BudgetProfiles(
+                FAST=BudgetProfile(
+                    max_candidates=10,
+                    max_tokens=4_000,
+                    max_domains=1,
+                    max_graph_hops=0,
+                    model_load=ModelLoadPolicy.FORBIDDEN,
+                    numeric_default_is_hypothesis=True,
+                ),
+                BALANCED=BudgetProfile(
+                    max_candidates=25,
+                    max_tokens=12_000,
+                    max_domains=2,
+                    max_graph_hops=1,
+                    model_load=ModelLoadPolicy.SELECTED_DOMAIN_ONLY,
+                    numeric_default_is_hypothesis=True,
+                ),
+                DEEP=BudgetProfile(
+                    max_candidates=50,
+                    max_tokens=30_000,
+                    max_domains=4,
+                    max_graph_hops=2,
+                    model_load=ModelLoadPolicy.EXPLICIT_REQUEST_OR_ESCALATION,
+                    numeric_default_is_hypothesis=True,
+                ),
+            ),
+        )
+
 
 class BackoffPolicy(RuntimeModel):
     strategy: RetryStrategy
@@ -1380,6 +1482,21 @@ class RuntimeContractEnvelope(RuntimeModel):
                 or payload._issuer_token is not _POLICY_ENGINE_TOKEN
             ):
                 raise ValueError("MemoryAction payload must be issued by the policy engine")
+            if expected is ContextPack:
+                status = (
+                    getattr(payload, "implementation_status", None)
+                    if isinstance(payload, ContextPack)
+                    else (
+                        payload.get("implementation_status") if isinstance(payload, dict) else None
+                    )
+                )
+                if status == "compiled" and (
+                    not isinstance(payload, ContextPack)
+                    or payload._issuer_token is not _CONTEXT_COMPILER_TOKEN
+                ):
+                    raise ValueError(
+                        "ContextPack payload with compiled status must be server-issued by ContextPackCompiler"
+                    )
             parsed = payload if isinstance(payload, expected) else expected.model_validate(payload)
         elif isinstance(expected, type) and issubclass(expected, StrEnum):
             if isinstance(payload, expected):
