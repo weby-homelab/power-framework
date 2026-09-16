@@ -2,9 +2,13 @@
   <a href="README.md">ENG</a> | <b>UKR</b>
 </p>
 
-# P.O.W.E.R. 3.7.11 — AI-Native Toolkit для Second Brain
+# P.O.W.E.R. — Local-First Verifiable AI Engineering Control Plane
 
-Валідуйте, індексуйте, шукайте та керуйте вашою базою знань з терміналу — або дозвольте AI-агентам робити це через MCP. Створено для людей, які хочуть машиночитабельні нотатки, автоматичну перевірку якості та токен-ефективний AI-доступ до свого Second Brain.
+**Local-first control plane для верифікованої AI-інженерії та операцій у Linux зі структурованим субстратом знань.**
+
+P.O.W.E.R. поєднує автономних AI-агентів (Antigravity, OpenCode, Claude Code, Gemini CLI, Codex), локальні інструменти розробника та хост-системи Linux через криптографічно закріплений ланцюг доказів (proof chain), брокерське керування повноваженнями інструментів і детерміноване управління станом.
+
+Obsidian Second Brain є першокласним підтримуваним субстратом даних та рівнем пам'яті в межах control plane, що забезпечує структуроване збереження знань, валідацію OKF frontmatter та гібридний Graph RAG пошук без узурпації канонічного авторитету.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/power-framework?logo=github)](https://github.com/weby-homelab/power-framework/releases)
@@ -16,35 +20,75 @@
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 [![Discovery](https://img.shields.io/badge/discovery-experimental%2Fcustom--discovery-8B5CF6?logo=openai&logoColor=white)](.agents/AGENTS.md)
 
-## Про P.O.W.E.R. - Hybrid Knowledge Management Framework
+---
 
-P.O.W.E.R. — це гібридна система, створена для подолання прірви між людськими робочими процесами, автоматичними скриптами та автономними ШІ-агентами на базі LLM. Назва є абревіатурою, що розшифровується за її ключовими компонентами: **P**.A.R.A., **O**KF, **W**iki та **E**xecution **R**ules. Вона об'єднує ці архітектурні підходи в цілісний, самовалідований та токен-ефективний Second Brain.
+## 🏛️ Лінії релізів та архітектури
+
+- **Поточний стабільний реліз:** [`v3.7.13`](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.13) (керована лінія супроводу `release/3.7`). Включає канонічний Task v2, типізовані decision workflows, fail-closed персистентність завдань, Application envelope v2 та консенсусний reranked search.
+- **Активна лінія розробки:** `3.8` (гілка `main`). Сфокусована на архітектурі North-Star control plane, EvidenceGraph, ContextPack, ObservationContract та handoff без пояснень (zero-explanation handoffs). Див. [ADR-0007: Архітектура North-Star Control Plane](docs/adr/0007-power-3.8-north-star-control-plane-architecture.md).
+
+---
+
+## 🛡️ Ключові принципи: Ланцюг доказів та Три Влади
+
+Операції автономних агентів підпорядковуються двом непорушним системним інваріантам:
+
+1. **`LLM OUTPUT NEVER GRANTS AUTHORITY`** — Вихідні дані мовної моделі є недовіреними пропозиціями. Усі переходи стану, виклики інструментів і заяви про завершення вимагають детермінованої верифікації.
+2. **`DERIVED STATE MUST NEVER SILENTLY BECOME CANONICAL AUTHORITY`** — Індекси, ембеддінги та кешовані графи є проекціями, які можна перебудувати. Канонічна істина міститься виключно в незмінній історії Git, підписаних комітах та перевірених артефактах CAS.
+
+### Ланцюг доказів POWER (Proof Chain)
+
+Кожна мутація життєвого циклу проходить наскрізний ланцюг доказів:
+$$\text{Ціль} \longrightarrow \text{Доказ} \longrightarrow \text{План} \longrightarrow \text{Повноваження} \longrightarrow \text{Дія} \longrightarrow \text{Верифікація} \longrightarrow \text{Квитанція} \longrightarrow \text{Канонічний стан}$$
+
+```mermaid
+flowchart LR
+    G[Ціль] --> E[Доказ]
+    E --> P[План]
+    P --> A[Перевірка повноважень]
+    A --> Act[Дія брокера]
+    Act --> V[Врата верифікації]
+    V --> R[Квитанція]
+    R --> S[(Канонічний стан)]
+```
+
+### Три Влади (Three Authorities)
+
+| Влада | Домен | Механізм забезпечення |
+|---|---|---|
+| **Влада Істини** | Канонічний репозиторій та стан системи | Робоче дерево Git, GPG-підписані коміти, незмінні журнали аудиту (`log.md`), сховище CAS |
+| **Влада Дії** | Системні мутації та виконання інструментів | Брокер інструментів, маніфест можливостей, явні погодження людиною, перевірка меж шляхів |
+| **Влада Завершення** | Завершення завдань та підтвердження воріт | Багаторівневі ворота верифікації, емпіричні квитанції тестів/лінтерів, непорожні логи доказів |
+
+---
+
+## ⚡ Матриця функцій за версіями
+
+| Область можливостей | Доступно в 3.7.x (Стабільний v3.7.13) | Злито в Main (`3.8-dev`) | Заплановано на 3.8 (Roadmap) |
+|---|---|---|---|
+| **Поверхня інтерфейсів** | 27 команд CLI, 21 інструмент MCP | 27 команд CLI, 21 інструмент MCP | Розширені інструменти брокера, daemon API |
+| **Субстрат знань** | Сховище P.A.R.A., frontmatter OKF v0.1, субіндекси | Сувора валідація OKF, Application envelope v2 | Зворотна проекція vault, федерація сховищ |
+| **Пошук та реранкінг** | FTS5 + BAAI/`bge-m3` + `bge-reranker-v2-m3-ONNX` (режим `auto`) | Реєстр гібридного пошуку, консенсусний реранкінг | SearchScope pushdown, AST code-symbol retrieval |
+| **Керування виконанням** | Fail-closed сховище завдань, обмеження 50% CPU | Unified Runtime Envelope v2, процеси Task v2 | Sandboxing брокера, мутаційний рушій за схваленням |
+| **Архітектура та докази** | Ефемерні передачі завдань, markdown-журнали | ADR-0007 North-Star Control Plane, Governance baseline | EvidenceGraph, ExecutionGraph, ContextPack, CAS store |
+| **Міжагентна наступність** | Файловий handoff CLI / MCP | Журнали типізованих рішень, hash-bound handoffs | Zero-Explanation Handoff, Edge-to-Hub sync |
+
+---
 
 ## Чому P.O.W.E.R.?
 
-На відміну від звичайних інструментів для баз знань, P.O.W.E.R. спроектовано для **AI-орієнтованого керування знаннями**:
+На відміну від звичайних інструментів для баз знань або простих агентних оболонок, P.O.W.E.R. надає **авторитетний, local-first control plane**:
 
-- **AI-нативні метадані** — Pydantic v2 схеми забезпечують строгий OKF frontmatter з полями governance (`owner`, `status`, `expiry`) та Graph RAG (`related`)
-- **Токен-ефективна індексація** — `index.md` + `_index.md` підтримують
-  selective agent navigation; linked historical v1.6.0 report містить
-  scenario-specific measurements, а не universal release guarantee
-- **Knowledge Graph** — поле `related` зв'язує нотатки між собою для Graph RAG
-- **Freshness Monitoring** — лінтер виявляє застарілі нотатки за полем `expiry`
-- **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + index
-- **MCP-нативний** — 21 інструмент доступний MCP-сумісним AI-клієнтам через офіційний MCP Python SDK v2
-- **Правдива discovery для агентів** — спочатку викликайте `get_server_info`,
-  щоб перевірити версію запущеного пакета, vault boundary, coverage і явний
-  стан provider binding; стандартний виклик не завантажує модель і не звертається до мережі
-- **Windows-safe rename** — `power rename` використовує `os.replace()` для
-  фізичного переміщення, тому перейменування на існуючу ціль працює у Windows
-  замість помилки `FileExistsError`
-- **Суворий мандат 50% CPU Throttling** — жорсткі ліміти паралелізму (`max_workers <= max(1, os.cpu_count() // 2)`) та автоматичне обмеження змінних оточення (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) гарантують, що P.O.W.E.R. ніколи не перевантажує процесорні ресурси
-- **Patch-реліз P.O.W.E.R. 3.7.11** — публікація вимагає перевірені
-  wheel, source archive, SBOM, Linux upgrade matrix і fresh release receipts.
-  Версія 3.7.11 містить canonical Task v2 і typed decision workflows,
-  fail-closed task persistence, Application envelope v2 та consensus-aware
-  reranked search. Межі
-  підтримки визначає [матриця платформ](docs/support-matrix.ua.md).
+- **Верифікований ланцюг доказів** — Кожна дія підтверджена емпіричними доказами, пройденими воротами та криптографічними квитанціями.
+- **AI-нативний субстрат метаданих** — Pydantic v2 схеми забезпечують строгий OKF frontmatter з полями governance (`owner`, `status`, `expiry`) та Graph RAG (`related`).
+- **Токен-ефективна індексація** — `index.md` + `_index.md` підтримують селективну навігацію агентів; збережений звіт v1.6.0 фіксує сценарійні вимірювання, а не універсальну гарантію.
+- **Knowledge Graph та субіндекси** — поле `related` зв'язує нотатки між собою для Graph RAG.
+- **Моніторинг свіжості** — лінтер виявляє застарілі нотатки за полем `expiry`.
+- **Agent Auto-Ingest** — MCP інструмент `synthesize_session` для автономного створення нотаток агентами з governance + graph links + індексація.
+- **MCP-нативний runtime** — 21 інструмент доступний MCP-сумісним AI-клієнтам через офіційний MCP Python SDK v2.
+- **Правдива discovery для агентів** — спочатку викликайте `get_server_info`, щоб перевірити версію запущеного пакета, межі vault, покриття і явний стан provider binding; стандартний виклик не завантажує модель і не звертається до мережі.
+- **Windows-safe rename** — `power rename` використовує `os.replace()` для фізичного переміщення, тому перейменування на існуючу ціль працює у Windows замість помилки `FileExistsError`.
+- **Суворий мандат 50% CPU Throttling** — жорсткі ліміти паралелізму (`max_workers <= max(1, os.cpu_count() // 2)`) та автоматичне обмеження змінних оточення (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) гарантують, що P.O.W.E.R. ніколи не перевантажує процесорні ресурси хоста.
 
 ## Для AI-агентів
 

@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "power-framework"
 version = "3.7.11"
-description = "AI-native toolkit for Second Brain knowledge bases — validate, index, and manage notes via CLI or MCP"
+description = "Local-first control plane for verifiable AI-assisted engineering and Linux operations with structured knowledge substrate"
 readme = "README.md"
 license = "GPL-3.0-only"
 requires-python = ">=3.13,<3.15"
 authors = [
     { name = "Weby Homelab", email = "rekvizitor.ua@gmail.com" }
 ]
-keywords = ["knowledge-management", "second-brain", "mcp", "ai-agents", "para", "okf"]
+keywords = ["ai-agents", "control-plane", "governance", "mcp", "developer-tools", "linux-operations", "knowledge-management"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",

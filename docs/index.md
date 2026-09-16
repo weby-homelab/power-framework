@@ -1,8 +1,8 @@
-# P.O.W.E.R. Framework 3.7.11
+# P.O.W.E.R. Control Plane
 
-P.O.W.E.R. is a local-first, Git-native toolkit for structured knowledge bases. It combines
-P.A.R.A., validated OKF frontmatter, hierarchical indexes, full-text and semantic retrieval,
-and an MCP interface for AI agents.
+P.O.W.E.R. is a local-first control plane for verifiable AI-assisted software engineering and Linux operations. It combines an authoritative execution runtime, broker-mediated tool governance, proof-carrying handoffs, and a structured knowledge substrate (Second Brain with P.A.R.A., validated OKF frontmatter, hierarchical indexing, and hybrid retrieval).
+
+> **Release Status:** Current stable release is [`v3.7.13`](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.13) (maintained on `release/3.7`). Active development line on `main` is targeted toward POWER 3.8. See [ADR-0007: North-Star Control Plane Architecture](adr/0007-power-3.8-north-star-control-plane-architecture.md).
 
 ## Start here
 
@@ -19,7 +19,7 @@ and an MCP interface for AI agents.
 - [Матриця підтримки платформ](support-matrix.ua.md)
 - [Інвентаризація документації](documentation-inventory.ua.md)
 
-These guides define the current `v3.7.11` patch release artifact contract, use an
+These guides define the supported release artifact contracts, use an
 isolated virtual environment, and include acceptance checks. Publication is
 complete only when the signed tag, wheel, source archive, SBOM, and release
 receipts can be read back from GitHub. The
@@ -61,6 +61,7 @@ are explicitly preserved as v1.6 historical snapshots.
 
 ## More documentation
 
+- [ADR-0007: North-Star Control Plane Architecture](adr/0007-power-3.8-north-star-control-plane-architecture.md)
 - [Architecture](architecture.md)
 - [Application API v2 and source read model](api/application.md)
 - [Security threat model](threat-model.md)

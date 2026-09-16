@@ -210,7 +210,7 @@ class PowerMCPServer(MCPServer):
 mcp = PowerMCPServer(
     "power",
     version=__version__,
-    instructions=f"P.O.W.E.R. {__version__} — Hybrid Knowledge Management Framework",
+    instructions=f"P.O.W.E.R. {__version__} — Local-First Verifiable AI Engineering Control Plane",
 )
 
 _write_limiter = RateLimiter(max_calls=10, period=60.0)

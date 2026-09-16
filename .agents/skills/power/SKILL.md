@@ -1,15 +1,15 @@
 ---
 name: power
 version: 3.7.11
-description: P.O.W.E.R. 3.7.11 — Hybrid Knowledge Management Framework (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules).
+description: P.O.W.E.R. 3.7.11 — Governed knowledge and context operations within the local-first AI engineering control plane.
 ---
 
-# ⚡ P.O.W.E.R. Knowledge Management Skill
+# ⚡ P.O.W.E.R. Knowledge & Context Operations Skill
 
-Автоматизація управління, перевірки та підтримки Obsidian Second Brain за
-гібридною методологією **P.O.W.E.R.** (P.A.R.A. + OKF v0.1 + Graph RAG +
-LLM-Wiki + Execution Rules). Скілл активується ШІ-агентами (Antigravity CLI та
-OpenCode) або вручну для контрольованих змін у базі знань.
+Автоматизація управління, перевірки та підтримки знань, контексту та Obsidian Second Brain у межах
+local-first control plane **P.O.W.E.R.** за гібридною методологією (P.A.R.A. +
+OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules). Скілл активується ШІ-агентами
+(Antigravity CLI та OpenCode) або вручну для контрольованих змін у базі знань.
 
 ## Progressive disclosure
 

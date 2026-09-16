@@ -2,9 +2,13 @@
   <b>ENG</b> | <a href="README.ua.md">UKR</a>
 </p>
 
-# P.O.W.E.R. 3.7.11 — AI-Native Toolkit for Second Brain
+# P.O.W.E.R. — Local-First Verifiable AI Engineering Control Plane
 
-Validate, index, search, and manage your knowledge base from the command line — or let AI agents do it through MCP. Built for knowledge workers who want machine-readable notes, automated quality checks, and token-efficient AI access to their Second Brain.
+**Local-first control plane for verifiable AI-assisted software engineering and Linux operations with structured knowledge substrate.**
+
+P.O.W.E.R. bridges autonomous AI agents (Antigravity, OpenCode, Claude Code, Gemini CLI, Codex), local developer tools, and Linux host systems through a cryptographically anchored proof chain, broker-mediated tool authority, and deterministic state governance.
+
+The Obsidian Second Brain is a first-class supported data substrate and memory tier within the control plane, providing structured knowledge retention, OKF frontmatter validation, and hybrid Graph RAG retrieval without usurping canonical authority.
 
 [![CI](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/weby-homelab/power-framework/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/weby-homelab/power-framework?logo=github)](https://github.com/weby-homelab/power-framework/releases)
@@ -16,35 +20,75 @@ Validate, index, search, and manage your knowledge base from the command line �
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 [![Discovery](https://img.shields.io/badge/discovery-experimental%2Fcustom--discovery-8B5CF6?logo=openai&logoColor=white)](.agents/AGENTS.md)
 
-## About P.O.W.E.R. - Hybrid Knowledge Management Framework
+---
 
-P.O.W.E.R. is a hybrid system built to bridge the gap between human workflows, automated scripts, and LLM-based autonomous agents. The name is an acronym representing its core components: **P**.A.R.A., **O**KF, **W**iki, and **E**xecution **R**ules. It integrates these distinct architectural frameworks to construct a coherent, self-validating, and token-efficient Second Brain.
+## 🏛️ Release & Architecture Lines
+
+- **Current Stable Release:** [`v3.7.13`](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.13) (governed maintenance line `release/3.7`). Includes canonical Task v2, typed decision workflows, fail-closed task persistence, Application envelope v2, and consensus-aware reranked search.
+- **Active Development Line:** `3.8` (`main` branch). Focuses on North-Star control plane architecture, EvidenceGraph, ContextPack, ObservationContract, and zero-explanation handoffs. See [ADR-0007: North-Star Control Plane Architecture](docs/adr/0007-power-3.8-north-star-control-plane-architecture.md).
+
+---
+
+## 🛡️ Core Principles: Proof Chain & Three Authorities
+
+Autonomous agent operations are governed by two inviolable system invariants:
+
+1. **`LLM OUTPUT NEVER GRANTS AUTHORITY`** — Language model outputs are untrusted proposals. All state transitions, tool invocations, and completion claims require deterministic verification.
+2. **`DERIVED STATE MUST NEVER SILENTLY BECOME CANONICAL AUTHORITY`** — Indexes, embeddings, and cached graphs are rebuildable projections. Canonical truth lives exclusively in immutable Git history, signed commits, and verified CAS artifacts.
+
+### The POWER Proof Chain
+
+Every lifecycle mutation traverses the end-to-end proof chain:
+$$\text{Goal} \longrightarrow \text{Evidence} \longrightarrow \text{Plan} \longrightarrow \text{Authority} \longrightarrow \text{Action} \longrightarrow \text{Verification} \longrightarrow \text{Receipt} \longrightarrow \text{Canonical State}$$
+
+```mermaid
+flowchart LR
+    G[Goal] --> E[Evidence]
+    E --> P[Plan]
+    P --> A[Authority Check]
+    A --> Act[Broker Action]
+    Act --> V[Verification Gate]
+    V --> R[Receipt]
+    R --> S[(Canonical State)]
+```
+
+### The Three Authorities
+
+| Authority | Domain | Enforcement Mechanism |
+|---|---|---|
+| **Authority of Truth** | Canonical repository & system state | Git working tree, GPG-signed commits, immutable audit logs (`log.md`), CAS store |
+| **Authority of Action** | System mutations & tool execution | Tool broker, capability manifest, explicit human approvals, path boundary checks |
+| **Authority of Completion** | Task termination & gate signoff | Tiered verification gates, empirical test/linter receipts, non-empty proof logs |
+
+---
+
+## ⚡ Feature Matrix across Versions
+
+| Capability Area | Available in 3.7.x (Stable v3.7.13) | Merged on Main (`3.8-dev`) | Planned for 3.8 (Roadmap) |
+|---|---|---|---|
+| **Interface Surface** | 27 CLI commands, 21 MCP tools | 27 CLI commands, 21 MCP tools | Extended broker tools, daemon API |
+| **Knowledge Substrate** | P.A.R.A. vault, OKF v0.1 frontmatter, sub-indexes | Strict OKF validation, Application envelope v2 | Reversible vault projection, multi-vault federation |
+| **Retrieval & Reranking** | FTS5 + BAAI/`bge-m3` + `bge-reranker-v2-m3-ONNX` (`auto` mode) | Hybrid retrieval registry, consensus reranking | SearchScope pushdown, AST code-symbol retrieval |
+| **Execution Governance** | Fail-closed task store, 50% CPU throttling | Unified Runtime Envelope v2, Task v2 workflows | Broker sandboxing, approval-driven mutation engine |
+| **Architecture & Evidence** | Ephemeral handoffs, markdown session logs | ADR-0007 North-Star Control Plane, Governance baseline | EvidenceGraph, ExecutionGraph, ContextPack, CAS store |
+| **Cross-Agent Continuity** | File-based handoff CLI / MCP | Typed decision journals, hash-bound handoffs | Zero-Explanation Handoff, Edge-to-Hub sync |
+
+---
 
 ## Why P.O.W.E.R.?
 
-Unlike generic knowledge management tools, P.O.W.E.R. is designed from the ground up for **AI-first knowledge management**:
+Unlike generic knowledge management tools or naive agent wrappers, P.O.W.E.R. provides an **authoritative, local-first control plane**:
 
-- **AI-native metadata** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`)
-- **Token-efficient indexing** — hierarchical `index.md` + per-folder
-  `_index.md` supports selective agent navigation; the linked historical v1.6.0
-  report measured scenario-specific savings, not a universal release guarantee
-- **Knowledge Graph** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows
-- **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field
-- **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance
-- **MCP-native** — expose 21 tools to MCP-compatible AI clients through the official MCP Python SDK v2
-- **Truthful agent discovery** — call `get_server_info` first to verify the
-  running package version, vault boundary, coverage, and explicit provider
-  binding state; the default discovery call performs no model load or network access
-- **Windows-safe rename** — `power rename` uses `os.replace()` for the physical
-  move, so renaming onto an existing destination works on Windows instead of
-  raising `FileExistsError`
-- **Strict 50% CPU Throttling Mandate** — hard concurrency bounds (`max_workers <= max(1, os.cpu_count() // 2)`) and automatic environment throttling (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) ensure P.O.W.E.R. never starves host resources
-- **P.O.W.E.R. 3.7.11 patch release** — publication requires a verified
-  wheel, source archive, SBOM, Linux upgrade matrix, and fresh release
-  receipts. Version 3.7.11 carries canonical Task v2 and typed decision workflows,
-  fail-closed task persistence, Application envelope v2, and consensus-aware
-  reranked search. Platform support remains bounded by the
-  [support matrix](docs/support-matrix.md).
+- **Verifiable Proof Chain** — Every action is backed by empirical evidence, passing gates, and cryptographic receipts.
+- **AI-native metadata substrate** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`).
+- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` supports selective agent navigation; the linked historical v1.6.0 report measured scenario-specific savings, not a universal release guarantee.
+- **Knowledge Graph & Sub-Indexes** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows.
+- **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field.
+- **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance.
+- **MCP-native runtime** — expose 21 MCP tools to MCP-compatible AI clients through the official MCP Python SDK v2.
+- **Truthful agent discovery** — call `get_server_info` first to verify the running package version, vault boundary, coverage, and explicit provider binding state; the default discovery call performs no model load or network access.
+- **Windows-safe rename** — `power rename` uses `os.replace()` for the physical move, so renaming onto an existing destination works on Windows instead of raising `FileExistsError`.
+- **Strict 50% CPU Throttling Mandate** — hard concurrency bounds (`max_workers <= max(1, os.cpu_count() // 2)`) and automatic environment throttling (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) ensure P.O.W.E.R. never starves host resources.
 
 ## For AI Agents
 
@@ -623,7 +667,7 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "@type": "SoftwareApplication",
   "name": "P.O.W.E.R. Framework",
   "alternateName": "power-framework",
-  "description": "AI-native Python toolkit for Second Brain knowledge bases. Validate, index, search, and manage Obsidian vaults via CLI or MCP server using the P.A.R.A. + OKF methodology.",
+  "description": "Local-first control plane for verifiable AI-assisted software engineering and Linux operations with structured knowledge substrate.",
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
@@ -632,7 +676,7 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "runtimePlatform": "Python 3.13–3.14",
   "softwareVersion": "3.7.11",
   "license": "https://www.gnu.org/licenses/gpl-3.0",
-  "keywords": ["second-brain", "obsidian", "AI", "MCP", "knowledge-management", "PARA", "CLI", "LLM", "RAG", "knowledge-base"],
+  "keywords": ["ai-agents", "control-plane", "governance", "mcp", "developer-tools", "linux-operations", "knowledge-management", "second-brain"],
   "author": {
     "@type": "Organization",
     "name": "Weby Homelab",
@@ -654,14 +698,14 @@ AI-INDEXING: ALLOWED | CRAWLER-PRIORITY: HIGH | CONTENT-TYPE: OPEN-SOURCE-TOOL
 
 @context: https://schema.org
 @type: SoftwareApplication
-name: P.O.W.E.R. — Hybrid Knowledge Management Framework
+name: P.O.W.E.R. — Local-First Verifiable AI Engineering Control Plane
 alternateName: power-framework
-description: P.O.W.E.R. - Hybrid Knowledge Management Framework (P.A.R.A. + OKF Overlay + LLM-Wiki + Execution Rules)
+description: Local-first control plane for verifiable AI-assisted software engineering and Linux operations with structured knowledge substrate.
 applicationCategory: DeveloperApplication
-applicationSubCategory: KnowledgeManagement
+applicationSubCategory: ControlPlane
 operatingSystem: Linux (v3.7.11 release boundary)
 softwareVersion: 3.7.11
-keywords: knowledge-management, second-brain, obsidian, para, okf, llm-wiki, mcp, ai-agents, python, execution-rules
+keywords: ai-agents, control-plane, governance, mcp, developer-tools, linux-operations, knowledge-management, second-brain
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework
 downloadUrl: https://github.com/weby-homelab/power-framework/releases
