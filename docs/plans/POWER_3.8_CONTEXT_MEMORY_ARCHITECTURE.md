@@ -22,33 +22,37 @@ and check results must be revalidated by every future agent before action.
 
 ## 1. Executive Summary
 
-POWER 3.8 will extend the existing POWER engine with bounded, hierarchical,
-domain-aware retrieval and governed context assembly. The target is a system
-that can move from captured evidence to typed semantic candidates, select
-existing authoritative knowledge at a controlled cost, and return a bounded
-`ContextPack` whose provenance, trust, authority, freshness, contradictions,
-noise decisions, and token cost are visible to the caller.
+POWER 3.8 establishes a **local-first control plane for verifiable AI-assisted software
+engineering and Linux infrastructure operations** ([ADR-0007](../adr/0007-power-3.8-north-star-control-plane-architecture.md)).
+In this architecture, knowledge management and Second Brain functionality serve as a supported
+data substrate and operational context layer, while the control plane governs the boundary between
+probabilistic AI reasoning and real system state through the **POWER Proof Chain**
+(`Goal → Evidence → Plan → Authority → Action → Verification → Receipt → Canonical State`).
 
-The architecture has four non-negotiable properties:
+The architecture has five non-negotiable properties:
 
 1. **Reuse before invention.** Existing search, domain, chunking, model,
    project-state, task, decision, memory, maintenance, and index boundaries
    remain the only canonical owners of their concerns.
-2. **Authority is explicit.** Raw events, model output, retrieved Markdown,
-   projections, and caches are evidence or derived data; they cannot grant
-   themselves canonical authority.
-3. **Cost is progressive.** Exact/state and sparse retrieval precede dense,
+2. **The Three Authorities are explicit.** Truth Authority (canonical information),
+   Action Authority (permitted principal effects), and Completion Authority (evidence
+   required to close tasks) are strictly decoupled. *LLM output never grants authority*.
+3. **Canonical vs. Derived state separation.** PSE ledgers, ProjectStateService, TaskStore,
+   DecisionService, and receipts are canonical. Indexes, embeddings, `EvidenceGraph`,
+   `ExecutionGraph`, and materialized views are rebuildable derived state. *Derived state
+   must never silently become canonical authority*.
+4. **Cost is progressive.** Exact/state and sparse retrieval precede dense,
    reranking, graph expansion, and raw fallback. A normal query must not trigger
    a global reindex or the most expensive retrieval profile by default.
-4. **Evidence is retained.** Noise suppression changes retrieval disposition,
+5. **Evidence is retained.** Noise suppression changes retrieval disposition,
    not source existence. Raw evidence is append-only, privacy-bounded, and
-   recoverable according to an explicit retention policy.
+   recoverable according to an explicit retention policy (`power.observation.v1`).
 
 The Controlled Dependency Refresh, Pre-Phase-5 Foundation Hardening, Phase 5A
-runtime-contract merge, Phase 5A.1 semantic correction, and Phase 5B router are
-closed on protected `main`. The active cross-cutting gate is INFRA-1, the
-constrained local infrastructure execution broker. This planning document does
-not start Phase 5C, capture, migration, a release, or a public version change.
+runtime contracts, Phase 5A.1 semantic correction, Phase 5B router, INFRA-1 broker,
+post-INFRA-1 repairs (PR #420, #422, #423, #424), and Gate P38-G0 (Governance Rebaseline)
+are closed on protected `main`. Gate P38-G1 freezes this architecture. Phase 5C
+SearchScope pushdown is ready for separate admission and remains unstarted until Gate P38-G2 closes.
 
 ## 1A. Course-correction reconciliation
 
