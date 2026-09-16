@@ -46,6 +46,12 @@ from .search_scope import (
     ResolvedSearchScope,
     compile_search_scope,
 )
+from .search_scope import (
+    eligible_graph_paths as _eligible_graph_paths,
+)
+from .search_scope import (
+    scoped_note_type_from_index as _scoped_note_type_from_index,
+)
 from .source_service import (
     SourceReadContext,
     authorize_current_source,
@@ -733,6 +739,16 @@ def _scan_and_search(
             continue
         if should_skip(vault_dir, rel_path):
             continue
+        # R1: source-type pre-read enforcement via safe metadata boundary.
+        # Do not infer type from directory name. If type cannot be established
+        # safely before reading body, fail closed for source-type constrained
+        # requests rather than reading everything.
+        if resolved_scope is not None and resolved_scope.source_types:
+            indexed_type = _scoped_note_type_from_index(vault_dir, rel_path)
+            if indexed_type is None:
+                continue
+            if not resolved_scope.is_path_in_scope(rel_path, note_type=indexed_type):
+                continue
 
         try:
             content = read_source(
@@ -793,6 +809,13 @@ def _scan_and_vector_search(
             continue
         if should_skip(vault_dir, rel_path):
             continue
+        # R1: source-type pre-read enforcement (fail closed when unknown).
+        if resolved_scope is not None and resolved_scope.source_types:
+            indexed_type = _scoped_note_type_from_index(vault_dir, rel_path)
+            if indexed_type is None:
+                continue
+            if not resolved_scope.is_path_in_scope(rel_path, note_type=indexed_type):
+                continue
         scanned += 1
         if scanned > 5000:
             break
@@ -2010,7 +2033,13 @@ def _graph_assisted_search(
     ``suggest_related_v2`` over validated OKF notes. Missing or quarantined
     relation targets are ignored by the graph builder. A graph hop is a
     ranking signal, never a replacement for the source note.
+
+    P38-WP01-R1: SCOPE BEFORE GRAPH MATERIALIZATION/TRAVERSAL. The eligible
+    graph-source set is derived first; relation suggestions run over eligible
+    sources only; the graph contains eligible nodes only; bounded BFS therefore
+    cannot read, queue, traverse, bridge through, or materialize OOS nodes.
     """
+
     from power_framework.experimental.relations import WeightedKnowledgeGraph, suggest_related_v2
 
     candidate_limit = max(20, max_results * 4)
@@ -2035,19 +2064,28 @@ def _graph_assisted_search(
     if not candidates:
         return []
 
+    # Scope before graph build: eligible set uses path + safe metadata only.
+    eligible_paths = _eligible_graph_paths(vault_dir, resolved_scope)
+
     graph_boosts: dict[str, float] = {}
     for rank, anchor in enumerate(candidates[:candidate_limit]):
+        # Anchors themselves are already scoped candidates; skip any anchor
+        # that falls outside the eligible set (defense in depth).
+        if eligible_paths is not None and anchor.rel_path not in eligible_paths:
+            continue
         try:
             suggestions = suggest_related_v2(
                 vault_dir,
                 target_path=anchor.rel_path,
                 max_results=max(20, max_results * 4),
                 score_threshold=0.0,
+                allowed_paths=eligible_paths,
             )
             graph = WeightedKnowledgeGraph.from_suggestions(suggestions)
             anchor_weight = 1.0 / (rank + 1)
             for path, weight, depth in graph.weighted_bfs(anchor.rel_path, max_hops=2):
-                if resolved_scope is not None and not resolved_scope.is_path_in_scope(path):
+                # Eligible-only graph already enforces scope; skip OOS before use.
+                if eligible_paths is not None and path not in eligible_paths:
                     continue
                 decay = 1.0 if depth == 1 else 0.5
                 graph_boosts[path] = max(
@@ -2069,7 +2107,7 @@ def _graph_assisted_search(
     for path, boost in graph_boosts.items():
         if path in result_map:
             continue
-        if resolved_scope is not None and not resolved_scope.is_path_in_scope(path):
+        if eligible_paths is not None and path not in eligible_paths:
             continue
         try:
             source = _read_indexed_source(vault_dir, path, resolved_db=resolved_db)

@@ -426,6 +426,7 @@ def suggest_related_v2(
     target_path: str | None = None,
     max_results: int = SUGGEST_MAX_RESULTS,
     score_threshold: float = SUGGEST_RELATION_SCORE_THRESHOLD,
+    allowed_paths: set[str] | frozenset[str] | None = None,
 ) -> list[RelationSuggestion]:
     """Graph RAG v2 relation suggester.
 
@@ -439,6 +440,9 @@ def suggest_related_v2(
         target_path: If set, only suggest relations for this note.
         max_results: Max suggestions.
         score_threshold: Minimum composite score.
+        allowed_paths: When set, only notes in this eligible set are read and
+            considered (SCOPE BEFORE GRAPH BUILD). Out-of-scope paths are never
+            read, materialized, queued, traversed, or used as bridges.
     """
     # rel_path -> (keywords, tags, explicit_related_paths:set[str])
     notes: dict[str, tuple[set[str], list[str], set[str]]] = {}
@@ -450,6 +454,10 @@ def suggest_related_v2(
             continue
         if filepath.name in ("index.md", "log.md", "_index.md"):
             continue
+        rel_path = rel.as_posix()
+        # Scope before read: never read OOS sources for graph construction.
+        if allowed_paths is not None and rel_path not in allowed_paths:
+            continue
         try:
             content = read_file_content(filepath)
         except Exception:  # noqa: S112
@@ -458,11 +466,14 @@ def suggest_related_v2(
         if metadata is None:
             continue
 
-        rel_path = rel.as_posix()
         kw_text = f"{metadata.title} {metadata.description} {content}"
         keywords = _extract_keywords(kw_text)
         tags = metadata.tags or []
         expl = {r.path for r in metadata.related}
+        # Drop explicit links that point outside the eligible set so OOS nodes
+        # can never enter the graph as bridge candidates.
+        if allowed_paths is not None:
+            expl = {p for p in expl if p in allowed_paths}
         notes[rel_path] = (keywords, tags, expl)
         explicit_links[rel_path] = expl
 

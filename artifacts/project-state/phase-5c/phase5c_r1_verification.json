@@ -1,0 +1,60 @@
+{
+  "schema": "power.phase5c-r1-verification.v1",
+  "evidence_identity": "phase5c_r1_verification",
+  "created_at_utc": "2026-09-16T12:30:00Z",
+  "base_sha": "a0ee8eea36ede547ef4196f4e54f3c3465de044a",
+  "base_tree": "629688d882acd241c5e95679f418d60cac736825",
+  "candidate_sha": "pending-final-PR-R1B-head-see-PR-tuple-and-handoff",
+  "candidate_tree": "pending-final-PR-R1B-tree-see-PR-tuple",
+  "test_fixture_revision": "r1_closure-v1-29-tests",
+  "commands": [
+    "uv sync --locked --group dev --extra web --extra semantic --extra rerank",
+    "uv run pytest tests/test_phase5c_r1_closure.py --no-cov -q",
+    "uv run pytest tests/test_phase5c_search_scope.py tests/test_searcher.py tests/test_perf_optimizations.py --no-cov -q",
+    "uv run ruff check src tests",
+    "uv run ruff format --check src/power_framework/core/search_scope.py src/power_framework/core/searcher.py src/power_framework/experimental/relations.py tests/test_phase5c_r1_closure.py",
+    "uv run mypy src/power_framework"
+  ],
+  "python_version": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+  "sqlite_version": "3.46.1",
+  "host_profile": "Linux-7.0.14-16-pve-x86_64-with-glibc2.41",
+  "dataset_identity": "adversarial-starvation-30-OOS-plus-1-target-quantum",
+  "dataset_digest": "b3fdf772c6b744495a503651c5ceecc0302bd3d34c00e1f12e2f014c5797be3e (reused v1.1 query set digest for comparability)",
+  "query_identity": "quantum / max_results=3 / domain=projects",
+  "scope_algebra_result": "PASS-projects-plus-RestrictedProject-intersection-AnotherProject-excluded",
+  "fts": {
+    "selected_total": 1,
+    "out_of_scope": 0
+  },
+  "tf": {
+    "selected_total": 1,
+    "out_of_scope": 0
+  },
+  "dense": {
+    "selected_total": 0,
+    "out_of_scope": 0,
+    "note": "hermetic fixture has 0 chunk_embeddings rows (sync_embeddings=False); scoped chunk SQL contains domain AND explicit clauses and would exclude OOS if present"
+  },
+  "reranker": {
+    "input_total": 1,
+    "out_of_scope": 0,
+    "note": "input pool is FTS+vector scoped candidates only; hermetic DummyReranker in offline suite"
+  },
+  "graph": {
+    "nodes_considered": 1,
+    "nodes_visited": 1,
+    "out_of_scope_reads": 0,
+    "out_of_scope_hops": 0,
+    "note": "eligible set derived before read (1 in-scope); suggest_related_v2 allowed_paths excludes OOS bridge; BFS over eligible-only graph; OOS bridge cannot connect"
+  },
+  "fallback": {
+    "source_reads": 1,
+    "out_of_scope_source_reads": 0,
+    "note": "source-type and path pre-checks via safe index metadata before read_source; unknown types fail closed"
+  },
+  "recall": 1.0,
+  "p50_ms": 5.58,
+  "p95_ms": 8.5,
+  "peak_memory_mb": 40.77,
+  "measurement_note": "p50/p95 over 20 scoped FTS runs on adversarial fixture; peak via resource.getrusage; baseline single-query, not full-suite peak (baseline 570MB was full-suite); R1 single-dimension performance equivalent to PR434, combined-dimension correctness narrows (PR434 widened AnotherProject, R1 excludes)"
+}
