@@ -24,31 +24,31 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / P38-WP01-R1 CLOSED / MERGED / VERIFIED / PR #437
+PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / P38-WP01-R1 CLOSED / MERGED / VERIFIED / PHASE 5D (P38-WP02) CLOSED / MERGED / VERIFIED / PR #439 / PR #440
 
 SNAPSHOT_BASE_SHA:
-999f8c04a9cafd39deb9de2716e5cd07ec3e60b6
+19bab5a8b23f79a69a54ba110bfbffe7a35f64c8
 
 SNAPSHOT_BASE_TREE:
-9da812c49d2c9f43030656f6655d8e541bfe7d7c
+558c49e2cf4b9beae4bf8934dfc4a20b72c918f4
 
 SNAPSHOT_LAST_INCLUDED_PR:
-437 (main) / 428 (release/3.7)
+440 (main) / 428 (release/3.7)
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-437
+440
 
 CURRENT_LIVE_MAIN:
-999f8c04a9cafd39deb9de2716e5cd07ec3e60b6
+19bab5a8b23f79a69a54ba110bfbffe7a35f64c8
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-P38-WP01-R1 Phase 5C SearchScope Closure Correction (main, PR #437) / Phase 5C / P38-WP01 SearchScope Pushdown (main, PR #434, corrected by R1) / PR #436 R1A admission / Gate P38-G2 (main, PR #431) / PR #428 Release v3.7.13 (release/3.7)
+Phase 5D / P38-WP02 Multi-Domain Union & Conflict Resolution / RetrievalPlanner + ContextPack Read-Only Vertical Slice (main, PR #439, PR #440) / P38-WP01-R1 Phase 5C SearchScope Closure Correction (main, PR #437) / Phase 5C / P38-WP01 SearchScope Pushdown (main, PR #434, corrected by R1) / PR #436 R1A admission / Gate P38-G2 (main, PR #431) / PR #428 Release v3.7.13 (release/3.7)
 
 NEXT_GATE:
-Phase 5D / P38-WP02 Multi-Domain Union & Conflict Resolution (ADMITTED / NOT STARTED)
+Phase 5E / P38-WP03 Shadow Benchmark / Legacy Comparison (READY FOR SEPARATE ADMISSION / NOT STARTED)
 
 P38-WP01-R1_STATUS:
 CLOSED / MERGED / VERIFIED / PR #437
@@ -57,7 +57,10 @@ PHASE_5C_EFFECTIVE_STATUS:
 CLOSED / VERIFIED AFTER R1 CORRECTION
 
 PHASE_5D_STATUS:
-ADMITTED / NOT STARTED
+CLOSED / MERGED / VERIFIED / PR #439 / PR #440
+
+PHASE_5E_STATUS:
+READY FOR SEPARATE ADMISSION / NOT STARTED
 
 INFRA_1_STATUS:
 CLOSED / MERGED / VERIFIED
@@ -123,7 +126,10 @@ P38-WP01-R1:
 CLOSED / MERGED / VERIFIED / PR #437
 
 PHASE_5D:
-ADMITTED / NOT STARTED
+CLOSED / MERGED / VERIFIED / PR #439 / PR #440
+
+PHASE_5E:
+READY FOR SEPARATE ADMISSION / NOT STARTED
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -147,7 +153,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-16T140000Z_p38_wp02_phase5d_admission.md
+artifacts/project-state/handoffs/2026-09-16T193000Z_p38_wp02_phase5d_closure_reconciliation.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -181,7 +187,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / VERIFIED AFTER R1 CORRECTION / PHASE 5D READY FOR ADMISSION / PHASE 5E+ NOT IMPLEMENTED
+CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / VERIFIED AFTER R1 CORRECTION / PHASE 5D CLOSED / MERGED / VERIFIED / PHASE 5E READY FOR ADMISSION / PHASE 5E+ NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -251,8 +257,9 @@ evidence.
 - Gate P38-G2: **CLOSED / MERGED / VERIFIED** through protected PR #431 (`7546ff8`).
 - Phase 5C (Search scope pushdown): **CLOSED / VERIFIED AFTER R1 CORRECTION** (PR #434 corrected by PR #437).
 - P38-WP01-R1 (Phase 5C SearchScope Closure Correction): **CLOSED / MERGED / VERIFIED / PR #437**.
-- Phase 5D (P38-WP02): **ADMITTED / NOT STARTED**.
-- Phase 5E–5H: **PLANNED / NOT STARTED**.
+- Phase 5D (P38-WP02): **CLOSED / MERGED / VERIFIED** through protected PR #439 (Admission / ADR-0008) and PR #440 (Runtime & 50/50 Tests).
+- Phase 5E (P38-WP03): **READY FOR SEPARATE ADMISSION / NOT STARTED**.
+- Phase 5F–5H: **PLANNED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
 
@@ -360,7 +367,7 @@ Evidence:
 
 > Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was
 > subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438),
-> and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is READY FOR SEPARATE ADMISSION / NOT STARTED.
+> and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / MERGED / VERIFIED (PR #439 / PR #440). Phase 5E is READY FOR SEPARATE ADMISSION / NOT STARTED.
 
 ## Actions #396 exact objects
 
@@ -492,7 +499,8 @@ GATE P38-G1 (NORTH-STAR ARCHITECTURE) = CLOSED / MERGED / VERIFIED / PR #430 / m
 GATE P38-G2 (PRODUCT IDENTITY & DOCS) = CLOSED / MERGED / VERIFIED / PR #431 / merge 7546ff8
 PHASE 5C (SEARCH SCOPE PUSHDOWN) = CLOSED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED BY PR #437
 P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION) = CLOSED / MERGED / VERIFIED / PR #437
-PHASE 5D (P38-WP02) = READY FOR SEPARATE ADMISSION / NOT STARTED
+PHASE 5D (P38-WP02) = CLOSED / MERGED / VERIFIED / PR #439 / PR #440 / merge 19bab5a
+PHASE 5E (P38-WP03) = READY FOR SEPARATE ADMISSION / NOT STARTED
 ```
 
 The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
@@ -502,8 +510,8 @@ fail-closed repair were accepted through normal protected merges and post-merge 
 Real receiver deployment is an operator follow-up. Gates P38-G0 (Governance Rebaseline),
 P38-G1 (North-Star Architecture Alignment), and P38-G2 (Product Identity & Documentation Rebaseline)
 are closed and verified. Phase 5C (SearchScope Pushdown, PR #434) is CLOSED /
-VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is ADMITTED /
-NOT STARTED.
+VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is CLOSED /
+MERGED / VERIFIED (PR #439, PR #440). Phase 5E (P38-WP03) is READY FOR SEPARATE ADMISSION / NOT STARTED.
 A post-merge Dependabot run failure on main was investigated and dispositioned as Class C (non-required
 dependency update attempt failure, non-blocking).
 POWER 3.8.0 cannot be released from this state.
@@ -569,7 +577,7 @@ repairs are canonical on protected `main`:
 
 ## Next authorized work
 
-1. Execute Phase 5D (P38-WP02 — Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack Vertical Slice) under separate admission.
+1. Prepare admission and prerequisites for Phase 5E (P38-WP03 — Shadow Benchmark / Legacy Comparison).
 2. Adhere to strict preflight admission, TDD defect reproduction, and dual-side diff audit.
 3. Keep Phase 5E–9 runtime work, version bumps, tags, releases,
    and POWER 3.8.0 publication blocked until each declared gate is
@@ -581,8 +589,8 @@ repairs are canonical on protected `main`:
   dependency candidate must record its exact base/head/tree/parent, diff,
   hashes, tests, security, CI, and policy evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
-- Do not implement Phase 5D until preflight admission is completed.
-- Do not start Phase 5E+ runtime implementation, RetrievalPlanner beyond 5D scope, ContextPackCompiler beyond 5D scope, new MCP context tools beyond 5D scope, capture, A2A, AGE, pgvector, PostgreSQL, version bump, tag, or release in this gate.
+- Do not implement Phase 5E until preflight admission is completed.
+- Do not start Phase 5E+ runtime implementation, Phase 5F incremental dense validity, Phase 5G MCP context tools, capture, A2A, AGE, pgvector, PostgreSQL, version bump, tag, or release in this gate.
 - Do not bump the public version, create a tag, create a release, or publish
   `POWER 3.8.0`.
 - Do not treat candidate or evidence-branch documents as `MERGED MAIN` evidence.
@@ -604,6 +612,10 @@ repairs are canonical on protected `main`:
 - [Phase 5C baseline reproduction](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_BASELINE.md)
 - [Phase 5C implementation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T110500Z_p38_wp01_phase5c_search_scope_pushdown.md)
 - [Phase 5C post-merge closure reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T111500Z_p38_wp01_phase5c_closure_reconciliation.md)
+- [Phase 5D verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5d/PHASE_5D_REPORT.md)
+- [Phase 5D verification evidence](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5d/phase5d_verification.json)
+- [Phase 5D admission handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T140000Z_p38_wp02_phase5d_admission.md)
+- [Phase 5D closure reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T193000Z_p38_wp02_phase5d_closure_reconciliation.md)
 - [INFRA-1 governance reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

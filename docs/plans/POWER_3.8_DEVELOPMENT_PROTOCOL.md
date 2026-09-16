@@ -421,7 +421,8 @@ GATE P38-G1 (NORTH-STAR ARCHITECTURE): CLOSED / MERGED / VERIFIED / PR #430 / me
 GATE P38-G2 (PRODUCT IDENTITY & DOCS): CLOSED / MERGED / VERIFIED / PR #431 / merge 7546ff8
 PHASE 5C (P38-WP01): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED BY PR #437
 P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #437
-PHASE 5D (P38-WP02): READY FOR SEPARATE ADMISSION / NOT STARTED
+PHASE 5D (P38-WP02): CLOSED / MERGED / VERIFIED / PR #439 / PR #440
+PHASE 5E (P38-WP03): READY FOR SEPARATE ADMISSION / NOT STARTED
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -432,7 +433,8 @@ receipts are retained `MERGED MAIN` evidence. Phase 5B and INFRA-1 are
 closed on protected `main`. Real receiver deployment is an operator follow-up.
 Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
 pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
-(P38-WP02) is READY FOR SEPARATE ADMISSION / NOT STARTED. Do not start Phase 5E–9, version bumps,
+(P38-WP02) is CLOSED / MERGED / VERIFIED (PR #439 / PR #440). Phase 5E (P38-WP03) is
+READY FOR SEPARATE ADMISSION / NOT STARTED. Do not start Phase 5E–9, version bumps,
 tags, releases, release images, or final release notes.
 
 ## INFRA-1 execution boundary
@@ -485,7 +487,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C SearchScope pushdown is closed and verified (PR #434). Phase 5D remains unstarted.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434). Phase 5D (P38-WP02) is closed and verified (PR #439 / PR #440). Phase 5E remains unstarted.
 
 ## Cross-links
 
