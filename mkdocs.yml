@@ -89,6 +89,7 @@ nav:
       - POWER Memory OS Principles: adr/0002-memory-os-principles.md
       - POWER 3.5 Core Boundary: adr/0003-power-3.5-core-boundary.md
       - INFRA-1 Constrained Execution Broker: adr/0006-infra-1-constrained-execution-broker.md
+      - POWER 3.8 North-Star Control Plane: adr/0007-power-3.8-north-star-control-plane-architecture.md
   - POWER 3.1 Release Evidence: release-3.1.md
   - POWER 3.4.0 Release Notes: release-3.4.0.md
   - POWER 3.3.2 Release Notes: release-3.3.2.md
