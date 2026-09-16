@@ -22,6 +22,10 @@ REST verification:
 - [Phase 5B domain-policy/router handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
 - [INFRA-1 original implementation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
 - [INFRA-1 governance reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md)
+- [Gate P38-G0 governance rebaseline handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T083000Z_p38_g0_governance_rebaseline.md)
+- [Gate P38-G1 north-star architecture alignment handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T084000Z_p38_g1_north_star_architecture_alignment.md)
+- [Gate P38-G2 product identity rebaseline handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T084800Z_p38_g2_product_identity_rebaseline.md)
+- [Gate P38-G2 post-merge closure & Phase 5C admission reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T103000Z_p38_g2_post_merge_reconciliation.md)
 - [INFRA-1 broker API](../api/infra_broker.md)
 - [INFRA-1 architectural decision](../adr/0006-infra-1-constrained-execution-broker.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
@@ -36,9 +40,9 @@ REST verification:
 > **CLOSED / MERGED / VERIFIED** through PR #418. INFRA-1 is
 > **CLOSED / MERGED / VERIFIED** through PR #419. Post-INFRA-1 repairs
 > (PR #420, #422, #423, #424) and maintenance releases (`v3.7.12`, `v3.7.13`
-> on `release/3.7`) are merged. The governance flow proceeds through Gates
-> P38-G0, P38-G1, and P38-G2 before Phase 5C admission. Phase 5C SearchScope
-> pushdown is ready for separate preflight admission and remains unstarted.
+> on `release/3.7`) are merged. Gates P38-G0 (PR #429), P38-G1 (PR #430),
+> and P38-G2 (PR #431) are closed and verified. Phase 5C SearchScope
+> pushdown is admitted for implementation under PR-B and remains unstarted.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.

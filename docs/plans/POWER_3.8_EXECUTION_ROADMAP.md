@@ -56,16 +56,16 @@ Post-INFRA-1 Governance Reconciliation & Fixes
 CLOSED / MERGED / VERIFIED (PR #420, #422, #423, #424)
         ↓
 Gate P38-G0 — Governance Rebaseline
-IN PROGRESS
+CLOSED / MERGED / VERIFIED (PR #429)
         ↓
 Gate P38-G1 — North-Star Architecture Alignment
-GATED BY G0 / PLANNED
+CLOSED / MERGED / VERIFIED (PR #430)
         ↓
 Gate P38-G2 — Product Identity & Documentation Rebaseline
-GATED BY G1 / PLANNED
+CLOSED / MERGED / VERIFIED (PR #431)
         ↓
 Phase 5C (P38-WP01) — Search Scope Pushdown
-READY FOR SEPARATE ADMISSION / NOT STARTED (gated by G2)
+ADMITTED / NOT STARTED
          ↓
 Phase 5D–5H (P38-WP02–P38-WP06) — ContextPack, Shadow, Dense Validity, MCP, Closure
 PLANNED / NOT STARTED
@@ -116,10 +116,10 @@ NO-GO
 | Maintenance bootstrap | CLOSED / MERGED / VERIFIED | PR #425 on `release/3.7` |
 | Patch release 3.7.12 | CLOSED / MERGED / VERIFIED | PR #426, PR #427 on `release/3.7`; tagged `v3.7.12` |
 | Patch release 3.7.13 | CLOSED / MERGED / VERIFIED | PR #428 on `release/3.7`; tagged `v3.7.13` |
-| Gate P38-G0 | IN PROGRESS | Governance Rebaseline; aligns mutable state with live reality |
-| Gate P38-G1 | PLANNED / GATED | North-Star Architecture Alignment; freezes architecture direction |
-| Gate P38-G2 | PLANNED / GATED | Product Identity & Documentation Rebaseline; mandatory before Phase 5C |
-| Phase 5C (P38-WP01) | READY FOR SEPARATE ADMISSION / NOT STARTED | SearchScope pushdown preflight/contract freeze; gated by G2 |
+| Gate P38-G0 | CLOSED / MERGED / VERIFIED | Governance Rebaseline; aligns mutable state with live reality (PR #429, merge `df813f4`) |
+| Gate P38-G1 | CLOSED / MERGED / VERIFIED | North-Star Architecture Alignment; freezes architecture direction (PR #430, merge `38f656b`) |
+| Gate P38-G2 | CLOSED / MERGED / VERIFIED | Product Identity & Documentation Rebaseline; aligned docs with ADR-0007 (PR #431, merge `7546ff8`) |
+| Phase 5C (P38-WP01) | ADMITTED / NOT STARTED | SearchScope pushdown preflight/contract freeze; admitted for implementation under PR-B |
 | Phase 5D–5H (P38-WP02–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5C → 5D → 5E → 5F → 5G → 5H) |
 | Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
