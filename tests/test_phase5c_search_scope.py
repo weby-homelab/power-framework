@@ -365,6 +365,14 @@ def make_access_policy(
     return AccessPolicy._from_authorization_boundary(**payload)
 
 
+class DummyReranker:
+    """Hermetic reranker stub returning constant scores for offline tests."""
+
+    def rerank(self, query: str, documents: list[str]) -> list[float]:
+        del query
+        return [1.0] * len(documents)
+
+
 def test_stage_materialization_counters_zero(rich_scoped_vault: Path) -> None:
     """Verify all 6 out-of-scope materialization counters are strictly 0."""
     vault = rich_scoped_vault
@@ -397,6 +405,7 @@ def test_stage_materialization_counters_zero(rich_scoped_vault: Path) -> None:
     with (
         patch("power_framework.core.searcher.validate_dense_index", return_value=1),
         patch("power_framework.core.searcher._semantic_search", return_value=[]),
+        patch("power_framework.core.searcher._get_reranker", return_value=DummyReranker()),
     ):
         rerank_results = _hybrid_reranked_search(
             vault, "quantum", max_results=20, resolved_scope=resolved_scope
@@ -745,6 +754,7 @@ def test_retrieval_modes_pushdown_all_modes(rich_scoped_vault: Path) -> None:
     with (
         patch("power_framework.core.searcher.validate_dense_index", return_value=1),
         patch("power_framework.core.searcher._semantic_search", return_value=[]),
+        patch("power_framework.core.searcher._get_reranker", return_value=DummyReranker()),
     ):
         results = search_vault(vault, "quantum", mode="reranked", scope=scope)
         paths = [r.rel_path for r in results]
