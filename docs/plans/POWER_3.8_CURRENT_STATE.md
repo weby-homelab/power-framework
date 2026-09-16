@@ -24,40 +24,40 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSURE CORRECTION ADMITTED / P38-WP01-R1 IN PROGRESS / PR #434 SUPERSEDED FOR CLOSURE / PHASE 5D BLOCKED BY P38-WP01-R1
+PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / P38-WP01-R1 CLOSED / MERGED / VERIFIED / PR #437
 
 SNAPSHOT_BASE_SHA:
-319e6101e6c96f04d532de67a6f9e8f2aee4fa73
+999f8c04a9cafd39deb9de2716e5cd07ec3e60b6
 
 SNAPSHOT_BASE_TREE:
-1768fb1662dc968611b1e8ab7cbd31d2c5997747
+9da812c49d2c9f43030656f6655d8e541bfe7d7c
 
 SNAPSHOT_LAST_INCLUDED_PR:
-435 (main) / 428 (release/3.7)
+437 (main) / 428 (release/3.7)
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-435
+437
 
 CURRENT_LIVE_MAIN:
-319e6101e6c96f04d532de67a6f9e8f2aee4fa73
+999f8c04a9cafd39deb9de2716e5cd07ec3e60b6
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-PR #435 Phase 5C closure reconciliation (main) / Phase 5C / P38-WP01 SearchScope Pushdown (main, PR #434, closure correction admitted) / Gate P38-G2 (main, PR #431) / PR #428 Release v3.7.13 (release/3.7)
+P38-WP01-R1 Phase 5C SearchScope Closure Correction (main, PR #437) / Phase 5C / P38-WP01 SearchScope Pushdown (main, PR #434, corrected by R1) / PR #436 R1A admission / Gate P38-G2 (main, PR #431) / PR #428 Release v3.7.13 (release/3.7)
 
 NEXT_GATE:
-P38-WP01-R1 Phase 5C SearchScope Closure Correction (IN PROGRESS) / Phase 5D / P38-WP02 BLOCKED BY P38-WP01-R1
+Phase 5D / P38-WP02 Multi-Domain Union & Conflict Resolution (READY FOR SEPARATE ADMISSION / NOT STARTED)
 
 P38-WP01-R1_STATUS:
-IN PROGRESS / FORENSIC ADMISSION
+CLOSED / MERGED / VERIFIED / PR #437
 
 PHASE_5C_EFFECTIVE_STATUS:
-CLOSURE CORRECTION ADMITTED / NOT CLOSED / PHASE 5D BLOCKED
+CLOSED / VERIFIED AFTER R1 CORRECTION
 
 PHASE_5D_STATUS:
-BLOCKED BY P38-WP01-R1 / NOT STARTED
+READY FOR SEPARATE ADMISSION / NOT STARTED
 
 INFRA_1_STATUS:
 CLOSED / MERGED / VERIFIED
@@ -117,13 +117,13 @@ INFRA_1_MERGE:
 bfb968846c0fc41582c2367782a28540498715b4
 
 PHASE_5C:
-CLOSURE CORRECTION ADMITTED / P38-WP01-R1 IN PROGRESS / PR #434 SUPERSEDED FOR CLOSURE / PHASE 5D BLOCKED
+CLOSED / MERGED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED BY PR #437
 
 P38-WP01-R1:
-IN PROGRESS / FORENSIC ADMISSION / RUNTIME CORRECTION PENDING / PHASE 5D BLOCKED
+CLOSED / MERGED / VERIFIED / PR #437
 
 PHASE_5D:
-BLOCKED BY P38-WP01-R1 / NOT STARTED
+READY FOR SEPARATE ADMISSION / NOT STARTED
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -147,7 +147,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-16T120000Z_p38_wp01_r1_forensic_admission.md
+artifacts/project-state/handoffs/2026-09-16T130000Z_p38_wp01_r1_closure.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -181,7 +181,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSURE CORRECTION ADMITTED (P38-WP01-R1 IN PROGRESS) / PHASE 5D BLOCKED / PHASE 5E+ NOT IMPLEMENTED
+CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / VERIFIED AFTER R1 CORRECTION / PHASE 5D READY FOR ADMISSION / PHASE 5E+ NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -249,10 +249,10 @@ evidence.
 - Gate P38-G0: **CLOSED / MERGED / VERIFIED** through protected PR #429 (`df813f4`).
 - Gate P38-G1: **CLOSED / MERGED / VERIFIED** through protected PR #430 (`38f656b`).
 - Gate P38-G2: **CLOSED / MERGED / VERIFIED** through protected PR #431 (`7546ff8`).
-- Phase 5C (Search scope pushdown): **CLOSURE CORRECTION ADMITTED / P38-WP01-R1 IN PROGRESS** (PR #434 superseded for closure; runtime correction pending).
-- P38-WP01-R1 (Phase 5C SearchScope Closure Correction): **IN PROGRESS / FORENSIC ADMISSION**.
-- Phase 5D (P38-WP02): **BLOCKED BY P38-WP01-R1 / NOT STARTED**.
-- Phase 5E–5H: **PLANNED / NOT STARTED / BLOCKED BY PREDECESSOR SEQUENCE**.
+- Phase 5C (Search scope pushdown): **CLOSED / VERIFIED AFTER R1 CORRECTION** (PR #434 corrected by PR #437).
+- P38-WP01-R1 (Phase 5C SearchScope Closure Correction): **CLOSED / MERGED / VERIFIED / PR #437**.
+- Phase 5D (P38-WP02): **READY FOR SEPARATE ADMISSION / NOT STARTED**.
+- Phase 5E–5H: **PLANNED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
 
@@ -491,9 +491,9 @@ MAINTENANCE RELEASES = CLOSED / MERGED / VERIFIED / v3.7.12 & v3.7.13 on release
 GATE P38-G0 (GOVERNANCE REBASELINE) = CLOSED / MERGED / VERIFIED / PR #429 / merge df813f4
 GATE P38-G1 (NORTH-STAR ARCHITECTURE) = CLOSED / MERGED / VERIFIED / PR #430 / merge 38f656b
 GATE P38-G2 (PRODUCT IDENTITY & DOCS) = CLOSED / MERGED / VERIFIED / PR #431 / merge 7546ff8
-PHASE 5C (SEARCH SCOPE PUSHDOWN) = CLOSURE CORRECTION ADMITTED / P38-WP01-R1 IN PROGRESS / PR #434 SUPERSEDED FOR CLOSURE
-P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION) = IN PROGRESS / FORENSIC ADMISSION
-PHASE 5D (P38-WP02) = BLOCKED BY P38-WP01-R1 / NOT STARTED
+PHASE 5C (SEARCH SCOPE PUSHDOWN) = CLOSED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED BY PR #437
+P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION) = CLOSED / MERGED / VERIFIED / PR #437
+PHASE 5D (P38-WP02) = READY FOR SEPARATE ADMISSION / NOT STARTED
 ```
 
 The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
@@ -502,9 +502,9 @@ broker, repository cleanup, CI required docs build, and task journal integrity
 fail-closed repair were accepted through normal protected merges and post-merge checks.
 Real receiver deployment is an operator follow-up. Gates P38-G0 (Governance Rebaseline),
 P38-G1 (North-Star Architecture Alignment), and P38-G2 (Product Identity & Documentation Rebaseline)
-are closed and verified. Phase 5C (SearchScope Pushdown, PR #434) closure is now under
-P38-WP01-R1 corrective gate (CLOSURE CORRECTION ADMITTED / IN PROGRESS). Phase 5D (P38-WP02)
-is BLOCKED BY P38-WP01-R1.
+are closed and verified. Phase 5C (SearchScope Pushdown, PR #434) is CLOSED /
+VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is READY FOR
+SEPARATE ADMISSION / NOT STARTED.
 A post-merge Dependabot run failure on main was investigated and dispositioned as Class C (non-required
 dependency update attempt failure, non-blocking).
 POWER 3.8.0 cannot be released from this state.
@@ -556,6 +556,12 @@ repairs are canonical on protected `main`:
   with tree `1768fb1662dc968611b1e8ab7cbd31d2c5997747` and parents
   `294b48319fdcd3dd3bc030a940bda64f7583889f` and `708b3677e97b91ef1748d62fce79c7b642b1419d`.
   Narrative SHA `319e610d4806a6c0c00b5220c3848b3b429ef9eb` is a reporting typo and does not exist as a Git object.
+- P38-WP01-R1 admission PR #436 is protected-merged as `a0ee8eea36ede547ef4196f4e54f3c3465de044a`
+  with tree `629688d882acd241c5e95679f418d60cac736825` and parents
+  `319e6101e6c96f04d532de67a6f9e8f2aee4fa73` and `5ebc13d3cd42ba8bb9d2202e3e4a81c22ae91004`.
+- P38-WP01-R1 runtime correction PR #437 is protected-merged as `999f8c04a9cafd39deb9de2716e5cd07ec3e60b6`
+  with tree `9da812c49d2c9f43030656f6655d8e541bfe7d7c` and parents
+  `a0ee8eea36ede547ef4196f4e54f3c3465de044a` and `d60032111144756beca997b6bc7aeb5d9ff7c659`.
 - The prior `docs/power-3.8-premerge-state-publication` branch remains
   provisional evidence and is retained as source material; it is not replaced
   or deleted.
@@ -564,10 +570,11 @@ repairs are canonical on protected `main`:
 
 ## Next authorized work
 
-1. Execute P38-WP01-R1 Phase 5C SearchScope Closure Correction (PR-R1A admission → PR-R1B runtime correction → PR-R1C closure reconciliation).
+1. Execute Phase 5D (P38-WP02 — Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack Vertical Slice) under separate admission.
 2. Adhere to strict preflight admission, TDD defect reproduction, and dual-side diff audit.
-3. Keep Phase 5D (P38-WP02), Phase 5E–9 runtime work, version bumps, tags, releases,
-   and POWER 3.8.0 publication BLOCKED until P38-WP01-R1 is completely closed.
+3. Keep Phase 5E–9 runtime work, version bumps, tags, releases,
+   and POWER 3.8.0 publication blocked until each declared gate is
+   independently closed.
 
 ## Do not start
 
@@ -575,8 +582,8 @@ repairs are canonical on protected `main`:
   dependency candidate must record its exact base/head/tree/parent, diff,
   hashes, tests, security, CI, and policy evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
-- Do not implement Phase 5D (P38-WP02) until P38-WP01-R1 is completely closed; Phase 5D is BLOCKED BY P38-WP01-R1.
-- Do not start Phase 5E+ runtime implementation, RetrievalPlanner, ContextPackCompiler, new MCP context tools, capture, A2A, AGE, pgvector, PostgreSQL, version bump, tag, or release in this gate.
+- Do not implement Phase 5D until preflight admission is completed.
+- Do not start Phase 5E+ runtime implementation, RetrievalPlanner beyond 5D scope, ContextPackCompiler beyond 5D scope, new MCP context tools beyond 5D scope, capture, A2A, AGE, pgvector, PostgreSQL, version bump, tag, or release in this gate.
 - Do not bump the public version, create a tag, create a release, or publish
   `POWER 3.8.0`.
 - Do not treat candidate or evidence-branch documents as `MERGED MAIN` evidence.
