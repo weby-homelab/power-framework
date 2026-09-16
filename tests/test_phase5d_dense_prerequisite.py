@@ -92,16 +92,16 @@ def _rehash_generation(vault: Path, db_path: Path) -> None:
     """Update the immutable generation state store with updated file identity and clear cache."""
     new_sha, new_size = _file_identity(db_path)
     state_db = _state_db_path(vault)
-    if state_db.is_file():
-        conn = sqlite3.connect(state_db, timeout=30)
-        try:
-            conn.execute(
-                "UPDATE index_generations SET db_sha256 = ?, db_size = ?",
-                (new_sha, new_size),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+    assert state_db.is_file(), f"Generation state store missing at {state_db}"
+    conn = sqlite3.connect(state_db, timeout=30)
+    try:
+        conn.execute(
+            "UPDATE index_generations SET db_sha256 = ?, db_size = ?",
+            (new_sha, new_size),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     invalidate_active_generation_cache(vault)
 
 

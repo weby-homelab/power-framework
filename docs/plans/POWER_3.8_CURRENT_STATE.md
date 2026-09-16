@@ -123,7 +123,7 @@ P38-WP01-R1:
 CLOSED / MERGED / VERIFIED / PR #437
 
 PHASE_5D:
-READY FOR SEPARATE ADMISSION / NOT STARTED
+ADMITTED / NOT STARTED
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -147,7 +147,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-16T130000Z_p38_wp01_r1_closure.md
+artifacts/project-state/handoffs/2026-09-16T140000Z_p38_wp02_phase5d_admission.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -502,8 +502,8 @@ fail-closed repair were accepted through normal protected merges and post-merge 
 Real receiver deployment is an operator follow-up. Gates P38-G0 (Governance Rebaseline),
 P38-G1 (North-Star Architecture Alignment), and P38-G2 (Product Identity & Documentation Rebaseline)
 are closed and verified. Phase 5C (SearchScope Pushdown, PR #434) is CLOSED /
-VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is READY FOR
-SEPARATE ADMISSION / NOT STARTED.
+VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is ADMITTED /
+NOT STARTED.
 A post-merge Dependabot run failure on main was investigated and dispositioned as Class C (non-required
 dependency update attempt failure, non-blocking).
 POWER 3.8.0 cannot be released from this state.
