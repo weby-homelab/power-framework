@@ -1,16 +1,4 @@
-"""
-P.O.W.E.R. Core Library.
-
-Shared functionality for the P.O.W.E.R. Knowledge Management Framework:
-- OKF metadata validation (Pydantic models)
-- Safe YAML frontmatter parsing
-- Vault indexing and catalog generation
-- Health linting (broken links, orphans, metadata)
-- Path traversal protection and atomic writes
-
-Usage:
-    from power_core import OKFMetadata, run_generate_index, run_lint_report
-"""
+"""P.O.W.E.R. Core Library for knowledge management, indexing, and runtime contracts."""
 
 from __future__ import annotations
 
@@ -30,6 +18,7 @@ from .application import (
 )
 from .chunker import SemanticChunker
 from .connect import ConnectPlan, apply_connect_plan, build_connect_plan
+from .context_compiler import ContextPackCompiler
 from .control_plane import (
     build_control_plane,
     build_obsidian_base,
@@ -198,6 +187,10 @@ from .provenance import (
     same_content,
     verify_bytes,
 )
+from .retrieval_planner import (
+    PlannerResult,
+    RetrievalPlanner,
+)
 from .searcher import (
     CANONICAL_SEARCH_MODES,
     DEFAULT_SEARCH_MODE,
@@ -327,6 +320,7 @@ __all__ = [
     "CompletedAfterDeadlineError",
     "ConnectPlan",
     "ContentDedupDetector",
+    "ContextPackCompiler",
     "ContradictionDetector",
     "DeadlineExceededError",
     "DomainAuthorityPolicy",
@@ -383,6 +377,7 @@ __all__ = [
     "NoteStatus",
     "NoteType",
     "OKFMetadata",
+    "PlannerResult",
     "Principal",
     "PrincipalBinding",
     "ProvenanceError",
@@ -395,6 +390,7 @@ __all__ = [
     "RerankerManager",
     "ResultBudgetExceededError",
     "RetrievalDomainRouter",
+    "RetrievalPlanner",
     "SearchResult",
     "SemanticChunker",
     "Sensitivity",

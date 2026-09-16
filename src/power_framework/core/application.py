@@ -16,7 +16,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
@@ -26,6 +26,16 @@ from .application_models import (
     SourceReadRequest,
 )
 from .capabilities import manifest
+from .context_compiler import ContextPackCompiler
+from .context_contracts import (
+    AccessPolicy,
+    BudgetClass,
+    BudgetProfile,
+    ProfileBudgetLayer,
+    QueryIntent,
+    QueryIntentKind,
+    TemporalBoundary,
+)
 from .decision_service import DecisionService
 from .errors import ConflictError
 from .healer import heal_vault
@@ -53,6 +63,8 @@ from .models import PARA_FOLDERS, MemoryKind, MemoryMetadata, NoteType, OKFMetad
 from .mutation import execute_vault_mutation
 from .parser import build_frontmatter
 from .principal import Principal
+from .retrieval_planner import RetrievalPlanner
+from .search_scope import SearchScopeAccessDeniedError
 from .searcher import (
     DEFAULT_SEARCH_MODE,
     format_untrusted_search_envelope,
@@ -70,7 +82,7 @@ from .task_service import _INFRA_PROJECTION_TOKEN, TaskService
 from .utils import resolve_path_in_vault
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Mapping, Sequence
 
 
 logger = logging.getLogger(__name__)
@@ -369,6 +381,126 @@ class ApplicationService:
             )
 
         return self._run("retrieve", context, execute)
+
+    def compile_context(
+        self,
+        query: str,
+        *,
+        intent: str | QueryIntentKind = QueryIntentKind.LOOKUP,
+        budget_class: str | BudgetClass = BudgetClass.FAST,
+        max_tokens: int | None = None,
+        domain_hints: Sequence[str] | None = None,
+        project_ids: Sequence[str] | None = None,
+        temporal_boundary: TemporalBoundary | str | None = None,
+        include_archived: bool = False,
+        include_quarantine: bool = False,
+        caller_hint: ProfileBudgetLayer | BudgetProfile | None = None,
+        access_policy: AccessPolicy | None = None,
+        context: RequestContext | None = None,
+    ) -> ApplicationEnvelope:
+        """Compile a server-issued, budget-bounded ContextPack for multi-domain queries."""
+        if not isinstance(query, str) or not query.strip():
+            self._reject_request(
+                "compile_context", context, ValueError("Search query cannot be empty")
+            )
+
+        if isinstance(intent, str):
+            try:
+                intent_kind = QueryIntentKind(intent.lower())
+            except ValueError as exc:
+                self._reject_request("compile_context", context, exc)
+        else:
+            intent_kind = intent
+
+        if isinstance(budget_class, str):
+            try:
+                budget_cls = BudgetClass(budget_class.upper())
+            except ValueError as exc:
+                self._reject_request("compile_context", context, exc)
+        else:
+            budget_cls = budget_class
+
+        tb: TemporalBoundary | None = None
+        if isinstance(temporal_boundary, str):
+            try:
+                tb = TemporalBoundary(
+                    as_of=date.fromisoformat(temporal_boundary), include_historical=False
+                )
+            except ValueError as exc:
+                self._reject_request("compile_context", context, exc)
+        elif isinstance(temporal_boundary, TemporalBoundary):
+            tb = temporal_boundary
+
+        intent_kwargs: dict[str, Any] = {
+            "query": query.strip(),
+            "intent": intent_kind,
+            "budget_class": budget_cls,
+            "include_archived": include_archived,
+            "include_quarantine": include_quarantine,
+        }
+        if max_tokens is not None:
+            intent_kwargs["max_tokens"] = max_tokens
+        if domain_hints:
+            intent_kwargs["domain_hints"] = list(domain_hints)
+        if project_ids:
+            intent_kwargs["project_ids"] = list(project_ids)
+        if tb is not None:
+            intent_kwargs["temporal_boundary"] = tb
+
+        query_intent = QueryIntent(**intent_kwargs)
+
+        if include_archived or include_quarantine:
+            if (
+                access_policy is None
+                or access_policy.raw_access != "privileged"
+                or access_policy.quarantine_access != "privileged"
+            ):
+                self._reject_request(
+                    "compile_context",
+                    context,
+                    SearchScopeAccessDeniedError(
+                        "privileged search scope requested without a verified privileged AccessPolicy"
+                    ),
+                )
+            effective_policy = access_policy
+        elif access_policy is not None:
+            effective_policy = access_policy
+        else:
+            actor = context.principal.ref if context and context.principal else "local_user"
+            effective_policy = AccessPolicy._from_authorization_boundary(
+                origin="authorization_boundary",
+                actor=actor,
+                raw_access="none",
+                quarantine_access="none",
+                redaction="mandatory",
+                capability_id="compile_context",
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+
+        def execute() -> dict[str, object]:
+            planner = RetrievalPlanner(
+                self.vault_dir,
+                task_service=self.task_service,
+                decision_service=self.decision_service,
+                search_fn=self._search_fn,
+            )
+            planner_result = planner.plan_and_retrieve(
+                query_intent,
+                caller_hint=caller_hint,
+                access_policy=effective_policy,
+            )
+            compiler = ContextPackCompiler()
+            pack = compiler.compile(
+                planner_result,
+                query_intent,
+                access_policy=effective_policy,
+            )
+            data = pack.model_dump(mode="json")
+            data["actual_capability"] = "compile_context"
+            data["source_revision"] = pack.generation_revision
+            return data
+
+        return self._run("compile_context", context, execute, mutation=False)
 
     def propose(
         self,
