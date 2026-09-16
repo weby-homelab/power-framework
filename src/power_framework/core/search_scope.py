@@ -27,7 +27,6 @@ from .temporal import (
 
 if TYPE_CHECKING:
     from .context_contracts import AccessPolicy, SearchScope
-    from .searcher import _ResolvedDb
 
 
 class SearchScopeError(Exception):
@@ -273,7 +272,7 @@ def compile_search_scope(
     temporal_view: str = "current",
     as_of: date | str | None = None,
     access_policy: AccessPolicy | None = None,
-    resolved_db: _ResolvedDb | None = None,
+    resolved_db: Any = None,
 ) -> ResolvedSearchScope:
     """Validate and compile raw search inputs into a canonical ResolvedSearchScope.
 
