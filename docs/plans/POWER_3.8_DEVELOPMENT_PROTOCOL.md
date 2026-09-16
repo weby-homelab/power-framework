@@ -416,10 +416,10 @@ REPOSITORY CLEANUP: CLOSED / MERGED / VERIFIED / PR #422 / merge cf017f3
 CI REQUIRED DOCS BUILD: CLOSED / MERGED / VERIFIED / PR #423 / merge 906986c
 TASK JOURNAL INTEGRITY FAIL-CLOSED: CLOSED / MERGED / VERIFIED / PR #424 / merge 3cb94ff
 MAINTENANCE RELEASES: CLOSED / MERGED / VERIFIED / v3.7.12 & v3.7.13 on release/3.7
-GATE P38-G0 (GOVERNANCE REBASELINE): IN PROGRESS
-GATE P38-G1 (NORTH-STAR ARCHITECTURE): PLANNED / GATED BY G0
-GATE P38-G2 (PRODUCT IDENTITY & DOCS): PLANNED / GATED BY G1
-PHASE 5C (P38-WP01): READY FOR SEPARATE ADMISSION / GATED BY G2
+GATE P38-G0 (GOVERNANCE REBASELINE): CLOSED / MERGED / VERIFIED / PR #429 / merge df813f4
+GATE P38-G1 (NORTH-STAR ARCHITECTURE): CLOSED / MERGED / VERIFIED / PR #430 / merge 38f656b
+GATE P38-G2 (PRODUCT IDENTITY & DOCS): CLOSED / MERGED / VERIFIED / PR #431 / merge 7546ff8
+PHASE 5C (P38-WP01): ADMITTED / NOT STARTED
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -428,8 +428,8 @@ The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, Phase 5B, INFRA-1,
 repository cleanup, CI required docs build, and task journal integrity merge
 receipts are retained `MERGED MAIN` evidence. Phase 5B and INFRA-1 are
 closed on protected `main`. Real receiver deployment is an operator follow-up.
-The authorized sequence executes Gates P38-G0, P38-G1, and P38-G2 before Phase 5C
-admission. Do not start Phase 5C runtime implementation or Phases 6–9, version bumps,
+Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
+pushdown is admitted for implementation under PR-B. Do not start Phases 6–9, version bumps,
 tags, releases, release images, or final release notes.
 
 ## INFRA-1 execution boundary
