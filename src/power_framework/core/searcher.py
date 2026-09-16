@@ -1312,10 +1312,7 @@ def _get_or_build_dense_matrix(
                 # A publication creates a new immutable key. Drop superseded
                 # entries for this vault before retaining the new matrix.
                 for old_key in tuple(_dense_matrix_cache):
-                    if (
-                        old_key[0] == key[0]
-                        and (old_key[1] != key[1] or old_key[2] != key[2])
-                    ):
+                    if old_key[0] == key[0] and (old_key[1] != key[1] or old_key[2] != key[2]):
                         _dense_matrix_cache.pop(old_key, None)
                 _dense_matrix_cache[key] = entry
                 _dense_matrix_cache.move_to_end(key)

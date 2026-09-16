@@ -376,12 +376,16 @@ def test_stage_materialization_counters_zero(rich_scoped_vault: Path) -> None:
 
     # 1. FTS candidate stage: 0 out-of-scope candidates returned
     fts_results = _fts_search(vault, "quantum", max_results=20, resolved_scope=resolved_scope)
-    out_of_scope_fts = [r.rel_path for r in fts_results if not r.rel_path.startswith("01_Projects/")]
+    out_of_scope_fts = [
+        r.rel_path for r in fts_results if not r.rel_path.startswith("01_Projects/")
+    ]
     assert len(out_of_scope_fts) == 0, f"Out of scope FTS candidates: {out_of_scope_fts}"
 
     # 2. TF vector stage: 0 out-of-scope rows returned from vector search
     vec_results = _vector_search(vault, "quantum", max_results=20, resolved_scope=resolved_scope)
-    out_of_scope_vec = [r.rel_path for r in vec_results if not r.rel_path.startswith("01_Projects/")]
+    out_of_scope_vec = [
+        r.rel_path for r in vec_results if not r.rel_path.startswith("01_Projects/")
+    ]
     assert len(out_of_scope_vec) == 0, f"Out of scope vector candidates: {out_of_scope_vec}"
 
     # 3. Dense stage: scoped chunk embeddings query returns 0 out-of-scope chunks
@@ -759,4 +763,3 @@ def test_backward_compatibility_unscoped_search(rich_scoped_vault: Path) -> None
     assert "03_Resources/quantum_resource.md" in paths
     assert "04_Archive/archived_quantum.md" in paths
     assert "03_Resources/quarantine/bad_quantum.md" not in paths
-

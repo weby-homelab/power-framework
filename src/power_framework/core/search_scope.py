@@ -213,9 +213,7 @@ class ResolvedSearchScope:
 
         # 2. Archive exclusion
         if not self.include_archived:
-            clauses.append(
-                f"({col} != '04_Archive' AND {col} NOT LIKE '04_Archive/%' ESCAPE '\\')"
-            )
+            clauses.append(f"({col} != '04_Archive' AND {col} NOT LIKE '04_Archive/%' ESCAPE '\\')")
             # Subquery to exclude Archive note_type
             clauses.append(
                 f"{col} NOT IN (SELECT rel_path FROM fts_notes WHERE note_type = 'Archive')"  # noqa: S608
