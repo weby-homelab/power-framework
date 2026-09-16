@@ -122,8 +122,9 @@ NO-GO
 | Gate P38-G0 | CLOSED / MERGED / VERIFIED | Governance Rebaseline; aligns mutable state with live reality (PR #429, merge `df813f4`) |
 | Gate P38-G1 | CLOSED / MERGED / VERIFIED | North-Star Architecture Alignment; freezes architecture direction (PR #430, merge `38f656b`) |
 | Gate P38-G2 | CLOSED / MERGED / VERIFIED | Product Identity & Documentation Rebaseline; aligned docs with ADR-0007 (PR #431, merge `7546ff8`) |
-| Phase 5C (P38-WP01) | CLOSED / MERGED / VERIFIED | SearchScope pushdown across retrieval pipelines; 0 out-of-scope candidates (PR #434, merge `294b483`) |
-| Phase 5D (P38-WP02) | PLANNED / NOT STARTED | Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack vertical slice |
+| Phase 5C (P38-WP01) | CLOSURE CORRECTION ADMITTED / P38-WP01-R1 IN PROGRESS | SearchScope pushdown PR #434 superseded for closure; runtime correction pending (PR-R1B) |
+| P38-WP01-R1 | IN PROGRESS / FORENSIC ADMISSION | Phase 5C SearchScope Closure Correction; Phase 5D BLOCKED |
+| Phase 5D (P38-WP02) | BLOCKED BY P38-WP01-R1 / NOT STARTED | Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack vertical slice |
 | Phase 5E–5H (P38-WP03–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5D → 5E → 5F → 5G → 5H) |
 | Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
@@ -150,7 +151,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C is ready for separate admission and remains unstarted.
+- Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was subsequently CLOSED via PR #434 and reconciled via PR #435, and is now under P38-WP01-R1 closure correction (CLOSURE CORRECTION ADMITTED / IN PROGRESS). Phase 5D is BLOCKED BY P38-WP01-R1.
 
 ## Controlled Dependency Refresh
 
@@ -185,8 +186,9 @@ dependency update:
        `12dda70c…` corrects a historical reporting typo.
 13. **INFRA-1 — closed.** The constrained local infrastructure
        execution broker was protected-merged as PR #419 (merge `bfb9688`).
-       Real receiver deployment is an operator follow-up. Phase 5C remains
-       unstarted and ready for separate preflight admission.
+       Real receiver deployment is an operator follow-up. Historical note: Phase 5C was
+       unstarted at INFRA-1 time; it was subsequently CLOSED via PR #434 / PR #435 and is now
+       under P38-WP01-R1 closure correction (Phase 5D BLOCKED).
 
 The controlled refresh and prior closures do not authorize a public version
 bump, tag, release, Phase 5C, or any later phase.
@@ -256,20 +258,24 @@ Phase 5 may eventually cover retrieval planning, ContextPacks, governed context
 assembly, and MCP context/explainability surfaces. It begins only after
 Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
 Controlled Dependency Refresh, Phase 5A runtime contracts, Phase 5A.1
-correction, Phase 5B router, INFRA-1 broker, and Phase 5C SearchScope pushdown are closed in this snapshot;
-Phase 5D is ready for separate admission and remains unstarted.
+correction, Phase 5B router, and INFRA-1 broker are closed in this snapshot;
+Phase 5C SearchScope pushdown is under P38-WP01-R1 closure correction
+(CLOSURE CORRECTION ADMITTED / IN PROGRESS);
+Phase 5D is BLOCKED BY P38-WP01-R1 and remains unstarted.
 
 ### Phase 5 internal gates
 
-Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, and Phase 5C are closed. The following future
+Phase 5A, Phase 5A.1, Phase 5B, and INFRA-1 are closed. Phase 5C is under P38-WP01-R1
+closure correction. The following future
 runtime gates remain `PLANNED / NOT IMPLEMENTED` until their own evidence and
-protected admission; Phase 5D is ready for separate admission and remains unstarted:
+protected admission; Phase 5D is BLOCKED BY P38-WP01-R1 and remains unstarted:
 
 ```text
 5A.1 — Evaluation corpus semantic integrity correction (closed)
 5B — Deterministic multi-domain router (closed)
 INFRA-1 — Constrained Local Infrastructure Execution Broker (closed / merged PR #419)
-5C — Search scope pushdown (closed / merged PR #434)
+5C — Search scope pushdown (PR #434 superseded for closure; P38-WP01-R1 IN PROGRESS)
+P38-WP01-R1 — Phase 5C SearchScope Closure Correction (IN PROGRESS; Phase 5D BLOCKED)
 5D — RetrievalPlanner + ContextPack read-only vertical slice
 5E — Shadow benchmark / legacy comparison
 5F — Incremental dense validity / dirty-set behavior
