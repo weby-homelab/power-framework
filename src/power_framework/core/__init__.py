@@ -1,16 +1,4 @@
-"""
-P.O.W.E.R. Core Library.
-
-Shared functionality for the P.O.W.E.R. Knowledge Management Framework:
-- OKF metadata validation (Pydantic models)
-- Safe YAML frontmatter parsing
-- Vault indexing and catalog generation
-- Health linting (broken links, orphans, metadata)
-- Path traversal protection and atomic writes
-
-Usage:
-    from power_core import OKFMetadata, run_generate_index, run_lint_report
-"""
+"""P.O.W.E.R. Core Library for knowledge management, indexing, and runtime contracts."""
 
 from __future__ import annotations
 
