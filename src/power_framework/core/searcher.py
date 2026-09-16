@@ -42,6 +42,10 @@ from .ignore import should_skip
 from .index_sync import _compute_tf_vector, _sync_vault_to_db, _tokenize
 from .models import OKFMetadata  # noqa: TC001
 from .parser import FRONTMATTER_PATTERN, validate_metadata
+from .search_scope import (
+    ResolvedSearchScope,
+    compile_search_scope,
+)
 from .source_service import (
     SourceReadContext,
     authorize_current_source,
@@ -65,6 +69,7 @@ from .vault_storage import existing_vault_db_path, vault_db_path
 if TYPE_CHECKING:
     from datetime import date
 
+    from power_framework.core.context_contracts import AccessPolicy, SearchScope
     from power_framework.experimental.reranker import RerankerProtocol
 
 logger = logging.getLogger(__name__)
@@ -138,7 +143,7 @@ class _IndexedSource:
 
 
 _DENSE_MATRIX_CACHE_MAX_ENTRIES = 4
-_DenseMatrixCacheKey = tuple[Path, str, str]
+_DenseMatrixCacheKey = tuple[Path, str, str, str | None]
 _dense_matrix_cache: OrderedDict[_DenseMatrixCacheKey, _DenseMatrixCacheEntry] = OrderedDict()
 _dense_matrix_cache_lock = RLock()
 
@@ -710,7 +715,11 @@ def _score_note(
 
 
 def _scan_and_search(
-    vault_dir: Path, terms: list[str], *, require_all: bool = False
+    vault_dir: Path,
+    terms: list[str],
+    *,
+    require_all: bool = False,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """Scan vault and return scored search results (fallback)."""
     results: list[SearchResult] = []
@@ -719,24 +728,30 @@ def _scan_and_search(
     for filepath in iter_vault_markdown_files(vault_dir):
         if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
             continue
-        if should_skip(vault_dir, filepath.relative_to(vault_dir).as_posix()):
+        rel_path = filepath.relative_to(vault_dir).as_posix()
+        if resolved_scope is not None and not resolved_scope.is_path_in_scope(rel_path):
+            continue
+        if should_skip(vault_dir, rel_path):
             continue
 
         try:
             content = read_source(
                 vault_dir,
-                SourceReadRequest(rel_path=filepath.relative_to(vault_dir).as_posix()),
+                SourceReadRequest(rel_path=rel_path),
                 context=source_context,
             ).content
             metadata = validate_metadata(content)
             if metadata is None:
+                continue
+            if resolved_scope is not None and not resolved_scope.is_path_in_scope(
+                rel_path, note_type=str(metadata.type)
+            ):
                 continue
 
             score, match_count, snippet = _score_note(content, metadata, terms)
             if score == 0 or (require_all and match_count < len(terms)):
                 continue
 
-            rel_path = filepath.relative_to(vault_dir).as_posix()
             results.append(
                 SearchResult(
                     rel_path=rel_path,
@@ -757,7 +772,10 @@ def _scan_and_search(
 
 
 def _scan_and_vector_search(
-    vault_dir: Path, query: str, max_results: int = 20
+    vault_dir: Path,
+    query: str,
+    max_results: int = 20,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """Run a bounded in-memory TF search without publishing cache state."""
     query_tokens = _tokenize(query)
@@ -770,6 +788,8 @@ def _scan_and_vector_search(
     for filepath in sorted(iter_vault_markdown_files(vault_dir)):
         rel_path = filepath.relative_to(vault_dir).as_posix()
         if filepath.name in ("index.md", "log.md") or is_catalog_filename(filepath.name):
+            continue
+        if resolved_scope is not None and not resolved_scope.is_path_in_scope(rel_path):
             continue
         if should_skip(vault_dir, rel_path):
             continue
@@ -836,6 +856,7 @@ def _fts_search(
     resolved_db: _ResolvedDb | None = None,
     *,
     allow_search_db_override: bool = True,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """SQLite FTS5 full-text search with weighted BM25 scoring."""
     clean_query = re.sub(
@@ -893,6 +914,7 @@ def _fts_search(
                 vault_dir,
                 _fallback_query_terms(query),
                 require_all=operator == "AND",
+                resolved_scope=resolved_scope,
             )
             fallback.sort(key=lambda result: (-result.score, -result.match_count, result.title))
             return fallback[:max_results]
@@ -902,9 +924,16 @@ def _fts_search(
         conn = _open_readonly_db(db_path)
 
         cursor = conn.cursor()
+        scope_sql, scope_params = (
+            resolved_scope.build_fts_condition() if resolved_scope is not None else ("", [])
+        )
+        where_clause = (
+            f"WHERE fts_notes MATCH ? AND ({scope_sql})" if scope_sql else "WHERE fts_notes MATCH ?"
+        )
+        query_params = [fts_query, *scope_params, max_results]
         with timing_span("sqlite_read"):
             cursor.execute(
-                """
+                f"""
                 SELECT
                     rel_path,
                     title,
@@ -914,11 +943,11 @@ def _fts_search(
                     snippet(fts_notes, 3, '...', '...', '...', 15) as snippet_text,
                     tags
                 FROM fts_notes
-                WHERE fts_notes MATCH ?
+                {where_clause}
                 ORDER BY score DESC
                 LIMIT ?
-                """,
-                (fts_query, max_results),
+                """,  # noqa: S608
+                query_params,
             )
             rows = cursor.fetchall()
 
@@ -933,6 +962,10 @@ def _fts_search(
                     continue
                 metadata = validate_metadata(source.content)
                 if metadata is None:
+                    continue
+                if resolved_scope is not None and not resolved_scope.is_path_in_scope(
+                    rel_path, note_type=str(metadata.type)
+                ):
                     continue
                 match_count = 1
                 results.append(
@@ -984,6 +1017,7 @@ def _vector_search(
     resolved_db: _ResolvedDb | None = None,
     *,
     allow_search_db_override: bool = True,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """
     Search vault notes using TF vector cosine similarity.
@@ -1008,7 +1042,9 @@ def _vector_search(
 
     if db_path is None or not db_path.is_file():
         if not (allow_search_db_override and os.getenv("POWER_SEARCH_DB")):
-            return _scan_and_vector_search(vault_dir, query, max_results=max_results)
+            return _scan_and_vector_search(
+                vault_dir, query, max_results=max_results, resolved_scope=resolved_scope
+            )
         bootstrap_conn: sqlite3.Connection | None = None
         try:
             bootstrap_conn = sqlite3.connect(str(db_path or _db_path(vault_dir)), timeout=30)
@@ -1032,11 +1068,27 @@ def _vector_search(
             if cursor.fetchone()[0] == 0:
                 return []
 
-            cursor.execute("""
-                SELECT t.rel_path, t.tf_data, f.title, f.description, f.note_type, f.tags, f.content
-                FROM tf_vectors t
-                JOIN fts_notes f ON t.rel_path = f.rel_path
-            """)
+            scope_sql, scope_params = (
+                resolved_scope.build_vector_condition("t", "f")
+                if resolved_scope is not None
+                else ("", [])
+            )
+            if scope_sql:
+                cursor.execute(
+                    f"""
+                    SELECT t.rel_path, t.tf_data, f.title, f.description, f.note_type, f.tags, f.content
+                    FROM tf_vectors t
+                    JOIN fts_notes f ON t.rel_path = f.rel_path
+                    WHERE {scope_sql}
+                    """,  # noqa: S608
+                    scope_params,
+                )
+            else:
+                cursor.execute("""
+                    SELECT t.rel_path, t.tf_data, f.title, f.description, f.note_type, f.tags, f.content
+                    FROM tf_vectors t
+                    JOIN fts_notes f ON t.rel_path = f.rel_path
+                """)
             rows = cursor.fetchall()
     except ActiveGenerationError:
         raise
@@ -1055,6 +1107,10 @@ def _vector_search(
                 content = source.content
                 metadata = validate_metadata(content)
                 if metadata is None:
+                    continue
+                if resolved_scope is not None and not resolved_scope.is_path_in_scope(
+                    rel_path, note_type=str(metadata.type)
+                ):
                     continue
 
                 doc_vec = json.loads(tf_data_str)
@@ -1136,7 +1192,9 @@ def _rrf_merge_many(
 
 
 def _dense_matrix_cache_key(
-    vault_dir: Path, resolved_db: _ResolvedDb
+    vault_dir: Path,
+    resolved_db: _ResolvedDb,
+    scope_digest: str | None = None,
 ) -> _DenseMatrixCacheKey | None:
     """Build a cache key only from a verified immutable-generation identity."""
     if (
@@ -1145,7 +1203,12 @@ def _dense_matrix_cache_key(
         or resolved_db.db_sha256 is None
     ):
         return None
-    return (vault_dir.expanduser().resolve(), resolved_db.generation_id, resolved_db.db_sha256)
+    return (
+        vault_dir.expanduser().resolve(),
+        resolved_db.generation_id,
+        resolved_db.db_sha256,
+        scope_digest,
+    )
 
 
 def _get_or_build_dense_matrix(
@@ -1153,6 +1216,7 @@ def _get_or_build_dense_matrix(
     db_path: Path,
     index_dimension: int,
     resolved_db: _ResolvedDb,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> _DenseMatrixCacheEntry:
     """Return exact dense rows, reusing only a verified immutable generation.
 
@@ -1165,7 +1229,8 @@ def _get_or_build_dense_matrix(
     """
     import numpy as np
 
-    key = _dense_matrix_cache_key(vault_dir, resolved_db)
+    scope_digest = resolved_scope.scope_digest if resolved_scope is not None else None
+    key = _dense_matrix_cache_key(vault_dir, resolved_db, scope_digest)
     with timing_span("dense_matrix_cache"):
         if key is not None:
             with _dense_matrix_cache_lock:
@@ -1178,11 +1243,22 @@ def _get_or_build_dense_matrix(
         try:
             conn = _open_readonly_db(db_path)
             cursor = conn.cursor()
+            chunk_sql, chunk_params = (
+                resolved_scope.build_chunk_condition("chunk_embeddings")
+                if resolved_scope is not None
+                else ("", [])
+            )
             # Chunk text is needed only for the few winners that become
             # snippets. Keep the full-corpus read limited to vector identity
             # and the exact bytes used by the cosine oracle.
             with timing_span("sqlite_read"):
-                cursor.execute("SELECT chunk_id, rel_path, embedding FROM chunk_embeddings")
+                if chunk_sql:
+                    cursor.execute(
+                        f"SELECT chunk_id, rel_path, embedding FROM chunk_embeddings WHERE {chunk_sql}",  # noqa: S608
+                        chunk_params,
+                    )
+                else:
+                    cursor.execute("SELECT chunk_id, rel_path, embedding FROM chunk_embeddings")
                 rows = cursor.fetchall()
         except Exception as exc:
             raise DenseIndexUnavailableError(
@@ -1194,6 +1270,13 @@ def _get_or_build_dense_matrix(
                 conn.close()
 
         if not rows:
+            if chunk_sql:
+                return _DenseMatrixCacheEntry(
+                    matrix=np.empty((0, index_dimension), dtype=np.float32),
+                    rel_paths=(),
+                    chunk_ids=(),
+                    dimension=index_dimension,
+                )
             raise DenseIndexUnavailableError(
                 f"Dense search is unavailable (no dense vectors). "
                 f"Run 'power sync {vault_dir}' and retry."
@@ -1202,6 +1285,13 @@ def _get_or_build_dense_matrix(
         expected_bytes = index_dimension * 4
         usable = [row for row in rows if len(row[2]) == expected_bytes]
         if not usable:
+            if chunk_sql:
+                return _DenseMatrixCacheEntry(
+                    matrix=np.empty((0, index_dimension), dtype=np.float32),
+                    rel_paths=(),
+                    chunk_ids=(),
+                    dimension=index_dimension,
+                )
             raise DenseIndexUnavailableError(
                 f"Dense search is unavailable (no dense vectors of width {index_dimension}). "
                 f"Run 'power sync {vault_dir}' and retry."
@@ -1222,7 +1312,10 @@ def _get_or_build_dense_matrix(
                 # A publication creates a new immutable key. Drop superseded
                 # entries for this vault before retaining the new matrix.
                 for old_key in tuple(_dense_matrix_cache):
-                    if old_key[0] == key[0] and old_key != key:
+                    if (
+                        old_key[0] == key[0]
+                        and (old_key[1] != key[1] or old_key[2] != key[2])
+                    ):
                         _dense_matrix_cache.pop(old_key, None)
                 _dense_matrix_cache[key] = entry
                 _dense_matrix_cache.move_to_end(key)
@@ -1237,6 +1330,7 @@ def _semantic_search(
     query: str,
     max_results: int = 20,
     resolved_db: _ResolvedDb | None = None,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """Search vault notes using dense embedding cosine similarity over chunks.
 
@@ -1298,8 +1392,15 @@ def _semantic_search(
         # matrix is cached only for a verified immutable generation, so cache
         # hits preserve the same oracle rows and ordering as a cold read.
         matrix_entry = _get_or_build_dense_matrix(
-            vault_dir, db_path, int(q_arr.shape[0]), resolved_db
+            vault_dir,
+            db_path,
+            int(q_arr.shape[0]),
+            resolved_db,
+            resolved_scope=resolved_scope,
         )
+        if len(matrix_entry.rel_paths) == 0:
+            return []
+
         matrix = matrix_entry.matrix
         norms = np.linalg.norm(matrix, axis=1)
         similarities = np.zeros(len(matrix_entry.rel_paths), dtype=np.float32)
@@ -1329,6 +1430,10 @@ def _semantic_search(
                 source = _read_indexed_source(vault_dir, rel_path, resolved_db=resolved_db)
                 content = source.content
                 metadata = source.metadata
+                if resolved_scope is not None and not resolved_scope.is_path_in_scope(
+                    rel_path, note_type=str(metadata.type)
+                ):
+                    continue
                 similarity, _chunk_id = doc_best[rel_path]
                 results.append(
                     SearchResult(
@@ -1356,6 +1461,7 @@ def _apply_semantic_lexical_guard(
     resolved_db: _ResolvedDb | None = None,
     *,
     allow_search_db_override: bool = True,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """Use lexical evidence only to break an ambiguous dense top-1 tie.
 
@@ -1374,6 +1480,7 @@ def _apply_semantic_lexical_guard(
             max_results=1,
             resolved_db=resolved_db,
             allow_search_db_override=allow_search_db_override,
+            resolved_scope=resolved_scope,
         )
     except Exception:
         return results
@@ -1435,6 +1542,8 @@ def search_vault(
     domain: str | None = None,
     *,
     allow_search_db_override: bool = True,
+    scope: SearchScope | None = None,
+    access_policy: AccessPolicy | None = None,
 ) -> list[SearchResult]:
     """
     Search the vault for notes matching the query.
@@ -1460,6 +1569,10 @@ def search_vault(
         allow_search_db_override: Whether a caller-controlled
             ``POWER_SEARCH_DB`` may supply the legacy writable test database.
             Read-only service boundaries must set this to ``False``.
+        scope: Optional Phase 5C SearchScope instance defining path, domain,
+            source type, temporal, or privileged access boundaries.
+        access_policy: Optional server-issued AccessPolicy required for
+            privileged boundaries (e.g. include_archived or include_quarantine).
 
     Returns:
         List of SearchResult sorted by relevance (highest first).
@@ -1479,6 +1592,15 @@ def search_vault(
         vault_dir,
         allow_search_db_override=allow_search_db_override,
     )
+    resolved_scope = compile_search_scope(
+        vault_dir,
+        scope=scope,
+        domain=domain,
+        temporal_view=temporal_view,
+        as_of=as_of,
+        access_policy=access_policy,
+        resolved_db=resolved_db,
+    )
     if mode.casefold() == "auto":
         dense_reason = "dense_index_unavailable"
         try:
@@ -1493,10 +1615,9 @@ def search_vault(
     else:
         mode = normalize_search_mode(mode)
     domain_path = resolved_domain.path if resolved_domain else None
-    if resolved_domain:
-        # Scope after candidate generation, but over-fetch so a domain does not
-        # appear empty merely because another domain occupied the global top-K.
-        max_results = max(max_results * 5, 20)
+    # Prior to Phase 5C, domain over-fetch (max_results = max(max_results * 5, 20)) was used
+    # as a heuristic workaround for lack of pushdown. With SearchScope pushdown, candidates
+    # are restricted before candidate LIMIT / scoring, so overfetch is eliminated.
     temporal_view = normalize_temporal_view(temporal_view).value
     boundary = normalize_as_of(as_of)
     mode_spec = get_search_mode_spec(mode)
@@ -1519,6 +1640,7 @@ def search_vault(
                 "1",
                 "true",
                 "yes",
+                "warn",
             }:
                 logger.warning(
                     "Dense index unavailable for %s; POWER_ALLOW_DENSE_FALLBACK=1 set, "
@@ -1550,7 +1672,11 @@ def search_vault(
                     allow_search_db_override=allow_search_db_override,
                 )
         except sqlite3.Error:
-            fallback = _scan_and_search(vault_dir, _fallback_query_terms(query))
+            fallback = _scan_and_search(
+                vault_dir,
+                _fallback_query_terms(query),
+                resolved_scope=resolved_scope,
+            )
             fallback.sort(key=lambda result: (-result.score, -result.match_count, result.title))
             return _with_runtime_metadata(
                 fallback[:requested_max_results],
@@ -1583,6 +1709,7 @@ def search_vault(
                     max_results=max_results * 2,
                     resolved_db=resolved_db,
                     allow_search_db_override=allow_search_db_override,
+                    resolved_scope=resolved_scope,
                 )
             )
             vec_all.extend(
@@ -1592,12 +1719,17 @@ def search_vault(
                     max_results=max_results * 2,
                     resolved_db=resolved_db,
                     allow_search_db_override=allow_search_db_override,
+                    resolved_scope=resolved_scope,
                 )
             )
             with contextlib.suppress(DenseIndexUnavailableError):
                 dense_all.extend(
                     _semantic_search(
-                        vault_dir, variant, max_results=max_results * 2, resolved_db=resolved_db
+                        vault_dir,
+                        variant,
+                        max_results=max_results * 2,
+                        resolved_db=resolved_db,
+                        resolved_scope=resolved_scope,
                     )
                 )
 
@@ -1657,10 +1789,15 @@ def search_vault(
                 max_results=max_results,
                 resolved_db=resolved_db,
                 allow_search_db_override=allow_search_db_override,
+                resolved_scope=resolved_scope,
             )
         elif mode == "semantic":
             results = _semantic_search(
-                vault_dir, variant, max_results=max_results, resolved_db=resolved_db
+                vault_dir,
+                variant,
+                max_results=max_results,
+                resolved_db=resolved_db,
+                resolved_scope=resolved_scope,
             )
         elif mode == "graph_assisted":
             results = _graph_assisted_search(
@@ -1669,6 +1806,7 @@ def search_vault(
                 max_results=max_results,
                 resolved_db=resolved_db,
                 allow_search_db_override=allow_search_db_override,
+                resolved_scope=resolved_scope,
             )
         elif mode in ("reranked", "hybrid_reranked"):
             results = _hybrid_reranked_search(
@@ -1677,6 +1815,7 @@ def search_vault(
                 max_results=max_results,
                 resolved_db=resolved_db,
                 allow_search_db_override=allow_search_db_override,
+                resolved_scope=resolved_scope,
             )
             # ``_hybrid_reranked_search`` already fuses dense candidates before
             # assigning cross-encoder scores. Do not add a second dense fallback
@@ -1690,6 +1829,7 @@ def search_vault(
                 max_results=max_results,
                 resolved_db=resolved_db,
                 allow_search_db_override=allow_search_db_override,
+                resolved_scope=resolved_scope,
             )
         all_results.extend(results)
 
@@ -1711,6 +1851,7 @@ def search_vault(
             final_results,
             resolved_db,
             allow_search_db_override=allow_search_db_override,
+            resolved_scope=resolved_scope,
         )
     _attach_runtime_contract(
         final_results,
@@ -1768,6 +1909,7 @@ def _hybrid_reranked_search(
     resolved_db: _ResolvedDb | None = None,
     *,
     allow_search_db_override: bool = True,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """Canonical POWER 3.2 retrieval: FTS/BM25 + TF-vector + Dense -> top-20 -> rerank.
 
@@ -1783,6 +1925,7 @@ def _hybrid_reranked_search(
         max_results=150,
         resolved_db=resolved_db,
         allow_search_db_override=allow_search_db_override,
+        resolved_scope=resolved_scope,
     )
     vector_results = _vector_search(
         vault_dir,
@@ -1790,6 +1933,7 @@ def _hybrid_reranked_search(
         max_results=150,
         resolved_db=resolved_db,
         allow_search_db_override=allow_search_db_override,
+        resolved_scope=resolved_scope,
     )
     candidates = _rrf_merge(candidates, vector_results)
 
@@ -1797,7 +1941,11 @@ def _hybrid_reranked_search(
     # Without this the reranker never sees documents the embedding model
     # considers relevant, which caused reranked quality < semantic quality.
     dense_results = _semantic_search(
-        vault_dir, query, max_results=max_results * 3, resolved_db=resolved_db
+        vault_dir,
+        query,
+        max_results=max_results * 3,
+        resolved_db=resolved_db,
+        resolved_scope=resolved_scope,
     )
     if dense_results:
         candidates = _rrf_merge(candidates, dense_results)
@@ -1856,6 +2004,7 @@ def _graph_assisted_search(
     resolved_db: _ResolvedDb | None = None,
     *,
     allow_search_db_override: bool = True,
+    resolved_scope: ResolvedSearchScope | None = None,
 ) -> list[SearchResult]:
     """Expand a sparse candidate pool through the accepted knowledge graph.
 
@@ -1875,6 +2024,7 @@ def _graph_assisted_search(
             max_results=candidate_limit,
             resolved_db=resolved_db,
             allow_search_db_override=allow_search_db_override,
+            resolved_scope=resolved_scope,
         ),
         _vector_search(
             vault_dir,
@@ -1882,6 +2032,7 @@ def _graph_assisted_search(
             max_results=candidate_limit,
             resolved_db=resolved_db,
             allow_search_db_override=allow_search_db_override,
+            resolved_scope=resolved_scope,
         ),
     )
     if not candidates:
@@ -1899,6 +2050,8 @@ def _graph_assisted_search(
             graph = WeightedKnowledgeGraph.from_suggestions(suggestions)
             anchor_weight = 1.0 / (rank + 1)
             for path, weight, depth in graph.weighted_bfs(anchor.rel_path, max_hops=2):
+                if resolved_scope is not None and not resolved_scope.is_path_in_scope(path):
+                    continue
                 decay = 1.0 if depth == 1 else 0.5
                 graph_boosts[path] = max(
                     graph_boosts.get(path, 0.0), anchor_weight * weight * decay
@@ -1919,10 +2072,16 @@ def _graph_assisted_search(
     for path, boost in graph_boosts.items():
         if path in result_map:
             continue
+        if resolved_scope is not None and not resolved_scope.is_path_in_scope(path):
+            continue
         try:
             source = _read_indexed_source(vault_dir, path, resolved_db=resolved_db)
             content = source.content
             metadata = source.metadata
+            if resolved_scope is not None and not resolved_scope.is_path_in_scope(
+                path, note_type=str(metadata.type)
+            ):
+                continue
             result_map[path] = SearchResult(
                 rel_path=path,
                 title=metadata.title,

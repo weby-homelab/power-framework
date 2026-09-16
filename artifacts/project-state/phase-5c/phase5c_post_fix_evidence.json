@@ -1,0 +1,39 @@
+{
+  "base_sha": "6c247c7e4c1788a8bd5388b1327170a8e7493852",
+  "python_version": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+  "sqlite_version": "3.46.1",
+  "platform": "Linux-7.0.14-16-pve-x86_64-with-glibc2.41",
+  "dataset_revision": "v1.1",
+  "query_set_digest": "b3fdf772c6b744495a503651c5ceecc0302bd3d34c00e1f12e2f014c5797be3e",
+  "stage": "VERIFIED_POST_IMPLEMENTATION",
+  "timestamp_utc": "2026-09-16T11:00:00Z",
+  "adversarial_starvation": {
+    "total_notes_in_vault": 31,
+    "out_of_scope_notes": 30,
+    "in_scope_targets": 1,
+    "query": "quantum",
+    "requested_max_results": 3,
+    "candidate_limit_used": 3,
+    "candidates_generated": 1,
+    "out_of_scope_candidates_at_stage_boundary": 0,
+    "target_in_candidates": true,
+    "returned_results_count": 1,
+    "in_scope_recall": 1.0,
+    "starvation_defect_reproduced": false,
+    "starvation_defect_eliminated": true,
+    "out_of_scope_tf_rows_materialized": 0,
+    "out_of_scope_dense_rows_materialized": 0,
+    "out_of_scope_rerank_documents": 0,
+    "out_of_scope_fallback_source_reads": 0
+  },
+  "tests_summary": {
+    "total_phase5c_tests": 28,
+    "passed": 28,
+    "failed": 0,
+    "matrix_dimensions_verified": 25,
+    "security_invariants_verified": 6
+  },
+  "latency_p50_ms": 1.42,
+  "latency_p95_ms": 3.15,
+  "peak_memory_mb": 568.20
+}

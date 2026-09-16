@@ -201,6 +201,9 @@ def _init_db(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_source_metadata_stem ON source_metadata(stem)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_source_links_source ON source_links(source_path)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_source_links_target ON source_links(target_path)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chunk_embeddings_rel_path ON chunk_embeddings(rel_path)"
+    )
     # M1.2: only reviewed candidates become accepted relations.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS relations (
