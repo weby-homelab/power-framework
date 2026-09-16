@@ -4,11 +4,11 @@
 >
 > **Publication class:** VERSIONED PRE-IMPLEMENTATION ACCEPTANCE CONTRACT
 >
-> **Implementation status:** NOT IMPLEMENTED
+> **Implementation status:** PHASE 5 IN PROGRESS (Foundation Hardening, 5A, 5A.1, 5B, INFRA-1, PR #420, #422, #423, #424 CLOSED / MERGED / VERIFIED)
 >
-> This file defines future evidence gates. It is not phase evidence and does
-> not authorize Actions #396, Phase 5 implementation, capture, migration, or a
-> release.
+> This file defines acceptance gates for Phase 5 through Phase 9. Gates P38-G0,
+> P38-G1, and P38-G2 are required prerequisites before Phase 5C admission. Future
+> runtime work remains blocked until each gate is independently satisfied.
 
 ## How to use this file
 
@@ -418,8 +418,14 @@ deployment.
 
 ### FAIL / blocked condition
 
-Any arbitrary command surface, credential exposure, password fallback, direct
-agent SSH, unknown external write completion, unsafe path escape, missing
+Missing, stale, contradictory, or unverified required framework evidence keeps
+the framework gate open. Missing any required framework evidence keeps INFRA-1
+open, including without limitation the exact candidate tuple, fresh required
+checks, protected-policy observation, independent review, receiver contract
+evidence, security evidence, or post-merge verification where required.
+
+In addition, any arbitrary command surface, credential exposure, password fallback,
+direct agent SSH, unknown external write completion, unsafe path escape, missing
 receiver restriction contract, missing host-key verification semantics, false
 Task completion, failing required CI, or invalid protected merge keeps INFRA-1
 open. The absence of one real receiver deployment is an operator follow-up and
@@ -429,8 +435,9 @@ is not a generic framework blocker.
 
 Failure of the INFRA-1 framework gate blocks Phase 5C–5H, Phase 6–9 runtime
 work, public version/tag/release changes, and POWER 3.8.0 publication.
-With INFRA-1 framework gate closed, Phase 5C is ready for separate admission
-and remains unstarted.
+With the INFRA-1 framework gate closed and post-INFRA-1 repairs merged, the
+sequence proceeds through Gates P38-G0, P38-G1, and P38-G2 before Phase 5C
+admission. Phase 5C is ready for separate admission and remains unstarted.
 
 ## Gate 5C — Search Scope Pushdown
 

@@ -54,12 +54,15 @@ FACT != FRAMEWORK INVARIANT`).
 
 - [INFRA-1 broker API](../../../docs/api/infra_broker.md)
 - [INFRA-1 architectural decision](../../../docs/adr/0006-infra-1-constrained-execution-broker.md)
-- [INFRA-1 candidate handoff](../handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+- [INFRA-1 original implementation handoff](../handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+- [INFRA-1 governance reconciliation handoff](../handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md)
 
 Real receiver deployment validation is classified as an operator follow-up and
-does not block generic framework gates. Phase 5C SearchScope pushdown is ready
-for separate preflight admission and remains unstarted. These results do not
-authorize a release or public version change.
+does not block generic framework gates. Post-INFRA-1 repairs (PR #420, #422, #423, #424)
+and maintenance releases (v3.7.12, v3.7.13 on `release/3.7`) are merged.
+The governance sequence proceeds through Gates P38-G0, P38-G1, and P38-G2 before Phase 5C
+admission. Phase 5C SearchScope pushdown is ready for separate preflight admission
+and remains unstarted. These results do not authorize a release or public version change.
 
 ## Files
 
