@@ -24,31 +24,31 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C ADMITTED NOT STARTED
+PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / VERIFIED / PR #434
 
 SNAPSHOT_BASE_SHA:
-7546ff86bd5debdd23c9e5a08cddc7b10224b850
+294b48319fdcd3dd3bc030a940bda64f7583889f
 
 SNAPSHOT_BASE_TREE:
-2e3e0233639270df5e92d1b348873c0fd6194b38
+a22f9267e4ddc626f38e05b23dbdfd6abadd91da
 
 SNAPSHOT_LAST_INCLUDED_PR:
-431 (main) / 428 (release/3.7)
+434 (main) / 428 (release/3.7)
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-431
+434
 
 CURRENT_LIVE_MAIN:
-7546ff86bd5debdd23c9e5a08cddc7b10224b850
+294b48319fdcd3dd3bc030a940bda64f7583889f
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-Gate P38-G2 Product Identity & Documentation Rebaseline (main, PR #431) / PR #428 Release v3.7.13 (release/3.7)
+Phase 5C / P38-WP01 SearchScope Pushdown (main, PR #434) / Gate P38-G2 (main, PR #431) / PR #428 Release v3.7.13 (release/3.7)
 
 NEXT_GATE:
-P38-WP01 / Phase 5C SearchScope Pushdown
+Phase 5D / P38-WP02 Multi-Domain Union & Conflict Resolution
 
 INFRA_1_STATUS:
 CLOSED / MERGED / VERIFIED
@@ -108,7 +108,7 @@ INFRA_1_MERGE:
 bfb968846c0fc41582c2367782a28540498715b4
 
 PHASE_5C:
-READY FOR SEPARATE ADMISSION / NOT STARTED
+CLOSED / MERGED / VERIFIED / PR #434
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -132,7 +132,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md
+artifacts/project-state/handoffs/2026-09-16T111500Z_p38_wp01_phase5c_closure_reconciliation.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -166,7 +166,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C+ NOT IMPLEMENTED
+CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / PHASE 5D+ NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -234,7 +234,7 @@ evidence.
 - Gate P38-G0: **CLOSED / MERGED / VERIFIED** through protected PR #429 (`df813f4`).
 - Gate P38-G1: **CLOSED / MERGED / VERIFIED** through protected PR #430 (`38f656b`).
 - Gate P38-G2: **CLOSED / MERGED / VERIFIED** through protected PR #431 (`7546ff8`).
-- Phase 5C (Search scope pushdown): **ADMITTED / NOT STARTED** (admitted via PR-A reconciliation).
+- Phase 5C (Search scope pushdown): **CLOSED / MERGED / VERIFIED** through protected PR #434 (`294b483`).
 - Phase 5D–5H: **PLANNED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
@@ -270,7 +270,7 @@ evidence.
 | Gate P38-G0 (governance rebaseline) | CLOSED / MERGED / VERIFIED | PR #429; merge `df813f4`; rebaselined governance and progression sequence |
 | Gate P38-G1 (north-star architecture) | CLOSED / MERGED / VERIFIED | PR #430; merge `38f656b`; aligned control-plane architecture with ADR-0007 |
 | Gate P38-G2 (product identity & docs) | CLOSED / MERGED / VERIFIED | PR #431; merge `7546ff8`; rebaselined product identity, docs, and feature matrix |
-| Phase 5C (SearchScope pushdown) | ADMITTED / NOT STARTED | Admitted via PR-A preflight audit; runtime implementation authorized under PR-B |
+| Phase 5C (SearchScope pushdown) | CLOSED / MERGED / VERIFIED | PR #434; merge `294b483`; search scope pushdown across retrieval pipelines |
 
 ## INFRA-1 merged evidence and governance reconciliation
 
@@ -471,7 +471,7 @@ MAINTENANCE RELEASES = CLOSED / MERGED / VERIFIED / v3.7.12 & v3.7.13 on release
 GATE P38-G0 (GOVERNANCE REBASELINE) = CLOSED / MERGED / VERIFIED / PR #429 / merge df813f4
 GATE P38-G1 (NORTH-STAR ARCHITECTURE) = CLOSED / MERGED / VERIFIED / PR #430 / merge 38f656b
 GATE P38-G2 (PRODUCT IDENTITY & DOCS) = CLOSED / MERGED / VERIFIED / PR #431 / merge 7546ff8
-PHASE 5C (SEARCH SCOPE PUSHDOWN) = ADMITTED / NOT STARTED
+PHASE 5C (SEARCH SCOPE PUSHDOWN) = CLOSED / MERGED / VERIFIED / PR #434 / merge 294b483
 ```
 
 The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
@@ -479,8 +479,8 @@ runtime contracts, Phase 5A.1 semantic correction, Phase 5B router, INFRA-1
 broker, repository cleanup, CI required docs build, and task journal integrity
 fail-closed repair were accepted through normal protected merges and post-merge checks.
 Real receiver deployment is an operator follow-up. Gates P38-G0 (Governance Rebaseline),
-P38-G1 (North-Star Architecture Alignment), and P38-G2 (Product Identity & Documentation Rebaseline)
-are closed and verified. Phase 5C (SearchScope Pushdown) is admitted for implementation.
+P38-G1 (North-Star Architecture Alignment), P38-G2 (Product Identity & Documentation Rebaseline),
+and Phase 5C (SearchScope Pushdown, PR #434) are closed and verified. Next gate is Phase 5D (P38-WP02).
 A post-merge Dependabot run failure on main was investigated and dispositioned as Class C (non-required
 dependency update attempt failure, non-blocking).
 POWER 3.8.0 cannot be released from this state.
@@ -524,6 +524,10 @@ repairs are canonical on protected `main`:
   with tree `ac7c62872f0fe9d1de6d5d0b232aa24ea58509c0`.
 - Gate P38-G2 product identity PR #431 is protected-merged as `7546ff86bd5debdd23c9e5a08cddc7b10224b850`
   with tree `2e3e0233639270df5e92d1b348873c0fd6194b38`.
+- Phase 5C admission reconciliation PR #433 is protected-merged as `6c247c7e4c1788a8bd5388b1327170a8e7493852`
+  with tree `09a6266d6e4336cd3d4c0b7e50561828ae8470af`.
+- Phase 5C SearchScope pushdown runtime PR #434 is protected-merged as `294b48319fdcd3dd3bc030a940bda64f7583889f`
+  with tree `a22f9267e4ddc626f38e05b23dbdfd6abadd91da`.
 - The prior `docs/power-3.8-premerge-state-publication` branch remains
   provisional evidence and is retained as source material; it is not replaced
   or deleted.
@@ -532,13 +536,9 @@ repairs are canonical on protected `main`:
 
 ## Next authorized work
 
-1. Execute Phase 5C (P38-WP01 — SearchScope Pushdown) runtime implementation on branch
-   `feat/p38-wp01-search-scope-pushdown` (PR-B) with failing regression tests first.
-2. Verify all stage invariants (zero out-of-scope candidates, zero out-of-scope TF/dense rows materialized,
-   zero out-of-scope rerank pool, zero out-of-scope graph hops, zero out-of-scope fallback reads).
-3. Merge PR-B under branch protection rulesets after full CI and independent reviews.
-4. Execute PR-C closure reconciliation handoff and governance updates.
-5. Keep Phase 5D–9 runtime work beyond this gate, version bumps, tags, releases,
+1. Execute Phase 5D (P38-WP02 — Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack Vertical Slice).
+2. Adhere to strict preflight admission, TDD defect reproduction, and dual-side diff audit.
+3. Keep Phase 5E–9 runtime work beyond this gate, version bumps, tags, releases,
    and POWER 3.8.0 publication blocked until each declared gate is
    independently closed.
 
@@ -548,9 +548,8 @@ repairs are canonical on protected `main`:
   dependency candidate must record its exact base/head/tree/parent, diff,
   hashes, tests, security, CI, and policy evidence.
 - Do not merge, auto-merge, force-push, or bypass protection.
-- Do not implement Phase 5C SearchScope pushdown until preflight and contract
-  freeze are completed and separately admitted.
-- Do not start Phase 5C runtime implementation or later phases in this gate.
+- Do not implement Phase 5D until preflight admission is completed.
+- Do not start Phase 5E+ runtime implementation or later phases in this gate.
 - Do not bump the public version, create a tag, create a release, or publish
   `POWER 3.8.0`.
 - Do not treat candidate or evidence-branch documents as `MERGED MAIN` evidence.
@@ -568,6 +567,10 @@ repairs are canonical on protected `main`:
 - [Active evaluation manifest](https://github.com/weby-homelab/power-framework/blob/main/benchmarks/power38/retrieval_eval/v1.1/manifest.json)
 - [Phase 5B report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
 - [Phase 5B routing evaluation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/domain-routing-evaluation-v1.md)
+- [Phase 5C verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_REPORT.md)
+- [Phase 5C baseline reproduction](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_BASELINE.md)
+- [Phase 5C implementation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T110500Z_p38_wp01_phase5c_search_scope_pushdown.md)
+- [Phase 5C post-merge closure reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T111500Z_p38_wp01_phase5c_closure_reconciliation.md)
 - [INFRA-1 governance reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)

@@ -419,7 +419,8 @@ MAINTENANCE RELEASES: CLOSED / MERGED / VERIFIED / v3.7.12 & v3.7.13 on release/
 GATE P38-G0 (GOVERNANCE REBASELINE): CLOSED / MERGED / VERIFIED / PR #429 / merge df813f4
 GATE P38-G1 (NORTH-STAR ARCHITECTURE): CLOSED / MERGED / VERIFIED / PR #430 / merge 38f656b
 GATE P38-G2 (PRODUCT IDENTITY & DOCS): CLOSED / MERGED / VERIFIED / PR #431 / merge 7546ff8
-PHASE 5C (P38-WP01): ADMITTED / NOT STARTED
+PHASE 5C (P38-WP01): CLOSED / MERGED / VERIFIED / PR #434 / merge 294b483
+PHASE 5D (P38-WP02): PLANNED / NOT STARTED
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -429,7 +430,8 @@ repository cleanup, CI required docs build, and task journal integrity merge
 receipts are retained `MERGED MAIN` evidence. Phase 5B and INFRA-1 are
 closed on protected `main`. Real receiver deployment is an operator follow-up.
 Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
-pushdown is admitted for implementation under PR-B. Do not start Phases 6–9, version bumps,
+pushdown is closed and verified on `main` (PR #434). Next authorized gate is
+Phase 5D (P38-WP02). Do not start Phase 5E–9, version bumps,
 tags, releases, release images, or final release notes.
 
 ## INFRA-1 execution boundary
@@ -482,7 +484,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C is ready for separate admission and remains unstarted.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434). Phase 5D remains unstarted.
 
 ## Cross-links
 
@@ -494,6 +496,10 @@ deployment facts and generic framework invariants:
 - [INFRA-1 ADR](../adr/0006-infra-1-constrained-execution-broker.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
+- [Phase 5C verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_REPORT.md)
+- [Phase 5C baseline reproduction](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_BASELINE.md)
+- [Phase 5C implementation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T110500Z_p38_wp01_phase5c_search_scope_pushdown.md)
+- [Phase 5C post-merge closure reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T111500Z_p38_wp01_phase5c_closure_reconciliation.md)
 - [Latest final-integration handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-09T065950Z_controlled-dependency-refresh_final-integration.md)
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Phase 5A.1 evaluation erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)

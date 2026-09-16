@@ -65,9 +65,12 @@ Gate P38-G2 — Product Identity & Documentation Rebaseline
 CLOSED / MERGED / VERIFIED (PR #431)
         ↓
 Phase 5C (P38-WP01) — Search Scope Pushdown
-ADMITTED / NOT STARTED
+CLOSED / MERGED / VERIFIED (PR #434)
          ↓
-Phase 5D–5H (P38-WP02–P38-WP06) — ContextPack, Shadow, Dense Validity, MCP, Closure
+Phase 5D (P38-WP02) — Multi-Domain Union & Conflict Resolution / ContextPack
+PLANNED / NOT STARTED
+         ↓
+Phase 5E–5H (P38-WP03–P38-WP06) — Shadow, Dense Validity, MCP, Closure
 PLANNED / NOT STARTED
          ↓
 Phase 6 (P38-WP07–P38-WP09) — Observation & Capture
@@ -119,8 +122,9 @@ NO-GO
 | Gate P38-G0 | CLOSED / MERGED / VERIFIED | Governance Rebaseline; aligns mutable state with live reality (PR #429, merge `df813f4`) |
 | Gate P38-G1 | CLOSED / MERGED / VERIFIED | North-Star Architecture Alignment; freezes architecture direction (PR #430, merge `38f656b`) |
 | Gate P38-G2 | CLOSED / MERGED / VERIFIED | Product Identity & Documentation Rebaseline; aligned docs with ADR-0007 (PR #431, merge `7546ff8`) |
-| Phase 5C (P38-WP01) | ADMITTED / NOT STARTED | SearchScope pushdown preflight/contract freeze; admitted for implementation under PR-B |
-| Phase 5D–5H (P38-WP02–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5C → 5D → 5E → 5F → 5G → 5H) |
+| Phase 5C (P38-WP01) | CLOSED / MERGED / VERIFIED | SearchScope pushdown across retrieval pipelines; 0 out-of-scope candidates (PR #434, merge `294b483`) |
+| Phase 5D (P38-WP02) | PLANNED / NOT STARTED | Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack vertical slice |
+| Phase 5E–5H (P38-WP03–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5D → 5E → 5F → 5G → 5H) |
 | Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
@@ -252,20 +256,20 @@ Phase 5 may eventually cover retrieval planning, ContextPacks, governed context
 assembly, and MCP context/explainability surfaces. It begins only after
 Pre-Phase-5 Foundation Hardening is admitted and separately authorized. The
 Controlled Dependency Refresh, Phase 5A runtime contracts, Phase 5A.1
-correction, Phase 5B router, and INFRA-1 broker are closed in this snapshot;
-Phase 5C is ready for separate admission and remains unstarted.
+correction, Phase 5B router, INFRA-1 broker, and Phase 5C SearchScope pushdown are closed in this snapshot;
+Phase 5D is ready for separate admission and remains unstarted.
 
 ### Phase 5 internal gates
 
-Phase 5A, Phase 5A.1, Phase 5B, and INFRA-1 are closed. The following future
+Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, and Phase 5C are closed. The following future
 runtime gates remain `PLANNED / NOT IMPLEMENTED` until their own evidence and
-protected admission; Phase 5C is ready for separate admission and remains unstarted:
+protected admission; Phase 5D is ready for separate admission and remains unstarted:
 
 ```text
 5A.1 — Evaluation corpus semantic integrity correction (closed)
 5B — Deterministic multi-domain router (closed)
 INFRA-1 — Constrained Local Infrastructure Execution Broker (closed / merged PR #419)
-5C — Search scope pushdown (ready for separate admission / not started)
+5C — Search scope pushdown (closed / merged PR #434)
 5D — RetrievalPlanner + ContextPack read-only vertical slice
 5E — Shadow benchmark / legacy comparison
 5F — Incremental dense validity / dirty-set behavior
@@ -380,6 +384,10 @@ planning snapshot as runtime implementation evidence.
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
 - [Phase 5B report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
 - [Phase 5B handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
+- [Phase 5C verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_REPORT.md)
+- [Phase 5C baseline reproduction](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_BASELINE.md)
+- [Phase 5C implementation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T110500Z_p38_wp01_phase5c_search_scope_pushdown.md)
+- [Phase 5C post-merge closure reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-16T111500Z_p38_wp01_phase5c_closure_reconciliation.md)
 - [Phase 5A.1 semantic-correction report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/PHASE_5A_1_REPORT.md)
 - [Evaluation v1 erratum](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5a/EVALUATION_CORPUS_V1_ERRATUM.md)
 - [Latest Phase 5A.1 handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
