@@ -20,7 +20,8 @@ REST verification:
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Phase 5B domain-policy/router report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
 - [Phase 5B domain-policy/router handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-11T011403Z_phase5b-domain-policy-router.md)
-- [INFRA-1 constrained execution broker handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+- [INFRA-1 original implementation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-12T201530Z_infra-1-constrained-execution-broker.md)
+- [INFRA-1 governance reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-15T090637Z_infra1_governance_reconciliation.md)
 - [INFRA-1 broker API](../api/infra_broker.md)
 - [INFRA-1 architectural decision](../adr/0006-infra-1-constrained-execution-broker.md)
 - [Historical HF post-merge handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-08T095310Z_hf-406_post-merge.md)
@@ -32,9 +33,12 @@ REST verification:
 > Hardening is **CLOSED / IMPLEMENTED / VERIFIED** after protected PR #414.
 > Phase 5A runtime contracts are **CLOSED / MERGED / VERIFIED** through PR #415;
 > Phase 5A.1 is **CLOSED / MERGED / VERIFIED** through PR #416. Phase 5B is
-> **CLOSED / MERGED / VERIFIED** through PR #418. INFRA-1 is the current
-> bounded candidate; Phase 5C and later runtime work remain blocked/not started
-> until INFRA-1 closes.
+> **CLOSED / MERGED / VERIFIED** through PR #418. INFRA-1 is
+> **CLOSED / MERGED / VERIFIED** through PR #419. Post-INFRA-1 repairs
+> (PR #420, #422, #423, #424) and maintenance releases (`v3.7.12`, `v3.7.13`
+> on `release/3.7`) are merged. The governance flow proceeds through Gates
+> P38-G0, P38-G1, and P38-G2 before Phase 5C admission. Phase 5C SearchScope
+> pushdown is ready for separate preflight admission and remains unstarted.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.

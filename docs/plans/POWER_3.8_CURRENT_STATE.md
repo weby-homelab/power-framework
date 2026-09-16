@@ -12,37 +12,43 @@ PROJECT_STATE_SCHEMA:
 power.project-state.v2
 
 PUBLIC_VERSION:
+3.7.13
+
+PUBLIC_RELEASE_BRANCH:
+release/3.7
+
+MAIN_PACKAGE_VERSION:
 3.7.11
 
 DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5B CLOSED / INFRA-1 CLOSED / MERGED / VERIFIED / PHASE 5C READY NOT STARTED
+PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 IN PROGRESS / PHASE 5C READY NOT STARTED
 
 SNAPSHOT_BASE_SHA:
-bfb968846c0fc41582c2367782a28540498715b4
+3cb94ff7f82d18c0f77b336848d1c34f220e58a3
 
 SNAPSHOT_BASE_TREE:
-70dbfd0f9c980672a757be601b72b138e4e3d744
+03c2689023e2e2213cd47f243f8fb46a6f626fcc
 
 SNAPSHOT_LAST_INCLUDED_PR:
-419
+424 (main) / 428 (release/3.7)
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-419
+424
 
 CURRENT_LIVE_MAIN:
-bfb968846c0fc41582c2367782a28540498715b4
+3cb94ff7f82d18c0f77b336848d1c34f220e58a3
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-INFRA-1 — Constrained Local Infrastructure Execution Broker (PR #419 / merge bfb9688)
+PR #424 Task Journal Integrity Fail-Closed Repair (main) / PR #428 Release v3.7.13 (release/3.7)
 
 NEXT_GATE:
-Phase 5C — Search Scope Pushdown (Preflight / Contract Freeze)
+P38-G0 Governance Rebaseline -> P38-G1 North-Star Architecture Alignment -> P38-G2 Product Identity & Documentation Rebaseline -> Phase 5C Search Scope Pushdown
 
 INFRA_1_STATUS:
 CLOSED / MERGED / VERIFIED
@@ -208,7 +214,7 @@ evidence.
 
 ## Public and phase state
 
-- Public version: **3.7.11**, stable and frozen.
+- Public version: **3.7.13** (maintenance line `release/3.7`, tags `v3.7.12`, `v3.7.13`). Development main package metadata remains **3.7.11** until authorized release.
 - Development target: **POWER 3.8.0**.
 - Phase 0: **CLOSED / FROZEN**.
 - Phase 1: **CLOSED / FROZEN**.
@@ -225,7 +231,11 @@ evidence.
 - Phase 5B: **CLOSED / MERGED / VERIFIED** through protected PR #418.
 - INFRA-1: **CLOSED / MERGED / VERIFIED** through protected PR #419.
 - INFRA-1 deployment validation: **OPERATOR DEPLOYMENT FOLLOW-UP**; not a generic framework blocker.
-- Phase 5C: **READY FOR SEPARATE ADMISSION / NOT STARTED**.
+- Gate P38-G0: **IN PROGRESS** (Governance Rebaseline).
+- Gate P38-G1: **PLANNED** (North-Star Architecture Alignment).
+- Gate P38-G2: **PLANNED** (Product Identity & Documentation Rebaseline).
+- Phase 5C (Search scope pushdown): **READY FOR SEPARATE ADMISSION / NOT STARTED** (gated by G0, G1, G2).
+- Phase 5D–5H: **PLANNED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
 
@@ -248,6 +258,15 @@ evidence.
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
 | Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; merge `6a315d5`; live parent erratum retained above |
 | INFRA-1 | CLOSED / MERGED / VERIFIED | PR #419; merge `bfb9688`; constrained local broker merged; receiver deployment is operator follow-up |
+| INFRA-1 governance reconciliation | CLOSED / MERGED / VERIFIED | PR #420; merge `5e65efa5`; reconciled framework gate vs operator receiver deployment |
+| PR #421 (finding repairs) | SUPERSEDED / CLOSED WITHOUT MERGE | Historical candidate epoch; superseded by P38-G0 governance rebaseline |
+| Repository cleanup | CLOSED / MERGED / VERIFIED | PR #422; merge `cf017f3`; removed confirmed obsolete repository artifacts |
+| CI required docs build | CLOSED / MERGED / VERIFIED | PR #423; merge `906986c`; always emit required docs build for PRs |
+| Task journal integrity fail-closed | CLOSED / MERGED / VERIFIED | PR #424; merge `3cb94ff`; fail closed on corrupt journals, degraded read-only view |
+| Maintenance line 3.7 bootstrap | CLOSED / MERGED / VERIFIED | PR #425 on `release/3.7`; CI triggers and backport workflow |
+| Backport task journal integrity (3.7.12) | CLOSED / MERGED / VERIFIED | PR #426 on `release/3.7`; released as `v3.7.12` |
+| Release notes 3.7.12 | CLOSED / MERGED / VERIFIED | PR #427 on `release/3.7`; patch release notes |
+| Bump version 3.7.13 | CLOSED / MERGED / VERIFIED | PR #428 on `release/3.7`; skill mirror sync, released as `v3.7.13` |
 
 ## INFRA-1 merged evidence and governance reconciliation
 
@@ -439,22 +458,32 @@ PHASE 5A RUNTIME CONTRACTS = CLOSED / MERGED / VERIFIED
 PHASE 5A.1 EVALUATION CORRECTION = CLOSED / MERGED / VERIFIED
 PHASE 5B = CLOSED / MERGED / VERIFIED / PR #418
 INFRA-1 = CLOSED / MERGED / VERIFIED / PR #419 / merge bfb9688
-INFRA-1 DEPLOYMENT VALIDATION = OPERATOR DEPLOYMENT FOLLOW-UP
-PHASE 5C = READY FOR SEPARATE ADMISSION / NOT STARTED
+INFRA-1 GOVERNANCE RECONCILIATION = CLOSED / MERGED / VERIFIED / PR #420 / merge 5e65efa
+PR #421 FINDING REPAIRS = SUPERSEDED / CLOSED WITHOUT MERGE
+REPOSITORY CLEANUP = CLOSED / MERGED / VERIFIED / PR #422 / merge cf017f3
+CI REQUIRED DOCS BUILD = CLOSED / MERGED / VERIFIED / PR #423 / merge 906986c
+TASK JOURNAL INTEGRITY FAIL-CLOSED = CLOSED / MERGED / VERIFIED / PR #424 / merge 3cb94ff
+MAINTENANCE RELEASES = CLOSED / MERGED / VERIFIED / v3.7.12 & v3.7.13 on release/3.7
+GATE P38-G0 (GOVERNANCE REBASELINE) = IN PROGRESS
+GATE P38-G1 (NORTH-STAR ARCHITECTURE) = GATED BY G0
+GATE P38-G2 (PRODUCT IDENTITY & DOCS) = GATED BY G1
+PHASE 5C (SEARCH SCOPE PUSHDOWN) = READY FOR SEPARATE ADMISSION / GATED BY G2
 ```
 
 The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
-runtime contracts, Phase 5A.1 semantic correction, Phase 5B router, and INFRA-1
-broker were accepted through normal protected merges and post-merge checks.
-Real receiver deployment is an operator follow-up. The next planned gate is
-Phase 5C preflight and contract freeze. POWER 3.8.0 cannot be released from this
-state.
+runtime contracts, Phase 5A.1 semantic correction, Phase 5B router, INFRA-1
+broker, repository cleanup, CI required docs build, and task journal integrity
+fail-closed repair were accepted through normal protected merges and post-merge checks.
+Real receiver deployment is an operator follow-up. The next planned gates are
+P38-G0 (Governance Rebaseline), P38-G1 (North-Star Architecture Alignment),
+and P38-G2 (Product Identity & Documentation Rebaseline), before Phase 5C admission.
+POWER 3.8.0 cannot be released from this state.
 
 ## Canonical governance status
 
 The prior governance, dependency, Foundation Hardening, Phase 5A runtime
-contract, Phase 5A.1 correction, Phase 5B merge, and INFRA-1 broker merge are
-canonical on protected `main`:
+contract, Phase 5A.1 correction, Phase 5B merge, INFRA-1 broker merge, and post-INFRA-1
+repairs are canonical on protected `main`:
 
 - Governance branch: `docs/power-3.8-final-integration-course-correction`.
 - Prior governance bootstrap merge: `4b49e00c75866fa57f71e7bef61547915f7e01db`,
@@ -472,6 +501,17 @@ canonical on protected `main`:
   `bfb968846c0fc41582c2367782a28540498715b4`, with tree
   `70dbfd0f9c980672a757be601b72b138e4e3d744`, closure comment `5671031312`,
   and post-merge CI/Docs/CodeQL verified.
+- INFRA-1 governance reconciliation PR #420 is protected-merged as
+  `5e65efa59288cd84aac3d416e4611e19d23ea7b7`.
+- Repository cleanup PR #422 is protected-merged as
+  `cf017f3f451be4b4e5aca0d599f6265a8ff8113a`.
+- CI required docs build PR #423 is protected-merged as
+  `906986cc0bf5d29994c65aebcfd1fbceaeec7307`.
+- Task journal integrity fail-closed repair PR #424 is protected-merged as
+  `3cb94ff7f82d18c0f77b336848d1c34f220e58a3` with tree
+  `03c2689023e2e2213cd47f243f8fb46a6f626fcc`.
+- Maintenance line `release/3.7` was bootstrapped (PR #425) and published
+  releases `v3.7.12` (PR #426, #427) and `v3.7.13` (PR #428, `44a3dd71fc14b4c45e3c379b5728c27395727560`).
 - The prior `docs/power-3.8-premerge-state-publication` branch remains
   provisional evidence and is retained as source material; it is not replaced
   or deleted.
@@ -480,12 +520,15 @@ canonical on protected `main`:
 
 ## Next authorized work
 
-1. Execute Phase 5C preflight and contract freeze in
-   `06-phase5c-preflight-contract-freeze` (inventory candidate-generation paths,
-   map SearchScope dimensions, define pushdown semantics, define baseline and
-   metrics, freeze implementation contract).
-2. Do not implement Phase 5C runtime changes in the preflight/freeze packet.
-3. Keep Phase 5C–9 runtime work beyond this gate, version bumps, tags, releases,
+1. Execute Gate P38-G0 (Governance Rebaseline) to bring mutable governance into
+   complete agreement with live repository facts.
+2. Execute Gate P38-G1 (North-Star Architecture Alignment) to freeze product and
+   architecture direction without implementing runtime features.
+3. Execute Gate P38-G2 (Product Identity & Documentation Rebaseline) to reconcile
+   all public entry points and user-facing identity.
+4. Execute Phase 5C preflight and contract freeze in
+   `06-phase5c-preflight-contract-freeze` only after G0, G1, and G2 are closed.
+5. Keep Phase 5C–9 runtime work beyond this gate, version bumps, tags, releases,
    and POWER 3.8.0 publication blocked until each declared gate is
    independently closed.
 

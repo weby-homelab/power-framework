@@ -9,7 +9,7 @@ ACTIVE_GATE: INFRA-1 Governance Reconciliation
 CANONICAL_BRANCH: docs/power-3.8-infra1-governance-reconciliation
 BASE_SHA: bfb968846c0fc41582c2367782a28540498715b4
 BASE_TREE: 70dbfd0f9c980672a757be601b72b138e4e3d744
-TARGET_PR: (governance reconciliation PR)
+TARGET_PR: #420
 ```
 
 ---
@@ -121,10 +121,13 @@ This reconciliation is NOT: "tests failed, therefore lower the bar." All 11 requ
 
 - **Base SHA:** `bfb968846c0fc41582c2367782a28540498715b4`
 - **Base Tree:** `70dbfd0f9c980672a757be601b72b138e4e3d744`
-- **Candidate Head SHA:** (to be recorded on candidate commit)
-- **Candidate Tree:** (to be recorded on candidate commit)
-- **PR:** (to be recorded on PR creation)
-- **Merge SHA:** (to be recorded upon merge)
+- **Candidate Head SHA:** `8b96eba1dfcadd94e501f7fa5d4a420321dc3c4c`
+- **Candidate Tree:** `738d7342da65a25ec5666e68fbe19c6543ac0e94`
+- **Candidate Parent:** `bfb968846c0fc41582c2367782a28540498715b4`
+- **PR:** #420
+- **Merge SHA:** `5e65efa59288cd84aac3d416e4611e19d23ea7b7`
+- **Merge Tree:** `738d7342da65a25ec5666e68fbe19c6543ac0e94`
+- **Merge Parents:** `bfb968846c0fc41582c2367782a28540498715b4`, `8b96eba1dfcadd94e501f7fa5d4a420321dc3c4c`
 
 ---
 

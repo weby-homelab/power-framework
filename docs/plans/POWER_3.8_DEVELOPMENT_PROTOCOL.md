@@ -410,17 +410,27 @@ PHASE 5A RUNTIME CONTRACTS: CLOSED / MERGED / VERIFIED
 PHASE 5A.1 EVALUATION CORRECTION: CLOSED / MERGED / VERIFIED / PR #416
 PHASE 5B: CLOSED / MERGED / VERIFIED / PR #418
 INFRA-1: CLOSED / MERGED / VERIFIED / PR #419 / merge bfb9688
-PHASE 5C: READY FOR SEPARATE ADMISSION / NOT STARTED
-PUBLIC VERSION: 3.7.11
+INFRA-1 GOVERNANCE RECONCILIATION: CLOSED / MERGED / VERIFIED / PR #420 / merge 5e65efa
+PR #421 FINDINGS: SUPERSEDED / CLOSED WITHOUT MERGE
+REPOSITORY CLEANUP: CLOSED / MERGED / VERIFIED / PR #422 / merge cf017f3
+CI REQUIRED DOCS BUILD: CLOSED / MERGED / VERIFIED / PR #423 / merge 906986c
+TASK JOURNAL INTEGRITY FAIL-CLOSED: CLOSED / MERGED / VERIFIED / PR #424 / merge 3cb94ff
+MAINTENANCE RELEASES: CLOSED / MERGED / VERIFIED / v3.7.12 & v3.7.13 on release/3.7
+GATE P38-G0 (GOVERNANCE REBASELINE): IN PROGRESS
+GATE P38-G1 (NORTH-STAR ARCHITECTURE): PLANNED / GATED BY G0
+GATE P38-G2 (PRODUCT IDENTITY & DOCS): PLANNED / GATED BY G1
+PHASE 5C (P38-WP01): READY FOR SEPARATE ADMISSION / GATED BY G2
+PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
 
-The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, Phase 5B, and INFRA-1
-merge receipts are retained `MERGED MAIN` evidence. Phase 5B and INFRA-1 are
+The HF, Actions, Phase 5A runtime-contract, Phase 5A.1, Phase 5B, INFRA-1,
+repository cleanup, CI required docs build, and task journal integrity merge
+receipts are retained `MERGED MAIN` evidence. Phase 5B and INFRA-1 are
 closed on protected `main`. Real receiver deployment is an operator follow-up.
-Do not start Phase 5C runtime implementation or Phases 6–9, version bumps,
-tags, releases, release images, or final release notes. Phase 5C preflight and
-contract freeze is the next planned step.
+The authorized sequence executes Gates P38-G0, P38-G1, and P38-G2 before Phase 5C
+admission. Do not start Phase 5C runtime implementation or Phases 6–9, version bumps,
+tags, releases, release images, or final release notes.
 
 ## INFRA-1 execution boundary
 

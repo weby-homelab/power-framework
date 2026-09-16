@@ -8,8 +8,8 @@
 ## Canonical execution sequence
 
 ```text
-POWER 3.7.11
-DONE / PUBLIC / FROZEN
+POWER 3.7.13
+DONE / PUBLIC / FROZEN (Maintenance line `release/3.7`)
         ↓
 Phase 0
 CLOSED / FROZEN
@@ -52,20 +52,35 @@ CLOSED / MERGED / VERIFIED (PR #418 / merge 6a315d5)
 INFRA-1 — Constrained Local Infrastructure Execution Broker
 CLOSED / MERGED / VERIFIED (PR #419 / merge bfb9688)
         ↓
-Phase 5C–5H — Scope, planner, shadow, dense validity, MCP, closure
-READY FOR SEPARATE ADMISSION / NOT STARTED
-         ↓
-Phase 6 — Agent Capture & Integrations
-NOT STARTED
-         ↓
-Phase 7 — Optional Context Broker, Materialized Views & Web
-NOT STARTED
+Post-INFRA-1 Governance Reconciliation & Fixes
+CLOSED / MERGED / VERIFIED (PR #420, #422, #423, #424)
         ↓
-Phase 8 — Security / Reliability / Performance
-NOT STARTED
+Gate P38-G0 — Governance Rebaseline
+IN PROGRESS
         ↓
-Phase 9 — Migration / Benchmark / Release
-NOT STARTED
+Gate P38-G1 — North-Star Architecture Alignment
+GATED BY G0 / PLANNED
+        ↓
+Gate P38-G2 — Product Identity & Documentation Rebaseline
+GATED BY G1 / PLANNED
+        ↓
+Phase 5C (P38-WP01) — Search Scope Pushdown
+READY FOR SEPARATE ADMISSION / NOT STARTED (gated by G2)
+         ↓
+Phase 5D–5H (P38-WP02–P38-WP06) — ContextPack, Shadow, Dense Validity, MCP, Closure
+PLANNED / NOT STARTED
+         ↓
+Phase 6 (P38-WP07–P38-WP09) — Observation & Capture
+PLANNED / NOT STARTED
+         ↓
+Phase 7 (P38-WP10–P38-WP11) — Graph, Artifact & Optional Hub
+PLANNED / NOT STARTED
+        ↓
+Phase 8 (P38-WP12) — Security / Durability / Chaos Verification
+PLANNED / NOT STARTED
+        ↓
+Phase 9 (P38-WP13) — Real-Work Validation & Release Decision
+PLANNED / NOT STARTED
         ↓
 POWER 3.8.0
 NO-GO
@@ -75,7 +90,8 @@ NO-GO
 
 | Work item | Status | Meaning |
 |---|---|---|
-| Public `3.7.11` | DONE / PUBLIC | Stable public baseline; no version bump |
+| Public `3.7.13` | DONE / PUBLIC | Stable public maintenance release (`release/3.7`, tags `v3.7.12`, `v3.7.13`) |
+| Development main | `3.7.11` | Package metadata on development `main`; no premature bump |
 | Phases 0–4 | DONE / FROZEN | No reopening in this gate |
 | Python refresh | DONE | Prior controlled admission |
 | WEB-01 / WEB-05 | DONE | Closed through security PR #405 |
@@ -92,8 +108,20 @@ NO-GO
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
 | Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; live parent erratum is retained in current state |
 | INFRA-1 | CLOSED / MERGED / VERIFIED | PR #419; merge `bfb9688`; framework contract closed; real receiver is operator follow-up |
-| Phase 5C | READY FOR SEPARATE ADMISSION / NOT STARTED | SearchScope pushdown preflight/contract freeze next; unstarted |
-| Phases 6–9 | NOT STARTED | No work authorized |
+| INFRA-1 reconciliation | CLOSED / MERGED / VERIFIED | PR #420; merge `5e65efa5`; framework vs operator receiver separation |
+| PR #421 (review findings) | SUPERSEDED / CLOSED WITHOUT MERGE | Replaced by P38-G0 governance rebaseline |
+| Repository cleanup | CLOSED / MERGED / VERIFIED | PR #422; merge `cf017f3`; removed confirmed obsolete repository artifacts |
+| CI required docs build | CLOSED / MERGED / VERIFIED | PR #423; merge `906986c`; always emit required docs build for PRs |
+| Task journal integrity | CLOSED / MERGED / VERIFIED | PR #424; merge `3cb94ff`; fail-closed on corrupt task journal |
+| Maintenance bootstrap | CLOSED / MERGED / VERIFIED | PR #425 on `release/3.7` |
+| Patch release 3.7.12 | CLOSED / MERGED / VERIFIED | PR #426, PR #427 on `release/3.7`; tagged `v3.7.12` |
+| Patch release 3.7.13 | CLOSED / MERGED / VERIFIED | PR #428 on `release/3.7`; tagged `v3.7.13` |
+| Gate P38-G0 | IN PROGRESS | Governance Rebaseline; aligns mutable state with live reality |
+| Gate P38-G1 | PLANNED / GATED | North-Star Architecture Alignment; freezes architecture direction |
+| Gate P38-G2 | PLANNED / GATED | Product Identity & Documentation Rebaseline; mandatory before Phase 5C |
+| Phase 5C (P38-WP01) | READY FOR SEPARATE ADMISSION / NOT STARTED | SearchScope pushdown preflight/contract freeze; gated by G2 |
+| Phase 5D–5H (P38-WP02–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5C → 5D → 5E → 5F → 5G → 5H) |
+| Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
 ### INFRA-1 closed framework gate and governance reconciliation
@@ -296,24 +324,28 @@ starts only after architecture, shadow, small-dataset, soak, capture, broker,
 and hardening gates pass. The release order is migration → benchmark → upgrade
 validation → RC → explicit POWER 3.8.0 decision; a plan is not release evidence.
 
-Phases 6–9 remain future work. Internal planning may retain these labels:
+Phases 5–9 work packages use explicit P38 governance and work-package identifiers:
 
 ```text
-3.7.12 forensic architecture
-3.7.13 contracts/schema/tests
-3.7.14 capture runtime
-3.7.15 Codex adapter
-3.7.16 multi-agent adapters
-3.7.17 working memory/curation
-3.7.18 durable temporal memory/living models
-3.7.19 context broker
-3.7.20 canonical POWER integration
-3.7.21 security/privacy/forgetting
-3.7.22 full validation/RC
+P38-G0: Governance Rebaseline
+P38-G1: North-Star Architecture Alignment
+P38-G2: Product Identity & Documentation Rebaseline
+P38-WP01: Phase 5C SearchScope Pushdown
+P38-WP02: Phase 5D ContextPack + EvidenceRef
+P38-WP03: Phase 5E Shadow Evaluation
+P38-WP04: Phase 5F Incremental Dense Validity
+P38-WP05: Phase 5G MCP Context / Explainability
+P38-WP06: Phase 5H Phase Closure
+P38-WP07: Phase 6 Forensic & Capture Architecture
+P38-WP08: Phase 6 Observation Contracts, Schema & Tests
+P38-WP09: Phase 6 Agent Capture Runtime & Adapters
+P38-WP10: Phase 7 Graph & Artifact Storage Projections
+P38-WP11: Phase 7 Context Broker & Optional Hub Benchmark
+P38-WP12: Phase 8 Security / Privacy / Chaos Verification
+P38-WP13: Phase 9 Real-Work Validation / Release Candidate
 ```
 
-These are **INTERNAL WORK-PACKAGE LABELS — NOT PUBLIC RELEASES**. They do not
-authorize tags, GitHub releases, version bumps, or release artifacts.
+These are **INTERNAL WORK-PACKAGE IDENTIFIERS — NOT RELEASES**. SemVer belongs strictly to real public releases on release branches. They do not authorize tags, GitHub releases, version bumps, or release artifacts.
 
 ## Roadmap remediation conditions
 
