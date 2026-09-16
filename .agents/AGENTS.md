@@ -1,13 +1,20 @@
-# P.O.W.E.R. Framework — Agent Instructions
+# P.O.W.E.R. Control Plane — Agent Instructions
 
-Python 3.13–3.14 toolkit for AI-native Second Brain management. CLI (`power`, 27 top-level
-commands) + local MCP server (21 tools).
+Authoritative local-first control plane for verifiable AI-assisted software engineering
+and Linux infrastructure operations, with structured Second Brain knowledge substrate.
+CLI (`power`, 27 top-level commands) + local MCP server (21 tools).
+
+## Core Governance Invariants
+
+All agent actions in this repository must strictly adhere to the two inviolable principles of [ADR-0007](../docs/adr/0007-power-3.8-north-star-control-plane-architecture.md):
+1. **`LLM OUTPUT NEVER GRANTS AUTHORITY`** — Model completions are untrusted proposals; execution requires deterministic verification and approval gates.
+2. **`DERIVED STATE MUST NEVER SILENTLY BECOME CANONICAL AUTHORITY`** — Indexes, embeddings, and graphs are rebuildable projections. Canonical truth lives exclusively in Git history, signed commits, and verified CAS artifacts.
 
 ## Project Structure
 
 ```
-src/power_framework/       # Core library
-  core/                    #   models, parser, indexer, linter, searcher, application service
+src/power_framework/       # Core library & control plane runtime
+  core/                    #   models, parser, indexer, linter, searcher, application service, state engine
   mcp/                     #   official MCP SDK v2 server (21 async tools)
 tests/                     # Pytest suite; CI enforces coverage >=70%
 scripts/                   # Dev/CI utilities

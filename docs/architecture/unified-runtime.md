@@ -2,10 +2,14 @@
 
 ## 1. Executive Architecture Summary
 
-P.O.W.E.R. is a single-repository, single-version, local-first Second Brain framework.
+P.O.W.E.R. is a single-repository, single-version, local-first control plane for
+verifiable AI-assisted software engineering and Linux operations, with an integrated
+structured knowledge substrate (Second Brain). See
+[ADR-0007](../adr/0007-power-3.8-north-star-control-plane-architecture.md).
 The Web UI introduced in the 3.7.8 release remains physically integrated into the
 `power-framework` repository and Python distribution as `power_framework.web`;
-the current patch runtime boundary is 3.7.11.
+the current stable maintenance boundary is `release/3.7` (v3.7.13), while active
+mainline development targets POWER 3.8.
 
 ```text
                            P.O.W.E.R.

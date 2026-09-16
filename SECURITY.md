@@ -2,22 +2,26 @@
 
 ## Purpose and scope
 
-P.O.W.E.R. is a local-first Python framework for validating, indexing, searching,
-and mutating Markdown knowledge vaults through a CLI and an MCP server. This
+P.O.W.E.R. is a local-first control plane for verifiable AI-assisted software
+engineering and Linux infrastructure operations. It provides an authoritative
+execution runtime, broker-mediated tool authority, proof-carrying handoffs, and
+a structured knowledge substrate (Second Brain) validated via CLI and MCP. This
 policy defines the security contract for the released package, its source
-repository, and the documented local MCP transports.
+repository, tool execution brokers, and the documented local MCP transports.
 
 P.O.W.E.R. is not a hosted multi-tenant service. The operating-system account,
-the installed package, and the configured vault root are trusted by the host
-operator. A process that already has the same OS privileges can usually read
-the vault and local cache directly; P.O.W.E.R. does not replace OS permissions,
-container isolation, or an authenticated gateway.
+the installed package, the broker daemon, and the configured vault root are
+trusted by the host operator. A process that already has the same OS privileges
+can usually read the vault, local cache, and broker sockets directly;
+P.O.W.E.R. does not replace OS permissions, container isolation, or an
+authenticated network gateway.
 
 ## Supported versions
 
 | Version | Security support |
 | --- | --- |
-| `3.7.x` | Supported |
+| `3.8 (dev)` | Main development line |
+| `3.7.x` | Supported maintenance line (`release/3.7`, stable `v3.7.13`) |
 | `<3.7` | Unsupported; upgrade before reporting a release-specific issue |
 
 The `main` branch may contain security fixes before the next release. Security
@@ -65,11 +69,11 @@ The following boundaries are part of the current contract:
   are not an authorization mechanism. The caller and its gateway remain
   responsible for enforcing user identity and approval policy.
 
-### POWER 3.8 INFRA-1 candidate boundary (provisional)
+### POWER 3.8 INFRA-1 broker boundary (merged on `main`)
 
-The following controls describe the unmerged INFRA-1 candidate in PR #419.
-They are not claims about the frozen public `3.7.11` release until the
-protected merge and release process separately admits them.
+The following controls describe the local Unix-domain infrastructure broker
+boundary merged on `main` (PR #420). They are part of the active 3.8 control-plane
+architecture and will be released in the next minor version:
 
 - INFRA-1 is an opt-in local Unix-domain broker boundary. The agent-facing
   client accepts only `status`, `probe`, `rsync-dry-run`, `replicate`, and

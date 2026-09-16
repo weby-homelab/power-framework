@@ -1,5 +1,13 @@
 # Architecture
 
+P.O.W.E.R. is an authoritative local-first control plane for verifiable AI-assisted software
+engineering and Linux infrastructure operations. It bridges autonomous agents, developer tools,
+and host operating systems via deterministic proof chains, broker-mediated execution boundaries,
+and structured knowledge substrates.
+
+See [ADR-0007: North-Star Control Plane Architecture](adr/0007-power-3.8-north-star-control-plane-architecture.md)
+for the canonical product definition, Three Authorities, and end-to-end proof chain.
+
 ## Package layout
 
 ```
