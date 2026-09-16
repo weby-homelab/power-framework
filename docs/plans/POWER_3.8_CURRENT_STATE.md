@@ -48,7 +48,7 @@ LAST_CLOSED_GATE:
 P38-WP01-R1 Phase 5C SearchScope Closure Correction (main, PR #437) / Phase 5C / P38-WP01 SearchScope Pushdown (main, PR #434, corrected by R1) / PR #436 R1A admission / Gate P38-G2 (main, PR #431) / PR #428 Release v3.7.13 (release/3.7)
 
 NEXT_GATE:
-Phase 5D / P38-WP02 Multi-Domain Union & Conflict Resolution (READY FOR SEPARATE ADMISSION / NOT STARTED)
+Phase 5D / P38-WP02 Multi-Domain Union & Conflict Resolution (ADMITTED / NOT STARTED)
 
 P38-WP01-R1_STATUS:
 CLOSED / MERGED / VERIFIED / PR #437
@@ -57,7 +57,7 @@ PHASE_5C_EFFECTIVE_STATUS:
 CLOSED / VERIFIED AFTER R1 CORRECTION
 
 PHASE_5D_STATUS:
-READY FOR SEPARATE ADMISSION / NOT STARTED
+ADMITTED / NOT STARTED
 
 INFRA_1_STATUS:
 CLOSED / MERGED / VERIFIED
@@ -123,7 +123,7 @@ P38-WP01-R1:
 CLOSED / MERGED / VERIFIED / PR #437
 
 PHASE_5D:
-READY FOR SEPARATE ADMISSION / NOT STARTED
+ADMITTED / NOT STARTED
 
 FOUNDATION_HARDENING:
 CLOSED / IMPLEMENTED / VERIFIED
@@ -147,7 +147,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-16T130000Z_p38_wp01_r1_closure.md
+artifacts/project-state/handoffs/2026-09-16T140000Z_p38_wp02_phase5d_admission.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -251,7 +251,7 @@ evidence.
 - Gate P38-G2: **CLOSED / MERGED / VERIFIED** through protected PR #431 (`7546ff8`).
 - Phase 5C (Search scope pushdown): **CLOSED / VERIFIED AFTER R1 CORRECTION** (PR #434 corrected by PR #437).
 - P38-WP01-R1 (Phase 5C SearchScope Closure Correction): **CLOSED / MERGED / VERIFIED / PR #437**.
-- Phase 5D (P38-WP02): **READY FOR SEPARATE ADMISSION / NOT STARTED**.
+- Phase 5D (P38-WP02): **ADMITTED / NOT STARTED**.
 - Phase 5E–5H: **PLANNED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
@@ -359,9 +359,8 @@ Evidence:
   framework capability and operator deployment validation.
 
 > Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was
-> subsequently CLOSED via PR #434 and reconciled via PR #435, and is now under
-> P38-WP01-R1 closure correction (CLOSURE CORRECTION ADMITTED / IN PROGRESS).
-> Phase 5D is BLOCKED BY P38-WP01-R1.
+> subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438),
+> and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is READY FOR SEPARATE ADMISSION / NOT STARTED.
 
 ## Actions #396 exact objects
 
@@ -503,8 +502,8 @@ fail-closed repair were accepted through normal protected merges and post-merge 
 Real receiver deployment is an operator follow-up. Gates P38-G0 (Governance Rebaseline),
 P38-G1 (North-Star Architecture Alignment), and P38-G2 (Product Identity & Documentation Rebaseline)
 are closed and verified. Phase 5C (SearchScope Pushdown, PR #434) is CLOSED /
-VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is READY FOR
-SEPARATE ADMISSION / NOT STARTED.
+VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is ADMITTED /
+NOT STARTED.
 A post-merge Dependabot run failure on main was investigated and dispositioned as Class C (non-required
 dependency update attempt failure, non-blocking).
 POWER 3.8.0 cannot be released from this state.
