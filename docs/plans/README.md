@@ -44,9 +44,9 @@ REST verification:
 > (PR #420, #422, #423, #424) and maintenance releases (`v3.7.12`, `v3.7.13`
 > on `release/3.7`) are merged. Gates P38-G0 (PR #429), P38-G1 (PR #430),
 > and P38-G2 (PR #431) are closed and verified. Phase 5C SearchScope
-> pushdown (PR #434) is under P38-WP01-R1 closure correction
-> (**CLOSURE CORRECTION ADMITTED / IN PROGRESS**).
-> Phase 5D (P38-WP02) is **BLOCKED BY P38-WP01-R1**.
+> pushdown (PR #434) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437)**.
+> P38-WP01-R1 is **CLOSED / MERGED / VERIFIED**.
+> Phase 5D (P38-WP02) is **READY FOR SEPARATE ADMISSION / NOT STARTED**.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
