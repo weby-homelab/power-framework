@@ -423,7 +423,8 @@ PHASE 5C (P38-WP01): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED B
 P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #437
 PHASE 5D (P38-WP02): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #439 / PR #440 / PR #441 CORRECTED BY PR #442 / PR #443
 P38-WP02-R1 (PHASE 5D CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #443
-PHASE 5E (P38-WP03): READY FOR SEPARATE ADMISSION / NOT STARTED
+PHASE 5E (P38-WP03): CLOSED / MERGED / VERIFIED / PR #445 / PR #446
+PHASE 5F (P38-WP04): READY FOR SEPARATE ADMISSION / NOT STARTED
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -436,7 +437,7 @@ Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
 pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
 (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by
 PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is
-READY FOR SEPARATE ADMISSION / NOT STARTED. Do not start Phase 5E–9, version bumps, tags, releases, release images, or
+CLOSED / MERGED / VERIFIED (PR #445, PR #446). Phase 5F (P38-WP04) is READY FOR SEPARATE ADMISSION / NOT STARTED. Do not start Phase 5F–9, version bumps, tags, releases, release images, or
 final release notes.
 
 ## INFRA-1 execution boundary
@@ -489,7 +490,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E is READY FOR SEPARATE ADMISSION / NOT STARTED.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is CLOSED / MERGED / VERIFIED (PR #445, PR #446). Phase 5F is READY FOR SEPARATE ADMISSION / NOT STARTED.
 
 ## Cross-links
 
