@@ -129,8 +129,9 @@ NO-GO
 | P38-WP01-R1 | CLOSED / MERGED / VERIFIED / PR #437 | Phase 5C SearchScope Closure Correction |
 | Phase 5D (P38-WP02) | CLOSED / VERIFIED AFTER R1 CORRECTION | Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack vertical slice (PR #439, PR #440, PR #441 corrected by PR #442, PR #443) |
 | P38-WP02-R1 | CLOSED / MERGED / VERIFIED / PR #443 | Phase 5D RetrievalPlanner / ContextPack Closure Correction |
-| Phase 5E (P38-WP03) | READY FOR SEPARATE ADMISSION / NOT STARTED | Shadow Benchmark / Legacy Comparison |
-| Phase 5F–5H (P38-WP04–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5D → 5E → 5F → 5G → 5H) |
+| Phase 5E (P38-WP03) | CLOSED / MERGED / VERIFIED | Shadow Benchmark / Legacy Comparison (PR #445, PR #446) |
+| Phase 5F (P38-WP04) | READY FOR SEPARATE ADMISSION / NOT STARTED | Context Memory / Stateful Multi-Turn Context |
+| Phase 5G–5H (P38-WP05–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5E → 5F → 5G → 5H) |
 | Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
 
@@ -156,7 +157,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is READY FOR SEPARATE ADMISSION / NOT STARTED.
+- Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is CLOSED / MERGED / VERIFIED (PR #445, PR #446). Phase 5F is READY FOR SEPARATE ADMISSION / NOT STARTED.
 
 ## Controlled Dependency Refresh
 
@@ -193,7 +194,7 @@ dependency update:
        execution broker was protected-merged as PR #419 (merge `bfb9688`).
        Real receiver deployment is an operator follow-up. Historical note: Phase 5C was
        unstarted at INFRA-1 time; it was subsequently CLOSED via PR #434 / PR #435, corrected via
-       P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is READY FOR SEPARATE ADMISSION / NOT STARTED.
+       P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is CLOSED / MERGED / VERIFIED (PR #445, PR #446). Phase 5F is READY FOR SEPARATE ADMISSION / NOT STARTED.
 
 The controlled refresh and prior closures do not authorize a public version
 bump, tag, release, Phase 5C, or any later phase.
@@ -266,13 +267,13 @@ Controlled Dependency Refresh, Phase 5A runtime contracts, Phase 5A.1
 correction, Phase 5B router, and INFRA-1 broker are closed in this snapshot;
 Phase 5C SearchScope pushdown is CLOSED / VERIFIED AFTER R1 CORRECTION
 (PR #437);
-Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443); P38-WP02-R1 is CLOSED / MERGED / VERIFIED; Phase 5E is READY FOR SEPARATE ADMISSION / NOT STARTED.
+Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443); P38-WP02-R1 is CLOSED / MERGED / VERIFIED; Phase 5E is CLOSED / MERGED / VERIFIED (PR #445, PR #446); Phase 5F is READY FOR SEPARATE ADMISSION / NOT STARTED.
 
 ### Phase 5 internal gates
 
-Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, Phase 5C, P38-WP01-R1, Phase 5D, and P38-WP02-R1 are closed. The following future
+Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, Phase 5C, P38-WP01-R1, Phase 5D, P38-WP02-R1, and Phase 5E are closed. The following future
 runtime gates remain `PLANNED / NOT IMPLEMENTED` until their own evidence and
-protected admission; Phase 5E is READY FOR SEPARATE ADMISSION / NOT STARTED:
+protected admission; Phase 5F is READY FOR SEPARATE ADMISSION / NOT STARTED:
 
 ```text
 5A.1 — Evaluation corpus semantic integrity correction (closed)
@@ -282,8 +283,8 @@ INFRA-1 — Constrained Local Infrastructure Execution Broker (closed / merged P
 P38-WP01-R1 — Phase 5C SearchScope Closure Correction (CLOSED / PR #437)
 5D — RetrievalPlanner + ContextPack read-only vertical slice (CLOSED / VERIFIED AFTER R1 CORRECTION)
 P38-WP02-R1 — Phase 5D RetrievalPlanner / ContextPack Closure Correction (CLOSED / PR #443)
-5E — Shadow benchmark / legacy comparison (READY FOR SEPARATE ADMISSION / NOT STARTED)
-5F — Incremental dense validity / dirty-set behavior
+5E — Shadow benchmark / legacy comparison (CLOSED / PR #445, PR #446)
+5F — Context Memory / stateful multi-turn context (READY FOR SEPARATE ADMISSION / NOT STARTED)
 5G — Small MCP read/explainability surfaces
 5H — Phase closure / default decision
 ```

@@ -48,7 +48,8 @@ REST verification:
 > P38-WP01-R1 is **CLOSED / MERGED / VERIFIED**.
 > Phase 5D (P38-WP02) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443)**.
 > P38-WP02-R1 is **CLOSED / MERGED / VERIFIED**.
-> Phase 5E (P38-WP03) is **READY FOR SEPARATE ADMISSION / NOT STARTED**.
+> Phase 5E (P38-WP03) is **CLOSED / MERGED / VERIFIED (PR #445, PR #446)**.
+> Phase 5F (P38-WP04) is **READY FOR SEPARATE ADMISSION / NOT STARTED**.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -71,8 +72,8 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. Verify the Phase 5D candidate and its exact
-   protected merge/readback; then stop before Phase 5E.
+   mutable operational truth. Verify the Phase 5E candidate and its exact
+   protected merge/readback; then stop before Phase 5F.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -91,7 +92,7 @@ These files remain **PLANNING EVIDENCE** and are not production runtime
 dependencies. Phase 5A has an independent installable runtime contract layer
 and frozen synthetic evaluation corpus; the v1 context schema and v1 index-cost
 policy remain retained historical planning evidence. No planning contract is a
-phase report, release artifact, or authorization to start Phase 5E.
+phase report, release artifact, or authorization to start Phase 5F.
 
 ## CONTRACT STATUS MAP
 
@@ -103,7 +104,7 @@ phase report, release artifact, or authorization to start Phase 5E.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5E (P38-WP03 Shadow Benchmark / Legacy Comparison) |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5F (P38-WP04 Context Memory / Stateful Multi-Turn Context) |
 
 ## HISTORICAL PLAN
 
@@ -135,8 +136,11 @@ MAIN`; Phase 5A runtime contracts and Phase 5A.1 are merged and verified,
 Phase 5B is `CLOSED / MERGED / VERIFIED` through PR #418, INFRA-1 is
 `CLOSED / MERGED / VERIFIED` through PR #419, Phase 5C SearchScope
 pushdown is `CLOSED / MERGED / VERIFIED` through PR #434 and PR #437,
-and Phase 5D (RetrievalPlanner + ContextPack) is `CLOSURE CORRECTION ADMITTED`
-through PR #439, PR #440, and PR #441. P38-WP02-R1 is `IN PROGRESS`. Phase 5E remains `BLOCKED BY P38-WP02-R1 / NOT STARTED`.
+and Phase 5D (RetrievalPlanner + ContextPack) is `CLOSED / MERGED / VERIFIED`
+through PR #439, PR #440, and PR #441 (corrected by PR #442 and PR #443).
+P38-WP02-R1 is `CLOSED / MERGED / VERIFIED`. Phase 5E (Shadow Benchmark) is
+`CLOSED / MERGED / VERIFIED` through PR #445 and PR #446. Phase 5F is
+`READY FOR SEPARATE ADMISSION / NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
 
@@ -176,7 +180,7 @@ override or replace the three explicit namespaces above.
 
 `PLANNED != IMPLEMENTED`: a merged architecture document is canonical planning,
 not runtime completion. This canonical projection records the closed Controlled
-Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B/5C/5D
+Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B/5C/5D/5E
 gates, and the merged INFRA-1 broker. It does not authorize Actions #396,
-Phase 5E, any later phase, version bump, tag, release, or `POWER 3.8.0`
+Phase 5F, any later phase, version bump, tag, release, or `POWER 3.8.0`
 publication.
