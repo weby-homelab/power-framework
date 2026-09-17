@@ -45,8 +45,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from power_framework.core.application import ApplicationService, RequestContext
-from power_framework.core.principal import Principal
+_SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
+from power_framework.core.application import ApplicationService, RequestContext  # noqa: E402
+from power_framework.core.principal import Principal  # noqa: E402
 
 
 def _sha256_file(path: Path) -> str:
@@ -137,7 +141,8 @@ def has_canonical_runtime_provenance(*, authority: str, basis: str, source_type:
     auth = (authority or "unknown").lower()
     if auth not in {"canonical", "verified", "curated"}:
         return False
-    if (basis or "UNKNOWN") not in CANONICAL_RUNTIME_BASES:
+    b = (basis or "UNKNOWN").upper()
+    if b not in CANONICAL_RUNTIME_BASES:
         return False
     st = (source_type or "").lower()
     return st.startswith(("canonical_", "verified_", "curated_")) or st in {

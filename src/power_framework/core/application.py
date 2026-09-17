@@ -76,6 +76,7 @@ from .source_service import (
     list_sources,
     read_source,
 )
+from .state_service import ProjectStateService
 from .synthesize import synthesize_session_ingest
 from .task_models import PowerTask
 from .task_service import _INFRA_PROJECTION_TOKEN, TaskService
@@ -314,13 +315,20 @@ class ApplicationService:
         audit_hook: Callable[[AuditReceipt], None] | None = None,
         search_fn: Callable[..., list[Any]] | None = None,
         task_service: TaskService | None = None,
+        decision_service: DecisionService | None = None,
+        project_state_service: ProjectStateService | None = None,
         infra_broker: InfraBrokerClientProtocol | None = None,
     ) -> None:
         self.vault_dir = Path(vault_dir).expanduser().resolve()
         self._audit_hook = audit_hook
         self._search_fn = search_fn or partial(search_vault, allow_search_db_override=False)
         self.task_service = task_service or TaskService(self.vault_dir, create_vault=False)
-        self.decision_service = DecisionService(self.vault_dir, task_service=self.task_service)
+        self.decision_service = decision_service or DecisionService(
+            self.vault_dir, task_service=self.task_service
+        )
+        self.project_state_service = project_state_service or ProjectStateService(
+            self.vault_dir, task_service=self.task_service, decision_service=self.decision_service
+        )
         self.infra_broker = infra_broker or InfraBrokerClient()
 
     def discover(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
@@ -488,6 +496,7 @@ class ApplicationService:
                 self.vault_dir,
                 task_service=self.task_service,
                 decision_service=self.decision_service,
+                project_state_service=self.project_state_service,
                 search_fn=self._search_fn,
             )
             planner_result = planner.plan_and_retrieve(
