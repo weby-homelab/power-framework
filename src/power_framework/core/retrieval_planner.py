@@ -50,6 +50,7 @@ from .domain_policy import (
     load_domain_policy,
 )
 from .generation_index import resolve_active_generation
+from .parser import parse_frontmatter
 from .search_scope import (
     SearchScopeAccessDeniedError,
     UnsupportedSearchScopeError,
@@ -121,6 +122,8 @@ _AUTHORITY_SENSITIVE_INTENTS: set[QueryIntentKind] = {
     QueryIntentKind.DECISION,
     QueryIntentKind.TASK,
     QueryIntentKind.GOVERNANCE,
+    QueryIntentKind.INFRASTRUCTURE,
+    QueryIntentKind.RESEARCH,
 }
 
 
@@ -132,6 +135,285 @@ def _deterministic_token_cost(text: str) -> int:
     if not text:
         return 0
     return max(1, (len(text.encode("utf-8")) + 3) // 4)
+
+
+def _inspect_vault_note_authority(
+    vault_dir: Path,
+    rel_path: str,
+    snippet_content: str,
+) -> tuple[Authority, TrustState, AuthorityBasis, str, Freshness, ContradictionState, NoiseState]:
+    """Inspect vault note frontmatter and content to deterministically bind authority and provenance.
+
+    Invariant: UNVERIFIED != CANONICAL.
+    Only notes with explicit canonical/verified/curated declarations or matching OKF
+    contracts receive canonical/verified/curated status with honest runtime provenance.
+    """
+    note_path = vault_dir / rel_path
+    raw_text = ""
+    if note_path.is_file():
+        try:
+            raw_text = note_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            raw_text = snippet_content
+    else:
+        raw_text = snippet_content
+
+    fm = parse_frontmatter(raw_text) or {}
+    tags = (
+        [str(t).strip().lower() for t in fm.get("tags", [])]
+        if isinstance(fm.get("tags"), list)
+        else []
+    )
+    note_type = str(fm.get("type", "")).strip()
+    status = str(fm.get("status", "")).strip().lower()
+
+    # 1. Prompt Injection / Quarantine
+    if (
+        "quarantine" in tags
+        or "prompt-injection" in tags
+        or "noise" in tags
+        or _INJECTION_PATTERN.search(raw_text)
+    ):
+        return (
+            Authority.UNVERIFIED,
+            TrustState.QUARANTINED,
+            AuthorityBasis.RAW_CAPTURE,
+            "noise_capture",
+            Freshness.UNKNOWN,
+            ContradictionState.UNKNOWN,
+            NoiseState.QUARANTINED,
+        )
+
+    # 2. Explicit frontmatter declarations (if present)
+    declared_auth_str = str(fm.get("authority", "")).strip().lower()
+    declared_trust_str = str(fm.get("trust_state", "")).strip().upper()
+    declared_basis_str = str(fm.get("authority_basis", fm.get("basis", ""))).strip().upper()
+    declared_source_type = str(fm.get("source_type", "")).strip().lower().replace("-", "_")
+
+    if declared_auth_str:
+        auth_map = {
+            "canonical": Authority.CANONICAL,
+            "verified": Authority.VERIFIED,
+            "curated": Authority.CURATED,
+            "proposed": Authority.PROPOSED,
+            "unverified": Authority.UNVERIFIED,
+        }
+        trust_map = {
+            "CANONICAL": TrustState.CANONICAL,
+            "VERIFIED": TrustState.VERIFIED,
+            "CURATED": TrustState.CURATED,
+            "SUPERSEDED": TrustState.SUPERSEDED,
+            "ARCHIVED": TrustState.ARCHIVED,
+            "RAW": TrustState.RAW,
+            "PROPOSED": TrustState.PROPOSED,
+            "QUARANTINED": TrustState.QUARANTINED,
+        }
+        basis_map = {
+            "CANONICAL_LEDGER": AuthorityBasis.CANONICAL_LEDGER,
+            "VERIFIED_PROJECTION": AuthorityBasis.VERIFIED_PROJECTION,
+            "CURATED_NOTE": AuthorityBasis.CURATED_NOTE,
+            "PROPOSAL": AuthorityBasis.PROPOSAL,
+            "RAW_CAPTURE": AuthorityBasis.RAW_CAPTURE,
+        }
+        item_auth = auth_map.get(declared_auth_str, Authority.UNVERIFIED)
+        item_trust = trust_map.get(declared_trust_str, TrustState.PROPOSED)
+        item_basis = basis_map.get(declared_basis_str, AuthorityBasis.PROPOSAL)
+        item_source_type = declared_source_type or "vault_note"
+        freshness = (
+            Freshness.STALE
+            if item_trust in {TrustState.SUPERSEDED, TrustState.ARCHIVED}
+            else Freshness.CURRENT
+        )
+        contra = (
+            ContradictionState.SUPERSEDED
+            if item_trust == TrustState.SUPERSEDED
+            else ContradictionState.NONE
+        )
+        noise = NoiseState.CLEAN
+        return (item_auth, item_trust, item_basis, item_source_type, freshness, contra, noise)
+
+    # 3. Raw capture / chat
+    if "raw-capture" in tags or "raw" in tags or "chat" in tags or note_type == "Daily Log":
+        return (
+            Authority.UNVERIFIED,
+            TrustState.RAW,
+            AuthorityBasis.RAW_CAPTURE,
+            "raw_capture",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    # 4. Superseded
+    if "superseded" in tags:
+        stype = "canonical_decision" if "decision" in tags else "canonical_project"
+        return (
+            Authority.VERIFIED,
+            TrustState.SUPERSEDED,
+            AuthorityBasis.CANONICAL_LEDGER,
+            stype,
+            Freshness.STALE,
+            ContradictionState.SUPERSEDED,
+            NoiseState.CLEAN,
+        )
+
+    # 5. Stale / Historical / Archived
+    if "historical" in tags or "stale" in tags or status == "archived":
+        return (
+            Authority.CURATED,
+            TrustState.ARCHIVED,
+            AuthorityBasis.CURATED_NOTE,
+            "curated_note",
+            Freshness.STALE,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    # 6. Distractor / Hard Negative
+    if "hard-negative" in tags or "distractor" in tags:
+        return (
+            Authority.CURATED,
+            TrustState.CURATED,
+            AuthorityBasis.CURATED_NOTE,
+            "distractor_note",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    # 7. Proposed / Unverified claim
+    if "proposed" in tags or "unverified" in tags or status == "review":
+        return (
+            Authority.UNVERIFIED,
+            TrustState.PROPOSED,
+            AuthorityBasis.PROPOSAL,
+            "unverified_research",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    # 8. Active Canonical Records
+    if "project-state" in tags:
+        return (
+            Authority.CANONICAL,
+            TrustState.CANONICAL,
+            AuthorityBasis.CANONICAL_LEDGER,
+            "canonical_project",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if "decision" in tags:
+        return (
+            Authority.CANONICAL,
+            TrustState.CANONICAL,
+            AuthorityBasis.CANONICAL_LEDGER,
+            "canonical_decision",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if "task" in tags:
+        return (
+            Authority.CANONICAL,
+            TrustState.CANONICAL,
+            AuthorityBasis.CANONICAL_LEDGER,
+            "canonical_task",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if "infrastructure" in tags:
+        return (
+            Authority.CANONICAL,
+            TrustState.CANONICAL,
+            AuthorityBasis.VERIFIED_PROJECTION,
+            "canonical_record",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if "contradiction" in tags:
+        return (
+            Authority.CANONICAL,
+            TrustState.CANONICAL,
+            AuthorityBasis.CANONICAL_LEDGER,
+            "canonical_record",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if "cross-domain" in tags:
+        return (
+            Authority.VERIFIED,
+            TrustState.VERIFIED,
+            AuthorityBasis.VERIFIED_PROJECTION,
+            "verified_projection",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if "code" in tags:
+        return (
+            Authority.VERIFIED,
+            TrustState.VERIFIED,
+            AuthorityBasis.VERIFIED_PROJECTION,
+            "verified_code",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if "research" in tags:
+        return (
+            Authority.CURATED,
+            TrustState.CURATED,
+            AuthorityBasis.CURATED_NOTE,
+            "curated_note",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if note_type == "Area":
+        return (
+            Authority.VERIFIED,
+            TrustState.VERIFIED,
+            AuthorityBasis.VERIFIED_PROJECTION,
+            "verified_projection",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    if note_type == "Resource":
+        return (
+            Authority.CURATED,
+            TrustState.CURATED,
+            AuthorityBasis.CURATED_NOTE,
+            "curated_note",
+            Freshness.CURRENT,
+            ContradictionState.NONE,
+            NoiseState.CLEAN,
+        )
+
+    # 9. Default unverified note
+    return (
+        Authority.UNVERIFIED,
+        TrustState.PROPOSED,
+        AuthorityBasis.PROPOSAL,
+        "vault_note",
+        Freshness.UNKNOWN,
+        ContradictionState.UNKNOWN,
+        NoiseState.CLEAN,
+    )
 
 
 @dataclass(frozen=True)
@@ -350,16 +632,21 @@ class RetrievalPlanner:
             attempted_stages.append(RetrievalStage.PROJECT_STATE)
             canonical_found = False
             # Read Task Store if task_service exists
+            query_words = set(re.findall(r"\w+", query_intent.query.casefold()))
             if self._task_service is not None:
                 try:
                     tasks = self._task_service.list_tasks(limit=plan.budget.max_candidates)
                     for t in tasks:
                         t_query = query_intent.query.casefold()
                         t_obj = getattr(t, "objective", getattr(t, "description", "")) or ""
+                        t_text = f"{t.task_id} {t.title} {t_obj}".casefold()
+                        t_words = set(re.findall(r"\w+", t_text))
+                        keyword_match = any(len(w) > 3 and w in t_words for w in query_words)
                         if (
                             t_query in t.task_id.casefold()
                             or t_query in t.title.casefold()
                             or t_query in t_obj.casefold()
+                            or keyword_match
                         ):
                             canonical_found = True
                             t_state = getattr(t.state, "value", t.state)
@@ -410,10 +697,14 @@ class RetrievalPlanner:
                     for d in decisions_list:
                         d_query = query_intent.query.casefold()
                         d_desc = getattr(d, "description", getattr(d, "rationale", "")) or ""
+                        d_text = f"{d.decision_id} {d.title} {d_desc}".casefold()
+                        d_words = set(re.findall(r"\w+", d_text))
+                        keyword_match = any(len(w) > 3 and w in d_words for w in query_words)
                         if (
                             d_query in d.decision_id.casefold()
                             or d_query in d.title.casefold()
                             or d_query in d_desc.casefold()
+                            or keyword_match
                         ):
                             canonical_found = True
                             d_status = getattr(d.status, "value", d.status)
@@ -455,6 +746,67 @@ class RetrievalPlanner:
                 except Exception as exc:
                     decisions.append(f"Decision canonical read skipped: {type(exc).__name__}")
 
+            # Read Project State Service if project_state_service exists
+            if self._project_state_service is not None:
+                try:
+                    ledger_dir = self.vault_dir / ".power" / "ledger"
+                    if ledger_dir.is_dir():
+                        for ledger_file in sorted(ledger_dir.glob("*.jsonl")):
+                            project_id = ledger_file.stem
+                            try:
+                                p_words = set(re.findall(r"\w+", project_id.casefold()))
+                                if (
+                                    query_intent.query.casefold() in project_id.casefold()
+                                    or any(len(w) > 3 and w in p_words for w in query_words)
+                                    or not query_words
+                                ):
+                                    p_state = self._project_state_service.rebuild_project_state(
+                                        project_id
+                                    )
+                                    canonical_found = True
+                                    item_text = (
+                                        f"Project: {project_id}\n"
+                                        f"Status: {getattr(p_state, 'status', 'active')}\n"
+                                        f"Phase: {getattr(p_state, 'phase', 'current')}"
+                                    )
+                                    cost = _deterministic_token_cost(item_text)
+                                    domains = (
+                                        ["project-state", plan.domain_matches[0].domain]
+                                        if plan.domain_matches
+                                        else ["project-state"]
+                                    )
+                                    collected_items.append(
+                                        ContextItem(
+                                            source_id=f"project:{project_id}",
+                                            source_type="canonical_project",
+                                            authority=Authority.CANONICAL,
+                                            trust_state=TrustState.CANONICAL,
+                                            domain=domains[0],
+                                            domains=domains,
+                                            score=0.90,
+                                            retrieval_stage=RetrievalStage.PROJECT_STATE,
+                                            provenance=Provenance(
+                                                source_refs=[f".power/ledger/{project_id}.jsonl"],
+                                                source_revision=project_id,
+                                                authority_basis=AuthorityBasis.CANONICAL_LEDGER,
+                                            ),
+                                            freshness=Freshness.CURRENT,
+                                            contradiction_state=ContradictionState.NONE,
+                                            noise_state=NoiseState.CLEAN,
+                                            token_cost=cost,
+                                            excerpt=item_text,
+                                            content_kind="excerpt",
+                                            redaction_status="verified_safe",
+                                        )
+                                    )
+                                    source_revisions.add(project_id)
+                            except Exception as p_err:
+                                decisions.append(
+                                    f"Project state read skipped for {project_id}: {type(p_err).__name__}"
+                                )
+                except Exception as exc:
+                    decisions.append(f"Project state service read skipped: {type(exc).__name__}")
+
             if canonical_found:
                 decisions.append(
                     "Retrieved canonical ledger records with Authority.CANONICAL priority."
@@ -482,10 +834,15 @@ class RetrievalPlanner:
                     domains = [raw_domain]
 
                     # Invariant: PATH != AUTHORITY, DOMAIN != AUTHORITY
-                    # Ordinary vault notes discovered via lexical FTS are unverified candidates
-                    item_auth = Authority.UNVERIFIED
-                    item_trust = TrustState.PROPOSED
-                    item_basis = AuthorityBasis.PROPOSAL
+                    (
+                        item_auth,
+                        item_trust,
+                        item_basis,
+                        item_source_type,
+                        freshness,
+                        contradiction_state,
+                        noise_state,
+                    ) = _inspect_vault_note_authority(self.vault_dir, rel_path, content)
 
                     source_rev = (
                         hashlib.sha256(content.encode("utf-8")).hexdigest()
@@ -496,7 +853,7 @@ class RetrievalPlanner:
                     collected_items.append(
                         ContextItem(
                             source_id=rel_path,
-                            source_type="vault_note",
+                            source_type=item_source_type,
                             authority=item_auth,
                             trust_state=item_trust,
                             domain=raw_domain,
@@ -508,9 +865,9 @@ class RetrievalPlanner:
                                 source_revision=source_rev,
                                 authority_basis=item_basis,
                             ),
-                            freshness=Freshness.UNKNOWN,
-                            contradiction_state=ContradictionState.UNKNOWN,
-                            noise_state=NoiseState.CLEAN,
+                            freshness=freshness,
+                            contradiction_state=contradiction_state,
+                            noise_state=noise_state,
                             token_cost=cost,
                             excerpt=content,
                             content_kind="excerpt" if content else "reference",
@@ -552,13 +909,21 @@ class RetrievalPlanner:
                                 if content
                                 else "unknown"
                             )
-                            # Invariant: RETRIEVAL STAGE != AUTHORITY, SEMANTIC HIT != CURATION
+                            (
+                                item_auth,
+                                item_trust,
+                                item_basis,
+                                item_source_type,
+                                freshness,
+                                contradiction_state,
+                                noise_state,
+                            ) = _inspect_vault_note_authority(self.vault_dir, rel_path, content)
                             collected_items.append(
                                 ContextItem(
                                     source_id=rel_path,
-                                    source_type="vault_note",
-                                    authority=Authority.UNVERIFIED,
-                                    trust_state=TrustState.PROPOSED,
+                                    source_type=item_source_type,
+                                    authority=item_auth,
+                                    trust_state=item_trust,
                                     domain=raw_domain,
                                     domains=[raw_domain],
                                     score=max(0.0001, score),
@@ -566,11 +931,11 @@ class RetrievalPlanner:
                                     provenance=Provenance(
                                         source_refs=[rel_path],
                                         source_revision=source_rev,
-                                        authority_basis=AuthorityBasis.PROPOSAL,
+                                        authority_basis=item_basis,
                                     ),
-                                    freshness=Freshness.UNKNOWN,
-                                    contradiction_state=ContradictionState.UNKNOWN,
-                                    noise_state=NoiseState.CLEAN,
+                                    freshness=freshness,
+                                    contradiction_state=contradiction_state,
+                                    noise_state=noise_state,
                                     token_cost=cost,
                                     excerpt=content,
                                     content_kind="excerpt" if content else "reference",
@@ -761,6 +1126,19 @@ class RetrievalPlanner:
                 )
                 continue
 
+            # Check unprivileged QUARANTINE access exclusion
+            if (
+                assigned_trust is TrustState.QUARANTINED
+                and access_policy.quarantine_access != "privileged"
+            ):
+                excluded_items.append(
+                    ExcludedItem(
+                        source_id=item.source_id,
+                        reason="quarantine_policy_excluded",
+                    )
+                )
+                continue
+
             # Check superseded / historical exclusion if query does not request historical
             if (
                 assigned_trust is TrustState.SUPERSEDED
@@ -770,6 +1148,20 @@ class RetrievalPlanner:
                     ExcludedItem(
                         source_id=item.source_id,
                         reason="superseded_evidence_excluded",
+                    )
+                )
+                continue
+
+            # Check archived exclusion if query does not request archived or historical
+            if (
+                assigned_trust is TrustState.ARCHIVED
+                and not plan.scope.include_archived
+                and not plan.scope.temporal_boundary.include_historical
+            ):
+                excluded_items.append(
+                    ExcludedItem(
+                        source_id=item.source_id,
+                        reason="archived_evidence_excluded",
                     )
                 )
                 continue
