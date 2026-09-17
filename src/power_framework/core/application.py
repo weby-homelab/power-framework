@@ -64,7 +64,7 @@ from .mutation import execute_vault_mutation
 from .parser import build_frontmatter
 from .principal import Principal
 from .retrieval_planner import RetrievalPlanner
-from .search_scope import SearchScopeAccessDeniedError
+from .search_scope import SearchScopeAccessDeniedError, UnsupportedSearchScopeError
 from .searcher import (
     DEFAULT_SEARCH_MODE,
     format_untrusted_search_envelope,
@@ -443,7 +443,13 @@ class ApplicationService:
         if domain_hints:
             intent_kwargs["domain_hints"] = list(domain_hints)
         if project_ids:
-            intent_kwargs["project_ids"] = list(project_ids)
+            self._reject_request(
+                "compile_context",
+                context,
+                UnsupportedSearchScopeError(
+                    "project-scoped retrieval is unsupported and fails closed"
+                ),
+            )
         if tb is not None:
             intent_kwargs["temporal_boundary"] = tb
 

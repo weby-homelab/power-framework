@@ -14,6 +14,7 @@ Invariants:
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -46,11 +47,14 @@ from .context_contracts import (
 from .domain_policy import (
     DomainPolicyRegistry,
     RetrievalDomainRouter,
-    _default_v1_routing,
     load_domain_policy,
 )
 from .generation_index import resolve_active_generation
-from .search_scope import SearchScopeAccessDeniedError, compile_search_scope
+from .search_scope import (
+    SearchScopeAccessDeniedError,
+    UnsupportedSearchScopeError,
+    compile_search_scope,
+)
 from .searcher import dense_embedding_ready, search_vault
 
 if TYPE_CHECKING:
@@ -167,16 +171,7 @@ class RetrievalPlanner:
     def _get_domain_registry(self) -> DomainPolicyRegistry:
         if self._domain_policy is not None:
             return self._domain_policy
-        try:
-            return load_domain_policy(self.vault_dir)
-        except Exception:
-            return DomainPolicyRegistry(
-                version=1,
-                policy_revision="v1-default",
-                normalization_revision="nfkc-casefold-tokens-v1",
-                routing=_default_v1_routing(),
-                domains=(),
-            )
+        return load_domain_policy(self.vault_dir)
 
     def plan(
         self,
@@ -262,7 +257,13 @@ class RetrievalPlanner:
             )
         )
 
-        # 3. Privileged Access Check
+        # 3. Fail closed on unsupported project scoping
+        if query_intent.project_ids:
+            raise UnsupportedSearchScopeError(
+                "project_ids dimension is not supported in SQLite index schema (must fail closed)"
+            )
+
+        # 4. Privileged Access Check
         if (query_intent.include_archived or query_intent.include_quarantine) and (
             access_policy is None
             or access_policy.raw_access != "privileged"
@@ -272,7 +273,7 @@ class RetrievalPlanner:
                 "privileged search scope requested without a verified privileged AccessPolicy"
             )
 
-        # 4. SearchScope Construction
+        # 5. SearchScope Construction
         matched_domain_ids = [m.domain for m in domain_matches]
         effective_domain_ids: list[str]
         if query_intent.domain_hints:
@@ -337,11 +338,8 @@ class RetrievalPlanner:
         excluded_items: list[ExcludedItem] = []
         source_revisions: set[str] = set()
 
-        # Check compilation of search scope
-        try:
-            compile_search_scope(self.vault_dir, scope=plan.scope)
-        except Exception as exc:
-            decisions.append(f"Scope compilation degraded: {type(exc).__name__}")
+        # Check compilation of search scope - must fail closed before any candidate read
+        compile_search_scope(self.vault_dir, scope=plan.scope, access_policy=access_policy)
 
         # Stage 1: Authority-Sensitive Canonical Store Reader (PROJECT_STATE)
         is_authority_sensitive = query_intent.intent in _AUTHORITY_SENSITIVE_INTENTS
@@ -480,21 +478,16 @@ class RetrievalPlanner:
                     raw_domain = plan.domain_matches[0].domain if plan.domain_matches else "general"
                     domains = [raw_domain]
 
-                    # Curated markdown notes in PARA structures have Curated authority by default
-                    item_auth = (
-                        Authority.CURATED
-                        if rel_path.startswith(("01_Projects/", "02_Areas/", "03_Resources/"))
-                        else Authority.PROPOSED
-                    )
-                    item_trust = (
-                        TrustState.CURATED
-                        if item_auth is Authority.CURATED
-                        else TrustState.PROPOSED
-                    )
-                    item_basis = (
-                        AuthorityBasis.CURATED_NOTE
-                        if item_auth is Authority.CURATED
-                        else AuthorityBasis.PROPOSAL
+                    # Invariant: PATH != AUTHORITY, DOMAIN != AUTHORITY
+                    # Ordinary vault notes discovered via lexical FTS are unverified candidates
+                    item_auth = Authority.UNVERIFIED
+                    item_trust = TrustState.PROPOSED
+                    item_basis = AuthorityBasis.PROPOSAL
+
+                    source_rev = (
+                        hashlib.sha256(content.encode("utf-8")).hexdigest()
+                        if content
+                        else "unknown"
                     )
 
                     collected_items.append(
@@ -509,11 +502,11 @@ class RetrievalPlanner:
                             retrieval_stage=RetrievalStage.FTS,
                             provenance=Provenance(
                                 source_refs=[rel_path],
-                                source_revision=rel_path,
+                                source_revision=source_rev,
                                 authority_basis=item_basis,
                             ),
-                            freshness=Freshness.CURRENT,
-                            contradiction_state=ContradictionState.NONE,
+                            freshness=Freshness.UNKNOWN,
+                            contradiction_state=ContradictionState.UNKNOWN,
                             noise_state=NoiseState.CLEAN,
                             token_cost=cost,
                             excerpt=content,
@@ -521,18 +514,18 @@ class RetrievalPlanner:
                             redaction_status="verified_safe",
                         )
                     )
-                    source_revisions.add(rel_path)
+                    source_revisions.add(source_rev)
             except Exception as exc:
                 decisions.append(f"FTS search encountered exception: {type(exc).__name__}")
 
         # Stage 3: SEMANTIC / Dense Vector Retrieval
         if RetrievalStage.SEMANTIC in plan.stages:
             if plan.budget.dense_allowed:
-                attempted_stages.append(RetrievalStage.SEMANTIC)
                 dense_ready, dense_reason = dense_embedding_ready()
                 active_gen = resolve_active_generation(self.vault_dir)
 
                 if dense_ready and active_gen is not None:
+                    attempted_stages.append(RetrievalStage.SEMANTIC)
                     try:
                         dense_results = self._search_fn(
                             self.vault_dir,
@@ -551,23 +544,29 @@ class RetrievalPlanner:
                             raw_domain = (
                                 plan.domain_matches[0].domain if plan.domain_matches else "general"
                             )
+                            source_rev = (
+                                hashlib.sha256(content.encode("utf-8")).hexdigest()
+                                if content
+                                else "unknown"
+                            )
+                            # Invariant: RETRIEVAL STAGE != AUTHORITY, SEMANTIC HIT != CURATION
                             collected_items.append(
                                 ContextItem(
                                     source_id=rel_path,
                                     source_type="vault_note",
-                                    authority=Authority.CURATED,
-                                    trust_state=TrustState.CURATED,
+                                    authority=Authority.UNVERIFIED,
+                                    trust_state=TrustState.PROPOSED,
                                     domain=raw_domain,
                                     domains=[raw_domain],
                                     score=max(0.01, min(0.99, score)),
                                     retrieval_stage=RetrievalStage.SEMANTIC,
                                     provenance=Provenance(
                                         source_refs=[rel_path],
-                                        source_revision=rel_path,
-                                        authority_basis=AuthorityBasis.CURATED_NOTE,
+                                        source_revision=source_rev,
+                                        authority_basis=AuthorityBasis.PROPOSAL,
                                     ),
-                                    freshness=Freshness.CURRENT,
-                                    contradiction_state=ContradictionState.NONE,
+                                    freshness=Freshness.UNKNOWN,
+                                    contradiction_state=ContradictionState.UNKNOWN,
                                     noise_state=NoiseState.CLEAN,
                                     token_cost=cost,
                                     excerpt=content,
@@ -575,7 +574,7 @@ class RetrievalPlanner:
                                     redaction_status="verified_safe",
                                 )
                             )
-                            source_revisions.add(rel_path)
+                            source_revisions.add(source_rev)
                     except Exception as exc:
                         dense_used = False
                         fallback_reason = (
@@ -584,6 +583,7 @@ class RetrievalPlanner:
                         retrieval_status = "degraded"
                         decisions.append(fallback_reason)
                 else:
+                    skipped_stages.append(RetrievalStage.SEMANTIC)
                     dense_used = False
                     fallback_reason = f"dense model or generation unavailable ({dense_reason}); fallback to FTS lexical"
                     retrieval_status = "degraded"
@@ -593,29 +593,21 @@ class RetrievalPlanner:
 
         # Stage 4: GRAPH_ASSISTED Stage
         if RetrievalStage.GRAPH_ASSISTED in plan.stages:
-            if plan.budget.graph_allowed:
-                attempted_stages.append(RetrievalStage.GRAPH_ASSISTED)
-                decisions.append("Graph-assisted expansion attempted within scope.")
-            else:
-                skipped_stages.append(RetrievalStage.GRAPH_ASSISTED)
+            skipped_stages.append(RetrievalStage.GRAPH_ASSISTED)
+            decisions.append(
+                "Graph-assisted stage skipped: bounded graph expansion unavailable in Phase 5D."
+            )
 
         # Stage 5: RERANK Stage
         if RetrievalStage.RERANK in plan.stages:
-            if plan.budget.reranker_allowed:
-                attempted_stages.append(RetrievalStage.RERANK)
-                reranker_used = False
-                decisions.append(
-                    "Cross-encoder reranker unavailable offline; preserving primary scores."
-                )
-            else:
-                skipped_stages.append(RetrievalStage.RERANK)
+            skipped_stages.append(RetrievalStage.RERANK)
+            reranker_used = False
+            decisions.append("Rerank stage skipped: local reranker unavailable offline.")
 
         # Stage 6: RAW_FALLBACK Stage
         if RetrievalStage.RAW_FALLBACK in plan.stages:
-            if plan.budget.raw_fallback_allowed:
-                attempted_stages.append(RetrievalStage.RAW_FALLBACK)
-            else:
-                skipped_stages.append(RetrievalStage.RAW_FALLBACK)
+            skipped_stages.append(RetrievalStage.RAW_FALLBACK)
+            decisions.append("Raw fallback stage skipped: raw source fallback not invoked.")
 
         # Handle other planned stages to ensure exact stage partition
         for st in plan.stages:
@@ -631,44 +623,35 @@ class RetrievalPlanner:
             if existing is None:
                 dedup_map[item.source_id] = item
             else:
-                # Merge domains and take highest score
+                # Merge domains while preserving authority-provenance-score binding
                 all_domains = sorted(set(existing.domains) | set(item.domains))
-                higher_score = max(existing.score, item.score)
-                # Keep higher authority if different
-                best_auth = (
-                    existing.authority
-                    if _AUTHORITY_RANK_INDEX[existing.authority]
-                    <= _AUTHORITY_RANK_INDEX[item.authority]
-                    else item.authority
-                )
-                best_trust = (
-                    existing.trust_state
-                    if _AUTHORITY_RANK_INDEX[existing.authority]
-                    <= _AUTHORITY_RANK_INDEX[item.authority]
-                    else item.trust_state
-                )
-                best_stage = (
-                    existing.retrieval_stage
-                    if existing.retrieval_stage == RetrievalStage.PROJECT_STATE
-                    else item.retrieval_stage
-                )
+                existing_rank = _AUTHORITY_RANK_INDEX[existing.authority]
+                item_rank = _AUTHORITY_RANK_INDEX[item.authority]
+
+                if existing_rank < item_rank:
+                    winner = existing
+                elif item_rank < existing_rank:
+                    winner = item
+                else:
+                    winner = existing if existing.score >= item.score else item
+
                 dedup_map[item.source_id] = ContextItem(
-                    source_id=existing.source_id,
-                    source_type=existing.source_type,
-                    authority=best_auth,
-                    trust_state=best_trust,
-                    domain=existing.domain,
+                    source_id=winner.source_id,
+                    source_type=winner.source_type,
+                    authority=winner.authority,
+                    trust_state=winner.trust_state,
+                    domain=winner.domain,
                     domains=all_domains,
-                    score=higher_score,
-                    retrieval_stage=best_stage,
-                    provenance=existing.provenance,
-                    freshness=existing.freshness,
-                    contradiction_state=existing.contradiction_state,
-                    noise_state=existing.noise_state,
-                    token_cost=existing.token_cost,
-                    excerpt=existing.excerpt,
-                    content_kind=existing.content_kind,
-                    redaction_status=existing.redaction_status,
+                    score=winner.score,
+                    retrieval_stage=winner.retrieval_stage,
+                    provenance=winner.provenance,
+                    freshness=winner.freshness,
+                    contradiction_state=winner.contradiction_state,
+                    noise_state=winner.noise_state,
+                    token_cost=winner.token_cost,
+                    excerpt=winner.excerpt,
+                    content_kind=winner.content_kind,
+                    redaction_status=winner.redaction_status,
                 )
 
         deduped_items = list(dedup_map.values())

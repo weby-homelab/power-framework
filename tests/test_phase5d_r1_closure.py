@@ -16,9 +16,9 @@ identified in Phase 5D (PR #440) closure audit:
 12. Dedup authority must remain bound to supporting provenance
 13. Runtime byte limit == compiler limit == reported limit (2_000_000 bytes)
 
-In PR-R1A, tests are decorated with @pytest.mark.xfail(strict=True) to capture
+In PR-R1A, tests were decorated with @pytest.mark.xfail(strict=True) to capture
 the pre-fix failure evidence while preserving green CI gates.
-In PR-R1B, the xfail markers are removed and all tests must pass green.
+In PR-R1B, the xfail markers are removed and all 13 reproduction tests pass green.
 """
 
 from __future__ import annotations
@@ -59,9 +59,17 @@ class DummySearchResult:
     content: str = ""
 
 
+class DummyStore:
+    def __init__(self, tmp_dir: Path) -> None:
+        self.tasks_dir = tmp_dir / "tasks"
+        self.tasks_dir.mkdir(parents=True, exist_ok=True)
+
+
 class SpyTaskService:
-    def __init__(self) -> None:
+    def __init__(self, tmp_dir: Path | None = None) -> None:
         self.read_count = 0
+        if tmp_dir:
+            self.store = DummyStore(tmp_dir)
 
     def list_tasks(self, limit: int = 100) -> list[Any]:
         self.read_count += 1
@@ -92,13 +100,10 @@ def _make_access_policy() -> AccessPolicy:
 # ---------------------------------------------------------------------------
 # Defect 1: project_ids unsupported must fail closed before any candidate read
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True, reason="PR-R1A: project_ids currently caught and degraded instead of fail-closed"
-)
 def test_r1_project_ids_unsupported_fails_closed_before_reads(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
-    spy_task = SpyTaskService()
+    spy_task = SpyTaskService(vault)
     spy_decision = SpyDecisionService()
     search_reads = 0
 
@@ -129,10 +134,6 @@ def test_r1_project_ids_unsupported_fails_closed_before_reads(tmp_path: Path) ->
 # ---------------------------------------------------------------------------
 # Defect 2: Invalid SearchScope must stop retrieval before any candidate read
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="PR-R1A: RetrievalPlanner currently catches compile_search_scope error and continues",
-)
 def test_r2_invalid_search_scope_stops_retrieval_before_reads(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -165,14 +166,12 @@ def test_r2_invalid_search_scope_stops_retrieval_before_reads(tmp_path: Path) ->
 # ---------------------------------------------------------------------------
 # Defect 3: Malformed explicit domain policy must fail closed
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="PR-R1A: _get_domain_registry currently swallows exception and returns empty registry",
-)
 def test_r3_malformed_domain_policy_fails_closed(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
-    config_file = vault / "domain-policy.yaml"
+    power_dir = vault / ".power"
+    power_dir.mkdir()
+    config_file = power_dir / "domains.yaml"
     # Corrupt domain policy: version is a string instead of an int
     config_file.write_text("version: 'two'\nrouting: {}\n", encoding="utf-8")
 
@@ -190,10 +189,6 @@ def test_r3_malformed_domain_policy_fails_closed(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Defect 4: Ordinary PARA-path FTS note must NOT automatically become CURATED
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="PR-R1A: FTS currently checks rel_path.startswith(('01_Projects/', ...)) and assigns CURATED",
-)
 def test_r4_ordinary_para_path_fts_does_not_become_curated(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -221,9 +216,6 @@ def test_r4_ordinary_para_path_fts_does_not_become_curated(tmp_path: Path) -> No
 # ---------------------------------------------------------------------------
 # Defect 5: Dense vector hit must NOT automatically become CURATED
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True, reason="PR-R1A: Dense stage currently hardcodes Authority.CURATED for all hits"
-)
 def test_r5_dense_hit_does_not_become_curated(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -231,7 +223,12 @@ def test_r5_dense_hit_does_not_become_curated(
     vault.mkdir()
     dense_note = [DummySearchResult("random_folder/some_doc.md", "dense vector match", 0.92)]
 
-    planner = RetrievalPlanner(vault, search_fn=lambda *args, **kwargs: dense_note)
+    def search_fn(*args: Any, **kwargs: Any) -> list[Any]:
+        if kwargs.get("mode") == "vector":
+            return dense_note
+        return []
+
+    planner = RetrievalPlanner(vault, search_fn=search_fn)
     intent = QueryIntent(
         query="dense match",
         intent=QueryIntentKind.LOOKUP,
@@ -262,9 +259,6 @@ def test_r5_dense_hit_does_not_become_curated(
 # ---------------------------------------------------------------------------
 # Defect 6: Unknown temporal metadata must NOT automatically become CURRENT
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True, reason="PR-R1A: FTS currently hardcodes Freshness.CURRENT without temporal proof"
-)
 def test_r6_unknown_temporal_metadata_not_automatically_current(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -285,9 +279,6 @@ def test_r6_unknown_temporal_metadata_not_automatically_current(tmp_path: Path) 
 # ---------------------------------------------------------------------------
 # Defect 7: Unknown contradiction state must NOT automatically become NONE
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True, reason="PR-R1A: FTS currently hardcodes ContradictionState.NONE without detection"
-)
 def test_r7_unknown_contradiction_state_not_automatically_none(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -308,10 +299,6 @@ def test_r7_unknown_contradiction_state_not_automatically_none(tmp_path: Path) -
 # ---------------------------------------------------------------------------
 # Defect 8: Graph unavailable must be SKIPPED, not ATTEMPTED
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="PR-R1A: GRAPH_ASSISTED currently added to attempted_stages without execution",
-)
 def test_r8_graph_unavailable_skipped_not_attempted(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -330,9 +317,6 @@ def test_r8_graph_unavailable_skipped_not_attempted(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Defect 9: Reranker unavailable must be SKIPPED, not ATTEMPTED
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True, reason="PR-R1A: RERANK currently added to attempted_stages even when offline"
-)
 def test_r9_reranker_unavailable_skipped_not_attempted(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -351,9 +335,6 @@ def test_r9_reranker_unavailable_skipped_not_attempted(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Defect 10: Raw fallback unavailable must be SKIPPED, not ATTEMPTED
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True, reason="PR-R1A: RAW_FALLBACK currently added to attempted_stages without execution"
-)
 def test_r10_raw_fallback_unavailable_skipped_not_attempted(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -372,9 +353,6 @@ def test_r10_raw_fallback_unavailable_skipped_not_attempted(tmp_path: Path) -> N
 # ---------------------------------------------------------------------------
 # Defect 11: Attempted stages must reach actual runtime execution boundaries
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True, reason="PR-R1A: DEEP plan currently marks unexecuted stages as attempted"
-)
 def test_r11_attempted_stages_reflect_actual_execution_boundary(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -395,10 +373,6 @@ def test_r11_attempted_stages_reflect_actual_execution_boundary(tmp_path: Path) 
 # ---------------------------------------------------------------------------
 # Defect 12: Dedup authority must remain bound to supporting provenance
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="PR-R1A: Dedup currently merges score from unverified hit onto canonical item",
-)
 def test_r12_dedup_authority_remains_bound_to_supporting_provenance(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()
