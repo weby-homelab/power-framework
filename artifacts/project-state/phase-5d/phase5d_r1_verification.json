@@ -1,0 +1,101 @@
+{
+  "schema": "power.phase5d-r1-verification.v1",
+  "evidence_identity": "phase5d_r1_verification",
+  "created_at_utc": "2026-09-17T05:45:00Z",
+  "base_sha": "2a7784625552ac2a7e7aba71a1e5e272f96948d6",
+  "base_tree": "18ffe39c501f3d91f5d709bcb51812297d56e679",
+  "pr_boundary": "PR-R1B",
+  "target": "P38-WP02-R1 / Phase 5D RetrievalPlanner / ContextPack Closure Correction",
+  "commands": [
+    "ruff check src/power_framework/core/retrieval_planner.py src/power_framework/core/application.py tests/test_phase5d_r1_closure.py tests/test_phase5d_authority_security.py tests/test_phase5d_retrieval_planner.py",
+    "ruff format --check src/power_framework/core/retrieval_planner.py src/power_framework/core/application.py tests/test_phase5d_r1_closure.py tests/test_phase5d_authority_security.py tests/test_phase5d_retrieval_planner.py",
+    "pytest tests/test_phase5d_r1_closure.py -v --no-cov",
+    "pytest tests/test_phase5d_*.py -v --no-cov",
+    "./verify.sh"
+  ],
+  "python_version": "3.13.5",
+  "test_matrix": {
+    "test_phase5d_r1_closure": {
+      "file": "tests/test_phase5d_r1_closure.py",
+      "count": 13,
+      "status": "PASS"
+    },
+    "test_phase5d_application_service": {
+      "file": "tests/test_phase5d_application_service.py",
+      "count": 15,
+      "status": "PASS"
+    },
+    "test_phase5d_authority_security": {
+      "file": "tests/test_phase5d_authority_security.py",
+      "count": 14,
+      "status": "PASS"
+    },
+    "test_phase5d_context_compiler": {
+      "file": "tests/test_phase5d_context_compiler.py",
+      "count": 11,
+      "status": "PASS"
+    },
+    "test_phase5d_dense_prerequisite": {
+      "file": "tests/test_phase5d_dense_prerequisite.py",
+      "count": 3,
+      "status": "PASS"
+    },
+    "test_phase5d_retrieval_planner": {
+      "file": "tests/test_phase5d_retrieval_planner.py",
+      "count": 10,
+      "status": "PASS"
+    },
+    "total_phase5d_tests": 66,
+    "all_passed": true
+  },
+  "invariants_corrected": {
+    "FAIL_CLOSED_ON_UNSUPPORTED_PROJECT_IDS": {
+      "status": "PASS",
+      "proof": "ApplicationService.compile_context and RetrievalPlanner.plan fail closed with typed UnsupportedSearchScopeError before any candidate or ledger read"
+    },
+    "SEARCH_SCOPE_COMPILATION_FAIL_CLOSED": {
+      "status": "PASS",
+      "proof": "RetrievalPlanner.retrieve calls compile_search_scope without try/except swallowing; invalid scope stops retrieval before any reads"
+    },
+    "MALFORMED_DOMAIN_POLICY_FAIL_CLOSED": {
+      "status": "PASS",
+      "proof": "RetrievalPlanner._get_domain_registry calls load_domain_policy without try/except fallback; malformed policy raises DomainConfigError"
+    },
+    "PATH_NOT_EQUAL_AUTHORITY": {
+      "status": "PASS",
+      "proof": "Ordinary PARA-path notes found via FTS lexical search are assigned Authority.UNVERIFIED, TrustState.PROPOSED, AuthorityBasis.PROPOSAL"
+    },
+    "RETRIEVAL_STAGE_NOT_EQUAL_AUTHORITY": {
+      "status": "PASS",
+      "proof": "Dense semantic vector hits are assigned Authority.UNVERIFIED, TrustState.PROPOSED, AuthorityBasis.PROPOSAL, never automatic CURATED"
+    },
+    "UNKNOWN_TEMPORAL_STATE_NOT_CURRENT": {
+      "status": "PASS",
+      "proof": "Notes without verified temporal metadata are assigned Freshness.UNKNOWN, never invented Freshness.CURRENT"
+    },
+    "UNKNOWN_CONTRADICTION_STATE_NOT_NONE": {
+      "status": "PASS",
+      "proof": "Notes without contradiction detection are assigned ContradictionState.UNKNOWN, never invented ContradictionState.NONE"
+    },
+    "ATTEMPTED_MEANS_EXECUTION_ATTEMPTED": {
+      "status": "PASS",
+      "proof": "Stages without actual runtime execution (GRAPH_ASSISTED, RERANK, RAW_FALLBACK, or SEMANTIC when vector runtime unavailable) are SKIPPED, not ATTEMPTED"
+    },
+    "AUTHORITY_BOUND_TO_PROVENANCE_IN_DEDUP": {
+      "status": "PASS",
+      "proof": "Deduplication across domains/stages preserves winning item's score, provenance, and authority intact without cross-contamination"
+    },
+    "SOURCE_REVISIONS_CONTENT_DIGEST": {
+      "status": "PASS",
+      "proof": "Source revisions in provenance and ContextPack are real SHA-256 digests or explicit 'unknown', never rel_path strings"
+    },
+    "BYTE_LIMIT_TRUTH_2_000_000": {
+      "status": "PASS",
+      "proof": "MAX_CONTEXT_PACK_BYTES is verified at 2_000_000 bytes across contracts, compiler, and documentation"
+    },
+    "ZERO_QUERY_SIDE_WRITES": {
+      "status": "PASS",
+      "proof": "Vault tree SHA-256 audit confirms 0 mutations during read-only retrieval and context compilation"
+    }
+  }
+}

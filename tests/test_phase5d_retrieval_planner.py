@@ -320,7 +320,7 @@ def test_authority_beats_semantic_similarity(tmp_path: Path) -> None:
     # Candidate 0 must be the canonical task despite lower score (0.85 vs 0.99)
     assert result.candidates[0].authority is Authority.CANONICAL
     assert result.candidates[0].source_id == f"task:{task.task_id}"
-    assert result.candidates[1].authority is Authority.CURATED
+    assert result.candidates[1].authority is Authority.UNVERIFIED
     assert result.candidates[1].source_id == "01_Projects/notes.md"
 
 

@@ -80,19 +80,12 @@ def _setup_vault_and_domains(tmp_path: Path) -> Path:
 
     domains_yaml = (
         "version: 1\n"
-        "policy_revision: v1\n"
-        "normalization_revision: nfkc-casefold-tokens-v1\n"
         "domains:\n"
-        "  - id: projects\n"
-        "    description: Projects domain\n"
-        "    aliases: [proj]\n"
-        "    keywords: [project, task, sprint]\n"
+        "  - name: projects\n"
+        "    path: 01_Projects\n"
         "    template: template.md\n"
-        "routing:\n"
-        "  intent_defaults:\n"
-        "    lookup: [projects]\n"
-        "    task_execution: [projects]\n"
-        "    governance_audit: [projects]\n"
+        "    rules:\n"
+        "      - keywords: [project, task, sprint, jailbreak, core, engine, secret, unverified, alpha, raw]\n"
     )
     (power_dir / "domains.yaml").write_text(domains_yaml, encoding="utf-8")
     return vault_dir
@@ -309,13 +302,13 @@ def test_authority_sensitive_ordering_canonical_beats_high_semantic_score(
 
     assert len(res.candidates) == 2
     # Invariant: AUTHORITY > SEMANTIC SIMILARITY
-    # Canonical item (score 0.85) MUST precede Curated item (score 0.99)
+    # Canonical item (score 0.85) MUST precede lower authority item (score 0.99)
     first = res.candidates[0]
     second = res.candidates[1]
 
     assert first.authority is Authority.CANONICAL
     assert first.source_id == "task:TSK-AUTH-001"
-    assert second.authority is Authority.CURATED
+    assert second.authority is Authority.UNVERIFIED
     assert second.source_id == "01_Projects/overview.md"
     assert second.score > first.score
 
