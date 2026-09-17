@@ -120,18 +120,21 @@ All findings from PRXMX-01 operations were reconciled in [`artifacts/project-sta
 
 ---
 
-## 5. Pull Request Lineage (3-PR Flow)
+## 5. Pull Request Lineage & Succession Flow
 
 | PR | Branch | Type | Description | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **#445 (PR-5E-A)** | `feat/p38-wp03-phase5e-development-benchmark` | Feature | Preflight admission, governance reconciliation, Skill drift fix, score clipping fix, runner implementation, dev split evaluation, and protocol freeze. | **MERGED** (commit `b651eb9`) |
-| **#446 (PR-5E-B)** | `test/p38-wp03-phase5e-sealed-holdout` | Test | Single sealed holdout evaluation epoch (`phase5e_holdout_results.json`) off exact merged PR-5E-A. | **MERGED** (commit `6eebd43`) |
-| **#447 (PR-5E-C)** | `docs/p38-wp03-phase5e-closure` | Docs | Canonical closure report, closure handoff, and governance doc updates. | **PENDING** |
+| **#445 (PR-5E-A)** | `feat/p38-wp03-phase5e-development-benchmark` | Feature | Preflight admission, runner implementation, dev split evaluation, and protocol freeze. | **MERGED** (`b651eb9`) |
+| **#446 (PR-5E-B)** | `test/p38-wp03-phase5e-sealed-holdout` | Test | First sealed holdout evaluation epoch (v1.1). | **MERGED** (`6eebd43`) |
+| **#448 (PR-R1)** | `fix/p38-wp03-r1-phase5e-benchmark-correction` | Fix | Ground-truth-aware benchmark correction & defect admission. | **MERGED** (`429a45f`) |
+| **#449 (PR-R2)** | `fix/p38-wp03-r2-runtime-authority-integration` | Fix | Runtime authority integration correction passing dev split & 12 CI checks. | **MERGED** (`2d512fb`) |
 
 ---
 
-## 6. Phase 5E Closure Verdict
+## 6. Phase 5E Final Closure Verdict (Post-R2 Fresh Holdout v1.2)
 
-- **Phase 5E (P38-WP03):** **CLOSED / MERGED / VERIFIED**
-- **Next Gate:** **Phase 5F (P38-WP04) Context Memory / Stateful Multi-Turn Context** (READY FOR SEPARATE ADMISSION / NOT STARTED)
-- **POWER 3.8.0 Release:** **NO-GO** (Production release remains blocked until all phases 5F, 5G, 5H, and formal release gating are complete).
+- **Execution Epoch:** `v1.2` (Fresh sealed unseen holdout split evaluated in one shot).
+- **Hard Invariants Result:** 8/10 Passed (0 authority order violations, 0 provenance failures, 0 writes, 0 leaks, 0 escalations; 3 authority winners missing on unseen Ukrainian lexical queries).
+- **Phase 5E Status:** **CLOSED / FAILED VERIFICATION** (honest defect accounting recorded in [`PHASE_5E_R2_VERDICT.md`](./PHASE_5E_R2_VERDICT.md)).
+- **Phase 5F Status:** **BLOCKED** (dense embedding retrieval required to bridge lexical vocabulary mismatch).
+- **POWER 3.8.0 Release:** **NO-GO**.

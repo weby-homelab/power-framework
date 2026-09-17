@@ -124,6 +124,31 @@ ACTIVE_PHASE5A1_DIGESTS = {
     "semantic_adjudication_digest": "106d3e220d01cc325ada3ffc3e551ebd4111be5c3fc5aebf62d22b0d45516218",
     "holdout_access_receipt_digest": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
 }
+ACTIVE_V12_ROOT_FILE_SHA256 = {
+    "README.md": "faede000d247bf4df06f2e9c5a3d69c8632c26fb5e392c9218e16fc5e85921e4",
+    "disjointness-proof.json": "fbf3c7c6759c81c725045185faf25c3b2b192355781c5ec8374edc8e723b33e1",
+    "ground_truth.development.jsonl": "4fd3136b3c807a6cf2f19e66dfeb36caaac359043e82c4346d2a3fe319264da0",
+    "ground_truth.holdout.jsonl": "3469e04d7366539940e634f6c9dc87d53966c94f21bbe607342659ab4822686f",
+    "holdout-access-receipt.json": "7389665e5b63866101849b1256c8812a00236bffc434928b6a83fc66d8f584aa",
+    "manifest.json": "8c162bfbd441c0edf08b68acb22dfdb47c92c035e2311704426b5adf9e672ea6",
+    "queries.development.jsonl": "f4e3adcd0d99e578bca5092eb6f36f70b3f5de72dfd33295ca6465409f1eec9d",
+    "queries.holdout.jsonl": "2aa1cd2e26b52d1b7da6b643566be408b8126c46a913d2a5daddac2c9966584f",
+    "semantic-adjudication.json": "5c08cf9b23fa635d8e2693d6062c74b5b519fb1c9f6be9495ce758fba07564e6",
+    "semantic-adjudication.md": "d256e7f5d92d2e56196308c367286bd1c13f456b5ab61e2931ce07b26bc6fe33",
+    "semantic-review-a-v1.2.json": "2e8a73116f98f7c90ea9a0c047dc2dc6689dc3961e94189dc0a23bd68e8474e0",
+    "semantic-review-b-v1.2.json": "219c9588fb20d97c6b234050bbc95a81351898e53dbabe39996d4c1af5dadc2c",
+    "source_metadata.jsonl": "6b6d43f0ad3a63a0b4bd4b98f23c4bb74e700b4c3f480ad207dc622294be67c9",
+}
+ACTIVE_PHASE5A2_DIGESTS = {
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+    "dataset_digest": "26e302ec74747e4201ead12ff8885c0e20f5e0230044a8b1ff1a34e74ef514e7",
+    "query_set_digest": "49e8309b09d10f60b1f5f20b47a65d5828eeee5bb0fbbd8133086c2e1941f282",
+    "development_digest": "9a911c305b417c0b0aa0f5b29d8d21976ce6b2523bb2f87420001f4bc631e008",
+    "holdout_digest": "012e866b08bc2ead16156d696bdd0ca433f067969bcc1f6b6b9829adab660026",
+    "disjointness_digest": "727af286d7f64f6bd3b155bddd7aee5495cc4edab893c527199bc016e862fbb8",
+    "semantic_adjudication_digest": "361f6262e716bbfc8e476a6e81f213e5eef616a8d14dd4aaed28e0f578d5712e",
+    "holdout_access_receipt_digest": "7389665e5b63866101849b1256c8812a00236bffc434928b6a83fc66d8f584aa",
+}
 EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
     "v1": {
         "active": False,
@@ -163,6 +188,26 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
             "semantic_adjudication_ref": "semantic-adjudication-v1.1",
             "reviewer_a_receipt_ref": "semantic-review-a-v1.1",
             "reviewer_b_receipt_ref": "semantic-review-b-v1.1",
+        },
+    },
+    "v1.2": {
+        "active": True,
+        "digests": ACTIVE_PHASE5A2_DIGESTS,
+        "semantic_status": "PASS",
+        "refs": {
+            "holdout_access_audit": "holdout-access-receipt-v1.2",
+            "sealed_artifact_ref": "power38-holdout-v1.2-sealed",
+            "disjointness_proof_ref": "disjointness-proof-v1.2",
+            "provenance_source_ref": "power38-ground-truth-v1.2",
+            "provenance_method": "human_adjudicated",
+            "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+            "semantic_adjudication_markdown_digest": "d256e7f5d92d2e56196308c367286bd1c13f456b5ab61e2931ce07b26bc6fe33",
+            "holdout_access_receipt_digest": "7389665e5b63866101849b1256c8812a00236bffc434928b6a83fc66d8f584aa",
+            "planning_only": True,
+            "supersedes_revision": "v1.1",
+            "semantic_adjudication_ref": "semantic-adjudication-v1.2",
+            "reviewer_a_receipt_ref": "semantic-review-a-v1.2",
+            "reviewer_b_receipt_ref": "semantic-review-b-v1.2",
         },
     },
 }
@@ -274,7 +319,7 @@ class EvaluationCorpusManifest(RuntimeModel):
     """Runtime form of the frozen ``power.retrieval-eval.v1`` manifest."""
 
     dataset_schema_version: Literal["power.retrieval-eval.v1"]
-    evaluation_revision: Literal["v1", "v1.1"] = "v1"
+    evaluation_revision: Literal["v1", "v1.1", "v1.2"] = "v1"
     dataset_digest: Digest
     source_corpus_digest: Digest | None = None
     holdout_access_receipt_digest: Digest | None = None
@@ -293,7 +338,7 @@ class EvaluationCorpusManifest(RuntimeModel):
     disjointness_proof_ref: OpaqueReference
     disjointness_proof_digest: Digest
     planning_only: Literal[True] | None = None
-    supersedes_revision: Literal["v1"] | None = None
+    supersedes_revision: Literal["v1", "v1.1"] | None = None
     semantic_adjudication_ref: OpaqueReference | None = None
     semantic_adjudication_digest: Digest | None = None
     semantic_adjudication_markdown_digest: Digest | None = None
@@ -445,7 +490,7 @@ class SemanticReviewReceipt(EvaluationRecordModel):
     defect_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
     input_dataset_digest: Digest
     input_query_set_digest: Digest
-    input_revision: Literal["v1"]
+    input_revision: Literal["v1", "v1.1"]
     pass_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
     retrieval_metrics_observed: Literal[False]
     reviewer_id: OpaqueReference
@@ -464,7 +509,7 @@ class SemanticAdjudicationArtifact(EvaluationRecordModel):
     """Content-addressed semantic evidence bound to one corpus revision."""
 
     algorithm_output_used: Literal[False]
-    dataset_revision: Literal["v1.1"]
+    dataset_revision: Literal["v1.1", "v1.2"]
     records: list[SemanticAdjudicationRecord] = Field(min_length=1, max_length=MAX_JSONL_RECORDS)
     retrieval_metrics_observed: Literal[False]
     reviewer_a_receipt_digest: Digest
@@ -772,7 +817,7 @@ def _parse_models(
             _read_json(_fixture_path(root, "holdout-access-receipt.json"))
         )
         semantic_adjudication = None
-        if manifest.evaluation_revision == ACTIVE_EVALUATION_REVISION:
+        if manifest.evaluation_revision in {"v1.1", "v1.2"}:
             semantic_adjudication = SemanticAdjudicationArtifact.model_validate(
                 _read_json(_fixture_path(root, "semantic-adjudication.json"))
             )
@@ -938,6 +983,37 @@ def _check_active_v11_inventory(root: Path) -> None:
     if actual != ACTIVE_V11_ROOT_FILE_SHA256:
         raise EvaluationIntegrityError(
             "active_v11_inventory", "active v1.1 root bytes or inventory changed"
+        )
+
+
+def _check_active_v12_inventory(root: Path) -> None:
+    actual: dict[str, str] = {}
+    try:
+        paths = list(root.iterdir())
+    except OSError as exc:
+        raise EvaluationIntegrityError(
+            "active_v12_inventory", "active v1.2 inventory is unreadable"
+        ) from exc
+    for path in paths:
+        if path.is_symlink():
+            raise EvaluationIntegrityError("active_v12_inventory", "active v1.2 contains a symlink")
+        if path.is_dir():
+            if path.name != "corpus":
+                raise EvaluationIntegrityError(
+                    "active_v12_inventory", "active v1.2 contains an unlisted directory"
+                )
+            continue
+        try:
+            actual[path.relative_to(root).as_posix()] = _sha256_bytes(
+                _read_bounded_regular_file(path)
+            )
+        except EvaluationIntegrityError as exc:
+            raise EvaluationIntegrityError(
+                "active_v12_inventory", "active v1.2 root artifact is unreadable"
+            ) from exc
+    if actual != ACTIVE_V12_ROOT_FILE_SHA256:
+        raise EvaluationIntegrityError(
+            "active_v12_inventory", "active v1.2 root bytes or inventory changed"
         )
 
 
@@ -1159,11 +1235,13 @@ def _check_semantic_adjudication(
             )
             for status in ("PASS", "DEFECT", "AMBIGUOUS")
         }
+        expected_input_rev = manifest.supersedes_revision or "v1"
+        expected_input_digests = EVALUATION_REVISION_REGISTRY[expected_input_rev]["digests"]
         if (
             review_receipt.reviewer_id != receipt_ref
-            or review_receipt.input_revision != "v1"
-            or review_receipt.input_dataset_digest != FROZEN_PHASE5A_DIGESTS["dataset_digest"]
-            or review_receipt.input_query_set_digest != FROZEN_PHASE5A_DIGESTS["query_set_digest"]
+            or review_receipt.input_revision != expected_input_rev
+            or review_receipt.input_dataset_digest != expected_input_digests["dataset_digest"]
+            or review_receipt.input_query_set_digest != expected_input_digests["query_set_digest"]
             or review_receipt.scope_query_count != 40
             or review_receipt.scope_source_count != 20
             or (
@@ -1348,7 +1426,7 @@ def _ground_truth_provenance_digest(record: EvaluationGroundTruth, revision: str
 def _check_ground_truth_provenance(
     ground_truth: list[EvaluationGroundTruth], revision: str
 ) -> None:
-    if revision != ACTIVE_EVALUATION_REVISION:
+    if revision not in {"v1.1", "v1.2"}:
         return
     if any(
         record.provenance_digest != _ground_truth_provenance_digest(record, revision)
@@ -1510,8 +1588,10 @@ def verify_evaluation_corpus(
         )
     if manifest.evaluation_revision == "v1":
         _check_historical_v1_bytes(root)
-    elif manifest.evaluation_revision == ACTIVE_EVALUATION_REVISION:
+    elif manifest.evaluation_revision == "v1.1":
         _check_active_v11_inventory(root)
+    elif manifest.evaluation_revision == "v1.2":
+        _check_active_v12_inventory(root)
     dataset_payload: dict[str, Any] = {
         "corpus_files": entries,
         "ground_truth": [

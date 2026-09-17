@@ -24,6 +24,7 @@ evaluation_contracts = sys.modules[EvaluationIntegrityError.__module__]
 
 ROOT = Path(__file__).parents[1] / "benchmarks" / "power38" / "retrieval_eval" / "v1"
 ACTIVE_ROOT = Path(__file__).parents[1] / "benchmarks" / "power38" / "retrieval_eval" / "v1.1"
+V12_ROOT = Path(__file__).parents[1] / "benchmarks" / "power38" / "retrieval_eval" / "v1.2"
 EXPECTED = {
     "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
     "dataset_digest": "179ac7ee8d2e8ec0d5e0924cb322d32783da8ae1fdff379ecb0bfa7e0afc53b0",
@@ -42,6 +43,17 @@ ACTIVE_EXPECTED = {
     "semantic_adjudication_digest": "106d3e220d01cc325ada3ffc3e551ebd4111be5c3fc5aebf62d22b0d45516218",
     "semantic_adjudication_markdown_digest": "b8156291d55b36d6c561c0f0f226e38a3a33dd9c6007ea8b071f9b95ed3614c5",
     "holdout_access_receipt_digest": "59815df472a4c238d28937d2ccd9f7837e885e04533888c06caed1103e98d6f7",
+}
+V12_EXPECTED = {
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+    "dataset_digest": "26e302ec74747e4201ead12ff8885c0e20f5e0230044a8b1ff1a34e74ef514e7",
+    "query_set_digest": "49e8309b09d10f60b1f5f20b47a65d5828eeee5bb0fbbd8133086c2e1941f282",
+    "development_digest": "9a911c305b417c0b0aa0f5b29d8d21976ce6b2523bb2f87420001f4bc631e008",
+    "holdout_digest": "012e866b08bc2ead16156d696bdd0ca433f067969bcc1f6b6b9829adab660026",
+    "disjointness_digest": "727af286d7f64f6bd3b155bddd7aee5495cc4edab893c527199bc016e862fbb8",
+    "semantic_adjudication_digest": "361f6262e716bbfc8e476a6e81f213e5eef616a8d14dd4aaed28e0f578d5712e",
+    "semantic_adjudication_markdown_digest": "d256e7f5d92d2e56196308c367286bd1c13f456b5ab61e2931ce07b26bc6fe33",
+    "holdout_access_receipt_digest": "7389665e5b63866101849b1256c8812a00236bffc434928b6a83fc66d8f584aa",
 }
 
 
@@ -91,6 +103,19 @@ def test_active_v11_revision_verifies_with_reproducible_digests() -> None:
     assert first == second
     assert {key: first[key] for key in ACTIVE_EXPECTED} == ACTIVE_EXPECTED
     assert first["evaluation_revision"] == "v1.1"
+    assert first["semantic_adjudication_status"] == "PASS"
+    assert first["source_count"] == 20
+    assert first["development_query_count"] == 20
+    assert first["holdout_query_count"] == 20
+
+
+def test_v12_revision_verifies_with_reproducible_digests() -> None:
+    first = verify_evaluation_corpus(V12_ROOT)
+    second = verify_evaluation_corpus(V12_ROOT)
+
+    assert first == second
+    assert {key: first[key] for key in V12_EXPECTED} == V12_EXPECTED
+    assert first["evaluation_revision"] == "v1.2"
     assert first["semantic_adjudication_status"] == "PASS"
     assert first["source_count"] == 20
     assert first["development_query_count"] == 20

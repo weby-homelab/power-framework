@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from power_framework.core.evaluation_contracts import (
-    ACTIVE_EVALUATION_REVISION,
+    EVALUATION_REVISION_REGISTRY,
     EvaluationIntegrityError,
     EvaluationVerificationSnapshot,
     build_holdout_access_receipt,
@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("root", type=Path, help="versioned retrieval-evaluation directory")
     parser.add_argument(
         "--expected-revision",
-        choices=("v1", ACTIVE_EVALUATION_REVISION),
+        choices=tuple(EVALUATION_REVISION_REGISTRY.keys()),
         help="optional explicit revision identity expected in the manifest",
     )
     parser.add_argument(
