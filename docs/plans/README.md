@@ -46,9 +46,9 @@ REST verification:
 > and P38-G2 (PR #431) are closed and verified. Phase 5C SearchScope
 > pushdown (PR #434) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437)**.
 > P38-WP01-R1 is **CLOSED / MERGED / VERIFIED**.
-> Phase 5D (P38-WP02) is **CLOSURE CORRECTION ADMITTED (PR #439 / PR #440 / PR #441)**.
-> P38-WP02-R1 is **IN PROGRESS**.
-> Phase 5E (P38-WP03) is **BLOCKED BY P38-WP02-R1 / NOT STARTED**.
+> Phase 5D (P38-WP02) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443)**.
+> P38-WP02-R1 is **CLOSED / MERGED / VERIFIED**.
+> Phase 5E (P38-WP03) is **READY FOR SEPARATE ADMISSION / NOT STARTED**.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
