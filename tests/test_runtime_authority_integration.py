@@ -73,7 +73,7 @@ def test_application_service_wires_project_state_service(tmp_path: Path) -> None
 
 
 def test_inspect_vault_note_authority_canonical_project(tmp_path: Path) -> None:
-    """OKF note with project-state tag receives CANONICAL authority and CANONICAL_LEDGER basis."""
+    """P38-WP03-R3: project-state tag alone never grants CANONICAL without service proof."""
     vault = tmp_path / "vault"
     vault.mkdir(parents=True, exist_ok=True)
     note = vault / "01_Projects" / "current_proj.md"
@@ -93,15 +93,15 @@ def test_inspect_vault_note_authority_canonical_project(tmp_path: Path) -> None:
     auth, trust, basis, stype, fresh, _contra, _noise = _inspect_vault_note_authority(
         vault, "01_Projects/current_proj.md", "Phase 5 is active."
     )
-    assert auth is Authority.CANONICAL
-    assert trust is TrustState.CANONICAL
-    assert basis is AuthorityBasis.CANONICAL_LEDGER
-    assert stype == "canonical_project"
-    assert fresh is Freshness.CURRENT
+    assert auth is Authority.UNVERIFIED
+    assert trust is TrustState.PROPOSED
+    assert basis is AuthorityBasis.PROPOSAL
+    assert stype == "vault_note"
+    assert fresh is Freshness.UNKNOWN
 
 
 def test_inspect_vault_note_authority_superseded_project(tmp_path: Path) -> None:
-    """OKF note with superseded tag receives SUPERSEDED trust state and STALE freshness."""
+    """P38-WP03-R3: superseded tag lowers trust but never raises to VERIFIED."""
     vault = tmp_path / "vault"
     vault.mkdir(parents=True, exist_ok=True)
     note = vault / "01_Projects" / "old_proj.md"
@@ -121,8 +121,9 @@ def test_inspect_vault_note_authority_superseded_project(tmp_path: Path) -> None
     auth, trust, _basis, _stype, fresh, contra, _noise = _inspect_vault_note_authority(
         vault, "01_Projects/old_proj.md", "Historical content."
     )
-    assert auth is Authority.VERIFIED
+    assert auth is Authority.UNVERIFIED
     assert trust is TrustState.SUPERSEDED
+    assert _basis is AuthorityBasis.PROPOSAL
     assert fresh is Freshness.STALE
     assert contra.value == "superseded"
 
@@ -155,7 +156,7 @@ def test_inspect_vault_note_authority_raw_chat(tmp_path: Path) -> None:
 
 
 def test_canonical_beats_raw_in_retrieval(tmp_path: Path) -> None:
-    """Canonical note outranks raw note with higher lexical score."""
+    """P38-WP03-R3: tag alone never grants CANONICAL; both notes stay UNVERIFIED."""
     vault = tmp_path / "vault"
     vault.mkdir(parents=True, exist_ok=True)
     p_curr = vault / "01_Projects" / "proj_current.md"
@@ -211,11 +212,13 @@ def test_canonical_beats_raw_in_retrieval(tmp_path: Path) -> None:
     result = planner.plan_and_retrieve(intent, access_policy=policy)
 
     assert len(result.candidates) == 2
-    # Winner must be the canonical item despite lower score (0.40 vs 0.95)
-    assert result.candidates[0].source_id == "01_Projects/proj_current.md"
-    assert result.candidates[0].authority is Authority.CANONICAL
-    assert result.candidates[1].source_id == "06_Daily_Logs/proj_raw.md"
-    assert result.candidates[1].authority is Authority.UNVERIFIED
+    # TEXT != AUTHORITY: without owning-service proof neither tag grants CANONICAL.
+    for candidate in result.candidates:
+        assert candidate.authority is Authority.UNVERIFIED
+        assert candidate.provenance.authority_basis is not AuthorityBasis.CANONICAL_LEDGER
+    by_id = {c.source_id: c for c in result.candidates}
+    assert by_id["01_Projects/proj_current.md"].trust_state is TrustState.PROPOSED
+    assert by_id["06_Daily_Logs/proj_raw.md"].trust_state is TrustState.RAW
 
 
 def test_superseded_decision_excluded_by_default(tmp_path: Path) -> None:
@@ -343,7 +346,7 @@ def test_archived_infra_excluded_by_default(tmp_path: Path) -> None:
 
 
 def test_curated_research_beats_unverified(tmp_path: Path) -> None:
-    """Curated research note outranks unverified proposal and carries CURATED_NOTE basis."""
+    """P38-WP03-R3: research/Resource tags alone never grant CURATED without proof."""
     vault = tmp_path / "vault"
     vault.mkdir(parents=True, exist_ok=True)
     r_cur = vault / "03_Resources" / "res_curated.md"
@@ -398,9 +401,11 @@ def test_curated_research_beats_unverified(tmp_path: Path) -> None:
     result = planner.plan_and_retrieve(intent, access_policy=policy)
 
     assert len(result.candidates) == 2
-    assert result.candidates[0].source_id == "03_Resources/res_curated.md"
-    assert result.candidates[0].authority is Authority.CURATED
-    assert result.candidates[0].provenance.authority_basis is AuthorityBasis.CURATED_NOTE
-    assert result.candidates[0].source_type == "curated_note"
-    assert result.candidates[1].source_id == "03_Resources/res_unverified.md"
-    assert result.candidates[1].authority is Authority.UNVERIFIED
+    for candidate in result.candidates:
+        assert candidate.authority is Authority.UNVERIFIED
+        assert candidate.provenance.authority_basis is not AuthorityBasis.CURATED_NOTE
+        assert candidate.provenance.authority_basis is not AuthorityBasis.CANONICAL_LEDGER
+        assert candidate.provenance.authority_basis is not AuthorityBasis.VERIFIED_PROJECTION
+    by_id = {c.source_id: c for c in result.candidates}
+    assert by_id["03_Resources/res_curated.md"].trust_state is TrustState.PROPOSED
+    assert by_id["03_Resources/res_unverified.md"].trust_state is TrustState.PROPOSED

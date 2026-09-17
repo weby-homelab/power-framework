@@ -396,10 +396,22 @@ def run_benchmark(
     split: str,
     vault_dir: Path,
     expected_revision: str = "v1.1",
+    budget_class: str = "FAST",
 ) -> dict[str, Any]:
-    """Execute complete shadow benchmark across all queries in specified split."""
+    """Execute complete shadow benchmark across all queries in specified split.
+
+    Runner measures runtime, never helps runtime: ground truth scores output
+    only; it never creates authority, selects the runtime owner, or changes
+    retrieval. Fixture setup copies corpus notes only; any canonical
+    Task/Decision/PSE records must be created via production APIs, never via
+    fixture-tag-to-authority promotion.
+    """
     # P38-WP03-R1 correction: measure served/default retrieval boundary before
     # any retrieval work (never hard-code default_switches = 0).
+    # P38-WP03-R3: reproducible dev diagnostics budget class (default FAST).
+    normalized_budget = str(budget_class or "FAST").upper()
+    if normalized_budget not in {"FAST", "BALANCED", "DEEP"}:
+        raise ValueError("budget_class must be FAST, BALANCED, or DEEP")
     served_default_before = capture_served_default()
     setup_benchmark_vault(vault_dir, eval_corpus)
 
@@ -485,9 +497,12 @@ def run_benchmark(
                 if auth_rank.get(pre_auth, 4) > auth_rank.get(winner_auth, 0):
                     leg_auth_violations += 1
 
-        # Shadow Execution
+        # Shadow Execution (budget-class is reproducible diagnostics only;
+        # it never selects authority or changes retrieval ownership).
         t0 = time.perf_counter()
-        shad_env = app.compile_context(query=q["query"], intent=q["intent"])
+        shad_env = app.compile_context(
+            query=q["query"], intent=q["intent"], budget_class=normalized_budget
+        )
         shad_latency = (time.perf_counter() - t0) * 1000.0
 
         shad_items = shad_env.data.get("items", [])
@@ -626,7 +641,9 @@ def run_benchmark(
                     total_secret_leakages += 1
 
         # Check determinism: run shadow a second time and verify functional items are identical
-        shad_env_2 = app.compile_context(query=q["query"], intent=q["intent"])
+        shad_env_2 = app.compile_context(
+            query=q["query"], intent=q["intent"], budget_class=normalized_budget
+        )
         items_1 = json.dumps(shad_env.data.get("items"), sort_keys=True)
         items_2 = json.dumps(shad_env_2.data.get("items"), sort_keys=True)
         if items_1 != items_2:
@@ -849,6 +866,8 @@ def run_benchmark(
         "benchmark_metadata": {
             "schema_version": "power.retrieval-benchmark-shadow.v1",
             "runner_correction": "P38-WP03-R1",
+            "runner_authority_correction": "P38-WP03-R3",
+            "budget_class": normalized_budget,
             "timestamp": datetime.now(UTC).isoformat(),
             "split": split,
             "eval_corpus_version": expected_revision,
@@ -1006,6 +1025,12 @@ def main(argv: list[str] | None = None) -> int:
         help="optional output path for benchmark JSON results",
     )
     parser.add_argument(
+        "--budget-class",
+        choices=("FAST", "BALANCED", "DEEP"),
+        default="FAST",
+        help="reproducible dev diagnostics budget class (default: FAST)",
+    )
+    parser.add_argument(
         "--freeze-protocol",
         type=Path,
         help="optional output path to generate protocol freeze JSON",
@@ -1044,6 +1069,7 @@ def main(argv: list[str] | None = None) -> int:
             eval_corpus=eval_corpus,
             split=args.split,
             vault_dir=vault_dir,
+            budget_class=args.budget_class,
         )
 
         # Write output if requested

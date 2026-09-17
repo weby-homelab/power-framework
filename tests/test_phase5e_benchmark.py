@@ -218,13 +218,18 @@ def test_development_benchmark_execution_and_invariants(tmp_path: Path) -> None:
     assert invars["default_switches_pass"] is True
     assert "served_default_before" in invars
     assert "served_default_after" in invars
-    # R2 correction: with runtime authority integration fixed,
-    # hard invariants pass with 0 outranked, 0 provenance failures.
-    assert invars["authority_outranked_by_relevance"] == 0
-    assert invars["authority_outranked_by_relevance_pass"] is True
-    assert invars["authority_provenance_failures"] == 0
-    assert invars["authority_provenance_failures_pass"] is True
-    assert results["benchmark_metadata"]["all_hard_invariants_pass"] is True
+    # P38-WP03-R3 correction: R2's 0-outranked expectation encoded the
+    # self-promotion cheat (fixture tag -> runtime authority). With honest
+    # provenance the notes-only fixture carries no canonical Task/Decision/PSE
+    # records, so the 9 authority-sensitive dev queries honestly report
+    # outranked/provenance failures (frozen corpus + deterministic runtime, so
+    # the measured counts are exact). The harness must REPORT this defect,
+    # never hard-code a PASS. Phase 5E therefore stays NOT PASSED in R3.
+    assert invars["authority_outranked_by_relevance"] == 9
+    assert invars["authority_outranked_by_relevance_pass"] is False
+    assert invars["authority_provenance_failures"] == 9
+    assert invars["authority_provenance_failures_pass"] is False
+    assert results["benchmark_metadata"]["all_hard_invariants_pass"] is False
     assert results["benchmark_metadata"]["HOLDOUT_PREVIOUSLY_EXPOSED"] is True
     assert results["benchmark_metadata"]["RUNTIME_TUNING_AFTER_HOLDOUT"] is False
 
