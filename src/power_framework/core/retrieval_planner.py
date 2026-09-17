@@ -70,7 +70,7 @@ if TYPE_CHECKING:
 # Regex patterns for safety inspection
 _INJECTION_PATTERN = re.compile(
     r"(?i)\b("
-    r"ignore\s+(all\s+)?previous\s+instructions|"
+    r"ignore\s+(all\s+)?previous\s+(instructions|policy)|"
     r"disregard\s+(all\s+)?prior\s+instructions|"
     r"system\s*:\s*you\s+are|"
     r"system\s+override|"
@@ -79,7 +79,10 @@ _INJECTION_PATTERN = re.compile(
     r"delete\s+all|"
     r"mark\s+this\s+canonical|"
     r"approve\s+this\s+decision|"
-    r"exfiltrate\s+secret"
+    r"exfiltrate\s+secret|"
+    r"reveal\s+credentials|"
+    r"change\s+the\s+retrieval\s+scope|"
+    r"promote\s+this\s+raw\s+message"
     r")\b"
 )
 
@@ -498,7 +501,7 @@ class RetrievalPlanner:
                             trust_state=item_trust,
                             domain=raw_domain,
                             domains=domains,
-                            score=max(0.01, min(0.99, score)),
+                            score=max(0.0001, score),
                             retrieval_stage=RetrievalStage.FTS,
                             provenance=Provenance(
                                 source_refs=[rel_path],
@@ -558,7 +561,7 @@ class RetrievalPlanner:
                                     trust_state=TrustState.PROPOSED,
                                     domain=raw_domain,
                                     domains=[raw_domain],
-                                    score=max(0.01, min(0.99, score)),
+                                    score=max(0.0001, score),
                                     retrieval_stage=RetrievalStage.SEMANTIC,
                                     provenance=Provenance(
                                         source_refs=[rel_path],
@@ -666,9 +669,17 @@ class RetrievalPlanner:
         screened_items: list[ContextItem] = []
         for item in deduped_items:
             text = item.excerpt
+            scan_text = text
+            if item.source_type == "vault_note":
+                note_path = self.vault_dir / item.source_id
+                if note_path.is_file():
+                    try:
+                        scan_text = f"{text}\n{note_path.read_text(encoding='utf-8', errors='ignore')}"
+                    except Exception:
+                        scan_text = text
 
             # 1. Prompt Injection Inspection
-            if _INJECTION_PATTERN.search(text):
+            if _INJECTION_PATTERN.search(scan_text):
                 # Quarantined: untrusted text never gains authority
                 decisions.append(
                     f"Prompt injection pattern detected in {item.source_id}; quarantined."
