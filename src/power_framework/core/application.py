@@ -326,6 +326,7 @@ class ApplicationService:
         self.decision_service = decision_service or DecisionService(
             self.vault_dir, task_service=self.task_service
         )
+        self.project_state_service: ProjectStateService | None
         if project_state_service is not None:
             self.project_state_service = project_state_service
         else:
