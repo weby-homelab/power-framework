@@ -48,8 +48,8 @@ REST verification:
 > P38-WP01-R1 is **CLOSED / MERGED / VERIFIED**.
 > Phase 5D (P38-WP02) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443)**.
 > P38-WP02-R1 is **CLOSED / MERGED / VERIFIED**.
-> Phase 5E (P38-WP03) is **CLOSED / MERGED / VERIFIED (PR #445, PR #446)**.
-> Phase 5F (P38-WP04) is **READY FOR SEPARATE ADMISSION / NOT STARTED**.
+> Phase 5E (P38-WP03) is **OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R3 restores baseline only; P38-WP03-R4 NOT STARTED)**.
+> P38-WP03-R4 is **NOT STARTED (SEPARATE ADMISSION)**; Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is **BLOCKED** behind R4.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -72,8 +72,9 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. Verify the Phase 5E candidate and its exact
-   protected merge/readback; then stop before Phase 5F.
+   mutable operational truth. Phase 5E is OPEN / NOT PASSED; the next
+   authorized gate is P38-WP03-R4 Fresh Evaluation Re-admission (NOT STARTED);
+   Phase 5F stays BLOCKED behind R4.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -104,7 +105,7 @@ phase report, release artifact, or authorization to start Phase 5F.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | Phase 5F (P38-WP04 Context Memory / Stateful Multi-Turn Context) |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | P38-WP03-R4 Fresh Evaluation Re-admission (SEPARATE ADMISSION / NOT STARTED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) BLOCKED behind R4 |
 
 ## HISTORICAL PLAN
 
@@ -139,8 +140,8 @@ pushdown is `CLOSED / MERGED / VERIFIED` through PR #434 and PR #437,
 and Phase 5D (RetrievalPlanner + ContextPack) is `CLOSED / MERGED / VERIFIED`
 through PR #439, PR #440, and PR #441 (corrected by PR #442 and PR #443).
 P38-WP02-R1 is `CLOSED / MERGED / VERIFIED`. Phase 5E (Shadow Benchmark) is
-`CLOSED / MERGED / VERIFIED` through PR #445 and PR #446. Phase 5F is
-`READY FOR SEPARATE ADMISSION / NOT STARTED`.
+`OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED` through PR #445 and PR #446 as historical evidence only (P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451). P38-WP03-R4 is `NOT STARTED`. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is
+`BLOCKED` behind P38-WP03-R4.
 
 ## ARCHITECTURAL DECISION
 
@@ -180,7 +181,9 @@ override or replace the three explicit namespaces above.
 
 `PLANNED != IMPLEMENTED`: a merged architecture document is canonical planning,
 not runtime completion. This canonical projection records the closed Controlled
-Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B/5C/5D/5E
-gates, and the merged INFRA-1 broker. It does not authorize Actions #396,
+Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B/5C/5D
+gates, the OPEN Phase 5E (FRESH RE-EVALUATION REQUIRED after P38-WP03-R3), the NOT STARTED P38-WP03-R4,
+the BLOCKED Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior),
+and the merged INFRA-1 broker. It does not authorize Actions #396,
 Phase 5F, any later phase, version bump, tag, release, or `POWER 3.8.0`
 publication.
