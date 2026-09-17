@@ -2,7 +2,7 @@
   "corpus_disjointness_proof_sha256": "1a648120b8d7fb245d590a2c0a106f331777bd3413a2c0a2c09ed62bbe465643",
   "corpus_manifest_sha256": "550f7d61ca3c2df84dd3a9ed996fa33cecff7d0aa583da59ac4e33106699cc40",
   "evaluation_corpus_revision": "v1.1",
-  "frozen_at": "2026-09-17T11:20:43.881448+00:00",
+  "frozen_at": "2026-09-17T11:43:32.063269+00:00",
   "governance": {
     "gpg_key_id": "2D49E810C7F2527E",
     "operator": "weby-homelab <rekvizitor.ua@gmail.com>",
@@ -40,5 +40,5 @@
     10
   ],
   "protocol_version": "power.retrieval-benchmark-protocol-freeze.v1",
-  "runner_implementation_sha256": "a0b71bc30683d1ba890c2b7cbaa648339cb8696f1e9925d5af3caf79c7b051fd"
+  "runner_implementation_sha256": "a0d9954db32d37e4a8db0c5d657d94451b5e64a6ecfc4f8019e6456c7d61358e"
 }

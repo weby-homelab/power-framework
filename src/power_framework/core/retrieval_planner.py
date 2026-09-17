@@ -674,7 +674,9 @@ class RetrievalPlanner:
                 note_path = self.vault_dir / item.source_id
                 if note_path.is_file():
                     try:
-                        scan_text = f"{text}\n{note_path.read_text(encoding='utf-8', errors='ignore')}"
+                        scan_text = (
+                            f"{text}\n{note_path.read_text(encoding='utf-8', errors='ignore')}"
+                        )
                     except Exception:
                         scan_text = text
 

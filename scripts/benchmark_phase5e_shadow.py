@@ -264,7 +264,9 @@ def run_benchmark(
         queries = [json.loads(line) for line in f if line.strip()]
 
     with gt_path.open("r", encoding="utf-8") as f:
-        ground_truth = {json.loads(line)["query_id"]: json.loads(line) for line in f if line.strip()}
+        ground_truth = {
+            json.loads(line)["query_id"]: json.loads(line) for line in f if line.strip()
+        }
 
     query_results: list[QueryResult] = []
     total_query_side_writes = 0
@@ -555,9 +557,7 @@ def run_benchmark(
         "default_switches_pass": True,
     }
 
-    all_invariants_pass = all(
-        v is True for k, v in hard_invariants.items() if k.endswith("_pass")
-    )
+    all_invariants_pass = all(v is True for k, v in hard_invariants.items() if k.endswith("_pass"))
 
     return {
         "benchmark_metadata": {
@@ -677,7 +677,9 @@ def generate_protocol_freeze(
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(freeze_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output_path.write_text(
+        json.dumps(freeze_data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return freeze_data
 
 
@@ -750,7 +752,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.output:
             out_path = args.output.resolve()
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            out_path.write_text(
+                json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
             print(f"Benchmark results written to {out_path}")
 
         # Print Executive Summary
@@ -764,20 +768,46 @@ def main(argv: list[str] | None = None) -> int:
         print("========================================================")
         print("Quality Metrics          Legacy       Shadow       Delta")
         print("--------------------------------------------------------")
-        print(f"Recall@1                 {leg['recall_at_1']:.4f}       {shad['recall_at_1']:.4f}       {comp['delta_recall_at_1']:+.4f}")
-        print(f"Recall@3                 {leg['recall_at_3']:.4f}       {shad['recall_at_3']:.4f}       {(shad['recall_at_3'] - leg['recall_at_3']):+.4f}")
-        print(f"Recall@5                 {leg['recall_at_5']:.4f}       {shad['recall_at_5']:.4f}       {comp['delta_recall_at_5']:+.4f}")
-        print(f"Recall@10                {leg['recall_at_10']:.4f}       {shad['recall_at_10']:.4f}       {(shad['recall_at_10'] - leg['recall_at_10']):+.4f}")
-        print(f"MRR                      {leg['mrr']:.4f}       {shad['mrr']:.4f}       {comp['delta_mrr']:+.4f}")
-        print(f"MAP                      {leg['map']:.4f}       {shad['map']:.4f}       {comp['delta_map']:+.4f}")
-        print(f"nDCG@5                   {leg['ndcg_at_5']:.4f}       {shad['ndcg_at_5']:.4f}       {(shad['ndcg_at_5'] - leg['ndcg_at_5']):+.4f}")
-        print(f"nDCG@10                  {leg['ndcg_at_10']:.4f}       {shad['ndcg_at_10']:.4f}       {comp['delta_ndcg_at_10']:+.4f}")
-        print(f"Context Precision        {leg['context_precision']:.4f}       {shad['context_precision']:.4f}       {comp['delta_context_precision']:+.4f}")
-        print(f"Exclusion Leaks          {leg['exclusion_leaks']}            {shad['exclusion_leaks']}            {comp['delta_exclusion_leaks']:+d}")
-        print(f"Authority Violations     {leg['authority_violations']}            {shad['authority_violations']}            {comp['delta_authority_violations']:+d}")
+        print(
+            f"Recall@1                 {leg['recall_at_1']:.4f}       {shad['recall_at_1']:.4f}       {comp['delta_recall_at_1']:+.4f}"
+        )
+        print(
+            f"Recall@3                 {leg['recall_at_3']:.4f}       {shad['recall_at_3']:.4f}       {(shad['recall_at_3'] - leg['recall_at_3']):+.4f}"
+        )
+        print(
+            f"Recall@5                 {leg['recall_at_5']:.4f}       {shad['recall_at_5']:.4f}       {comp['delta_recall_at_5']:+.4f}"
+        )
+        print(
+            f"Recall@10                {leg['recall_at_10']:.4f}       {shad['recall_at_10']:.4f}       {(shad['recall_at_10'] - leg['recall_at_10']):+.4f}"
+        )
+        print(
+            f"MRR                      {leg['mrr']:.4f}       {shad['mrr']:.4f}       {comp['delta_mrr']:+.4f}"
+        )
+        print(
+            f"MAP                      {leg['map']:.4f}       {shad['map']:.4f}       {comp['delta_map']:+.4f}"
+        )
+        print(
+            f"nDCG@5                   {leg['ndcg_at_5']:.4f}       {shad['ndcg_at_5']:.4f}       {(shad['ndcg_at_5'] - leg['ndcg_at_5']):+.4f}"
+        )
+        print(
+            f"nDCG@10                  {leg['ndcg_at_10']:.4f}       {shad['ndcg_at_10']:.4f}       {comp['delta_ndcg_at_10']:+.4f}"
+        )
+        print(
+            f"Context Precision        {leg['context_precision']:.4f}       {shad['context_precision']:.4f}       {comp['delta_context_precision']:+.4f}"
+        )
+        print(
+            f"Exclusion Leaks          {leg['exclusion_leaks']}            {shad['exclusion_leaks']}            {comp['delta_exclusion_leaks']:+d}"
+        )
+        print(
+            f"Authority Violations     {leg['authority_violations']}            {shad['authority_violations']}            {comp['delta_authority_violations']:+d}"
+        )
         print("--------------------------------------------------------")
-        print(f"Latency p50 (ms)         {leg['latency_ms_p50']:.1f}        {shad['latency_ms_p50']:.1f}        {comp['latency_speedup_p50']:.2f}x speedup")
-        print(f"Latency p95 (ms)         {leg['latency_ms_p95']:.1f}        {shad['latency_ms_p95']:.1f}")
+        print(
+            f"Latency p50 (ms)         {leg['latency_ms_p50']:.1f}        {shad['latency_ms_p50']:.1f}        {comp['latency_speedup_p50']:.2f}x speedup"
+        )
+        print(
+            f"Latency p95 (ms)         {leg['latency_ms_p95']:.1f}        {shad['latency_ms_p95']:.1f}"
+        )
         print(f"ContextPack Tokens (mean): {shad['token_accounting']['mean_tokens']:.1f}")
         print(f"ContextPack Bytes (mean):  {shad['context_pack_bytes']['mean_bytes']:.1f}")
         print("--------------------------------------------------------")

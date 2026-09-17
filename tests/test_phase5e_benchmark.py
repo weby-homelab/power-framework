@@ -68,7 +68,9 @@ def _make_vault(tmp_path: Path) -> Path:
     return vault
 
 
-def test_fts_candidate_score_preserves_bm25_ranking_without_artificial_capping(tmp_path: Path) -> None:
+def test_fts_candidate_score_preserves_bm25_ranking_without_artificial_capping(
+    tmp_path: Path,
+) -> None:
     """Reproduction test: BM25 scores > 1.0 must not be clipped to 0.99."""
     vault = _make_vault(tmp_path)
 
@@ -225,4 +227,3 @@ def test_development_benchmark_execution_and_invariants(tmp_path: Path) -> None:
     assert freeze_out.is_file()
     assert freeze["evaluation_corpus_revision"] == "v1.1"
     assert "runner_implementation_sha256" in freeze
-
