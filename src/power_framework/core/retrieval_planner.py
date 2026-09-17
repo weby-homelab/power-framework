@@ -786,9 +786,7 @@ class RetrievalPlanner:
                                             score=0.90,
                                             retrieval_stage=RetrievalStage.PROJECT_STATE,
                                             provenance=Provenance(
-                                                source_refs=[
-                                                    f".power/ledger/{project_id}.jsonl"
-                                                ],
+                                                source_refs=[f".power/ledger/{project_id}.jsonl"],
                                                 source_revision=project_id,
                                                 authority_basis=AuthorityBasis.CANONICAL_LEDGER,
                                             ),

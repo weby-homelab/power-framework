@@ -52,7 +52,15 @@ def test_application_service_wires_project_state_service(tmp_path: Path) -> None
     """ApplicationService initializes ProjectStateService and wires it."""
     vault = tmp_path / "vault"
     vault.mkdir(parents=True, exist_ok=True)
-    for folder in ["01_Projects", "02_Areas", "03_Resources", "04_Archive", "05_Templates", "06_Daily_Logs", ".power"]:
+    for folder in [
+        "01_Projects",
+        "02_Areas",
+        "03_Resources",
+        "04_Archive",
+        "05_Templates",
+        "06_Daily_Logs",
+        ".power",
+    ]:
         (vault / folder).mkdir(parents=True, exist_ok=True)
 
     app = ApplicationService(vault)
@@ -396,4 +404,3 @@ def test_curated_research_beats_unverified(tmp_path: Path) -> None:
     assert result.candidates[0].source_type == "curated_note"
     assert result.candidates[1].source_id == "03_Resources/res_unverified.md"
     assert result.candidates[1].authority is Authority.UNVERIFIED
-
