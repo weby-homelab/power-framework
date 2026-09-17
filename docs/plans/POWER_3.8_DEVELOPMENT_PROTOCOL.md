@@ -433,9 +433,10 @@ receipts are retained `MERGED MAIN` evidence. Phase 5B and INFRA-1 are
 closed on protected `main`. Real receiver deployment is an operator follow-up.
 Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
 pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
-(P38-WP02) is CLOSED / MERGED / VERIFIED (PR #439 / PR #440). Phase 5E (P38-WP03) is
-READY FOR SEPARATE ADMISSION / NOT STARTED. Do not start Phase 5E–9, version bumps,
-tags, releases, release images, or final release notes.
+(P38-WP02) is CLOSURE CORRECTION ADMITTED (PR #439 / PR #440 / PR #441; under P38-WP02-R1
+correction). P38-WP02-R1 is IN PROGRESS. Phase 5E (P38-WP03) is BLOCKED BY P38-WP02-R1 /
+NOT STARTED. Do not start Phase 5E–9, version bumps, tags, releases, release images, or
+final release notes.
 
 ## INFRA-1 execution boundary
 
@@ -487,7 +488,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C SearchScope pushdown is closed and verified (PR #434). Phase 5D (P38-WP02) is closed and verified (PR #439 / PR #440). Phase 5E remains unstarted.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSURE CORRECTION ADMITTED (PR #439, PR #440, PR #441). P38-WP02-R1 is IN PROGRESS. Phase 5E is BLOCKED BY P38-WP02-R1 / NOT STARTED.
 
 ## Cross-links
 
