@@ -186,7 +186,13 @@ def test_metric_formulas_exact() -> None:
 
 
 def test_development_benchmark_execution_and_invariants(tmp_path: Path) -> None:
-    """End-to-end integration test of benchmark runner on development split."""
+    """End-to-end integration test of benchmark runner on development split.
+
+    P38-WP03-R1 correction: the harness must be ground-truth-aware and must
+    report the proven runtime defect (authority outranked 9/9, no canonical
+    provenance) instead of a hard-coded PASS. Measured invariants
+    (scope/writes/default/determinism) must still PASS with real measurement.
+    """
     from scripts.benchmark_phase5e_shadow import generate_protocol_freeze, run_benchmark
 
     eval_corpus = Path("benchmarks/power38/retrieval_eval/v1.1").resolve()
@@ -198,19 +204,33 @@ def test_development_benchmark_execution_and_invariants(tmp_path: Path) -> None:
         vault_dir=vault_dir,
     )
 
-    # Hard Invariants
+    # Hard Invariants (measured, never hard-coded)
     invars = results["hard_invariants"]
-    assert invars["authority_order_violations"] == 0
-    assert invars["authority_order_violations_pass"] is True
     assert invars["query_side_writes"] == 0
     assert invars["query_side_writes_pass"] is True
+    assert invars["scope_escape"] == 0
+    assert invars["scope_escape_pass"] is True
     assert invars["prompt_injection_authority_escalation"] == 0
     assert invars["prompt_injection_authority_escalation_pass"] is True
     assert invars["determinism_mismatches"] == 0
     assert invars["determinism_mismatches_pass"] is True
-    assert results["benchmark_metadata"]["all_hard_invariants_pass"] is True
+    assert invars["default_switches"] == 0
+    assert invars["default_switches_pass"] is True
+    assert "served_default_before" in invars
+    assert "served_default_after" in invars
+    assert invars["served_default_before"] == invars["served_default_after"]
+    # R1 correction: ground-truth-aware authority must FAIL on current runtime
+    # (9/9 winners outranked, all unverified, no canonical provenance).
+    # HARD-CODED PASS IS NOT VERIFICATION.
+    assert invars["authority_outranked_by_relevance"] == 9
+    assert invars["authority_outranked_by_relevance_pass"] is False
+    assert invars["authority_provenance_failures"] == 9
+    assert invars["authority_provenance_failures_pass"] is False
+    assert results["benchmark_metadata"]["all_hard_invariants_pass"] is False
+    assert results["benchmark_metadata"]["HOLDOUT_PREVIOUSLY_EXPOSED"] is True
+    assert results["benchmark_metadata"]["RUNTIME_TUNING_AFTER_HOLDOUT"] is False
 
-    # Quality Gates
+    # Quality Gates (thresholds still hold; precision uses frozen hits/K)
     shad = results["summary"]["shadow"]
     assert shad["recall_at_5"] >= 0.70
     assert shad["mrr"] >= 0.50
