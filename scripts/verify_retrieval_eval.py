@@ -11,7 +11,6 @@ import tempfile
 from pathlib import Path
 
 from power_framework.core.evaluation_contracts import (
-    ACTIVE_EVALUATION_REVISION,
     EVALUATION_REVISION_REGISTRY,
     EvaluationIntegrityError,
     EvaluationVerificationSnapshot,
