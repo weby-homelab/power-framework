@@ -1,0 +1,14 @@
+# POWER 3.8 Retrieval Evaluation Dataset — Revision v1.2
+
+Fresh sealed evaluation epoch created under P38-WP03-R2.
+Supersedes v1.1 whose holdout was exposed during R1 forensic errata.
+
+- evaluation_revision: v1.2
+- source_corpus_digest: 3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118
+- dataset_digest: 26e302ec74747e4201ead12ff8885c0e20f5e0230044a8b1ff1a34e74ef514e7
+- query_set_digest: 49e8309b09d10f60b1f5f20b47a65d5828eeee5bb0fbbd8133086c2e1941f282
+- development_digest: 9a911c305b417c0b0aa0f5b29d8d21976ce6b2523bb2f87420001f4bc631e008
+- holdout_digest: 012e866b08bc2ead16156d696bdd0ca433f067969bcc1f6b6b9829adab660026
+- disjointness_digest: 727af286d7f64f6bd3b155bddd7aee5495cc4edab893c527199bc016e862fbb8
+- semantic_adjudication_digest: 361f6262e716bbfc8e476a6e81f213e5eef616a8d14dd4aaed28e0f578d5712e
+- GT provenance_digest: dbaa9c6666d6851d0c9a943c8352ad2cee634d9575efd79e9a5d5c493ac3c95c

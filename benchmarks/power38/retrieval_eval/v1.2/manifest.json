@@ -1,0 +1,66 @@
+{
+  "dataset_digest": "26e302ec74747e4201ead12ff8885c0e20f5e0230044a8b1ff1a34e74ef514e7",
+  "dataset_schema_version": "power.retrieval-eval.v1",
+  "development_split": {
+    "digest": "9a911c305b417c0b0aa0f5b29d8d21976ce6b2523bb2f87420001f4bc631e008",
+    "name": "development",
+    "query_count": 20,
+    "tuning_allowed": true
+  },
+  "disjointness_proof_digest": "727af286d7f64f6bd3b155bddd7aee5495cc4edab893c527199bc016e862fbb8",
+  "disjointness_proof_ref": "disjointness-proof-v1.2",
+  "evaluation_revision": "v1.2",
+  "ground_truth_provenance": [
+    {
+      "method": "human_adjudicated",
+      "provenance_digest": "dbaa9c6666d6851d0c9a943c8352ad2cee634d9575efd79e9a5d5c493ac3c95c",
+      "reviewed": true,
+      "source_ref": "power38-ground-truth-v1.2"
+    }
+  ],
+  "holdout_access_audit": "holdout-access-receipt-v1.2",
+  "holdout_access_receipt_digest": "7389665e5b63866101849b1256c8812a00236bffc434928b6a83fc66d8f584aa",
+  "holdout_split": {
+    "digest": "012e866b08bc2ead16156d696bdd0ca433f067969bcc1f6b6b9829adab660026",
+    "name": "holdout",
+    "query_count": 20,
+    "tuning_allowed": false
+  },
+  "language_mix": [
+    "EN",
+    "MIXED_UA_EN",
+    "UA"
+  ],
+  "no_shared_query_ids": true,
+  "no_tuning_on_holdout": true,
+  "planning_only": true,
+  "query_set_digest": "49e8309b09d10f60b1f5f20b47a65d5828eeee5bb0fbbd8133086c2e1941f282",
+  "real_vault_ingestion": false,
+  "required_categories": [
+    "AUTHORITY_CONFLICT",
+    "CODE",
+    "CONTRADICTION",
+    "CROSS_DOMAIN",
+    "DECISION",
+    "EN",
+    "EXACT_LOOKUP",
+    "HARD_NEGATIVE",
+    "HISTORICAL_STALE",
+    "INFRASTRUCTURE",
+    "MIXED_UA_EN",
+    "NOISE",
+    "PROJECT_STATE",
+    "PROMPT_INJECTION",
+    "RESEARCH",
+    "SUPERSEDED",
+    "TASK",
+    "UA"
+  ],
+  "sealed_artifact_ref": "power38-holdout-v1.2-sealed",
+  "semantic_adjudication_digest": "361f6262e716bbfc8e476a6e81f213e5eef616a8d14dd4aaed28e0f578d5712e",
+  "semantic_adjudication_markdown_digest": "d256e7f5d92d2e56196308c367286bd1c13f456b5ab61e2931ce07b26bc6fe33",
+  "semantic_adjudication_ref": "semantic-adjudication-v1.2",
+  "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+  "split_relation": "disjoint",
+  "supersedes_revision": "v1.1"
+}
