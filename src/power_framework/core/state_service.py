@@ -23,6 +23,7 @@ result; they are not bearer credentials.
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -95,6 +96,76 @@ class ProjectStateService:
     # ------------------------------------------------------------------
     # Canonical ledger access
     # ------------------------------------------------------------------
+    _LIST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+    def list_project_ids(self) -> list[str]:
+        """List canonical project IDs with an existing ledger, read-only.
+
+        Reads ONLY the existing ``.power/projects/`` directory; creates
+        nothing and performs no mutation. Rejects symlink/traversal via the
+        vault-root symlink guard plus strict ID validation
+        ``^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`` (reject ``.``/``..``/slashes/
+        empty/``..`` substrings). Returns ONLY valid IDs whose canonical
+        ledger file ``events.jsonl`` is present. Deterministic sorted,
+        bounded to 1000 entries.
+        """
+        for ancestor in (self.vault_root, *self.vault_root.parents):
+            if ancestor.is_symlink():
+                raise ValueError(f"Vault path contains a symlink ancestor: {ancestor}")
+            if ancestor == ancestor.parent:
+                break
+        projects_dir = self.vault_root / ".power" / "projects"
+        if projects_dir.is_symlink():
+            raise ValueError(f"Projects directory must not be a symlink: {projects_dir}")
+        if not projects_dir.is_dir():
+            return []
+        try:
+            resolved_projects = projects_dir.resolve()
+        except OSError:
+            return []
+        try:
+            resolved_projects.relative_to(self.vault_root.resolve())
+        except ValueError as exc:
+            raise ValueError("Projects directory escapes vault boundary") from exc
+        collected: list[str] = []
+        try:
+            entries = sorted(projects_dir.iterdir(), key=lambda p: p.name)
+        except OSError:
+            return []
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    continue
+                if not entry.is_dir():
+                    continue
+            except OSError:
+                continue
+            name = entry.name
+            if not name or name in {".", ".."}:
+                continue
+            if "/" in name or "\\" in name or ".." in name:
+                continue
+            if not self._LIST_ID_RE.fullmatch(name):
+                continue
+            try:
+                resolved = entry.resolve()
+                resolved.relative_to(resolved_projects)
+            except (OSError, ValueError):
+                continue
+            ledger = entry / "events.jsonl"
+            try:
+                if ledger.is_symlink():
+                    continue
+                if not ledger.is_file():
+                    continue
+            except OSError:
+                continue
+            collected.append(name)
+            if len(collected) >= 1000:
+                break
+        collected.sort()
+        return collected[:1000]
+
     def _canonical_store(self, project_id: str) -> ProjectEventStore:
         return ProjectEventStore(project_id, self.vault_root)
 

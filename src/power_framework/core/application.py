@@ -327,8 +327,12 @@ class ApplicationService:
             self.vault_dir, task_service=self.task_service
         )
         self.project_state_service: ProjectStateService | None
+        self._project_state_status: Literal["AVAILABLE", "UNAVAILABLE", "DEGRADED", "FAILED"]
+        self._project_state_reason: str
         if project_state_service is not None:
             self.project_state_service = project_state_service
+            self._project_state_status = "AVAILABLE"
+            self._project_state_reason = ""
         else:
             try:
                 self.project_state_service = ProjectStateService(
@@ -336,9 +340,23 @@ class ApplicationService:
                     task_service=self.task_service,
                     decision_service=self.decision_service,
                 )
-            except Exception:
+                self._project_state_status = "AVAILABLE"
+                self._project_state_reason = ""
+            except Exception as exc:
                 self.project_state_service = None
+                self._project_state_status = "FAILED"
+                self._project_state_reason = f"{type(exc).__name__}: {exc}"
         self.infra_broker = infra_broker or InfraBrokerClient()
+
+    @property
+    def project_state_status(self) -> Literal["AVAILABLE", "UNAVAILABLE", "DEGRADED", "FAILED"]:
+        """Explicit canonical-owner availability (never silent None)."""
+        return self._project_state_status
+
+    @property
+    def project_state_reason(self) -> str:
+        """Bounded human-readable reason for the canonical-owner status."""
+        return self._project_state_reason
 
     def discover(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
         """Return bounded capability metadata without probing optional runtimes."""
@@ -506,6 +524,8 @@ class ApplicationService:
                 task_service=self.task_service,
                 decision_service=self.decision_service,
                 project_state_service=self.project_state_service,
+                project_state_status=self._project_state_status,
+                project_state_reason=self._project_state_reason,
                 search_fn=self._search_fn,
             )
             planner_result = planner.plan_and_retrieve(
