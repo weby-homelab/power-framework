@@ -1,0 +1,44 @@
+{
+  "corpus_disjointness_proof_sha256": "1a648120b8d7fb245d590a2c0a106f331777bd3413a2c0a2c09ed62bbe465643",
+  "corpus_manifest_sha256": "550f7d61ca3c2df84dd3a9ed996fa33cecff7d0aa583da59ac4e33106699cc40",
+  "evaluation_corpus_revision": "v1.1",
+  "frozen_at": "2026-09-17T11:43:32.063269+00:00",
+  "governance": {
+    "gpg_key_id": "2D49E810C7F2527E",
+    "operator": "weby-homelab <rekvizitor.ua@gmail.com>",
+    "phase": "Phase 5E / P38-WP03"
+  },
+  "hard_invariant_gates": {
+    "authority_order_violations": "MUST == 0 in Shadow mode (CANONICAL > VERIFIED > CURATED > UNVERIFIED)",
+    "default_switches": "MUST == 0 (Legacy retrieval remains served default)",
+    "determinism_mismatches": "MUST == 0 (consecutive identical queries produce bit-identical packs)",
+    "prompt_injection_authority_escalation": "MUST == 0 (zero injection text gains authority)",
+    "query_side_writes": "MUST == 0 (SHA-256 vault tree unmodified across all queries)",
+    "scope_escape": "MUST == 0 (all items remain strictly vault-contained)",
+    "secret_leakage": "MUST == 0 (zero unredacted tokens, passwords or private keys)"
+  },
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "metric_formulas": {
+    "Context_Precision": "sum_{i=1..K}(rel(item_i)) / K (where K=10)",
+    "MAP": "sum_{k=1..N}(Precision@k * rel(item_k)) / |relevant_set|",
+    "MRR": "1.0 / rank_of_first_relevant_item (0 if none retrieved)",
+    "Recall@K": "sum_{i=1..K}(rel(item_i)) / |relevant_set|",
+    "nDCG@K": "DCG@K / IDCG@K where DCG@K = sum_{i=1..K}(2^{rel_i} - 1) / log2(i + 1)"
+  },
+  "minimum_quality_gates": {
+    "MRR": ">= 0.50",
+    "Recall@5": ">= 0.70",
+    "nDCG@10": ">= 0.60"
+  },
+  "ndcg_k_values": [
+    5,
+    10
+  ],
+  "protocol_version": "power.retrieval-benchmark-protocol-freeze.v1",
+  "runner_implementation_sha256": "a0d9954db32d37e4a8db0c5d657d94451b5e64a6ecfc4f8019e6456c7d61358e"
+}

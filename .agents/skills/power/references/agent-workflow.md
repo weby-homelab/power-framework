@@ -65,14 +65,14 @@ governance fields remain optional unless a specific operation requires them.
    Read-only probes не повинні створювати namespace чи змінювати vault.
 6. Для `memory apply` перевір receipt, виконай `power memory validate <path>` та
    пошук унікального маркера в режимі з receipt (`fts`, якщо dense projection
-   відсутня); для `ingest`/`synthesize` так само перевір receipt. Окремий
-   `power sync <path> --strict` потрібен для import або зовнішніх writerів. У
+   відсутня); для `ingest`/`synthesize` так само перевір receipt.
+   Канонічний receipt є вичерпним доказом виконання внутрішнього index/sync —
+   не запускай сліпий дублюючий full-vault `power sync` чи `power index`.
+   Окремий `power sync <path> --strict` та `power index <path> --strict` потрібен
+   виключно для import, зовнішніх writerів або ручних редагувань без receipt. У
    всіх випадках заверши `power lint <path>` і `power markdown-check <path>`.
    Для кожного кроку збережи exit code та короткий receipt; частковий результат
    не маскуй.
-   Повний ручний gate для будь-якої іншої mutation-поверхні: `power sync <path>
-   --strict`, `power index <path> --strict`, `power lint <path>` та
-   `power markdown-check <path>`.
 7. Додай Action/Result до `log.md` і передай handoff: стан, source revision,
    змінені артефакти, receipts, blockers та наступну дію. Для роботи, яку може
    продовжити інший агент, створи або онови content-free packet:
