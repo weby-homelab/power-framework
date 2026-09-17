@@ -46,8 +46,9 @@ REST verification:
 > and P38-G2 (PR #431) are closed and verified. Phase 5C SearchScope
 > pushdown (PR #434) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437)**.
 > P38-WP01-R1 is **CLOSED / MERGED / VERIFIED**.
-> Phase 5D (P38-WP02) is **CLOSED / MERGED / VERIFIED (PR #439 / PR #440)**.
-> Phase 5E (P38-WP03) is **READY FOR SEPARATE ADMISSION / NOT STARTED**.
+> Phase 5D (P38-WP02) is **CLOSURE CORRECTION ADMITTED (PR #439 / PR #440 / PR #441)**.
+> P38-WP02-R1 is **IN PROGRESS**.
+> Phase 5E (P38-WP03) is **BLOCKED BY P38-WP02-R1 / NOT STARTED**.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -134,8 +135,8 @@ MAIN`; Phase 5A runtime contracts and Phase 5A.1 are merged and verified,
 Phase 5B is `CLOSED / MERGED / VERIFIED` through PR #418, INFRA-1 is
 `CLOSED / MERGED / VERIFIED` through PR #419, Phase 5C SearchScope
 pushdown is `CLOSED / MERGED / VERIFIED` through PR #434 and PR #437,
-and Phase 5D (RetrievalPlanner + ContextPack) is `CLOSED / MERGED / VERIFIED`
-through PR #439 and PR #440. Phase 5E remains `READY FOR SEPARATE ADMISSION / NOT STARTED`.
+and Phase 5D (RetrievalPlanner + ContextPack) is `CLOSURE CORRECTION ADMITTED`
+through PR #439, PR #440, and PR #441. P38-WP02-R1 is `IN PROGRESS`. Phase 5E remains `BLOCKED BY P38-WP02-R1 / NOT STARTED`.
 
 ## ARCHITECTURAL DECISION
 
