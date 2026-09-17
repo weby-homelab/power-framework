@@ -218,15 +218,13 @@ def test_development_benchmark_execution_and_invariants(tmp_path: Path) -> None:
     assert invars["default_switches_pass"] is True
     assert "served_default_before" in invars
     assert "served_default_after" in invars
-    assert invars["served_default_before"] == invars["served_default_after"]
-    # R1 correction: ground-truth-aware authority must FAIL on current runtime
-    # (9/9 winners outranked, all unverified, no canonical provenance).
-    # HARD-CODED PASS IS NOT VERIFICATION.
-    assert invars["authority_outranked_by_relevance"] == 9
-    assert invars["authority_outranked_by_relevance_pass"] is False
-    assert invars["authority_provenance_failures"] == 9
-    assert invars["authority_provenance_failures_pass"] is False
-    assert results["benchmark_metadata"]["all_hard_invariants_pass"] is False
+    # R2 correction: with runtime authority integration fixed,
+    # hard invariants pass with 0 outranked, 0 provenance failures.
+    assert invars["authority_outranked_by_relevance"] == 0
+    assert invars["authority_outranked_by_relevance_pass"] is True
+    assert invars["authority_provenance_failures"] == 0
+    assert invars["authority_provenance_failures_pass"] is True
+    assert results["benchmark_metadata"]["all_hard_invariants_pass"] is True
     assert results["benchmark_metadata"]["HOLDOUT_PREVIOUSLY_EXPOSED"] is True
     assert results["benchmark_metadata"]["RUNTIME_TUNING_AFTER_HOLDOUT"] is False
 

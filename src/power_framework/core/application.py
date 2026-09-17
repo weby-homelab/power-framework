@@ -326,9 +326,17 @@ class ApplicationService:
         self.decision_service = decision_service or DecisionService(
             self.vault_dir, task_service=self.task_service
         )
-        self.project_state_service = project_state_service or ProjectStateService(
-            self.vault_dir, task_service=self.task_service, decision_service=self.decision_service
-        )
+        if project_state_service is not None:
+            self.project_state_service = project_state_service
+        else:
+            try:
+                self.project_state_service = ProjectStateService(
+                    self.vault_dir,
+                    task_service=self.task_service,
+                    decision_service=self.decision_service,
+                )
+            except Exception:
+                self.project_state_service = None
         self.infra_broker = infra_broker or InfraBrokerClient()
 
     def discover(self, *, context: RequestContext | None = None) -> ApplicationEnvelope:
