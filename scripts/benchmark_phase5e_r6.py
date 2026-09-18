@@ -49,7 +49,6 @@ from benchmark_phase5e_shadow import (  # noqa: E402
     compute_ndcg,
     compute_recall_at_k,
     compute_reciprocal_rank,
-    has_canonical_runtime_provenance,
     is_vault_contained,
     normalize_source_id,
     setup_benchmark_vault,
@@ -61,6 +60,107 @@ from phase5e_concept_mapping_r6 import (  # noqa: E402
     owner_for_concept,
     source_id_to_concept,
 )
+from phase5e_r6a1_admission import evaluate_authority_metrics  # noqa: E402
+
+from power_framework.core.context_contracts import canonical_sha256  # noqa: E402
+from power_framework.core.evaluation_contracts import (  # noqa: E402
+    EvaluationIntegrityError,
+    load_bounded_json,
+    load_verified_development_snapshot,
+    reject_holdout_tuning,
+    verify_fixture_fidelity_v2,
+)
+
+PHASE5E_ROOT = Path(__file__).resolve().parent.parent / "artifacts" / "project-state" / "phase-5e"
+R6A1_MANIFEST_VERSION = "r6a1"
+R6A1_RUNTIME_BASE_SHA = "10321b748a4b144c16720b4109c4c2c65fead83a"
+R6A1_OWNERSHIP_CONTRACT = PHASE5E_ROOT / "phase5e_evaluation_ownership_r6a1.json"
+R6A1_FAST_CAPABILITY_CONTRACT = PHASE5E_ROOT / "phase5e_fast_capability_r6a1.json"
+
+
+def compute_setup_payload_digest(manifest: dict[str, Any]) -> str:
+    """Digest only deterministic production setup payloads in concept order."""
+
+    payloads = [
+        {
+            "eval_concept_id": str(concept["eval_concept_id"]),
+            "setup_payload": concept["setup_payload"],
+        }
+        for concept in manifest.get("concepts", [])
+        if concept.get("owner_backed") and isinstance(concept.get("setup_payload"), dict)
+    ]
+    return canonical_sha256(
+        {"setup_payloads": sorted(payloads, key=lambda item: item["eval_concept_id"])}
+    )
+
+
+def _load_r6a1_inputs(manifest_path: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    manifest = load_manifest(manifest_path)
+    if manifest.get("manifest_version") != R6A1_MANIFEST_VERSION:
+        raise EvaluationIntegrityError(
+            "manifest_version", "R6A.1 runner requires the R6A.1 manifest"
+        )
+    if manifest.get("runtime_base_sha") != R6A1_RUNTIME_BASE_SHA:
+        raise EvaluationIntegrityError("runtime_identity", "R6A.1 runtime base identity mismatch")
+    declared_setup_digest = manifest.get("setup_payload_digest")
+    if declared_setup_digest != compute_setup_payload_digest(manifest):
+        raise EvaluationIntegrityError("setup_payload_digest", "setup payload digest mismatch")
+    ownership = load_bounded_json(R6A1_OWNERSHIP_CONTRACT)
+    capability = load_bounded_json(R6A1_FAST_CAPABILITY_CONTRACT)
+    if not isinstance(ownership, dict) or not isinstance(capability, dict):
+        raise EvaluationIntegrityError(
+            "contract_schema", "R6A.1 contract artifacts must be objects"
+        )
+    if capability.get("schema_version") != "power.retrieval-fast-capability.v1":
+        raise EvaluationIntegrityError(
+            "capability_contract", "FAST capability contract version mismatch"
+        )
+    return manifest, ownership, capability
+
+
+def _repository_relative(path: Path) -> str:
+    repo_root = Path(__file__).resolve().parent.parent
+    try:
+        return path.resolve().relative_to(repo_root).as_posix()
+    except ValueError:
+        return f"logical:{path.name}"
+
+
+def verify_fast_runtime_conformance(
+    context_data: dict[str, Any], capability: dict[str, Any]
+) -> dict[str, Any]:
+    """Check observed FAST output against the independent capability contract."""
+
+    plan = context_data.get("retrieval_plan")
+    if not isinstance(plan, dict):
+        raise EvaluationIntegrityError("fast_conformance", "FAST output omitted retrieval plan")
+    budget = plan.get("budget")
+    if not isinstance(budget, dict):
+        raise EvaluationIntegrityError("fast_conformance", "FAST output omitted retrieval budget")
+    expected = capability["fast_runtime_conformance"]
+    observed = {
+        "budget_class": str(budget.get("budget_class", "")),
+        "cpu_only": str(budget.get("model_load", "")) == "forbidden",
+        "model_load": str(budget.get("model_load", "")),
+        "dense_required": bool(budget.get("dense_allowed", True)),
+        "reranker_required": bool(budget.get("reranker_allowed", True)),
+        "graph_allowed": bool(budget.get("graph_allowed", True)),
+        "raw_fallback_allowed": bool(budget.get("raw_fallback_allowed", True)),
+        "stages": list(plan.get("stages", [])),
+    }
+    if (
+        observed["budget_class"] != "FAST"
+        or observed["cpu_only"] != expected["cpu_only"]
+        or observed["model_load"] != expected["model_load"]
+        or observed["dense_required"] != expected["dense_required"]
+        or observed["reranker_required"] != expected["reranker_required"]
+        or observed["graph_allowed"] != expected["graph_allowed"]
+        or observed["raw_fallback_allowed"] != expected["raw_fallback_allowed"]
+    ):
+        raise EvaluationIntegrityError(
+            "fast_conformance", "observed FAST runtime violates capability contract"
+        )
+    return {"pass": True, "observed": observed}
 
 
 def compute_setup_state_digest(vault_dir: Path) -> str:
@@ -94,56 +194,43 @@ def setup_production_fixtures(vault_dir: Path, manifest: dict[str, Any]) -> dict
     task_concept = concepts.get("task-current", {})
     task_payload = task_concept.get("setup_payload") or {}
     task_id = str(task_payload.get("task_id", "p38-task-current-corpus-verify"))
-    existing = None
-    with contextlib.suppress(Exception):
-        existing = ts.get_task(task_id)
-    if existing is None:
-        created_task = ts.create_task(
-            task_id=task_id,
-            title=str(task_payload.get("title", "Verify corpus task")),
-            objective=str(task_payload.get("objective", "Verify corpus")),
-            owner="fixture-setup",
-            state=str(task_payload.get("state", "ready")),  # type: ignore[arg-type]
-            actor="fixture-setup",
-        )
-        receipts["tasks"][task_id] = {
-            "revision": int(getattr(created_task, "revision", 1)),
-            "title": created_task.title,
-        }
-    else:
-        receipts["tasks"][task_id] = {
-            "revision": int(getattr(existing, "revision", 1)),
-            "title": getattr(existing, "title", ""),
-        }
+    existing = ts.get_task(task_id)
+    if existing is not None:
+        raise RuntimeError("fixture vault is not empty: task already exists")
+    created_task = ts.create_task(
+        task_id=task_id,
+        title=str(task_payload.get("title", "Verify corpus task")),
+        objective=str(task_payload.get("objective", "Verify corpus")),
+        owner="fixture-setup",
+        state=str(task_payload.get("state", "ready")),  # type: ignore[arg-type]
+        actor="fixture-setup",
+    )
+    receipts["tasks"][task_id] = {
+        "revision": int(getattr(created_task, "revision", 1)),
+        "title": created_task.title,
+    }
 
     # 2. Decision fixture (binds current task revision).
     dec_concept = concepts.get("decision-current", {})
     dec_payload = dec_concept.get("setup_payload") or {}
     dec_id = str(dec_payload.get("decision_id", "dec_x-current-holdout-tuning-decision"))
     dec_task_id = str(dec_payload.get("task_id", task_id))
-    existing_dec = None
-    with contextlib.suppress(Exception):
-        existing_dec = ds.get_decision(dec_id)
-    if existing_dec is None:
-        created_dec = ds.create_decision(
-            decision_id=dec_id,
-            task_id=dec_task_id,
-            title=str(dec_payload.get("title", "Canonical decision")),
-            requested_by=str(dec_payload.get("requested_by", "fixture-setup")),
-            description=str(dec_payload.get("description", "")),
-            allowed_actors=["fixture-setup"],
-        )
-        receipts["decisions"][dec_id] = {
-            "task_id": dec_task_id,
-            "task_revision": int(getattr(created_dec, "task_revision", 1)),
-            "title": created_dec.title,
-        }
-    else:
-        receipts["decisions"][dec_id] = {
-            "task_id": getattr(existing_dec, "task_id", dec_task_id),
-            "task_revision": int(getattr(existing_dec, "task_revision", 1)),
-            "title": getattr(existing_dec, "title", ""),
-        }
+    existing_dec = ds.get_decision(dec_id)
+    if existing_dec is not None:
+        raise RuntimeError("fixture vault is not empty: decision already exists")
+    created_dec = ds.create_decision(
+        decision_id=dec_id,
+        task_id=dec_task_id,
+        title=str(dec_payload.get("title", "Canonical decision")),
+        requested_by=str(dec_payload.get("requested_by", "fixture-setup")),
+        description=str(dec_payload.get("description", "")),
+        allowed_actors=["fixture-setup"],
+    )
+    receipts["decisions"][dec_id] = {
+        "task_id": dec_task_id,
+        "task_revision": int(getattr(created_dec, "task_revision", 1)),
+        "title": created_dec.title,
+    }
 
     # 3. Project fixtures via trusted PSE writer (dynamically from manifest).
     pss = ProjectStateService(vault_dir, task_service=ts, decision_service=ds)
@@ -166,6 +253,8 @@ def setup_production_fixtures(vault_dir: Path, manifest: dict[str, Any]) -> dict
                         "actor": "fixture-setup",
                     }
                 ]
+            if store.list_event_files():
+                raise RuntimeError(f"fixture vault is not empty: project {project_id} exists")
             for ev in events:
                 cmd = AppendCommand(
                     project_id=project_id,
@@ -174,17 +263,7 @@ def setup_production_fixtures(vault_dir: Path, manifest: dict[str, Any]) -> dict
                     actor=str(ev.get("actor", "fixture-setup")),
                     source="pse_governance",
                 )
-                with contextlib.suppress(Exception):
-                    head_exists = False
-                    try:
-                        files = store.list_event_files()
-                        head_exists = len(files) > 0
-                    except Exception:
-                        head_exists = False
-                    if not head_exists:
-                        store._append_governed(cmd)
-                    else:
-                        break
+                store._append_governed(cmd)
             state = pss.rebuild_project_state(project_id)
             receipts["projects"][project_id] = {
                 "eval_concept_id": concept_id,
@@ -214,18 +293,29 @@ def run_benchmark_r6(
     split: str,
     vault_dir: Path,
     manifest_path: Path,
-    expected_revision: str = "v1.1",
+    expected_revision: str = "v1.4",
     budget_class: str = "FAST",
 ) -> dict[str, Any]:
     """Execute production-faithful benchmark with concept-aware scoring."""
     from power_framework.core.application import ApplicationService
     from power_framework.core.principal import Principal
 
+    reject_holdout_tuning(split)
     eval_corpus = Path(eval_corpus).resolve()
     vault_dir = Path(vault_dir).resolve()
     manifest_path = Path(manifest_path).resolve()
 
-    manifest = load_manifest(manifest_path)
+    snapshot = load_verified_development_snapshot(eval_corpus, expected_revision=expected_revision)
+    manifest, ownership_contract, capability_contract = _load_r6a1_inputs(manifest_path)
+    if snapshot.source_corpus_digest != manifest.get("source_corpus_digest"):
+        raise EvaluationIntegrityError(
+            "source_digest_mismatch", "development source corpus differs from fixture manifest"
+        )
+    fixture_fidelity = verify_fixture_fidelity_v2(
+        manifest,
+        ownership_contract,
+        eval_corpus / "corpus",
+    )
     alias_lookup = build_alias_to_concept(manifest)
     manifest_sha = _sha256_file(manifest_path)
     runner_sha = _sha256_file(Path(__file__).resolve())
@@ -248,21 +338,11 @@ def run_benchmark_r6(
     baseline_tree = _hash_vault_tree(vault_dir)
     setup_state_digest = compute_setup_state_digest(vault_dir)
 
-    # Step 4: Load queries and ground truth for the split.
-    queries_file = eval_corpus / f"queries.{split}.jsonl"
-    gt_file = eval_corpus / f"ground_truth.{split}.jsonl"
-    queries = [
-        json.loads(line)
-        for line in queries_file.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    # Step 4: use only the already verified development snapshot.
+    queries = [item.to_canonical_dict() for item in snapshot.queries]
     ground_truth = {
         item["query_id"]: item
-        for item in (
-            json.loads(line)
-            for line in gt_file.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        )
+        for item in (record.to_canonical_dict() for record in snapshot.ground_truth)
     }
 
     k_values = [1, 3, 5, 10]
@@ -274,6 +354,8 @@ def run_benchmark_r6(
     total_secret_leakages = 0
     total_prompt_injection_escalations = 0
     total_determinism_mismatches = 0
+    fast_conformance_failures = 0
+    fast_conformance_observations: list[dict[str, Any]] = []
     discriminator_checks: list[dict[str, Any]] = []
 
     normalized_budget = budget_class.upper()
@@ -329,6 +411,9 @@ def run_benchmark_r6(
         shad_env = app.compile_context(
             query=q["query"], intent=q["intent"], budget_class=normalized_budget
         )
+        fast_conformance_observations.append(
+            verify_fast_runtime_conformance(shad_env.data, capability_contract)
+        )
         shad_latency = (time.perf_counter() - shad_t0) * 1000.0
         shad_items = shad_env.data.get("items", [])
         shad_raw_ids = [str(item.get("source_id", "")) for item in shad_items]
@@ -342,13 +427,6 @@ def run_benchmark_r6(
                 shad_concepts_raw[idx] = mapped_full
         shad_concepts: list[str] = _dedup_preserve_order(shad_concepts_raw)
         shad_authorities = [str(item.get("authority", "unknown")) for item in shad_items]
-        shad_bases = [
-            str((item.get("provenance") or {}).get("authority_basis", "UNKNOWN"))
-            if isinstance(item.get("provenance"), dict)
-            else "UNKNOWN"
-            for item in shad_items
-        ]
-        shad_source_types = [str(item.get("source_type", "")) for item in shad_items]
         shad_refs: list[list[str]] = []
         for item in shad_items:
             prov = item.get("provenance") or {}
@@ -368,119 +446,50 @@ def run_benchmark_r6(
         shad_prec = compute_context_precision(shad_concepts, rel_concepts, k=10)
         shad_excl_leaks = sum(1 for s in shad_concepts[:10] if s in excl_concepts)
 
-        auth_level = {
-            "canonical": 0,
-            "verified": 1,
-            "curated": 2,
-            "proposed": 3,
-            "unverified": 4,
-            "unknown": 5,
-        }
-        shad_auth_violations = 0
-        seen_raw = False
-        for it_auth in shad_authorities:
-            lvl = auth_level.get(it_auth.lower(), 5)
-            if lvl >= 4:
-                seen_raw = True
-            elif seen_raw and lvl <= 1:
-                shad_auth_violations += 1
-
-        # Concept-aware authority winner check (owner-backed only for gates).
-        winner_present = False
+        winner_projected_owner = (
+            owner_for_concept(str(expected_concept), manifest) if expected_concept else None
+        )
+        metric_candidates = [
+            {
+                "source_id": item.get("source_id", ""),
+                "authority": item.get("authority", "unknown"),
+                "source_type": item.get("source_type", ""),
+                "provenance": item.get("provenance", {}),
+            }
+            for item in shad_items
+        ]
+        authority_metrics = evaluate_authority_metrics(
+            expected_concept=str(expected_concept) if expected_concept else None,
+            owner_backed=owner_backed_query,
+            candidates=metric_candidates,
+            ground_truth_row=gt,
+            alias_lookup=alias_lookup,
+        )
+        shad_auth_violations = int(authority_metrics["authority_order_violations"])
+        winner_present = bool(authority_metrics["winner_present"])
+        winner_has_provenance = bool(authority_metrics["winner_has_canonical_provenance"])
+        outranked = int(authority_metrics["authority_outranked"])
+        outranked_applicable = bool(authority_metrics["outranked_applicable"])
         winner_rank: int | None = None
         winner_authority: str | None = None
-        winner_projected_owner: str | None = None
-        winner_has_provenance = True
-        exclusions_above = 0
-        outranked = 0
-        outranked_applicable = False
-        if expected_concept:
-            winner_projected_owner = owner_for_concept(str(expected_concept), manifest)
-            if owner_backed_query:
-                if str(expected_concept) in shad_concepts:
-                    winner_present = True
-                    widx = shad_concepts.index(str(expected_concept))
-                    winner_rank = widx + 1
-                    raw_idx = shad_concepts_raw.index(str(expected_concept))
-                    winner_authority = shad_authorities[raw_idx]
-                    winner_basis = shad_bases[raw_idx]
-                    winner_source_type = shad_source_types[raw_idx]
-                    winner_has_provenance = has_canonical_runtime_provenance(
-                        authority=winner_authority or "unknown",
-                        basis=winner_basis,
-                        source_type=winner_source_type,
-                    )
-                # Exclusions above winner (concept space, top-10).
-                rank0 = (
-                    shad_concepts.index(str(expected_concept))
-                    if winner_present
-                    else len(shad_concepts)
-                )
-                for idx2, sid in enumerate(shad_concepts[:10]):
-                    if idx2 >= rank0:
-                        break
-                    if sid in excl_concepts:
-                        exclusions_above += 1
-
-                # True outranked_by_relevance semantics (Layer E generic remediation):
-                # Applicable ONLY when evidence proves canonical winner and a lower-authority
-                # competitor are legitimate competitors for the SAME requested subject.
-                gt_row = gt
-                graded_rel = gt_row.get("graded_relevance", [])
-                same_subject_source_ids = {
-                    g["source_id"]
-                    for g in graded_rel
-                    if g.get("source_id") != gt_row.get("expected_authority_winner")
-                    and g.get("authority_outcome")
-                    in ("do_not_cite", "report_conflict", "curated", "unverified")
-                }
-
-                same_subject_lower_auth_indices: list[int] = []
-                for i, (cid, auth) in enumerate(
-                    zip(shad_concepts_raw, shad_authorities, strict=True)
-                ):
-                    raw_id = shad_raw_ids[i]
-                    is_same_subject = (
-                        cid == str(expected_concept) or raw_id in same_subject_source_ids
-                    )
-                    auth_lvl = auth_level.get(auth.lower(), 5)
-                    if is_same_subject and auth_lvl > 0:
-                        same_subject_lower_auth_indices.append(i)
-
-                if same_subject_lower_auth_indices:
-                    outranked_applicable = True
-                    if winner_present:
-                        canonical_raw_idx = None
-                        for i, (cid, auth) in enumerate(
-                            zip(shad_concepts_raw, shad_authorities, strict=True)
-                        ):
-                            if (
-                                cid == str(expected_concept)
-                                and auth_level.get(auth.lower(), 5) == 0
-                            ):
-                                canonical_raw_idx = i
-                                break
-                        if canonical_raw_idx is not None:
-                            min_comp_idx = min(same_subject_lower_auth_indices)
-                            outranked = 1 if min_comp_idx < canonical_raw_idx else 0
-                        else:
-                            outranked = 1
-                    else:
-                        outranked = 1
-                else:
-                    outranked_applicable = False
-                    outranked = 0
-            else:
-                # VaultNote / Quarantine: no CANONICAL requirement.
-                winner_present = str(expected_concept) in shad_concepts
-                if winner_present:
-                    widx = shad_concepts.index(str(expected_concept))
-                    winner_rank = widx + 1
-                    raw_idx = shad_concepts_raw.index(str(expected_concept))
-                    winner_authority = shad_authorities[raw_idx]
-                winner_has_provenance = True
-                exclusions_above = 0
-                outranked = 0
+        if expected_concept and str(expected_concept) in shad_concepts:
+            winner_rank = shad_concepts.index(str(expected_concept)) + 1
+            raw_idx = next(
+                (
+                    index
+                    for index, concept in enumerate(authority_metrics["normalized_concepts"])
+                    if concept == str(expected_concept)
+                ),
+                None,
+            )
+            if raw_idx is not None:
+                winner_authority = shad_authorities[raw_idx]
+        rank0 = shad_concepts.index(str(expected_concept)) if winner_present else len(shad_concepts)
+        exclusions_above = sum(
+            1
+            for idx2, sid in enumerate(shad_concepts[:10])
+            if idx2 < rank0 and sid in excl_concepts
+        )
 
         # Discriminator evidence for owner-backed concepts.
         if owner_backed_query and expected_concept:
@@ -571,6 +580,9 @@ def run_benchmark_r6(
                     "exclusions_above_winner": exclusions_above,
                     "authority_outranked": outranked,
                     "outranked_applicable": outranked_applicable,
+                    "authority_order_applicable": bool(
+                        authority_metrics["authority_order_applicable"]
+                    ),
                     "token_cost": shad_total_tokens,
                     "pack_bytes": shad_pack_bytes,
                     "dense_used": shad_dense_used,
@@ -641,10 +653,13 @@ def run_benchmark_r6(
     }
 
     total_order_violations = sum(q["shadow"]["authority_violations"] for q in query_results)
+    applicable_order_queries = [
+        q for q in query_results if q["shadow"].get("authority_order_applicable", False)
+    ]
     auth_order_metric = {
-        "applicable_query_count": total_query_count,
+        "applicable_query_count": len(applicable_order_queries),
         "measured_violation_count": total_order_violations,
-        "not_applicable_count": 0,
+        "not_applicable_count": total_query_count - len(applicable_order_queries),
         "pass": total_order_violations == 0,
     }
 
@@ -667,6 +682,35 @@ def run_benchmark_r6(
             q["shadow"]["exclusions_above_winner"] for q in owner_results
         ),
         "owner_backed_query_count": len(owner_results),
+    }
+
+    quality_specs = {
+        "recall_at_5": (shad_summary["recall_at_5"], 0.70),
+        "mrr": (shad_summary["mrr"], 0.50),
+        "ndcg_at_10": (shad_summary["ndcg_at_10"], 0.60),
+    }
+    quality_metrics = {
+        name: {
+            "applicable_query_count": total_query_count,
+            "measured_violation_count": sum(
+                1 for query in query_results if query["shadow"]["recall"][5] < threshold
+            )
+            if name == "recall_at_5"
+            else sum(
+                1
+                for query in query_results
+                if (
+                    query["shadow"]["mrr"] < threshold
+                    if name == "mrr"
+                    else query["shadow"]["ndcg"]["10"] < threshold
+                )
+            ),
+            "not_applicable_count": 0,
+            "threshold": threshold,
+            "value": value,
+            "pass": value >= threshold,
+        }
+        for name, (value, threshold) in quality_specs.items()
     }
 
     served_default_after = capture_served_default()
@@ -713,27 +757,65 @@ def run_benchmark_r6(
         "default_switches_pass": default_switches == 0,
         "resource_bounds_pass": resource_bounds_pass,
         "non_regression_pass": all(non_regression.values()),
+        "fast_runtime_conformance": {
+            "applicable_query_count": total_query_count,
+            "measured_violation_count": fast_conformance_failures,
+            "not_applicable_count": 0,
+            "pass": fast_conformance_failures == 0,
+        },
+        "fast_runtime_conformance_pass": fast_conformance_failures == 0,
+        "fixture_fidelity_pass": fixture_fidelity["status"] == "PASS",
+        "development_input_verification_pass": True,
     }
-    all_pass = all(v is True for k, v in hard_invariants.items() if k.endswith("_pass"))
-    quality_pass = bool(
-        shad_summary["recall_at_5"] >= 0.70
-        and shad_summary["mrr"] >= 0.50
-        and shad_summary["ndcg_at_10"] >= 0.60
+    quality_pass = all(metric["pass"] for metric in quality_metrics.values())
+    all_pass = (
+        all(v is True for k, v in hard_invariants.items() if k.endswith("_pass")) and quality_pass
     )
-
-    with (eval_corpus / "manifest.json").open("r", encoding="utf-8") as f:
-        corpus_manifest = json.load(f)
 
     return {
         "benchmark_metadata": {
-            "schema_version": "power.retrieval-benchmark-r6.v1",
+            "schema_version": "power.retrieval-benchmark-r6a1.v1",
             "runner": "benchmark_phase5e_r6",
             "runner_sha256": runner_sha,
-            "fixture_manifest_path": str(manifest_path),
+            "fixture_manifest_path": _repository_relative(manifest_path),
             "fixture_manifest_sha256": manifest_sha,
+            "fixture_manifest_version": manifest.get("manifest_version"),
+            "ownership_contract_path": _repository_relative(R6A1_OWNERSHIP_CONTRACT),
+            "ownership_contract_sha256": _sha256_file(R6A1_OWNERSHIP_CONTRACT),
+            "fast_capability_contract_path": _repository_relative(R6A1_FAST_CAPABILITY_CONTRACT),
+            "fast_capability_contract_sha256": _sha256_file(R6A1_FAST_CAPABILITY_CONTRACT),
+            "evaluation_contracts_sha256": _sha256_file(
+                _SRC_DIR / "power_framework/core/evaluation_contracts.py"
+            ),
+            "concept_mapping_sha256": _sha256_file(
+                Path(__file__).resolve().parent / "phase5e_concept_mapping_r6.py"
+            ),
+            "runtime_sha256": _sha256_file(_SRC_DIR / "power_framework/core/retrieval_planner.py"),
+            "runtime_base_sha": manifest.get("runtime_base_sha"),
             "setup_state_digest": setup_state_digest,
-            "setup_payload_digest": manifest.get("setup_payload_digest", ""),
-            "source_corpus_digest": manifest.get("source_corpus_digest", ""),
+            "setup_payload_digest": compute_setup_payload_digest(manifest),
+            "source_corpus_digest": snapshot.source_corpus_digest,
+            "development_split_digest": snapshot.development_digest,
+            "input_verification": {
+                "status": "PASS",
+                "evaluation_revision": snapshot.manifest.evaluation_revision,
+                "holdout_used": snapshot.holdout_used,
+                "development_query_count": len(snapshot.queries),
+            },
+            "fixture_fidelity": fixture_fidelity,
+            "fast_runtime_conformance": {
+                "status": "PASS" if fast_conformance_failures == 0 else "FAIL",
+                "failure_count": fast_conformance_failures,
+                "observations": fast_conformance_observations,
+                "evaluation_expectation_compatibility": capability_contract[
+                    "evaluation_expectation_compatibility"
+                ],
+            },
+            "legacy_default_identity": {
+                "before": served_default_before,
+                "after": served_default_after,
+                "switches": default_switches,
+            },
             "budget_class": normalized_budget,
             "timestamp": datetime.now(UTC).isoformat(),
             "split": split,
@@ -744,9 +826,7 @@ def run_benchmark_r6(
             "python_version": sys.version,
             "all_hard_invariants_pass": all_pass,
             "quality_thresholds_pass": quality_pass,
-            "corpus_manifest_digest": hashlib.sha256(
-                json.dumps(corpus_manifest, sort_keys=True).encode("utf-8")
-            ).hexdigest(),
+            "corpus_manifest_digest": canonical_sha256(snapshot.manifest.to_canonical_dict()),
         },
         "fixture_receipts": receipts,
         "summary": {
@@ -754,6 +834,7 @@ def run_benchmark_r6(
             "shadow": shad_summary,
             "non_regression": non_regression,
             "resource_bounds": resource_bounds,
+            "quality_metrics": quality_metrics,
         },
         "hard_invariants": hard_invariants,
         "security_discriminator": discriminator_checks,
@@ -769,9 +850,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--fixture-manifest",
         type=Path,
-        default=Path("artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6.json"),
+        default=Path("artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6a1.json"),
     )
-    parser.add_argument("--expected-revision", type=str, default="v1.1")
+    parser.add_argument("--expected-revision", type=str, default="v1.4")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--budget-class", choices=("FAST", "BALANCED", "DEEP"), default="FAST")
     args = parser.parse_args(argv)
@@ -826,7 +907,10 @@ def main(argv: list[str] | None = None) -> int:
     print("Hard Invariants Pass:", results["benchmark_metadata"]["all_hard_invariants_pass"])
     print("Quality Thresholds Pass:", results["benchmark_metadata"]["quality_thresholds_pass"])
     print(json.dumps(safe_shadow, indent=2, sort_keys=True))
-    if not results["benchmark_metadata"]["all_hard_invariants_pass"]:
+    if not (
+        results["benchmark_metadata"]["all_hard_invariants_pass"]
+        and results["benchmark_metadata"]["quality_thresholds_pass"]
+    ):
         return 2
     return 0
 

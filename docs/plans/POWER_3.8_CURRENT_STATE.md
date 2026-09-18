@@ -24,31 +24,31 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / P38-WP01-R1 CLOSED / MERGED / VERIFIED / PHASE 5D (P38-WP02) CLOSED / MERGED / P38-WP02-R1 CLOSED / MERGED / VERIFIED / PHASE 5D EFFECTIVE STATUS: CLOSED / VERIFIED AFTER R1 CORRECTION / P38-WP03-R1 CLOSED / FAILURE EVIDENCE / P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION / P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED / P38-WP03-R4 CLOSED / FAILED VERIFICATION / P38-WP03-R5 CLOSED / FAILED VERIFICATION / R5 ONE-SHOT EPOCH CLOSED / FAILED / PHASE 5E (P38-WP03) OPEN / NOT PASSED / P38-WP03-R6 RE-ADMISSION IN PROGRESS / PHASE 5F (P38-WP04) BLOCKED / POWER 3.8.0 NO-GO
+PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / P38-WP01-R1 CLOSED / MERGED / VERIFIED / PHASE 5D (P38-WP02) CLOSED / MERGED / P38-WP02-R1 CLOSED / MERGED / VERIFIED / PHASE 5D EFFECTIVE STATUS: CLOSED / VERIFIED AFTER R1 CORRECTION / P38-WP03-R1 CLOSED / FAILURE EVIDENCE / P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION / P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED / P38-WP03-R4 CLOSED / FAILED VERIFICATION / P38-WP03-R5 CLOSED / FAILED VERIFICATION / R5 ONE-SHOT EPOCH CLOSED / FAILED / P38-WP03-R6A.1 CLOSED / MERGED / DEVELOPMENT ADMITTED / PHASE 5E (P38-WP03) OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED / PHASE 5F (P38-WP04) BLOCKED / POWER 3.8.0 NO-GO
 
 SNAPSHOT_BASE_SHA:
-c5e70c8f98fcfb15fe23d634fa3e1b5e6b359546
+10321b748a4b144c16720b4109c4c2c65fead83a
 
 SNAPSHOT_BASE_TREE:
-883d1d3f317ab696e240c0136272933becc31566
+a764030b5bccfebf33978fde78455aad38680807
 
 SNAPSHOT_LAST_INCLUDED_PR:
-458 (main)
+459 (main)
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-458
+459
 
 CURRENT_LIVE_MAIN:
-c5e70c8f98fcfb15fe23d634fa3e1b5e6b359546
+10321b748a4b144c16720b4109c4c2c65fead83a
 
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-Phase 5E (P38-WP03) Shadow Benchmark / Legacy Comparison (main, PR #445, PR #446) / P38-WP02-R1 Phase 5D Closure Reconciliation (main, PR #444) / P38-WP02-R1 Phase 5D RetrievalPlanner / ContextPack Closure Correction (main, PR #442, PR #443) / Phase 5D / P38-WP02 (main, PR #439, PR #440, corrected by R1) / PR #441 Phase 5D Closure Reconciliation / P38-WP01-R1 Phase 5C SearchScope Closure Correction (main, PR #437) / Phase 5C / P38-WP01 SearchScope Pushdown (main, PR #434, corrected by R1) / Gate P38-G2 (main, PR #431) / PR #428 Release v3.7.13 (release/3.7) / P38-WP03-R3 authority security correction (main, PR #451) / P38-WP03-R5 Holdout Epoch Verdict (main, PR #458; P38-WP03-R5 CLOSED / FAILED VERIFICATION; Phase 5E remains OPEN / NOT PASSED)
+P38-WP03-R6A.1 Evaluation Admission Integrity Repair (candidate branch; protected merge pending in this snapshot) / Phase 5E development admission evidence; historical R4/R5 holdout epochs remain immutable and failed
 
 NEXT_GATE:
-P38-WP03-R6 Evaluation Fidelity, Metric Semantics & Final Phase 5E Re-admission (ACTIVE GATE / IN PROGRESS); Phase 5F (P38-WP04) stays BLOCKED behind Phase 5E
+FRESH EVALUATION AUTHORING (SEPARATE INVOCATION; v1.5 EXPOSED / INVALIDATED / UNUSED; no one-shot in this gate); Phase 5F (P38-WP04) stays BLOCKED behind Phase 5E
 
 P38-WP01-R1_STATUS:
 CLOSED / MERGED / VERIFIED / PR #437
@@ -78,10 +78,10 @@ P38-WP03-R3_STATUS:
 CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction; PR-R3B governance rebaseline; self-declared metadata never raises authority; canonical Task/Decision/ProjectState only via owning services over .power/projects/<id>/events.jsonl + state_revision; explicit AVAILABLE/UNAVAILABLE/DEGRADED/FAILED; benchmark --budget-class; honest dev evidence outranked 9/9; runner digest 3bb51f11f6398175d787e6fe204a9cb4a5f07bcce1c29846589e210d68e7b271)
 
 PHASE_5E_R4_STATUS:
-P38-WP03-R4 Fresh Evaluation Re-admission NOT STARTED (freezes runtime + runner, creates fresh v1.3, seals unseen holdout, runs one-shot evaluation, decides PASS/FAIL)
+HISTORICAL / CLOSED / FAILED VERIFICATION; superseded as the current next gate by P38-WP03-R6A.1
 
 PHASE_5F_STATUS:
-BLOCKED (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind P38-WP03-R4)
+BLOCKED (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior; Phase 5E remains open and fresh evaluation authoring is required)
 
 INFRA_1_STATUS:
 CLOSED / MERGED / VERIFIED
@@ -123,10 +123,10 @@ EVALUATION_CORPUS_V1:
 SUPERSEDED FOR FUTURE EVALUATION / RETAINED AS HISTORICAL ERRATUM EVIDENCE
 
 ACTIVE_EVALUATION_REVISION:
-v1.1 HISTORICAL / EXPOSED; v1.2 HISTORICAL FAILED EPOCH / EXPOSED; NEXT FRESH HOLDOUT NOT CREATED
+v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / INVALIDATED / UNUSED; no fresh revision authored in R6A.1
 
 ACTIVE_RETRIEVAL_EVAL_REVISION_NOTE:
-v1.1 HISTORICAL / EXPOSED; v1.2 HISTORICAL FAILED EPOCH / EXPOSED; v1.3 NOT CREATED; NEXT FRESH HOLDOUT NOT CREATED
+v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / INVALIDATED / UNUSED; fresh evaluation authoring requires a separate invocation
 
 PHASE_5A_1:
 CLOSED / MERGED / VERIFIED / PR #416
@@ -287,7 +287,7 @@ evidence.
 - Phase 5A runtime contracts: **CLOSED / MERGED / VERIFIED** through protected PR #415.
 - Evaluation corpus v1: **HISTORICAL / RETAINED / SEMANTIC ERRATUM**.
 - Phase 5A.1: **CLOSED / MERGED / VERIFIED** through protected PR #416.
-- Active evaluation revision: **v1.1 HISTORICAL / EXPOSED; v1.2 HISTORICAL FAILED EPOCH / EXPOSED; NEXT FRESH HOLDOUT NOT CREATED**.
+- Active evaluation revision: **v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / INVALIDATED / UNUSED; NEXT FRESH EVALUATION AUTHORING REQUIRES A SEPARATE INVOCATION**.
 - Phase 5B: **CLOSED / MERGED / VERIFIED** through protected PR #418.
 - INFRA-1: **CLOSED / MERGED / VERIFIED** through protected PR #419.
 - INFRA-1 deployment validation: **OPERATOR DEPLOYMENT FOLLOW-UP**; not a generic framework blocker.
@@ -298,12 +298,13 @@ evidence.
 - P38-WP01-R1 (Phase 5C SearchScope Closure Correction): **CLOSED / MERGED / VERIFIED / PR #437**.
 - Phase 5D (P38-WP02): **CLOSED / VERIFIED AFTER R1 CORRECTION** (PR #439, PR #440, corrected by PR #442, PR #443).
 - P38-WP02-R1 (Phase 5D RetrievalPlanner / ContextPack Closure Correction): **CLOSED / MERGED / VERIFIED / PR #443**.
-- Phase 5E (P38-WP03): **OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED** (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R3 restores baseline only; P38-WP03-R4 NOT STARTED).
+- Phase 5E (P38-WP03): **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED** (historical R1–R5 failures retained; R6A.1 admission integrity repair is closed/merged/development-admitted without fresh holdout execution).
 - P38-WP03-R1: **CLOSED / FAILURE EVIDENCE**.
 - P38-WP03-R2 attempt: **CLOSED / FAILED VERIFICATION** (PR #449 runtime + PR #450 governance).
 - P38-WP03-R3: **CLOSED / SECURITY CORRECTION VERIFIED** (PR #451 runtime correction; PR-R3B governance rebaseline).
-- P38-WP03-R4: **NOT STARTED** (SEPARATE ADMISSION; freezes runtime + runner, creates fresh v1.3, seals unseen holdout, runs one-shot evaluation, decides PASS/FAIL).
-- Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior): **BLOCKED** (gated behind P38-WP03-R4).
+- P38-WP03-R4: **CLOSED / HISTORICAL FAILED VERIFICATION** (exposed epoch is immutable and not reusable).
+- P38-WP03-R6A.1: **CLOSED / MERGED / DEVELOPMENT ADMITTED** (review provenance v2, independent ownership/fidelity, fail-closed development admission, metric semantics, FAST contract, q14 forensic trace; no fresh holdout or one-shot).
+- Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior): **BLOCKED** (Phase 5E remains open; fresh evaluation authoring and separate admission are required).
 - Phase 5G–5H: **PLANNED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
@@ -412,7 +413,7 @@ Evidence:
 
 > Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was
 > subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438),
-> and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind P38-WP03-R4.
+> and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; P38-WP03-R6A.1 repaired evaluation admission integrity but did not execute a fresh holdout or pass Phase 5E. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
 
 ## Actions #396 exact objects
 
@@ -548,9 +549,10 @@ PHASE 5D (P38-WP02) = CLOSED / MERGED / VERIFIED / PR #439 / PR #440 / merge 19b
 P38-WP03-R1 = CLOSED / FAILURE EVIDENCE
 P38-WP03-R2 ATTEMPT = CLOSED / FAILED VERIFICATION (PR #449 runtime + PR #450 governance)
 P38-WP03-R3 = CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction; PR-R3B governance rebaseline)
-PHASE 5E (P38-WP03) = OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445 / PR #446 historical; R3 restores baseline only; P38-WP03-R4 NOT STARTED)
-P38-WP03-R4 = NOT STARTED (SEPARATE ADMISSION; freezes runtime + runner, creates fresh v1.3, seals unseen holdout, runs one-shot evaluation, decides PASS/FAIL)
-PHASE 5F (P38-WP04) = BLOCKED (Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind P38-WP03-R4)
+PHASE 5E (P38-WP03) = OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED
+P38-WP03-R4 = CLOSED / HISTORICAL FAILED VERIFICATION (not reusable)
+P38-WP03-R6A.1 = CLOSED / MERGED / DEVELOPMENT ADMITTED (no fresh holdout or one-shot)
+PHASE 5F (P38-WP04) = BLOCKED (Phase 5E remains open; fresh evaluation authoring and separate admission required)
 ```
 
 The dependency surfaces, Foundation Hardening, Actions admission, Phase 5A
@@ -627,7 +629,7 @@ repairs are canonical on protected `main`:
 
 ## Next authorized work
 
-1. Prepare P38-WP03-R4 Fresh Evaluation Re-admission first (SEPARATE ADMISSION / NOT STARTED): freeze runtime + runner, create fresh v1.3, seal unseen holdout, run one-shot evaluation, decide PASS/FAIL. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) stays BLOCKED behind R4.
+1. Prepare fresh evaluation authoring in a separate invocation. v1.5 is exposed/invalidated/unused; do not reuse it, execute a one-shot, or start Phase 5F in this gate.
 2. Adhere to strict preflight admission, TDD defect reproduction, and dual-side diff audit.
 3. Keep Phase 5F–9 runtime work, version bumps, tags, releases,
    and POWER 3.8.0 publication blocked until each declared gate is

@@ -375,13 +375,12 @@ no holdout tuning; no new holdout is created in R3 (R3 restores baseline only)
 legacy non-regression is a gate
 ```
 
-Evaluation state: v1.1 HISTORICAL / EXPOSED; v1.2 HISTORICAL FAILED EPOCH /
-EXPOSED; v1.3 NOT CREATED; NEXT FRESH HOLDOUT NOT CREATED. Tuning q29 / q32 /
-q37 against exposed revisions is forbidden. Phase 5E (P38-WP03) is OPEN / NOT
-PASSED / FRESH RE-EVALUATION REQUIRED. Phase 5F (P38-WP04 / Phase 5F Incremental
-Dense Validity / dirty-set behavior) is BLOCKED behind P38-WP03-R4. The next
-separate gate P38-WP03-R4 freezes runtime + runner, creates fresh v1.3, seals
-unseen holdout, runs one-shot evaluation, and decides PASS/FAIL; R4 NOT STARTED.
+Evaluation state: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED /
+INVALIDATED / UNUSED. Tuning against exposed revisions is forbidden. Phase 5E
+(P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED. R6A.1
+admission integrity is CLOSED / MERGED / DEVELOPMENT ADMITTED; no fresh holdout
+or one-shot was executed. Phase 5F remains BLOCKED until a separate fresh
+evaluation authoring and admission gate completes.
 
 ### Dense cost and external vector policy
 
@@ -452,15 +451,15 @@ PHASE 5C (P38-WP01): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED B
 P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #437
 PHASE 5D (P38-WP02): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #439 / PR #440 / PR #441 CORRECTED BY PR #442 / PR #443
 P38-WP02-R1 (PHASE 5D CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #443
-PHASE 5E (P38-WP03): OPEN / NOT PASSED / REMEDIATION IN PROGRESS (P38-WP03-R5 CLOSED / FAILED VERIFICATION PR #456, PR #457, PR #458; R5 epoch CLOSED / FAILED; P38-WP03-R6 active gate)
+PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (historical R1–R5 failures retained; R6A.1 admission integrity repair closed/merged/development-admitted)
 P38-WP03-R1: CLOSED / FAILURE EVIDENCE
 P38-WP03-R2 ATTEMPT: CLOSED / FAILED VERIFICATION (PR #449 runtime + PR #450 governance)
 P38-WP03-R3: CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction; PR-R3B governance rebaseline)
 P38-WP03-R4: CLOSED / FAILED VERIFICATION
 P38-WP03-R5: CLOSED / FAILED VERIFICATION (v1.4 holdout exposed; immutable development evidence)
-P38-WP03-R6: IN PROGRESS (Evaluation Fidelity, Metric Semantics & Final Phase 5E Re-admission)
+P38-WP03-R6A.1: CLOSED / MERGED / DEVELOPMENT ADMITTED (review provenance v2, fixture fidelity, fail-closed development admission, metric semantics, FAST contract; no fresh holdout or one-shot)
 PHASE 5F (P38-WP04): BLOCKED (Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind Phase 5E)
-ACTIVE EVALUATION: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 PENDING FRESH SEAL
+ACTIVE EVALUATION: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / INVALIDATED / UNUSED; fresh authoring is separate
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```

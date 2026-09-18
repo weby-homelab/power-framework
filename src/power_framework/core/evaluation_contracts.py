@@ -619,6 +619,37 @@ class SemanticReviewReceipt(EvaluationRecordModel):
         return self
 
 
+class SemanticReviewReceiptV2(EvaluationRecordModel):
+    """Review receipt bound to the exact candidate input seen by a reviewer.
+
+    This is intentionally a new contract.  Historical v1 receipts retain their
+    original meaning and remain parseable.  ``review_input_digest`` is computed
+    from the candidate corpus/query/ground-truth inputs and capability metadata
+    before review; it excludes receipts, adjudication, benchmark output, and
+    retrieval results, so the binding is acyclic.
+    """
+
+    algorithm_output_used: Literal[False]
+    ambiguous_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
+    candidate_revision: Annotated[str, Field(pattern=r"^v1(?:\.[0-9]+)?$")]
+    defect_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
+    pass_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
+    retrieval_metrics_observed: Literal[False]
+    review_input_digest: Digest
+    query_set_digest: Digest
+    reviewer_id: OpaqueReference
+    schema_version: Literal["power.retrieval-semantic-review.v2"]
+    scope_query_count: Annotated[StrictInt, Field(ge=1, le=MAX_JSONL_RECORDS)]
+    scope_source_count: Annotated[StrictInt, Field(ge=1, le=MAX_JSONL_RECORDS)]
+    source_corpus_digest: Digest
+
+    @model_validator(mode="after")
+    def validate_scope_counts(self) -> Self:
+        if self.pass_count + self.defect_count + self.ambiguous_count != self.scope_query_count:
+            raise ValueError("semantic review counts must cover the declared query scope")
+        return self
+
+
 class SemanticAdjudicationArtifact(EvaluationRecordModel):
     """Content-addressed semantic evidence bound to one corpus revision."""
 
@@ -708,6 +739,38 @@ class FixtureFidelityError(EvaluationIntegrityError):
     """Raised when runtime fixture setup fails source-concept fidelity."""
 
 
+class EvaluationOwnershipConcept(EvaluationRecordModel):
+    """Independent source-to-owner evidence for one evaluation concept."""
+
+    concept_id: OpaqueReference
+    production_owner: Literal["DecisionService", "TaskService", "ProjectStateService"]
+    required_authority: Literal["CANONICAL"]
+    required_lifecycle: Literal["created_pending", "ready", "current_state_from_events"]
+    required_source_facts: list[ShortText] = Field(min_length=1, max_length=32)
+    runtime_object_class: OpaqueReference
+    runtime_object_id: OpaqueReference | None = None
+    source_evidence_refs: list[SourceReference] = Field(min_length=1, max_length=8)
+    source_representations: list[OpaqueReference] = Field(min_length=1, max_length=8)
+
+    _unique_source_refs = field_validator(
+        "source_evidence_refs", "source_representations", "required_source_facts"
+    )(_unique)
+
+
+class EvaluationOwnershipContract(EvaluationRecordModel):
+    """Phase-owned contract independent from queries, GT, and ranking output."""
+
+    concepts: list[EvaluationOwnershipConcept] = Field(min_length=1, max_length=128)
+    schema_version: Literal["power.retrieval-evaluation-ownership.v1"]
+
+    @model_validator(mode="after")
+    def validate_concept_ids(self) -> Self:
+        ids = [concept.concept_id for concept in self.concepts]
+        if len(ids) != len(set(ids)):
+            raise ValueError("ownership contract concept IDs must be unique")
+        return self
+
+
 @dataclass(frozen=True)
 class EvaluationVerificationSnapshot:
     """Verified integrity result plus counters captured during that read."""
@@ -716,6 +779,19 @@ class EvaluationVerificationSnapshot:
     manifest: EvaluationCorpusManifest
     holdout_rows_read: int
     holdout_bytes_read: int
+
+
+@dataclass(frozen=True)
+class VerifiedDevelopmentSnapshot:
+    """Development-only evidence loaded without reading holdout artifacts."""
+
+    manifest: EvaluationCorpusManifest
+    source_rows: tuple[EvaluationSourceMetadata, ...]
+    queries: tuple[EvaluationQuery, ...]
+    ground_truth: tuple[EvaluationGroundTruth, ...]
+    source_corpus_digest: str
+    development_digest: str
+    holdout_used: bool = False
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -806,6 +882,12 @@ def _read_json(path: Path) -> Any:
         error_code="invalid_json",
         error_message="evaluation artifact is not valid UTF-8 JSON",
     )
+
+
+def load_bounded_json(path: Path | str) -> Any:
+    """Read one repository-owned JSON artifact with bounded no-follow I/O."""
+
+    return _read_json(Path(path))
 
 
 def _read_jsonl_with_size(path: Path) -> tuple[list[dict[str, Any]], int]:
@@ -1678,6 +1760,385 @@ def _query_set_digest(development: list[EvaluationQuery], holdout: list[Evaluati
     )
 
 
+def compute_review_input_digest(
+    *,
+    candidate_revision: str,
+    capability_contract_revision: str,
+    source_corpus_digest: str,
+    source_metadata_identity: str,
+    development_queries: list[dict[str, Any]],
+    holdout_queries: list[dict[str, Any]],
+    development_ground_truth: list[dict[str, Any]],
+    holdout_ground_truth: list[dict[str, Any]],
+) -> str:
+    """Digest the exact semantic-review input, excluding all review outputs.
+
+    The explicit payload is the non-circular review boundary.  It includes both
+    split inputs, source identity, candidate revision, and capability contract;
+    it deliberately has no receipt, adjudication, retrieval-result, or metric
+    field.
+    """
+
+    if not re.fullmatch(r"^v1(?:\.[0-9]+)?$", candidate_revision):
+        raise ValueError("candidate_revision must match the evaluation revision format")
+    payload = {
+        "candidate_revision": candidate_revision,
+        "capability_contract_revision": capability_contract_revision,
+        "source_corpus_digest": source_corpus_digest,
+        "source_metadata_identity": source_metadata_identity,
+        "queries": {
+            "development": sorted(
+                development_queries, key=lambda row: str(row.get("query_id", ""))
+            ),
+            "holdout": sorted(holdout_queries, key=lambda row: str(row.get("query_id", ""))),
+        },
+        "ground_truth": {
+            "development": sorted(
+                development_ground_truth, key=lambda row: str(row.get("query_id", ""))
+            ),
+            "holdout": sorted(holdout_ground_truth, key=lambda row: str(row.get("query_id", ""))),
+        },
+    }
+    return canonical_sha256(payload)
+
+
+def validate_semantic_review_receipt_v2(
+    receipt: SemanticReviewReceiptV2,
+    *,
+    candidate_revision: str,
+    review_input_digest: str,
+    query_set_digest: str,
+    source_corpus_digest: str,
+    scope_query_count: int,
+    scope_source_count: int,
+) -> None:
+    """Validate a v2 receipt against the exact input that was reviewed."""
+
+    checks = (
+        (
+            receipt.candidate_revision == candidate_revision,
+            "semantic review candidate revision does not match the admitted candidate",
+        ),
+        (
+            receipt.review_input_digest == review_input_digest,
+            "semantic review input digest does not match the reviewed input",
+        ),
+        (
+            receipt.query_set_digest == query_set_digest,
+            "semantic review query-set digest does not match the reviewed query set",
+        ),
+        (
+            receipt.source_corpus_digest == source_corpus_digest,
+            "semantic review source corpus digest does not match the reviewed corpus",
+        ),
+        (
+            receipt.scope_query_count == scope_query_count,
+            "semantic review query scope does not match the reviewed query count",
+        ),
+        (
+            receipt.scope_source_count == scope_source_count,
+            "semantic review source scope does not match the reviewed source count",
+        ),
+    )
+    for matches, message in checks:
+        if not matches:
+            raise EvaluationIntegrityError("semantic_review_binding", message)
+
+
+_QUERY_ID_MARKER = re.compile(r"\bp38-(?:dev|ho|v13|v14)-q\d+\b", re.IGNORECASE)
+_TERMINAL_DECISION_MARKER = re.compile(r"\b(?:approved|final|resolved|rejected)\b", re.IGNORECASE)
+
+
+def _read_fidelity_source(corpus_root: Path, reference: str) -> str:
+    """Read one direct corpus Markdown file through the bounded verifier."""
+
+    if (
+        not reference.endswith(".md")
+        or Path(reference).name != reference
+        or reference.startswith(("/", "\\"))
+        or ".." in Path(reference).parts
+    ):
+        raise FixtureFidelityError(
+            "unsafe_source_reference", "ownership source reference is unsafe"
+        )
+    try:
+        path = _fixture_path(corpus_root, reference)
+        data = _read_bounded_regular_file(path)
+        return data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise FixtureFidelityError(
+            "invalid_source_encoding", "ownership source evidence is not valid UTF-8"
+        ) from exc
+    except EvaluationIntegrityError as exc:
+        raise FixtureFidelityError(
+            exc.code, f"ownership source evidence is unreadable: {exc.code}"
+        ) from exc
+
+
+def _payload_text(payload: dict[str, Any]) -> str:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True).casefold()
+
+
+def _verify_fidelity_lifecycle(
+    concept: EvaluationOwnershipConcept, payload: dict[str, Any], payload_text: str
+) -> None:
+    lifecycle = concept.required_lifecycle
+    if lifecycle == "created_pending":
+        status = payload.get("status")
+        if status not in (None, "pending"):
+            raise FixtureFidelityError(
+                "lifecycle_mismatch", "created decision fixture must remain pending"
+            )
+        if any(
+            key in payload
+            for key in ("resolved_at", "resolved_by", "resolution_action", "receipt_id")
+        ):
+            raise FixtureFidelityError(
+                "lifecycle_mismatch", "pending decision fixture contains resolution evidence"
+            )
+        title = str(payload.get("title", ""))
+        description = str(payload.get("description", ""))
+        if _TERMINAL_DECISION_MARKER.search(f"{title} {description}"):
+            raise FixtureFidelityError(
+                "lifecycle_mismatch", "pending decision fixture claims terminal status"
+            )
+    elif lifecycle == "ready":
+        if payload.get("state") != "ready":
+            raise FixtureFidelityError(
+                "lifecycle_mismatch", "task fixture does not preserve the ready lifecycle state"
+            )
+    elif lifecycle == "current_state_from_events":
+        events = payload.get("events")
+        if not isinstance(events, list) or not events:
+            raise FixtureFidelityError(
+                "lifecycle_mismatch", "project fixture must contain lifecycle events"
+            )
+        if any(not isinstance(event, dict) or not event.get("event_type") for event in events):
+            raise FixtureFidelityError(
+                "lifecycle_mismatch", "project lifecycle events must be typed objects"
+            )
+    if _QUERY_ID_MARKER.search(payload_text):
+        raise FixtureFidelityError(
+            "query_specific_enrichment", "fixture payload contains a benchmark query identifier"
+        )
+
+
+def verify_fixture_fidelity_v2(
+    manifest_data: dict[str, Any],
+    ownership_data: dict[str, Any],
+    corpus_dir: Path | str,
+) -> dict[str, Any]:
+    """Verify fixture fidelity against an independent ownership contract."""
+
+    try:
+        ownership = EvaluationOwnershipContract.model_validate(ownership_data)
+    except ValidationError as exc:
+        raise FixtureFidelityError(
+            "ownership_contract_invalid", "ownership contract failed strict validation"
+        ) from exc
+    concepts = manifest_data.get("concepts")
+    if not isinstance(concepts, list) or not concepts:
+        raise FixtureFidelityError("empty_concepts", "fixture manifest contains no concepts")
+    manifest_by_id: dict[str, dict[str, Any]] = {}
+    for item in concepts:
+        if not isinstance(item, dict) or not isinstance(item.get("eval_concept_id"), str):
+            raise FixtureFidelityError("missing_concept_id", "fixture concept identity is invalid")
+        concept_id = str(item["eval_concept_id"])
+        if concept_id in manifest_by_id:
+            raise FixtureFidelityError("duplicate_concept_id", "fixture concept IDs must be unique")
+        manifest_by_id[concept_id] = item
+
+    corpus_root = Path(corpus_dir)
+    if corpus_root.is_symlink() or not corpus_root.is_dir():
+        raise FixtureFidelityError(
+            "unsafe_corpus_root", "fixture corpus root is not a regular directory"
+        )
+    corpus_root = corpus_root.resolve()
+    verified: list[str] = []
+    contract_ids = {concept.concept_id for concept in ownership.concepts}
+    manifest_text = json.dumps(manifest_data, ensure_ascii=False, sort_keys=True).casefold()
+    if _QUERY_ID_MARKER.search(manifest_text):
+        raise FixtureFidelityError(
+            "query_specific_enrichment", "fixture manifest contains a benchmark query identifier"
+        )
+    for concept_id, fixture in manifest_by_id.items():
+        if concept_id in contract_ids:
+            continue
+        if fixture.get("owner_backed") is not False:
+            raise FixtureFidelityError(
+                "ownership_mismatch",
+                "ownership mismatch: unowned fixture concept must not claim owner backing",
+            )
+        if fixture.get("production_owner") not in ("VaultNote", "Quarantine"):
+            raise FixtureFidelityError(
+                "fabricated_authority", "unowned fixture concept declares a production owner"
+            )
+        if fixture.get("expected_runtime_authority") is not None:
+            raise FixtureFidelityError(
+                "fabricated_authority", "unowned fixture concept declares runtime authority"
+            )
+        if fixture.get("runtime_object_id") is not None or fixture.get("setup_payload") is not None:
+            raise FixtureFidelityError(
+                "fabricated_authority", "unowned fixture concept declares runtime setup"
+            )
+
+    for contract_concept in ownership.concepts:
+        fixture_candidate = manifest_by_id.get(contract_concept.concept_id)
+        if fixture_candidate is None:
+            raise FixtureFidelityError(
+                "ownership_mismatch", "fixture is missing an independently owned concept"
+            )
+        fixture = fixture_candidate
+        if fixture.get("owner_backed") is not True:
+            raise FixtureFidelityError(
+                "ownership_mismatch", "independently owned concept is not marked owner-backed"
+            )
+        if fixture.get("production_owner") != contract_concept.production_owner:
+            raise FixtureFidelityError(
+                "ownership_mismatch", "fixture owner does not match independent ownership contract"
+            )
+        if fixture.get("expected_runtime_authority") != contract_concept.required_authority:
+            raise FixtureFidelityError(
+                "ownership_mismatch",
+                "fixture authority does not match independent ownership contract",
+            )
+        if fixture.get("runtime_object_class") != contract_concept.runtime_object_class:
+            raise FixtureFidelityError(
+                "ownership_mismatch", "fixture runtime class does not match ownership contract"
+            )
+        if (
+            contract_concept.runtime_object_id is not None
+            and fixture.get("runtime_object_id") != contract_concept.runtime_object_id
+        ):
+            raise FixtureFidelityError(
+                "ownership_mismatch", "fixture runtime identity does not match ownership contract"
+            )
+        representations = fixture.get("note_representations")
+        if not isinstance(representations, list) or not all(
+            isinstance(reference, str) for reference in representations
+        ):
+            raise FixtureFidelityError(
+                "source_representation_mismatch", "fixture source representations must be strings"
+            )
+        if set(representations) != set(contract_concept.source_representations):
+            raise FixtureFidelityError(
+                "source_representation_mismatch",
+                "fixture source representations do not match independent ownership evidence",
+            )
+        payload = fixture.get("setup_payload")
+        if not isinstance(payload, dict):
+            raise FixtureFidelityError(
+                "missing_setup_payload", "owner-backed fixture requires a setup payload"
+            )
+        payload_text = _payload_text(payload)
+        _verify_fidelity_lifecycle(contract_concept, payload, payload_text)
+        source_text = "\n".join(
+            _read_fidelity_source(corpus_root, str(reference))
+            for reference in contract_concept.source_evidence_refs
+        ).casefold()
+        if any(
+            fact.casefold() not in source_text for fact in contract_concept.required_source_facts
+        ):
+            raise FixtureFidelityError(
+                "source_fact_missing", "ownership contract references an unproven source fact"
+            )
+        if any(
+            fact.casefold() not in payload_text for fact in contract_concept.required_source_facts
+        ):
+            raise FixtureFidelityError(
+                "material_fact_deletion", "fixture payload omits a material source fact"
+            )
+        verified.append(contract_concept.concept_id)
+
+    return {
+        "status": "PASS",
+        "owner_backed_concepts": len(verified),
+        "total_concepts": len(concepts),
+        "verified_concepts": verified,
+        "ownership_contract_version": ownership.schema_version,
+    }
+
+
+def load_verified_development_snapshot(
+    root: Path, *, expected_revision: str | None = None
+) -> VerifiedDevelopmentSnapshot:
+    """Load and verify development inputs without opening holdout artifacts.
+
+    This is intentionally separate from :func:`verify_evaluation_corpus`, whose
+    integrity mode must inspect both splits and produce holdout-read evidence.
+    The function never calls a helper that enumerates or opens holdout files.
+    """
+
+    root = root.resolve()
+    try:
+        manifest = EvaluationCorpusManifest.model_validate(
+            _read_json(_fixture_path(root, "manifest.json"))
+        )
+        if expected_revision is not None and manifest.evaluation_revision != expected_revision:
+            raise EvaluationIntegrityError(
+                "revision_mismatch", "requested revision is not the manifest"
+            )
+        spec = _check_pinned_manifest(manifest)
+        _check_manifest_provenance(manifest, spec)
+        source_rows = [
+            EvaluationSourceMetadata.model_validate(row)
+            for row in _read_jsonl(_fixture_path(root, "source_metadata.jsonl"))
+        ]
+        source_entries = _source_entries(root, source_rows)
+        source_digest = _source_corpus_digest(source_entries)
+        expected_source_digest = spec["digests"].get("source_corpus_digest")
+        if (
+            source_digest != expected_source_digest
+            or manifest.source_corpus_digest != source_digest
+        ):
+            raise EvaluationIntegrityError(
+                "source_digest_mismatch", "development source corpus is not frozen"
+            )
+        queries = [
+            EvaluationQuery.model_validate(row)
+            for row in _read_jsonl(_fixture_path(root, "queries.development.jsonl"))
+        ]
+        ground_truth = [
+            EvaluationGroundTruth.model_validate(row)
+            for row in _read_jsonl(_fixture_path(root, "ground_truth.development.jsonl"))
+        ]
+        _check_ground_truth(
+            source_rows,
+            queries,
+            [],
+            ground_truth,
+            expected_split=EvaluationSplitName.DEVELOPMENT,
+        )
+        _check_ground_truth_provenance(ground_truth, manifest.evaluation_revision)
+        development_digest = _split_digest(queries, ground_truth)
+        expected_development_digest = spec["digests"]["development_digest"]
+        if (
+            development_digest != expected_development_digest
+            or development_digest != manifest.development_split.digest
+        ):
+            raise EvaluationIntegrityError(
+                "development_digest_mismatch", "development input is not frozen"
+            )
+        if len(queries) != manifest.development_split.query_count:
+            raise EvaluationIntegrityError(
+                "query_count_mismatch", "development query count does not match manifest"
+            )
+        return VerifiedDevelopmentSnapshot(
+            manifest=manifest,
+            source_rows=tuple(source_rows),
+            queries=tuple(queries),
+            ground_truth=tuple(ground_truth),
+            source_corpus_digest=source_digest,
+            development_digest=development_digest,
+        )
+    except EvaluationIntegrityError:
+        raise
+    except ValidationError as exc:
+        raise EvaluationIntegrityError(
+            "schema_mismatch", "development input failed strict validation"
+        ) from exc
+
+
 def verify_evaluation_corpus(
     root: Path, *, expected_revision: str | None = None, return_snapshot: bool = False
 ) -> dict[str, Any] | EvaluationVerificationSnapshot:
@@ -2101,6 +2562,8 @@ __all__ = [
     "EvaluationGroundTruth",
     "EvaluationIntegrityError",
     "EvaluationLanguage",
+    "EvaluationOwnershipConcept",
+    "EvaluationOwnershipContract",
     "EvaluationQuery",
     "EvaluationSourceMetadata",
     "EvaluationVerificationSnapshot",
@@ -2112,11 +2575,18 @@ __all__ = [
     "SemanticAdjudicationArtifact",
     "SemanticAdjudicationRecord",
     "SemanticReviewReceipt",
+    "SemanticReviewReceiptV2",
+    "VerifiedDevelopmentSnapshot",
     "build_holdout_access_receipt",
+    "compute_review_input_digest",
+    "load_bounded_json",
     "load_development_for_tuning",
+    "load_verified_development_snapshot",
     "normalize_query_text",
     "register_evaluation_revision",
     "reject_holdout_tuning",
+    "validate_semantic_review_receipt_v2",
     "verify_evaluation_corpus",
     "verify_fixture_fidelity",
+    "verify_fixture_fidelity_v2",
 ]

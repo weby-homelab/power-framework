@@ -1,0 +1,30 @@
+{
+  "schema_version": "power.retrieval-semantic-review.v2",
+  "candidate_revision_field": "candidate_revision",
+  "review_input_digest_field": "review_input_digest",
+  "query_set_digest_field": "query_set_digest",
+  "source_corpus_digest_field": "source_corpus_digest",
+  "scope_fields": ["scope_query_count", "scope_source_count"],
+  "required_flags": {
+    "algorithm_output_used": false,
+    "retrieval_metrics_observed": false
+  },
+  "review_input_digest_includes": [
+    "candidate_revision",
+    "capability_contract_revision",
+    "source_corpus_digest",
+    "source_metadata_identity",
+    "queries.development",
+    "queries.holdout",
+    "ground_truth.development",
+    "ground_truth.holdout"
+  ],
+  "review_input_digest_excludes": [
+    "review_receipts",
+    "semantic_adjudication",
+    "benchmark_output",
+    "retrieval_results",
+    "metric_results"
+  ],
+  "historical_contract": "power.retrieval-semantic-review.v1 remains parseable and immutable"
+}

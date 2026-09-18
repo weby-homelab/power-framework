@@ -17,23 +17,61 @@ TEXT != AUTHORITY, TAG != AUTHORITY, PATH != AUTHORITY, DOMAIN != AUTHORITY.
 
 from __future__ import annotations
 
-import json
+import hashlib
 from pathlib import Path
 from typing import Any
+
+from power_framework.core.evaluation_contracts import load_bounded_json
+from power_framework.core.utils import read_file_bytes_no_follow
 
 _MANIFEST_DEFAULT = (
     Path(__file__).resolve().parent.parent
     / "artifacts"
     / "project-state"
     / "phase-5e"
-    / "phase5e_runtime_fixture_manifest_r6.json"
+    / "phase5e_runtime_fixture_manifest_r6a1.json"
 )
 
 
 def load_manifest(manifest_path: Path | str = _MANIFEST_DEFAULT) -> dict[str, Any]:
-    """Load the frozen R6 fixture manifest (read-only)."""
-    with Path(manifest_path).open("r", encoding="utf-8") as f:
-        return json.load(f)
+    """Load the immutable R6A.1 manifest and its exact R6 base snapshot."""
+    path = Path(manifest_path)
+    data = load_bounded_json(path)
+    if not isinstance(data, dict):
+        raise ValueError("fixture manifest must be a JSON object")
+    base_reference = data.get("base_manifest_path")
+    if base_reference is None:
+        return data
+    if (
+        not isinstance(base_reference, str)
+        or Path(base_reference).name != base_reference
+        or Path(base_reference).suffix != ".json"
+        or ".." in Path(base_reference).parts
+    ):
+        raise ValueError("R6A.1 base manifest reference is unsafe")
+    base_path = path.parent / base_reference
+    base_bytes = read_file_bytes_no_follow(base_path, max_bytes=4 * 1024 * 1024)
+    actual_base_digest = hashlib.sha256(base_bytes).hexdigest()
+    if actual_base_digest != data.get("base_manifest_sha256"):
+        raise ValueError("R6A.1 base manifest digest mismatch")
+    base = load_bounded_json(base_path)
+    if not isinstance(base, dict):
+        raise ValueError("R6 base manifest must be a JSON object")
+    merged = dict(base)
+    merged.pop("runtime_main_sha", None)
+    merged.update({key: value for key, value in data.items() if key != "base_manifest_path"})
+    overrides = data.get("concept_overrides", {})
+    if not isinstance(overrides, dict):
+        raise ValueError("R6A.1 concept_overrides must be an object")
+    concepts = [dict(concept) for concept in merged.get("concepts", [])]
+    concepts_by_id = {str(concept.get("eval_concept_id")): concept for concept in concepts}
+    for concept_id, override in overrides.items():
+        if concept_id not in concepts_by_id or not isinstance(override, dict):
+            raise ValueError("R6A.1 concept override is invalid")
+        concepts_by_id[concept_id].update(override)
+    merged["concepts"] = concepts
+    merged["base_manifest_path"] = base_reference
+    return merged
 
 
 def _normalize_raw_source_id(raw_id: str) -> str:

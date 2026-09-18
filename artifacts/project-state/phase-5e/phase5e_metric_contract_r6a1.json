@@ -1,0 +1,29 @@
+{
+  "schema_version": "power.retrieval-metric-applicability.r6a1.v1",
+  "pipeline": [
+    "query_intent",
+    "eligible_answer_set",
+    "authority_temporal_supersession_contradiction",
+    "relevance"
+  ],
+  "winner_missing": {
+    "applicable_when": "legitimate owner-backed expected winner exists",
+    "violation_when": "winner is absent from the evaluated result boundary"
+  },
+  "provenance_failure": {
+    "applicable_when": "expected winner is present",
+    "violation_when": "present winner lacks required owner provenance"
+  },
+  "outranked_by_relevance": {
+    "applicable_when": "winner is present and a lower-authority same-subject competitor is present",
+    "violation_when": "competitor ranks above the legitimate canonical winner",
+    "winner_missing_result": "NOT_APPLICABLE"
+  },
+  "same_subject_identity": "source ID, runtime ID, and path-form source ID are normalized through one concept mapping",
+  "authority_order": "only eligible same-subject competitors are included; unrelated raw candidates do not create violations",
+  "coverage_reporting": [
+    "applicable_query_count",
+    "measured_violation_count",
+    "not_applicable_count"
+  ]
+}
