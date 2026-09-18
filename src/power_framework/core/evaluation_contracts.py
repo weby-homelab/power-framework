@@ -261,6 +261,52 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
             "source_metadata.jsonl": "6b6d43f0ad3a63a0b4bd4b98f23c4bb74e700b4c3f480ad207dc622294be67c9",
         },
     },
+    "v1.4": {
+        "active": True,
+        "lifecycle_status": "ACTIVE_PRODUCTION",
+        "digests": {
+            "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+            "dataset_digest": "a37269ca5d7ff45af5c11ef0ffd2dd33a0b818452a700a89f4248daab01a2fdf",
+            "query_set_digest": "95137cccd27ca4d525a244c3b3902d741cf018a378368c020f20ebf9d1fa7ecd",
+            "development_digest": "6aa73e8a0c039cd9741fb1fada48acbc372196c1ef41ec31f426c5b564b09175",
+            "holdout_digest": "3e3b219a6f879d5f951641169f65471cd190e226a2d193ccb9c589d2c5f65f91",
+            "disjointness_digest": "31874c2d5aa6d13f764c0dd681042d61bbd74f3095b2f58228a814654de92367",
+            "semantic_adjudication_digest": "87f54c5f41aae4fdf1f6170ec8d38956116c79c5a5b186fbc921694a1aade68f",
+            "semantic_adjudication_markdown_digest": "4a7313c7c879322affeff355f32e01dabd77ff2559151858aec82c45e85c0245",
+            "holdout_access_receipt_digest": "9a7abc13272dcd85090f828152970245d9cde8edea0e34a17e7c514785ec74f1",
+        },
+        "semantic_status": "PASS",
+        "refs": {
+            "holdout_access_audit": "holdout-access-receipt-v1.4",
+            "sealed_artifact_ref": "power38-holdout-v1.4-sealed",
+            "disjointness_proof_ref": "disjointness-proof-v1.4",
+            "provenance_source_ref": "power38-ground-truth-v1.4",
+            "provenance_method": "human_adjudicated",
+            "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+            "semantic_adjudication_markdown_digest": "4a7313c7c879322affeff355f32e01dabd77ff2559151858aec82c45e85c0245",
+            "holdout_access_receipt_digest": "9a7abc13272dcd85090f828152970245d9cde8edea0e34a17e7c514785ec74f1",
+            "planning_only": True,
+            "supersedes_revision": "v1.1",
+            "semantic_adjudication_ref": "semantic-adjudication-v1.4",
+            "reviewer_a_receipt_ref": "semantic-review-a-v1.4",
+            "reviewer_b_receipt_ref": "semantic-review-b-v1.4",
+        },
+        "root_file_sha256": {
+            "README.md": "251c0408cd725d58bf2082c0589f8080393bcebd4e16ac68e52e7ebe7165e861",
+            "disjointness-proof.json": "6ff59242bf1f6eff2e57c10b1d216aff7c81c8ce86d9bf9f50e1e603d604dc0b",
+            "ground_truth.development.jsonl": "4d26b0c237fc194753546f2fb8e0a2d350417b8325a07f1402c7a3154341304e",
+            "ground_truth.holdout.jsonl": "483f311901898a7ee73163e0d8e6cb2efe9a9a41a9be4dc9d64a6a47f4ef7027",
+            "holdout-access-receipt.json": "9a7abc13272dcd85090f828152970245d9cde8edea0e34a17e7c514785ec74f1",
+            "manifest.json": "e728c269ee7e15fb08265fabf791d548704b71ef1f892bc3963834beaee3b98c",
+            "queries.development.jsonl": "f4e3adcd0d99e578bca5092eb6f36f70b3f5de72dfd33295ca6465409f1eec9d",
+            "queries.holdout.jsonl": "652588527865afaefce93d7344e07e9813698b6ef28362cb038903dfd682eb75",
+            "semantic-adjudication.json": "67f30399782fc7edc17d12b15ef8f8b9d95023a68bcf4204c4c5cc44ac89d57a",
+            "semantic-adjudication.md": "4a7313c7c879322affeff355f32e01dabd77ff2559151858aec82c45e85c0245",
+            "semantic-review-a-v1.4.json": "a4a55cbe9dd61c4154592ebc23b925e6c58b3ebc03ab10bef7d6a919b39e9c4e",
+            "semantic-review-b-v1.4.json": "f976bd61ff5354c85577a9c72a18b3a08f9d916550b0ca8de41ebba64e10e88d",
+            "source_metadata.jsonl": "6b6d43f0ad3a63a0b4bd4b98f23c4bb74e700b4c3f480ad207dc622294be67c9",
+        },
+    },
 }
 
 
@@ -885,7 +931,7 @@ def _parse_models(
             _read_json(_fixture_path(root, "holdout-access-receipt.json"))
         )
         semantic_adjudication = None
-        if manifest.evaluation_revision in {"v1.1", "v1.2"}:
+        if (root / "semantic-adjudication.json").is_file():
             semantic_adjudication = SemanticAdjudicationArtifact.model_validate(
                 _read_json(_fixture_path(root, "semantic-adjudication.json"))
             )
@@ -1528,7 +1574,7 @@ def _ground_truth_provenance_digest(record: EvaluationGroundTruth, revision: str
 def _check_ground_truth_provenance(
     ground_truth: list[EvaluationGroundTruth], revision: str
 ) -> None:
-    if revision not in {"v1.1", "v1.2"}:
+    if revision == "v1":
         return
     if any(
         record.provenance_digest != _ground_truth_provenance_digest(record, revision)
