@@ -1,0 +1,39 @@
+{
+  "base_manifest_path": "phase5e_runtime_fixture_manifest_r6.json",
+  "base_manifest_sha256": "a2d19f05c3504f76e3ba9497a4df08823b99a609dfeb0ed05b2a49f01e07d6a9",
+  "concept_overrides": {
+    "decision-current": {
+      "runtime_object_class": "Decision",
+      "scoring_aliases": [
+        "p38-src-decision-current",
+        "decision:dec_x-freeze-phase5a-corpus-decision"
+      ]
+    },
+    "project-current": {
+      "runtime_object_class": "ProjectState",
+      "setup_payload": {
+        "events": [
+          {
+            "actor": "fixture-setup",
+            "event_type": "project.created",
+            "payload": {
+              "description": "Deterministic fixture: POWER 3.8 at the Phase 5A runtime-contract admission boundary; Foundation Hardening is closed and Phase 5B has not started.",
+              "name": "POWER current project phase status",
+              "status": "current; Foundation Hardening closed; Phase 5B not started"
+            }
+          }
+        ],
+        "name": "POWER current project phase status",
+        "project_id": "prj_x-power-current-project-phase-status"
+      }
+    },
+    "task-current": {
+      "runtime_object_class": "PowerTask"
+    }
+  },
+  "manifest_version": "r6a1",
+  "runtime_base_sha": "10321b748a4b144c16720b4109c4c2c65fead83a",
+  "setup_payload_digest": "c05cb249ad2cc4b47dd6b895f9cde4eda24eb37dafa56d4a08894786555d10d3",
+  "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+  "source_corpus_version": "v1.1"
+}

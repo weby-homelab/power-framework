@@ -1,0 +1,41 @@
+{
+  "schema_version": "power.retrieval-evaluation-ownership.v1",
+  "concepts": [
+    {
+      "concept_id": "decision-current",
+      "source_representations": ["p38-src-decision-current"],
+      "production_owner": "DecisionService",
+      "runtime_object_class": "Decision",
+      "runtime_object_id": "dec_x-freeze-phase5a-corpus-decision",
+      "required_authority": "CANONICAL",
+      "required_lifecycle": "created_pending",
+      "required_source_facts": ["freeze", "do not tune", "integrity verification"],
+      "source_evidence_refs": ["p38-src-decision-current.md"]
+    },
+    {
+      "concept_id": "project-current",
+      "source_representations": [
+        "p38-src-project-current",
+        "p38-src-project-current-ua"
+      ],
+      "production_owner": "ProjectStateService",
+      "runtime_object_class": "ProjectState",
+      "runtime_object_id": "prj_x-power-current-project-phase-status",
+      "required_authority": "CANONICAL",
+      "required_lifecycle": "current_state_from_events",
+      "required_source_facts": ["current", "Phase 5A", "Phase 5B"],
+      "source_evidence_refs": ["p38-src-project-current.md"]
+    },
+    {
+      "concept_id": "task-current",
+      "source_representations": ["p38-src-task-current"],
+      "production_owner": "TaskService",
+      "runtime_object_class": "PowerTask",
+      "runtime_object_id": "p38-task-current-corpus-verify",
+      "required_authority": "CANONICAL",
+      "required_lifecycle": "ready",
+      "required_source_facts": ["verify", "ready"],
+      "source_evidence_refs": ["p38-src-task-current.md"]
+    }
+  ]
+}

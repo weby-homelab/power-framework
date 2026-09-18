@@ -1,0 +1,121 @@
+{
+  "protocol_version": "power.retrieval-benchmark-protocol-freeze.r6a1.v1",
+  "frozen_at": "2026-09-18T18:50:00Z",
+  "governance": {
+    "phase": "Phase 5E / P38-WP03-R6A.1",
+    "operator": "weby-homelab <rekvizitor.ua@gmail.com>",
+    "gpg_key_id": "2D49E810C7F2527E",
+    "merge_sha": "NOT_KNOWN_BEFORE_PROTECTED_MERGE"
+  },
+  "runtime": {
+    "base_sha": "10321b748a4b144c16720b4109c4c2c65fead83a",
+    "path": "src/power_framework/core/retrieval_planner.py",
+    "sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf",
+    "production_behavior_changed": false
+  },
+  "runner": {
+    "path": "scripts/benchmark_phase5e_r6.py",
+    "sha256": "f54117b9dd16f64a04e19fcaef412dca32f6c8d54f5ee293bd95369bd67b164d"
+  },
+  "concept_mapping": {
+    "path": "scripts/phase5e_concept_mapping_r6.py",
+    "sha256": "7a393ed2e8c188465eac9fcaaed1164a3b39c4286aa12bcd64a28131ae5df857"
+  },
+  "evaluation_contracts": {
+    "path": "src/power_framework/core/evaluation_contracts.py",
+    "sha256": "f28106e72a0be0e3e83b566ee8986f4e77842e41c1e4dc764ca904b37fa40a11",
+    "historical_v1_review_contract_parseable": true,
+    "review_contract_path": "artifacts/project-state/phase-5e/phase5e_review_contract_r6a1.json",
+    "review_contract_sha256": "e99f945d459edfde5b23fd95b0cfc8a038ab801bb55188e8db2a7562f6d4315b"
+  },
+  "fixture_manifest": {
+    "path": "artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6a1.json",
+    "sha256": "9a152780cb1d51efc07aafdee50c5118ea8562065802272ebdca2a2596a70305",
+    "version": "r6a1",
+    "runtime_base_sha": "10321b748a4b144c16720b4109c4c2c65fead83a",
+    "setup_payload_digest": "c05cb249ad2cc4b47dd6b895f9cde4eda24eb37dafa56d4a08894786555d10d3",
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118"
+  },
+  "ownership_contract": {
+    "path": "artifacts/project-state/phase-5e/phase5e_evaluation_ownership_r6a1.json",
+    "sha256": "505f1ede6ba71377c24fbf62de805ed8d5ec3e5d7423de30f9cc00b3f27516f9",
+    "fidelity_verifier": "verify_fixture_fidelity_v2",
+    "owner_inference_from_concept_name": false,
+    "owner_inference_from_path_type_tag_domain_gt": false,
+    "lifecycle_contract": "Decision created_pending; Task ready; ProjectState current_state_from_events"
+  },
+  "fast_capability_contract": {
+    "path": "artifacts/project-state/phase-5e/phase5e_fast_capability_r6a1.json",
+    "sha256": "1a1b2b32e3d01cbcd4a861ee854c8c51687ee104923d1930d25cc0a555848953",
+    "runtime_conformance_separate_from_expectation_compatibility": true,
+    "cross_language_paraphrase_guaranteed": false
+  },
+  "metric_contract": {
+    "path": "artifacts/project-state/phase-5e/phase5e_metric_contract_r6a1.json",
+    "sha256": "0083ae4ada3b1f6069d488d1a8739817d7272b5ea3a54431a895afdf7c71d14e",
+    "winner_missing_not_outranked": true,
+    "provenance_requires_present_winner": true,
+    "same_subject_uses_normalized_concept_ids": true,
+    "authority_order_restricted_to_eligible_set": true
+  },
+  "development_evidence": {
+    "path": "artifacts/project-state/phase-5e/phase5e_development_r6a1_fast.json",
+    "sha256": "cbcd0fe5b1a6e8f517a5347a669255cba5daec6f8cdce340c72935b232884bd2",
+    "development_evidence_sha256": "cbcd0fe5b1a6e8f517a5347a669255cba5daec6f8cdce340c72935b232884bd2",
+    "revision": "v1.4",
+    "split": "development",
+    "holdout_used": false,
+    "input_verification": "PASS",
+    "fixture_fidelity": "PASS",
+    "shadow_recall_at_5": 1.0,
+    "shadow_mrr": 0.7417,
+    "shadow_ndcg_at_10": 0.9052,
+    "shadow_map": 0.8917,
+    "quality_thresholds_pass": true,
+    "all_hard_invariants_pass": true,
+    "authority_order_applicable_query_count": 0,
+    "authority_outranked_applicable_query_count": 0,
+    "legacy_default_switches": 0
+  },
+  "q14_diagnostic": {
+    "path": "logical:phase5e-q14-v1.4-r6a1-diagnostic",
+    "harness_path": "scripts/diagnose_phase5e_q14_r6a1.py",
+    "harness_sha256": "b3f755750511b70631bcb3cdc0eeed4a3b9f996a33878afdf46048d5b2d21f0e",
+    "historical_revision": "v1.4",
+    "executed": true,
+    "admission_evidence": false,
+    "root_disposition": "MIXED",
+    "production_runtime_defect_proven": false,
+    "decision_service_read": true,
+    "decision_status": "pending",
+    "canonical_eligibility": "none",
+    "fts_result_count": 0,
+    "packing_item_count": 0,
+    "fast_capability_mismatch_only_component": true,
+    "evaluation_semantics_defect_component": true
+  },
+  "quality_thresholds": {
+    "Recall@5": ">= 0.70",
+    "MRR": ">= 0.50",
+    "nDCG@10": ">= 0.60"
+  },
+  "hard_invariants": {
+    "winner_missing": 0,
+    "provenance_failures": 0,
+    "true_outranked_by_relevance": 0,
+    "authority_order_violations": 0,
+    "query_side_writes": 0,
+    "scope_escape": 0,
+    "secret_leakage": 0,
+    "prompt_injection_authority_escalation": 0,
+    "determinism_mismatch": 0,
+    "default_switches": 0,
+    "resource_bounds": "PASS"
+  },
+  "future_holdout": {
+    "runner_policy": "full verifier + exact revision + seal/inventory + review input + adjudication + fixture fidelity",
+    "executed_in_this_invocation": false,
+    "fresh_revision_authored_in_this_invocation": false,
+    "v1.5_reused": false
+  }
+}

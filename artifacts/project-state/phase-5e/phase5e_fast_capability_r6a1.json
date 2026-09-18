@@ -1,0 +1,20 @@
+{
+  "schema_version": "power.retrieval-fast-capability.v1",
+  "capability_contract_revision": "power.fast-capability.v1",
+  "budget_class": "FAST",
+  "fast_runtime_conformance": {
+    "cpu_only": true,
+    "model_load": "forbidden",
+    "dense_required": false,
+    "reranker_required": false,
+    "canonical_owner_lookup": true,
+    "lexical_state_retrieval": true,
+    "graph_allowed": false,
+    "raw_fallback_allowed": false
+  },
+  "evaluation_expectation_compatibility": {
+    "cross_language_paraphrase_guaranteed": false,
+    "hard_gating_requires_admitted_fast_evidence": true,
+    "unsupported_semantic_cases": "diagnostic_non_gating"
+  }
+}
