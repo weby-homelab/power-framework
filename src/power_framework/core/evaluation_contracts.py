@@ -890,6 +890,21 @@ def load_bounded_json(path: Path | str) -> Any:
     return _read_json(Path(path))
 
 
+def load_bounded_json_bytes(data: bytes) -> Any:
+    """Parse already bounded bytes with the same JSON integrity policy."""
+
+    if len(data) > MAX_FILE_BYTES:
+        raise EvaluationIntegrityError(
+            "artifact_too_large", "evaluation artifact exceeds the byte bound"
+        )
+    _reject_forbidden_markers(data)
+    return _parse_json_bytes(
+        data,
+        error_code="invalid_json",
+        error_message="evaluation artifact is not valid UTF-8 JSON",
+    )
+
+
 def _read_jsonl_with_size(path: Path) -> tuple[list[dict[str, Any]], int]:
     try:
         data = _read_bounded_regular_file(path)
@@ -1845,7 +1860,7 @@ def validate_semantic_review_receipt_v2(
             raise EvaluationIntegrityError("semantic_review_binding", message)
 
 
-_QUERY_ID_MARKER = re.compile(r"\bp38-(?:dev|ho|v13|v14)-q\d+\b", re.IGNORECASE)
+_QUERY_ID_MARKER = re.compile(r"\bp38-(?:(?:dev|ho)-q\d+|v1[34]-h\d+)\b", re.IGNORECASE)
 _TERMINAL_DECISION_MARKER = re.compile(r"\b(?:approved|final|resolved|rejected)\b", re.IGNORECASE)
 
 
@@ -2580,6 +2595,7 @@ __all__ = [
     "build_holdout_access_receipt",
     "compute_review_input_digest",
     "load_bounded_json",
+    "load_bounded_json_bytes",
     "load_development_for_tuning",
     "load_verified_development_snapshot",
     "normalize_query_text",

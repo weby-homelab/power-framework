@@ -72,10 +72,17 @@ def evaluate_authority_metrics(
     raw_ids = [str(item.get("source_id", "")) for item in candidates]
     concepts = [normalized_concept_id(raw_id, alias_lookup) for raw_id in raw_ids]
     winner_present = bool(owner_backed and expected_concept and expected_concept in concepts)
-    winner_index = concepts.index(expected_concept) if winner_present and expected_concept else None
-    winner_item = candidates[winner_index] if winner_index is not None else None
+    winner_items = (
+        [
+            item
+            for concept, item in zip(concepts, candidates, strict=True)
+            if concept == expected_concept
+        ]
+        if winner_present and expected_concept
+        else []
+    )
     winner_has_provenance = (
-        _has_canonical_provenance(winner_item) if winner_item is not None else True
+        any(_has_canonical_provenance(item) for item in winner_items) if winner_items else True
     )
 
     expected_winner_source = ground_truth_row.get("expected_authority_winner")

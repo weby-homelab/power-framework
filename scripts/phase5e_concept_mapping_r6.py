@@ -21,7 +21,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from power_framework.core.evaluation_contracts import load_bounded_json
+from power_framework.core.evaluation_contracts import load_bounded_json, load_bounded_json_bytes
 from power_framework.core.utils import read_file_bytes_no_follow
 
 _MANIFEST_DEFAULT = (
@@ -54,7 +54,7 @@ def load_manifest(manifest_path: Path | str = _MANIFEST_DEFAULT) -> dict[str, An
     actual_base_digest = hashlib.sha256(base_bytes).hexdigest()
     if actual_base_digest != data.get("base_manifest_sha256"):
         raise ValueError("R6A.1 base manifest digest mismatch")
-    base = load_bounded_json(base_path)
+    base = load_bounded_json_bytes(base_bytes)
     if not isinstance(base, dict):
         raise ValueError("R6 base manifest must be a JSON object")
     merged = dict(base)

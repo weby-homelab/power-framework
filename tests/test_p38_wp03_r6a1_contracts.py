@@ -426,6 +426,63 @@ def test_fidelity_v2_rejects_symlinked_source_evidence(tmp_path: Path) -> None:
         verify_fixture_fidelity_v2(manifest, ownership, corpus)
 
 
+def test_fidelity_v2_rejects_historical_query_id_markers() -> None:
+    manifest = load_manifest(PHASE5E_ROOT / "phase5e_runtime_fixture_manifest_r6a1.json")
+    decision = next(
+        concept
+        for concept in manifest["concepts"]
+        if concept["eval_concept_id"] == "decision-current"
+    )
+    decision["setup_payload"]["description"] += " p38-v14-h07"
+    ownership = evaluation_contracts.load_bounded_json(
+        PHASE5E_ROOT / "phase5e_evaluation_ownership_r6a1.json"
+    )
+
+    with pytest.raises(evaluation_contracts.FixtureFidelityError, match="query identifier"):
+        verify_fixture_fidelity_v2(manifest, ownership, V14_ROOT / "corpus")
+
+
+def test_metric_provenance_accepts_canonical_duplicate_representation() -> None:
+    manifest = {
+        "concepts": [
+            {
+                "eval_concept_id": "decision-current",
+                "scoring_aliases": ["p38-src-decision-current", "decision:dec_fixture"],
+            }
+        ]
+    }
+    from scripts.phase5e_concept_mapping_r6 import build_alias_to_concept
+
+    result = evaluate_authority_metrics(
+        expected_concept="decision-current",
+        owner_backed=True,
+        candidates=[
+            {
+                "source_id": "p38-src-decision-current",
+                "authority": "unverified",
+                "source_type": "file_note",
+                "provenance": {"authority_basis": "RAW"},
+            },
+            {
+                "source_id": "decision:dec_fixture",
+                "authority": "canonical",
+                "source_type": "canonical_decision",
+                "provenance": {"authority_basis": "CANONICAL_LEDGER"},
+            },
+        ],
+        ground_truth_row={
+            "expected_authority_winner": "p38-src-decision-current",
+            "graded_relevance": [
+                {"source_id": "p38-src-decision-current", "authority_outcome": "prefer"}
+            ],
+        },
+        alias_lookup=build_alias_to_concept(manifest),
+    )
+
+    assert result["winner_present"] is True
+    assert result["provenance_failure"] == 0
+
+
 def test_metric_semantics_missing_winner_is_not_outranked() -> None:
     manifest = {
         "concepts": [

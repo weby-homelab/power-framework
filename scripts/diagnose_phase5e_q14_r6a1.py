@@ -80,6 +80,12 @@ class DecisionTrace:
 
 
 def diagnose(*, corpus: Path, manifest_path: Path, query_id: str) -> dict[str, Any]:
+    corpus_manifest = load_bounded_json(corpus / "manifest.json")
+    if (
+        not isinstance(corpus_manifest, dict)
+        or corpus_manifest.get("evaluation_revision") != "v1.4"
+    ):
+        raise ValueError("q14 diagnostic accepts the historical v1.4 corpus only")
     query_row = _read_jsonl_row(corpus / "queries.holdout.jsonl", query_id)
     gt_row = _read_jsonl_row(corpus / "ground_truth.holdout.jsonl", query_id)
     manifest = load_manifest(manifest_path)
@@ -230,9 +236,7 @@ def diagnose(*, corpus: Path, manifest_path: Path, query_id: str) -> dict[str, A
             "fixture_receipts": receipts,
             "runtime": {
                 "runner": "diagnose_phase5e_q14_r6a1",
-                "corpus_manifest_digest": canonical_sha256(
-                    load_bounded_json(corpus / "manifest.json")
-                ),
+                "corpus_manifest_digest": canonical_sha256(corpus_manifest),
                 "manifest_sha256": _sha256_file(manifest_path),
                 "production_runtime_changed": False,
             },

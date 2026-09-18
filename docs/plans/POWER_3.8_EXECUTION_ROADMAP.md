@@ -168,7 +168,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind P38-WP03-R4.
+- Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 admission integrity is CLOSED / MERGED / DEVELOPMENT ADMITTED. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
 
 ## Controlled Dependency Refresh
 
@@ -203,9 +203,9 @@ dependency update:
        `12dda70c…` corrects a historical reporting typo.
 13. **INFRA-1 — closed.** The constrained local infrastructure
        execution broker was protected-merged as PR #419 (merge `bfb9688`).
-       Real receiver deployment is an operator follow-up. Historical note: Phase 5C was
-       unstarted at INFRA-1 time; it was subsequently CLOSED via PR #434 / PR #435, corrected via
-       P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind P38-WP03-R4.
+        Real receiver deployment is an operator follow-up. Historical note: Phase 5C was
+        unstarted at INFRA-1 time; it was subsequently CLOSED via PR #434 / PR #435, corrected via
+        P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 admission integrity is CLOSED / MERGED / DEVELOPMENT ADMITTED. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
 
 The controlled refresh and prior closures do not authorize a public version
 bump, tag, release, Phase 5C, or any later phase.

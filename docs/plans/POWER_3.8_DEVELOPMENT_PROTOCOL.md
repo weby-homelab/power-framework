@@ -472,7 +472,9 @@ Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
 pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
 (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by
 PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is
-OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind P38-WP03-R4. P38-WP03-R4 is NOT STARTED. Do not start Phase 5F–9, version bumps, tags, releases, release images, or
+OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 admission integrity
+is CLOSED / MERGED / DEVELOPMENT ADMITTED. Phase 5F (P38-WP04 / Phase 5F Incremental
+Dense Validity / dirty-set behavior) remains BLOCKED. Do not start Phase 5F–9, version bumps, tags, releases, release images, or
 final release notes.
 
 ## INFRA-1 execution boundary
