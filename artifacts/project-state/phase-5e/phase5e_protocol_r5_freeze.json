@@ -1,0 +1,93 @@
+{
+  "concept_mapping_path": "scripts/phase5e_concept_mapping_r5.py",
+  "concept_mapping_sha256": "379310b25058560f00af3a4fc7acedfa1963016f06a2646d8b173cbbff222649",
+  "corpus_disjointness_proof_sha256": "1a648120b8d7fb245d590a2c0a106f331777bd3413a2c0a2c09ed62bbe465643",
+  "corpus_manifest_digest": "4a97ef84e24dc57ffb9b527faa2f8bb590a5c9c014707cd3637bf34ae544de17",
+  "corpus_manifest_sha256": "550f7d61ca3c2df84dd3a9ed996fa33cecff7d0aa583da59ac4e33106699cc40",
+  "development_evidence": {
+    "all_hard_invariants_pass": true,
+    "non_regression_pass": true,
+    "path": "artifacts/project-state/phase-5e/phase5e_development_r5_fast.json",
+    "quality_thresholds_pass": true,
+    "runner": "benchmark_phase5e_r5",
+    "shadow_mrr": 0.7417,
+    "shadow_ndcg_at_10": 0.9052,
+    "shadow_recall_at_5": 1.0
+  },
+  "evaluation_corpus_revision": "v1.1",
+  "fast_budget_profile": {
+    "budget_class": "FAST",
+    "cpu_only": true,
+    "query_count": 20,
+    "split": "development",
+    "tuning_allowed": true
+  },
+  "fixture_manifest_path": "artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r5.json",
+  "fixture_manifest_sha256": "d928f0754b83e451ee2050b2c85eede3762b1cc1b9692c097795ee6b09fc2c69",
+  "fixture_manifest_version": "r5",
+  "frozen_at": "2026-09-18T13:56:17.977198+00:00",
+  "governance": {
+    "gpg_key_id": "2D49E810C7F2527E",
+    "operator": "weby-homelab <rekvizitor.ua@gmail.com>",
+    "phase": "Phase 5E / P38-WP03-R5"
+  },
+  "hard_invariant_gates": {
+    "authority_order_violations": "MUST == 0 in Shadow mode (CANONICAL > VERIFIED > CURATED > UNVERIFIED)",
+    "authority_outranked_by_relevance": "MUST == 0",
+    "authority_provenance_failures": "MUST == 0 (CANONICAL_LEDGER / VERIFIED_PROJECTION / CURATED_NOTE)",
+    "authority_winner_missing": "MUST == 0 (owner-backed winner present)",
+    "default_switches": "MUST == 0 (Legacy retrieval remains served default)",
+    "determinism_mismatches": "MUST == 0 (consecutive identical queries produce bit-identical packs)",
+    "non_regression_pass": "MUST be true (Shadow >= Legacy)",
+    "prompt_injection_authority_escalation": "MUST == 0 (zero injection text gains authority)",
+    "query_side_writes": "MUST == 0 (SHA-256 vault tree unmodified across all queries)",
+    "resource_bounds_pass": "MUST be true",
+    "scope_escape": "MUST == 0 (all items remain strictly vault-contained)",
+    "secret_leakage": "MUST == 0 (zero unredacted tokens, passwords or private keys)"
+  },
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "legacy_served_default_identity": {
+    "DEFAULT_SEARCH_MODE": "auto",
+    "has_compile_context": "yes",
+    "has_retrieve": "yes",
+    "retrieve_default_mode": "auto"
+  },
+  "metric_formulas": {
+    "Context_Precision": "sum_{i=1..K}(rel(item_i)) / K (where K=10)",
+    "MAP": "sum_{k=1..N}(Precision@k * rel(item_k)) / |relevant_set|",
+    "MRR": "1.0 / rank_of_first_relevant_item (0 if none retrieved)",
+    "Recall@K": "sum_{i=1..K}(rel(item_i)) / |relevant_set|",
+    "nDCG@K": "DCG@K / IDCG@K where DCG@K = sum_{i=1..K}(2^{rel_i} - 1) / log2(i + 1)"
+  },
+  "minimum_quality_gates": {
+    "MRR": ">= 0.50",
+    "Recall@5": ">= 0.70",
+    "nDCG@10": ">= 0.60"
+  },
+  "ndcg_k_values": [
+    5,
+    10
+  ],
+  "non_regression_gate": "Shadow >= Legacy (recall_at_5, mrr, map, ndcg_at_10)",
+  "protocol_version": "power.retrieval-benchmark-protocol-freeze.r5.v1",
+  "resource_bounds": {
+    "mean_tokens_limit": 10000.0,
+    "mean_tokens_measured": 128.7,
+    "p95_latency_ms_limit": 10000.0,
+    "p95_latency_ms_measured": 325.44
+  },
+  "runner_implementation_sha256": "a2da6898f76bc77a4cc354e3e63322231dfcd402f5fabc0fd57dfac46d158c2a",
+  "runner_path": "scripts/benchmark_phase5e_r5.py",
+  "runtime_file_path": "src/power_framework/core/retrieval_planner.py",
+  "runtime_file_sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf",
+  "setup_payload_digest": "48dab7024e502747fe3329508e119d449b33b39e8f92866b54add5a532412197",
+  "setup_state_digest": "521e30f3c45d1d2668b2f7ac87dcbfa1fdcc86342bfc2a53a243e7830374109c",
+  "shadow_runner_path": "scripts/benchmark_phase5e_shadow.py",
+  "shadow_runner_sha256": "2bf17b2312bd186d7cafa4801ced6401963e449f69250d7040f734338150037b",
+  "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118"
+}
