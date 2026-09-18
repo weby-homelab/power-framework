@@ -1950,7 +1950,9 @@ def verify_fixture_fidelity(
         note_reps = concept.get("note_representations", [])
 
         if not note_reps:
-            raise FixtureFidelityError("missing_notes", f"concept {cid} has no note representations")
+            raise FixtureFidelityError(
+                "missing_notes", f"concept {cid} has no note representations"
+            )
 
         # 1. Non-owner-backed invariants
         if not owner_backed:

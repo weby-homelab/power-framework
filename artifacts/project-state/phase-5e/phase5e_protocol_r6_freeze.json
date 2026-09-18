@@ -7,7 +7,7 @@
     "gpg_key_id": "2D49E810C7F2527E"
   },
   "runner_path": "scripts/benchmark_phase5e_r6.py",
-  "runner_implementation_sha256": "e0aec5228b799df82facc2b518c02226ffd0656b8faa5de5ef053b1b627eca55",
+  "runner_implementation_sha256": "f485519d29b3224a19374db00c81f03989ad7cb0ef030d5abb41afa828628fcb",
   "concept_mapping_path": "scripts/phase5e_concept_mapping_r6.py",
   "concept_mapping_sha256": "35510405b3d2cb16fc668716b6ceb92e50b45284827ac71a3f7c12d6e275fd6e",
   "fixture_manifest_path": "artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6.json",
@@ -16,7 +16,7 @@
   "runtime_file_path": "src/power_framework/core/retrieval_planner.py",
   "runtime_file_sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf",
   "evaluation_contracts_path": "src/power_framework/core/evaluation_contracts.py",
-  "evaluation_contracts_sha256": "6ce6be2df2252e7b313a0b036625e3e86e487c0e863bab91f5686243443f5246",
+  "evaluation_contracts_sha256": "22bc2dae514c93c0bd994dd146558019af830368ea0d1269c4b550bca17604fc",
   "fast_budget_profile": {
     "budget_class": "FAST",
     "cpu_only": true,

@@ -431,15 +431,17 @@ def run_benchmark_r6(
                     g["source_id"]
                     for g in graded_rel
                     if g.get("source_id") != gt_row.get("expected_authority_winner")
-                    and g.get("authority_outcome") in ("do_not_cite", "report_conflict", "curated", "unverified")
+                    and g.get("authority_outcome")
+                    in ("do_not_cite", "report_conflict", "curated", "unverified")
                 }
 
                 same_subject_lower_auth_indices: list[int] = []
-                for i, (cid, auth) in enumerate(zip(shad_concepts_raw, shad_authorities, strict=True)):
+                for i, (cid, auth) in enumerate(
+                    zip(shad_concepts_raw, shad_authorities, strict=True)
+                ):
                     raw_id = shad_raw_ids[i]
                     is_same_subject = (
-                        cid == str(expected_concept)
-                        or raw_id in same_subject_source_ids
+                        cid == str(expected_concept) or raw_id in same_subject_source_ids
                     )
                     auth_lvl = auth_level.get(auth.lower(), 5)
                     if is_same_subject and auth_lvl > 0:
@@ -449,8 +451,13 @@ def run_benchmark_r6(
                     outranked_applicable = True
                     if winner_present:
                         canonical_raw_idx = None
-                        for i, (cid, auth) in enumerate(zip(shad_concepts_raw, shad_authorities, strict=True)):
-                            if cid == str(expected_concept) and auth_level.get(auth.lower(), 5) == 0:
+                        for i, (cid, auth) in enumerate(
+                            zip(shad_concepts_raw, shad_authorities, strict=True)
+                        ):
+                            if (
+                                cid == str(expected_concept)
+                                and auth_level.get(auth.lower(), 5) == 0
+                            ):
                                 canonical_raw_idx = i
                                 break
                         if canonical_raw_idx is not None:

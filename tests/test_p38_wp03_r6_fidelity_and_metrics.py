@@ -62,9 +62,7 @@ def _compute_metrics_for_case(
     }
 
     shad_raw_ids = [str(item.get("source_id", "")) for item in shad_items]
-    shad_concepts_raw = [
-        source_id_to_concept(rid, alias_lookup) or rid for rid in shad_raw_ids
-    ]
+    shad_concepts_raw = [source_id_to_concept(rid, alias_lookup) or rid for rid in shad_raw_ids]
     # Deduplicate concepts preserving order
     shad_concepts: list[str] = []
     for c in shad_concepts_raw:
@@ -115,10 +113,7 @@ def _compute_metrics_for_case(
         same_subject_lower_auth_indices: list[int] = []
         for i, (cid, auth) in enumerate(zip(shad_concepts_raw, shad_authorities, strict=True)):
             raw_id = shad_raw_ids[i]
-            is_same_subject = (
-                cid == expected_concept
-                or raw_id in same_subject_source_ids
-            )
+            is_same_subject = cid == expected_concept or raw_id in same_subject_source_ids
             auth_lvl = auth_level.get(auth.lower(), 5)
             if is_same_subject and auth_lvl > 0:
                 same_subject_lower_auth_indices.append(i)
@@ -127,7 +122,9 @@ def _compute_metrics_for_case(
             outranked_applicable = True
             if winner_present:
                 canonical_raw_idx = None
-                for i, (cid, auth) in enumerate(zip(shad_concepts_raw, shad_authorities, strict=True)):
+                for i, (cid, auth) in enumerate(
+                    zip(shad_concepts_raw, shad_authorities, strict=True)
+                ):
                     if cid == expected_concept and auth_level.get(auth.lower(), 5) == 0:
                         canonical_raw_idx = i
                         break
