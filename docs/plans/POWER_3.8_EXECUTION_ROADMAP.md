@@ -71,13 +71,13 @@ Phase 5D (P38-WP02) — Multi-Domain Union & Conflict Resolution / ContextPack
 CLOSED / MERGED / VERIFIED (PR #439 / PR #440)
          ↓
 Phase 5E (P38-WP03) — Shadow Benchmark / Legacy Comparison
-OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R3 restores baseline only)
+OPEN / NOT PASSED / REMEDIATION IN PROGRESS (P38-WP03-R5 CLOSED / FAILED VERIFICATION; R5 epoch CLOSED / FAILED; P38-WP03-R6 active gate)
           ↓
-P38-WP03-R4 — Fresh Evaluation Re-admission
-NOT STARTED (SEPARATE ADMISSION; freezes runtime + runner, creates fresh v1.3, seals unseen holdout, runs one-shot evaluation, decides PASS/FAIL)
+P38-WP03-R6 — Evaluation Fidelity, Metric Semantics & Final Phase 5E Re-admission
+IN PROGRESS (freezes R6A runtime + runner, creates fresh v1.5, seals unseen holdout, runs one-shot evaluation, decides PASS/FAIL)
           ↓
 Phase 5F (P38-WP04) — Phase 5F Incremental Dense Validity / dirty-set behavior
-BLOCKED (gated behind P38-WP03-R4)
+BLOCKED (gated behind Phase 5E / P38-WP03-R6)
           ↓
 Phase 5G–5H (P38-WP05–P38-WP06) — MCP, Closure
 PLANNED / NOT STARTED (gated behind Phase 5F)

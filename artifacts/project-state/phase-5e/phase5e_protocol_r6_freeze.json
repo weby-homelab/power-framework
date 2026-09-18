@@ -1,0 +1,69 @@
+{
+  "protocol_version": "power.retrieval-benchmark-protocol-freeze.r6.v1",
+  "frozen_at": "2026-09-18T15:22:56.360009+00:00",
+  "governance": {
+    "phase": "Phase 5E / P38-WP03-R6",
+    "operator": "weby-homelab <rekvizitor.ua@gmail.com>",
+    "gpg_key_id": "2D49E810C7F2527E"
+  },
+  "runner_path": "scripts/benchmark_phase5e_r6.py",
+  "runner_implementation_sha256": "e0aec5228b799df82facc2b518c02226ffd0656b8faa5de5ef053b1b627eca55",
+  "concept_mapping_path": "scripts/phase5e_concept_mapping_r6.py",
+  "concept_mapping_sha256": "35510405b3d2cb16fc668716b6ceb92e50b45284827ac71a3f7c12d6e275fd6e",
+  "fixture_manifest_path": "artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6.json",
+  "fixture_manifest_sha256": "a2d19f05c3504f76e3ba9497a4df08823b99a609dfeb0ed05b2a49f01e07d6a9",
+  "fixture_manifest_version": "r6",
+  "runtime_file_path": "src/power_framework/core/retrieval_planner.py",
+  "runtime_file_sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf",
+  "evaluation_contracts_path": "src/power_framework/core/evaluation_contracts.py",
+  "evaluation_contracts_sha256": "6ce6be2df2252e7b313a0b036625e3e86e487c0e863bab91f5686243443f5246",
+  "fast_budget_profile": {
+    "budget_class": "FAST",
+    "cpu_only": true,
+    "query_count": 20,
+    "split": "development",
+    "tuning_allowed": true
+  },
+  "development_evidence": {
+    "path": "artifacts/project-state/phase-5e/phase5e_development_r6_fast.json",
+    "runner": "benchmark_phase5e_r6",
+    "shadow_recall_at_5": 1.0,
+    "shadow_mrr": 0.7417,
+    "shadow_ndcg_at_10": 0.9052,
+    "shadow_map": 0.8917,
+    "all_hard_invariants_pass": true,
+    "quality_thresholds_pass": true,
+    "non_regression_pass": true
+  },
+  "hard_invariant_gates": {
+    "authority_order_violations": "MUST == 0 in Shadow mode",
+    "authority_winner_missing": "MUST == 0 for applicable owner-backed queries",
+    "authority_provenance_failures": "MUST == 0 for applicable queries with present winner",
+    "authority_outranked_by_relevance": "MUST == 0 for applicable queries with same-subject competition",
+    "query_side_writes": "MUST == 0",
+    "scope_escape": "MUST == 0",
+    "secret_leakage": "MUST == 0",
+    "prompt_injection_authority_escalation": "MUST == 0",
+    "determinism_mismatches": "MUST == 0",
+    "default_switches": "MUST == 0",
+    "resource_bounds_pass": "MUST be true",
+    "non_regression_pass": "MUST be true"
+  },
+  "minimum_quality_gates": {
+    "Recall@5": ">= 0.70",
+    "MRR": ">= 0.50",
+    "nDCG@10": ">= 0.60"
+  },
+  "metric_formulas": {
+    "Recall@K": "sum_{i=1..K}(rel(item_i)) / |relevant_set|",
+    "MRR": "1.0 / rank_of_first_relevant_item (0 if none retrieved)",
+    "MAP": "sum_{k=1..N}(Precision@k * rel(item_k)) / |relevant_set|",
+    "nDCG@K": "DCG@K / IDCG@K",
+    "Context_Precision": "sum_{i=1..K}(rel(item_i)) / K"
+  },
+  "metric_applicability_semantics": {
+    "winner_missing": "Violation iff a legitimately expected owner-backed winner is absent from the evaluated result boundary",
+    "provenance_failure": "Applicable only when the expected winner is present; violation iff present winner lacks required canonical provenance",
+    "outranked_by_relevance": "Applicable only when evidence proves canonical winner and lower-authority competitor are legitimate competitors for the same requested subject; violation iff competitor is ranked above winner. If result empty: winner_missing=TRUE, outranked_by_relevance=NOT_APPLICABLE"
+  }
+}

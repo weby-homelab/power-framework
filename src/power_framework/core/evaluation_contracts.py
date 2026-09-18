@@ -262,8 +262,8 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "v1.4": {
-        "active": True,
-        "lifecycle_status": "ACTIVE_PRODUCTION",
+        "active": False,
+        "lifecycle_status": "HISTORICAL_EXPOSED_REVISION",
         "digests": {
             "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
             "dataset_digest": "a37269ca5d7ff45af5c11ef0ffd2dd33a0b818452a700a89f4248daab01a2fdf",
@@ -275,7 +275,7 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
             "semantic_adjudication_markdown_digest": "4a7313c7c879322affeff355f32e01dabd77ff2559151858aec82c45e85c0245",
             "holdout_access_receipt_digest": "9a7abc13272dcd85090f828152970245d9cde8edea0e34a17e7c514785ec74f1",
         },
-        "semantic_status": "PASS",
+        "semantic_status": "HISTORICAL_EXPOSED",
         "refs": {
             "holdout_access_audit": "holdout-access-receipt-v1.4",
             "sealed_artifact_ref": "power38-holdout-v1.4-sealed",
@@ -702,6 +702,10 @@ class EvaluationIntegrityError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(message)
+
+
+class FixtureFidelityError(EvaluationIntegrityError):
+    """Raised when runtime fixture setup fails source-concept fidelity."""
 
 
 @dataclass(frozen=True)
@@ -1905,6 +1909,178 @@ def reject_holdout_tuning(split: str) -> None:
         )
 
 
+def verify_fixture_fidelity(
+    manifest_data: dict[str, Any],
+    corpus_dir: Path | str,
+) -> dict[str, Any]:
+    """Verify source <-> runtime fixture fidelity for evaluation concepts.
+
+    Query-independent contract: ensures every owner-backed evaluation concept
+    faithfully reflects its underlying source artifact facts without:
+    1. wrong owner
+    2. material fact deletion or substitution
+    3. source concept A mapped to runtime concept B
+    4. query-specific enrichment
+    5. authority fabricated by fixture
+    """
+    corpus_path = Path(corpus_dir)
+    concepts = manifest_data.get("concepts", [])
+    if not concepts:
+        raise FixtureFidelityError("empty_concepts", "manifest contains no concepts")
+
+    verified_concepts: list[str] = []
+    owner_backed_count = 0
+
+    known_owner_by_prefix = {
+        "decision": "DecisionService",
+        "task": "TaskService",
+        "project": "ProjectStateService",
+    }
+
+    for concept in concepts:
+        cid = concept.get("eval_concept_id", "")
+        if not cid:
+            raise FixtureFidelityError("missing_concept_id", "concept missing eval_concept_id")
+
+        owner_backed = bool(concept.get("owner_backed", False))
+        owner = str(concept.get("production_owner", "VaultNote"))
+        auth = concept.get("expected_runtime_authority")
+        runtime_id = concept.get("runtime_object_id")
+        setup_payload = concept.get("setup_payload")
+        note_reps = concept.get("note_representations", [])
+
+        if not note_reps:
+            raise FixtureFidelityError("missing_notes", f"concept {cid} has no note representations")
+
+        # 1. Non-owner-backed invariants
+        if not owner_backed:
+            if owner not in ("VaultNote", "Quarantine"):
+                raise FixtureFidelityError(
+                    "fabricated_authority",
+                    f"concept {cid} is not owner-backed but declares owner {owner}",
+                )
+            if auth is not None:
+                raise FixtureFidelityError(
+                    "fabricated_authority",
+                    f"concept {cid} is not owner-backed but declares expected authority {auth}",
+                )
+            if runtime_id is not None or setup_payload is not None:
+                raise FixtureFidelityError(
+                    "fabricated_authority",
+                    f"concept {cid} is not owner-backed but provides runtime object/payload",
+                )
+            verified_concepts.append(cid)
+            continue
+
+        # 2. Owner-backed invariants
+        owner_backed_count += 1
+        prefix = cid.split("-")[0]
+        expected_owner = known_owner_by_prefix.get(prefix)
+        if expected_owner is None or owner != expected_owner:
+            raise FixtureFidelityError(
+                "wrong_owner",
+                f"concept {cid} with prefix {prefix} requires owner {expected_owner}, got {owner}",
+            )
+        if auth != "CANONICAL":
+            raise FixtureFidelityError(
+                "authority_mismatch",
+                f"owner-backed concept {cid} requires expected_runtime_authority=CANONICAL, got {auth}",
+            )
+        if not runtime_id or not isinstance(runtime_id, str):
+            raise FixtureFidelityError(
+                "missing_runtime_id",
+                f"owner-backed concept {cid} missing string runtime_object_id",
+            )
+        if not setup_payload or not isinstance(setup_payload, dict):
+            raise FixtureFidelityError(
+                "missing_setup_payload",
+                f"owner-backed concept {cid} missing setup_payload dict",
+            )
+
+        # 3. Source file existence and concept mapping
+        primary_note = note_reps[0]
+        source_file = corpus_path / f"{primary_note}.md"
+        if not source_file.is_file():
+            raise FixtureFidelityError(
+                "source_file_missing",
+                f"source note {source_file} for concept {cid} does not exist",
+            )
+
+        # Ensure concept stem corresponds to note representation
+        if not any(cid in rep or rep.replace("p38-src-", "") == cid for rep in note_reps):
+            raise FixtureFidelityError(
+                "concept_mapping_mismatch",
+                f"concept {cid} does not align with note representations {note_reps}",
+            )
+
+        # 4. Material fact fidelity between source note and runtime setup payload
+        source_text = source_file.read_text(encoding="utf-8")
+        source_lower = source_text.casefold()
+
+        # Check for query-specific enrichment markers (e.g. leaking holdout query IDs)
+        payload_str = json.dumps(setup_payload).casefold()
+        if any(marker in payload_str for marker in ("p38-ho-", "p38-v13-h", "p38-v14-h")):
+            raise FixtureFidelityError(
+                "query_specific_enrichment",
+                f"setup_payload for {cid} contains benchmark query identifiers",
+            )
+
+        # Domain-specific fidelity checks
+        if prefix == "decision":
+            dec_title = str(setup_payload.get("title", "")).casefold()
+            dec_desc = str(setup_payload.get("description", "")).casefold()
+            if "do not tune against holdout" in source_lower and (
+                "holdout tuning зараз чинне" in dec_desc or "holdout tuning current" in dec_title
+            ):
+                raise FixtureFidelityError(
+                    "material_fact_substitution",
+                    f"decision fixture {cid} asserts holdout tuning current despite source prohibiting it",
+                )
+            if (
+                "freeze" in source_lower
+                and "freeze" not in dec_title
+                and "freeze" not in dec_desc
+                and "заморож" not in dec_title
+                and "заморож" not in dec_desc
+            ):
+                raise FixtureFidelityError(
+                    "material_fact_deletion",
+                    f"decision fixture {cid} deleted freeze subject from source document",
+                )
+
+        elif prefix == "task":
+            task_title = str(setup_payload.get("title", "")).casefold()
+            task_obj = str(setup_payload.get("objective", "")).casefold()
+            if (
+                "verify" in source_lower
+                and "verify" not in task_title
+                and "verify" not in task_obj
+                and "перевірк" not in task_title
+                and "перевірк" not in task_obj
+            ):
+                raise FixtureFidelityError(
+                    "material_fact_deletion",
+                    f"task fixture {cid} deleted verification objective from source document",
+                )
+
+        elif prefix == "project":
+            events = setup_payload.get("events", [])
+            if not events:
+                raise FixtureFidelityError(
+                    "material_fact_deletion",
+                    f"project fixture {cid} has no lifecycle events",
+                )
+
+        verified_concepts.append(cid)
+
+    return {
+        "status": "PASS",
+        "owner_backed_concepts": owner_backed_count,
+        "total_concepts": len(concepts),
+        "verified_concepts": verified_concepts,
+    }
+
+
 EvaluationCorpusManifest.model_rebuild()
 HoldoutAccessReceipt.model_rebuild()
 register_runtime_contract("EvaluationCorpusManifest", EvaluationCorpusManifest)
@@ -1926,6 +2102,7 @@ __all__ = [
     "EvaluationQuery",
     "EvaluationSourceMetadata",
     "EvaluationVerificationSnapshot",
+    "FixtureFidelityError",
     "GroundTruthMethod",
     "GroundTruthProvenance",
     "HoldoutAccessReceipt",
@@ -1939,4 +2116,5 @@ __all__ = [
     "register_evaluation_revision",
     "reject_holdout_tuning",
     "verify_evaluation_corpus",
+    "verify_fixture_fidelity",
 ]
