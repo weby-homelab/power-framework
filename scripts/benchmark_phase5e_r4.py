@@ -387,8 +387,6 @@ def run_benchmark_r4(
         winner_present = False
         winner_rank: int | None = None
         winner_authority: str | None = None
-        winner_basis = "UNKNOWN"
-        winner_source_type = ""
         winner_projected_owner: str | None = None
         winner_has_provenance = True
         exclusions_above = 0
@@ -430,8 +428,6 @@ def run_benchmark_r4(
                     winner_rank = widx + 1
                     raw_idx = shad_concepts_raw.index(str(expected_concept))
                     winner_authority = shad_authorities[raw_idx]
-                    winner_basis = shad_bases[raw_idx]
-                    winner_source_type = shad_source_types[raw_idx]
                 winner_has_provenance = True
                 exclusions_above = 0
                 outranked = 0
@@ -727,8 +723,24 @@ def main(argv: list[str] | None = None) -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"R4 results written to {out}")
-    print(json.dumps(results["hard_invariants"], indent=2, sort_keys=True))
-    print(json.dumps(results["summary"]["shadow"], indent=2, sort_keys=True))
+    safe_invariants = {
+        key: (int(value) if isinstance(value, bool) else value)
+        for key, value in results["hard_invariants"].items()
+        if isinstance(value, (bool, int, float))
+    }
+    shadow_summary = results["summary"]["shadow"]
+    safe_shadow = {
+        "recall_at_5": float(shadow_summary["recall_at_5"]),
+        "mrr": float(shadow_summary["mrr"]),
+        "ndcg_at_10": float(shadow_summary["ndcg_at_10"]),
+        "map": float(shadow_summary["map"]),
+        "authority_winner_missing": int(shadow_summary["authority_winner_missing"]),
+        "authority_provenance_failures": int(shadow_summary["authority_provenance_failures"]),
+        "authority_outranked_by_relevance": int(shadow_summary["authority_outranked_by_relevance"]),
+        "authority_violations": int(shadow_summary["authority_violations"]),
+    }
+    print(json.dumps(safe_invariants, indent=2, sort_keys=True))
+    print(json.dumps(safe_shadow, indent=2, sort_keys=True))
     if not results["benchmark_metadata"]["all_hard_invariants_pass"]:
         return 2
     return 0

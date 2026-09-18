@@ -12,13 +12,13 @@
     "quality_thresholds_pass": true,
     "query_count": 20,
     "runner": "benchmark_phase5e_r4",
-    "runner_sha256": "79826d53a2a1c6cfb17e46ecf00f2f78b143f4f888a156430af2592910cb9119",
+    "runner_sha256": "df2ff71dd5dc4f41fc74817055c8ee341155ba3c4634f4950bb98aff9f7b3500",
     "schema_version": "power.retrieval-benchmark-r4.v1",
     "setup_payload_digest": "00c7b640bb6d5d5d7aa61649e9dcd9724c2ddcc801d382253d7dee08fc1d40bf",
-    "setup_state_digest": "a81d408927a076202ddc4d12f06b3b8b26e27cb5d5d79425ff99586f42ebbdbc",
+    "setup_state_digest": "30bb0e4296189266867daae6382615cd517094611c07e6e2d0ea0af80e0e7b45",
     "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
     "split": "development",
-    "timestamp": "2026-09-18T10:19:23.395827+00:00"
+    "timestamp": "2026-09-18T10:27:27.573899+00:00"
   },
   "fixture_receipts": {
     "decisions": {
@@ -31,11 +31,11 @@
     "projects": {
       "prj_x-contradiction-tuning-authority-canonical": {
         "eval_concept_id": "contradiction-canonical",
-        "state_revision": "31ffe9385da049ec66c760f365b89f68539493acd464c6bbf81232a9c7080488"
+        "state_revision": "c10dc7326b01f9481ceee4352ae74eb2e0581c56c6abcf690f9cd1d3415bc81e"
       },
       "prj_x-power-current-project-phase-status": {
         "eval_concept_id": "project-current",
-        "state_revision": "bd12d3bd00654d5f3fcd02416b50c800feea2eb20cce85b60ae2bd4e94141c4c"
+        "state_revision": "9194fc9c0794851f774fc6c3e62efb613ed090eceab45331688f6ffe41a6df68"
       }
     },
     "tasks": {
@@ -95,7 +95,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 802.31,
+        "latency_ms": 586.11,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -128,7 +128,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 191.77,
+        "latency_ms": 225.52,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -188,7 +188,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 534.91,
+        "latency_ms": 643.04,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -219,7 +219,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 198.05,
+        "latency_ms": 187.72,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -265,7 +265,7 @@
           "decision-raw"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 170.79,
+        "latency_ms": 212.84,
         "map": 0.3333,
         "mrr": 0.3333,
         "ndcg": {
@@ -295,7 +295,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 121.79,
+        "latency_ms": 140.2,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -338,7 +338,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 156.91,
+        "latency_ms": 178.76,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -368,7 +368,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 114.52,
+        "latency_ms": 134.15,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -417,7 +417,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 339.43,
+        "latency_ms": 412.94,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -449,7 +449,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 157.6,
+        "latency_ms": 178.28,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -496,7 +496,7 @@
           "hard-negative"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 251.93,
+        "latency_ms": 272.86,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -527,7 +527,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 144.56,
+        "latency_ms": 163.69,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -568,7 +568,7 @@
           "task-raw"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 89.46,
+        "latency_ms": 110.08,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -596,7 +596,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 74.52,
+        "latency_ms": 106.74,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -641,7 +641,7 @@
           "code-en"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 259.72,
+        "latency_ms": 327.64,
         "map": 0.3333,
         "mrr": 0.3333,
         "ndcg": {
@@ -674,7 +674,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 149.27,
+        "latency_ms": 180.36,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -721,7 +721,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 205.55,
+        "latency_ms": 250.02,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -751,7 +751,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 142.53,
+        "latency_ms": 161.88,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -807,7 +807,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 788.26,
+        "latency_ms": 895.89,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -837,7 +837,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 378.33,
+        "latency_ms": 434.06,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -888,7 +888,7 @@
           "task-raw"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 369.53,
+        "latency_ms": 458.99,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -920,7 +920,7 @@
         "dense_used": false,
         "exclusion_leaks": 1,
         "exclusions_above_winner": 0,
-        "latency_ms": 155.21,
+        "latency_ms": 178.96,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -975,7 +975,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 434.12,
+        "latency_ms": 575.78,
         "map": 0.2,
         "mrr": 0.2,
         "ndcg": {
@@ -1005,7 +1005,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 162.94,
+        "latency_ms": 247.13,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1046,7 +1046,7 @@
           "project-raw-chat"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 154.5,
+        "latency_ms": 155.88,
         "map": 0.3333,
         "mrr": 0.3333,
         "ndcg": {
@@ -1073,7 +1073,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 104.79,
+        "latency_ms": 132.56,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1118,7 +1118,7 @@
           "project-current"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 398.87,
+        "latency_ms": 477.11,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1149,7 +1149,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 296.86,
+        "latency_ms": 355.85,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1205,7 +1205,7 @@
           "code-ua"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 539.26,
+        "latency_ms": 575.16,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1237,7 +1237,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 167.35,
+        "latency_ms": 238.08,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1281,7 +1281,7 @@
           "project-current"
         ],
         "exclusion_leaks": 1,
-        "latency_ms": 159.58,
+        "latency_ms": 211.01,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -1312,7 +1312,7 @@
         "dense_used": false,
         "exclusion_leaks": 1,
         "exclusions_above_winner": 0,
-        "latency_ms": 121.93,
+        "latency_ms": 124.6,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -1361,7 +1361,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 315.35,
+        "latency_ms": 361.11,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1393,7 +1393,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 167.26,
+        "latency_ms": 206.13,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1445,7 +1445,7 @@
           "cross-domain"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 308.13,
+        "latency_ms": 353.46,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1477,7 +1477,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 149.37,
+        "latency_ms": 165.16,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1523,7 +1523,7 @@
           "infra-stale"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 199.41,
+        "latency_ms": 213.44,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1555,7 +1555,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 123.16,
+        "latency_ms": 148.49,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1610,7 +1610,7 @@
           "code-ua"
         ],
         "exclusion_leaks": 0,
-        "latency_ms": 361.69,
+        "latency_ms": 361.76,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1642,7 +1642,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 149.27,
+        "latency_ms": 140.75,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1722,8 +1722,8 @@
   "summary": {
     "legacy": {
       "context_precision": 0.085,
-      "latency_ms_p50": 315.35,
-      "latency_ms_p95": 802.31,
+      "latency_ms_p50": 361.11,
+      "latency_ms_p95": 895.89,
       "map": 0.734995,
       "mrr": 0.5849949999999999,
       "ndcg_at_10": 0.80769,
@@ -1741,7 +1741,7 @@
       "mean_tokens_limit": 10000.0,
       "mean_tokens_measured": 130.7,
       "p95_latency_ms_limit": 10000.0,
-      "p95_latency_ms_measured": 378.33
+      "p95_latency_ms_measured": 434.06
     },
     "shadow": {
       "authority_exclusions_above_winner": 0,
@@ -1750,8 +1750,8 @@
       "authority_violations": 0,
       "authority_winner_missing": 0,
       "context_precision": 0.085,
-      "latency_ms_p50": 149.37,
-      "latency_ms_p95": 378.33,
+      "latency_ms_p50": 178.28,
+      "latency_ms_p95": 434.06,
       "map": 0.925,
       "mrr": 0.775,
       "ndcg_at_10": 0.9280950000000001,
