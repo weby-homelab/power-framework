@@ -73,7 +73,7 @@ def _hash_vault_tree(vault_dir: Path) -> dict[str, str]:
 
 def normalize_source_id(raw_id: str) -> str:
     """Extract canonical source ID matching corpus note stem."""
-    cleaned = raw_id.removeprefix("task:").removeprefix("decision:")
+    cleaned = raw_id.removeprefix("task:").removeprefix("decision:").removeprefix("project:")
     return Path(cleaned).stem
 
 
