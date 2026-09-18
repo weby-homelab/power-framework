@@ -51,7 +51,7 @@ from .context_contracts import (
 MAX_FILE_BYTES = 4 * 1024 * 1024
 MAX_JSONL_RECORD_BYTES = 64 * 1024
 MAX_JSONL_RECORDS = 4096
-_QUERY_ID_PATTERN = re.compile(r"^p38-(?:dev|ho)-q[0-9]{2}$")
+_QUERY_ID_PATTERN = re.compile(r"^p38-(?:(?:dev|ho)-q[0-9]{2}|v13-h[0-9]{2})$")
 _FORBIDDEN_SYNTHETIC_MARKERS = (
     "/root/",
     "-----begin private key-----",
@@ -152,6 +152,7 @@ ACTIVE_PHASE5A2_DIGESTS = {
 EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
     "v1": {
         "active": False,
+        "lifecycle_status": "HISTORICAL_SUPERSEDED",
         "digests": FROZEN_PHASE5A_DIGESTS,
         "semantic_status": "SUPERSEDED_ERRATUM",
         "refs": {
@@ -172,6 +173,7 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
     },
     "v1.1": {
         "active": True,
+        "lifecycle_status": "ACTIVE_DEVELOPMENT",
         "digests": ACTIVE_PHASE5A1_DIGESTS,
         "semantic_status": "PASS",
         "refs": {
@@ -189,9 +191,11 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
             "reviewer_a_receipt_ref": "semantic-review-a-v1.1",
             "reviewer_b_receipt_ref": "semantic-review-b-v1.1",
         },
+        "root_file_sha256": ACTIVE_V11_ROOT_FILE_SHA256,
     },
     "v1.2": {
-        "active": True,
+        "active": False,
+        "lifecycle_status": "HISTORICAL_SUPERSEDED",
         "digests": ACTIVE_PHASE5A2_DIGESTS,
         "semantic_status": "PASS",
         "refs": {
@@ -209,8 +213,70 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
             "reviewer_a_receipt_ref": "semantic-review-a-v1.2",
             "reviewer_b_receipt_ref": "semantic-review-b-v1.2",
         },
+        "root_file_sha256": ACTIVE_V12_ROOT_FILE_SHA256,
+    },
+    "v1.3": {
+        "active": False,
+        "lifecycle_status": "HISTORICAL_EXPOSED_REVISION",
+        "digests": {
+            "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+            "dataset_digest": "db656d94c84baa5b9bf7723a33dcd66729f666aa13f7812741605dc73680a302",
+            "query_set_digest": "3f12883574c9e1036345a4d8de248a29874030bc73f5b8243b2f267c0ec10f80",
+            "development_digest": "f4e3adcd0d99e578bca5092eb6f36f70b3f5de72dfd33295ca6465409f1eec9d",
+            "holdout_digest": "b8f5503d1284b83050afc2abf8bf8e861be052e7032076393f48221f4b9884e5",
+            "disjointness_digest": "0c5704ba8dce61c74a3e0e7f279a7ee6675f7516a14254f07834c5979caf762b",
+            "semantic_adjudication_digest": "6af10e837e37774e294c25a9dd80db2ccb45d86bfef70ac35a87c2d6a0679e3d",
+            "semantic_adjudication_markdown_digest": "4530dfbca95bea5cb8b8e2ebe42255c6aa465ff0396e377123c6d34caf913d1c",
+            "holdout_access_receipt_digest": "2633c647fcd7aebb81065057519b783aa3ea3947fd84480290634fca72371d79",
+        },
+        "semantic_status": "HISTORICAL_EXPOSED",
+        "refs": {
+            "holdout_access_audit": "holdout-access-receipt-v1.3",
+            "sealed_artifact_ref": "power38-holdout-v1.3-sealed",
+            "disjointness_proof_ref": "disjointness-proof-v1.3",
+            "provenance_source_ref": "power38-ground-truth-v1.3",
+            "provenance_method": "human_adjudicated",
+            "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+            "semantic_adjudication_markdown_digest": "4530dfbca95bea5cb8b8e2ebe42255c6aa465ff0396e377123c6d34caf913d1c",
+            "holdout_access_receipt_digest": "2633c647fcd7aebb81065057519b783aa3ea3947fd84480290634fca72371d79",
+            "planning_only": True,
+            "supersedes_revision": "v1.2",
+            "semantic_adjudication_ref": "semantic-adjudication-v1.3",
+            "reviewer_a_receipt_ref": "semantic-review-a-v1.3",
+            "reviewer_b_receipt_ref": "semantic-review-b-v1.3",
+        },
+        "root_file_sha256": {
+            "README.md": "597b60afa84f425ce76873d7da3c77cab925ccb03f5aff5e150f9f5cf99ef7da",
+            "disjointness-proof.json": "0c5704ba8dce61c74a3e0e7f279a7ee6675f7516a14254f07834c5979caf762b",
+            "ground_truth.development.jsonl": "470420a4441c6f707704a77938416ae06821a10b8eafcd34820eeca51c47d48b",
+            "ground_truth.holdout.jsonl": "7dca2d0826ab2bb242025bb4e13211b35259203b2a30cdac6427b7bfb0880e94",
+            "holdout-access-receipt.json": "2633c647fcd7aebb81065057519b783aa3ea3947fd84480290634fca72371d79",
+            "manifest.json": "b1ac9160afb525e82fd75d0895ec41523dd5a34895c36980ad612f5e1b0c3644",
+            "queries.development.jsonl": "f4e3adcd0d99e578bca5092eb6f36f70b3f5de72dfd33295ca6465409f1eec9d",
+            "queries.holdout.jsonl": "b8f5503d1284b83050afc2abf8bf8e861be052e7032076393f48221f4b9884e5",
+            "semantic-adjudication.json": "6af10e837e37774e294c25a9dd80db2ccb45d86bfef70ac35a87c2d6a0679e3d",
+            "semantic-adjudication.md": "4530dfbca95bea5cb8b8e2ebe42255c6aa465ff0396e377123c6d34caf913d1c",
+            "semantic-review-a-v1.3.json": "c54db88a12b208a5693c6aa8d375283e5baaba2df911345fb9d3dd12c27e31d2",
+            "semantic-review-b-v1.3.json": "47644bd123dfaa1ee5036589fcd6f12f2c7b8101dda9619675fd89d314c2b732",
+            "source_metadata.jsonl": "6b6d43f0ad3a63a0b4bd4b98f23c4bb74e700b4c3f480ad207dc622294be67c9",
+        },
     },
 }
+
+
+def register_evaluation_revision(
+    revision: str,
+    spec: dict[str, Any],
+    *,
+    override: bool = False,
+) -> None:
+    """Admit an evaluation revision into the registry via data-only configuration."""
+    if not re.fullmatch(r"^v1(?:\.[0-9]+)?$", revision):
+        raise ValueError(f"revision must match ^v1(?:\\.[0-9]+)?$, got {revision!r}")
+    if revision in EVALUATION_REVISION_REGISTRY and not override:
+        raise ValueError(f"revision {revision!r} is already registered")
+    EVALUATION_REVISION_REGISTRY[revision] = spec
+
 
 
 class EvaluationLanguage(StrEnum):
@@ -319,7 +385,7 @@ class EvaluationCorpusManifest(RuntimeModel):
     """Runtime form of the frozen ``power.retrieval-eval.v1`` manifest."""
 
     dataset_schema_version: Literal["power.retrieval-eval.v1"]
-    evaluation_revision: Literal["v1", "v1.1", "v1.2"] = "v1"
+    evaluation_revision: Annotated[str, Field(pattern=r"^v1(?:\.[0-9]+)?$")] = "v1"
     dataset_digest: Digest
     source_corpus_digest: Digest | None = None
     holdout_access_receipt_digest: Digest | None = None
@@ -338,7 +404,7 @@ class EvaluationCorpusManifest(RuntimeModel):
     disjointness_proof_ref: OpaqueReference
     disjointness_proof_digest: Digest
     planning_only: Literal[True] | None = None
-    supersedes_revision: Literal["v1", "v1.1"] | None = None
+    supersedes_revision: Annotated[str, Field(pattern=r"^v1(?:\.[0-9]+)?$")] | None = None
     semantic_adjudication_ref: OpaqueReference | None = None
     semantic_adjudication_digest: Digest | None = None
     semantic_adjudication_markdown_digest: Digest | None = None
@@ -431,7 +497,10 @@ class EvaluationQuery(RuntimeModel):
         if not _QUERY_ID_PATTERN.fullmatch(self.query_id):
             raise ValueError("query_id must use the frozen p38 split prefix")
         expected_prefix = "p38-dev-" if self.split is EvaluationSplitName.DEVELOPMENT else "p38-ho-"
-        if not self.query_id.startswith(expected_prefix):
+        if not self.query_id.startswith(expected_prefix) and not (
+            self.split is EvaluationSplitName.HOLDOUT
+            and re.fullmatch(r"^p38-v13-h[0-9]{2}$", self.query_id)
+        ):
             raise ValueError("query_id prefix does not match split")
         return self
 
@@ -490,7 +559,7 @@ class SemanticReviewReceipt(EvaluationRecordModel):
     defect_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
     input_dataset_digest: Digest
     input_query_set_digest: Digest
-    input_revision: Literal["v1", "v1.1"]
+    input_revision: Annotated[str, Field(pattern=r"^v1(?:\.[0-9]+)?$")]
     pass_count: Annotated[StrictInt, Field(ge=0, le=MAX_JSONL_RECORDS)]
     retrieval_metrics_observed: Literal[False]
     reviewer_id: OpaqueReference
@@ -509,7 +578,7 @@ class SemanticAdjudicationArtifact(EvaluationRecordModel):
     """Content-addressed semantic evidence bound to one corpus revision."""
 
     algorithm_output_used: Literal[False]
-    dataset_revision: Literal["v1.1", "v1.2"]
+    dataset_revision: Annotated[str, Field(pattern=r"^v1(?:\.[0-9]+)?$")]
     records: list[SemanticAdjudicationRecord] = Field(min_length=1, max_length=MAX_JSONL_RECORDS)
     retrieval_metrics_observed: Literal[False]
     reviewer_a_receipt_digest: Digest
@@ -1014,6 +1083,39 @@ def _check_active_v12_inventory(root: Path) -> None:
     if actual != ACTIVE_V12_ROOT_FILE_SHA256:
         raise EvaluationIntegrityError(
             "active_v12_inventory", "active v1.2 root bytes or inventory changed"
+        )
+
+
+def _check_revision_inventory(root: Path, revision: str, expected: dict[str, str]) -> None:
+    actual: dict[str, str] = {}
+    try:
+        paths = list(root.iterdir())
+    except OSError as exc:
+        raise EvaluationIntegrityError(
+            f"revision_{revision}_inventory", f"revision {revision} inventory is unreadable"
+        ) from exc
+    for path in paths:
+        if path.is_symlink():
+            raise EvaluationIntegrityError(
+                f"revision_{revision}_inventory", f"revision {revision} contains a symlink"
+            )
+        if path.is_dir():
+            if path.name != "corpus":
+                raise EvaluationIntegrityError(
+                    f"revision_{revision}_inventory", f"revision {revision} contains an unlisted directory"
+                )
+            continue
+        try:
+            actual[path.relative_to(root).as_posix()] = _sha256_bytes(
+                _read_bounded_regular_file(path)
+            )
+        except EvaluationIntegrityError as exc:
+            raise EvaluationIntegrityError(
+                f"revision_{revision}_inventory", f"revision {revision} root artifact is unreadable"
+            ) from exc
+    if actual != expected:
+        raise EvaluationIntegrityError(
+            f"revision_{revision}_inventory", f"revision {revision} root bytes or inventory changed"
         )
 
 
@@ -1592,6 +1694,13 @@ def verify_evaluation_corpus(
         _check_active_v11_inventory(root)
     elif manifest.evaluation_revision == "v1.2":
         _check_active_v12_inventory(root)
+    elif "root_file_sha256" in spec:
+        _check_revision_inventory(root, manifest.evaluation_revision, spec["root_file_sha256"])
+    else:
+        raise EvaluationIntegrityError(
+            "revision_inventory_missing",
+            f"revision {manifest.evaluation_revision} has no verified root file inventory",
+        )
     dataset_payload: dict[str, Any] = {
         "corpus_files": entries,
         "ground_truth": [
@@ -1781,6 +1890,7 @@ __all__ = [
     "build_holdout_access_receipt",
     "load_development_for_tuning",
     "normalize_query_text",
+    "register_evaluation_revision",
     "reject_holdout_tuning",
     "verify_evaluation_corpus",
 ]

@@ -25,7 +25,8 @@
     ],
     "properties": {
         "evaluation_revision": {
-            "enum": ["v1", "v1.1"],
+            "type": "string",
+            "pattern": "^v1(\\.[0-9]+)?$",
             "description": "Explicit corpus revision identity; omission is the historical v1 default."
         },
         "dataset_schema_version": {
@@ -118,7 +119,8 @@
             "$ref": "#/$defs/Digest"
         },
         "supersedes_revision": {
-            "const": "v1"
+            "type": "string",
+            "pattern": "^v1(\\.[0-9]+)?$"
         },
         "semantic_adjudication_ref": {
             "$ref": "#/$defs/OpaqueReference"
@@ -137,7 +139,7 @@
         {
             "if": {
                 "required": ["evaluation_revision"],
-                "properties": {"evaluation_revision": {"const": "v1.1"}}
+                "properties": {"evaluation_revision": {"not": {"const": "v1"}}}
             },
             "then": {
                 "required": [

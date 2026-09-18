@@ -179,6 +179,25 @@ def _meaningful_tokens(text: str) -> frozenset[str]:
     return frozenset(t for t in _eligibility_tokens(text) if len(t) >= 3)
 
 
+_PROJECT_TOPICAL_TOKENS: frozenset[str] = frozenset(
+    {
+        "project",
+        "phase",
+        "state",
+        "status",
+        "проєкт",
+        "проект",
+        "проєкту",
+        "проекту",
+        "фаза",
+        "фази",
+        "фазу",
+        "стан",
+        "статус",
+    }
+)
+
+
 @dataclass(frozen=True)
 class _CanonicalEligibility:
     """Query-derived admission verdict for one canonical record."""
@@ -968,12 +987,14 @@ class RetrievalPlanner:
                             if (
                                 scoped_project_ids is None
                                 and query_meaningful
+                                and primary_owner != "project"
+                                and not (query_meaningful & _PROJECT_TOPICAL_TOKENS)
                                 and not (query_meaningful & _meaningful_tokens(project_id))
                             ):
                                 # Cheap identity-level pre-filter: skip ledgers
-                                # whose identity shares no query signal instead
-                                # of rebuilding every ledger (parity with the
-                                # previous id-level gate).
+                                # whose identity shares no query signal when the
+                                # query does not express project topical intent,
+                                # instead of rebuilding every ledger.
                                 continue
                             p_state = self._project_state_service.rebuild_project_state(project_id)
                             p_phase_raw = getattr(p_state, "current_phase", "")
@@ -1001,7 +1022,7 @@ class RetrievalPlanner:
                             item_text = (
                                 f"Project: {project_id}\n"
                                 f"Status: {getattr(p_state, 'status', 'active')}\n"
-                                f"Phase: {getattr(p_state, 'phase', 'current')}"
+                                f"Phase: {p_phase or 'current'}"
                             )
                             cost = _deterministic_token_cost(item_text)
                             domains = (
