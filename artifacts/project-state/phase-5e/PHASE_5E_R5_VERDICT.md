@@ -130,3 +130,19 @@ Measured Retrieval Results:
    - As mandated by the Release Gate, POWER 3.8.0 release activities are blocked until a formal resolution track addresses dense embedding support or lexical synonym expansion for cross-lingual queries under FAST profiles.
 3. **Work Package B:**
    - Strictly deferred per user mandate.
+
+---
+
+## 6. Governance Clarification (Post-R5 / R6 Re-admission)
+
+**Date:** 2026-09-18  
+**Context:** P38-WP03-R6 Re-admission  
+
+To prevent ambiguity between a closed work-package iteration and the parent acceptance gate:
+- **P38-WP03-R5 Work Package:** `CLOSED / FAILED VERIFICATION` (Historical attempt finalized).
+- **R5 One-Shot Epoch:** `CLOSED / FAILED` (v1.4 holdout exposed; immutable development evidence).
+- **Phase 5E Gate:** `OPEN / NOT PASSED` (Remediation authorized under P38-WP03-R6).
+- **Phase 5F:** `BLOCKED` (Pending Phase 5E verification).
+- **POWER 3.8.0:** `NO-GO` (Release gated).
+
+A failed work-package attempt may be CLOSED while the parent acceptance gate remains UNSATISFIED and open for authorized continuation.

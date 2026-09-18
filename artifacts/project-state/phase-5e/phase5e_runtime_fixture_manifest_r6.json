@@ -1,0 +1,317 @@
+{
+  "concepts": [
+    {
+      "eval_concept_id": "code-en",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-code-en"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-code-en"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "code-ua",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-code-ua"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-code-ua"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "contradiction-canonical",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-contradiction-canonical"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-contradiction-canonical"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "contradiction-raw",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-contradiction-raw"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-contradiction-raw"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "cross-domain",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-cross-domain"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-cross-domain"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "decision-current",
+      "expected_runtime_authority": "CANONICAL",
+      "note_representations": [
+        "p38-src-decision-current"
+      ],
+      "owner_backed": true,
+      "production_owner": "DecisionService",
+      "runtime_object_id": "dec_x-freeze-phase5a-corpus-decision",
+      "scoring_aliases": [
+        "p38-src-decision-current",
+        "decision:dec_x-freeze-phase5a-corpus-decision",
+        "decision:dec_x-current-holdout-tuning-decision"
+      ],
+      "setup_payload": {
+        "decision_id": "dec_x-freeze-phase5a-corpus-decision",
+        "title": "Synthetic decision: freeze Phase 5A corpus — рішення про замороження корпусу",
+        "description": "Synthetic canonical decision for the evaluation fixture. Freeze the Phase 5A synthetic corpus before exact-head admission. Do not tune against holdout labels; integrity verification is separate from development tuning. Рішення щодо замороження synthetic corpus та заборони holdout tuning.",
+        "task_id": "p38-task-current-corpus-verify",
+        "requested_by": "fixture-setup"
+      }
+    },
+    {
+      "eval_concept_id": "decision-old",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-decision-old"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-decision-old"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "decision-raw",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-decision-raw"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-decision-raw"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "hard-negative",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-hard-negative"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-hard-negative"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "infra-current",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-infra-current"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-infra-current"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "infra-stale",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-infra-stale"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-infra-stale"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "noise-injection",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-noise-injection"
+      ],
+      "owner_backed": false,
+      "production_owner": "Quarantine",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-noise-injection"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "project-current",
+      "expected_runtime_authority": "CANONICAL",
+      "note_representations": [
+        "p38-src-project-current",
+        "p38-src-project-current-ua"
+      ],
+      "owner_backed": true,
+      "production_owner": "ProjectStateService",
+      "runtime_object_id": "prj_x-power-current-project-phase-status",
+      "scoring_aliases": [
+        "p38-src-project-current",
+        "p38-src-project-current-ua",
+        "project:prj_x-power-current-project-phase-status"
+      ],
+      "setup_payload": {
+        "events": [
+          {
+            "actor": "fixture-setup",
+            "event_type": "project.created",
+            "payload": {
+              "description": "Deterministic fixture: power current project phase status for Phase 5E R4 evaluation.",
+              "name": "POWER current project phase status",
+              "phase": "EXECUTION",
+              "status": "current POWER project phase status v1.1"
+            }
+          },
+          {
+            "actor": "fixture-setup",
+            "event_type": "project.phase.changed",
+            "payload": {
+              "note": "power project current phase status authoritative",
+              "phase": "EXECUTION",
+              "status": "current"
+            }
+          }
+        ],
+        "name": "POWER current project phase status",
+        "project_id": "prj_x-power-current-project-phase-status"
+      }
+    },
+    {
+      "eval_concept_id": "project-raw-chat",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-project-raw-chat"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-project-raw-chat"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "project-superseded",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-project-superseded"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-project-superseded"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "research-curated",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-research-curated"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-research-curated"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "research-unverified",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-research-unverified"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-research-unverified"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "task-current",
+      "expected_runtime_authority": "CANONICAL",
+      "note_representations": [
+        "p38-src-task-current"
+      ],
+      "owner_backed": true,
+      "production_owner": "TaskService",
+      "runtime_object_id": "p38-task-current-corpus-verify",
+      "scoring_aliases": [
+        "p38-src-task-current",
+        "task:p38-task-current-corpus-verify"
+      ],
+      "setup_payload": {
+        "objective": "Task to verify frozen corpus: verification of corpus resource policy; завдання перевірки corpus готове до виконання.",
+        "state": "ready",
+        "task_id": "p38-task-current-corpus-verify",
+        "title": "Verify corpus task — завдання перевірки готове"
+      }
+    },
+    {
+      "eval_concept_id": "task-raw",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-task-raw"
+      ],
+      "owner_backed": false,
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-task-raw"
+      ],
+      "setup_payload": null
+    }
+  ],
+  "created_at": "2026-09-18T13:52:00Z",
+  "manifest_version": "r5",
+  "runtime_main_sha": "e5aea04d46638ce9a0a66d6afaaa782f0a7a5d16",
+  "setup_payload_digest": "48dab7024e502747fe3329508e119d449b33b39e8f92866b54add5a532412197",
+  "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+  "source_corpus_version": "v1.1"
+}
