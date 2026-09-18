@@ -406,8 +406,12 @@ def test_r12_dedup_authority_remains_bound_to_supporting_provenance(tmp_path: Pa
     item = result.candidates[0]
     assert item.authority is Authority.CANONICAL
     assert item.provenance.authority_basis is AuthorityBasis.CANONICAL_LEDGER
-    # Invariant: Score from unverified hit must NOT overwrite canonical score
-    assert item.score == 0.85, f"Canonical item score should be preserved, got {item.score}"
+    # Invariant: Score from unverified hit must NOT overwrite canonical score.
+    # The canonical score is the deterministic query-relevance grade (exact
+    # title-phrase match -> 0.8 here), never the 0.99 FTS score and never an
+    # authority constant.
+    assert item.score == 0.8, f"Canonical relevance score should be preserved, got {item.score}"
+    assert item.score != 0.99
 
 
 # ---------------------------------------------------------------------------

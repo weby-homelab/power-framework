@@ -1,0 +1,314 @@
+{
+  "concepts": [
+    {
+      "eval_concept_id": "code-en",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-code-en"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-code-en"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "code-ua",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-code-ua"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-code-ua"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "contradiction-canonical",
+      "expected_runtime_authority": "CANONICAL",
+      "note_representations": [
+        "p38-src-contradiction-canonical"
+      ],
+      "production_owner": "ProjectStateService",
+      "runtime_object_id": "prj_x-contradiction-tuning-authority-canonical",
+      "scoring_aliases": [
+        "p38-src-contradiction-canonical",
+        "project:prj_x-contradiction-tuning-authority-canonical"
+      ],
+      "setup_payload": {
+        "events": [
+          {
+            "actor": "fixture-setup",
+            "event_type": "project.created",
+            "payload": {
+              "description": "Deterministic fixture: contradiction tuning authority canonical side wins over raw.",
+              "name": "Contradiction tuning authority canonical",
+              "phase": "EXECUTION",
+              "status": "canonical contradiction tuning authority outcome"
+            }
+          }
+        ],
+        "name": "Contradiction tuning authority canonical",
+        "project_id": "prj_x-contradiction-tuning-authority-canonical"
+      }
+    },
+    {
+      "eval_concept_id": "contradiction-raw",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-contradiction-raw"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-contradiction-raw"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "cross-domain",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-cross-domain"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-cross-domain"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "decision-current",
+      "expected_runtime_authority": "CANONICAL",
+      "note_representations": [
+        "p38-src-decision-current"
+      ],
+      "production_owner": "DecisionService",
+      "runtime_object_id": "dec_x-current-holdout-tuning-decision",
+      "scoring_aliases": [
+        "p38-src-decision-current",
+        "decision:dec_x-current-holdout-tuning-decision"
+      ],
+      "setup_payload": {
+        "decision_id": "dec_x-current-holdout-tuning-decision",
+        "description": "Canonical holdout tuning decision fixture. Рішення щодо holdout tuning зараз чинне; canonical decision authority.",
+        "requested_by": "fixture-setup",
+        "task_id": "p38-task-current-corpus-verify",
+        "title": "Canonical decision: holdout tuning current — рішення"
+      }
+    },
+    {
+      "eval_concept_id": "decision-old",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-decision-old"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-decision-old"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "decision-raw",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-decision-raw"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-decision-raw"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "hard-negative",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-hard-negative"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-hard-negative"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "infra-current",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-infra-current"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-infra-current"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "infra-stale",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-infra-stale"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-infra-stale"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "noise-injection",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-noise-injection"
+      ],
+      "production_owner": "Quarantine",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-noise-injection"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "project-current",
+      "expected_runtime_authority": "CANONICAL",
+      "note_representations": [
+        "p38-src-project-current",
+        "p38-src-project-current-ua"
+      ],
+      "production_owner": "ProjectStateService",
+      "runtime_object_id": "prj_x-power-current-project-phase-status",
+      "scoring_aliases": [
+        "p38-src-project-current",
+        "p38-src-project-current-ua",
+        "project:prj_x-power-current-project-phase-status"
+      ],
+      "setup_payload": {
+        "events": [
+          {
+            "actor": "fixture-setup",
+            "event_type": "project.created",
+            "payload": {
+              "description": "Deterministic fixture: power current project phase status for Phase 5E R4 evaluation.",
+              "name": "POWER current project phase status",
+              "phase": "EXECUTION",
+              "status": "current POWER project phase status v1.1"
+            }
+          },
+          {
+            "actor": "fixture-setup",
+            "event_type": "project.phase.changed",
+            "payload": {
+              "note": "power project current phase status authoritative",
+              "phase": "EXECUTION",
+              "status": "current"
+            }
+          }
+        ],
+        "name": "POWER current project phase status",
+        "project_id": "prj_x-power-current-project-phase-status"
+      }
+    },
+    {
+      "eval_concept_id": "project-raw-chat",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-project-raw-chat"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-project-raw-chat"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "project-superseded",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-project-superseded"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-project-superseded"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "research-curated",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-research-curated"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-research-curated"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "research-unverified",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-research-unverified"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-research-unverified"
+      ],
+      "setup_payload": null
+    },
+    {
+      "eval_concept_id": "task-current",
+      "expected_runtime_authority": "CANONICAL",
+      "note_representations": [
+        "p38-src-task-current"
+      ],
+      "production_owner": "TaskService",
+      "runtime_object_id": "p38-task-current-corpus-verify",
+      "scoring_aliases": [
+        "p38-src-task-current",
+        "task:p38-task-current-corpus-verify"
+      ],
+      "setup_payload": {
+        "objective": "Task to verify frozen corpus: verification of corpus resource policy; завдання перевірки corpus готове до виконання.",
+        "state": "ready",
+        "task_id": "p38-task-current-corpus-verify",
+        "title": "Verify corpus task — завдання перевірки готове"
+      }
+    },
+    {
+      "eval_concept_id": "task-raw",
+      "expected_runtime_authority": null,
+      "note_representations": [
+        "p38-src-task-raw"
+      ],
+      "production_owner": "VaultNote",
+      "runtime_object_id": null,
+      "scoring_aliases": [
+        "p38-src-task-raw"
+      ],
+      "setup_payload": null
+    }
+  ],
+  "created_at": "2026-09-18T06:25:52Z",
+  "manifest_version": "v2",
+  "runtime_main_sha": "d0c45ba06556c5d12ed2d067522518d9b0432eb7",
+  "runtime_tree": "54efd3b7208b03230c9c51c55e03b7e57403a60c",
+  "setup_payload_digest": "00c7b640bb6d5d5d7aa61649e9dcd9724c2ddcc801d382253d7dee08fc1d40bf",
+  "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+  "source_corpus_version": "v1.1"
+}

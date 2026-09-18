@@ -1,8 +1,8 @@
 """RetrievalPlanner for Phase 5D: Multi-Domain Retrieval Planning & Evidence Ordering.
 
 Pure, deterministic, read-only orchestration of multi-domain routing, bounded
-retrieval stages, authority-first evidence ordering, conflict resolution, and
-noise gate filtering.
+retrieval stages, intent-gated canonical admission, evidence ordering,
+conflict resolution, and noise gate filtering.
 
 Invariants:
 - DOMAIN != AUTHORITY
@@ -15,9 +15,11 @@ Invariants:
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import pairwise
 from typing import TYPE_CHECKING, Any, Literal
 
 from .context_contracts import (
@@ -122,9 +124,128 @@ _AUTHORITY_SENSITIVE_INTENTS: set[QueryIntentKind] = {
     QueryIntentKind.DECISION,
     QueryIntentKind.TASK,
     QueryIntentKind.GOVERNANCE,
-    QueryIntentKind.INFRASTRUCTURE,
-    QueryIntentKind.RESEARCH,
 }
+# NOTE (P38-WP03-R4): INFRASTRUCTURE and RESEARCH are intentionally NOT
+# authority-sensitive. No binding contract requires them: the
+# EvidenceOrderingPolicy contract (context_contracts.py,
+# validate_ordering) mandates authority_sensitive=true exactly for
+# {PROJECT_STATE, DECISION, TASK, GOVERNANCE}. Infrastructure and research
+# evidence therefore stays relevance-ranked; authority is at most a
+# tie-break there and never overrides semantic relevance.
+
+# Canonical owner matrix: which owning-subsystem stores may contribute
+# CANONICAL records for each intent. Bounded by production ownership, never
+# by benchmark labels:
+# - PROJECT_STATE -> ProjectStateService primary; Task/Decision related.
+# - DECISION -> DecisionService primary; TaskService related on real binding.
+# - TASK -> TaskService primary; DecisionService related on real binding.
+# - GOVERNANCE -> all three owners, each eligibility-filtered (bounded).
+# - Any other intent -> no automatic canonical injection; the planner must
+#   not query every owner for every intent.
+_CANONICAL_OWNERS_BY_INTENT: dict[QueryIntentKind, tuple[str, ...]] = {
+    QueryIntentKind.PROJECT_STATE: ("project", "task", "decision"),
+    QueryIntentKind.DECISION: ("decision", "task"),
+    QueryIntentKind.TASK: ("task", "decision"),
+    QueryIntentKind.GOVERNANCE: ("project", "decision", "task"),
+}
+
+# Primary owner per intent: admitted on strong OR weak (single-token)
+# query evidence. Related owners need strong evidence; GOVERNANCE has no
+# single primary, so every consulted owner is related-grade there.
+_PRIMARY_OWNER_BY_INTENT: dict[QueryIntentKind, str] = {
+    QueryIntentKind.PROJECT_STATE: "project",
+    QueryIntentKind.DECISION: "decision",
+    QueryIntentKind.TASK: "task",
+}
+
+_TOKEN_RE = re.compile(r"\w+", re.UNICODE)
+
+
+def _eligibility_tokens(text: str) -> tuple[str, ...]:
+    """Casefolded unicode word tokens, single letters dropped (noise).
+
+    Snake_case identifiers are split on underscores so that each segment
+    carries signal (``proj_alpha`` matches ``alpha``); hyphens already
+    split via the word pattern.
+    """
+    out: list[str] = []
+    for raw in _TOKEN_RE.findall((text or "").casefold()):
+        out.extend(part for part in raw.split("_") if len(part) >= 2)
+    return tuple(out)
+
+
+def _meaningful_tokens(text: str) -> frozenset[str]:
+    """Tokens long enough to carry topical signal (generic noise floor)."""
+    return frozenset(t for t in _eligibility_tokens(text) if len(t) >= 3)
+
+
+@dataclass(frozen=True)
+class _CanonicalEligibility:
+    """Query-derived admission verdict for one canonical record."""
+
+    eligible_strong: bool
+    eligible_weak: bool
+    relevance: float
+    matched: tuple[str, ...]
+
+
+def _canonical_eligibility(query: str, object_id: str, match_text: str) -> _CanonicalEligibility:
+    """Deterministic query-derived canonical eligibility (production rule).
+
+    Tiers (generic retrieval logic; no benchmark/ID-specific branches, no
+    authority constants — the score represents query relevance only):
+    - ID-EXACT: the query names the object id (or vice versa) -> strong, 0.95.
+    - PHRASE: the full query or a query bigram occurs in the record text ->
+      strong, 0.80.
+    - MULTI: >=2 distinct meaningful query tokens occur in the record ->
+      strong, 0.55 + density bonus + term-proximity bonus (adjacent matched
+      terms rank above scattered ones).
+    - SINGLE: exactly 1 meaningful token -> weak (primary owners only), 0.40.
+    - Otherwise ineligible: an unrelated canonical is not admitted at all,
+      so raw evidence about another subject can never be outranked by it,
+      while raw evidence about the SAME subject still sorts below the
+      admitted canonical current record via the authority rank.
+    """
+    none = _CanonicalEligibility(False, False, 0.0, ())
+    q = (query or "").casefold().strip()
+    oid = (object_id or "").casefold()
+    text = (match_text or "").casefold()
+    if not q or not oid:
+        return none
+    text_tokens = _eligibility_tokens(match_text or "")
+    text_set = frozenset(text_tokens)
+    matched = sorted(t for t in _meaningful_tokens(query or "") if t in text_set)
+    if len(oid) >= 3 and (oid in q or q == oid or (len(q) >= 4 and q in oid)):
+        return _CanonicalEligibility(True, True, 0.95, tuple(matched) or (oid,))
+    if len(q) >= 6 and q in text:
+        return _CanonicalEligibility(True, True, 0.8, tuple(matched))
+    query_tokens = _eligibility_tokens(query or "")
+    if len(query_tokens) >= 2:
+        for first, second in pairwise(query_tokens):
+            if f"{first} {second}" in text:
+                return _CanonicalEligibility(True, True, 0.8, tuple(matched))
+    if len(matched) >= 2:
+        positions = [i for i, t in enumerate(text_tokens) if t in set(matched)]
+        span = max(positions) - min(positions) if len(positions) >= 2 else 0
+        proximity = 0.0
+        if span <= 20:
+            proximity = 0.15 * (1.0 - math.log1p(span) / math.log1p(20))
+        relevance = 0.55 + 0.05 * min(len(matched) - 2, 3) + proximity
+        return _CanonicalEligibility(True, True, round(min(relevance, 0.9), 4), tuple(matched))
+    if len(matched) == 1:
+        return _CanonicalEligibility(False, True, 0.4, tuple(matched))
+    return none
+
+
+def _scoped_object_ids(query: str, object_ids: list[str]) -> set[str] | None:
+    """Explicit scope: when the query names object ids, restrict to them.
+
+    Hard restriction per owner dimension: a query that explicitly scopes to
+    one object must not admit sibling objects from the same store.
+    """
+    q = (query or "").casefold()
+    named = {oid for oid in object_ids if len(oid) >= 3 and oid.casefold() in q}
+    return named or None
 
 
 def _deterministic_token_cost(text: str) -> int:
@@ -567,131 +688,266 @@ class RetrievalPlanner:
         # Check compilation of search scope - must fail closed before any candidate read
         compile_search_scope(self.vault_dir, scope=plan.scope, access_policy=access_policy)
 
-        # Stage 1: Authority-Sensitive Canonical Store Reader (PROJECT_STATE)
+        # Stage 1: Intent-Gated Canonical Store Reader (PROJECT_STATE)
+        # Eligible-set admission: only canonical records owned by the
+        # intent's owner matrix AND passing deterministic query-derived
+        # eligibility are admitted. Authority ordering applies AFTER this
+        # admission, never as a global pre-sort over unrelated records.
         is_authority_sensitive = query_intent.intent in _AUTHORITY_SENSITIVE_INTENTS
         if RetrievalStage.PROJECT_STATE in plan.stages:
             attempted_stages.append(RetrievalStage.PROJECT_STATE)
             canonical_found = False
-            # Read Task Store if task_service exists
-            query_words = set(re.findall(r"\w+", query_intent.query.casefold()))
-            if self._task_service is not None:
+            owners = _CANONICAL_OWNERS_BY_INTENT.get(query_intent.intent, ())
+            primary_owner = _PRIMARY_OWNER_BY_INTENT.get(query_intent.intent)
+            query_text = query_intent.query or ""
+            task_elig_by_id: dict[str, _CanonicalEligibility] = {}
+            decision_elig_by_id: dict[str, _CanonicalEligibility] = {}
+            task_records_by_id: dict[str, Any] = {}
+            decision_records_by_id: dict[str, Any] = {}
+            admitted_task_ids: set[str] = set()
+            admitted_decision_ids: set[str] = set()
+            if not owners:
+                decisions.append(
+                    "No canonical owners consulted for non-authority intent "
+                    f"{query_intent.intent.value}; relevance-ranked evidence only."
+                )
+            # Read Task Store through the owning service when consulted.
+            if owners and "task" in owners and self._task_service is not None:
                 try:
                     tasks = self._task_service.list_tasks(limit=plan.budget.max_candidates)
+                    scoped_task_ids = _scoped_object_ids(
+                        query_text, [str(getattr(t, "task_id", "")) for t in tasks]
+                    )
                     for t in tasks:
-                        t_query = query_intent.query.casefold()
+                        t_id = str(getattr(t, "task_id", ""))
+                        task_records_by_id[t_id] = t
+                        if scoped_task_ids is not None and t_id not in scoped_task_ids:
+                            continue
                         t_obj = getattr(t, "objective", getattr(t, "description", "")) or ""
-                        t_text = f"{t.task_id} {t.title} {t_obj}".casefold()
-                        t_words = set(re.findall(r"\w+", t_text))
-                        keyword_match = any(len(w) > 3 and w in t_words for w in query_words)
-                        if (
-                            t_query in t.task_id.casefold()
-                            or t_query in t.title.casefold()
-                            or t_query in t_obj.casefold()
-                            or keyword_match
+                        t_state = getattr(t.state, "value", t.state)
+                        t_elig = _canonical_eligibility(
+                            query_text, t_id, f"{t_id} {t.title} {t_obj} {t_state}"
+                        )
+                        task_elig_by_id[t_id] = t_elig
+                        if not (
+                            (primary_owner == "task" and t_elig.eligible_weak)
+                            or t_elig.eligible_strong
                         ):
-                            canonical_found = True
-                            t_state = getattr(t.state, "value", t.state)
-                            item_text = (
-                                f"Task: {t.title}\nID: {t.task_id}\nState: {t_state}\n"
-                                f"Objective: {t_obj}"
+                            continue
+                        canonical_found = True
+                        admitted_task_ids.add(t_id)
+                        item_text = (
+                            f"Task: {t.title}\nID: {t.task_id}\nState: {t_state}\n"
+                            f"Objective: {t_obj}"
+                        )
+                        cost = _deterministic_token_cost(item_text)
+                        domains = (
+                            ["tasks", plan.domain_matches[0].domain]
+                            if plan.domain_matches
+                            else ["tasks"]
+                        )
+                        collected_items.append(
+                            ContextItem(
+                                source_id=f"task:{t.task_id}",
+                                source_type="canonical_task",
+                                authority=Authority.CANONICAL,
+                                trust_state=TrustState.CANONICAL,
+                                domain=domains[0],
+                                domains=domains,
+                                score=t_elig.relevance,
+                                retrieval_stage=RetrievalStage.PROJECT_STATE,
+                                provenance=Provenance(
+                                    source_refs=[f"tasks/{t.task_id}.json"],
+                                    source_revision=t.task_id,
+                                    authority_basis=AuthorityBasis.CANONICAL_LEDGER,
+                                ),
+                                freshness=Freshness.CURRENT,
+                                contradiction_state=ContradictionState.NONE,
+                                noise_state=NoiseState.CLEAN,
+                                token_cost=cost,
+                                excerpt=item_text,
+                                content_kind="excerpt",
+                                redaction_status="verified_safe",
                             )
-                            cost = _deterministic_token_cost(item_text)
-                            domains = (
-                                ["tasks", plan.domain_matches[0].domain]
-                                if plan.domain_matches
-                                else ["tasks"]
-                            )
-                            collected_items.append(
-                                ContextItem(
-                                    source_id=f"task:{t.task_id}",
-                                    source_type="canonical_task",
-                                    authority=Authority.CANONICAL,
-                                    trust_state=TrustState.CANONICAL,
-                                    domain=domains[0],
-                                    domains=domains,
-                                    score=0.85,
-                                    retrieval_stage=RetrievalStage.PROJECT_STATE,
-                                    provenance=Provenance(
-                                        source_refs=[f"tasks/{t.task_id}.json"],
-                                        source_revision=t.task_id,
-                                        authority_basis=AuthorityBasis.CANONICAL_LEDGER,
-                                    ),
-                                    freshness=Freshness.CURRENT,
-                                    contradiction_state=ContradictionState.NONE,
-                                    noise_state=NoiseState.CLEAN,
-                                    token_cost=cost,
-                                    excerpt=item_text,
-                                    content_kind="excerpt",
-                                    redaction_status="verified_safe",
-                                )
-                            )
-                            source_revisions.add(t.task_id)
+                        )
+                        source_revisions.add(t.task_id)
                 except Exception as exc:
                     decisions.append(f"Task canonical read skipped: {type(exc).__name__}")
 
-            # Read Decision Store if decision_service exists
-            if self._decision_service is not None:
+            # Read Decision Store through the owning service when consulted.
+            if owners and "decision" in owners and self._decision_service is not None:
                 try:
                     decisions_list = self._decision_service.list_decisions(
                         limit=plan.budget.max_candidates
                     )
+                    scoped_decision_ids = _scoped_object_ids(
+                        query_text, [str(getattr(d, "decision_id", "")) for d in decisions_list]
+                    )
                     for d in decisions_list:
-                        d_query = query_intent.query.casefold()
+                        d_id = str(getattr(d, "decision_id", ""))
+                        decision_records_by_id[d_id] = d
+                        if scoped_decision_ids is not None and d_id not in scoped_decision_ids:
+                            continue
                         d_desc = getattr(d, "description", getattr(d, "rationale", "")) or ""
-                        d_text = f"{d.decision_id} {d.title} {d_desc}".casefold()
-                        d_words = set(re.findall(r"\w+", d_text))
-                        keyword_match = any(len(w) > 3 and w in d_words for w in query_words)
-                        if (
-                            d_query in d.decision_id.casefold()
-                            or d_query in d.title.casefold()
-                            or d_query in d_desc.casefold()
-                            or keyword_match
+                        d_status = getattr(d.status, "value", d.status)
+                        d_elig = _canonical_eligibility(
+                            query_text, d_id, f"{d_id} {d.title} {d_desc} {d_status}"
+                        )
+                        decision_elig_by_id[d_id] = d_elig
+                        if not (
+                            (primary_owner == "decision" and d_elig.eligible_weak)
+                            or d_elig.eligible_strong
                         ):
-                            canonical_found = True
-                            d_status = getattr(d.status, "value", d.status)
-                            item_text = (
-                                f"Decision: {d.title}\nID: {d.decision_id}\n"
-                                f"Status: {d_status}\nDescription: {d_desc}"
+                            continue
+                        canonical_found = True
+                        admitted_decision_ids.add(d_id)
+                        item_text = (
+                            f"Decision: {d.title}\nID: {d.decision_id}\n"
+                            f"Status: {d_status}\nDescription: {d_desc}"
+                        )
+                        cost = _deterministic_token_cost(item_text)
+                        domains = (
+                            ["decisions", plan.domain_matches[0].domain]
+                            if plan.domain_matches
+                            else ["decisions"]
+                        )
+                        collected_items.append(
+                            ContextItem(
+                                source_id=f"decision:{d.decision_id}",
+                                source_type="canonical_decision",
+                                authority=Authority.CANONICAL,
+                                trust_state=TrustState.CANONICAL,
+                                domain=domains[0],
+                                domains=domains,
+                                score=d_elig.relevance,
+                                retrieval_stage=RetrievalStage.PROJECT_STATE,
+                                provenance=Provenance(
+                                    source_refs=[f"decisions/{d.decision_id}.json"],
+                                    source_revision=d.decision_id,
+                                    authority_basis=AuthorityBasis.CANONICAL_LEDGER,
+                                ),
+                                freshness=Freshness.CURRENT,
+                                contradiction_state=ContradictionState.NONE,
+                                noise_state=NoiseState.CLEAN,
+                                token_cost=cost,
+                                excerpt=item_text,
+                                content_kind="excerpt",
+                                redaction_status="verified_safe",
                             )
-                            cost = _deterministic_token_cost(item_text)
-                            domains = (
-                                ["decisions", plan.domain_matches[0].domain]
-                                if plan.domain_matches
-                                else ["decisions"]
-                            )
-                            collected_items.append(
-                                ContextItem(
-                                    source_id=f"decision:{d.decision_id}",
-                                    source_type="canonical_decision",
-                                    authority=Authority.CANONICAL,
-                                    trust_state=TrustState.CANONICAL,
-                                    domain=domains[0],
-                                    domains=domains,
-                                    score=0.85,
-                                    retrieval_stage=RetrievalStage.PROJECT_STATE,
-                                    provenance=Provenance(
-                                        source_refs=[f"decisions/{d.decision_id}.json"],
-                                        source_revision=d.decision_id,
-                                        authority_basis=AuthorityBasis.CANONICAL_LEDGER,
-                                    ),
-                                    freshness=Freshness.CURRENT,
-                                    contradiction_state=ContradictionState.NONE,
-                                    noise_state=NoiseState.CLEAN,
-                                    token_cost=cost,
-                                    excerpt=item_text,
-                                    content_kind="excerpt",
-                                    redaction_status="verified_safe",
-                                )
-                            )
-                            source_revisions.add(d.decision_id)
+                        )
+                        source_revisions.add(d.decision_id)
                 except Exception as exc:
                     decisions.append(f"Decision canonical read skipped: {type(exc).__name__}")
+
+            # Relationship-bound related records (TASK/DECISION intents only).
+            # A related record bound to an admitted primary (decision.task_id)
+            # is admitted when it carries at least one matched query token of
+            # its own: real relationship AND query relevance, never either
+            # alone. Weak grade by construction; primaries outrank it.
+            if query_intent.intent is QueryIntentKind.TASK:
+                for d_id, d in decision_records_by_id.items():
+                    if d_id in admitted_decision_ids:
+                        continue
+                    if str(getattr(d, "task_id", "")) not in admitted_task_ids:
+                        continue
+                    d_rel_elig = decision_elig_by_id.get(d_id)
+                    if d_rel_elig is None or not d_rel_elig.matched:
+                        continue
+                    canonical_found = True
+                    admitted_decision_ids.add(d_id)
+                    d_desc = getattr(d, "description", getattr(d, "rationale", "")) or ""
+                    d_status = getattr(d.status, "value", d.status)
+                    item_text = (
+                        f"Decision: {d.title}\nID: {d_id}\n"
+                        f"Status: {d_status}\nDescription: {d_desc}"
+                    )
+                    cost = _deterministic_token_cost(item_text)
+                    domains = (
+                        ["decisions", plan.domain_matches[0].domain]
+                        if plan.domain_matches
+                        else ["decisions"]
+                    )
+                    collected_items.append(
+                        ContextItem(
+                            source_id=f"decision:{d_id}",
+                            source_type="canonical_decision",
+                            authority=Authority.CANONICAL,
+                            trust_state=TrustState.CANONICAL,
+                            domain=domains[0],
+                            domains=domains,
+                            score=0.4,
+                            retrieval_stage=RetrievalStage.PROJECT_STATE,
+                            provenance=Provenance(
+                                source_refs=[f"decisions/{d_id}.json"],
+                                source_revision=d_id,
+                                authority_basis=AuthorityBasis.CANONICAL_LEDGER,
+                            ),
+                            freshness=Freshness.CURRENT,
+                            contradiction_state=ContradictionState.NONE,
+                            noise_state=NoiseState.CLEAN,
+                            token_cost=cost,
+                            excerpt=item_text,
+                            content_kind="excerpt",
+                            redaction_status="verified_safe",
+                        )
+                    )
+                    source_revisions.add(d_id)
+            elif query_intent.intent is QueryIntentKind.DECISION:
+                bound_task_ids = {
+                    str(getattr(decision_records_by_id[d_id], "task_id", ""))
+                    for d_id in admitted_decision_ids
+                    if d_id in decision_records_by_id
+                }
+                for t_id, t in task_records_by_id.items():
+                    if t_id in admitted_task_ids or t_id not in bound_task_ids:
+                        continue
+                    t_rel_elig = task_elig_by_id.get(t_id)
+                    if t_rel_elig is None or not t_rel_elig.matched:
+                        continue
+                    canonical_found = True
+                    admitted_task_ids.add(t_id)
+                    t_obj = getattr(t, "objective", getattr(t, "description", "")) or ""
+                    t_state = getattr(t.state, "value", t.state)
+                    item_text = f"Task: {t.title}\nID: {t_id}\nState: {t_state}\nObjective: {t_obj}"
+                    cost = _deterministic_token_cost(item_text)
+                    domains = (
+                        ["tasks", plan.domain_matches[0].domain]
+                        if plan.domain_matches
+                        else ["tasks"]
+                    )
+                    collected_items.append(
+                        ContextItem(
+                            source_id=f"task:{t_id}",
+                            source_type="canonical_task",
+                            authority=Authority.CANONICAL,
+                            trust_state=TrustState.CANONICAL,
+                            domain=domains[0],
+                            domains=domains,
+                            score=0.4,
+                            retrieval_stage=RetrievalStage.PROJECT_STATE,
+                            provenance=Provenance(
+                                source_refs=[f"tasks/{t_id}.json"],
+                                source_revision=t_id,
+                                authority_basis=AuthorityBasis.CANONICAL_LEDGER,
+                            ),
+                            freshness=Freshness.CURRENT,
+                            contradiction_state=ContradictionState.NONE,
+                            noise_state=NoiseState.CLEAN,
+                            token_cost=cost,
+                            excerpt=item_text,
+                            content_kind="excerpt",
+                            redaction_status="verified_safe",
+                        )
+                    )
+                    source_revisions.add(t_id)
 
             # Read Project State Service via canonical owning-subsystem proof only.
             # Canonical path is .power/projects/<id>/events.jsonl, enumerated
             # via ProjectStateService.list_project_ids(); no direct ledger glob.
             if (
-                self._project_state_service is not None
+                owners
+                and "project" in owners
+                and self._project_state_service is not None
                 and self._project_state_status == "AVAILABLE"
             ):
                 try:
@@ -700,77 +956,105 @@ class RetrievalPlanner:
                     except Exception as exc:
                         decisions.append(f"Project state enumeration skipped: {type(exc).__name__}")
                         project_ids = []
+                    scoped_project_ids = _scoped_object_ids(query_text, list(project_ids))
+                    query_meaningful = _meaningful_tokens(query_text)
                     for project_id in sorted(project_ids):
                         try:
-                            p_words = set(re.findall(r"\w+", project_id.casefold()))
                             if (
-                                query_intent.query.casefold() in project_id.casefold()
-                                or any(len(w) > 3 and w in p_words for w in query_words)
-                                or not query_words
+                                scoped_project_ids is not None
+                                and project_id not in scoped_project_ids
                             ):
-                                p_state = self._project_state_service.rebuild_project_state(
-                                    project_id
+                                continue
+                            if (
+                                scoped_project_ids is None
+                                and query_meaningful
+                                and not (query_meaningful & _meaningful_tokens(project_id))
+                            ):
+                                # Cheap identity-level pre-filter: skip ledgers
+                                # whose identity shares no query signal instead
+                                # of rebuilding every ledger (parity with the
+                                # previous id-level gate).
+                                continue
+                            p_state = self._project_state_service.rebuild_project_state(project_id)
+                            p_phase_raw = getattr(p_state, "current_phase", "")
+                            p_phase = getattr(p_phase_raw, "value", p_phase_raw)
+                            p_owner = getattr(p_state, "owner", "") or ""
+                            p_members = " ".join(
+                                sorted(
+                                    set(getattr(p_state, "active_tasks", []) or [])
+                                    | set(getattr(p_state, "ready_tasks", []) or [])
+                                    | set(getattr(p_state, "blocked_tasks", []) or [])
+                                    | set(getattr(p_state, "valid_decisions", []) or [])
                                 )
-                                canonical_found = True
-                                item_text = (
-                                    f"Project: {project_id}\n"
-                                    f"Status: {getattr(p_state, 'status', 'active')}\n"
-                                    f"Phase: {getattr(p_state, 'phase', 'current')}"
-                                )
-                                cost = _deterministic_token_cost(item_text)
-                                domains = (
-                                    ["project-state", plan.domain_matches[0].domain]
-                                    if plan.domain_matches
-                                    else ["project-state"]
-                                )
-                                state_rev = str(getattr(p_state, "state_revision", "")).strip()
-                                if not state_rev:
-                                    try:
-                                        _seq, head = self._project_state_service._ledger_head(
-                                            project_id
-                                        )
-                                        state_rev = str(head or "").strip()
-                                    except Exception:
-                                        state_rev = ""
-                                if not state_rev:
-                                    decisions.append(
-                                        f"Project state revision unavailable for {project_id}; skipped"
+                            )
+                            p_elig = _canonical_eligibility(
+                                query_text,
+                                project_id,
+                                f"{project_id} {p_phase} {p_owner} {p_members}",
+                            )
+                            if not (
+                                (primary_owner == "project" and p_elig.eligible_weak)
+                                or p_elig.eligible_strong
+                            ):
+                                continue
+                            canonical_found = True
+                            item_text = (
+                                f"Project: {project_id}\n"
+                                f"Status: {getattr(p_state, 'status', 'active')}\n"
+                                f"Phase: {getattr(p_state, 'phase', 'current')}"
+                            )
+                            cost = _deterministic_token_cost(item_text)
+                            domains = (
+                                ["project-state", plan.domain_matches[0].domain]
+                                if plan.domain_matches
+                                else ["project-state"]
+                            )
+                            state_rev = str(getattr(p_state, "state_revision", "")).strip()
+                            if not state_rev:
+                                try:
+                                    _seq, head = self._project_state_service._ledger_head(
+                                        project_id
                                     )
-                                    continue
-                                collected_items.append(
-                                    ContextItem(
-                                        source_id=f"project:{project_id}",
-                                        source_type="canonical_project",
-                                        authority=Authority.CANONICAL,
-                                        trust_state=TrustState.CANONICAL,
-                                        domain=domains[0],
-                                        domains=domains,
-                                        score=0.90,
-                                        retrieval_stage=RetrievalStage.PROJECT_STATE,
-                                        provenance=Provenance(
-                                            source_refs=[
-                                                f".power/projects/{project_id}/events.jsonl"
-                                            ],
-                                            source_revision=state_rev,
-                                            authority_basis=AuthorityBasis.CANONICAL_LEDGER,
-                                        ),
-                                        freshness=Freshness.CURRENT,
-                                        contradiction_state=ContradictionState.NONE,
-                                        noise_state=NoiseState.CLEAN,
-                                        token_cost=cost,
-                                        excerpt=item_text,
-                                        content_kind="excerpt",
-                                        redaction_status="verified_safe",
-                                    )
+                                    state_rev = str(head or "").strip()
+                                except Exception:
+                                    state_rev = ""
+                            if not state_rev:
+                                decisions.append(
+                                    f"Project state revision unavailable for {project_id}; skipped"
                                 )
-                                source_revisions.add(state_rev)
+                                continue
+                            collected_items.append(
+                                ContextItem(
+                                    source_id=f"project:{project_id}",
+                                    source_type="canonical_project",
+                                    authority=Authority.CANONICAL,
+                                    trust_state=TrustState.CANONICAL,
+                                    domain=domains[0],
+                                    domains=domains,
+                                    score=p_elig.relevance,
+                                    retrieval_stage=RetrievalStage.PROJECT_STATE,
+                                    provenance=Provenance(
+                                        source_refs=[f".power/projects/{project_id}/events.jsonl"],
+                                        source_revision=state_rev,
+                                        authority_basis=AuthorityBasis.CANONICAL_LEDGER,
+                                    ),
+                                    freshness=Freshness.CURRENT,
+                                    contradiction_state=ContradictionState.NONE,
+                                    noise_state=NoiseState.CLEAN,
+                                    token_cost=cost,
+                                    excerpt=item_text,
+                                    content_kind="excerpt",
+                                    redaction_status="verified_safe",
+                                )
+                            )
+                            source_revisions.add(state_rev)
                         except Exception as p_err:
                             decisions.append(
                                 f"Project state read skipped for {project_id}: {type(p_err).__name__}"
                             )
                 except Exception as exc:
                     decisions.append(f"Project state service read skipped: {type(exc).__name__}")
-            elif is_authority_sensitive:
+            elif is_authority_sensitive and owners and "project" in owners:
                 owner_reason = (
                     f"canonical owner unavailable: ProjectStateService "
                     f"{self._project_state_status}: {self._project_state_reason}"
@@ -1162,21 +1446,36 @@ class RetrievalPlanner:
         # -------------------------------------------------------------
         # Evidence Ordering Policy Enforcement
         # -------------------------------------------------------------
-        # Sort key implements approved EvidenceOrderingPolicy:
-        # 1. Authority rank (0=canonical, 1=verified, 2=curated, 3=proposed, 4=raw, 5=unknown)
-        # 2. Temporal freshness (current=0, stale=1, expired=2)
-        # 3. Supersession state (active=0, superseded=1)
-        # 4. Contradiction state (none=0, conflicted=1)
-        # 5. Semantic score (descending: -score)
-        # 6. Lexicographical tie-breaker (rel_path)
-        def _sort_key(it: ContextItem) -> tuple[int, int, int, int, float, str]:
+        # Sort keys implement the approved EvidenceOrderingPolicy. For
+        # authority-sensitive intents (after eligible-set admission):
+        # authority -> temporal -> supersession -> contradiction ->
+        # relevance -> deterministic tie-break. Raw evidence about the SAME
+        # subject therefore sorts below the admitted canonical current
+        # record. For non-authority intents relevance stays primary and
+        # authority is only a secondary tie-break: no global authority sort
+        # may erase relevance there.
+        def _authority_first_key(it: ContextItem) -> tuple[int, int, int, int, float, str]:
             auth_idx = _AUTHORITY_RANK_INDEX.get(it.authority, 5)
             fresh_idx = 0 if it.freshness == Freshness.CURRENT else 1
             super_idx = 1 if it.contradiction_state == ContradictionState.SUPERSEDED else 0
             contra_idx = 0 if it.contradiction_state == ContradictionState.NONE else 1
             return (auth_idx, fresh_idx, super_idx, contra_idx, -it.score, it.source_id)
 
-        ordered_candidates = sorted(screened_items, key=_sort_key)
+        def _relevance_first_key(it: ContextItem) -> tuple[float, int, int, int, int, str]:
+            auth_idx = _AUTHORITY_RANK_INDEX.get(it.authority, 5)
+            fresh_idx = 0 if it.freshness == Freshness.CURRENT else 1
+            super_idx = 1 if it.contradiction_state == ContradictionState.SUPERSEDED else 0
+            contra_idx = 0 if it.contradiction_state == ContradictionState.NONE else 1
+            return (-it.score, auth_idx, fresh_idx, super_idx, contra_idx, it.source_id)
+
+        if is_authority_sensitive:
+            ordered_candidates = sorted(screened_items, key=_authority_first_key)
+        else:
+            ordered_candidates = sorted(screened_items, key=_relevance_first_key)
+            decisions.append(
+                "Non-authority intent: relevance-primary ordering applied; "
+                "authority kept as tie-break only."
+            )
 
         # Audit authority order violations for authority-sensitive intents
         if is_authority_sensitive:
