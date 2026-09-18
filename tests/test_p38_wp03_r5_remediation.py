@@ -71,17 +71,34 @@ def test_concept_mapping_source_id_resolution() -> None:
 
     # File stem resolution
     assert source_id_to_concept("p38-src-task-current", alias_lookup) == "task-current"
-    assert source_id_to_concept("p38-src-contradiction-canonical", alias_lookup) == "contradiction-canonical"
+    assert (
+        source_id_to_concept("p38-src-contradiction-canonical", alias_lookup)
+        == "contradiction-canonical"
+    )
 
     # Runtime prefix resolution
-    assert source_id_to_concept("task:p38-task-current-corpus-verify", alias_lookup) == "task-current"
-    assert source_id_to_concept("decision:dec_x-current-holdout-tuning-decision", alias_lookup) == "decision-current"
-    assert source_id_to_concept("project:prj_x-power-current-project-phase-status", alias_lookup) == "project-current"
+    assert (
+        source_id_to_concept("task:p38-task-current-corpus-verify", alias_lookup) == "task-current"
+    )
+    assert (
+        source_id_to_concept("decision:dec_x-current-holdout-tuning-decision", alias_lookup)
+        == "decision-current"
+    )
+    assert (
+        source_id_to_concept("project:prj_x-power-current-project-phase-status", alias_lookup)
+        == "project-current"
+    )
 
 
 def test_authority_metrics_structure_in_r5_development_evidence() -> None:
     """Invariant 5: authority metrics report Section 3.2 required 4-field shape."""
-    dev_path = Path(__file__).parents[1] / "artifacts" / "project-state" / "phase-5e" / "phase5e_development_r5_fast.json"
+    dev_path = (
+        Path(__file__).parents[1]
+        / "artifacts"
+        / "project-state"
+        / "phase-5e"
+        / "phase5e_development_r5_fast.json"
+    )
     data = json.loads(dev_path.read_text(encoding="utf-8"))
     hard_invariants = data["hard_invariants"]
 

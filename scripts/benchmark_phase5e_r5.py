@@ -148,7 +148,9 @@ def setup_production_fixtures(vault_dir: Path, manifest: dict[str, Any]) -> dict
     # 3. Project fixtures via trusted PSE writer (dynamically from manifest).
     pss = ProjectStateService(vault_dir, task_service=ts, decision_service=ds)
     for concept in manifest.get("concepts", []):
-        if concept.get("production_owner") == "ProjectStateService" and concept.get("setup_payload"):
+        if concept.get("production_owner") == "ProjectStateService" and concept.get(
+            "setup_payload"
+        ):
             concept_id = concept["eval_concept_id"]
             payload = concept["setup_payload"]
             project_id = str(payload.get("project_id", concept.get("runtime_object_id", "")))

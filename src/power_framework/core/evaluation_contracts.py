@@ -278,7 +278,6 @@ def register_evaluation_revision(
     EVALUATION_REVISION_REGISTRY[revision] = spec
 
 
-
 class EvaluationLanguage(StrEnum):
     UA = "UA"
     EN = "EN"
@@ -1102,7 +1101,8 @@ def _check_revision_inventory(root: Path, revision: str, expected: dict[str, str
         if path.is_dir():
             if path.name != "corpus":
                 raise EvaluationIntegrityError(
-                    f"revision_{revision}_inventory", f"revision {revision} contains an unlisted directory"
+                    f"revision_{revision}_inventory",
+                    f"revision {revision} contains an unlisted directory",
                 )
             continue
         try:

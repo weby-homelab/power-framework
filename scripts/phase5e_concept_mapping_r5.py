@@ -103,7 +103,8 @@ def is_owner_backed(
         if concept.get("eval_concept_id") == eval_concept_id:
             return (
                 bool(concept.get("owner_backed", False))
-                and concept.get("production_owner") in {
+                and concept.get("production_owner")
+                in {
                     "TaskService",
                     "DecisionService",
                     "ProjectStateService",

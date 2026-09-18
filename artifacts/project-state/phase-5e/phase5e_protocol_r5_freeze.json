@@ -1,6 +1,6 @@
 {
   "concept_mapping_path": "scripts/phase5e_concept_mapping_r5.py",
-  "concept_mapping_sha256": "ec70e5bf8df35db35aca77db6b7187ce8b42006b6b83f25bddf1ce31c2c35b39",
+  "concept_mapping_sha256": "379310b25058560f00af3a4fc7acedfa1963016f06a2646d8b173cbbff222649",
   "corpus_disjointness_proof_sha256": "1a648120b8d7fb245d590a2c0a106f331777bd3413a2c0a2c09ed62bbe465643",
   "corpus_manifest_digest": "4a97ef84e24dc57ffb9b527faa2f8bb590a5c9c014707cd3637bf34ae544de17",
   "corpus_manifest_sha256": "550f7d61ca3c2df84dd3a9ed996fa33cecff7d0aa583da59ac4e33106699cc40",
@@ -81,7 +81,7 @@
     "p95_latency_ms_limit": 10000.0,
     "p95_latency_ms_measured": 325.44
   },
-  "runner_implementation_sha256": "f024a964181a2bec2dd7cbe542a545a2bcecc55d4f9a2713af93e18538391c78",
+  "runner_implementation_sha256": "a2da6898f76bc77a4cc354e3e63322231dfcd402f5fabc0fd57dfac46d158c2a",
   "runner_path": "scripts/benchmark_phase5e_r5.py",
   "runtime_file_path": "src/power_framework/core/retrieval_planner.py",
   "runtime_file_sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf",
