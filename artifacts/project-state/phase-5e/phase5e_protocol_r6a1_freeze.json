@@ -19,11 +19,11 @@
   },
   "concept_mapping": {
     "path": "scripts/phase5e_concept_mapping_r6.py",
-    "sha256": "bf7c09da95c32832ff5f2c1f16c675aa9b5e53de469ee8f5a790632f930185eb"
+    "sha256": "7a393ed2e8c188465eac9fcaaed1164a3b39c4286aa12bcd64a28131ae5df857"
   },
   "evaluation_contracts": {
     "path": "src/power_framework/core/evaluation_contracts.py",
-    "sha256": "8211a00439aff025ee29e696e1f186e0d04125f7d8dc587ec9c6dc3cf1bacd3c",
+    "sha256": "f28106e72a0be0e3e83b566ee8986f4e77842e41c1e4dc764ca904b37fa40a11",
     "historical_v1_review_contract_parseable": true,
     "review_contract_path": "artifacts/project-state/phase-5e/phase5e_review_contract_r6a1.json",
     "review_contract_sha256": "e99f945d459edfde5b23fd95b0cfc8a038ab801bb55188e8db2a7562f6d4315b"
@@ -60,8 +60,8 @@
   },
   "development_evidence": {
     "path": "artifacts/project-state/phase-5e/phase5e_development_r6a1_fast.json",
-    "sha256": "60cb6ef83fae85327a748e3544f7b69b65a70ce39abb0e3113e80f8047687fee",
-    "development_evidence_sha256": "60cb6ef83fae85327a748e3544f7b69b65a70ce39abb0e3113e80f8047687fee",
+    "sha256": "cbcd0fe5b1a6e8f517a5347a669255cba5daec6f8cdce340c72935b232884bd2",
+    "development_evidence_sha256": "cbcd0fe5b1a6e8f517a5347a669255cba5daec6f8cdce340c72935b232884bd2",
     "revision": "v1.4",
     "split": "development",
     "holdout_used": false,
@@ -79,6 +79,8 @@
   },
   "q14_diagnostic": {
     "path": "logical:phase5e-q14-v1.4-r6a1-diagnostic",
+    "harness_path": "scripts/diagnose_phase5e_q14_r6a1.py",
+    "harness_sha256": "b3f755750511b70631bcb3cdc0eeed4a3b9f996a33878afdf46048d5b2d21f0e",
     "historical_revision": "v1.4",
     "executed": true,
     "admission_evidence": false,

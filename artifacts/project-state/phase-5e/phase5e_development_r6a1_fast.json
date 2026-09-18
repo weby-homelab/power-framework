@@ -2,11 +2,11 @@
   "benchmark_metadata": {
     "all_hard_invariants_pass": true,
     "budget_class": "FAST",
-    "concept_mapping_sha256": "bf7c09da95c32832ff5f2c1f16c675aa9b5e53de469ee8f5a790632f930185eb",
+    "concept_mapping_sha256": "7a393ed2e8c188465eac9fcaaed1164a3b39c4286aa12bcd64a28131ae5df857",
     "corpus_manifest_digest": "25bb289451fca60b8619b475c79eed19d4fd5e9fc5a83d76381e698825355c74",
     "development_split_digest": "6aa73e8a0c039cd9741fb1fada48acbc372196c1ef41ec31f426c5b564b09175",
     "eval_corpus_version": "v1.4",
-    "evaluation_contracts_sha256": "8211a00439aff025ee29e696e1f186e0d04125f7d8dc587ec9c6dc3cf1bacd3c",
+    "evaluation_contracts_sha256": "f28106e72a0be0e3e83b566ee8986f4e77842e41c1e4dc764ca904b37fa40a11",
     "fast_capability_contract_path": "artifacts/project-state/phase-5e/phase5e_fast_capability_r6a1.json",
     "fast_capability_contract_sha256": "1a1b2b32e3d01cbcd4a861ee854c8c51687ee104923d1930d25cc0a555848953",
     "fast_runtime_conformance": {
@@ -388,10 +388,10 @@
     "runtime_sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf",
     "schema_version": "power.retrieval-benchmark-r6a1.v1",
     "setup_payload_digest": "c05cb249ad2cc4b47dd6b895f9cde4eda24eb37dafa56d4a08894786555d10d3",
-    "setup_state_digest": "bc8fdd4dc90b9aa33adee9179529e9f8ed34104355f8ae9367993fa2148d3fff",
+    "setup_state_digest": "b247c507230bf6d937e6cf8bf09e90048217af253858e4df439a97ef11b160af",
     "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
     "split": "development",
-    "timestamp": "2026-09-18T19:17:36.917432+00:00"
+    "timestamp": "2026-09-18T19:41:40.294979+00:00"
   },
   "fixture_receipts": {
     "decisions": {
@@ -404,7 +404,7 @@
     "projects": {
       "prj_x-power-current-project-phase-status": {
         "eval_concept_id": "project-current",
-        "state_revision": "2d2c8db8cbbbd18b10242ed9ea28eab6c6c689e982eacb3284ecb9796a8ee287"
+        "state_revision": "83d3f77066a2895ac1782c13a38afe08ba7fa0801728066772f1180e6656675d"
       }
     },
     "tasks": {
@@ -492,7 +492,7 @@
           "project-raw-chat",
           "cross-domain"
         ],
-        "latency_ms": 522.52,
+        "latency_ms": 555.02,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -537,7 +537,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 178.15,
+        "latency_ms": 171.42,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -596,7 +596,7 @@
           "noise-injection",
           "cross-domain"
         ],
-        "latency_ms": 527.47,
+        "latency_ms": 490.64,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -638,7 +638,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 180.51,
+        "latency_ms": 193.34,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -684,7 +684,7 @@
           "research-curated",
           "decision-raw"
         ],
-        "latency_ms": 248.54,
+        "latency_ms": 209.82,
         "map": 0.3333,
         "mrr": 0.3333,
         "ndcg": {
@@ -722,7 +722,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 143.02,
+        "latency_ms": 130.33,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -764,7 +764,7 @@
           "hard-negative",
           "cross-domain"
         ],
-        "latency_ms": 205.81,
+        "latency_ms": 177.32,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -803,7 +803,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 144.36,
+        "latency_ms": 107.04,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -852,7 +852,7 @@
           "project-raw-chat",
           "cross-domain"
         ],
-        "latency_ms": 332.31,
+        "latency_ms": 339.03,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -894,7 +894,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 169.84,
+        "latency_ms": 169.81,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -940,7 +940,7 @@
           "project-superseded",
           "hard-negative"
         ],
-        "latency_ms": 255.88,
+        "latency_ms": 247.84,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -980,7 +980,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 156.69,
+        "latency_ms": 167.93,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1020,7 +1020,7 @@
           "decision-current",
           "task-raw"
         ],
-        "latency_ms": 105.52,
+        "latency_ms": 102.53,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1053,7 +1053,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 89.35,
+        "latency_ms": 76.39,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1097,7 +1097,7 @@
           "code-ua",
           "code-en"
         ],
-        "latency_ms": 305.72,
+        "latency_ms": 299.47,
         "map": 0.3333,
         "mrr": 0.3333,
         "ndcg": {
@@ -1140,7 +1140,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 166.95,
+        "latency_ms": 154.03,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -1186,7 +1186,7 @@
           "noise-injection",
           "cross-domain"
         ],
-        "latency_ms": 244.36,
+        "latency_ms": 236.16,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1224,7 +1224,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 152.12,
+        "latency_ms": 145.58,
         "map": 0.3333,
         "mrr": 0.3333,
         "ndcg": {
@@ -1278,7 +1278,7 @@
           "project-superseded",
           "cross-domain"
         ],
-        "latency_ms": 831.37,
+        "latency_ms": 840.98,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1315,7 +1315,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 358.2,
+        "latency_ms": 403.79,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1365,7 +1365,7 @@
           "decision-old",
           "task-raw"
         ],
-        "latency_ms": 444.24,
+        "latency_ms": 416.04,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -1408,7 +1408,7 @@
         "dense_used": false,
         "exclusion_leaks": 1,
         "exclusions_above_winner": 0,
-        "latency_ms": 218.76,
+        "latency_ms": 231.35,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1463,7 +1463,7 @@
           "project-superseded",
           "cross-domain"
         ],
-        "latency_ms": 525.72,
+        "latency_ms": 468.38,
         "map": 0.2,
         "mrr": 0.2,
         "ndcg": {
@@ -1501,7 +1501,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 173.74,
+        "latency_ms": 147.98,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1541,7 +1541,7 @@
           "project-current",
           "project-raw-chat"
         ],
-        "latency_ms": 146.93,
+        "latency_ms": 157.7,
         "map": 0.3333,
         "mrr": 0.3333,
         "ndcg": {
@@ -1574,7 +1574,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 127.32,
+        "latency_ms": 121.38,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1618,7 +1618,7 @@
           "hard-negative",
           "project-current"
         ],
-        "latency_ms": 441.73,
+        "latency_ms": 443.37,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1657,7 +1657,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 321.99,
+        "latency_ms": 322.98,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1712,7 +1712,7 @@
           "cross-domain",
           "code-ua"
         ],
-        "latency_ms": 531.57,
+        "latency_ms": 569.45,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1753,7 +1753,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 174.16,
+        "latency_ms": 195.78,
         "map": 1.0,
         "mrr": 0.0,
         "ndcg": {
@@ -1796,7 +1796,7 @@
           "task-current",
           "project-current"
         ],
-        "latency_ms": 177.01,
+        "latency_ms": 233.11,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -1835,7 +1835,7 @@
         "dense_used": false,
         "exclusion_leaks": 1,
         "exclusions_above_winner": 1,
-        "latency_ms": 114.21,
+        "latency_ms": 109.1,
         "map": 0.5,
         "mrr": 0.5,
         "ndcg": {
@@ -1883,7 +1883,7 @@
           "project-raw-chat",
           "cross-domain"
         ],
-        "latency_ms": 369.56,
+        "latency_ms": 337.95,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1925,7 +1925,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 183.35,
+        "latency_ms": 160.64,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -1975,7 +1975,7 @@
           "project-raw-chat",
           "cross-domain"
         ],
-        "latency_ms": 367.71,
+        "latency_ms": 339.14,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -2017,7 +2017,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 230.99,
+        "latency_ms": 160.9,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -2062,7 +2062,7 @@
           "code-en",
           "infra-stale"
         ],
-        "latency_ms": 162.7,
+        "latency_ms": 206.12,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -2103,7 +2103,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 114.4,
+        "latency_ms": 143.24,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -2157,7 +2157,7 @@
           "task-raw",
           "code-ua"
         ],
-        "latency_ms": 297.06,
+        "latency_ms": 353.31,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -2198,7 +2198,7 @@
         "dense_used": false,
         "exclusion_leaks": 0,
         "exclusions_above_winner": 0,
-        "latency_ms": 116.0,
+        "latency_ms": 146.22,
         "map": 1.0,
         "mrr": 1.0,
         "ndcg": {
@@ -2266,8 +2266,8 @@
   "summary": {
     "legacy": {
       "context_precision": 0.085,
-      "latency_ms_p50": 332.31,
-      "latency_ms_p95": 531.57,
+      "latency_ms_p50": 339.03,
+      "latency_ms_p95": 569.45,
       "map": 0.735,
       "mrr": 0.585,
       "ndcg_at_10": 0.8077,
@@ -2312,7 +2312,7 @@
       "mean_tokens_limit": 10000.0,
       "mean_tokens_measured": 156.3,
       "p95_latency_ms_limit": 10000.0,
-      "p95_latency_ms_measured": 321.99
+      "p95_latency_ms_measured": 322.98
     },
     "shadow": {
       "authority_exclusions_above_winner": 0,
@@ -2321,8 +2321,8 @@
       "authority_violations": 0,
       "authority_winner_missing": 0,
       "context_precision": 0.085,
-      "latency_ms_p50": 169.84,
-      "latency_ms_p95": 321.99,
+      "latency_ms_p50": 160.64,
+      "latency_ms_p95": 322.98,
       "map": 0.8917,
       "mrr": 0.7417,
       "ndcg_at_10": 0.9052,
