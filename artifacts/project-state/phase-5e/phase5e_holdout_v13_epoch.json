@@ -1,0 +1,1674 @@
+{
+  "benchmark_metadata": {
+    "all_hard_invariants_pass": false,
+    "budget_class": "FAST",
+    "corpus_manifest_digest": "0a3185df977dbb02423561b671b57c09887b9a3db80c7bd46604a5031455b31c",
+    "eval_corpus_version": "v1.1",
+    "fixture_manifest_path": "/root/geminicli/projects/power-framework/artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_v2.json",
+    "fixture_manifest_sha256": "2fb4e40b9d8f91cd3ed98eae8d29bdb8bab6c341066f6924f2599bc6c4c8c699",
+    "owner_backed_query_count": 8,
+    "platform": "Linux-7.0.14-16-pve-x86_64-with-glibc2.41",
+    "python_version": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+    "quality_thresholds_pass": true,
+    "query_count": 20,
+    "runner": "benchmark_phase5e_r4",
+    "runner_sha256": "df2ff71dd5dc4f41fc74817055c8ee341155ba3c4634f4950bb98aff9f7b3500",
+    "schema_version": "power.retrieval-benchmark-r4.v1",
+    "setup_payload_digest": "00c7b640bb6d5d5d7aa61649e9dcd9724c2ddcc801d382253d7dee08fc1d40bf",
+    "setup_state_digest": "ad012509bc16c2fc056f62c5516abc8cefacdb82b5fbb8d3b1caa77676c6e2bc",
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+    "split": "holdout",
+    "timestamp": "2026-09-18T10:46:04.313338+00:00"
+  },
+  "fixture_receipts": {
+    "decisions": {
+      "dec_x-current-holdout-tuning-decision": {
+        "task_id": "p38-task-current-corpus-verify",
+        "task_revision": 1,
+        "title": "Canonical decision: holdout tuning current \u2014 \u0440\u0456\u0448\u0435\u043d\u043d\u044f"
+      }
+    },
+    "projects": {
+      "prj_x-contradiction-tuning-authority-canonical": {
+        "eval_concept_id": "contradiction-canonical",
+        "state_revision": "46ec523ea20cb8cf4971e6e5b349097fa8fc67ffb7ac73fb6fac8b73ba89868f"
+      },
+      "prj_x-power-current-project-phase-status": {
+        "eval_concept_id": "project-current",
+        "state_revision": "f883114e437e81a9fe6b2911b8e991b83d3efd876a7a7a0faa9445ce4a9ee296"
+      }
+    },
+    "tasks": {
+      "p38-task-current-corpus-verify": {
+        "revision": 1,
+        "title": "Verify corpus task \u2014 \u0437\u0430\u0432\u0434\u0430\u043d\u043d\u044f \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0438 \u0433\u043e\u0442\u043e\u0432\u0435"
+      }
+    }
+  },
+  "hard_invariants": {
+    "authority_order_violations": 0,
+    "authority_order_violations_pass": true,
+    "authority_outranked_by_relevance": 1,
+    "authority_outranked_by_relevance_pass": false,
+    "authority_provenance_failures": 0,
+    "authority_provenance_failures_pass": true,
+    "authority_winner_missing": 1,
+    "authority_winner_missing_pass": false,
+    "default_switches": 0,
+    "default_switches_pass": true,
+    "determinism_mismatches": 0,
+    "determinism_mismatches_pass": true,
+    "non_regression_pass": true,
+    "prompt_injection_authority_escalation": 0,
+    "prompt_injection_authority_escalation_pass": true,
+    "query_side_writes": 0,
+    "query_side_writes_pass": true,
+    "resource_bounds_pass": true,
+    "scope_escape": 0,
+    "scope_escape_pass": true,
+    "secret_leakage": 0,
+    "secret_leakage_pass": true
+  },
+  "queries": [
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "project-current",
+          "code-ua",
+          "project-superseded",
+          "hard-negative",
+          "code-en",
+          "task-current",
+          "decision-old",
+          "research-curated",
+          "research-unverified",
+          "contradiction-canonical",
+          "infra-current",
+          "decision-raw",
+          "decision-current",
+          "infra-stale",
+          "task-raw",
+          "contradiction-raw",
+          "noise-injection",
+          "project-raw-chat",
+          "cross-domain"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 506.39,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h01",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current",
+          "research-unverified",
+          "code-ua",
+          "hard-negative",
+          "code-en",
+          "research-curated",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 155.89,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "pack_bytes": 10101,
+        "precision": 0.1,
+        "raw_ids": [
+          "project:prj_x-power-current-project-phase-status",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 197,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "project-current",
+      "legacy": {
+        "concepts": [
+          "project-raw-chat",
+          "project-superseded",
+          "project-current",
+          "hard-negative",
+          "task-raw",
+          "cross-domain",
+          "contradiction-raw",
+          "code-ua",
+          "decision-current",
+          "code-en",
+          "task-current",
+          "decision-old",
+          "research-curated",
+          "research-unverified",
+          "contradiction-canonical",
+          "infra-current",
+          "decision-raw",
+          "infra-stale",
+          "noise-injection"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 569.81,
+        "map": 0.3333,
+        "mrr": 0.3333,
+        "ndcg": {
+          "5": 0.5897,
+          "10": 0.5897
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "ProjectStateService",
+      "query_id": "p38-v13-h02",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current",
+          "hard-negative",
+          "cross-domain",
+          "code-ua",
+          "decision-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 157.88,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9173,
+          "10": 0.9173
+        },
+        "pack_bytes": 8504,
+        "precision": 0.1,
+        "raw_ids": [
+          "project:prj_x-power-current-project-phase-status",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-decision-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 153,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": "decision-current",
+      "legacy": {
+        "concepts": [
+          "decision-old",
+          "decision-current",
+          "decision-raw",
+          "code-ua",
+          "project-current",
+          "hard-negative",
+          "contradiction-canonical",
+          "code-en",
+          "task-current",
+          "project-superseded",
+          "contradiction-raw",
+          "noise-injection",
+          "project-raw-chat",
+          "cross-domain"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 375.05,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "5": 0.7098,
+          "10": 0.7098
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "DecisionService",
+      "query_id": "p38-v13-h03",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "decision-current",
+          "code-ua",
+          "project-current",
+          "hard-negative",
+          "code-en",
+          "contradiction-canonical",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 167.3,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9173,
+          "10": 0.9173
+        },
+        "pack_bytes": 10194,
+        "precision": 0.1,
+        "raw_ids": [
+          "decision:dec_x-current-holdout-tuning-decision",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 221,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": "task-current",
+      "legacy": {
+        "concepts": [
+          "task-current",
+          "cross-domain",
+          "decision-current",
+          "task-raw",
+          "decision-raw",
+          "hard-negative",
+          "infra-current",
+          "infra-stale",
+          "decision-old",
+          "noise-injection",
+          "research-curated",
+          "research-unverified",
+          "code-ua",
+          "code-en"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 374.47,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9738,
+          "10": 0.9738
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "TaskService",
+      "query_id": "p38-v13-h04",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "task-current",
+          "cross-domain",
+          "decision-current",
+          "hard-negative",
+          "infra-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 148.96,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9173,
+          "10": 0.9173
+        },
+        "pack_bytes": 7969,
+        "precision": 0.1,
+        "raw_ids": [
+          "task:p38-task-current-corpus-verify",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-infra-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 172,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": "task-current",
+      "legacy": {
+        "concepts": [
+          "task-current"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 49.61,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9173,
+          "10": 0.9173
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "TaskService",
+      "query_id": "p38-v13-h05",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 59.31,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9173,
+          "10": 0.9173
+        },
+        "pack_bytes": 4272,
+        "precision": 0.1,
+        "raw_ids": [
+          "task:p38-task-current-corpus-verify",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 88,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "research-curated",
+          "research-unverified",
+          "infra-stale",
+          "infra-current",
+          "project-raw-chat",
+          "contradiction-canonical",
+          "decision-current",
+          "task-raw",
+          "project-superseded",
+          "hard-negative",
+          "project-current",
+          "cross-domain"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 510.37,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h06",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "research-curated",
+          "research-unverified",
+          "contradiction-canonical",
+          "decision-current",
+          "hard-negative",
+          "infra-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 1,
+        "exclusions_above_winner": 0,
+        "latency_ms": 352.53,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "pack_bytes": 7485,
+        "precision": 0.1,
+        "raw_ids": [
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-infra-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 127,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "research-curated",
+          "research-unverified",
+          "code-ua",
+          "project-current"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 127.42,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h07",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "research-curated",
+          "research-unverified",
+          "code-ua",
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 1,
+        "exclusions_above_winner": 0,
+        "latency_ms": 105.81,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "pack_bytes": 5949,
+        "precision": 0.1,
+        "raw_ids": [
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 93,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "code-en",
+          "decision-current",
+          "code-ua",
+          "task-current",
+          "decision-old",
+          "decision-raw",
+          "hard-negative",
+          "cross-domain",
+          "contradiction-canonical",
+          "project-current",
+          "project-superseded",
+          "contradiction-raw",
+          "noise-injection",
+          "project-raw-chat"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 370.81,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h08",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "code-en",
+          "decision-current",
+          "code-ua",
+          "task-current",
+          "hard-negative",
+          "cross-domain",
+          "contradiction-canonical",
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 148.91,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "pack_bytes": 8967,
+        "precision": 0.1,
+        "raw_ids": [
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 171,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [],
+        "exclusion_leaks": 0,
+        "latency_ms": 33.51,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h09",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 54.58,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "pack_bytes": 2414,
+        "precision": 0.0,
+        "raw_ids": [],
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 0,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "infra-current",
+          "infra-stale",
+          "cross-domain",
+          "code-en"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 262.19,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h10",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "infra-current",
+          "cross-domain",
+          "code-en"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 213.61,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9173,
+          "10": 0.9173
+        },
+        "pack_bytes": 4629,
+        "precision": 0.1,
+        "raw_ids": [
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-code-en.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 60,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [],
+        "exclusion_leaks": 0,
+        "latency_ms": 32.74,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h11",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 47.72,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "pack_bytes": 2463,
+        "precision": 0.0,
+        "raw_ids": [],
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 0,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "decision-current",
+          "decision-old",
+          "infra-current",
+          "infra-stale",
+          "cross-domain",
+          "decision-raw",
+          "hard-negative",
+          "project-current",
+          "project-superseded",
+          "code-en",
+          "contradiction-canonical",
+          "contradiction-raw",
+          "research-curated",
+          "research-unverified",
+          "task-current",
+          "code-ua"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 326.64,
+        "map": 0.2,
+        "mrr": 0.2,
+        "ndcg": {
+          "5": 0.6419,
+          "10": 0.6419
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h12",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "decision-current",
+          "infra-current",
+          "cross-domain",
+          "hard-negative",
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 130.09,
+        "map": 0.3333,
+        "mrr": 0.3333,
+        "ndcg": {
+          "5": 0.7309,
+          "10": 0.7309
+        },
+        "pack_bytes": 8046,
+        "precision": 0.1,
+        "raw_ids": [
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-project-current.md"
+        ],
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 136,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "contradiction-canonical",
+      "legacy": {
+        "concepts": [
+          "contradiction-raw",
+          "project-raw-chat",
+          "task-raw",
+          "decision-raw",
+          "noise-injection",
+          "contradiction-canonical",
+          "cross-domain",
+          "project-superseded",
+          "decision-old",
+          "decision-current",
+          "project-current",
+          "research-unverified",
+          "code-ua",
+          "code-en",
+          "task-current"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 400.62,
+        "map": 0.1667,
+        "mrr": 0.1667,
+        "ndcg": {
+          "5": 0.131,
+          "10": 0.4578
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "ProjectStateService",
+      "query_id": "p38-v13-h13",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "contradiction-canonical",
+          "decision-current",
+          "cross-domain"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 167.6,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.9173,
+          "10": 0.9173
+        },
+        "pack_bytes": 7521,
+        "precision": 0.1,
+        "raw_ids": [
+          "project:prj_x-contradiction-tuning-authority-canonical",
+          "decision:dec_x-current-holdout-tuning-decision",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-decision-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 136,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": "decision-current",
+      "legacy": {
+        "concepts": [
+          "project-current"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 50.12,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "DecisionService",
+      "query_id": "p38-v13-h14",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "decision-current",
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 56.87,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.8609,
+          "10": 0.8609
+        },
+        "pack_bytes": 4439,
+        "precision": 0.1,
+        "raw_ids": [
+          "decision:dec_x-current-holdout-tuning-decision",
+          "01_Projects/corpus/p38-src-project-current-ua.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 101,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "hard-negative",
+          "decision-current",
+          "cross-domain",
+          "project-raw-chat",
+          "task-raw",
+          "project-superseded",
+          "contradiction-canonical",
+          "task-current",
+          "decision-old",
+          "research-unverified",
+          "decision-raw"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 386.65,
+        "map": 0.125,
+        "mrr": 0.125,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.3155
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h15",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "task-current",
+          "research-unverified",
+          "hard-negative",
+          "decision-current",
+          "cross-domain",
+          "contradiction-canonical"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 1,
+        "exclusions_above_winner": 0,
+        "latency_ms": 181.74,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "pack_bytes": 8606,
+        "precision": 0.1,
+        "raw_ids": [
+          "task:p38-task-current-corpus-verify",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 200,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "project-current",
+          "project-superseded",
+          "hard-negative",
+          "infra-current",
+          "code-ua",
+          "infra-stale",
+          "decision-current",
+          "project-raw-chat",
+          "code-en",
+          "task-current",
+          "contradiction-canonical",
+          "cross-domain",
+          "decision-old",
+          "research-curated",
+          "research-unverified",
+          "decision-raw",
+          "task-raw",
+          "contradiction-raw",
+          "noise-injection"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 506.64,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h16",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current",
+          "hard-negative",
+          "infra-current",
+          "code-ua",
+          "decision-current",
+          "code-en"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 191.45,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "pack_bytes": 9156,
+        "precision": 0.1,
+        "raw_ids": [
+          "project:prj_x-power-current-project-phase-status",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-code-en.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 177,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "decision-current",
+      "legacy": {
+        "concepts": [
+          "noise-injection",
+          "cross-domain",
+          "contradiction-raw",
+          "project-superseded",
+          "project-current",
+          "project-raw-chat",
+          "contradiction-canonical",
+          "decision-current",
+          "infra-stale",
+          "research-curated",
+          "research-unverified",
+          "code-ua",
+          "code-en",
+          "task-current",
+          "infra-current",
+          "decision-old",
+          "task-raw",
+          "hard-negative"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 560.95,
+        "map": 0.125,
+        "mrr": 0.125,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.3155
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "DecisionService",
+      "query_id": "p38-v13-h17",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "decision-current",
+          "cross-domain",
+          "project-current",
+          "contradiction-canonical",
+          "research-curated"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 156.03,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 1.0,
+          "10": 1.0
+        },
+        "pack_bytes": 8129,
+        "precision": 0.1,
+        "raw_ids": [
+          "decision:dec_x-current-holdout-tuning-decision",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-research-curated.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 171,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [],
+        "exclusion_leaks": 0,
+        "latency_ms": 28.45,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h18",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 49.46,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "pack_bytes": 2595,
+        "precision": 0.0,
+        "raw_ids": [],
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 0,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "task-current",
+          "task-raw",
+          "cross-domain",
+          "decision-current"
+        ],
+        "exclusion_leaks": 1,
+        "latency_ms": 157.55,
+        "map": 0.8333,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.7592,
+          "10": 0.7592
+        },
+        "precision": 0.2,
+        "recall": {
+          "1": 0.5,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-v13-h19",
+      "shadow": {
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "task-current",
+          "decision-current",
+          "cross-domain"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 130.46,
+        "map": 0.8333,
+        "mrr": 1.0,
+        "ndcg": {
+          "5": 0.692,
+          "10": 0.692
+        },
+        "pack_bytes": 6828,
+        "precision": 0.2,
+        "raw_ids": [
+          "task:p38-task-current-corpus-verify",
+          "decision:dec_x-current-holdout-tuning-decision",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-decision-current.md"
+        ],
+        "recall": {
+          "1": 0.5,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 207,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "contradiction-canonical",
+      "legacy": {
+        "concepts": [
+          "project-current"
+        ],
+        "exclusion_leaks": 0,
+        "latency_ms": 53.12,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "ProjectStateService",
+      "query_id": "p38-v13-h20",
+      "shadow": {
+        "authority_outranked": 1,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 61.19,
+        "map": 0.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "5": 0.0,
+          "10": 0.0
+        },
+        "pack_bytes": 3408,
+        "precision": 0.0,
+        "raw_ids": [
+          "01_Projects/corpus/p38-src-project-current-ua.md"
+        ],
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "10": 0.0
+        },
+        "reranker_used": false,
+        "scope_escapes": 0,
+        "total_tokens": 30,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    }
+  ],
+  "security_discriminator": [
+    {
+      "concept": "project-current",
+      "file_hits_not_canonical": 2,
+      "query_id": "p38-v13-h02",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "decision-current",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-v13-h03",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "task-current",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-v13-h04",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "task-current",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-v13-h05",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "contradiction-canonical",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-v13-h13",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "decision-current",
+      "file_hits_not_canonical": 0,
+      "query_id": "p38-v13-h14",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "decision-current",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-v13-h17",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "contradiction-canonical",
+      "file_hits_not_canonical": 0,
+      "query_id": "p38-v13-h20",
+      "runtime_hits_canonical": 0
+    }
+  ],
+  "summary": {
+    "legacy": {
+      "context_precision": 0.08,
+      "latency_ms_p50": 370.81,
+      "latency_ms_p95": 569.81,
+      "map": 0.514165,
+      "mrr": 0.5225,
+      "ndcg_at_10": 0.584025,
+      "recall_at_1": 0.425,
+      "recall_at_10": 0.75,
+      "recall_at_5": 0.6
+    },
+    "non_regression": {
+      "map_pass": true,
+      "mrr_pass": true,
+      "ndcg_at_10_pass": true,
+      "recall_at_5_pass": true
+    },
+    "resource_bounds": {
+      "mean_tokens_limit": 10000.0,
+      "mean_tokens_measured": 122.0,
+      "p95_latency_ms_limit": 10000.0,
+      "p95_latency_ms_measured": 352.53
+    },
+    "shadow": {
+      "authority_exclusions_above_winner": 0,
+      "authority_outranked_by_relevance": 1,
+      "authority_provenance_failures": 0,
+      "authority_violations": 0,
+      "authority_winner_missing": 1,
+      "context_precision": 0.085,
+      "latency_ms_p50": 148.96,
+      "latency_ms_p95": 352.53,
+      "map": 0.7583300000000001,
+      "mrr": 0.7666649999999999,
+      "ndcg_at_10": 0.7393799999999999,
+      "owner_backed_query_count": 8,
+      "recall_at_1": 0.725,
+      "recall_at_10": 0.8,
+      "recall_at_5": 0.8
+    }
+  }
+}
