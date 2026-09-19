@@ -9,6 +9,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from re import fullmatch
 
 from power_framework.core.evaluation_contracts import (
     EVALUATION_REVISION_REGISTRY,
@@ -16,6 +17,7 @@ from power_framework.core.evaluation_contracts import (
     EvaluationVerificationSnapshot,
     build_holdout_access_receipt,
     load_development_for_tuning,
+    load_sealed_revision_spec,
     reject_holdout_tuning,
     verify_evaluation_corpus,
 )
@@ -26,8 +28,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("root", type=Path, help="versioned retrieval-evaluation directory")
     parser.add_argument(
         "--expected-revision",
-        choices=tuple(EVALUATION_REVISION_REGISTRY.keys()),
-        help="optional explicit revision identity expected in the manifest",
+        help="explicit revision identity expected in the manifest",
+    )
+    parser.add_argument(
+        "--revision-spec",
+        type=Path,
+        help="strict future sealed revision spec; requires --expected-revision",
     )
     parser.add_argument(
         "--mode",
@@ -49,6 +55,33 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        if args.expected_revision is not None and not fullmatch(
+            r"^v1(?:\.[0-9]+)?$", args.expected_revision
+        ):
+            raise EvaluationIntegrityError("revision_invalid", "revision has an invalid format")
+        if args.revision_spec is not None:
+            if args.expected_revision is None:
+                raise EvaluationIntegrityError(
+                    "revision_required", "--revision-spec requires --expected-revision"
+                )
+            if args.mode != "integrity":
+                raise EvaluationIntegrityError(
+                    "revision_spec_mode", "--revision-spec is available only in integrity mode"
+                )
+            candidate_spec = load_sealed_revision_spec(args.revision_spec)
+            if candidate_spec.revision != args.expected_revision:
+                raise EvaluationIntegrityError(
+                    "revision_mismatch", "sealed revision spec does not match --expected-revision"
+                )
+        else:
+            candidate_spec = None
+            if (
+                args.expected_revision is not None
+                and args.expected_revision not in EVALUATION_REVISION_REGISTRY
+            ):
+                raise EvaluationIntegrityError(
+                    "revision_unknown", "revision is not in the historical registry"
+                )
         if args.receipt_out is not None and args.mode != "integrity":
             raise EvaluationIntegrityError(
                 "receipt_mode", "receipt output is available only for integrity verification"
@@ -57,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
             verified = verify_evaluation_corpus(
                 args.root,
                 expected_revision=args.expected_revision,
+                revision_spec=candidate_spec,
                 return_snapshot=True,
             )
             if not isinstance(verified, EvaluationVerificationSnapshot):

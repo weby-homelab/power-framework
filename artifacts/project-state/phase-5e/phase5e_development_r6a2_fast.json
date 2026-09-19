@@ -1,0 +1,2336 @@
+{
+  "benchmark_metadata": {
+    "all_hard_invariants_pass": true,
+    "budget_class": "FAST",
+    "concept_mapping_sha256": "7a393ed2e8c188465eac9fcaaed1164a3b39c4286aa12bcd64a28131ae5df857",
+    "corpus_manifest_digest": "25bb289451fca60b8619b475c79eed19d4fd5e9fc5a83d76381e698825355c74",
+    "development_split_digest": "6aa73e8a0c039cd9741fb1fada48acbc372196c1ef41ec31f426c5b564b09175",
+    "eval_corpus_version": "v1.4",
+    "evaluation_contracts_sha256": "ce0dad226c7c2a3a789fe5a8dc0bbd129342640e62cb950176a9b61b2c68071f",
+    "fast_capability_contract_path": "artifacts/project-state/phase-5e/phase5e_fast_capability_r6a1.json",
+    "fast_capability_contract_sha256": "1a1b2b32e3d01cbcd4a861ee854c8c51687ee104923d1930d25cc0a555848953",
+    "fast_runtime_conformance": {
+      "evaluation_expectation_compatibility": {
+        "cross_language_paraphrase_guaranteed": false,
+        "hard_gating_requires_admitted_fast_evidence": true,
+        "unsupported_semantic_cases": "diagnostic_non_gating"
+      },
+      "failure_count": 0,
+      "observations": [
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        },
+        {
+          "observed": {
+            "budget_class": "FAST",
+            "cpu_only": true,
+            "dense_required": false,
+            "graph_allowed": false,
+            "model_load": "forbidden",
+            "raw_fallback_allowed": false,
+            "reranker_required": false,
+            "stages": [
+              "fts",
+              "project_state"
+            ]
+          },
+          "pass": true
+        }
+      ],
+      "status": "PASS"
+    },
+    "fixture_fidelity": {
+      "owner_backed_concepts": 3,
+      "ownership_contract_version": "power.retrieval-evaluation-ownership.v1",
+      "status": "PASS",
+      "total_concepts": 19,
+      "verified_concepts": [
+        "decision-current",
+        "project-current",
+        "task-current"
+      ]
+    },
+    "fixture_manifest_path": "artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6a1.json",
+    "fixture_manifest_sha256": "9a152780cb1d51efc07aafdee50c5118ea8562065802272ebdca2a2596a70305",
+    "fixture_manifest_version": "r6a1",
+    "input_verification": {
+      "development_query_count": 20,
+      "evaluation_revision": "v1.4",
+      "holdout_used": false,
+      "status": "PASS"
+    },
+    "legacy_default_identity": {
+      "after": {
+        "DEFAULT_SEARCH_MODE": "auto",
+        "has_compile_context": "yes",
+        "has_retrieve": "yes",
+        "retrieve_default_mode": "auto"
+      },
+      "before": {
+        "DEFAULT_SEARCH_MODE": "auto",
+        "has_compile_context": "yes",
+        "has_retrieve": "yes",
+        "retrieve_default_mode": "auto"
+      },
+      "switches": 0
+    },
+    "owner_backed_query_count": 5,
+    "ownership_contract_path": "artifacts/project-state/phase-5e/phase5e_evaluation_ownership_r6a1.json",
+    "ownership_contract_sha256": "505f1ede6ba71377c24fbf62de805ed8d5ec3e5d7423de30f9cc00b3f27516f9",
+    "platform": "Linux-7.0.14-16-pve-x86_64-with-glibc2.41",
+    "python_version": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+    "quality_thresholds_pass": true,
+    "query_count": 20,
+    "runner": "benchmark_phase5e_r6",
+    "runner_sha256": "1d938dda9513294e7f6def89b1ab1f6a2cd0c5ed21f30ad41a27a934e20fd862",
+    "runtime_base_sha": "10321b748a4b144c16720b4109c4c2c65fead83a",
+    "runtime_sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf",
+    "schema_version": "power.retrieval-benchmark-r6a1.v1",
+    "setup_payload_digest": "c05cb249ad2cc4b47dd6b895f9cde4eda24eb37dafa56d4a08894786555d10d3",
+    "setup_state_digest": "61666c32c3eb3e23192da562cda6f12d0626890515d16fb405b82cf7383a85f5",
+    "source_corpus_digest": "3a71c3d691cb1f3557b43f88a0717bf256479d74ff8d27e2b5f2cb5ba7de6118",
+    "split": "development",
+    "timestamp": "2026-09-19T23:06:24.746609+00:00"
+  },
+  "fixture_receipts": {
+    "decisions": {
+      "dec_x-freeze-phase5a-corpus-decision": {
+        "task_id": "p38-task-current-corpus-verify",
+        "task_revision": 1,
+        "title": "Synthetic decision: freeze Phase 5A corpus \u2014 \u0440\u0456\u0448\u0435\u043d\u043d\u044f \u043f\u0440\u043e \u0437\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d\u043d\u044f \u043a\u043e\u0440\u043f\u0443\u0441\u0443"
+      }
+    },
+    "projects": {
+      "prj_x-power-current-project-phase-status": {
+        "eval_concept_id": "project-current",
+        "state_revision": "f2967b2b399ac6a22113c2553c9fbcc110fce771d2876826f0ee0d1389c45fb8"
+      }
+    },
+    "tasks": {
+      "p38-task-current-corpus-verify": {
+        "revision": 1,
+        "title": "Verify corpus task \u2014 \u0437\u0430\u0432\u0434\u0430\u043d\u043d\u044f \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0438 \u0433\u043e\u0442\u043e\u0432\u0435"
+      }
+    }
+  },
+  "hard_invariants": {
+    "authority_order_violations": {
+      "applicable_query_count": 0,
+      "measured_violation_count": 0,
+      "not_applicable_count": 20,
+      "pass": true
+    },
+    "authority_order_violations_pass": true,
+    "authority_outranked_by_relevance": {
+      "applicable_query_count": 0,
+      "measured_violation_count": 0,
+      "not_applicable_count": 20,
+      "pass": true
+    },
+    "authority_outranked_by_relevance_pass": true,
+    "authority_provenance_failures": {
+      "applicable_query_count": 5,
+      "measured_violation_count": 0,
+      "not_applicable_count": 15,
+      "pass": true
+    },
+    "authority_provenance_failures_pass": true,
+    "authority_winner_missing": {
+      "applicable_query_count": 5,
+      "measured_violation_count": 0,
+      "not_applicable_count": 15,
+      "pass": true
+    },
+    "authority_winner_missing_pass": true,
+    "default_switches": 0,
+    "default_switches_pass": true,
+    "determinism_mismatches": 0,
+    "determinism_mismatches_pass": true,
+    "development_input_verification_pass": true,
+    "fast_runtime_conformance": {
+      "applicable_query_count": 20,
+      "measured_violation_count": 0,
+      "not_applicable_count": 0,
+      "pass": true
+    },
+    "fast_runtime_conformance_pass": true,
+    "fixture_fidelity_pass": true,
+    "non_regression_pass": true,
+    "prompt_injection_authority_escalation": 0,
+    "prompt_injection_authority_escalation_pass": true,
+    "query_side_writes": 0,
+    "query_side_writes_pass": true,
+    "resource_bounds_pass": true,
+    "scope_escape": 0,
+    "scope_escape_pass": true,
+    "secret_leakage": 0,
+    "secret_leakage_pass": true
+  },
+  "queries": [
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "project-current",
+          "project-superseded",
+          "hard-negative",
+          "code-ua",
+          "code-en",
+          "task-current",
+          "decision-old",
+          "research-curated",
+          "research-unverified",
+          "contradiction-canonical",
+          "infra-current",
+          "decision-raw",
+          "decision-current",
+          "infra-stale",
+          "task-raw",
+          "contradiction-raw",
+          "noise-injection",
+          "project-raw-chat",
+          "cross-domain"
+        ],
+        "latency_ms": 611.62,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q01",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current",
+          "research-unverified",
+          "hard-negative",
+          "code-ua",
+          "code-en",
+          "research-curated",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 195.38,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 9817,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "project:prj_x-power-current-project-phase-status",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 196,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "project-current",
+      "legacy": {
+        "concepts": [
+          "project-raw-chat",
+          "project-current",
+          "infra-current",
+          "project-superseded",
+          "hard-negative",
+          "decision-current",
+          "infra-stale",
+          "task-current",
+          "decision-old",
+          "research-curated",
+          "research-unverified",
+          "contradiction-canonical",
+          "decision-raw",
+          "code-ua",
+          "code-en",
+          "task-raw",
+          "contradiction-raw",
+          "noise-injection",
+          "cross-domain"
+        ],
+        "latency_ms": 573.87,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.7098,
+          "5": 0.7098
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "ProjectStateService",
+      "query_id": "p38-dev-q02",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "canonical",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current",
+          "decision-current",
+          "infra-current",
+          "hard-negative",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 203.08,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 0.9173,
+          "5": 0.9173
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 9745,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "project:prj_x-power-current-project-phase-status",
+          "decision:dec_x-freeze-phase5a-corpus-decision",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 271,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": "decision-current",
+      "legacy": {
+        "concepts": [
+          "decision-old",
+          "contradiction-canonical",
+          "decision-current",
+          "contradiction-raw",
+          "task-current",
+          "research-curated",
+          "decision-raw"
+        ],
+        "latency_ms": 223.94,
+        "map": 0.3333,
+        "mrr": 0.3333,
+        "ndcg": {
+          "10": 0.5,
+          "5": 0.5
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "DecisionService",
+      "query_id": "p38-dev-q03",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "decision-current",
+          "contradiction-canonical",
+          "task-current",
+          "research-curated"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 156.7,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 7145,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "decision:dec_x-freeze-phase5a-corpus-decision",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-research-curated.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 206,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "task-current",
+          "decision-current",
+          "decision-old",
+          "decision-raw",
+          "hard-negative",
+          "cross-domain"
+        ],
+        "latency_ms": 219.9,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q04",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "canonical",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "task-current",
+          "decision-current",
+          "hard-negative",
+          "cross-domain"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 186.24,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 8204,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "task:p38-task-current-corpus-verify",
+          "decision:dec_x-freeze-phase5a-corpus-decision",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-cross-domain.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 285,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "code-ua",
+          "code-en",
+          "contradiction-canonical",
+          "project-current",
+          "task-current",
+          "decision-current",
+          "decision-old",
+          "project-superseded",
+          "contradiction-raw",
+          "noise-injection",
+          "project-raw-chat",
+          "cross-domain"
+        ],
+        "latency_ms": 365.23,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.6309,
+          "5": 0.6309
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q05",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "code-ua",
+          "code-en",
+          "contradiction-canonical",
+          "decision-current",
+          "project-current",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 153.06,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.6309,
+          "5": 0.6309
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 8294,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 142,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "infra-current",
+      "legacy": {
+        "concepts": [
+          "infra-stale",
+          "infra-current",
+          "project-current",
+          "code-ua",
+          "task-current",
+          "noise-injection",
+          "project-superseded",
+          "hard-negative"
+        ],
+        "latency_ms": 221.44,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.6309,
+          "5": 0.6309
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": "VaultNote",
+      "query_id": "p38-dev-q06",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "infra-current",
+          "project-current",
+          "code-ua",
+          "task-current",
+          "hard-negative"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 143.78,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 7762,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 128,
+        "winner_authority": "unverified",
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "research-curated",
+          "decision-current",
+          "task-raw"
+        ],
+        "latency_ms": 92.65,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q07",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "research-curated",
+          "decision-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 80.17,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 3953,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-decision-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 44,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "task-current",
+          "task-raw",
+          "cross-domain",
+          "decision-current",
+          "infra-current",
+          "infra-stale",
+          "noise-injection",
+          "research-curated",
+          "research-unverified",
+          "code-ua",
+          "code-en"
+        ],
+        "latency_ms": 288.68,
+        "map": 0.3333,
+        "mrr": 0.3333,
+        "ndcg": {
+          "10": 0.5,
+          "5": 0.5
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q08",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "task-current",
+          "cross-domain",
+          "decision-current",
+          "infra-current",
+          "research-curated",
+          "research-unverified",
+          "code-ua"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 145.94,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.6309,
+          "5": 0.6309
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 8470,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-code-ua.md"
+        ],
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 162,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "contradiction-canonical",
+      "legacy": {
+        "concepts": [
+          "contradiction-canonical",
+          "contradiction-raw",
+          "decision-old",
+          "decision-current",
+          "research-unverified",
+          "task-raw",
+          "noise-injection",
+          "cross-domain"
+        ],
+        "latency_ms": 216.06,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": "VaultNote",
+      "query_id": "p38-dev-q09",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "decision-current",
+          "research-unverified",
+          "contradiction-canonical",
+          "cross-domain"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 141.01,
+        "map": 0.3333,
+        "mrr": 0.3333,
+        "ndcg": {
+          "10": 0.4587,
+          "5": 0.4587
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 7411,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "decision:dec_x-freeze-phase5a-corpus-decision",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md"
+        ],
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 193,
+        "winner_authority": "unverified",
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": 3
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "infra-stale",
+          "noise-injection",
+          "research-curated",
+          "research-unverified",
+          "decision-raw",
+          "contradiction-raw",
+          "project-raw-chat",
+          "task-raw",
+          "task-current",
+          "infra-current",
+          "contradiction-canonical",
+          "code-ua",
+          "code-en",
+          "project-current",
+          "decision-current",
+          "decision-old",
+          "project-superseded",
+          "cross-domain"
+        ],
+        "latency_ms": 782.88,
+        "map": 1.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q10",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "research-curated",
+          "research-unverified",
+          "task-current",
+          "infra-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 338.68,
+        "map": 1.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 6421,
+        "precision": 0.0,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-infra-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 77,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "project-current",
+      "legacy": {
+        "concepts": [
+          "hard-negative",
+          "project-current",
+          "project-superseded",
+          "infra-current",
+          "cross-domain",
+          "contradiction-raw",
+          "infra-stale",
+          "project-raw-chat",
+          "contradiction-canonical",
+          "decision-current",
+          "research-curated",
+          "research-unverified",
+          "task-current",
+          "decision-old",
+          "task-raw"
+        ],
+        "latency_ms": 396.46,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.6309,
+          "5": 0.6309
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "ProjectStateService",
+      "query_id": "p38-dev-q11",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "canonical",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current",
+          "decision-current",
+          "hard-negative",
+          "infra-current",
+          "cross-domain",
+          "contradiction-canonical"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 1,
+        "exclusions_above_winner": 0,
+        "latency_ms": 175.66,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 9685,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "project:prj_x-power-current-project-phase-status",
+          "decision:dec_x-freeze-phase5a-corpus-decision",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 280,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": "decision-current",
+      "legacy": {
+        "concepts": [
+          "project-raw-chat",
+          "task-raw",
+          "decision-raw",
+          "decision-old",
+          "decision-current",
+          "research-unverified",
+          "contradiction-raw",
+          "hard-negative",
+          "contradiction-canonical",
+          "noise-injection",
+          "code-ua",
+          "code-en",
+          "project-current",
+          "task-current",
+          "project-superseded",
+          "cross-domain"
+        ],
+        "latency_ms": 415.94,
+        "map": 0.2,
+        "mrr": 0.2,
+        "ndcg": {
+          "10": 0.4204,
+          "5": 0.4204
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 0.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "DecisionService",
+      "query_id": "p38-dev-q12",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "decision-current",
+          "research-unverified",
+          "hard-negative",
+          "contradiction-canonical"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 172.29,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 0.9173,
+          "5": 0.9173
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 7706,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "decision:dec_x-freeze-phase5a-corpus-decision",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 195,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": "project-current",
+      "legacy": {
+        "concepts": [
+          "project-superseded",
+          "decision-old",
+          "project-current",
+          "project-raw-chat"
+        ],
+        "latency_ms": 139.08,
+        "map": 0.3333,
+        "mrr": 0.3333,
+        "ndcg": {
+          "10": 0.5,
+          "5": 0.5
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": true,
+      "projected_owner": "ProjectStateService",
+      "query_id": "p38-dev-q13",
+      "shadow": {
+        "authorities": [
+          "canonical",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 104.95,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 5060,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "project:prj_x-power-current-project-phase-status",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 71,
+        "winner_authority": "canonical",
+        "winner_has_canonical_provenance": true,
+        "winner_present": true,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "noise-injection",
+          "research-unverified",
+          "infra-stale",
+          "research-curated",
+          "contradiction-canonical",
+          "decision-raw",
+          "project-superseded",
+          "contradiction-raw",
+          "hard-negative",
+          "project-current"
+        ],
+        "latency_ms": 428.87,
+        "map": 1.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q14",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "research-unverified",
+          "research-curated",
+          "contradiction-canonical",
+          "hard-negative",
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 333.2,
+        "map": 1.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 6940,
+        "precision": 0.0,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-hard-negative.md",
+          "01_Projects/corpus/p38-src-project-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 103,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "noise-injection",
+          "task-current",
+          "decision-old",
+          "research-curated",
+          "decision-raw",
+          "research-unverified",
+          "decision-current",
+          "contradiction-canonical",
+          "infra-current",
+          "contradiction-raw",
+          "code-en",
+          "infra-stale",
+          "task-raw",
+          "project-superseded",
+          "hard-negative",
+          "project-current",
+          "project-raw-chat",
+          "cross-domain",
+          "code-ua"
+        ],
+        "latency_ms": 523.11,
+        "map": 1.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.0,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q15",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "research-unverified",
+          "contradiction-canonical",
+          "decision-current",
+          "infra-current",
+          "research-curated",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 167.94,
+        "map": 1.0,
+        "mrr": 0.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 7574,
+        "precision": 0.0,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 119,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": "research-curated",
+      "legacy": {
+        "concepts": [
+          "research-unverified",
+          "research-curated",
+          "code-en",
+          "contradiction-raw",
+          "task-current",
+          "project-current"
+        ],
+        "latency_ms": 164.84,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.6309,
+          "5": 0.6309
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": "VaultNote",
+      "query_id": "p38-dev-q16",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "research-unverified",
+          "research-curated",
+          "code-en",
+          "task-current",
+          "project-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 1,
+        "exclusions_above_winner": 1,
+        "latency_ms": 113.66,
+        "map": 0.5,
+        "mrr": 0.5,
+        "ndcg": {
+          "10": 0.6309,
+          "5": 0.6309
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 6198,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-project-current.md"
+        ],
+        "recall": {
+          "1": 0.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 105,
+        "winner_authority": "unverified",
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": 2
+      }
+    },
+    {
+      "expected_concept": "contradiction-canonical",
+      "legacy": {
+        "concepts": [
+          "contradiction-canonical",
+          "contradiction-raw",
+          "code-ua",
+          "code-en",
+          "project-current",
+          "task-current",
+          "decision-current",
+          "decision-old",
+          "project-superseded",
+          "noise-injection",
+          "project-raw-chat",
+          "cross-domain"
+        ],
+        "latency_ms": 343.68,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": "VaultNote",
+      "query_id": "p38-dev-q17",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "contradiction-canonical",
+          "code-en",
+          "code-ua",
+          "decision-current",
+          "project-current",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 178.29,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 0.9173,
+          "5": 0.9173
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 8248,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 148,
+        "winner_authority": "unverified",
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": 1
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "code-ua",
+          "code-en",
+          "contradiction-canonical",
+          "project-current",
+          "task-current",
+          "decision-current",
+          "decision-old",
+          "project-superseded",
+          "contradiction-raw",
+          "noise-injection",
+          "project-raw-chat",
+          "cross-domain"
+        ],
+        "latency_ms": 330.57,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q18",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "code-ua",
+          "code-en",
+          "contradiction-canonical",
+          "decision-current",
+          "project-current",
+          "task-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 170.8,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 8411,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-contradiction-canonical.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-project-current-ua.md",
+          "01_Projects/corpus/p38-src-project-current.md",
+          "01_Projects/corpus/p38-src-task-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 146,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "infra-current",
+          "cross-domain",
+          "research-curated",
+          "research-unverified",
+          "code-ua",
+          "code-en",
+          "infra-stale"
+        ],
+        "latency_ms": 222.63,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q19",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "infra-current",
+          "cross-domain",
+          "research-curated",
+          "research-unverified",
+          "code-ua",
+          "code-en"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 149.69,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 7214,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-infra-current.md",
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-research-curated.md",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-code-ua.md",
+          "01_Projects/corpus/p38-src-code-en.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 139,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    },
+    {
+      "expected_concept": null,
+      "legacy": {
+        "concepts": [
+          "cross-domain",
+          "task-current",
+          "research-unverified",
+          "code-en",
+          "decision-current",
+          "decision-old",
+          "infra-current",
+          "contradiction-raw",
+          "project-superseded",
+          "decision-raw",
+          "project-current",
+          "hard-negative",
+          "infra-stale",
+          "project-raw-chat",
+          "research-curated",
+          "task-raw",
+          "code-ua"
+        ],
+        "latency_ms": 334.9,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "precision": 0.1,
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        }
+      },
+      "owner_backed": false,
+      "projected_owner": null,
+      "query_id": "p38-dev-q20",
+      "shadow": {
+        "authorities": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ],
+        "authority_order_applicable": false,
+        "authority_outranked": 0,
+        "authority_violations": 0,
+        "concepts": [
+          "cross-domain",
+          "task-current",
+          "research-unverified",
+          "code-en",
+          "decision-current",
+          "infra-current"
+        ],
+        "dense_used": false,
+        "exclusion_leaks": 0,
+        "exclusions_above_winner": 0,
+        "latency_ms": 148.6,
+        "map": 1.0,
+        "mrr": 1.0,
+        "ndcg": {
+          "10": 1.0,
+          "5": 1.0
+        },
+        "outranked_applicable": false,
+        "pack_bytes": 7509,
+        "precision": 0.1,
+        "raw_source_ids": [
+          "01_Projects/corpus/p38-src-cross-domain.md",
+          "01_Projects/corpus/p38-src-task-current.md",
+          "01_Projects/corpus/p38-src-research-unverified.md",
+          "01_Projects/corpus/p38-src-code-en.md",
+          "01_Projects/corpus/p38-src-decision-current.md",
+          "01_Projects/corpus/p38-src-infra-current.md"
+        ],
+        "recall": {
+          "1": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "10": 1.0
+        },
+        "reranker_used": false,
+        "token_cost": 116,
+        "winner_authority": null,
+        "winner_has_canonical_provenance": true,
+        "winner_present": false,
+        "winner_rank": null
+      }
+    }
+  ],
+  "security_discriminator": [
+    {
+      "concept": "project-current",
+      "file_hits_not_canonical": 2,
+      "query_id": "p38-dev-q02",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "decision-current",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-dev-q03",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "project-current",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-dev-q11",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "decision-current",
+      "file_hits_not_canonical": 1,
+      "query_id": "p38-dev-q12",
+      "runtime_hits_canonical": 1
+    },
+    {
+      "concept": "project-current",
+      "file_hits_not_canonical": 2,
+      "query_id": "p38-dev-q13",
+      "runtime_hits_canonical": 1
+    }
+  ],
+  "summary": {
+    "legacy": {
+      "context_precision": 0.085,
+      "latency_ms_p50": 334.9,
+      "latency_ms_p95": 611.62,
+      "map": 0.735,
+      "mrr": 0.585,
+      "ndcg_at_10": 0.8077,
+      "recall_at_1": 0.55,
+      "recall_at_10": 1.0,
+      "recall_at_3": 0.95,
+      "recall_at_5": 1.0
+    },
+    "non_regression": {
+      "map_pass": true,
+      "mrr_pass": true,
+      "ndcg_at_10_pass": true,
+      "recall_at_5_pass": true
+    },
+    "quality_metrics": {
+      "mrr": {
+        "applicable_query_count": 20,
+        "measured_violation_count": 4,
+        "not_applicable_count": 0,
+        "pass": true,
+        "threshold": 0.5,
+        "value": 0.7417
+      },
+      "ndcg_at_10": {
+        "applicable_query_count": 20,
+        "measured_violation_count": 1,
+        "not_applicable_count": 0,
+        "pass": true,
+        "threshold": 0.6,
+        "value": 0.9052
+      },
+      "recall_at_5": {
+        "applicable_query_count": 20,
+        "measured_violation_count": 0,
+        "not_applicable_count": 0,
+        "pass": true,
+        "threshold": 0.7,
+        "value": 1.0
+      }
+    },
+    "resource_bounds": {
+      "mean_tokens_limit": 10000.0,
+      "mean_tokens_measured": 156.3,
+      "p95_latency_ms_limit": 10000.0,
+      "p95_latency_ms_measured": 333.2
+    },
+    "shadow": {
+      "authority_exclusions_above_winner": 0,
+      "authority_outranked_by_relevance": 0,
+      "authority_provenance_failures": 0,
+      "authority_violations": 0,
+      "authority_winner_missing": 0,
+      "context_precision": 0.085,
+      "latency_ms_p50": 167.94,
+      "latency_ms_p95": 333.2,
+      "map": 0.8917,
+      "mrr": 0.7417,
+      "ndcg_at_10": 0.9052,
+      "owner_backed_query_count": 5,
+      "recall_at_1": 0.8,
+      "recall_at_10": 1.0,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0
+    }
+  }
+}

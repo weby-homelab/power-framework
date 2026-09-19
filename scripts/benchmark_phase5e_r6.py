@@ -28,7 +28,6 @@ import json
 import platform
 import sys
 import tempfile
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -60,6 +59,7 @@ from phase5e_concept_mapping_r6 import (  # noqa: E402
     owner_for_concept,
     source_id_to_concept,
 )
+from phase5e_execution_core import execute_runtime_query  # noqa: E402
 from phase5e_r6a1_admission import evaluate_authority_metrics  # noqa: E402
 
 from power_framework.core.context_contracts import canonical_sha256  # noqa: E402
@@ -70,6 +70,7 @@ from power_framework.core.evaluation_contracts import (  # noqa: E402
     reject_holdout_tuning,
     verify_fixture_fidelity_v2,
 )
+from power_framework.core.evaluation_execution import QueryOnlyRecord  # noqa: E402
 
 PHASE5E_ROOT = Path(__file__).resolve().parent.parent / "artifacts" / "project-state" / "phase-5e"
 R6A1_MANIFEST_VERSION = "r6a1"
@@ -390,10 +391,19 @@ def run_benchmark_r6(
             if r not in graded_rel:
                 graded_rel[str(r)] = 1.0
 
+        query_input_data: dict[str, Any] = {
+            "query_id": qid,
+            "query": q["query"],
+            "budget_class": normalized_budget,
+        }
+        if q.get("intent") is not None:
+            query_input_data["intent"] = q["intent"]
+        query_input = QueryOnlyRecord.model_validate(query_input_data)
+        observation = execute_runtime_query(app, query_input)
+
         # Legacy retrieval (concept-mapped for non-regression fairness).
-        leg_t0 = time.perf_counter()
-        leg_env = app.retrieve(query=q["query"], max_results=20)
-        leg_latency = (time.perf_counter() - leg_t0) * 1000.0
+        leg_env = observation.legacy_envelope
+        leg_latency = observation.legacy_latency_ms
         leg_raw = leg_env.data.get("results", [])
         leg_raw_ids = [str(r["source"]["path"]) for r in leg_raw]
         leg_stems = [normalize_source_id(r) for r in leg_raw_ids]
@@ -407,14 +417,11 @@ def run_benchmark_r6(
         leg_prec = compute_context_precision(leg_concepts, rel_concepts, k=10)
 
         # Shadow retrieval (RetrievalPlanner context compilation).
-        shad_t0 = time.perf_counter()
-        shad_env = app.compile_context(
-            query=q["query"], intent=q["intent"], budget_class=normalized_budget
-        )
+        shad_env = observation.shadow_envelope
         fast_conformance_observations.append(
             verify_fast_runtime_conformance(shad_env.data, capability_contract)
         )
-        shad_latency = (time.perf_counter() - shad_t0) * 1000.0
+        shad_latency = observation.shadow_latency_ms
         shad_items = shad_env.data.get("items", [])
         shad_raw_ids = [str(item.get("source_id", "")) for item in shad_items]
         shad_stems = [normalize_source_id(rid) for rid in shad_raw_ids]
@@ -535,9 +542,7 @@ def run_benchmark_r6(
                 if s in item.get("excerpt", ""):
                     total_secret_leakages += 1
 
-        shad_env_2 = app.compile_context(
-            query=q["query"], intent=q["intent"], budget_class=normalized_budget
-        )
+        shad_env_2 = observation.shadow_repeat_envelope
         if json.dumps(shad_env.data.get("items"), sort_keys=True) != json.dumps(
             shad_env_2.data.get("items"), sort_keys=True
         ):

@@ -16,8 +16,12 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from pathlib import Path
-from typing import Annotated, Any, Literal, Self, cast
+from pathlib import Path, PurePosixPath
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 from pydantic import (
     BaseModel,
@@ -68,6 +72,7 @@ FROZEN_PHASE5A_DIGESTS = {
 }
 FROZEN_PHASE5A_COUNTS = {"sources": 20, "development_queries": 20, "holdout_queries": 20}
 ACTIVE_EVALUATION_REVISION = "v1.1"
+INVALIDATED_HISTORICAL_REVISIONS = frozenset({"v1.5"})
 HISTORICAL_V1_FILE_SHA256 = {
     "README.md": "b4742b926212d76a156fa0ce74208551554c3ebc4d468688cb0db93e03dddf9c",
     "corpus/p38-src-code-en.md": "6e2afab08afad604560d02bc0bdac57c2e64561b41e036c33aa97f1ccffc4f3d",
@@ -149,7 +154,7 @@ ACTIVE_PHASE5A2_DIGESTS = {
     "semantic_adjudication_digest": "361f6262e716bbfc8e476a6e81f213e5eef616a8d14dd4aaed28e0f578d5712e",
     "holdout_access_receipt_digest": "7389665e5b63866101849b1256c8812a00236bffc434928b6a83fc66d8f584aa",
 }
-EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
+EVALUATION_REVISION_REGISTRY: Mapping[str, Mapping[str, Any]] = {
     "v1": {
         "active": False,
         "lifecycle_status": "HISTORICAL_SUPERSEDED",
@@ -310,18 +315,33 @@ EVALUATION_REVISION_REGISTRY: dict[str, dict[str, Any]] = {
 }
 
 
+def _freeze_revision_registry(value: Any) -> Any:
+    if isinstance(value, dict):
+        return MappingProxyType(
+            {key: _freeze_revision_registry(item) for key, item in value.items()}
+        )
+    if isinstance(value, list):
+        return tuple(_freeze_revision_registry(item) for item in value)
+    return value
+
+
+EVALUATION_REVISION_REGISTRY = _freeze_revision_registry(EVALUATION_REVISION_REGISTRY)
+
+
 def register_evaluation_revision(
     revision: str,
     spec: dict[str, Any],
     *,
     override: bool = False,
 ) -> None:
-    """Admit an evaluation revision into the registry via data-only configuration."""
+    """Reject mutable registration; historical registry is compatibility-only."""
     if not re.fullmatch(r"^v1(?:\.[0-9]+)?$", revision):
         raise ValueError(f"revision must match ^v1(?:\\.[0-9]+)?$, got {revision!r}")
-    if revision in EVALUATION_REVISION_REGISTRY and not override:
-        raise ValueError(f"revision {revision!r} is already registered")
-    EVALUATION_REVISION_REGISTRY[revision] = spec
+    del spec, override
+    raise EvaluationIntegrityError(
+        "revision_registry_immutable",
+        "future evaluation revisions require an explicit sealed revision spec",
+    )
 
 
 class EvaluationLanguage(StrEnum):
@@ -650,6 +670,108 @@ class SemanticReviewReceiptV2(EvaluationRecordModel):
         return self
 
 
+def _validate_relative_spec_reference(value: str) -> str:
+    """Validate a repository/corpus-relative file reference in a sealed spec."""
+
+    if (
+        not value
+        or value.startswith(("/", "\\"))
+        or "\\" in value
+        or ".." in PurePosixPath(value).parts
+        or PurePosixPath(value).is_absolute()
+    ):
+        raise ValueError("sealed revision references must be relative and traversal-free")
+    return PurePosixPath(value).as_posix()
+
+
+class SealedRevisionFile(EvaluationRecordModel):
+    """One bounded, content-addressed file in a future revision inventory."""
+
+    path: SourceReference
+    sha256: Digest
+    byte_size: Annotated[StrictInt, Field(ge=1, le=MAX_FILE_BYTES)]
+    scope: Literal["corpus_root"] = "corpus_root"
+
+    _safe_path = field_validator("path")(_validate_relative_spec_reference)
+
+
+class SealedRevisionSpec(EvaluationRecordModel):
+    """Immutable, data-only pin for a future evaluation revision.
+
+    The spec grants no execution authority.  It only binds candidate bytes,
+    independent review evidence, and the historical integrity receipt that a
+    verifier must inspect before a caller may request one-shot execution.
+    """
+
+    schema_version: Literal["power.retrieval-evaluation-revision-spec.v1"]
+    revision: Annotated[str, Field(pattern=r"^v1(?:\.[0-9]+)?$")]
+    lifecycle_status: Literal["SEALED_NOT_SECRET_NO_TUNING"]
+    dataset_digest: Digest
+    query_set_digest: Digest
+    development_digest: Digest
+    holdout_digest: Digest
+    source_corpus_digest: Digest
+    source_metadata_digest: Digest
+    disjointness_digest: Digest
+    disjointness_proof_ref: OpaqueReference
+    provenance_source_ref: OpaqueReference
+    provenance_method: GroundTruthMethod
+    planning_only: Literal[True] | None = None
+    supersedes_revision: Annotated[str, Field(pattern=r"^v1(?:\.[0-9]+)?$")] | None = None
+    semantic_adjudication_digest: Digest
+    semantic_adjudication_markdown_digest: Digest
+    review_contract_version: OpaqueReference
+    capability_contract_revision: OpaqueReference
+    review_a_ref: SourceReference
+    review_a_digest: Digest
+    review_b_ref: SourceReference
+    review_b_digest: Digest
+    holdout_integrity_receipt_ref: SourceReference
+    holdout_integrity_receipt_digest: Digest
+    semantic_adjudication_ref: SourceReference
+    sealed_artifact_ref: OpaqueReference
+    root_inventory: list[SealedRevisionFile] = Field(min_length=1, max_length=MAX_JSONL_RECORDS)
+    root_inventory_digest: Digest
+
+    _safe_refs = field_validator(
+        "review_a_ref",
+        "review_b_ref",
+        "holdout_integrity_receipt_ref",
+        "semantic_adjudication_ref",
+    )(_validate_relative_spec_reference)
+
+    @field_validator("root_inventory")
+    @classmethod
+    def validate_inventory_paths(cls, values: list[SealedRevisionFile]) -> list[SealedRevisionFile]:
+        paths = [item.path for item in values]
+        if len(paths) != len(set(paths)):
+            raise ValueError("sealed revision inventory paths must be unique")
+        if paths != sorted(paths):
+            raise ValueError("sealed revision inventory paths must be canonical-sorted")
+        return values
+
+    @model_validator(mode="after")
+    def validate_sealed_identity(self) -> Self:
+        if (
+            self.revision in EVALUATION_REVISION_REGISTRY
+            or self.revision in INVALIDATED_HISTORICAL_REVISIONS
+        ):
+            raise ValueError(
+                "historical evaluation revisions cannot be overridden by a candidate spec"
+            )
+        expected_inventory_digest = canonical_sha256(
+            {"files": [item.to_canonical_dict() for item in self.root_inventory]}
+        )
+        if self.root_inventory_digest != expected_inventory_digest:
+            raise ValueError("sealed revision inventory digest does not match its entries")
+        return self
+
+    def digest(self) -> str:
+        """Return the canonical content digest used by the epoch binding."""
+
+        return canonical_sha256(self.to_canonical_dict())
+
+
 class SemanticAdjudicationArtifact(EvaluationRecordModel):
     """Content-addressed semantic evidence bound to one corpus revision."""
 
@@ -777,6 +899,7 @@ class EvaluationVerificationSnapshot:
 
     summary: dict[str, Any]
     manifest: EvaluationCorpusManifest
+    holdout_queries: tuple[EvaluationQuery, ...]
     holdout_rows_read: int
     holdout_bytes_read: int
 
@@ -890,6 +1013,62 @@ def load_bounded_json(path: Path | str) -> Any:
     return _read_json(Path(path))
 
 
+def validate_sealed_revision_spec(
+    value: SealedRevisionSpec | Mapping[str, Any],
+) -> SealedRevisionSpec:
+    """Validate one explicit future revision spec without mutating global state."""
+
+    try:
+        if isinstance(value, SealedRevisionSpec):
+            return value
+        return SealedRevisionSpec.model_validate(dict(value))
+    except ValidationError as exc:
+        raise EvaluationIntegrityError(
+            "revision_spec_invalid", "sealed revision spec failed strict validation"
+        ) from exc
+
+
+def load_sealed_revision_spec(path: Path | str) -> SealedRevisionSpec:
+    """Load a candidate revision spec through the bounded JSON reader."""
+
+    return validate_sealed_revision_spec(load_bounded_json(Path(path)))
+
+
+def _sealed_spec_registry_view(spec: SealedRevisionSpec) -> dict[str, Any]:
+    """Project an explicit spec into the historical verifier's read-only shape."""
+
+    return {
+        "active": False,
+        "lifecycle_status": spec.lifecycle_status,
+        "semantic_status": "PASS",
+        "digests": {
+            "dataset_digest": spec.dataset_digest,
+            "query_set_digest": spec.query_set_digest,
+            "development_digest": spec.development_digest,
+            "holdout_digest": spec.holdout_digest,
+            "source_corpus_digest": spec.source_corpus_digest,
+            "disjointness_digest": spec.disjointness_digest,
+            "semantic_adjudication_digest": spec.semantic_adjudication_digest,
+            "holdout_access_receipt_digest": spec.holdout_integrity_receipt_digest,
+        },
+        "refs": {
+            "holdout_access_audit": spec.holdout_integrity_receipt_ref,
+            "holdout_integrity_receipt_ref": spec.holdout_integrity_receipt_ref,
+            "sealed_artifact_ref": spec.sealed_artifact_ref,
+            "disjointness_proof_ref": spec.disjointness_proof_ref,
+            "provenance_source_ref": spec.provenance_source_ref,
+            "provenance_method": spec.provenance_method.value,
+            "source_corpus_digest": spec.source_corpus_digest,
+            "semantic_adjudication_markdown_digest": spec.semantic_adjudication_markdown_digest,
+            "planning_only": spec.planning_only,
+            "supersedes_revision": spec.supersedes_revision,
+            "semantic_adjudication_ref": spec.semantic_adjudication_ref,
+            "reviewer_a_receipt_ref": spec.review_a_ref,
+            "reviewer_b_receipt_ref": spec.review_b_ref,
+        },
+    }
+
+
 def load_bounded_json_bytes(data: bytes) -> Any:
     """Parse already bounded bytes with the same JSON integrity policy."""
 
@@ -971,6 +1150,9 @@ def _fixture_path(root: Path, reference: str) -> Path:
 
 def _parse_models(
     root: Path,
+    *,
+    holdout_receipt_reference: str = "holdout-access-receipt.json",
+    semantic_adjudication_reference: str = "semantic-adjudication.json",
 ) -> tuple[
     EvaluationCorpusManifest,
     list[EvaluationSourceMetadata],
@@ -1029,12 +1211,13 @@ def _parse_models(
             _read_json(_fixture_path(root, "disjointness-proof.json"))
         )
         receipt = HoldoutAccessReceipt.model_validate(
-            _read_json(_fixture_path(root, "holdout-access-receipt.json"))
+            _read_json(_fixture_path(root, holdout_receipt_reference))
         )
         semantic_adjudication = None
-        if (root / "semantic-adjudication.json").is_file():
+        semantic_path = _fixture_path(root, semantic_adjudication_reference)
+        if semantic_path.is_file():
             semantic_adjudication = SemanticAdjudicationArtifact.model_validate(
-                _read_json(_fixture_path(root, "semantic-adjudication.json"))
+                _read_json(semantic_path)
             )
     except ValidationError as exc:
         raise EvaluationIntegrityError(
@@ -1345,7 +1528,12 @@ def _check_coverage(
         )
 
 
-def _revision_spec(manifest: EvaluationCorpusManifest) -> dict[str, Any]:
+def _revision_spec(
+    manifest: EvaluationCorpusManifest,
+    explicit_spec: SealedRevisionSpec | None = None,
+) -> Mapping[str, Any]:
+    if explicit_spec is not None:
+        return _sealed_spec_registry_view(explicit_spec)
     try:
         return EVALUATION_REVISION_REGISTRY[manifest.evaluation_revision]
     except KeyError as exc:
@@ -1354,8 +1542,12 @@ def _revision_spec(manifest: EvaluationCorpusManifest) -> dict[str, Any]:
         ) from exc
 
 
-def _check_pinned_manifest(manifest: EvaluationCorpusManifest) -> dict[str, Any]:
-    spec = _revision_spec(manifest)
+def _check_pinned_manifest(
+    manifest: EvaluationCorpusManifest,
+    *,
+    explicit_spec: SealedRevisionSpec | None = None,
+) -> Mapping[str, Any]:
+    spec = _revision_spec(manifest, explicit_spec)
     expected = spec["digests"]
     if manifest.dataset_digest != expected["dataset_digest"]:
         raise EvaluationIntegrityError(
@@ -1397,7 +1589,10 @@ def _check_pinned_manifest(manifest: EvaluationCorpusManifest) -> dict[str, Any]
     return spec
 
 
-def _check_manifest_provenance(manifest: EvaluationCorpusManifest, spec: dict[str, Any]) -> None:
+def _check_manifest_provenance(
+    manifest: EvaluationCorpusManifest,
+    spec: Mapping[str, Any],
+) -> None:
     if len(manifest.ground_truth_provenance) != 1:
         raise EvaluationIntegrityError("provenance", "frozen corpus requires one provenance record")
     provenance = manifest.ground_truth_provenance[0]
@@ -1420,8 +1615,10 @@ def _check_semantic_adjudication(
     manifest: EvaluationCorpusManifest,
     artifact: SemanticAdjudicationArtifact | None,
     query_ids: set[str],
+    *,
+    explicit_spec: SealedRevisionSpec | None = None,
 ) -> str | None:
-    spec = _revision_spec(manifest)
+    spec = _revision_spec(manifest, explicit_spec)
     expected_digest = spec["digests"].get("semantic_adjudication_digest")
     if expected_digest is None:
         if artifact is not None:
@@ -1537,15 +1734,21 @@ def _check_semantic_adjudication(
     return markdown_digest
 
 
-def _check_holdout_receipt_digest(root: Path, manifest: EvaluationCorpusManifest) -> str | None:
-    spec = _revision_spec(manifest)
+def _check_holdout_receipt_digest(
+    root: Path,
+    manifest: EvaluationCorpusManifest,
+    *,
+    explicit_spec: SealedRevisionSpec | None = None,
+) -> str | None:
+    spec = _revision_spec(manifest, explicit_spec)
     expected_digest = cast("str | None", spec["digests"].get("holdout_access_receipt_digest"))
     if expected_digest is None:
         return None
+    receipt_reference = str(
+        spec["refs"].get("holdout_integrity_receipt_ref", "holdout-access-receipt.json")
+    )
     try:
-        receipt_bytes = _read_bounded_regular_file(
-            _fixture_path(root, "holdout-access-receipt.json")
-        )
+        receipt_bytes = _read_bounded_regular_file(_fixture_path(root, receipt_reference))
     except EvaluationIntegrityError as exc:
         raise EvaluationIntegrityError(
             "holdout_receipt_binding", "holdout receipt bytes are unreadable"
@@ -1796,6 +1999,35 @@ def compute_review_input_digest(
 
     if not re.fullmatch(r"^v1(?:\.[0-9]+)?$", candidate_revision):
         raise ValueError("candidate_revision must match the evaluation revision format")
+
+    def _validate_rows(rows: list[dict[str, Any]], label: str) -> list[dict[str, Any]]:
+        ids = [row.get("query_id") for row in rows]
+        if any(not isinstance(query_id, str) or not query_id for query_id in ids):
+            raise ValueError(f"{label} must contain non-empty query IDs")
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{label} query IDs must be unique")
+        return rows
+
+    development_queries = _validate_rows(development_queries, "development queries")
+    holdout_queries = _validate_rows(holdout_queries, "holdout queries")
+    development_ground_truth = _validate_rows(development_ground_truth, "development ground truth")
+    holdout_ground_truth = _validate_rows(holdout_ground_truth, "holdout ground truth")
+    development_query_ids = {str(row["query_id"]) for row in development_queries}
+    holdout_query_ids = {str(row["query_id"]) for row in holdout_queries}
+    if development_query_ids & holdout_query_ids:
+        raise ValueError("review input query IDs must be disjoint across splits")
+    if {str(row["query_id"]) for row in development_ground_truth} != development_query_ids:
+        raise ValueError("development ground truth must cover exactly the development queries")
+    if {str(row["query_id"]) for row in holdout_ground_truth} != holdout_query_ids:
+        raise ValueError("holdout ground truth must cover exactly the holdout queries")
+    for label, value in (
+        ("source_corpus_digest", source_corpus_digest),
+        ("source_metadata_identity", source_metadata_identity),
+    ):
+        if not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise ValueError(f"{label} must be a lowercase SHA-256 digest")
+    if not capability_contract_revision:
+        raise ValueError("capability_contract_revision must be non-empty")
     payload = {
         "candidate_revision": candidate_revision,
         "capability_contract_revision": capability_contract_revision,
@@ -2154,10 +2386,245 @@ def load_verified_development_snapshot(
         ) from exc
 
 
+def _source_metadata_identity(source_rows: list[EvaluationSourceMetadata]) -> str:
+    return canonical_sha256(
+        {
+            "source_metadata": [
+                row.to_canonical_dict()
+                for row in sorted(source_rows, key=lambda item: item.source_id)
+            ]
+        }
+    )
+
+
+def _check_explicit_revision_inventory(root: Path, spec: SealedRevisionSpec) -> None:
+    """Verify every candidate-root file against the explicit sealed inventory."""
+
+    if root.is_symlink() or not root.is_dir():
+        raise EvaluationIntegrityError("revision_inventory", "candidate corpus root is unsafe")
+    actual: dict[str, tuple[str, int]] = {}
+    try:
+        paths = list(root.rglob("*"))
+    except OSError as exc:
+        raise EvaluationIntegrityError(
+            "revision_inventory", "candidate corpus inventory is unreadable"
+        ) from exc
+    if len(paths) > MAX_JSONL_RECORDS * 4:
+        raise EvaluationIntegrityError(
+            "revision_inventory", "candidate corpus inventory exceeds the file bound"
+        )
+    for path in paths:
+        if path.is_symlink():
+            raise EvaluationIntegrityError(
+                "symlink_reference", "candidate corpus contains a symlink"
+            )
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise EvaluationIntegrityError(
+                "invalid_artifact", "candidate corpus contains a non-file"
+            )
+        relative = path.relative_to(root).as_posix()
+        data = _read_bounded_regular_file(path)
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise EvaluationIntegrityError(
+                "invalid_utf8", "candidate revision inventory contains invalid UTF-8"
+            ) from exc
+        actual[relative] = (_sha256_bytes(data), len(data))
+    expected = {
+        item.path: (item.sha256, item.byte_size)
+        for item in spec.root_inventory
+        if item.scope == "corpus_root"
+    }
+    if actual != expected:
+        raise EvaluationIntegrityError(
+            "revision_inventory", "candidate corpus bytes or inventory do not match the sealed spec"
+        )
+
+
+def _check_review_v2_candidate(
+    root: Path,
+    manifest: EvaluationCorpusManifest,
+    source_rows: list[EvaluationSourceMetadata],
+    development: list[EvaluationQuery],
+    holdout: list[EvaluationQuery],
+    ground_truth: list[EvaluationGroundTruth],
+    semantic_adjudication: SemanticAdjudicationArtifact | None,
+    receipt: HoldoutAccessReceipt,
+    spec: SealedRevisionSpec,
+) -> str:
+    """Verify future Review-v2 receipts and their acyclic adjudication binding."""
+
+    if spec.review_contract_version != "power.retrieval-semantic-review.v2":
+        raise EvaluationIntegrityError(
+            "semantic_review_binding", "candidate must use the Review-v2 contract"
+        )
+    development_gt = [
+        item for item in ground_truth if item.query_id in {q.query_id for q in development}
+    ]
+    holdout_gt = [item for item in ground_truth if item.query_id in {q.query_id for q in holdout}]
+    source_metadata_digest = _source_metadata_identity(source_rows)
+    if source_metadata_digest != spec.source_metadata_digest:
+        raise EvaluationIntegrityError(
+            "semantic_review_binding", "source metadata identity does not match the sealed spec"
+        )
+    query_set_digest = _query_set_digest(development, holdout)
+    if query_set_digest != spec.query_set_digest:
+        raise EvaluationIntegrityError(
+            "semantic_review_binding", "candidate query-set digest does not match the sealed spec"
+        )
+    review_input_digest = compute_review_input_digest(
+        candidate_revision=spec.revision,
+        capability_contract_revision=spec.capability_contract_revision,
+        source_corpus_digest=spec.source_corpus_digest,
+        source_metadata_identity=source_metadata_digest,
+        development_queries=[item.to_canonical_dict() for item in development],
+        holdout_queries=[item.to_canonical_dict() for item in holdout],
+        development_ground_truth=[item.to_canonical_dict() for item in development_gt],
+        holdout_ground_truth=[item.to_canonical_dict() for item in holdout_gt],
+    )
+    scope_query_count = len(development) + len(holdout)
+    scope_source_count = len(source_rows)
+    receipts: list[SemanticReviewReceiptV2] = []
+    for reference, expected_digest in (
+        (spec.review_a_ref, spec.review_a_digest),
+        (spec.review_b_ref, spec.review_b_digest),
+    ):
+        receipt_path = _fixture_path(root, reference)
+        receipt_bytes = _read_bounded_regular_file(receipt_path)
+        if _sha256_bytes(receipt_bytes) != expected_digest:
+            raise EvaluationIntegrityError(
+                "semantic_review_binding", "Review-v2 receipt digest does not match the sealed spec"
+            )
+        try:
+            parsed = SemanticReviewReceiptV2.model_validate(
+                _parse_json_bytes(
+                    receipt_bytes,
+                    error_code="semantic_review_binding",
+                    error_message="Review-v2 receipt is invalid JSON",
+                )
+            )
+        except ValidationError as exc:
+            raise EvaluationIntegrityError(
+                "semantic_review_binding", "Review-v2 receipt failed strict validation"
+            ) from exc
+        validate_semantic_review_receipt_v2(
+            parsed,
+            candidate_revision=spec.revision,
+            review_input_digest=review_input_digest,
+            query_set_digest=query_set_digest,
+            source_corpus_digest=spec.source_corpus_digest,
+            scope_query_count=scope_query_count,
+            scope_source_count=scope_source_count,
+        )
+        receipts.append(parsed)
+    if receipts[0].reviewer_id == receipts[1].reviewer_id:
+        raise EvaluationIntegrityError(
+            "semantic_review_binding", "Review-v2 receipts must have independent reviewers"
+        )
+    if semantic_adjudication is None:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "future revision requires semantic adjudication"
+        )
+    if semantic_adjudication.dataset_revision != manifest.evaluation_revision:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication revision does not match the candidate"
+        )
+    for receipt_item, reviewer_field in zip(receipts, ("reviewer_a", "reviewer_b"), strict=True):
+        derived_counts = {
+            status: sum(
+                1
+                for record in semantic_adjudication.records
+                if getattr(record, reviewer_field) == status
+            )
+            for status in ("PASS", "DEFECT", "AMBIGUOUS")
+        }
+        if (
+            receipt_item.pass_count,
+            receipt_item.defect_count,
+            receipt_item.ambiguous_count,
+        ) != (
+            derived_counts["PASS"],
+            derived_counts["DEFECT"],
+            derived_counts["AMBIGUOUS"],
+        ):
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "Review-v2 counts do not match adjudication records"
+            )
+    if (
+        canonical_sha256(semantic_adjudication.to_canonical_dict())
+        != spec.semantic_adjudication_digest
+    ):
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication digest does not match the sealed spec"
+        )
+    if semantic_adjudication.reviewer_a_receipt_ref != spec.review_a_ref:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication does not bind Review A reference"
+        )
+    if semantic_adjudication.reviewer_b_receipt_ref != spec.review_b_ref:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication does not bind Review B reference"
+        )
+    if semantic_adjudication.reviewer_a_receipt_digest != spec.review_a_digest:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication does not bind Review A digest"
+        )
+    if semantic_adjudication.reviewer_b_receipt_digest != spec.review_b_digest:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication does not bind Review B digest"
+        )
+    query_ids = {item.query_id for item in development + holdout}
+    if {record.query_id for record in semantic_adjudication.records} != query_ids:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication does not cover the candidate query set"
+        )
+    markdown_bytes = _read_bounded_regular_file(_fixture_path(root, "semantic-adjudication.md"))
+    _reject_forbidden_markers(markdown_bytes)
+    if _sha256_bytes(markdown_bytes) != spec.semantic_adjudication_markdown_digest:
+        raise EvaluationIntegrityError(
+            "semantic_adjudication", "adjudication rationale digest does not match the sealed spec"
+        )
+    for record in semantic_adjudication.records:
+        if record.rationale_ref.encode("ascii") not in markdown_bytes:
+            raise EvaluationIntegrityError(
+                "semantic_adjudication", "adjudication rationale reference is missing"
+            )
+    if (
+        receipt.dataset_revision != manifest.dataset_digest
+        or receipt.query_set_digest != manifest.query_set_digest
+        or receipt.tool_revision != "verify-retrieval-eval-v1"
+    ):
+        raise EvaluationIntegrityError(
+            "holdout_receipt_binding", "holdout integrity receipt is not bound to the candidate"
+        )
+    return spec.semantic_adjudication_markdown_digest
+
+
 def verify_evaluation_corpus(
-    root: Path, *, expected_revision: str | None = None, return_snapshot: bool = False
+    root: Path,
+    *,
+    expected_revision: str | None = None,
+    revision_spec: SealedRevisionSpec | Mapping[str, Any] | None = None,
+    return_snapshot: bool = False,
 ) -> dict[str, Any] | EvaluationVerificationSnapshot:
     """Verify one explicitly identified corpus revision offline."""
+    explicit_spec = (
+        validate_sealed_revision_spec(revision_spec) if revision_spec is not None else None
+    )
+    if explicit_spec is not None and expected_revision is None:
+        raise EvaluationIntegrityError(
+            "revision_required", "candidate verification requires an explicit expected revision"
+        )
+    if explicit_spec is not None and explicit_spec.revision != expected_revision:
+        raise EvaluationIntegrityError(
+            "revision_mismatch", "expected revision does not match the sealed revision spec"
+        )
+    root = Path(root)
+    if root.is_symlink() or not root.is_dir():
+        raise EvaluationIntegrityError("corpus_root", "evaluation corpus root is unsafe")
     root = root.resolve()
     (
         manifest,
@@ -2170,24 +2637,59 @@ def verify_evaluation_corpus(
         semantic_adjudication,
         holdout_bytes_read,
         holdout_ground_truth_count,
-    ) = _parse_models(root)
+    ) = _parse_models(
+        root,
+        holdout_receipt_reference=(
+            explicit_spec.holdout_integrity_receipt_ref
+            if explicit_spec is not None
+            else "holdout-access-receipt.json"
+        ),
+        semantic_adjudication_reference=(
+            explicit_spec.semantic_adjudication_ref
+            if explicit_spec is not None
+            else "semantic-adjudication.json"
+        ),
+    )
     if expected_revision is not None and manifest.evaluation_revision != expected_revision:
         raise EvaluationIntegrityError(
             "revision_mismatch", "requested revision is not the manifest"
         )
-    spec = _check_pinned_manifest(manifest)
+    if explicit_spec is not None and manifest.evaluation_revision != explicit_spec.revision:
+        raise EvaluationIntegrityError(
+            "revision_mismatch", "manifest revision does not match the sealed revision spec"
+        )
+    if explicit_spec is not None:
+        _check_explicit_revision_inventory(root, explicit_spec)
+    spec = _check_pinned_manifest(manifest, explicit_spec=explicit_spec)
     _check_manifest_provenance(manifest, spec)
     _check_coverage(manifest, development, holdout)
     _check_proof(proof, development, holdout)
     ground_truth_by_split = _check_ground_truth(source_rows, development, holdout, ground_truth)
-    semantic_markdown_digest = _check_semantic_adjudication(
+    if explicit_spec is None:
+        semantic_markdown_digest = _check_semantic_adjudication(
+            root,
+            manifest,
+            semantic_adjudication,
+            {item.query_id for item in development + holdout},
+        )
+    else:
+        semantic_markdown_digest = _check_review_v2_candidate(
+            root,
+            manifest,
+            source_rows,
+            development,
+            holdout,
+            ground_truth,
+            semantic_adjudication,
+            receipt,
+            explicit_spec,
+        )
+    _check_ground_truth_provenance(ground_truth, manifest.evaluation_revision)
+    receipt_digest = _check_holdout_receipt_digest(
         root,
         manifest,
-        semantic_adjudication,
-        {item.query_id for item in development + holdout},
+        explicit_spec=explicit_spec,
     )
-    _check_ground_truth_provenance(ground_truth, manifest.evaluation_revision)
-    receipt_digest = _check_holdout_receipt_digest(root, manifest)
     if (
         receipt.dataset_revision != manifest.dataset_digest
         or receipt.query_set_digest != manifest.query_set_digest
@@ -2214,19 +2716,20 @@ def verify_evaluation_corpus(
         raise EvaluationIntegrityError(
             "source_digest_mismatch", "manifest source corpus digest does not match bytes"
         )
-    if manifest.evaluation_revision == "v1":
-        _check_historical_v1_bytes(root)
-    elif manifest.evaluation_revision == "v1.1":
-        _check_active_v11_inventory(root)
-    elif manifest.evaluation_revision == "v1.2":
-        _check_active_v12_inventory(root)
-    elif "root_file_sha256" in spec:
-        _check_revision_inventory(root, manifest.evaluation_revision, spec["root_file_sha256"])
-    else:
-        raise EvaluationIntegrityError(
-            "revision_inventory_missing",
-            f"revision {manifest.evaluation_revision} has no verified root file inventory",
-        )
+    if explicit_spec is None:
+        if manifest.evaluation_revision == "v1":
+            _check_historical_v1_bytes(root)
+        elif manifest.evaluation_revision == "v1.1":
+            _check_active_v11_inventory(root)
+        elif manifest.evaluation_revision == "v1.2":
+            _check_active_v12_inventory(root)
+        elif "root_file_sha256" in spec:
+            _check_revision_inventory(root, manifest.evaluation_revision, spec["root_file_sha256"])
+        else:
+            raise EvaluationIntegrityError(
+                "revision_inventory_missing",
+                f"revision {manifest.evaluation_revision} has no verified root file inventory",
+            )
     dataset_payload: dict[str, Any] = {
         "corpus_files": entries,
         "ground_truth": [
@@ -2289,6 +2792,7 @@ def verify_evaluation_corpus(
         return EvaluationVerificationSnapshot(
             summary=summary,
             manifest=manifest,
+            holdout_queries=tuple(holdout),
             holdout_rows_read=holdout_rows_read,
             holdout_bytes_read=holdout_bytes_read,
         )
@@ -2348,6 +2852,158 @@ def load_development_for_tuning(
         raise EvaluationIntegrityError(
             "schema_mismatch", "development tuning input failed strict validation"
         ) from exc
+
+
+def _reject_scoring_payload_content(value: Any) -> None:
+    forbidden_keys = {"content", "excerpt", "ground_truth", "query", "reason", "text"}
+    forbidden_markers = (
+        "github_release_token=",
+        "aws_secret_access_key",
+        "-----begin private key-----",
+        "ghp_",
+        "sk-or-",
+        "sk-",
+    )
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).casefold() in forbidden_keys:
+                raise EvaluationIntegrityError(
+                    "raw_output_content", "raw output contains a forbidden content field"
+                )
+            _reject_scoring_payload_content(item)
+    elif isinstance(value, list):
+        for item in value:
+            _reject_scoring_payload_content(item)
+    elif isinstance(value, str):
+        lowered = value.casefold()
+        if any(marker in lowered for marker in forbidden_markers):
+            raise EvaluationIntegrityError(
+                "raw_output_secret", "raw output contains a forbidden secret marker"
+            )
+
+
+def _verify_scoring_raw_and_epoch(
+    *,
+    raw_output_path: Path,
+    epoch_receipt_path: Path,
+    raw_output_digest: str,
+    spec: SealedRevisionSpec,
+    expected_epoch_fields: Mapping[str, Any],
+) -> None:
+    if raw_output_path.resolve().parent != epoch_receipt_path.resolve().parent:
+        raise EvaluationIntegrityError(
+            "raw_output_binding", "raw output and epoch receipt must share one bounded directory"
+        )
+    raw_data = load_bounded_json(raw_output_path)
+    if not isinstance(raw_data, dict):
+        raise EvaluationIntegrityError("raw_output_binding", "raw output must be a JSON object")
+    allowed_raw_fields = {
+        "schema_version",
+        "evaluation_revision",
+        "revision_spec_digest",
+        "query_set_digest",
+        "source_corpus_digest",
+        "runtime_digest",
+        "execution_runner_digest",
+        "fixture_digest",
+        "records",
+    }
+    if set(raw_data) != allowed_raw_fields:
+        raise EvaluationIntegrityError(
+            "raw_output_binding", "raw output contains unknown or missing fields"
+        )
+    _reject_scoring_payload_content(raw_data)
+    if raw_data.get("schema_version") != "power.retrieval-raw-output.v1":
+        raise EvaluationIntegrityError("raw_output_binding", "raw output schema is not admitted")
+    expected_raw_fields = {
+        "evaluation_revision": spec.revision,
+        "revision_spec_digest": spec.digest(),
+        "query_set_digest": spec.query_set_digest,
+        "source_corpus_digest": spec.source_corpus_digest,
+    }
+    expected_raw_fields.update(
+        {
+            key: expected_epoch_fields[key]
+            for key in ("runtime_digest", "execution_runner_digest", "fixture_digest")
+            if key in expected_epoch_fields
+        }
+    )
+    for key, expected in expected_raw_fields.items():
+        if raw_data.get(key) != expected:
+            raise EvaluationIntegrityError(
+                "raw_output_binding", f"raw output field {key} is not bound to the epoch"
+            )
+    records = raw_data.get("records")
+    if not isinstance(records, list) or not records:
+        raise EvaluationIntegrityError("raw_output_binding", "raw output records are missing")
+    query_ids = [record.get("query_id") for record in records if isinstance(record, dict)]
+    if len(query_ids) != len(records) or len(query_ids) != len(set(query_ids)):
+        raise EvaluationIntegrityError("raw_output_binding", "raw output query IDs are invalid")
+    if canonical_sha256(raw_data) != raw_output_digest:
+        raise EvaluationIntegrityError(
+            "raw_output_binding", "raw output digest does not match bytes"
+        )
+
+    epoch_data = load_bounded_json(epoch_receipt_path)
+    if not isinstance(epoch_data, dict):
+        raise EvaluationIntegrityError("epoch_receipt", "epoch receipt must be a JSON object")
+    if epoch_data.get("schema_version") != "power.retrieval-one-shot-epoch.v1":
+        raise EvaluationIntegrityError("epoch_receipt", "epoch receipt schema is not admitted")
+    if epoch_data.get("status") != "COMPLETED_PASS":
+        raise EvaluationIntegrityError("epoch_receipt", "epoch is not a completed passing epoch")
+    if epoch_data.get("raw_output_digest") != raw_output_digest:
+        raise EvaluationIntegrityError("epoch_receipt", "epoch does not bind the raw output digest")
+    if epoch_data.get("raw_output_ref") != raw_output_path.name:
+        raise EvaluationIntegrityError("epoch_receipt", "epoch raw output reference is not bounded")
+    for key, expected in expected_epoch_fields.items():
+        if key in epoch_data and epoch_data.get(key) != expected:
+            raise EvaluationIntegrityError(
+                "epoch_receipt", f"epoch field {key} does not match the admitted binding"
+            )
+
+
+def load_verified_holdout_ground_truth_for_scoring(
+    root: Path,
+    *,
+    expected_revision: str,
+    revision_spec: SealedRevisionSpec | Mapping[str, Any],
+    raw_output_path: Path,
+    epoch_receipt_path: Path,
+    raw_output_digest: str,
+    expected_epoch_fields: Mapping[str, Any],
+) -> tuple[EvaluationGroundTruth, ...]:
+    """Load holdout GT only after a raw-output digest has been established."""
+
+    if not re.fullmatch(r"[0-9a-f]{64}", raw_output_digest):
+        raise EvaluationIntegrityError(
+            "raw_output_required", "scoring requires a valid frozen raw-output digest"
+        )
+    spec = validate_sealed_revision_spec(revision_spec)
+    if spec.revision != expected_revision:
+        raise EvaluationIntegrityError(
+            "revision_mismatch", "scoring revision does not match the sealed spec"
+        )
+    _verify_scoring_raw_and_epoch(
+        raw_output_path=raw_output_path,
+        epoch_receipt_path=epoch_receipt_path,
+        raw_output_digest=raw_output_digest,
+        spec=spec,
+        expected_epoch_fields=expected_epoch_fields,
+    )
+    verify_evaluation_corpus(
+        Path(root),
+        expected_revision=expected_revision,
+        revision_spec=spec,
+        return_snapshot=True,
+    )
+    _, _, development, holdout, ground_truth, _, _, _, _, _ = _parse_models(
+        Path(root).resolve(),
+        holdout_receipt_reference=spec.holdout_integrity_receipt_ref,
+        semantic_adjudication_reference=spec.semantic_adjudication_ref,
+    )
+    del development
+    holdout_ids = {query.query_id for query in holdout}
+    return tuple(record for record in ground_truth if record.query_id in holdout_ids)
 
 
 def build_holdout_access_receipt(
@@ -2570,6 +3226,7 @@ __all__ = [
     "EVALUATION_REVISION_REGISTRY",
     "FROZEN_PHASE5A_COUNTS",
     "FROZEN_PHASE5A_DIGESTS",
+    "INVALIDATED_HISTORICAL_REVISIONS",
     "DevelopmentSplit",
     "DisjointnessProof",
     "EvaluationCategory",
@@ -2587,6 +3244,8 @@ __all__ = [
     "GroundTruthProvenance",
     "HoldoutAccessReceipt",
     "HoldoutSplit",
+    "SealedRevisionFile",
+    "SealedRevisionSpec",
     "SemanticAdjudicationArtifact",
     "SemanticAdjudicationRecord",
     "SemanticReviewReceipt",
@@ -2597,10 +3256,13 @@ __all__ = [
     "load_bounded_json",
     "load_bounded_json_bytes",
     "load_development_for_tuning",
+    "load_sealed_revision_spec",
     "load_verified_development_snapshot",
+    "load_verified_holdout_ground_truth_for_scoring",
     "normalize_query_text",
     "register_evaluation_revision",
     "reject_holdout_tuning",
+    "validate_sealed_revision_spec",
     "validate_semantic_review_receipt_v2",
     "verify_evaluation_corpus",
     "verify_fixture_fidelity",
