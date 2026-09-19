@@ -1,0 +1,112 @@
+{
+  "artifacts": {
+    "cli_verifier": {
+      "path": "scripts/verify_retrieval_eval.py",
+      "sha256": "fb713b5cbaee51b0b2d73d313d7f651f2cbd07a7af3e1d095144ae90a724a01f"
+    },
+    "common_execution": {
+      "path": "scripts/phase5e_execution_core.py",
+      "sha256": "8bcd1f44df1a7b782b6a8f85a5640ac2879e0f8d0529cf2baf44b4d12a543de4"
+    },
+    "development_evidence": {
+      "path": "artifacts/project-state/phase-5e/phase5e_development_r6a2_fast.json",
+      "sha256": "ee0f6d2d0258fcab73b08c9945a6b7ad10ccd08b4bf290159cf353e3264309e0"
+    },
+    "development_runner": {
+      "path": "scripts/benchmark_phase5e_r6.py",
+      "sha256": "1d938dda9513294e7f6def89b1ab1f6a2cd0c5ed21f30ad41a27a934e20fd862"
+    },
+    "epoch_contract": {
+      "path": "src/power_framework/core/evaluation_execution.py",
+      "sha256": "863ab84d17109a78cc78739cd5e75025612fb36c670d71c3e5252f136cbb822d"
+    },
+    "evaluation_contract": {
+      "path": "src/power_framework/core/evaluation_contracts.py",
+      "sha256": "ce0dad226c7c2a3a789fe5a8dc0bbd129342640e62cb950176a9b61b2c68071f"
+    },
+    "fast_contract": {
+      "path": "artifacts/project-state/phase-5e/phase5e_fast_capability_r6a1.json",
+      "sha256": "1a1b2b32e3d01cbcd4a861ee854c8c51687ee104923d1930d25cc0a555848953"
+    },
+    "fixture_manifest": {
+      "path": "artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6a1.json",
+      "sha256": "9a152780cb1d51efc07aafdee50c5118ea8562065802272ebdca2a2596a70305"
+    },
+    "gt_scoring_stage": {
+      "path": "scripts/phase5e_holdout_scoring_r6a2.py",
+      "sha256": "90820a4456f789ccbe3545161a03c8eec14e4c1becf0ccacbd605c9737439245"
+    },
+    "holdout_stage_a_runner": {
+      "path": "scripts/phase5e_holdout_stage_a_r6a2.py",
+      "sha256": "05b9b0eeaa4887911a2c7f5c8ccf5d37b1f096175ca3da64a749f292abee5fdc"
+    },
+    "metric_contract": {
+      "path": "artifacts/project-state/phase-5e/phase5e_metric_contract_r6a1.json",
+      "sha256": "0083ae4ada3b1f6069d488d1a8739817d7272b5ea3a54431a895afdf7c71d14e"
+    },
+    "ownership_contract": {
+      "path": "artifacts/project-state/phase-5e/phase5e_evaluation_ownership_r6a1.json",
+      "sha256": "505f1ede6ba71377c24fbf62de805ed8d5ec3e5d7423de30f9cc00b3f27516f9"
+    },
+    "r6a2_tests": {
+      "path": "tests/test_p38_wp03_r6a2_execution.py",
+      "sha256": "a2cc051c9266ceee9b7b104e8adce3a57718bc78137a510df2e07733e7991fc4"
+    },
+    "raw_output_contract": {
+      "path": "src/power_framework/core/evaluation_execution.py",
+      "sha256": "863ab84d17109a78cc78739cd5e75025612fb36c670d71c3e5252f136cbb822d"
+    },
+    "review_v2_verifier": {
+      "path": "src/power_framework/core/evaluation_contracts.py",
+      "sha256": "ce0dad226c7c2a3a789fe5a8dc0bbd129342640e62cb950176a9b61b2c68071f"
+    },
+    "revision_spec_contract": {
+      "path": "src/power_framework/core/evaluation_contracts.py",
+      "sha256": "ce0dad226c7c2a3a789fe5a8dc0bbd129342640e62cb950176a9b61b2c68071f"
+    },
+    "runtime": {
+      "path": "src/power_framework/core/retrieval_planner.py",
+      "sha256": "11d48740920b93fa485a8d2ceb41598b9aea1eae247f1cea8a960f16bdc1fcaf"
+    }
+  },
+  "development_parity": {
+    "hard_invariants": {
+      "authority_order_applicable_query_count": 0,
+      "authority_outranked_applicable_query_count": 0,
+      "default_switches": 0,
+      "determinism_mismatches": 0,
+      "prompt_injection_authority_escalation": 0,
+      "query_side_writes": 0,
+      "scope_escape": 0,
+      "secret_leakage": 0
+    },
+    "holdout_used": false,
+    "legacy_non_regression": true,
+    "revision": "v1.4",
+    "shadow_map": 0.8917,
+    "shadow_mrr": 0.7417,
+    "shadow_ndcg_at_10": 0.9052,
+    "shadow_recall_at_5": 1.0,
+    "split": "development",
+    "verdict": "PASS"
+  },
+  "execution_invariants": {
+    "automatic_retry": false,
+    "ground_truth_in_query_stage": false,
+    "one_shot_guard_precedes_first_query": true,
+    "raw_output_hashed_before_gt": true,
+    "retrieval_calls_in_scoring_stage": false,
+    "second_epoch_forbidden": true
+  },
+  "frozen_at": "2026-09-19T22:24:00Z",
+  "governance": {
+    "fresh_holdout_executed": false,
+    "fresh_revision_authored": false,
+    "future_revision_spec_grants_authority": false,
+    "holdout_policy": "SEALED_NOT_SECRET_NO_TUNING",
+    "phase": "Phase 5E / P38-WP03-R6A.2",
+    "production_behavior_changed": false,
+    "v1.6_authored": false
+  },
+  "protocol_version": "power.retrieval-benchmark-protocol-freeze.r6a2.v1"
+}

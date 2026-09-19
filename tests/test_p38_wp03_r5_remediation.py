@@ -17,8 +17,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from power_framework.core.evaluation_contracts import (
     EVALUATION_REVISION_REGISTRY,
+    EvaluationIntegrityError,
     EvaluationQuery,
     EvaluationSplitName,
     register_evaluation_revision,
@@ -139,11 +142,11 @@ def test_evaluation_revision_registry_lifecycle_and_data_only_admission() -> Non
     assert EVALUATION_REVISION_REGISTRY["v1.3"]["active"] is False
     assert EVALUATION_REVISION_REGISTRY["v1.3"]["lifecycle_status"] == "HISTORICAL_EXPOSED_REVISION"
 
-    # Data-only admission helper
+    # Future admission must use an explicit immutable sealed revision spec.
     custom_spec = {"active": False, "lifecycle_status": "TEST_REVISION"}
-    register_evaluation_revision("v1.99", custom_spec)
-    assert EVALUATION_REVISION_REGISTRY["v1.99"] == custom_spec
-    del EVALUATION_REVISION_REGISTRY["v1.99"]
+    with pytest.raises(EvaluationIntegrityError, match="explicit sealed revision spec"):
+        register_evaluation_revision("v1.99", custom_spec)
+    assert "v1.99" not in EVALUATION_REVISION_REGISTRY
 
 
 def test_historical_v13_query_id_shape_validation() -> None:
