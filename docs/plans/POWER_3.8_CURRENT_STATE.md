@@ -572,7 +572,6 @@ PHASE 5E (P38-WP03) = OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED
 P38-WP03-R4 = CLOSED / HISTORICAL FAILED VERIFICATION (not reusable)
 P38-WP03-R6A.1 = CLOSED / MERGED / DEVELOPMENT ADMITTED (no fresh holdout or one-shot)
 P38-WP03-R6A.2 = CLOSED / MERGED / FRESH HOLDOUT EXECUTION MACHINERY FROZEN (no fresh revision authored or fresh holdout executed)
-P38-WP03-R6A.2 = CLOSED / MERGED / FRESH HOLDOUT EXECUTION MACHINERY FROZEN (no fresh revision authored or fresh holdout executed)
 PHASE 5F (P38-WP04) = BLOCKED (Phase 5E remains open; fresh evaluation authoring and separate admission required; historical R4 is not the gate)
 ```
 
