@@ -376,11 +376,13 @@ legacy non-regression is a gate
 ```
 
 Evaluation state: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED /
-INVALIDATED / UNUSED. Tuning against exposed revisions is forbidden. Phase 5E
-(P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED. R6A.1
-admission integrity is CLOSED / MERGED / DEVELOPMENT ADMITTED; no fresh holdout
-or one-shot was executed. Phase 5F remains BLOCKED until a separate fresh
-evaluation authoring and admission gate completes.
+UNUSED / INVALIDATED / NOT REUSABLE. Tuning against exposed revisions is
+forbidden. Prospective policy is `SEALED_NOT_SECRET_NO_TUNING`; publication alone
+is not tuning. Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION
+AUTHORING REQUIRED. R6A.1 development admission and R6A.2 execution machinery
+are CLOSED / MERGED / FROZEN; no fresh holdout or one-shot was executed. Phase
+5F remains BLOCKED until a separate fresh evaluation authoring and admission gate
+completes.
 
 ### Dense cost and external vector policy
 
@@ -451,15 +453,16 @@ PHASE 5C (P38-WP01): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED B
 P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #437
 PHASE 5D (P38-WP02): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #439 / PR #440 / PR #441 CORRECTED BY PR #442 / PR #443
 P38-WP02-R1 (PHASE 5D CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #443
-PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (historical R1–R5 failures retained; R6A.1 admission integrity repair closed/merged/development-admitted)
+PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (historical R1–R5 failures retained; R6A.1 development admission and R6A.2 execution machinery closed/merged/frozen)
 P38-WP03-R1: CLOSED / FAILURE EVIDENCE
 P38-WP03-R2 ATTEMPT: CLOSED / FAILED VERIFICATION (PR #449 runtime + PR #450 governance)
 P38-WP03-R3: CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction; PR-R3B governance rebaseline)
 P38-WP03-R4: CLOSED / FAILED VERIFICATION
 P38-WP03-R5: CLOSED / FAILED VERIFICATION (v1.4 holdout exposed; immutable development evidence)
 P38-WP03-R6A.1: CLOSED / MERGED / DEVELOPMENT ADMITTED (review provenance v2, fixture fidelity, fail-closed development admission, metric semantics, FAST contract; no fresh holdout or one-shot)
-PHASE 5F (P38-WP04): BLOCKED (Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind Phase 5E)
-ACTIVE EVALUATION: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / INVALIDATED / UNUSED; fresh authoring is separate
+P38-WP03-R6A.2: CLOSED / MERGED / FRESH HOLDOUT EXECUTION MACHINERY FROZEN (explicit revision spec, Review-v2 verifier, query-only execution, raw-output/GT separation, atomic one-shot guard; no fresh holdout)
+PHASE 5F (P38-WP04): BLOCKED (Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind Phase 5E fresh evaluation admission, not historical R4)
+ACTIVE EVALUATION: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; fresh authoring is separate
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -472,8 +475,8 @@ Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
 pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
 (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by
 PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is
-OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 admission integrity
-is CLOSED / MERGED / DEVELOPMENT ADMITTED. Phase 5F (P38-WP04 / Phase 5F Incremental
+OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 development admission
+and R6A.2 execution machinery are CLOSED / MERGED / FROZEN. Phase 5F (P38-WP04 / Phase 5F Incremental
 Dense Validity / dirty-set behavior) remains BLOCKED. Do not start Phase 5F–9, version bumps, tags, releases, release images, or
 final release notes.
 
@@ -527,7 +530,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind P38-WP03-R4.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R6A.1 development admission and R6A.2 execution machinery are closed/merged/frozen). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind Phase 5E fresh evaluation admission, not historical R4.
 
 ## Cross-links
 
