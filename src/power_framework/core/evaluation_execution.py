@@ -433,6 +433,17 @@ def time_ns() -> int:
     return time.time_ns()
 
 
+def _deep_validate_raw_output_artifact(
+    artifact: RawRetrievalOutputArtifact,
+) -> RawRetrievalOutputArtifact:
+    try:
+        return RawRetrievalOutputArtifact.model_validate(artifact.model_dump(mode="python"))
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise EvaluationIntegrityError(
+            "raw_output_schema", "raw output failed deep canonical validation"
+        ) from exc
+
+
 def write_raw_output_artifact(
     artifact: RawRetrievalOutputArtifact,
     *,
@@ -441,11 +452,12 @@ def write_raw_output_artifact(
 ) -> Path:
     """Persist raw output exactly once inside a bounded work root."""
 
+    validated_artifact = _deep_validate_raw_output_artifact(artifact)
     root = _bounded_root(Path(output_root), Path(allowed_root), allow_guard=True)
     output = root / RAW_OUTPUT_FILENAME
     if output.exists() or output.is_symlink():
         raise EvaluationIntegrityError("raw_output_exists", "raw output artifact already exists")
-    payload = artifact.to_canonical_bytes() + b"\n"
+    payload = validated_artifact.to_canonical_bytes() + b"\n"
     if len(payload) > MAX_RAW_OUTPUT_BYTES:
         raise EvaluationIntegrityError("raw_output_too_large", "raw output exceeds the byte bound")
     _write_exclusive(output, payload)
@@ -533,8 +545,15 @@ def execute_query_only_once(
         raise EvaluationIntegrityError(
             "query_scope", "one-shot execution requires at least one query"
         )
-    if verified_descriptor is not None:
-        binding.assert_matches_descriptor(verified_descriptor)
+    if not isinstance(verified_descriptor, HoldoutExecutionDescriptor):
+        raise EvaluationIntegrityError(
+            "descriptor_required", "one-shot execution requires a verified descriptor"
+        )
+    binding.assert_matches_descriptor(verified_descriptor)
+    if len(queries) != verified_descriptor.query_count:
+        raise EvaluationIntegrityError(
+            "descriptor_query_count", "query count does not match the verified descriptor"
+        )
     receipt = OneShotEvaluationEpochReceipt.start(binding=binding)
     guard = OneShotEpochGuard.acquire(output_root, receipt, allowed_root=allowed_root)
     try:
@@ -557,16 +576,17 @@ def execute_query_only_once(
             fixture_digest=binding.fixture_digest,
             records=records,
         )
+        validated_artifact = _deep_validate_raw_output_artifact(artifact)
         output_path = write_raw_output_artifact(
-            artifact,
+            validated_artifact,
             output_root=output_root,
             allowed_root=allowed_root,
         )
         completed = guard.complete(
-            raw_output_digest=artifact.digest(),
+            raw_output_digest=validated_artifact.digest(),
             raw_output_ref=output_path.relative_to(Path(output_root).resolve()).as_posix(),
         )
-        return artifact, completed
+        return validated_artifact, completed
     except Exception:
         guard.interrupt()
         raise

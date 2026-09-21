@@ -1,0 +1,188 @@
+{
+  "protocol_version": "power.retrieval-benchmark-protocol-correction-freeze.r6a2-admission-repair.v1",
+  "freeze_name": "R6A2_ADMISSION_REPAIR",
+  "frozen_at": "2026-09-21T12:04:34Z",
+  "governance": {
+    "technical_verdict": "R6A2_ADMISSION_REPAIR_PASS",
+    "phase_5e": "OPEN / NOT PASSED",
+    "phase_5f": "BLOCKED",
+    "power_3_8_0": "NO-GO",
+    "fresh_evaluation_authoring": "NOT_AUTHORIZED_IN_THIS_INVOCATION",
+    "historical_r6a2_freeze_retained": true,
+    "historical_post_merge_admission": "FAILED / REQUIRED FINDINGS REMAINED",
+    "corrected_machinery_has_new_identity": true
+  },
+  "historical_r6a2_freeze": {
+    "path": "artifacts/project-state/phase-5e/phase5e_protocol_r6a2_freeze.json",
+    "sha256": "4dff4b361d98adcd74c1b1de5d78a66fe8936cb6b4809e7cb9cea9602f1b0250",
+    "modified": false
+  },
+  "candidate": {
+    "state": "LOCAL CANDIDATE",
+    "repository": "weby-homelab/power-framework",
+    "branch": "fix/p38-wp03-r6a2-admission-repair",
+    "base_sha": "2cfc9d3cf7264c71dae0b4cd5ed884738a56a1aa",
+    "base_tree": "6be066ddff0a172b554e9edf0589b7da6ca6f701",
+    "base_parents": [
+      "bfefe59188fc16e3204c40c765224ec1c6419715",
+      "56a538a22956329be89074004e9674100510f74b"
+    ],
+    "head": "UNCOMMITTED_WORKTREE",
+    "remote_exact_head": false,
+    "merged_main": false
+  },
+  "scope": {
+    "in": [
+      "F1 epoch-field completeness",
+      "F2 verified descriptor enforcement",
+      "F3 write-time raw-ID deep validation and digest consistency",
+      "F4 bounded inventory traversal",
+      "direct synthetic regression and security tests"
+    ],
+    "out": [
+      "real fresh evaluation revision",
+      "real fresh holdout authoring or inspection",
+      "Phase 5F",
+      "R6A.3",
+      "POWER 3.9",
+      "dependency integration",
+      "version/tag/release work",
+      "RetrievalPlanner/ranking/synonym/dense tuning"
+    ]
+  },
+  "closed_required_findings": {
+    "F1": {
+      "status": "CLOSED",
+      "invariant": "canonical receipt schema, complete EpochBinding projection, exact equality, then GT",
+      "red": "14 missing-field cases reached the GT boundary before repair",
+      "green": "14 missing + wrong-value + unknown-field cases rejected before GT"
+    },
+    "F2": {
+      "status": "CLOSED",
+      "invariant": "descriptor exists, binding matches, query_count matches, all before guard",
+      "red": "missing descriptor executed without raising before repair",
+      "green": "missing plus six identity mismatches and query_count mismatch reject with zero executor calls"
+    },
+    "F3": {
+      "status": "CLOSED",
+      "invariant": "primitive conversion, deep canonical validation, validated bytes and validated digest",
+      "red": "constructor-bypassed query/nested IDs were persisted before repair",
+      "green": "10 adversarial ID/content/secret cases reject; interrupted epoch cannot retry; persisted digest matches receipt"
+    },
+    "F4": {
+      "status": "CLOSED",
+      "invariant": "incremental no-follow os.scandir traversal with entry-work bound during enumeration",
+      "red": "list(root.rglob('*')) enumerated all entries before rejecting the bound",
+      "green": "wide/deep bound, valid nested tree, symlinks, non-regular, mismatch and filesystem-error cases pass"
+    }
+  },
+  "artifacts": {
+    "evaluation_contracts": {
+      "path": "src/power_framework/core/evaluation_contracts.py",
+      "sha256": "1e7e06771e53b23676a5193983e0d01c2312e40af78e7798e5e956f8c943ca51",
+      "role": "F1 canonical receipt admission and F4 bounded inventory"
+    },
+    "evaluation_execution": {
+      "path": "src/power_framework/core/evaluation_execution.py",
+      "sha256": "39520fff02e6dee0fce1eac31dde765ad655069694c0494bbf0ffe597fc7ac10",
+      "role": "F2 descriptor gate and F3 write-time validation/digest"
+    },
+    "holdout_stage_a": {
+      "path": "scripts/phase5e_holdout_stage_a_r6a2.py",
+      "sha256": "05b9b0eeaa4887911a2c7f5c8ccf5d37b1f096175ca3da64a749f292abee5fdc",
+      "role": "unchanged official Stage-A composition"
+    },
+    "holdout_scoring": {
+      "path": "scripts/phase5e_holdout_scoring_r6a2.py",
+      "sha256": "90820a4456f789ccbe3545161a03c8eec14e4c1becf0ccacbd605c9737439245",
+      "role": "unchanged GT-only scoring boundary"
+    },
+    "r6a2_regression_tests": {
+      "path": "tests/test_p38_wp03_r6a2_execution.py",
+      "sha256": "37a071c8bfd2acfd58a146e990a773b74f7229972824d4f605c3910316b02fdd",
+      "role": "synthetic red/green and adversarial regression proof"
+    },
+    "development_evidence": {
+      "path": "artifacts/project-state/phase-5e/phase5e_development_r6a2_fast.json",
+      "sha256": "ee0f6d2d0258fcab73b08c9945a6b7ad10ccd08b4bf290159cf353e3264309e0",
+      "role": "retained development-only historical evidence"
+    },
+    "fixture_manifest": {
+      "path": "artifacts/project-state/phase-5e/phase5e_runtime_fixture_manifest_r6a1.json",
+      "sha256": "9a152780cb1d51efc07aafdee50c5118ea8562065802272ebdca2a2596a70305",
+      "role": "retained fixture identity"
+    },
+    "fast_capability_contract": {
+      "path": "artifacts/project-state/phase-5e/phase5e_fast_capability_r6a1.json",
+      "sha256": "1a1b2b32e3d01cbcd4a861ee854c8c51687ee104923d1930d25cc0a555848953",
+      "role": "retained FAST contract"
+    },
+    "ownership_contract": {
+      "path": "artifacts/project-state/phase-5e/phase5e_evaluation_ownership_r6a1.json",
+      "sha256": "505f1ede6ba71377c24fbf62de805ed8d5ec3e5d7423de30f9cc00b3f27516f9",
+      "role": "retained ownership contract"
+    },
+    "metric_contract": {
+      "path": "artifacts/project-state/phase-5e/phase5e_metric_contract_r6a1.json",
+      "sha256": "0083ae4ada3b1f6069d488d1a8739817d7272b5ea3a54431a895afdf7c71d14e",
+      "role": "retained metric contract"
+    }
+  },
+  "fresh_context_adversarial_review": {
+    "agent": "security-review",
+    "foreground": true,
+    "read_only": true,
+    "formal_github_approval": false,
+    "Q1_missing_epoch_binding_reaches_gt": "NO",
+    "Q2_guard_without_matching_descriptor": "NO",
+    "Q3_malformed_raw_id_or_digest_bypass": "NO",
+    "Q4_unbounded_explicit_inventory_walk": "NO",
+    "required_findings_remaining": [],
+    "recommended_out_of_scope": [
+      "descriptor provenance hardening for hostile direct callers",
+      "TOCTOU-resistant parent-directory traversal",
+      "deep nested validation in the lower-level raw scoring helper",
+      "legacy historical-v1 rglob materialization bound"
+    ]
+  },
+  "validation": {
+    "targeted_r6a2": "PASS: 62 passed",
+    "full_pytest": "PASS: 2303 passed, 4 skipped, 17 deselected, coverage 81.98%",
+    "ruff_check": "PASS",
+    "ruff_format": "PASS: 339 files already formatted",
+    "mypy": "PASS: 126 source files",
+    "strict_mkdocs": "PASS",
+    "complexity_budget": "PASS",
+    "neural_hermetic": "PASS: 5 tests",
+    "release_contract": "PASS: 3 tests",
+    "benchmark_integrity": "PASS: 114 passed, 1 skipped",
+    "maintenance_rollback": "PASS: 9 passed",
+    "security_pip_audit": "PASS: no known vulnerabilities",
+    "base_runtime_smoke": "PASS",
+    "upgrade_matrix": "PASS: exit 0",
+    "package_build_and_smoke": "PASS",
+    "workspace_verify": "PASS",
+    "doc_drift": "FAIL / OUT OF SCOPE: global OpenCode skill mirrors are stale; global skills/configuration were not modified"
+  },
+  "real_evaluation_hygiene": {
+    "v1.5_contents_read_or_reused": false,
+    "real_new_revision_authored": false,
+    "real_fresh_holdout_authored": false,
+    "real_fresh_holdout_read": false,
+    "real_fresh_one_shot_executed": false,
+    "real_fresh_epoch_consumed": false,
+    "synthetic_security_tests_executed": true,
+    "retrieval_planner_tuned": false,
+    "dependency_pr_integrated": false,
+    "phase_5f_started": false,
+    "r6a3_started": false,
+    "power_3_9_started": false,
+    "version_tag_release_changed": false
+  },
+  "freeze_integrity": {
+    "all_listed_artifact_digests_verified_against_worktree": true,
+    "historical_freeze_modified": false,
+    "changes_after_this_freeze": false,
+    "candidate_freeze_stale": false
+  }
+}

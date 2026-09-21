@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import threading
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -27,6 +30,7 @@ from power_framework.core.evaluation_contracts import (
 from power_framework.core.evaluation_execution import (
     EpochBinding,
     HoldoutExecutionDescriptor,
+    ObservedCandidate,
     OneShotEpochGuard,
     OneShotEvaluationEpochReceipt,
     QueryOnlyRecord,
@@ -109,6 +113,38 @@ def _receipt() -> OneShotEvaluationEpochReceipt:
     return OneShotEvaluationEpochReceipt.start(binding=_binding())
 
 
+def _descriptor(*, query_count: int = 1) -> HoldoutExecutionDescriptor:
+    binding = _binding()
+    return HoldoutExecutionDescriptor(
+        evaluation_revision=binding.evaluation_revision,
+        revision_spec_digest=binding.revision_spec_digest,
+        dataset_digest=binding.dataset_digest,
+        query_set_digest=binding.query_set_digest,
+        holdout_digest=binding.holdout_digest,
+        source_corpus_digest=binding.source_corpus_digest,
+        query_count=query_count,
+    )
+
+
+def _spec_for_inventory(root: Path, paths: list[str]) -> SealedRevisionSpec:
+    files = [
+        SealedRevisionFile(
+            path=relative,
+            sha256=hashlib.sha256((root / relative).read_bytes()).hexdigest(),
+            byte_size=(root / relative).stat().st_size,
+        )
+        for relative in sorted(paths)
+    ]
+    values = {
+        key: value for key, value in _spec().model_dump(mode="python").items() if value is not None
+    }
+    values["root_inventory"] = files
+    values["root_inventory_digest"] = canonical_sha256(
+        {"files": [item.to_canonical_dict() for item in files]}
+    )
+    return SealedRevisionSpec.model_validate(values)
+
+
 def _record(query_id: str = "p38-ho-q01") -> RawRetrievalOutputRecord:
     return RawRetrievalOutputRecord(
         query_id=query_id,
@@ -184,6 +220,193 @@ def test_raw_output_contract_rejects_ground_truth_fields() -> None:
         )
 
 
+def test_raw_output_write_revalidates_constructor_bypass_ids(tmp_path: Path) -> None:
+    unsafe_candidate = ObservedCandidate.model_construct(
+        source_id="../source",
+        rank=1,
+        authority="unknown",
+        source_type="unknown",
+        provenance={},
+    )
+    unsafe_record = RawRetrievalOutputRecord.model_construct(
+        query_id="../query",
+        legacy_candidate_ids=["source-a"],
+        shadow_candidate_ids=["source-a"],
+        shadow_candidates=[unsafe_candidate],
+        latency_ms=1.0,
+        token_cost=2,
+        pack_bytes=3,
+        security_observations={},
+    )
+    unsafe_artifact = RawRetrievalOutputArtifact.model_construct(
+        schema_version="power.retrieval-raw-output.v1",
+        evaluation_revision="v1.6",
+        revision_spec_digest=_spec().digest(),
+        query_set_digest=_digest("queries"),
+        source_corpus_digest=_digest("sources"),
+        runtime_digest=_digest("runtime"),
+        execution_runner_digest=_digest("runner"),
+        fixture_digest=_digest("fixture"),
+        records=[unsafe_record],
+    )
+
+    with pytest.raises(EvaluationIntegrityError, match="raw output"):
+        write_raw_output_artifact(unsafe_artifact, output_root=tmp_path, allowed_root=tmp_path)
+
+    assert not (tmp_path / "raw-retrieval-output.json").exists()
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "path_like_query_id",
+        "uri_like_query_id",
+        "traversal_like_candidate_id",
+        "control_character_query_id",
+        "overlong_query_id",
+        "invalid_legacy_candidate_id",
+        "invalid_shadow_candidate_id",
+        "invalid_nested_candidate_id",
+        "forbidden_content_marker",
+        "forbidden_secret_marker",
+    ],
+)
+def test_raw_output_write_rejects_adversarial_constructor_bypass_values(
+    tmp_path: Path, case: str
+) -> None:
+    candidate_source_id = (
+        "../nested-source" if case == "invalid_nested_candidate_id" else "source-a"
+    )
+    provenance: dict[str, Any] = {}
+    security_observations: dict[str, int | bool | str] = {}
+    query_id = "p38-ho-q01"
+    legacy_ids = ["source-a"]
+    shadow_ids = ["source-a"]
+    if case == "path_like_query_id":
+        query_id = "../query"
+    elif case == "uri_like_query_id":
+        query_id = "https://query"
+    elif case == "traversal_like_candidate_id":
+        shadow_ids = ["../candidate"]
+    elif case == "control_character_query_id":
+        query_id = "bad\nquery"
+    elif case == "overlong_query_id":
+        query_id = "q" * 257
+    elif case == "invalid_legacy_candidate_id":
+        legacy_ids = ["legacy/id"]
+    elif case == "invalid_shadow_candidate_id":
+        shadow_ids = ["shadow/id"]
+    elif case == "forbidden_content_marker":
+        provenance = {"content": "ground truth must not persist"}
+    elif case == "forbidden_secret_marker":
+        security_observations = {"secret": "sk-test"}
+    candidate = ObservedCandidate.model_construct(
+        source_id=candidate_source_id,
+        rank=1,
+        authority="unknown",
+        source_type="unknown",
+        provenance=provenance,
+    )
+    record = RawRetrievalOutputRecord.model_construct(
+        query_id=query_id,
+        legacy_candidate_ids=legacy_ids,
+        shadow_candidate_ids=shadow_ids,
+        shadow_candidates=[candidate],
+        latency_ms=1.0,
+        token_cost=2,
+        pack_bytes=3,
+        security_observations=security_observations,
+    )
+    artifact = RawRetrievalOutputArtifact.model_construct(
+        schema_version="power.retrieval-raw-output.v1",
+        evaluation_revision="v1.6",
+        revision_spec_digest=_spec().digest(),
+        query_set_digest=_digest("queries"),
+        source_corpus_digest=_digest("sources"),
+        runtime_digest=_digest("runtime"),
+        execution_runner_digest=_digest("runner"),
+        fixture_digest=_digest("fixture"),
+        records=[record],
+    )
+
+    with pytest.raises(EvaluationIntegrityError, match="raw output"):
+        write_raw_output_artifact(artifact, output_root=tmp_path, allowed_root=tmp_path)
+    assert not (tmp_path / "raw-retrieval-output.json").exists()
+
+
+def test_invalid_raw_output_interrupts_consumed_epoch_without_retry(tmp_path: Path) -> None:
+    prepared = (QueryOnlyRecord(query_id="p38-ho-q01", query="synthetic", budget_class="FAST"),)
+    invalid_candidate = ObservedCandidate.model_construct(
+        source_id="../nested-source",
+        rank=1,
+        authority="unknown",
+        source_type="unknown",
+        provenance={},
+    )
+    invalid_record = RawRetrievalOutputRecord.model_construct(
+        query_id="p38-ho-q01",
+        legacy_candidate_ids=["source-a"],
+        shadow_candidate_ids=["source-a"],
+        shadow_candidates=[invalid_candidate],
+        latency_ms=1.0,
+        token_cost=2,
+        pack_bytes=3,
+        security_observations={},
+    )
+    with pytest.raises(EvaluationIntegrityError, match="raw output"):
+        execute_query_only_once(
+            queries=prepared,
+            binding=_binding(),
+            output_root=tmp_path,
+            allowed_root=tmp_path,
+            one_shot_intent="fresh_holdout_one_shot",
+            executor=lambda query: invalid_record,
+            verified_descriptor=_descriptor(),
+        )
+
+    interrupted = evaluation_contracts.load_bounded_json(tmp_path / "one-shot-epoch.json")
+    assert interrupted["status"] == "INTERRUPTED"
+    assert not (tmp_path / "raw-retrieval-output.json").exists()
+    with pytest.raises(EvaluationIntegrityError, match="epoch"):
+        execute_query_only_once(
+            queries=prepared,
+            binding=_binding(),
+            output_root=tmp_path,
+            allowed_root=tmp_path,
+            one_shot_intent="fresh_holdout_one_shot",
+            executor=lambda query: _record(query.query_id),
+            verified_descriptor=_descriptor(),
+        )
+
+
+def test_epoch_digest_matches_deep_validated_persisted_bytes(tmp_path: Path) -> None:
+    coercible_record = RawRetrievalOutputRecord.model_construct(
+        query_id="p38-ho-q01",
+        legacy_candidate_ids=["source-a"],
+        shadow_candidate_ids=["source-a"],
+        shadow_candidates=[],
+        latency_ms="1.0",
+        token_cost=2,
+        pack_bytes=3,
+        security_observations={},
+    )
+    artifact, receipt = execute_query_only_once(
+        queries=(QueryOnlyRecord(query_id="p38-ho-q01", query="synthetic"),),
+        binding=_binding(),
+        output_root=tmp_path,
+        allowed_root=tmp_path,
+        one_shot_intent="fresh_holdout_one_shot",
+        executor=lambda query: coercible_record,
+        verified_descriptor=_descriptor(),
+    )
+    del artifact
+    persisted = RawRetrievalOutputArtifact.model_validate(
+        evaluation_contracts.load_bounded_json(tmp_path / "raw-retrieval-output.json")
+    )
+
+    assert receipt.raw_output_digest == persisted.digest()
+
+
 def test_atomic_guard_allows_one_and_rejects_second(tmp_path: Path) -> None:
     receipt = _receipt()
     guard = OneShotEpochGuard.acquire(tmp_path, receipt, allowed_root=tmp_path)
@@ -239,6 +462,70 @@ def test_executor_requires_explicit_one_shot_intent(tmp_path: Path) -> None:
         )
 
 
+def test_executor_rejects_missing_verified_descriptor_before_guard(tmp_path: Path) -> None:
+    prepared = (QueryOnlyRecord(query_id="p38-ho-q01", query="synthetic", budget_class="FAST"),)
+    calls = 0
+
+    def executor(query: QueryOnlyRecord) -> RawRetrievalOutputRecord:
+        nonlocal calls
+        calls += 1
+        return _record(query.query_id)
+
+    with pytest.raises(EvaluationIntegrityError, match="descriptor"):
+        execute_query_only_once(
+            queries=prepared,
+            binding=_binding(),
+            output_root=tmp_path,
+            allowed_root=tmp_path,
+            one_shot_intent="fresh_holdout_one_shot",
+            executor=executor,
+        )
+
+    assert calls == 0
+    assert not (tmp_path / "one-shot-epoch.json").exists()
+    assert not (tmp_path / "raw-retrieval-output.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("evaluation_revision", "v1.7"),
+        ("revision_spec_digest", _digest("wrong-spec")),
+        ("dataset_digest", _digest("wrong-dataset")),
+        ("query_set_digest", _digest("wrong-query-set")),
+        ("holdout_digest", _digest("wrong-holdout")),
+        ("source_corpus_digest", _digest("wrong-source-corpus")),
+        ("query_count", 2),
+    ],
+)
+def test_executor_rejects_descriptor_mismatch_before_guard(
+    tmp_path: Path, field: str, value: str | int
+) -> None:
+    prepared = (QueryOnlyRecord(query_id="p38-ho-q01", query="synthetic", budget_class="FAST"),)
+    descriptor = replace(_descriptor(), **{field: value})
+    calls = 0
+
+    def executor(query: QueryOnlyRecord) -> RawRetrievalOutputRecord:
+        nonlocal calls
+        calls += 1
+        return _record(query.query_id)
+
+    with pytest.raises(EvaluationIntegrityError, match=r"descriptor|binding"):
+        execute_query_only_once(
+            queries=prepared,
+            binding=_binding(),
+            output_root=tmp_path,
+            allowed_root=tmp_path,
+            one_shot_intent="fresh_holdout_one_shot",
+            executor=executor,
+            verified_descriptor=descriptor,
+        )
+
+    assert calls == 0
+    assert not (tmp_path / "one-shot-epoch.json").exists()
+    assert not (tmp_path / "raw-retrieval-output.json").exists()
+
+
 def test_failure_after_guard_consumes_epoch_without_retry(tmp_path: Path) -> None:
     prepared = (QueryOnlyRecord(query_id="p38-ho-q01", query="synthetic", budget_class="FAST"),)
     with pytest.raises(RuntimeError, match="synthetic failure"):
@@ -249,6 +536,7 @@ def test_failure_after_guard_consumes_epoch_without_retry(tmp_path: Path) -> Non
             allowed_root=tmp_path,
             one_shot_intent="fresh_holdout_one_shot",
             executor=lambda query: (_ for _ in ()).throw(RuntimeError("synthetic failure")),
+            verified_descriptor=_descriptor(),
         )
     with pytest.raises(EvaluationIntegrityError, match="epoch"):
         execute_query_only_once(
@@ -258,6 +546,7 @@ def test_failure_after_guard_consumes_epoch_without_retry(tmp_path: Path) -> Non
             allowed_root=tmp_path,
             one_shot_intent="fresh_holdout_one_shot",
             executor=lambda query: _record(query.query_id),
+            verified_descriptor=_descriptor(),
         )
 
 
@@ -277,6 +566,7 @@ def test_executor_never_receives_ground_truth(tmp_path: Path) -> None:
         allowed_root=tmp_path,
         one_shot_intent="fresh_holdout_one_shot",
         executor=executor,
+        verified_descriptor=_descriptor(),
     )
 
     assert seen == list(prepared)
@@ -376,6 +666,145 @@ def test_explicit_inventory_rejects_symlink(tmp_path: Path) -> None:
         evaluation_contracts._check_explicit_revision_inventory(corpus, candidate)
 
 
+def test_explicit_inventory_rejects_before_full_tree_enumeration(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    for index in range(10):
+        (corpus / f"file-{index:02d}.txt").write_text("safe", encoding="utf-8")
+
+    monkeypatch.setattr(evaluation_contracts, "MAX_INVENTORY_TRAVERSAL_ENTRIES", 8)
+    rglob_scanned = 0
+    original_rglob = evaluation_contracts.Path.rglob
+
+    def tracked_rglob(path: Path, pattern: str) -> Any:
+        nonlocal rglob_scanned
+        for item in original_rglob(path, pattern):
+            rglob_scanned += 1
+            yield item
+
+    monkeypatch.setattr(evaluation_contracts.Path, "rglob", tracked_rglob)
+    scanned = 0
+    original_scandir = evaluation_contracts.os.scandir
+
+    class CountingScandir:
+        def __init__(self, path: object) -> None:
+            self._iterator = original_scandir(path)
+
+        def __enter__(self) -> CountingScandir:
+            self._iterator.__enter__()
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            self._iterator.__exit__(exc_type, exc, traceback)
+
+        def __iter__(self) -> CountingScandir:
+            return self
+
+        def __next__(self) -> object:
+            nonlocal scanned
+            entry = next(self._iterator)
+            scanned += 1
+            return entry
+
+        def close(self) -> None:
+            self._iterator.close()
+
+    monkeypatch.setattr(evaluation_contracts.os, "scandir", CountingScandir)
+    with pytest.raises(EvaluationIntegrityError, match=r"traversal|entry bound"):
+        evaluation_contracts._check_explicit_revision_inventory(corpus, _spec())
+
+    assert rglob_scanned == 0
+    assert scanned == evaluation_contracts.MAX_INVENTORY_TRAVERSAL_ENTRIES + 1
+
+
+def test_explicit_inventory_accepts_valid_bounded_nested_tree(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    nested = corpus / "nested" / "deep"
+    nested.mkdir(parents=True)
+    (corpus / "nested" / "source.md").write_text("safe source", encoding="utf-8")
+    (nested / "manifest.json").write_text("{}", encoding="utf-8")
+    spec = _spec_for_inventory(corpus, ["nested/source.md", "nested/deep/manifest.json"])
+
+    evaluation_contracts._check_explicit_revision_inventory(corpus, spec)
+
+
+def test_explicit_inventory_rejects_deep_tree_at_traversal_bound(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    current = corpus
+    for index in range(8):
+        current = current / f"level-{index:02d}"
+        current.mkdir()
+    (current / "leaf.txt").write_text("safe", encoding="utf-8")
+    monkeypatch.setattr(evaluation_contracts, "MAX_INVENTORY_TRAVERSAL_ENTRIES", 8)
+
+    with pytest.raises(EvaluationIntegrityError, match=r"traversal|entry bound"):
+        evaluation_contracts._check_explicit_revision_inventory(corpus, _spec())
+
+
+def test_explicit_inventory_rejects_symlink_directory(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    target = corpus / "target"
+    target.mkdir()
+    link = corpus / "link"
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks unavailable in this environment")
+
+    with pytest.raises(EvaluationIntegrityError, match="symlink"):
+        evaluation_contracts._check_explicit_revision_inventory(corpus, _spec())
+
+
+def test_explicit_inventory_rejects_inventory_mismatch(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    payload = corpus / "source.md"
+    payload.write_text("safe", encoding="utf-8")
+    item = SealedRevisionFile(path="source.md", sha256=_digest("wrong"), byte_size=4)
+    values = {
+        key: value for key, value in _spec().model_dump(mode="python").items() if value is not None
+    }
+    values["root_inventory"] = [item]
+    values["root_inventory_digest"] = canonical_sha256({"files": [item.to_canonical_dict()]})
+    spec = SealedRevisionSpec.model_validate(values)
+
+    with pytest.raises(EvaluationIntegrityError, match=r"bytes|inventory"):
+        evaluation_contracts._check_explicit_revision_inventory(corpus, spec)
+
+
+def test_explicit_inventory_rejects_non_regular_artifact(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    fifo = corpus / "pipe"
+    try:
+        os.mkfifo(fifo)
+    except (AttributeError, OSError):
+        pytest.skip("named pipes unavailable in this environment")
+
+    with pytest.raises(EvaluationIntegrityError, match=r"non-file|regular"):
+        evaluation_contracts._check_explicit_revision_inventory(corpus, _spec())
+
+
+def test_explicit_inventory_converts_filesystem_error_to_integrity_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+
+    def fail_scandir(path: object) -> object:
+        raise OSError("synthetic scandir failure")
+
+    monkeypatch.setattr(evaluation_contracts.os, "scandir", fail_scandir)
+    with pytest.raises(EvaluationIntegrityError, match="unreadable"):
+        evaluation_contracts._check_explicit_revision_inventory(corpus, _spec())
+
+
 def test_scoring_loads_gt_only_after_raw_digest(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -426,3 +855,100 @@ def test_scoring_loads_gt_only_after_raw_digest(
     assert result.raw_output_digest == artifact.digest()
     assert result.recall_at_5 == 1.0
     assert not hasattr(scoring, "ApplicationService")
+
+
+@pytest.mark.parametrize("missing_field", tuple(EpochBinding.model_fields))
+def test_scoring_rejects_epoch_receipt_missing_any_binding_field(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, missing_field: str
+) -> None:
+    artifact = RawRetrievalOutputArtifact(
+        schema_version="power.retrieval-raw-output.v1",
+        evaluation_revision="v1.6",
+        revision_spec_digest=_spec().digest(),
+        query_set_digest=_digest("queries"),
+        source_corpus_digest=_digest("sources"),
+        runtime_digest=_digest("runtime"),
+        execution_runner_digest=_digest("runner"),
+        fixture_digest=_digest("fixture"),
+        records=[_record()],
+    )
+    raw_path = write_raw_output_artifact(artifact, output_root=tmp_path, allowed_root=tmp_path)
+    epoch_data = _receipt().model_dump(mode="json")
+    epoch_data.update(
+        {
+            "status": "COMPLETED_PASS",
+            "raw_output_digest": artifact.digest(),
+            "raw_output_ref": raw_path.name,
+            "completed_at": epoch_data["started_at"],
+        }
+    )
+    del epoch_data[missing_field]
+    epoch_path = tmp_path / "one-shot-epoch.json"
+    epoch_path.write_text(json.dumps(epoch_data, sort_keys=True), encoding="utf-8")
+
+    def fail_if_ground_truth_is_reached(*args: object, **kwargs: object) -> object:
+        raise AssertionError("ground-truth verification was reached")
+
+    monkeypatch.setattr(
+        evaluation_contracts, "verify_evaluation_corpus", fail_if_ground_truth_is_reached
+    )
+    with pytest.raises(EvaluationIntegrityError, match="epoch"):
+        evaluation_contracts.load_verified_holdout_ground_truth_for_scoring(
+            tmp_path,
+            expected_revision="v1.6",
+            revision_spec=_spec(),
+            raw_output_path=raw_path,
+            epoch_receipt_path=epoch_path,
+            raw_output_digest=artifact.digest(),
+            expected_epoch_fields=_binding().model_dump(mode="python"),
+        )
+
+
+@pytest.mark.parametrize("mutation", ["wrong_value", "unknown_field"])
+def test_scoring_rejects_epoch_receipt_wrong_or_unknown_binding(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mutation: str
+) -> None:
+    artifact = RawRetrievalOutputArtifact(
+        schema_version="power.retrieval-raw-output.v1",
+        evaluation_revision="v1.6",
+        revision_spec_digest=_spec().digest(),
+        query_set_digest=_digest("queries"),
+        source_corpus_digest=_digest("sources"),
+        runtime_digest=_digest("runtime"),
+        execution_runner_digest=_digest("runner"),
+        fixture_digest=_digest("fixture"),
+        records=[_record()],
+    )
+    raw_path = write_raw_output_artifact(artifact, output_root=tmp_path, allowed_root=tmp_path)
+    epoch_data = _receipt().model_dump(mode="json", exclude_none=True)
+    epoch_data.update(
+        {
+            "status": "COMPLETED_PASS",
+            "raw_output_digest": artifact.digest(),
+            "raw_output_ref": raw_path.name,
+            "completed_at": epoch_data["started_at"],
+        }
+    )
+    if mutation == "wrong_value":
+        epoch_data["dataset_digest"] = _digest("wrong-dataset")
+    else:
+        epoch_data["unexpected_binding"] = "must-reject"
+    epoch_path = tmp_path / "one-shot-epoch.json"
+    epoch_path.write_text(json.dumps(epoch_data, sort_keys=True), encoding="utf-8")
+
+    def fail_if_ground_truth_is_reached(*args: object, **kwargs: object) -> object:
+        raise AssertionError("ground-truth verification was reached")
+
+    monkeypatch.setattr(
+        evaluation_contracts, "verify_evaluation_corpus", fail_if_ground_truth_is_reached
+    )
+    with pytest.raises(EvaluationIntegrityError, match="epoch"):
+        evaluation_contracts.load_verified_holdout_ground_truth_for_scoring(
+            tmp_path,
+            expected_revision="v1.6",
+            revision_spec=_spec(),
+            raw_output_path=raw_path,
+            epoch_receipt_path=epoch_path,
+            raw_output_digest=artifact.digest(),
+            expected_epoch_fields=_binding().model_dump(mode="python"),
+        )
