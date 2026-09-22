@@ -55,6 +55,7 @@ from .context_contracts import (
 MAX_FILE_BYTES = 4 * 1024 * 1024
 MAX_JSONL_RECORD_BYTES = 64 * 1024
 MAX_JSONL_RECORDS = 4096
+MAX_INVENTORY_TRAVERSAL_ENTRIES = MAX_JSONL_RECORDS * 4
 _QUERY_ID_PATTERN = re.compile(r"^p38-(?:(?:dev|ho)-q[0-9]{2}|v13-h[0-9]{2})$")
 _FORBIDDEN_SYNTHETIC_MARKERS = (
     "/root/",
@@ -2403,36 +2404,53 @@ def _check_explicit_revision_inventory(root: Path, spec: SealedRevisionSpec) -> 
     if root.is_symlink() or not root.is_dir():
         raise EvaluationIntegrityError("revision_inventory", "candidate corpus root is unsafe")
     actual: dict[str, tuple[str, int]] = {}
+    pending_directories = [root]
+    traversal_work = 0
     try:
-        paths = list(root.rglob("*"))
+        while pending_directories:
+            directory = pending_directories.pop()
+            entries: list[Any] = []
+            with os.scandir(directory) as iterator:
+                for entry in iterator:
+                    traversal_work += 1
+                    if traversal_work > MAX_INVENTORY_TRAVERSAL_ENTRIES:
+                        raise EvaluationIntegrityError(
+                            "revision_inventory",
+                            "candidate corpus traversal exceeds the entry bound",
+                        )
+                    entries.append(entry)
+            for entry in sorted(entries, key=lambda item: item.name, reverse=True):
+                path = Path(entry.path)
+                try:
+                    relative_path = path.relative_to(root)
+                except ValueError as exc:
+                    raise EvaluationIntegrityError(
+                        "revision_inventory", "candidate corpus path escapes its root"
+                    ) from exc
+                if entry.is_symlink():
+                    raise EvaluationIntegrityError(
+                        "symlink_reference", "candidate corpus contains a symlink"
+                    )
+                if entry.is_dir(follow_symlinks=False):
+                    pending_directories.append(path)
+                    continue
+                if not entry.is_file(follow_symlinks=False):
+                    raise EvaluationIntegrityError(
+                        "invalid_artifact", "candidate corpus contains a non-file"
+                    )
+                relative = relative_path.as_posix()
+                data = _read_bounded_regular_file(path)
+                try:
+                    data.decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise EvaluationIntegrityError(
+                        "invalid_utf8", "candidate revision inventory contains invalid UTF-8"
+                    ) from exc
+                actual[relative] = (_sha256_bytes(data), len(data))
     except OSError as exc:
         raise EvaluationIntegrityError(
             "revision_inventory", "candidate corpus inventory is unreadable"
         ) from exc
-    if len(paths) > MAX_JSONL_RECORDS * 4:
-        raise EvaluationIntegrityError(
-            "revision_inventory", "candidate corpus inventory exceeds the file bound"
-        )
-    for path in paths:
-        if path.is_symlink():
-            raise EvaluationIntegrityError(
-                "symlink_reference", "candidate corpus contains a symlink"
-            )
-        if path.is_dir():
-            continue
-        if not path.is_file():
-            raise EvaluationIntegrityError(
-                "invalid_artifact", "candidate corpus contains a non-file"
-            )
-        relative = path.relative_to(root).as_posix()
-        data = _read_bounded_regular_file(path)
-        try:
-            data.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise EvaluationIntegrityError(
-                "invalid_utf8", "candidate revision inventory contains invalid UTF-8"
-            ) from exc
-        actual[relative] = (_sha256_bytes(data), len(data))
     expected = {
         item.path: (item.sha256, item.byte_size)
         for item in spec.root_inventory
@@ -2947,16 +2965,29 @@ def _verify_scoring_raw_and_epoch(
     epoch_data = load_bounded_json(epoch_receipt_path)
     if not isinstance(epoch_data, dict):
         raise EvaluationIntegrityError("epoch_receipt", "epoch receipt must be a JSON object")
-    if epoch_data.get("schema_version") != "power.retrieval-one-shot-epoch.v1":
-        raise EvaluationIntegrityError("epoch_receipt", "epoch receipt schema is not admitted")
-    if epoch_data.get("status") != "COMPLETED_PASS":
+    from .evaluation_execution import EpochBinding, OneShotEvaluationEpochReceipt
+
+    try:
+        epoch_receipt = OneShotEvaluationEpochReceipt.model_validate(epoch_data)
+    except ValidationError as exc:
+        raise EvaluationIntegrityError(
+            "epoch_receipt", "epoch receipt failed canonical schema validation"
+        ) from exc
+    if epoch_receipt.status != "COMPLETED_PASS":
         raise EvaluationIntegrityError("epoch_receipt", "epoch is not a completed passing epoch")
-    if epoch_data.get("raw_output_digest") != raw_output_digest:
+    if epoch_receipt.raw_output_digest != raw_output_digest:
         raise EvaluationIntegrityError("epoch_receipt", "epoch does not bind the raw output digest")
-    if epoch_data.get("raw_output_ref") != raw_output_path.name:
+    if epoch_receipt.raw_output_ref != raw_output_path.name:
         raise EvaluationIntegrityError("epoch_receipt", "epoch raw output reference is not bounded")
-    for key, expected in expected_epoch_fields.items():
-        if key in epoch_data and epoch_data.get(key) != expected:
+    binding_fields = tuple(EpochBinding.model_fields)
+    if set(expected_epoch_fields) != set(binding_fields):
+        raise EvaluationIntegrityError(
+            "epoch_receipt", "expected epoch binding projection is incomplete or unknown"
+        )
+    actual_binding = {key: getattr(epoch_receipt, key) for key in binding_fields}
+    expected_binding = {key: expected_epoch_fields[key] for key in binding_fields}
+    for key, expected in expected_binding.items():
+        if actual_binding[key] != expected:
             raise EvaluationIntegrityError(
                 "epoch_receipt", f"epoch field {key} does not match the admitted binding"
             )
