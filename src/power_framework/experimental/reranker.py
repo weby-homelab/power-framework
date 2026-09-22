@@ -340,6 +340,8 @@ class BGEM3Reranker:
             input_feed["token_type_ids"] = token_type_ids
 
         logits = self._session.run(None, input_feed)[0]
+        bound = list(self._session.get_providers())
+        self.active_provider = bound[0] if bound else "unknown"
         scores: list[float] = []
         for i in range(len(documents)):
             val = logits[i]
