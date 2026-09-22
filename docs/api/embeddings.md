@@ -24,7 +24,7 @@ get_embedding_manager(provider: str | None = None) -> (
 
 The canonical ONNX managers select the device from `POWER_EMBED_DEVICE`; the
 reranker uses `POWER_RERANKER_DEVICE` and falls back to the embedding setting
-when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, and
+when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, `openvino`, and
 `directml`.
 
 - `auto` may bind `CPUExecutionProvider`, but logs the provider actually bound
@@ -38,6 +38,11 @@ when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, and
 - `BGEM3OnnxManager.active_provider` and `BGEM3Reranker.active_provider` hold
   the verified provider after successful session creation; a failed check does
   not retain the invalid session.
+- OpenVINO receives only `device_type`: `POWER_EMBED_DEVICE_TYPE` defaults to
+  `GPU`; `POWER_RERANKER_DEVICE_TYPE` overrides it for the reranker. Neither
+  `device_id` nor `arena_extend_strategy` is passed to OpenVINO. CPU fallback
+  retains its existing arena option. Auto priority is CUDA, ROCm, OpenVINO,
+  DirectML, then CPU. See the [OpenVINO guide](../guides/openvino.md).
 
 ### Model acquisition security contract
 

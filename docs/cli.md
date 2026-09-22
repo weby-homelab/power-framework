@@ -151,10 +151,18 @@ Dense modes require a compatible full `power sync`; `fts` requires at least an
 FTS sync. `reranked` is explicit opt-in, not the default.
 
 ONNX-backed embedding and reranking honor `POWER_EMBED_DEVICE` and
-`POWER_RERANKER_DEVICE` (`auto`, `cpu`, `cuda`, `rocm`, or `directml`). `auto`
+`POWER_RERANKER_DEVICE` (`auto`, `cpu`, `cuda`, `rocm`, `openvino`, or `directml`). `auto`
 may fall back to CPU; an explicit accelerator mode fails closed if the created
 session does not bind the requested provider. The actual bound provider is
 logged during initialization.
+
+`auto` prefers CUDA, ROCm, OpenVINO, then DirectML. OpenVINO uses
+`POWER_EMBED_DEVICE_TYPE` (default `GPU`; for example `GPU.0` or `CPU`), not
+`POWER_EMBED_DEVICE_ID`. `POWER_RERANKER_DEVICE_TYPE` overrides the embedding
+type for the reranker; when unset it inherits `POWER_EMBED_DEVICE_TYPE`.
+Install `onnxruntime-openvino` as the sole ONNX Runtime distribution in its
+environment. See the [Intel OpenVINO setup and acceptance guide](guides/openvino.md)
+([українською](guides/openvino.ua.md)) for installation and cache-only probes.
 
 ### `memory`
 
