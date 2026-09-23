@@ -45,7 +45,7 @@ LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-P38-WP03-R6A.2 technical repair (PR #472 protected merge; exact repair tree present and integrity verified) / original admission process deviation recorded below; historical R4/R5 holdout epochs remain immutable and failed
+P38-WP03-R6A.2 technical repair (PR #472 merged to main; exact repair tree present and integrity verified) / original admission process deviation recorded below; historical R4/R5 holdout epochs remain immutable and failed
 
 NEXT_GATE:
 OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION (separate invocation; fresh evaluation authoring remains deferred until the runtime baseline is dispositioned); Phase 5F (P38-WP04) stays BLOCKED behind Phase 5E
@@ -327,7 +327,7 @@ evidence.
 - P38-WP03-R6A.2: **CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED** (explicit revision spec, Review-v2 complete verification, query-only execution, raw-output freeze, GT-only scoring, atomic one-shot guard; no fresh holdout).
 - P38-WP03-R6A.2: **CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED** (`phase5e_protocol_r6a2_freeze.json`; no fresh revision authored and no fresh holdout executed).
 - R6A.2 post-merge reconciliation: **THIS GOVERNANCE PR** records the exact
-  protected merge, the historical admission-process deviation, and the retained
+  PR #472 merge commit, the historical admission-process deviation, and the retained
   security repair; it is not a retroactive approval of PR #472.
 - Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior): **BLOCKED** (Phase 5E remains open; fresh evaluation authoring and separate admission are required).
 - Phase 5G–5H: **PLANNED / NOT STARTED**.
