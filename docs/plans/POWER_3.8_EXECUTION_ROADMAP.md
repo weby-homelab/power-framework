@@ -78,10 +78,13 @@ CLOSED / MERGED / DEVELOPMENT ADMITTED (review provenance v2, independent fixtur
            ↓
 P38-WP03-R6A.2 — Final Holdout-Execution Admission Repair
 CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED (no fresh revision authored and no fresh holdout executed)
-            ↓
+             ↓
+SOLO_MAINTAINER_POLICY_BOOTSTRAP (PR #475)
+PROVISIONAL / OWNER-AUTHORIZED ONE-TIME POLICY TRANSITION / PROTECTED NORMAL MERGE PENDING
+             ↓
 OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION
-NEXT SEPARATE INVOCATION (reconstruct #473 from current protected main; preserve attribution; resolve runtime-baseline blockers)
-            ↓
+NEXT SEPARATE INVOCATION ONLY AFTER PR #475 PASS (reconstruct #473 from current protected main; preserve attribution; resolve runtime-baseline blockers)
+             ↓
 Fresh evaluation authoring
 DEFERRED until the OpenVINO runtime baseline is dispositioned (sealed-not-secret/no-tuning policy; no one-shot execution in this gate)
             ↓
@@ -151,6 +154,7 @@ NO-GO
 | P38-WP03-R4 | CLOSED / HISTORICAL FAILED VERIFICATION | Superseded historical admission epoch; do not reuse its exposed evidence |
 | P38-WP03-R6A.1 | CLOSED / MERGED / DEVELOPMENT ADMITTED | Evaluation admission integrity repair; freeze `phase5e_protocol_r6a1_freeze.json`; no fresh holdout or one-shot execution |
 | P38-WP03-R6A.2 | CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED | Security repair retained; original admission process deviation recorded; no fresh holdout |
+| PR #475 solo-maintainer policy bootstrap | PROVISIONAL / OPEN | One-time owner-authorized transition; the legacy approval rule is not claimed satisfied; technical admission, explicit attestation, protected normal merge, and post-merge readback remain mandatory |
 | PR #453 | CLOSED STALE / NOT MERGED | Future dedicated dependency-refresh gate if still needed |
 | PR #454 | CLOSED STALE / NOT MERGED | Future dedicated dependency-refresh gate if still needed |
 | PR #473 | CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED | OpenVINO provenance retained; no feature rejection |
@@ -182,7 +186,7 @@ Formal APPROVED reviews on #472: 0
 Required approvals: at least 1
 Required merge method: protected normal merge commit
 Actual merge topology: squash-style / one parent
-Original #472 admission process: NONCOMPLIANT
+Original #472 admission process: NONCOMPLIANT UNDER POLICY THEN IN FORCE
 Technical repair: MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED
 Security repair: RETAINED
 Process incident: HISTORICAL / RECORDED
@@ -458,13 +462,23 @@ Treat the following as remediation inputs rather than automatic stops:
 - A source, dependency, workflow, version, or release file appears in a docs
   publication change; remove the unrelated scope before publication.
 
-Stop only when a human-only approval/permission is objectively required after
-the reviewer/request path is exhausted, a secret is lawfully unavailable, a
-security remediation remains impossible after three meaningful cycles, or a
-history/data-loss risk is demonstrated. Do not use admin bypass, protection
-disablement, fake approval, or force merge. A later agent must independently
-admit Foundation Hardening before starting Phase 5 and must not treat this
-planning snapshot as runtime implementation evidence.
+In `SOLO_MAINTAINER` mode, the absence of an independent collaborator is not a
+merge blocker for a maintainer-authored PR. Do not manufacture a reviewer or
+retry random reviewer requests; use the solo-maintainer admission contract in
+`POWER_3.8_DEVELOPMENT_PROTOCOL.md`. External-contributor PRs and
+`MULTI_MAINTAINER` gates still require the specified human maintainer review.
+Live GitHub protection may impose stronger requirements and must never be
+bypassed, disabled, or weakened; if an authoritative live protection rule makes
+a required human approval unavailable, stop with
+`GITHUB_REVIEW_PROTECTION_CONFLICT`.
+
+The mode-aware review rule does not relax exact-head signature, required CI,
+scope, gate-specific protected normal-merge, or post-merge verification gates.
+Stop for a lawfully unavailable secret, a security remediation that remains
+impossible after three meaningful cycles, or demonstrated history/data-loss
+risk. Do not use admin bypass, fake approval, or force merge. A later agent must
+independently admit Foundation Hardening before starting Phase 5 and must not
+treat this planning snapshot as runtime implementation evidence.
 
 ## Cross-links
 

@@ -41,6 +41,30 @@ LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
 CURRENT_LIVE_MAIN:
 aafafe7453ba1d242cd80003866146a14abe311e
 
+REVIEW_MODE:
+SOLO_MAINTAINER
+
+REPOSITORY_MAINTAINERS:
+[weby-homelab]
+
+MAINTAINER_IDENTITY_POLICY:
+MATCH FRESH PR AUTHOR LOGIN TO EXPLICIT ROSTER AND LIVE REPOSITORY PERMISSION; UNKNOWN/UNVERIFIED = EXTERNAL REVIEW PATH
+
+REVIEW_MODE_POLICY_STATUS:
+PROVISIONAL / CANONICAL ONLY AFTER PR #475 PROTECTED NORMAL MERGE
+
+MAINTAINER_AUTHORED_PR_HUMAN_APPROVAL:
+NOT REQUIRED IN SOLO MODE (PROSPECTIVE AFTER PR #475 MERGES)
+
+EXTERNAL_CONTRIBUTOR_PR_REVIEW:
+MAINTAINER HUMAN REVIEW REQUIRED
+
+AUTOMATED_REVIEW_AUTHORITY:
+TECHNICAL EVIDENCE / NOT AUTHORITY
+
+R6A2_GOVERNANCE_RECONCILIATION:
+PROVISIONAL / PR #475 SOLO-MAINTAINER POLICY BOOTSTRAP PENDING PROTECTED NORMAL MERGE
+
 LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
@@ -489,6 +513,17 @@ This is a post-merge governance reconciliation and independently reviewed
 retention decision. It preserves historical truth; it does not retroactively
 approve PR #472 or rewrite its admission history.
 
+The separate PR #475 policy change is a one-time owner/operator-authorized
+bootstrap. At its start, the legacy rule required at least one review approval;
+the PR author was the sole maintainer, no reviewer was requested, and a request
+to `Turdus-M` returned HTTP 422 because that account was not a repository
+collaborator. No eligible independent collaborator was identified through that
+reviewer path. This records a policy/topology mismatch, not an approval. The
+bootstrap does not claim the old rule was satisfied, does not grant #475 a human
+approval, and does not retroactively change #472. The proposed
+`SOLO_MAINTAINER` policy remains provisional until #475 receives its protected
+normal merge and applies prospectively thereafter.
+
 ### R6A.2 forensic facts
 
 ```text
@@ -508,7 +543,7 @@ Required merge method: protected normal merge commit
 Actual merge topology: squash-style / one parent
 Technical repair: MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED
 Security repair: RETAINED
-Original #472 admission process: NONCOMPLIANT
+Original #472 admission process: NONCOMPLIANT UNDER POLICY THEN IN FORCE
 Process incident: HISTORICAL / RECORDED
 ```
 

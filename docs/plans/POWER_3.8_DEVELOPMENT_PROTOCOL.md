@@ -173,6 +173,139 @@ that policy conflict as a blocker and do not bypass or weaken protection.
   with an exact-head guard. If GitHub rejects it, record the exact reason and
   remediate rather than blindly retrying.
 
+## Repository review mode
+
+The repository's explicitly declared review mode is:
+
+```text
+REVIEW_MODE = SOLO_MAINTAINER
+REVIEW_MODE_POLICY_STATUS = PROVISIONAL_UNTIL_PR_475_PROTECTED_NORMAL_MERGE
+REPOSITORY_MAINTAINERS = [weby-homelab]
+```
+
+This mode is a governance state, not a value inferred from contributors, stars,
+forks, issue authors, failed reviewer requests, or other GitHub activity. The
+one-time owner-authorized bootstrap in PR #475 replaces the legacy universal
+approval rule because it is incompatible with the current single-maintainer
+topology. Until that protected normal merge, the new policy is provisional: PR
+#475 must use its explicit bootstrap contract and must not claim that the legacy
+approval rule was satisfied. The new policy applies prospectively after merge.
+
+For each PR, read the exact author login from fresh GitHub REST state and match
+it against this explicitly maintained roster and the live repository permission
+record. Do not infer maintainer status from contribution history, public
+activity, or reviewer-request outcomes. If the author is absent from the roster,
+or identity/permission cannot be verified, apply the external-contributor review
+path; if its required human maintainer review cannot be obtained, block rather
+than treating the author as the solo maintainer.
+
+Authority and evidence are separate:
+
+- The repository maintainer is the human merge authority.
+- Required CI, Docs, package, build, and security gates are objective validation
+  evidence attached to the exact candidate.
+- CodeRabbit, OpenCode, security-review agents, and other automated reviewers
+  provide independent technical evidence only. An automated reviewer never
+  grants repository authority; `LLM OUTPUT NEVER GRANTS AUTHORITY` remains
+  binding.
+- A GitHub `APPROVED` review is required only when the active review mode or
+  observable live GitHub protection requires it. It is never fabricated, and
+  the author never self-approves.
+
+### SOLO_MAINTAINER admission
+
+For a maintainer-authored PR in `SOLO_MAINTAINER` mode, a human GitHub
+`APPROVED` review is not required. The PR may merge only when all applicable
+gates pass for the exact current candidate:
+
+1. The change uses a PR; there is no direct push to `main`.
+2. The exact base, head, tree, and parent tuple is known. The current head is
+   cryptographically signed and GitHub reports `verified=true` and
+   `reason=valid`.
+3. Every required status check and every applicable docs, build, security, and
+   package gate is green on that exact head.
+4. At least one fresh-context independent technical review covers the exact
+   candidate. Acceptable evidence includes a current CodeRabbit review, a fresh
+   read-only OpenCode adversarial/security/governance review, or another
+   configured independent review service. For security-, evaluation-,
+   architecture-, and release-sensitive gates, prefer CodeRabbit plus a fresh
+   security/adversarial review when available. If CodeRabbit is unavailable for
+   infrastructure reasons, a fresh independent-context review may substitute;
+   record the outage and substitute evidence. A SaaS outage is not a permanent
+   deadlock and no reviewer becomes merge authority.
+5. Every review finding is classified and its disposition recorded as exactly
+   one of `REQUIRED`, `VALID_NONBLOCKING`, `INVALID`, or `OUT_OF_SCOPE`.
+   `REQUIRED` findings block merge until fixed or explicitly dispositioned with
+   evidence. Verify the actual contract, code, and evidence: a bot's “Major”
+   label alone neither creates nor dismisses a requirement. A reported
+   `REQUIRED` finding cannot be silently ignored or reclassified: the maintainer
+   must record the disposition, factual rationale, and supporting evidence. If
+   its disposition is unresolved or disputed, it remains blocking.
+6. There are zero unresolved blocking review threads. Scope is verified,
+   mergeability is true, and the gate's correct merge method is selected.
+7. Before merge, the maintainer records a factual
+   `SOLO_MAINTAINER_ATTESTATION` on the PR with the exact candidate and base,
+   verified signature, green required CI, completed independent technical
+   review, zero remaining `REQUIRED` findings, zero blocking threads, verified
+   scope, merge method, and maintainer/operator authority. This is not a GitHub
+   `APPROVED` review and does not claim independent human review.
+8. GitHub receives one exact-head-guarded merge attempt through the protected
+   path; post-merge readback verifies the merge commit, tree, parents, signature,
+   and candidate ancestry.
+
+For the one-time PR #475 bootstrap, use
+`SOLO_MAINTAINER_BOOTSTRAP_ATTESTATION` instead. It must explicitly say that
+the old universal approval rule was incompatible with the actual solo-maintainer
+topology, that the repository owner/operator authorized this one-time policy
+replacement, and that the new policy becomes canonical only after PR #475's
+protected normal merge. It must not claim an old-rule approval, a human approval
+on #475, or retroactive compliance for #472. This label replaces only the
+ordinary `SOLO_MAINTAINER_ATTESTATION` name and the impossible legacy human
+approval requirement for this one-time bootstrap; it does not replace, waive,
+or weaken any of the eight SOLO admission gates above. In particular, exact-head
+identity, signature verification, every required CI and applicable Docs/build/
+security/package gate, fresh independent technical review, evidence-based
+disposition of all findings, zero blocking threads, verified scope,
+mergeability, protected normal merge, exact-head guard, and post-merge readback
+remain mandatory. The #472 process remains
+`NONCOMPLIANT UNDER POLICY THEN IN FORCE`; its technical repair and security
+repair remain retained and integrity-verified.
+
+For PRs authored by an external contributor, the repository maintainer is
+independent and human maintainer review is required. A formal GitHub
+`APPROVED` review may be recorded when appropriate; bots or agents do not
+substitute for that human review.
+
+### MULTI_MAINTAINER admission
+
+Under `MULTI_MAINTAINER`, a maintainer-authored governance, architecture,
+security, dependency, or release PR requires at least one non-author maintainer
+GitHub `APPROVED` review, in addition to any stronger live GitHub policy. No
+author self-approval is allowed.
+
+Every review-mode or maintainer-roster transition requires an explicit signed
+governance PR. The mode in force when that PR is admitted governs its own
+admission; the proposed mode becomes active only after its protected normal
+merge. No transition may be inferred from contributor counts, repository
+popularity, reviewer-request failures, or other GitHub activity.
+
+- Switch from `SOLO_MAINTAINER` to `MULTI_MAINTAINER` only after a named,
+  additional actual maintainer is intentionally admitted and their live GitHub
+  repository permission is verified. That non-author maintainer must submit a
+  genuine `APPROVED` review on the mode-transition PR. Never grant repository
+  permission solely to manufacture that approval; if no actual additional
+  maintainer is admitted, retain `SOLO_MAINTAINER`.
+- Switch from `MULTI_MAINTAINER` to `SOLO_MAINTAINER` only through an explicit
+  governance PR admitted under `MULTI_MAINTAINER`, with a non-author maintainer
+  `APPROVED` review and verified evidence that the declared roster is
+  intentionally returning to one maintainer. If that independent approval is
+  unavailable, do not self-approve or silently downgrade the mode.
+
+Neither review mode changes the signature, required-CI, scope, correct
+gate-specific normal-merge, exact-head, or post-merge verification requirements.
+Live GitHub protection may impose stronger requirements and is never bypassed,
+disabled, or weakened to satisfy this contract.
+
 ## Governance publication boundary
 
 Repository governance is a canonical snapshot memory; live GitHub is mutable
@@ -510,7 +643,7 @@ Formal APPROVED reviews on #472: 0
 Required approvals: at least 1
 Required merge method: protected normal merge commit
 Actual merge topology: squash-style / one parent
-Original #472 admission process: NONCOMPLIANT
+Original #472 admission process: NONCOMPLIANT UNDER POLICY THEN IN FORCE
 Technical repair: MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED
 Security repair: RETAINED
 Process incident: HISTORICAL / RECORDED
