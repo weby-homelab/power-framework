@@ -71,19 +71,22 @@ Phase 5D (P38-WP02) — Multi-Domain Union & Conflict Resolution / ContextPack
 CLOSED / MERGED / VERIFIED (PR #439 / PR #440)
          ↓
 Phase 5E (P38-WP03) — Shadow Benchmark / Legacy Comparison
-OPEN / NOT PASSED / EVALUATION TRUST REPAIRED (P38-WP03-R5 CLOSED / FAILED VERIFICATION; v1.5 exposed/unused/invalidated/not reusable; fresh evaluation authoring still required)
+OPEN / NOT PASSED / EVALUATION TRUST REPAIRED (P38-WP03-R5 CLOSED / FAILED VERIFICATION; v1.5 exposed/unused/invalidated/not reusable; fresh evaluation authoring remains deferred)
            ↓
 P38-WP03-R6A.1 — Evaluation Admission Integrity Repair
 CLOSED / MERGED / DEVELOPMENT ADMITTED (review provenance v2, independent fixture ownership, fail-closed development admission, metric semantics, FAST contract, and historical q14 diagnostic; no fresh holdout and no one-shot)
            ↓
 P38-WP03-R6A.2 — Final Holdout-Execution Admission Repair
-CLOSED / MERGED / FRESH HOLDOUT EXECUTION MACHINERY FROZEN (no fresh revision authored and no fresh holdout executed)
-           ↓
+CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED (no fresh revision authored and no fresh holdout executed)
+            ↓
+OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION
+NEXT SEPARATE INVOCATION (reconstruct #473 from current protected main; preserve attribution; resolve runtime-baseline blockers)
+            ↓
 Fresh evaluation authoring
-NEXT SEPARATE INVOCATION (sealed-not-secret/no-tuning policy; no one-shot execution in this gate)
-           ↓
+DEFERRED until the OpenVINO runtime baseline is dispositioned (sealed-not-secret/no-tuning policy; no one-shot execution in this gate)
+            ↓
 Phase 5F (P38-WP04) — Phase 5F Incremental Dense Validity / dirty-set behavior
-BLOCKED (Phase 5E remains OPEN / NOT PASSED; fresh evaluation authoring and separate admission are required)
+BLOCKED (Phase 5E remains OPEN / NOT PASSED; OpenVINO integration, fresh evaluation authoring, and separate admission are required)
           ↓
 Phase 5G–5H (P38-WP05–P38-WP06) — MCP, Closure
 PLANNED / NOT STARTED (gated behind Phase 5F)
@@ -122,7 +125,7 @@ NO-GO
 | Final integration | CLOSED / FINAL INTEGRATION VERIFIED | Current main dependency graph, security, package, upgrade, frozen regression, Docs, and CodeQL evidence passed |
 | Foundation Hardening | CLOSED / IMPLEMENTED / VERIFIED | PR #414 protected merge and post-merge checks are on `main` |
 | Phase 5A runtime contracts | CLOSED / MERGED / VERIFIED | PR #415 protected merge and post-merge checks |
-| Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable original revision; v1.1 is the active revision |
+| Evaluation corpus v1 | HISTORICAL / RETAINED / SEMANTIC ERRATUM | Immutable historical evidence; v1.1–v1.4 exposed, v1.5 exposed/unused/invalidated/not reusable |
 | Phase 5A.1 | CLOSED / MERGED / VERIFIED | PR #416 protected merge and post-merge checks |
 | Phase 5B | CLOSED / MERGED / VERIFIED | PR #418; live parent erratum is retained in current state |
 | INFRA-1 | CLOSED / MERGED / VERIFIED | PR #419; merge `bfb9688`; framework contract closed; real receiver is operator follow-up |
@@ -141,17 +144,72 @@ NO-GO
 | P38-WP01-R1 | CLOSED / MERGED / VERIFIED / PR #437 | Phase 5C SearchScope Closure Correction |
 | Phase 5D (P38-WP02) | CLOSED / VERIFIED AFTER R1 CORRECTION | Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack vertical slice (PR #439, PR #440, PR #441 corrected by PR #442, PR #443) |
 | P38-WP02-R1 | CLOSED / MERGED / VERIFIED / PR #443 | Phase 5D RetrievalPlanner / ContextPack Closure Correction |
-| Phase 5E (P38-WP03) | OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED | Shadow Benchmark / Legacy Comparison; historical R1–R5 failures retained; R6A.1 repaired development admission and R6A.2 froze execution machinery without executing a fresh holdout |
+| Phase 5E (P38-WP03) | OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED | Shadow Benchmark / Legacy Comparison; historical R1–R5 failures retained; R6A.1 repaired development admission and R6A.2 technical repair is retained without fresh holdout execution; authoring is deferred until OpenVINO baseline disposition |
 | P38-WP03-R1 | CLOSED / FAILURE EVIDENCE | Phase 5E failure evidence |
 | P38-WP03-R2 attempt | CLOSED / FAILED VERIFICATION | PR #449 runtime + PR #450 governance |
 | P38-WP03-R3 | CLOSED / SECURITY CORRECTION VERIFIED | PR #451 runtime correction; PR-R3B governance rebaseline |
 | P38-WP03-R4 | CLOSED / HISTORICAL FAILED VERIFICATION | Superseded historical admission epoch; do not reuse its exposed evidence |
 | P38-WP03-R6A.1 | CLOSED / MERGED / DEVELOPMENT ADMITTED | Evaluation admission integrity repair; freeze `phase5e_protocol_r6a1_freeze.json`; no fresh holdout or one-shot execution |
-| P38-WP03-R6A.2 | CLOSED / MERGED / MACHINERY FROZEN | Explicit revision spec, Review-v2 verifier, query-only execution, raw-output/GT separation, atomic one-shot guard; no fresh holdout |
-| Phase 5F (P38-WP04) | BLOCKED | Phase 5E remains open; fresh evaluation authoring and separate admission are required before Phase 5F |
+| P38-WP03-R6A.2 | CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED | Security repair retained; original admission process deviation recorded; no fresh holdout |
+| PR #453 | CLOSED STALE / NOT MERGED | Future dedicated dependency-refresh gate if still needed |
+| PR #454 | CLOSED STALE / NOT MERGED | Future dedicated dependency-refresh gate if still needed |
+| PR #473 | CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED | OpenVINO provenance retained; no feature rejection |
+| Issue #471 | OPEN | Hardware-performance acceptance, including full-sync benchmark, remains incomplete |
+| OpenVINO | PENDING SIGNED UPSTREAM INTEGRATION FROM CURRENT MAIN | Next action; unsigned source, old base, and review findings require independent disposition |
+| Phase 5F (P38-WP04) | BLOCKED | Phase 5E remains open; OpenVINO integration, fresh evaluation authoring, and separate admission are required before Phase 5F |
 | Phase 5G–5H (P38-WP05–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5E → fresh authoring/admission → 5F → 5G → 5H) |
 | Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
 | POWER 3.8.0 | NO-GO | No tag, release, or public version change |
+
+## R6A.2 post-merge governance reconciliation checkpoint
+
+This checkpoint records the protected-main readback and queue cleanup after PR
+#472. It is a post-merge governance reconciliation, not a retroactive approval
+of the original admission process.
+
+```text
+PR #472 source head: 419ac4962d2b9e2f40095e61def2c242e15f2e83
+PR #472 base: 2cfc9d3cf7264c71dae0b4cd5ed884738a56a1aa
+PR #472 source tree: 24d2a6e507363662d0a047803aa7446309e39d9a
+PR #472 source head parents: [2cfc9d3cf7264c71dae0b4cd5ed884738a56a1aa]
+Actual merged commit: aafafe7453ba1d242cd80003866146a14abe311e
+Actual merged tree: 24d2a6e507363662d0a047803aa7446309e39d9a
+Actual merge parents: [2cfc9d3cf7264c71dae0b4cd5ed884738a56a1aa]
+Source commit in main ancestry: NO
+Source head tree preserved on main: YES
+Merge signature: verified=true / reason=valid
+Formal APPROVED reviews on #472: 0
+Required approvals: at least 1
+Required merge method: protected normal merge commit
+Actual merge topology: squash-style / one parent
+Original #472 admission process: NONCOMPLIANT
+Technical repair: MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED
+Security repair: RETAINED
+Process incident: HISTORICAL / RECORDED
+
+Historical freeze sha256: 4dff4b361d98adcd74c1b1de5d78a66fe8936cb6b4809e7cb9cea9602f1b0250
+Correction freeze sha256: 1381b8d38980a21a427a43dd340c0986dfc23835adba252102f4cbc0b6570762
+Correction-freeze referenced artifact digests: 11/11 VERIFIED
+
+PR_CLEANUP_ALLOWLIST: {453, 454, 473}
+Allowlist scope: comment and close only for these exact PRs; no merge, rebase,
+branch edit/deletion, issue closure, review-thread resolution, or policy change.
+PR #453: CLOSED STALE / NOT MERGED / future dedicated dependency-refresh gate
+PR #454: CLOSED STALE / NOT MERGED / future dedicated dependency-refresh gate
+PR #473: CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED
+Issue #471: OPEN
+OpenVINO: PENDING SIGNED UPSTREAM INTEGRATION FROM CURRENT MAIN
+Phase 5E: OPEN / NOT PASSED
+Phase 5F: BLOCKED
+POWER 3.8.0: NO-GO
+NEXT_ACTION: OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION
+```
+
+The evidence-supported process statement is limited to the contract and live
+objects: approval was required but absent, and the actual merge topology had
+one parent instead of the required normal merge. No admin bypass,
+branch-protection configuration, or human intent is inferred. #473 review
+threads were not resolved during closure, and #471 remains open.
 
 ### INFRA-1 closed framework gate and governance reconciliation
 
@@ -175,7 +233,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 development admission and R6A.2 execution machinery are CLOSED / MERGED / FROZEN. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
+- Historical note (INFRA-1 era): Phase 5C was then unstarted. Phase 5C was subsequently CLOSED via PR #434, corrected via P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 development admission and the R6A.2 technical repair are CLOSED / MERGED / INTEGRITY VERIFIED. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
 
 ## Controlled Dependency Refresh
 
@@ -212,7 +270,7 @@ dependency update:
        execution broker was protected-merged as PR #419 (merge `bfb9688`).
         Real receiver deployment is an operator follow-up. Historical note: Phase 5C was
         unstarted at INFRA-1 time; it was subsequently CLOSED via PR #434 / PR #435, corrected via
-        P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 development admission and R6A.2 execution machinery are CLOSED / MERGED / FROZEN. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
+         P38-WP01-R1 (PR #437 / PR #438), and is CLOSED / VERIFIED AFTER R1 CORRECTION. Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443). Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 development admission and the R6A.2 technical repair are CLOSED / MERGED / INTEGRITY VERIFIED. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
 
 The controlled refresh and prior closures do not authorize a public version
 bump, tag, release, Phase 5C, or any later phase.
@@ -285,13 +343,13 @@ Controlled Dependency Refresh, Phase 5A runtime contracts, Phase 5A.1
 correction, Phase 5B router, and INFRA-1 broker are closed in this snapshot;
 Phase 5C SearchScope pushdown is CLOSED / VERIFIED AFTER R1 CORRECTION
 (PR #437);
-Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443); P38-WP02-R1 is CLOSED / MERGED / VERIFIED; Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; P38-WP03-R6A.1 is CLOSED / MERGED / DEVELOPMENT ADMITTED; P38-WP03-R6A.2 is CLOSED / MERGED / MACHINERY FROZEN; Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
+Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443); P38-WP02-R1 is CLOSED / MERGED / VERIFIED; Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; P38-WP03-R6A.1 is CLOSED / MERGED / DEVELOPMENT ADMITTED; P38-WP03-R6A.2 is CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED; Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED.
 
 ### Phase 5 internal gates
 
-Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, Phase 5C, P38-WP01-R1, Phase 5D, P38-WP02-R1, P38-WP03-R6A.1 development admission, and P38-WP03-R6A.2 execution machinery are closed. Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED. The following future
+Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, Phase 5C, P38-WP01-R1, Phase 5D, P38-WP02-R1, P38-WP03-R6A.1 development admission, and the P38-WP03-R6A.2 technical repair are closed. Phase 5E is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED. The following future
 runtime gates remain `PLANNED / NOT IMPLEMENTED` until their own evidence and
-protected admission; fresh evaluation authoring is the next separate gate and Phase 5F is BLOCKED:
+protected admission; `OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION` is the next separate gate, fresh evaluation authoring is deferred until its runtime baseline is dispositioned, and Phase 5F is BLOCKED:
 
 ```text
 5A.1 — Evaluation corpus semantic integrity correction (closed)
@@ -301,11 +359,12 @@ INFRA-1 — Constrained Local Infrastructure Execution Broker (closed / merged P
 P38-WP01-R1 — Phase 5C SearchScope Closure Correction (CLOSED / PR #437)
 5D — RetrievalPlanner + ContextPack read-only vertical slice (CLOSED / VERIFIED AFTER R1 CORRECTION)
 P38-WP02-R1 — Phase 5D RetrievalPlanner / ContextPack Closure Correction (CLOSED / PR #443)
-5E — Shadow benchmark / legacy comparison (OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; historical R1–R5 failures retained; R6A.1 development admission and R6A.2 execution machinery closed)
+5E — Shadow benchmark / legacy comparison (OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; historical R1–R5 failures retained; R6A.1 development admission and R6A.2 technical repair closed)
 P38-WP03-R6A.1 — Evaluation Admission Integrity Repair (CLOSED / MERGED / DEVELOPMENT ADMITTED; no fresh holdout or one-shot)
-P38-WP03-R6A.2 — Final Holdout-Execution Admission Repair (CLOSED / MERGED / MACHINERY FROZEN; no fresh holdout)
-Fresh evaluation authoring — NEXT SEPARATE INVOCATION (v1.5 exposed/unused/invalidated/not reusable; `SEALED_NOT_SECRET_NO_TUNING`)
-5F — Phase 5F Incremental Dense Validity / dirty-set behavior (BLOCKED until fresh evaluation authoring and separate admission)
+P38-WP03-R6A.2 — Final Holdout-Execution Admission Repair (CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED; no fresh holdout)
+OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION — NEXT SEPARATE INVOCATION (reconstruct #473 from current protected main; preserve attribution; resolve runtime-baseline blockers)
+Fresh evaluation authoring — DEFERRED until OpenVINO runtime baseline disposition (v1.5 exposed/unused/invalidated/not reusable; `SEALED_NOT_SECRET_NO_TUNING`)
+5F — Phase 5F Incremental Dense Validity / dirty-set behavior (BLOCKED until OpenVINO integration, fresh evaluation authoring, and separate admission)
 5G — Small MCP read/explainability surfaces
 5H — Phase closure / default decision
 ```
