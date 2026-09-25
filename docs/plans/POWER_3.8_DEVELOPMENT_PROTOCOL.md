@@ -111,9 +111,11 @@ Foundation Hardening → Phase 5A–5H → Phase 6 → Phase 7 → Phase 8 → P
 
 The Controlled Dependency Refresh, Foundation Hardening (PR #414), including
 Actions #396 and final integration, Phase 5A runtime contracts (PR #415), Phase
-5A.1 (PR #416), and Phase 5B (PR #418) are closed in the current governance
-snapshot. The next bounded gate is INFRA-1; Phase 5C must not be silently
-chained into it or started before INFRA-1 closes.
+5A.1 (PR #416), Phase 5B (PR #418), and the R6A.2 technical repair (PR #472)
+are closed in the current governance snapshot. The next bounded gate after this
+post-merge reconciliation is `OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION`; fresh
+evaluation authoring remains deferred until that runtime baseline is
+dispositioned. Phase 5F remains blocked.
 
 ## GitHub publication policy
 
@@ -171,6 +173,139 @@ that policy conflict as a blocker and do not bypass or weaken protection.
   with an exact-head guard. If GitHub rejects it, record the exact reason and
   remediate rather than blindly retrying.
 
+## Repository review mode
+
+The repository's explicitly declared review mode is:
+
+```text
+REVIEW_MODE = SOLO_MAINTAINER
+REVIEW_MODE_POLICY_STATUS = PROVISIONAL_UNTIL_PR_475_PROTECTED_NORMAL_MERGE
+REPOSITORY_MAINTAINERS = [weby-homelab]
+```
+
+This mode is a governance state, not a value inferred from contributors, stars,
+forks, issue authors, failed reviewer requests, or other GitHub activity. The
+one-time owner-authorized bootstrap in PR #475 replaces the legacy universal
+approval rule because it is incompatible with the current single-maintainer
+topology. Until that protected normal merge, the new policy is provisional: PR
+#475 must use its explicit bootstrap contract and must not claim that the legacy
+approval rule was satisfied. The new policy applies prospectively after merge.
+
+For each PR, read the exact author login from fresh GitHub REST state and match
+it against this explicitly maintained roster and the live repository permission
+record. Do not infer maintainer status from contribution history, public
+activity, or reviewer-request outcomes. If the author is absent from the roster,
+or identity/permission cannot be verified, apply the external-contributor review
+path; if its required human maintainer review cannot be obtained, block rather
+than treating the author as the solo maintainer.
+
+Authority and evidence are separate:
+
+- The repository maintainer is the human merge authority.
+- Required CI, Docs, package, build, and security gates are objective validation
+  evidence attached to the exact candidate.
+- CodeRabbit, OpenCode, security-review agents, and other automated reviewers
+  provide independent technical evidence only. An automated reviewer never
+  grants repository authority; `LLM OUTPUT NEVER GRANTS AUTHORITY` remains
+  binding.
+- A GitHub `APPROVED` review is required only when the active review mode or
+  observable live GitHub protection requires it. It is never fabricated, and
+  the author never self-approves.
+
+### SOLO_MAINTAINER admission
+
+For a maintainer-authored PR in `SOLO_MAINTAINER` mode, a human GitHub
+`APPROVED` review is not required. The PR may merge only when all applicable
+gates pass for the exact current candidate:
+
+1. The change uses a PR; there is no direct push to `main`.
+2. The exact base, head, tree, and parent tuple is known. The current head is
+   cryptographically signed and GitHub reports `verified=true` and
+   `reason=valid`.
+3. Every required status check and every applicable docs, build, security, and
+   package gate is green on that exact head.
+4. At least one fresh-context independent technical review covers the exact
+   candidate. Acceptable evidence includes a current CodeRabbit review, a fresh
+   read-only OpenCode adversarial/security/governance review, or another
+   configured independent review service. For security-, evaluation-,
+   architecture-, and release-sensitive gates, prefer CodeRabbit plus a fresh
+   security/adversarial review when available. If CodeRabbit is unavailable for
+   infrastructure reasons, a fresh independent-context review may substitute;
+   record the outage and substitute evidence. A SaaS outage is not a permanent
+   deadlock and no reviewer becomes merge authority.
+5. Every review finding is classified and its disposition recorded as exactly
+   one of `REQUIRED`, `VALID_NONBLOCKING`, `INVALID`, or `OUT_OF_SCOPE`.
+   `REQUIRED` findings block merge until fixed or explicitly dispositioned with
+   evidence. Verify the actual contract, code, and evidence: a bot's “Major”
+   label alone neither creates nor dismisses a requirement. A reported
+   `REQUIRED` finding cannot be silently ignored or reclassified: the maintainer
+   must record the disposition, factual rationale, and supporting evidence. If
+   its disposition is unresolved or disputed, it remains blocking.
+6. There are zero unresolved blocking review threads. Scope is verified,
+   mergeability is true, and the gate's correct merge method is selected.
+7. Before merge, the maintainer records a factual
+   `SOLO_MAINTAINER_ATTESTATION` on the PR with the exact candidate and base,
+   verified signature, green required CI, completed independent technical
+   review, zero remaining `REQUIRED` findings, zero blocking threads, verified
+   scope, merge method, and maintainer/operator authority. This is not a GitHub
+   `APPROVED` review and does not claim independent human review.
+8. GitHub receives one exact-head-guarded merge attempt through the protected
+   path; post-merge readback verifies the merge commit, tree, parents, signature,
+   and candidate ancestry.
+
+For the one-time PR #475 bootstrap, use
+`SOLO_MAINTAINER_BOOTSTRAP_ATTESTATION` instead. It must explicitly say that
+the old universal approval rule was incompatible with the actual solo-maintainer
+topology, that the repository owner/operator authorized this one-time policy
+replacement, and that the new policy becomes canonical only after PR #475's
+protected normal merge. It must not claim an old-rule approval, a human approval
+on #475, or retroactive compliance for #472. This label replaces only the
+ordinary `SOLO_MAINTAINER_ATTESTATION` name and the impossible legacy human
+approval requirement for this one-time bootstrap; it does not replace, waive,
+or weaken any of the eight SOLO admission gates above. In particular, exact-head
+identity, signature verification, every required CI and applicable Docs/build/
+security/package gate, fresh independent technical review, evidence-based
+disposition of all findings, zero blocking threads, verified scope,
+mergeability, protected normal merge, exact-head guard, and post-merge readback
+remain mandatory. The #472 process remains
+`NONCOMPLIANT UNDER POLICY THEN IN FORCE`; its technical repair and security
+repair remain retained and integrity-verified.
+
+For PRs authored by an external contributor, the repository maintainer is
+independent and human maintainer review is required. A formal GitHub
+`APPROVED` review may be recorded when appropriate; bots or agents do not
+substitute for that human review.
+
+### MULTI_MAINTAINER admission
+
+Under `MULTI_MAINTAINER`, a maintainer-authored governance, architecture,
+security, dependency, or release PR requires at least one non-author maintainer
+GitHub `APPROVED` review, in addition to any stronger live GitHub policy. No
+author self-approval is allowed.
+
+Every review-mode or maintainer-roster transition requires an explicit signed
+governance PR. The mode in force when that PR is admitted governs its own
+admission; the proposed mode becomes active only after its protected normal
+merge. No transition may be inferred from contributor counts, repository
+popularity, reviewer-request failures, or other GitHub activity.
+
+- Switch from `SOLO_MAINTAINER` to `MULTI_MAINTAINER` only after a named,
+  additional actual maintainer is intentionally admitted and their live GitHub
+  repository permission is verified. That non-author maintainer must submit a
+  genuine `APPROVED` review on the mode-transition PR. Never grant repository
+  permission solely to manufacture that approval; if no actual additional
+  maintainer is admitted, retain `SOLO_MAINTAINER`.
+- Switch from `MULTI_MAINTAINER` to `SOLO_MAINTAINER` only through an explicit
+  governance PR admitted under `MULTI_MAINTAINER`, with a non-author maintainer
+  `APPROVED` review and verified evidence that the declared roster is
+  intentionally returning to one maintainer. If that independent approval is
+  unavailable, do not self-approve or silently downgrade the mode.
+
+Neither review mode changes the signature, required-CI, scope, correct
+gate-specific normal-merge, exact-head, or post-merge verification requirements.
+Live GitHub protection may impose stronger requirements and is never bypassed,
+disabled, or weakened to satisfy this contract.
+
 ## Governance publication boundary
 
 Repository governance is a canonical snapshot memory; live GitHub is mutable
@@ -188,11 +323,11 @@ verify snapshot ancestry and exact gate evidence
 publish one consolidated governance reconciliation
 ```
 
-The current reconciliation records the closed Controlled Dependency Refresh,
-the closed Foundation Hardening PR #414, the closed Phase 5A runtime contracts
-PR #415, the deferred/closed #402 bundle, the superseded/closed #407 historical
-PR, and the current Phase 5A.1 gate. Only the protected normal merge makes this
-snapshot canonical; an open PR or unsigned REST Contents commit remains
+This reconciliation records the exact protected #472 repair tree, the historical
+absence of a formal approval and normal merge topology on #472, and the
+allowlisted queue disposition for #453, #454, and #473. It is not a retroactive
+approval of #472. Only the protected normal merge of this governance PR makes
+the snapshot canonical; an open PR or unsigned REST Contents commit remains
 provisional. Historical handoffs and evidence branches are retained and never
 rewritten to look current.
 
@@ -379,10 +514,11 @@ Evaluation state: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED /
 UNUSED / INVALIDATED / NOT REUSABLE. Tuning against exposed revisions is
 forbidden. Prospective policy is `SEALED_NOT_SECRET_NO_TUNING`; publication alone
 is not tuning. Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION
-AUTHORING REQUIRED. R6A.1 development admission and R6A.2 execution machinery
-are CLOSED / MERGED / FROZEN; no fresh holdout or one-shot was executed. Phase
-5F remains BLOCKED until a separate fresh evaluation authoring and admission gate
-completes.
+AUTHORING REQUIRED. R6A.1 development admission and the R6A.2 technical repair
+are CLOSED / MERGED / INTEGRITY VERIFIED; no fresh holdout or one-shot was
+executed. The next action is `OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION`; fresh
+evaluation authoring remains deferred until that runtime baseline is
+dispositioned. Phase 5F remains BLOCKED.
 
 ### Dense cost and external vector policy
 
@@ -426,7 +562,8 @@ Maximum retry discipline:
 
 ## Current operational state
 
-Current state after the protected governance and HF merges:
+Current state after the protected #472 technical repair and prior governance/HF
+merges:
 
 ```text
 CONTROLLED DEPENDENCY REFRESH: CLOSED / FINAL INTEGRATION VERIFIED
@@ -453,16 +590,21 @@ PHASE 5C (P38-WP01): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #434 CORRECTED B
 P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #437
 PHASE 5D (P38-WP02): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #439 / PR #440 / PR #441 CORRECTED BY PR #442 / PR #443
 P38-WP02-R1 (PHASE 5D CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #443
-PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (historical R1–R5 failures retained; R6A.1 development admission and R6A.2 execution machinery closed/merged/frozen)
+PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair closed/merged/integrity verified)
 P38-WP03-R1: CLOSED / FAILURE EVIDENCE
 P38-WP03-R2 ATTEMPT: CLOSED / FAILED VERIFICATION (PR #449 runtime + PR #450 governance)
 P38-WP03-R3: CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction; PR-R3B governance rebaseline)
 P38-WP03-R4: CLOSED / FAILED VERIFICATION
 P38-WP03-R5: CLOSED / FAILED VERIFICATION (v1.4 holdout exposed; immutable development evidence)
 P38-WP03-R6A.1: CLOSED / MERGED / DEVELOPMENT ADMITTED (review provenance v2, fixture fidelity, fail-closed development admission, metric semantics, FAST contract; no fresh holdout or one-shot)
-P38-WP03-R6A.2: CLOSED / MERGED / FRESH HOLDOUT EXECUTION MACHINERY FROZEN (explicit revision spec, Review-v2 verifier, query-only execution, raw-output/GT separation, atomic one-shot guard; no fresh holdout)
+P38-WP03-R6A.2: CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED (technical repair retained; no fresh holdout)
 PHASE 5F (P38-WP04): BLOCKED (Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind Phase 5E fresh evaluation admission, not historical R4)
 ACTIVE EVALUATION: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; fresh authoring is separate
+PR #453: CLOSED STALE / NOT MERGED
+PR #454: CLOSED STALE / NOT MERGED
+PR #473: CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED
+ISSUE #471: OPEN
+NEXT_ACTION: OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -476,9 +618,59 @@ pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
 (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by
 PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is
 OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED; R6A.1 development admission
-and R6A.2 execution machinery are CLOSED / MERGED / FROZEN. Phase 5F (P38-WP04 / Phase 5F Incremental
+and the R6A.2 technical repair are CLOSED / MERGED / INTEGRITY VERIFIED. Phase 5F (P38-WP04 / Phase 5F Incremental
 Dense Validity / dirty-set behavior) remains BLOCKED. Do not start Phase 5F–9, version bumps, tags, releases, release images, or
 final release notes.
+
+## R6A.2 post-merge governance reconciliation checkpoint
+
+This checkpoint is historical reconciliation, not retroactive approval. The
+technical repair is retained because the source and merged trees are identical;
+the original process deviation remains recorded.
+
+```text
+PR #472 source head: 419ac4962d2b9e2f40095e61def2c242e15f2e83
+PR #472 base: 2cfc9d3cf7264c71dae0b4cd5ed884738a56a1aa
+PR #472 source tree: 24d2a6e507363662d0a047803aa7446309e39d9a
+PR #472 source head parents: [2cfc9d3cf7264c71dae0b4cd5ed884738a56a1aa]
+Actual merged commit: aafafe7453ba1d242cd80003866146a14abe311e
+Actual merged tree: 24d2a6e507363662d0a047803aa7446309e39d9a
+Actual merge parents: [2cfc9d3cf7264c71dae0b4cd5ed884738a56a1aa]
+Source commit in main ancestry: NO
+Source head tree preserved on main: YES
+Merge signature: verified=true / reason=valid
+Formal APPROVED reviews on #472: 0
+Required approvals: at least 1
+Required merge method: protected normal merge commit
+Actual merge topology: squash-style / one parent
+Original #472 admission process: NONCOMPLIANT UNDER POLICY THEN IN FORCE
+Technical repair: MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED
+Security repair: RETAINED
+Process incident: HISTORICAL / RECORDED
+
+Historical freeze sha256: 4dff4b361d98adcd74c1b1de5d78a66fe8936cb6b4809e7cb9cea9602f1b0250
+Correction freeze sha256: 1381b8d38980a21a427a43dd340c0986dfc23835adba252102f4cbc0b6570762
+Correction-freeze referenced artifact digests: 11/11 VERIFIED
+
+PR_CLEANUP_ALLOWLIST: {453, 454, 473}
+Allowlist scope: comment and close only for these exact PRs; no merge, rebase,
+branch edit/deletion, issue closure, review-thread resolution, or policy change.
+PR #453: CLOSED STALE / NOT MERGED / future dedicated dependency-refresh gate
+PR #454: CLOSED STALE / NOT MERGED / future dedicated dependency-refresh gate
+PR #473: CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED
+Issue #471: OPEN
+OpenVINO: PENDING SIGNED UPSTREAM INTEGRATION FROM CURRENT MAIN
+Phase 5E: OPEN / NOT PASSED
+Phase 5F: BLOCKED
+POWER 3.8.0: NO-GO
+NEXT_ACTION: OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION
+```
+
+The only process claim is evidence-supported: the repository contract required
+an approval and normal merge, while #472 has no `APPROVED` review and its merge
+commit has one parent. No claim is made about an admin bypass,
+branch-protection configuration, or human intent. PR #473 review threads were
+not resolved as part of closure.
 
 ## INFRA-1 execution boundary
 
@@ -530,7 +722,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R6A.1 development admission and R6A.2 execution machinery are closed/merged/frozen). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind Phase 5E fresh evaluation admission, not historical R4.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRED (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind Phase 5E fresh evaluation admission, not historical R4.
 
 ## Cross-links
 

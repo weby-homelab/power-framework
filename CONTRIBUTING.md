@@ -58,8 +58,17 @@ and preserve the two core invariants:
 
 - All changes land through PRs (no direct pushes to `main`).
 - All CI checks must pass (tests, lint, types, doc-drift, packaging, strict docs build).
-- At least one review approval required.
-- Governance and architectural gates use protected normal merge (`gh pr merge --merge`); squash merge is reserved for atomic single-commit feature branches.
+- Review policy is mode-aware and defined by `docs/plans/POWER_3.8_DEVELOPMENT_PROTOCOL.md`.
+  In `SOLO_MAINTAINER` mode, a maintainer-authored PR does not require a human GitHub
+  `APPROVED` review and must never self-approve; it must pass the solo-maintainer technical
+  gates, record the maintainer attestation, use an exact-head merge, and pass post-merge
+  verification. External-contributor PRs require human maintainer review. In
+  `MULTI_MAINTAINER` mode, maintainer-authored gates require at least one non-author maintainer
+  GitHub `APPROVED` review, subject to any stronger live GitHub policy.
+- This policy becomes canonical only after PR #475's protected normal merge and applies
+  prospectively. The one-time bootstrap must not claim the legacy approval rule was satisfied.
+- Governance, dependency, architecture, and release gates use a protected normal merge commit;
+  squash merge is reserved for atomic single-commit feature branches.
 
 ## Maintenance and Backport Policy
 
