@@ -35,10 +35,30 @@ def test_openvino_options(monkeypatch, env_var, mode, device_type):
     if device_type is not None:
         monkeypatch.setenv("POWER_EMBED_DEVICE_TYPE", device_type)
     ort = SimpleNamespace(get_available_providers=lambda: [CPU, OPENVINO])
-    assert embeddings.select_onnx_providers(ort, env_var) == [
-        (OPENVINO, {"device_type": device_type or "GPU"}),
-        (CPU, {"arena_extend_strategy": "kSameAsRequested"}),
-    ]
+    expected = [(OPENVINO, {"device_type": device_type or "GPU"})]
+    if mode == "auto":
+        expected.append((CPU, {"arena_extend_strategy": "kSameAsRequested"}))
+    assert embeddings.select_onnx_providers(ort, env_var) == expected
+
+
+@pytest.mark.parametrize(
+    ("mode", "provider"),
+    [
+        ("cuda", "CUDAExecutionProvider"),
+        ("rocm", "ROCMExecutionProvider"),
+        ("openvino", OPENVINO),
+        ("directml", "DmlExecutionProvider"),
+    ],
+)
+def test_explicit_accelerator_mode_omits_cpu_ep(monkeypatch, mode, provider):
+    monkeypatch.setenv("POWER_EMBED_DEVICE", mode)
+    monkeypatch.setenv("POWER_EMBED_DEVICE_ID", "0")
+    ort = SimpleNamespace(get_available_providers=lambda: [CPU, provider])
+
+    providers = embeddings.select_onnx_providers(ort)
+
+    names = [item[0] if isinstance(item, tuple) else item for item in providers]
+    assert names == [provider]
 
 
 def test_reranker_inherits_mode_but_can_override_device_type(monkeypatch):
@@ -95,16 +115,19 @@ def test_openvino_case_insensitive_provider_and_empty_type(monkeypatch):
         ("openvino", OPENVINO, False),
         ("openvino", CPU, False),
         ("openvino", OPENVINO, True),
+        ("cuda", "CUDAExecutionProvider", False),
+        ("rocm", "ROCmExecutionProvider", False),
+        ("directml", "DmlExecutionProvider", False),
         ("auto", OPENVINO, False),
         ("auto", CPU, False),
         ("auto", OPENVINO, True),
         ("cpu", CPU, False),
     ],
 )
-def test_managers_create_and_verify_openvino_session(
+def test_managers_create_and_verify_accelerator_session(
     monkeypatch, kind, mode, bound, runtime_failure
 ):
-    """Exercise real lazy-init, inference, options and cleanup with runtime doubles."""
+    """Exercise lazy-init, inference, options and cleanup with runtime doubles."""
     import numpy as np
 
     module = embeddings if kind == "embedding" else reranker
@@ -121,6 +144,32 @@ def test_managers_create_and_verify_openvino_session(
     monkeypatch.setenv("POWER_RERANKER_DEVICE", mode)
     monkeypatch.setenv("POWER_EMBED_NUM_THREADS", "1")
     calls = []
+    providers_by_mode = {
+        "openvino": OPENVINO,
+        "cuda": "CUDAExecutionProvider",
+        "rocm": "ROCmExecutionProvider",
+        "directml": "DmlExecutionProvider",
+        "auto": OPENVINO,
+        "cpu": CPU,
+    }
+    options_by_mode = {
+        "openvino": {"device_type": "GPU"},
+        "cuda": {"device_id": 0, "arena_extend_strategy": "kSameAsRequested"},
+        "rocm": {"device_id": 0, "arena_extend_strategy": "kSameAsRequested"},
+        "directml": {},
+        "auto": {"device_type": "GPU"},
+        "cpu": {"arena_extend_strategy": "kSameAsRequested"},
+    }
+
+    class SessionOptions:
+        def __init__(self):
+            self.enable_cpu_mem_arena = True
+            self.intra_op_num_threads = 0
+            self.inter_op_num_threads = 0
+            self.config_entries = {}
+
+        def add_session_config_entry(self, key, value):
+            self.config_entries[key] = value
 
     class Session:
         def __init__(self, path, *, providers, sess_options):
@@ -130,13 +179,22 @@ def test_managers_create_and_verify_openvino_session(
             if mode == "cpu":
                 assert providers == [(CPU, {"arena_extend_strategy": "kSameAsRequested"})]
             else:
-                assert providers[0] == (OPENVINO, {"device_type": "GPU"})
+                expected_providers = [
+                    (providers_by_mode[mode], options_by_mode[mode]),
+                ]
+                if mode == "auto":
+                    expected_providers.append((CPU, {"arena_extend_strategy": "kSameAsRequested"}))
+                assert providers == expected_providers
             assert sess_options.enable_cpu_mem_arena is False
             assert sess_options.intra_op_num_threads >= 1
             assert sess_options.inter_op_num_threads == 1
+            config_value = sess_options.config_entries.get("session.disable_cpu_ep_fallback")
+            assert config_value == (
+                "1" if mode in {"openvino", "cuda", "rocm", "directml"} else None
+            )
 
         def get_providers(self):
-            return [self.bound, CPU] if self.bound == OPENVINO else [CPU]
+            return [self.bound, CPU] if self.bound != CPU else [CPU]
 
         def disable_fallback(self):
             self.fallback_enabled = False
@@ -175,9 +233,9 @@ def test_managers_create_and_verify_openvino_session(
         sys.modules,
         "onnxruntime",
         SimpleNamespace(
-            SessionOptions=SimpleNamespace,
+            SessionOptions=SessionOptions,
             InferenceSession=Session,
-            get_available_providers=lambda: [CPU, OPENVINO],
+            get_available_providers=lambda: [CPU, providers_by_mode[mode]],
         ),
     )
     monkeypatch.setitem(sys.modules, "tokenizers", SimpleNamespace(Tokenizer=Tokenizer))

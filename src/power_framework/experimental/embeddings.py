@@ -262,13 +262,18 @@ def _onnx_provider_options(provider_name: str, env_var: str) -> dict[str, object
     return {}
 
 
+def _configure_provider_fallback(session_options: Any, env_var: str) -> None:
+    """Keep explicit accelerator sessions from assigning unsupported nodes to CPU EP."""
+    if requested_device(env_var) not in {"auto", "cpu"}:
+        session_options.add_session_config_entry("session.disable_cpu_ep_fallback", "1")
+
+
 def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list[object]:
     """Select ONNX Runtime providers with explicit and automatic device modes.
 
     ``auto`` prefers GPU-capable providers reported by the installed ORT build
     and always retains CPU as a deterministic fallback. An explicit device is
-    fail-closed when unavailable, preventing a requested GPU benchmark from
-    silently running on a different backend.
+    fail-closed when unavailable and does not include CPU as a graph fallback.
     """
     _preload_gpu_runtime(ort)
     available = set(ort.get_available_providers())
@@ -297,7 +302,7 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
                 f"available={sorted(available)}"
             )
         options = _onnx_provider_options(provider_name, env_var)
-        return [(provider_name, options), cpu_provider]
+        return [(provider_name, options)]
 
     for candidate in (
         "CUDAExecutionProvider",
@@ -803,6 +808,7 @@ class BGEM3OnnxManager:
             so.intra_op_num_threads = max(1, min(EMBED_NUM_THREADS, get_cpu_worker_limit()))
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort)
+            _configure_provider_fallback(so, "POWER_EMBED_DEVICE")
             session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
             active_provider = verify_bound_provider(session, providers, "POWER_EMBED_DEVICE")
             self._session = session

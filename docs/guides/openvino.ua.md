@@ -44,15 +44,21 @@ python -c "import onnxruntime as ort; print(ort.get_available_providers())"
 `arena_extend_strategy` цьому EP не передаються.
 
 Явний `openvino` завершується `requested_onnx_provider_unavailable`, коли EP
-відсутній, або `requested_onnx_provider_not_bound`, коли сесія завантажила інший
-EP. Лише `auto` дозволяє такий fallback. `device_type=CPU` свідомо використовує
-CPU через OpenVINO. Прив'язка EP не гарантує, що всі вузли графа виконуються на
-GPU: непідтримувані вузли можуть виконуватись через CPU EP.
+відсутній, або `requested_onnx_provider_not_bound`, коли прив'язався інший EP.
+POWER прибирає `CPUExecutionProvider` і задає
+`session.disable_cpu_ep_fallback=1`; якщо OpenVINO не може обробити всі вузли
+графа, ONNX Runtime завершує створення сесії помилкою замість CPU EP. `auto`
+зберігає цей fallback. `device_type=CPU` свідомо спрямовує обчислення на CPU
+через OpenVINO EP, а не через `CPUExecutionProvider`. Внутрішні політики
+OpenVINO також залежать від `device_type`: `CPU` використовує його CPU-плагін,
+а `AUTO`, `HETERO` та `MULTI` можуть планувати роботу на CPU. Для GPU задайте
+`GPU` або `GPU.<індекс>`; сама прив'язка OpenVINO EP не доводить, що всі вузли
+виконались на GPU. Наведене налаштування керує лише CPU EP ONNX Runtime.
 
-У явних режимах POWER вимикає повторний запуск сесії на іншому EP після помилки
-inference. Для `auto` цей fallback збережено. `active_provider` після успішного
-inference відображає поточну прив'язку, зокрема перехід на CPU. Виконання окремих
-непідтримуваних GPU-операторів через CPU EP залишається доступним.
+У явних режимах POWER також вимикає повторний запуск на іншому EP після помилки
+inference; у `auto` він збережений. Після успішного inference `active_provider`
+показує поточну прив'язку, зокрема CPU fallback у `auto`. Помилки явного режиму
+повертаються виклику без тихого переходу на `CPUExecutionProvider`.
 
 Перевіряйте `platform.platform()`, `platform.machine()`, `onnxruntime.__version__`
 та `onnxruntime.get_available_providers()` саме в робочому Python-середовищі.
@@ -77,8 +83,8 @@ power doctor /path/to/vault --probe-provider --json
 
 [Виконуваний Python smoke-тест](openvino.md#cache-only-acceptance) перевіряє
 1024-вимірний скінченний вектор, скінченний reranker score та прив'язку обох EP.
-Він також перевіряє на реальному обладнанні чинні SessionOptions:
-`enable_cpu_mem_arena=False`, обмежені `intra_op_num_threads`, `inter_op_num_threads=1`.
+Він не читає значення SessionOptions; їх конфігурацію перевіряють offline unit
+тести. Цей smoke-тест не доводить продуктивність обладнання.
 
 Повний sync потребує окремого погодження оператора. Для issue #471 на незмінному
 знімку vault потрібно виміряти час <8.5 год, RAM <7000 MB, swap, кількість

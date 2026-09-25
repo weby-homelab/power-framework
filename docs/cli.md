@@ -152,9 +152,11 @@ FTS sync. `reranked` is explicit opt-in, not the default.
 
 ONNX-backed embedding and reranking honor `POWER_EMBED_DEVICE` and
 `POWER_RERANKER_DEVICE` (`auto`, `cpu`, `cuda`, `rocm`, `openvino`, or `directml`). `auto`
-may fall back to CPU; an explicit accelerator mode fails closed if the created
-session does not bind the requested provider. The actual bound provider is
-logged during initialization.
+may fall back to CPU. An explicit accelerator mode fails closed if its provider
+is unavailable, the created session binds another provider, or the provider
+cannot support the whole graph. It excludes `CPUExecutionProvider` and disables
+ORT's graph-level and run-time CPU fallback. The actual bound provider is logged
+during initialization.
 
 `auto` prefers CUDA, ROCm, OpenVINO, then DirectML. OpenVINO uses
 `POWER_EMBED_DEVICE_TYPE` (default `GPU`; for example `GPU.0` or `CPU`), not

@@ -41,15 +41,23 @@ Empty device types fail validation. Other target strings are passed to OpenVINO
 for validation. `POWER_EMBED_DEVICE_ID` does not affect OpenVINO.
 `auto` selects CUDA → ROCm → OpenVINO → DirectML → CPU and permits fallback.
 Explicit `openvino` fails with `requested_onnx_provider_unavailable` when the EP
-is absent, or `requested_onnx_provider_not_bound` if session creation falls back
-to another EP. `device_type=CPU` still binds the OpenVINO EP intentionally.
-Provider binding proves which EP loaded; it does not prove every graph node ran
-on the GPU, since unsupported nodes may execute through the CPU fallback EP.
+is absent, or `requested_onnx_provider_not_bound` if a different EP binds.
+POWER excludes `CPUExecutionProvider` and sets
+`session.disable_cpu_ep_fallback=1`; if OpenVINO cannot claim every graph node,
+ONNX Runtime fails session creation instead of assigning unsupported nodes to
+its CPU EP. `auto` retains that graph-level CPU fallback. `device_type=CPU`
+intentionally targets the OpenVINO EP, not `CPUExecutionProvider`. OpenVINO's
+own device policies remain controlled by `device_type`: `CPU` targets its CPU
+plugin, while `AUTO`, `HETERO`, and `MULTI` can schedule work on CPU. For a GPU
+target, request `GPU` or `GPU.<index>`; binding the OpenVINO EP alone does not
+prove every graph node ran on the GPU. The setting above controls ONNX Runtime's
+CPU EP only.
 
-For explicit modes POWER disables ORT's session-level retry on inference failure;
-`auto` keeps that retry enabled. After successful inference `active_provider`
-reflects the current session binding, including a CPU fallback during inference.
-This does not disable per-node CPU execution for unsupported accelerator operators.
+For explicit modes POWER also disables ORT's run-time retry on inference
+failure; `auto` keeps that retry enabled. After successful inference
+`active_provider` reflects the current session binding, including a CPU
+fallback in `auto`. Explicit accelerator errors propagate instead of silently
+switching to `CPUExecutionProvider`.
 
 Detect support in the actual Python environment, not from the CPU brand or OS
 alone: inspect `platform.platform()`, `platform.machine()`, `onnxruntime.__version__`
@@ -89,6 +97,9 @@ assert len(scores) == 1 and all(math.isfinite(x) for x in scores)
 print(embedder.active_provider, len(vector), reranker.active_provider, scores)
 PY
 ```
+
+The smoke checks verify provider binding and finite outputs. They do not inspect
+the `SessionOptions` values; the offline unit tests cover that option wiring.
 
 Doctor needs `--probe-provider`: discovery alone does not bind a model session.
 Check `embedding.bound_provider` in its JSON. A missing cached model is a separate

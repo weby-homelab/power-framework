@@ -28,9 +28,12 @@ when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, `openvino`
 `directml`.
 
 - `auto` may bind `CPUExecutionProvider`, but logs the provider actually bound
-  by the created `InferenceSession`.
-- An explicit GPU device fails closed when the session binds CPU or a different
-  provider. It never silently turns a requested GPU run into a CPU benchmark.
+  by the created `InferenceSession`; ORT's graph-level and run-time CPU fallback
+  remain available in this mode.
+- Explicit accelerator modes fail closed when the requested provider is
+  unavailable or the session binds another provider. They omit
+  `CPUExecutionProvider` and disable ORT's graph-level CPU EP fallback, so a
+  graph the selected provider cannot fully support fails during session creation.
 - Before provider probing, POWER calls the optional
   `onnxruntime.preload_dlls()` hook used by pip-installed CUDA/cuDNN wheels.
 - Provider names are resolved case-insensitively because ONNX Runtime builds

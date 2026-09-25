@@ -82,6 +82,23 @@ class TestEmbeddingManager:
         assert providers[0][0] == "CUDAExecutionProvider"
         assert providers[-1][0] == "CPUExecutionProvider"
 
+    def test_openvino_is_explicit_and_auto_keeps_cpu_fallback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class FakeOrt:
+            @staticmethod
+            def get_available_providers():
+                return ["CPUExecutionProvider", "OpenVINOExecutionProvider"]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "openvino")
+        explicit = embeddings.select_onnx_providers(FakeOrt())
+        assert explicit == [("OpenVINOExecutionProvider", {"device_type": "GPU"})]
+
+        monkeypatch.setenv("POWER_EMBED_DEVICE", "auto")
+        automatic = embeddings.select_onnx_providers(FakeOrt())
+        assert automatic[0] == ("OpenVINOExecutionProvider", {"device_type": "GPU"})
+        assert automatic[-1][0] == "CPUExecutionProvider"
+
     def test_explicit_unavailable_device_fails_closed(self, monkeypatch: pytest.MonkeyPatch):
         class FakeOrt:
             @staticmethod
@@ -129,6 +146,7 @@ class TestEmbeddingManager:
         monkeypatch.setenv("POWER_EMBED_DEVICE", "rocm")
         providers = embeddings.select_onnx_providers(FakeOrt())
         assert providers[0][0] == "ROCmExecutionProvider"
+        assert len(providers) == 1
         assert providers[0][1]["device_id"] == 0
 
     def test_directml_provider_can_be_selected_and_verified(self, monkeypatch: pytest.MonkeyPatch):
@@ -140,6 +158,7 @@ class TestEmbeddingManager:
         monkeypatch.setenv("POWER_EMBED_DEVICE", "directml")
         providers = embeddings.select_onnx_providers(FakeOrt())
         assert providers[0][0] == "DmlExecutionProvider"
+        assert len(providers) == 1
         assert (
             embeddings.verify_bound_provider(
                 self._fake_session(["DmlExecutionProvider", "CPUExecutionProvider"]),
@@ -576,7 +595,7 @@ class TestEmbeddingManager:
 
     def test_explicit_gpu_empty_binding_fails_closed(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("POWER_EMBED_DEVICE", "cuda")
-        providers: list[object] = [("CUDAExecutionProvider", {}), ("CPUExecutionProvider", {})]
+        providers: list[object] = [("CUDAExecutionProvider", {})]
         with pytest.raises(RuntimeError, match="requested_onnx_provider_not_bound"):
             embeddings.verify_bound_provider(
                 self._fake_session([]), providers, "POWER_EMBED_DEVICE"
@@ -601,7 +620,8 @@ class TestEmbeddingManager:
         monkeypatch.delenv("HF_ENDPOINT", raising=False)
 
         class FakeOptions:
-            pass
+            def add_session_config_entry(self, key: str, value: str) -> None:
+                self.config_entry = (key, value)
 
         class FakeSession:
             def __init__(self, *args: object, **kwargs: object):
