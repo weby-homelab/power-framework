@@ -17,7 +17,11 @@ from power_framework.core.model_policy import (
     prepare_external_model,
 )
 from power_framework.core.utils import get_cpu_worker_limit
-from power_framework.experimental.embeddings import select_onnx_providers, verify_bound_provider
+from power_framework.experimental.embeddings import (
+    _configure_provider_fallback,
+    select_onnx_providers,
+    verify_bound_provider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -273,6 +277,7 @@ class BGEM3Reranker:
             )
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort, env_var="POWER_RERANKER_DEVICE")
+            _configure_provider_fallback(so, "POWER_RERANKER_DEVICE")
             session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
             active_provider = verify_bound_provider(session, providers, "POWER_RERANKER_DEVICE")
             self._session = session
@@ -340,6 +345,8 @@ class BGEM3Reranker:
             input_feed["token_type_ids"] = token_type_ids
 
         logits = self._session.run(None, input_feed)[0]
+        bound = list(self._session.get_providers())
+        self.active_provider = bound[0] if bound else "unknown"
         scores: list[float] = []
         for i in range(len(documents)):
             val = logits[i]

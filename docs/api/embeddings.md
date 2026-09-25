@@ -24,13 +24,18 @@ get_embedding_manager(provider: str | None = None) -> (
 
 The canonical ONNX managers select the device from `POWER_EMBED_DEVICE`; the
 reranker uses `POWER_RERANKER_DEVICE` and falls back to the embedding setting
-when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, and
+when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, `openvino`, and
 `directml`.
 
 - `auto` may bind `CPUExecutionProvider`, but logs the provider actually bound
-  by the created `InferenceSession`.
-- An explicit GPU device fails closed when the session binds CPU or a different
-  provider. It never silently turns a requested GPU run into a CPU benchmark.
+  by the created `InferenceSession`; ORT's graph-level and run-time CPU fallback
+  remain available in this mode.
+- Explicit accelerator modes fail closed when the requested provider is
+  unavailable or the session binds another provider. They omit
+  `CPUExecutionProvider` and set `session.disable_cpu_ep_fallback=1`, so a graph
+  the selected provider cannot fully support fails during session creation. If
+  the session exposes a callable `disable_fallback()` hook, POWER calls it to
+  disable ORT's run-time provider retry for that session.
 - Before provider probing, POWER calls the optional
   `onnxruntime.preload_dlls()` hook used by pip-installed CUDA/cuDNN wheels.
 - Provider names are resolved case-insensitively because ONNX Runtime builds
@@ -38,6 +43,11 @@ when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, and
 - `BGEM3OnnxManager.active_provider` and `BGEM3Reranker.active_provider` hold
   the verified provider after successful session creation; a failed check does
   not retain the invalid session.
+- OpenVINO receives only `device_type`: `POWER_EMBED_DEVICE_TYPE` defaults to
+  `GPU`; `POWER_RERANKER_DEVICE_TYPE` overrides it for the reranker. Neither
+  `device_id` nor `arena_extend_strategy` is passed to OpenVINO. CPU fallback
+  retains its existing arena option. Auto priority is CUDA, ROCm, OpenVINO,
+  DirectML, then CPU. See the [OpenVINO guide](../guides/openvino.md).
 
 ### Model acquisition security contract
 

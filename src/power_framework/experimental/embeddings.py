@@ -231,7 +231,41 @@ def verify_bound_provider(session: Any, providers: list[object], env_var: str) -
             f"requested_onnx_provider_not_bound:{expected}; session bound {bound}. "
             f"The requested provider may be compiled in but unavailable at runtime. {fallback_hint}"
         )
+    # ORT can also replace the EP on a later session.run() failure. Explicit
+    # selection is an assertion for the lifetime of this session, not only init.
+    disable_fallback = getattr(session, "disable_fallback", None)
+    if callable(disable_fallback):
+        disable_fallback()
     return actual
+
+
+def _onnx_provider_options(provider_name: str, env_var: str) -> dict[str, object]:
+    """Keep provider-specific options identical in explicit and auto modes."""
+    if provider_name.casefold() == "openvinoexecutionprovider":
+        device_type = (
+            os.getenv("POWER_RERANKER_DEVICE_TYPE")
+            if env_var == "POWER_RERANKER_DEVICE"
+            else os.getenv("POWER_EMBED_DEVICE_TYPE")
+        )
+        if device_type is None:
+            device_type = os.getenv("POWER_EMBED_DEVICE_TYPE", "GPU")
+        device_type = device_type.strip()
+        if not device_type:
+            raise ValueError(f"invalid_{env_var.lower()}_type:empty")
+        # OpenVINO uses device_type, not CUDA/ROCm device_id or arena options.
+        return {"device_type": device_type}
+    if provider_name.casefold() in _DEVICE_ID_PROVIDERS:
+        return {
+            "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
+            "arena_extend_strategy": "kSameAsRequested",
+        }
+    return {}
+
+
+def _configure_provider_fallback(session_options: Any, env_var: str) -> None:
+    """Keep explicit accelerator sessions from assigning unsupported nodes to CPU EP."""
+    if requested_device(env_var) not in {"auto", "cpu"}:
+        session_options.add_session_config_entry("session.disable_cpu_ep_fallback", "1")
 
 
 def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list[object]:
@@ -239,13 +273,12 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
 
     ``auto`` prefers GPU-capable providers reported by the installed ORT build
     and always retains CPU as a deterministic fallback. An explicit device is
-    fail-closed when unavailable, preventing a requested GPU benchmark from
-    silently running on a different backend.
+    fail-closed when unavailable and does not include CPU as a graph fallback.
     """
     _preload_gpu_runtime(ort)
     available = set(ort.get_available_providers())
     requested = requested_device(env_var)
-    if requested not in {"auto", "cpu", "cuda", "rocm", "directml"}:
+    if requested not in {"auto", "cpu", "cuda", "rocm", "openvino", "directml"}:
         raise ValueError(f"invalid_{env_var.lower()}:{requested}")
 
     cpu_provider: tuple[str, dict[str, object]] = (
@@ -258,6 +291,7 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
     gpu_candidates = {
         "cuda": "CUDAExecutionProvider",
         "rocm": "ROCMExecutionProvider",
+        "openvino": "OpenVINOExecutionProvider",
         "directml": "DmlExecutionProvider",
     }
     if requested != "auto":
@@ -267,29 +301,18 @@ def select_onnx_providers(ort: Any, env_var: str = "POWER_EMBED_DEVICE") -> list
                 f"requested_onnx_provider_unavailable:{gpu_candidates[requested]}; "
                 f"available={sorted(available)}"
             )
-        options: dict[str, object] = {}
-        if provider_name.casefold() in _DEVICE_ID_PROVIDERS:
-            options = {
-                "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
-                "arena_extend_strategy": "kSameAsRequested",
-            }
-        return [(provider_name, options), cpu_provider]
+        options = _onnx_provider_options(provider_name, env_var)
+        return [(provider_name, options)]
 
     for candidate in (
         "CUDAExecutionProvider",
         "ROCMExecutionProvider",
+        "OpenVINOExecutionProvider",
         "DmlExecutionProvider",
     ):
         provider_name = _resolve_provider_name(candidate, available)
         if provider_name is not None:
-            options = (
-                {
-                    "device_id": int(os.getenv("POWER_EMBED_DEVICE_ID", "0")),
-                    "arena_extend_strategy": "kSameAsRequested",
-                }
-                if provider_name.casefold() in _DEVICE_ID_PROVIDERS
-                else {}
-            )
+            options = _onnx_provider_options(provider_name, env_var)
             logger.info("ONNX Runtime device=auto selected %s", provider_name)
             return [(provider_name, options), cpu_provider]
 
@@ -785,6 +808,7 @@ class BGEM3OnnxManager:
             so.intra_op_num_threads = max(1, min(EMBED_NUM_THREADS, get_cpu_worker_limit()))
             so.inter_op_num_threads = 1
             providers = select_onnx_providers(ort)
+            _configure_provider_fallback(so, "POWER_EMBED_DEVICE")
             session = ort.InferenceSession(model_path, providers=providers, sess_options=so)
             active_provider = verify_bound_provider(session, providers, "POWER_EMBED_DEVICE")
             self._session = session
@@ -814,6 +838,8 @@ class BGEM3OnnxManager:
         ids = np.array([e.ids for e in encs], dtype=np.int64)
         mask = np.array([e.attention_mask for e in encs], dtype=np.int64)
         out = self._session.run(["dense_vecs"], {"input_ids": ids, "attention_mask": mask})[0]
+        bound = list(self._session.get_providers())
+        self.active_provider = bound[0] if bound else "unknown"
         arr = np.asarray(out, dtype=np.float32)
         # BGE-M3 dense_vecs are already L2-normalized by the exported graph, but
         # normalize defensively so cosine == dot downstream.
