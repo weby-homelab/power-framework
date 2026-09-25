@@ -32,8 +32,10 @@ when it is unset. Supported values are `auto`, `cpu`, `cuda`, `rocm`, `openvino`
   remain available in this mode.
 - Explicit accelerator modes fail closed when the requested provider is
   unavailable or the session binds another provider. They omit
-  `CPUExecutionProvider` and disable ORT's graph-level CPU EP fallback, so a
-  graph the selected provider cannot fully support fails during session creation.
+  `CPUExecutionProvider` and set `session.disable_cpu_ep_fallback=1`, so a graph
+  the selected provider cannot fully support fails during session creation. If
+  the session exposes a callable `disable_fallback()` hook, POWER calls it to
+  disable ORT's run-time provider retry for that session.
 - Before provider probing, POWER calls the optional
   `onnxruntime.preload_dlls()` hook used by pip-installed CUDA/cuDNN wheels.
 - Provider names are resolved case-insensitively because ONNX Runtime builds

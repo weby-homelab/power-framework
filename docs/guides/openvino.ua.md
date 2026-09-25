@@ -55,10 +55,14 @@ OpenVINO також залежать від `device_type`: `CPU` викорис�
 `GPU` або `GPU.<індекс>`; сама прив'язка OpenVINO EP не доводить, що всі вузли
 виконались на GPU. Наведене налаштування керує лише CPU EP ONNX Runtime.
 
-У явних режимах POWER також вимикає повторний запуск на іншому EP після помилки
-inference; у `auto` він збережений. Після успішного inference `active_provider`
-показує поточну прив'язку, зокрема CPU fallback у `auto`. Помилки явного режиму
-повертаються виклику без тихого переходу на `CPUExecutionProvider`.
+У явних режимах POWER викликає необов'язковий hook
+`session.disable_fallback()`, якщо він доступний і є callable; тоді runtime
+повторне перенаправлення на інший EP після помилки inference вимикається. Якщо
+hook недоступний, POWER не може вимкнути цей повторний запуск. У `auto` hook не
+викликається, а runtime retry залишається доступним. Після успішного inference
+`active_provider` показує поточну прив'язку, зокрема CPU fallback у `auto`.
+Помилки явного режиму повертаються виклику без тихого переходу на
+`CPUExecutionProvider`.
 
 Перевіряйте `platform.platform()`, `platform.machine()`, `onnxruntime.__version__`
 та `onnxruntime.get_available_providers()` саме в робочому Python-середовищі.

@@ -53,8 +53,10 @@ target, request `GPU` or `GPU.<index>`; binding the OpenVINO EP alone does not
 prove every graph node ran on the GPU. The setting above controls ONNX Runtime's
 CPU EP only.
 
-For explicit modes POWER also disables ORT's run-time retry on inference
-failure; `auto` keeps that retry enabled. After successful inference
+For explicit modes, POWER calls ORT's optional `session.disable_fallback()`
+hook when it is callable to disable run-time provider retry after inference
+failure. If that hook is unavailable, POWER cannot disable that retry. `auto`
+does not call the hook and keeps run-time retry available. After successful inference
 `active_provider` reflects the current session binding, including a CPU
 fallback in `auto`. Explicit accelerator errors propagate instead of silently
 switching to `CPUExecutionProvider`.
