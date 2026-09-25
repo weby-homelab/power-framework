@@ -514,11 +514,12 @@ retention decision. It preserves historical truth; it does not retroactively
 approve PR #472 or rewrite its admission history.
 
 The separate PR #475 policy change is a one-time owner/operator-authorized
-bootstrap. At its start, the legacy rule required at least one review approval;
-the PR author was the sole maintainer, no reviewer was requested, and a request
-to `Turdus-M` returned HTTP 422 because that account was not a repository
-collaborator. No eligible independent collaborator was identified through that
-reviewer path. This records a policy/topology mismatch, not an approval. The
+bootstrap. At its start, the legacy rule required at least one review approval.
+The PR author was the sole maintainer, and no reviewer was successfully added.
+The PR description records a request to `Turdus-M` that GitHub rejected with
+HTTP 422 because that account was not a repository collaborator. No eligible
+independent collaborator was identified through that reviewer path. This
+records a policy/topology mismatch, not an approval. The
 bootstrap does not claim the old rule was satisfied, does not grant #475 a human
 approval, and does not retroactively change #472. The proposed
 `SOLO_MAINTAINER` policy remains provisional until #475 receives its protected
