@@ -16,6 +16,7 @@ REST verification:
 - [POWER 3.8 — Development Protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [POWER 3.8 — Context / Memory / Retrieval Architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
+- [OpenVINO #478 post-merge reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-27T230732Z_openvino-471-post-merge-reconciliation_candidate-ready.md) — current software-integration closure and hardware-acceptance next gate.
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Phase 5B domain-policy/router report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
@@ -48,8 +49,9 @@ REST verification:
 > P38-WP01-R1 is **CLOSED / MERGED / VERIFIED**.
 > Phase 5D (P38-WP02) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443)**.
 > P38-WP02-R1 is **CLOSED / MERGED / VERIFIED**.
-> Phase 5E (P38-WP03) is **OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R3 restores baseline only; P38-WP03-R4 NOT STARTED)**.
-> P38-WP03-R4 is **NOT STARTED (SEPARATE ADMISSION)**; Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is **BLOCKED** behind R4.
+> Phase 5E (P38-WP03) is **OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED** (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R4/R5 historical failed evidence; R6A.1/R6A.2 closed without fresh holdout execution).
+> OpenVINO software integration is **CLOSED / MERGED / VERIFIED through PR #478**. Issue #471 remains **OPEN** because target-hardware acceptance is not verified; the next gate is **OPENVINO_471_HARDWARE_ACCEPTANCE**. PR #473 remains **CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED**.
+> Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is **BLOCKED** behind hardware acceptance and the separately admitted fresh evaluation sequence.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
@@ -63,7 +65,7 @@ To recover the current POWER 3.8 state:
 3. Read `POWER_3.8_DEVELOPMENT_PROTOCOL.md`.
 4. Read `POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md` and the planning-artifacts
    README.
-5. Read the latest append-only INFRA-1 handoff; classify the Phase 5B and HF
+5. Read the latest append-only handoff; classify prior phase and HF
    handoffs as historical evidence.
 6. Fetch current GitHub `main`, the closed gate dispositions, required checks,
    reviews, rulesets, and protected-branch policy independently through the
@@ -72,9 +74,11 @@ To recover the current POWER 3.8 state:
    exact head, required checks, reviews, and protected-branch policy, before
    acting or attempting a new gate action.
 8. Treat this snapshot as repository governance memory and live GitHub as
-   mutable operational truth. Phase 5E is OPEN / NOT PASSED; the next
-   authorized gate is P38-WP03-R4 Fresh Evaluation Re-admission (NOT STARTED);
-   Phase 5F stays BLOCKED behind R4.
+   mutable operational truth. Software integration through PR #478 is
+   CLOSED / MERGED / VERIFIED; Issue #471 is OPEN with hardware acceptance
+   NOT VERIFIED; the next authorized gate is
+   OPENVINO_471_HARDWARE_ACCEPTANCE. Phase 5E is OPEN / NOT PASSED,
+   fresh evaluation authoring remains deferred, and Phase 5F stays BLOCKED.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -105,7 +109,7 @@ phase report, release artifact, or authorization to start Phase 5F.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | P38-WP03-R4 Fresh Evaluation Re-admission (SEPARATE ADMISSION / NOT STARTED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) BLOCKED behind R4 |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | OPENVINO_471_HARDWARE_ACCEPTANCE (Issue #471; hardware acceptance NOT VERIFIED); fresh evaluation authoring remains deferred until the runtime baseline is dispositioned; Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED |
 
 ## HISTORICAL PLAN
 
@@ -140,8 +144,8 @@ pushdown is `CLOSED / MERGED / VERIFIED` through PR #434 and PR #437,
 and Phase 5D (RetrievalPlanner + ContextPack) is `CLOSED / MERGED / VERIFIED`
 through PR #439, PR #440, and PR #441 (corrected by PR #442 and PR #443).
 P38-WP02-R1 is `CLOSED / MERGED / VERIFIED`. Phase 5E (Shadow Benchmark) is
-`OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED` through PR #445 and PR #446 as historical evidence only (P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451). P38-WP03-R4 is `NOT STARTED`. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is
-`BLOCKED` behind P38-WP03-R4.
+`OPEN / NOT PASSED / FRESH RE-EVALUATION REQUIRED` through PR #445 and PR #446 as historical evidence only (P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R4/R5 historical failed evidence; R6A.1/R6A.2 closed without fresh holdout execution). P38-WP03-R4 is `HISTORICAL / CLOSED / FAILED VERIFICATION`. OpenVINO software integration is `CLOSED / MERGED / VERIFIED / PR #478`; hardware acceptance for Issue #471 is `OPEN / NOT VERIFIED`. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is
+`BLOCKED` behind the hardware-acceptance and fresh-evaluation sequence.
 
 ## ARCHITECTURAL DECISION
 
