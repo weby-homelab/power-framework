@@ -186,8 +186,11 @@ override or replace the three explicit namespaces above.
 `PLANNED != IMPLEMENTED`: a merged architecture document is canonical planning,
 not runtime completion. This canonical projection records the closed Controlled
 Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B/5C/5D
-gates, the OPEN Phase 5E (FRESH RE-EVALUATION REQUIRED after P38-WP03-R3), the NOT STARTED P38-WP03-R4,
-the BLOCKED Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior),
+gates, the CLOSED / MERGED / VERIFIED OpenVINO software integration through PR
+#478, the OPEN / NOT VERIFIED OpenVINO hardware acceptance for Issue #471, the
+OPEN Phase 5E (fresh evaluation authoring deferred until hardware acceptance),
+the HISTORICAL / CLOSED / FAILED VERIFICATION P38-WP03-R4, the BLOCKED Phase 5F
+(P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior),
 and the merged INFRA-1 broker. It does not authorize Actions #396,
 Phase 5F, any later phase, version bump, tag, release, or `POWER 3.8.0`
 publication.
