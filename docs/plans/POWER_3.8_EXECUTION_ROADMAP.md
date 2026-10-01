@@ -170,7 +170,7 @@ NO-GO
 | PR #454 | CLOSED STALE / NOT MERGED | Future dedicated dependency-refresh gate if still needed |
 | PR #473 | CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED | OpenVINO provenance retained; no feature rejection |
 | Issue #471 | OPEN pending governance reconciliation | Authorized current-snapshot hardware acceptance passes; signed governance PR and post-merge issue closure remain pending |
-| OpenVINO hardware acceptance | CLOSED / ACCEPTED FOR CURRENT SNAPSHOT | S-Book Intel Iris Xe; full GPU sync 791/791, 100% FTS/dense coverage; historical 3,624-note data remains unrecovered and incomparable |
+| OpenVINO hardware acceptance | CLOSED / ACCEPTED FOR CURRENT SNAPSHOT | S-Book Intel Iris Xe; 791/791 sources, 5,876 chunks, 100% FTS/dense coverage; historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable |
 | Phase 5F (P38-WP04) | BLOCKED | Phase 5E remains open/not passed; fresh evaluation authoring and separate admission are required before Phase 5F |
 | Phase 5G–5H (P38-WP05–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5E → fresh authoring/admission → 5F → 5G → 5H) |
 | Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
@@ -383,7 +383,7 @@ P38-WP03-R6A.1 — Evaluation Admission Integrity Repair (CLOSED / MERGED / DEVE
 P38-WP03-R6A.2 — Final Holdout-Execution Admission Repair (CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED; no fresh holdout)
 OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION — CLOSED / MERGED / VERIFIED / PR #478 (historical integration vehicle #473 remains not merged)
 PR #481 security dependency remediation — CLOSED / MERGED / VERIFIED / security check PASS
-OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE — CLOSED / PASS FOR THE OPERATOR-AUTHORIZED CURRENT SNAPSHOT (historical 3,624-note dataset remains unrecovered and incomparable)
+OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE — CLOSED / PASS FOR THE OPERATOR-AUTHORIZED CURRENT SNAPSHOT (historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable)
 Issue #471 governance reconciliation — PENDING SIGNED PR AND POST-MERGE READBACK / ISSUE CLOSURE
 Fresh Phase 5E evaluation authoring — NEXT SEPARATE INVOCATION (Phase 5E remains OPEN / NOT PASSED; v1.5 exposed/unused/invalidated/not reusable; `SEALED_NOT_SECRET_NO_TUNING`; no fresh evaluation or one-shot was started here)
 5F — Phase 5F Incremental Dense Validity / dirty-set behavior (BLOCKED until the separate Phase 5E evaluation authoring/admission/execution is complete)

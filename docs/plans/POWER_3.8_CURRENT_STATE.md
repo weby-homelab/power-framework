@@ -84,7 +84,7 @@ LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE: PASS for the explicitly authorized frozen current KB snapshot; historical 3,624-note data remains unrecovered and incomparable; PR #481 security dependency remediation is merged and verified; signed governance PR and issue close are pending post-merge readback
+OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE: PASS for the explicitly authorized frozen current KB snapshot; historical 3,624-note / 19,954-chunk / 23,578-vector workload is unrecovered, NOT_REPRODUCED, and not directly comparable; PR #481 security dependency remediation is merged and verified; signed governance PR and issue close are pending post-merge readback
 
 NEXT_GATE:
 PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation after governance reconciliation; Phase 5E remains OPEN / NOT PASSED and no fresh evaluation is authorized in this handoff); Phase 5F (P38-WP04) stays BLOCKED behind Phase 5E and the separate admission sequence
@@ -371,7 +371,7 @@ evidence.
 - P38-WP01-R1 (Phase 5C SearchScope Closure Correction): **CLOSED / MERGED / VERIFIED / PR #437**.
 - Phase 5D (P38-WP02): **CLOSED / VERIFIED AFTER R1 CORRECTION** (PR #439, PR #440, corrected by PR #442, PR #443).
 - P38-WP02-R1 (Phase 5D RetrievalPlanner / ContextPack Closure Correction): **CLOSED / MERGED / VERIFIED / PR #443**.
-- Phase 5E (P38-WP03): **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE GATE** (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified without fresh holdout execution; OpenVINO hardware acceptance passed only for the explicitly authorized current KB snapshot; no fresh evaluation was started).
+- Phase 5E (P38-WP03): **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE GATE** (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified without fresh holdout execution; OpenVINO hardware acceptance passed only for the explicitly authorized current KB snapshot; the historical 3,624-note / 19,954-chunk / 23,578-vector workload was NOT_REPRODUCED; no fresh evaluation was started).
 - P38-WP03-R1: **CLOSED / FAILURE EVIDENCE**.
 - P38-WP03-R2 attempt: **CLOSED / FAILED VERIFICATION** (PR #449 runtime + PR #450 governance).
 - P38-WP03-R3: **CLOSED / SECURITY CORRECTION VERIFIED** (PR #451 runtime correction; PR-R3B governance rebaseline).
@@ -811,7 +811,8 @@ repairs are canonical on protected `main`:
 1. Complete the signed governance PR and post-merge readback for
    `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE`; the hardware
    result is PASS for the explicitly authorized current KB snapshot. The
-   historical 3,624-note dataset remains unrecovered and incomparable. After
+   historical 3,624-note / 19,954-chunk / 23,578-vector workload remains
+   unrecovered, was NOT_REPRODUCED, and is not directly comparable. After
    that reconciliation, Phase 5E fresh evaluation authoring is the next
    separate invocation. v1.5 remains exposed/unused/invalidated/not reusable;
    do not reuse it, execute a one-shot, or start Phase 5F in this gate.

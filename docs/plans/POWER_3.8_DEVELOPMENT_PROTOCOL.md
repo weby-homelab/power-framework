@@ -115,8 +115,9 @@ Actions #396 and final integration, Phase 5A runtime contracts (PR #415), Phase
 OpenVINO software integration (PR #478), and security dependency remediation
 (PR #481) are closed in the current governance snapshot. The authorized
 `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE` passed for the
-exact current KB snapshot; the historical 3,624-note evidence remains
-unrecovered and incomparable. The next bounded runtime gate is fresh Phase 5E
+exact current KB snapshot; the historical 3,624-note / 19,954-chunk /
+23,578-vector workload remains unrecovered, was NOT_REPRODUCED, and is not
+directly comparable. The next bounded runtime gate is fresh Phase 5E
 evaluation authoring in a separate invocation; Issue #471 closure awaits the
 signed governance PR post-merge readback. Phase 5E remains OPEN / NOT PASSED and
 Phase 5F remains blocked.
@@ -520,8 +521,9 @@ forbidden. Prospective policy is `SEALED_NOT_SECRET_NO_TUNING`; publication alon
 is not tuning. OpenVINO software integration is CLOSED / MERGED / VERIFIED
 through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED
 through PR #481. Current-snapshot hardware acceptance for Issue #471 is PASS
-with sanitized evidence published; the historical 3,624-note dataset remains
-unrecovered and incomparable. Issue #471 closure is pending the signed
+with sanitized evidence published; the historical 3,624-note / 19,954-chunk /
+23,578-vector workload remains unrecovered, was NOT_REPRODUCED, and is not
+directly comparable. Issue #471 closure is pending the signed
 governance PR post-merge readback. Phase 5E (P38-WP03) remains OPEN / NOT PASSED;
 fresh evaluation authoring is the next separate invocation. R6A.1 development
 admission and the R6A.2 technical repair are CLOSED / MERGED / INTEGRITY

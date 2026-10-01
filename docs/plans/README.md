@@ -50,7 +50,7 @@ REST verification:
 > Phase 5D (P38-WP02) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443)**.
 > P38-WP02-R1 is **CLOSED / MERGED / VERIFIED**.
 > Phase 5E (P38-WP03) is **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE GATE** (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R4/R5 historical failed evidence; R6A.1/R6A.2 closed without fresh holdout execution).
-> OpenVINO software integration is **CLOSED / MERGED / VERIFIED through PR #478** and security dependency remediation is **CLOSED / MERGED / VERIFIED through PR #481**. `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE` passed for the explicitly authorized current private KB snapshot; the historical 3,624-note workload remains unrecovered and incomparable. Issue #471 closure is pending the signed governance PR post-merge readback. PR #473 remains **CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED**.
+> OpenVINO software integration is **CLOSED / MERGED / VERIFIED through PR #478** and security dependency remediation is **CLOSED / MERGED / VERIFIED through PR #481**. `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE` passed for the explicitly authorized current private KB snapshot; the historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable. Issue #471 closure is pending the signed governance PR post-merge readback. PR #473 remains **CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED**.
 > Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is **BLOCKED** behind Phase 5E fresh evaluation authoring and separate admission.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
@@ -151,8 +151,10 @@ R6A.1/R6A.2 closed without fresh holdout execution). P38-WP03-R4 is
 `HISTORICAL / CLOSED / FAILED VERIFICATION`. OpenVINO software integration is
 `CLOSED / MERGED / VERIFIED / PR #478`; security dependency remediation is
 `CLOSED / MERGED / VERIFIED / PR #481`; hardware acceptance for Issue #471 is
-`PASS` for the explicitly authorized current snapshot, with issue closure
-pending signed governance post-merge readback. Phase 5F (P38-WP04 / Phase 5F
+`PASS` for the explicitly authorized current snapshot (791/791 sources, 5,876
+chunks, complete FTS+dense coverage); the historical 3,624-note / 19,954-chunk /
+23,578-vector workload was not reproduced and is not directly comparable.
+Issue #471 closure is pending signed governance post-merge readback. Phase 5F (P38-WP04 / Phase 5F
 Incremental Dense Validity / dirty-set behavior) is `BLOCKED` behind Phase 5E.
 
 ## ARCHITECTURAL DECISION

@@ -30,7 +30,7 @@
     },
     {
       "criterion": "current issue criteria 8: benchmarked dataset-specific 3624-note historical vault",
-      "status": "NOT_APPLICABLE_TO_THIS_AUTHORIZED_RUN; current 791-source workload accepted without comparability claim"
+      "status": "NOT_APPLICABLE_TO_THIS_AUTHORIZED_RUN; historical 3,624-note / 19,954-chunk / 23,578-vector workload NOT_REPRODUCED; no direct performance-comparability claim"
     },
     {
       "criterion": "authorized current workload >=95% sync coverage and >=95% eligible FTS/dense coverage",
@@ -68,7 +68,17 @@
     "invalid_notes": 0,
     "second_pass_generated_pages": 0
   },
-  "historical_record": "The 3624-note historical dataset remains unrecovered and historical. No byte-for-byte or performance comparability is claimed.",
+  "historical_record": "The 3,624-note / 19,954-chunk / 23,578-vector historical workload remains unrecovered and was NOT_REPRODUCED. It is superseded for this authorization; no byte-for-byte or direct performance comparability is claimed.",
+  "workload_disposition": {
+    "current_authorized_workload": "PASS",
+    "historical_numeric_criteria": "NOT_REPRODUCED / NOT_PASSED",
+    "legacy_3624_workload": "NONREPRODUCIBLE / SUPERSEDED",
+    "legacy_counts": {
+      "notes": 3624,
+      "chunks": 19954,
+      "vectors": 23578
+    }
+  },
   "host": {
     "cpu": "Intel Core i7-1165G7",
     "gpu": "Intel Iris Xe Graphics (iGPU)",
@@ -81,6 +91,26 @@
   "one_shot_consumed": false,
   "phase_5e_started": false,
   "phase_5f_started": false,
+  "performance_provenance": {
+    "benchmark_rerun_for_governance_or_ci": false,
+    "canonical_performance_metrics_source": "SECOND_INDEPENDENT_CLEAN_CACHE_REBUILD",
+    "first_full_sync": {
+      "metrics_collector": "FAILED",
+      "metrics_used_as_canonical": false,
+      "sync": "SUCCEEDED"
+    },
+    "gpu_utilization": "NOT_MEASURED",
+    "reranked_latency_observation": {
+      "classification": "FACTUAL_NONBLOCKING_OBSERVATION; NOT AN ACCEPTANCE THRESHOLD",
+      "cold_seconds": 161.480787,
+      "warm_seconds": 149.030765
+    },
+    "second_independent_clean_cache_rebuild": {
+      "canonical": true,
+      "cache_state": "CLEAN",
+      "wall_seconds": 1794.7842812340023
+    }
+  },
   "post_acceptance_kb_publication": {
     "classification": "INTENTIONAL_SOURCE_DRIFT_AFTER_FREEZE / private session-record publication after the measured run; frozen acceptance input unchanged",
     "frozen_acceptance_input_unchanged": true,
@@ -187,6 +217,7 @@
     "sqlite_state_integrity": "ok",
     "sync_coverage_percent": 100.0,
     "vector_dimension": 1024,
+    "performance_measurement_iteration": "SECOND_INDEPENDENT_CLEAN_CACHE_REBUILD",
     "wall_seconds": 1794.7842812340023
   },
   "search_validation": {
@@ -262,7 +293,7 @@
     }
   },
   "sources": {
-    "historical_3624_note_snapshot": "NOT_RECOVERED / NOT USED / current snapshot is not byte- or performance-comparable",
+    "historical_3624_note_snapshot": "3,624 notes / 19,954 chunks / 23,578 vectors; NOT_RECOVERED / NOT_REPRODUCED / NOT_USED / NONREPRODUCIBLE / SUPERSEDED / no direct performance comparison",
     "knowledge_base": {
       "archive_sha256": "6bd7f0d470e246775fb4e20f450b82df2f5ec4227ba6cfefa6dcf3307d5d0c0f",
       "commit": "eb9890057a9ff3507b6818a24ef86eb70750f0ba",

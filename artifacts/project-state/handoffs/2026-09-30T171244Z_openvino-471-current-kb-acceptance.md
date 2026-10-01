@@ -21,8 +21,9 @@ SOURCE_DRIFT_AFTER_FREEZE: NO DURING ACCEPTANCE RUN; YES AFTER THE SEPARATE POST
 LOCAL_GIT_TREE_RECONSTRUCTION: POWER MATCH / KNOWLEDGE-BASE MATCH
 POST_ACCEPTANCE_KB_PUBLICATION: A separate authorized session-record update moved current KB main after the measured run to commit c4d8e9f8e029f34db323a23fb455dcdfd28b3ab9 / tree e7a37ae2c817134dfee0fd3c4414a7b8942d7588. This is intentional SOURCE_DRIFT_AFTER_FREEZE; the frozen benchmark input remains unchanged and was not silently substituted.
 
-HISTORICAL_DATASET: The 3,624-note historical snapshot remains unrecovered and was not used.
-COMPARABILITY: The authorized current snapshot is not byte-for-byte or performance-comparable with the historical dataset.
+HISTORICAL_DATASET: The 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered and was NOT_REPRODUCED / NOT_USED / NONREPRODUCIBLE / SUPERSEDED for this authorization.
+HISTORICAL_NUMERIC_CRITERIA: NOT_REPRODUCED / NOT_PASSED; no historical criterion is marked PASS.
+COMPARABILITY: The authorized current snapshot is not byte-for-byte or directly performance-comparable with the historical workload.
 
 HOST: S-Book / Intel Core i7-1165G7 / Intel Iris Xe Graphics / Ubuntu 26.04.1 / kernel 7.0.0-34-generic
 RUNTIME_USER: weby UID / process-scoped supplementary render group
@@ -35,6 +36,8 @@ MODELS: BGE-M3 revision 76a603396f5eb9f03ed51bbab8f4893fcea7b2fe; BGE reranker r
 HIERARCHICAL_INDEX: PASS / 791 notes / 20 generated catalogs / 0 invalid notes / 0 conflicts / second pass idempotent
 FRESH_SEARCH_STATE: PASS / isolated empty XDG cache before timing / no POWER_SEARCH_DB override / one ready generation
 SYNC: PASS / 791 of 791 sources / 5,876 chunks / 0 excluded / 0 errors / 0 retries / 1,794.78 seconds
+FIRST_FULL_SYNC: SYNC SUCCEEDED; METRICS COLLECTOR FAILED; THIS RUN'S METRICS ARE NOT CANONICAL
+CANONICAL_PERFORMANCE_METRICS: SECOND INDEPENDENT CLEAN-CACHE REBUILD / 1,794.78 seconds
 FTS: 791 records / 100% eligible coverage
 DENSE: 791 document vectors / 5,876 chunk vectors / 1,024 dimensions / 100% eligible coverage
 SQLITE: state integrity_check=ok / generation integrity_check=ok / foreign_key issues=0 / active generation hash and size verified
@@ -42,10 +45,11 @@ SQLITE: state integrity_check=ok / generation integrity_check=ok / foreign_key i
 PROVIDER_CONTRACT: The application passed no CPU EP to the explicit provider input and set session.disable_cpu_ep_fallback=1. Direct embedding and reranker profiles recorded OpenVINO nodes and zero CPU nodes. ORT automatically registers CPU EP in session.get_providers(); this is not CPU node execution.
 SEMANTIC_SEARCH: PASS / 10 real results / cold 7.281s / warm 2.270s / no fallback / generation provenance verified
 RERANKED_SEARCH: PASS / 10 real results / OpenVINO reranker / cold 161.481s / warm 149.031s / no fallback / generation provenance verified
+RERANKED_LATENCY_CLASSIFICATION: FACTUAL NONBLOCKING OBSERVATION / not an acceptance threshold
 QUERY_PRIVACY: Query strings and result text are omitted from public evidence.
 TESTS: 83 focused OpenVINO/embedding tests passed / 0 failed / 1 warning
 RESOURCE: peak process-tree RSS 3.37 GiB / peak system used 4.86 GiB / minimum available 6.10 GiB / swap delta -4.1 MiB / max thermal 72.05 C
-GPU_TELEMETRY: Reliable utilization telemetry unavailable; no utilization claim is made.
+GPU_TELEMETRY: Direct GPU utilization percentage NOT MEASURED; no utilization claim is made.
 
 ACCEPTANCE_RESULT: PASS FOR THE EXPLICITLY AUTHORIZED CURRENT SNAPSHOT
 ISSUE_471_CRITERIA: Criteria 1–4 and 6–7 pass; criterion 5 is reconciled to merged PR #478 fail-closed behavior; criterion 8's historical fixed-dataset clause is not reused and is dispositioned as non-comparable under the explicit current-snapshot authorization.

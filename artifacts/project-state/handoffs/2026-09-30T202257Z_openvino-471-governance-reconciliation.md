@@ -18,10 +18,20 @@ chunks, 100% eligible FTS and dense coverage, zero retries/errors/exclusions,
 SQLite integrity PASS, semantic and reranked real results without fallback,
 and 83 focused tests passed.
 
-The historical 3,624-note snapshot remains unrecovered and was not used. No
-byte-for-byte or performance-comparability claim is made. Criterion 5 is
-dispositioned to the merged PR #478 fail-closed provider contract; criterion 8
-is not applicable to this explicitly authorized current-snapshot run. The
+The first full sync succeeded, but its metrics collector failed; that run's
+metrics are not canonical. Canonical performance metrics come from the second
+independent clean-cache rebuild: 1,794.78 seconds. Peak process-tree RSS was
+3.37 GiB. Direct GPU-utilization percentage was NOT_MEASURED. Reranked latency
+(cold 161.481 s / warm 149.031 s) is a factual nonblocking observation, not an
+acceptance threshold.
+
+The historical 3,624-note / 19,954-chunk / 23,578-vector workload remains
+unrecovered and was NOT_REPRODUCED / NOT_USED / NONREPRODUCIBLE / SUPERSEDED
+for this authorization. Historical numeric criteria are NOT_REPRODUCED / NOT
+PASSED. No byte-for-byte or direct performance-comparability claim is made.
+Criterion 5 is dispositioned to the merged PR #478 fail-closed provider
+contract; criterion 8 is not applicable to this explicitly authorized
+current-snapshot run. The
 sanitized acceptance receipt is published at
 https://github.com/weby-homelab/power-framework/issues/471#issuecomment-5914573383.
 
