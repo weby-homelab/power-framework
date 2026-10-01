@@ -1,0 +1,325 @@
+{
+  "acceptance_criteria": [
+    {
+      "criterion": "current issue criteria 1: doctor binds OpenVINO EP",
+      "status": "PASS"
+    },
+    {
+      "criterion": "current issue criteria 2: real 1024-dimensional embedding",
+      "status": "PASS"
+    },
+    {
+      "criterion": "current issue criteria 3: explicit provider unavailable fails closed",
+      "status": "PASS_IN_FOCUSED_TESTS"
+    },
+    {
+      "criterion": "current issue criteria 4: invalid device value rejected",
+      "status": "PASS_IN_FOCUSED_TESTS"
+    },
+    {
+      "criterion": "current issue criteria 5: provider-list wording vs merged fail-closed contract",
+      "status": "DISPOSITIONED_TO_MERGED_478_CONTRACT; explicit CPU input 0, CPU fallback disabled, zero profiled CPU nodes; ORT registers CPU EP in session provider list"
+    },
+    {
+      "criterion": "current issue criteria 6: real reranker uses OpenVINO",
+      "status": "PASS"
+    },
+    {
+      "criterion": "current issue criteria 7: focused software tests",
+      "status": "PASS"
+    },
+    {
+      "criterion": "current issue criteria 8: benchmarked dataset-specific 3624-note historical vault",
+      "status": "NOT_APPLICABLE_TO_THIS_AUTHORIZED_RUN; historical 3,624-note / 19,954-chunk / 23,578-vector workload NOT_REPRODUCED; no direct performance-comparability claim"
+    },
+    {
+      "criterion": "authorized current workload >=95% sync coverage and >=95% eligible FTS/dense coverage",
+      "status": "PASS"
+    },
+    {
+      "criterion": "real semantic/reranked results without fallback",
+      "status": "PASS"
+    },
+    {
+      "criterion": "no sync retries/errors invalidating run",
+      "status": "PASS"
+    }
+  ],
+  "acceptance_result": "PASS_FOR_AUTHORIZED_CURRENT_SNAPSHOT",
+  "authorization": "OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE",
+  "governance_publication": {
+    "issue_state": "OPEN_PENDING_SIGNED_REPLACEMENT_PR_POST_MERGE_READBACK",
+    "key_handling": "Initial PR #480 was remotely GPG-signed before local key import was authorized. After explicit operator authorization, the signing key was imported into a dedicated protected local GPG keyring for the replacement governance commit. The replacement commit is locally signed; private key material is excluded from the repository and evidence.",
+    "status": "REPLACEMENT_GOVERNANCE_PR_PENDING_PROTECTED_MERGE_AND_READBACK",
+    "superseded_candidate": {
+      "base_sha": "22788b17b54b5e9f1a10561e72fbe35ba4e769d4",
+      "disposition": "SUPERSEDED_BY_FRESH_CANDIDATE_BASED_ON_SECURITY_FIXED_MAIN; DO_NOT_MERGE",
+      "head_sha": "4cee6d13ba7413744ab77578cafc12c0aed5fab5",
+      "pull_request": 480,
+      "required_security_check": "FAILED_ON_PRE_SECURITY_DEPENDENCY_LOCK"
+    }
+  },
+  "hierarchical_rebuild": {
+    "catalog_conflicts": 0,
+    "catalog_projection_idempotent": true,
+    "exit_code": 0,
+    "generated_catalog_pages": 20,
+    "indexed_notes": 791,
+    "invalid_notes": 0,
+    "second_pass_generated_pages": 0
+  },
+  "historical_record": "The 3,624-note / 19,954-chunk / 23,578-vector historical workload remains unrecovered and was NOT_REPRODUCED. It is superseded for this authorization; no byte-for-byte or direct performance comparability is claimed.",
+  "workload_disposition": {
+    "current_authorized_workload": "PASS",
+    "historical_numeric_criteria": "NOT_REPRODUCED / NOT_PASSED",
+    "legacy_3624_workload": "NONREPRODUCIBLE / SUPERSEDED",
+    "legacy_counts": {
+      "notes": 3624,
+      "chunks": 19954,
+      "vectors": 23578
+    }
+  },
+  "host": {
+    "cpu": "Intel Core i7-1165G7",
+    "gpu": "Intel Iris Xe Graphics (iGPU)",
+    "identity": "S-Book",
+    "kernel": "7.0.0-34-generic",
+    "os": "Ubuntu 26.04.1 LTS",
+    "power_runtime_uid": "weby",
+    "render_access": "process-scoped supplementary render group"
+  },
+  "one_shot_consumed": false,
+  "phase_5e_started": false,
+  "phase_5f_started": false,
+  "performance_provenance": {
+    "benchmark_rerun_for_governance_or_ci": false,
+    "canonical_performance_metrics_source": "SECOND_INDEPENDENT_CLEAN_CACHE_REBUILD",
+    "first_full_sync": {
+      "metrics_collector": "FAILED",
+      "metrics_used_as_canonical": false,
+      "sync": "SUCCEEDED"
+    },
+    "gpu_utilization": "NOT_MEASURED",
+    "reranked_latency_observation": {
+      "classification": "FACTUAL_NONBLOCKING_OBSERVATION; NOT AN ACCEPTANCE THRESHOLD",
+      "cold_seconds": 161.480787,
+      "warm_seconds": 149.030765
+    },
+    "second_independent_clean_cache_rebuild": {
+      "canonical": true,
+      "cache_state": "CLEAN",
+      "wall_seconds": 1794.7842812340023
+    }
+  },
+  "post_acceptance_kb_publication": {
+    "classification": "INTENTIONAL_SOURCE_DRIFT_AFTER_FREEZE / private session-record publication after the measured run; frozen acceptance input unchanged",
+    "frozen_acceptance_input_unchanged": true,
+    "merge_sha": "c4d8e9f8e029f34db323a23fb455dcdfd28b3ab9",
+    "merge_tree": "e7a37ae2c817134dfee0fd3c4414a7b8942d7588",
+    "repository": "PRIVATE_KNOWLEDGE_BASE_REPOSITORY_WITHHELD"
+  },
+  "power_security_dependency_remediation": {
+    "all_required_checks_passed": true,
+    "head_sha": "feccdd2f469a04656c4ee589f8c5f7eb8f349527",
+    "merge_sha": "e68bc4eacd5d49db451d0f1379299c17c9175ad1",
+    "merge_tree": "e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b",
+    "merged_at_utc": "2026-09-30T19:58:31Z",
+    "parents": [
+      "22788b17b54b5e9f1a10561e72fbe35ba4e769d4",
+      "feccdd2f469a04656c4ee589f8c5f7eb8f349527"
+    ],
+    "pull_request": 481,
+    "required_security_check": "PASS",
+    "signature_verified": true
+  },
+  "power_main_at_superseded_governance_candidate": {
+    "observed_at_utc": "2026-09-30T17:14:22Z",
+    "sha": "22788b17b54b5e9f1a10561e72fbe35ba4e769d4",
+    "tree": "3fc32d0d1330eb9afd35e82f990cc0078489faf6"
+  },
+  "power_main_at_replacement_governance_base": {
+    "observed_at_utc": "2026-09-30T20:22:57Z",
+    "sha": "e68bc4eacd5d49db451d0f1379299c17c9175ad1",
+    "tree": "e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b"
+  },
+  "provider_contract": {
+    "device_enumerated": "Intel(R) Iris(R) Xe Graphics (iGPU)",
+    "embedding_cpu_profile_node_events": 0,
+    "embedding_openvino_profile_node_events": 2,
+    "explicit_provider_input_cpu_ep_count": 0,
+    "ort_session_cpu_ep_registered_by_default": true,
+    "reranker_cpu_profile_node_events": 0,
+    "reranker_openvino_profile_node_events": 2,
+    "runtime_retry_disable_hook_available": true,
+    "session_disable_cpu_ep_fallback": "1"
+  },
+  "publication_artifact": "artifacts/project-state/evidence/openvino-471-current-kb-acceptance.json",
+  "resource_observations": {
+    "average_host_cpu_percent": 34.52,
+    "average_power_process_cpu_percent_host_capacity": 18.85,
+    "gpu_frequency_is_not_claimed_as_utilization": true,
+    "gpu_utilization": "NOT_MEASURED; no reliable i915 engine-busy/intel_gpu_top telemetry available",
+    "minimum_system_mem_available_gib": 6.102,
+    "peak_host_cpu_percent": 100.0,
+    "peak_power_process_cpu_percent_host_capacity": 95.08,
+    "peak_process_tree_rss_gib": 3.375,
+    "peak_single_process_rss_gib": 3.368,
+    "peak_system_memory_used_gib": 4.862,
+    "peak_thermal_c": 72.05,
+    "process_cpu_sample_count": 3422,
+    "process_cpu_samples_above_50_percent": 4,
+    "swap_delta_mib": -4.1,
+    "swap_end_mib": 647.1,
+    "swap_start_mib": 651.2
+  },
+  "roadmap": {
+    "fresh_evaluation_started": false,
+    "next_gate_after_governance_reconciliation": "PHASE_5E_FRESH_EVALUATION_AUTHORING",
+    "one_shot_consumed": false,
+    "phase_5e_status": "OPEN / NOT PASSED",
+    "phase_5f_status": "BLOCKED",
+    "separate_invocation_required": true
+  },
+  "runtime": {
+    "available_execution_providers": [
+      "OpenVINOExecutionProvider",
+      "CPUExecutionProvider"
+    ],
+    "device_type": "GPU",
+    "embedding_model_revision": "76a603396f5eb9f03ed51bbab8f4893fcea7b2fe",
+    "onnxruntime_distribution": "onnxruntime-openvino==1.24.1",
+    "onnxruntime_distribution_count": 1,
+    "openvino": "2025.4.1",
+    "python": "3.13.14",
+    "requested_provider": "OpenVINOExecutionProvider",
+    "reranker_model_revision": "6f5ff65298512715a1e669753bc754d2bc8f367b"
+  },
+  "schema": "power.openvino471.current-kb-acceptance.v1",
+  "search_index_rebuild": {
+    "candidate_sources": 791,
+    "chunks": 5876,
+    "command": "power sync <kb-working> --force --strict",
+    "dense_chunk_vectors": 5876,
+    "document_vectors": 791,
+    "eligible_dense_document_coverage_percent": 100.0,
+    "eligible_fts_coverage_percent": 100.0,
+    "eligible_sources": 791,
+    "errors": 0,
+    "excluded_files": 0,
+    "exit_code": 0,
+    "foreign_key_issues": 0,
+    "fresh_state_before_timing": "CLEAN",
+    "fts_records": 791,
+    "indexed_files": 791,
+    "retries": 0,
+    "source_snapshot_matches_inventory": true,
+    "sqlite_generation_integrity": "ok",
+    "sqlite_state_integrity": "ok",
+    "sync_coverage_percent": 100.0,
+    "vector_dimension": 1024,
+    "performance_measurement_iteration": "SECOND_INDEPENDENT_CLEAN_CACHE_REBUILD",
+    "wall_seconds": 1794.7842812340023
+  },
+  "search_validation": {
+    "query_strings_saved": false,
+    "reranked": {
+      "active_mode": "reranked",
+      "cold_warm": [
+        {
+          "dense_scoring_ms": 115677.255,
+          "embedding_session_startup_ms": 4253.923,
+          "query_embedding_ms": 47.56,
+          "reranker_scoring_ms": 9191.775,
+          "reranker_session_startup_ms": 1.561,
+          "result_materialization_ms": 29301.671,
+          "temperature": "cold",
+          "total_latency_ms": 161480.787,
+          "vector_retrieval_ms": 129.35
+        },
+        {
+          "dense_scoring_ms": 116633.404,
+          "embedding_session_startup_ms": 0.017,
+          "query_embedding_ms": 43.806,
+          "reranker_scoring_ms": 2508.29,
+          "reranker_session_startup_ms": 0.002,
+          "result_materialization_ms": 26747.442,
+          "temperature": "warm",
+          "total_latency_ms": 149030.765,
+          "vector_retrieval_ms": 75.518
+        }
+      ],
+      "embedding_provider": "OpenVINOExecutionProvider",
+      "fallback": false,
+      "provenance_verified": true,
+      "real_match_text_present": true,
+      "reranker_provider": "OpenVINOExecutionProvider",
+      "result_count_cold": 10,
+      "result_count_warm": 10
+    },
+    "result_text_saved": false,
+    "semantic": {
+      "active_mode": "semantic",
+      "cold_warm": [
+        {
+          "dense_scoring_ms": 59.668,
+          "embedding_session_startup_ms": 4856.984,
+          "query_embedding_ms": 47.364,
+          "reranker_scoring_ms": 0.0,
+          "reranker_session_startup_ms": 0.0,
+          "result_materialization_ms": 2125.871,
+          "temperature": "cold",
+          "total_latency_ms": 7280.752,
+          "vector_retrieval_ms": 79.906
+        },
+        {
+          "dense_scoring_ms": 14.545,
+          "embedding_session_startup_ms": 0.013,
+          "query_embedding_ms": 41.446,
+          "reranker_scoring_ms": 0.0,
+          "reranker_session_startup_ms": 0.0,
+          "result_materialization_ms": 2044.076,
+          "temperature": "warm",
+          "total_latency_ms": 2270.084,
+          "vector_retrieval_ms": 8.281
+        }
+      ],
+      "embedding_provider": "OpenVINOExecutionProvider",
+      "fallback": false,
+      "provenance_verified": true,
+      "real_match_text_present": true,
+      "reranker_provider": null,
+      "result_count_cold": 10,
+      "result_count_warm": 10
+    }
+  },
+  "sources": {
+    "historical_3624_note_snapshot": "3,624 notes / 19,954 chunks / 23,578 vectors; NOT_RECOVERED / NOT_REPRODUCED / NOT_USED / NONREPRODUCIBLE / SUPERSEDED / no direct performance comparison",
+    "knowledge_base": {
+      "archive_sha256": "6bd7f0d470e246775fb4e20f450b82df2f5ec4227ba6cfefa6dcf3307d5d0c0f",
+      "commit": "eb9890057a9ff3507b6818a24ef86eb70750f0ba",
+      "commit_signature_verified": true,
+      "local_git_tree_reconstruction": "MATCH",
+      "private_content_manifest_sha256": "d7863a03622bb454bc0367fae4ea125fc2d92387f72ef1383831ccbc88975e58",
+      "repository": "PRIVATE_KNOWLEDGE_BASE_REPOSITORY_WITHHELD",
+      "source_drift_after_freeze": false,
+      "tree": "0e542bb25479ea44410bc53091f78ae21c3765d3"
+    },
+    "power_framework": {
+      "archive_sha256": "001b4b510e23a63df6474517b72c66b5854423bfa1632caddacd46c0ba352c7a",
+      "commit": "22788b17b54b5e9f1a10561e72fbe35ba4e769d4",
+      "commit_signature_verified": true,
+      "local_git_tree_reconstruction": "MATCH",
+      "repository": "weby-homelab/power-framework",
+      "tree": "3fc32d0d1330eb9afd35e82f990cc0078489faf6"
+    }
+  },
+  "tests": {
+    "failed": 0,
+    "focused_openvino_embedding_tests": "PASS",
+    "ort_distributions_after_tests": [
+      "onnxruntime-openvino==1.24.1"
+    ],
+    "passed": 83,
+    "warnings": 1
+  }
+}

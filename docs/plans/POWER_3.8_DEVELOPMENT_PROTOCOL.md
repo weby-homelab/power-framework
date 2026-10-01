@@ -111,12 +111,16 @@ Foundation Hardening → Phase 5A–5H → Phase 6 → Phase 7 → Phase 8 → P
 
 The Controlled Dependency Refresh, Foundation Hardening (PR #414), including
 Actions #396 and final integration, Phase 5A runtime contracts (PR #415), Phase
-5A.1 (PR #416), Phase 5B (PR #418), the R6A.2 technical repair (PR #472), and
-OpenVINO software integration (PR #478) are closed in the current governance
-snapshot. The next bounded gate after this post-merge reconciliation is
-`OPENVINO_471_HARDWARE_ACCEPTANCE`; Issue #471 remains open and hardware
-acceptance is not verified. Fresh evaluation authoring remains deferred until
-that runtime baseline is dispositioned. Phase 5F remains blocked.
+5A.1 (PR #416), Phase 5B (PR #418), the R6A.2 technical repair (PR #472),
+OpenVINO software integration (PR #478), and security dependency remediation
+(PR #481) are closed in the current governance snapshot. The authorized
+`OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE` passed for the
+exact current KB snapshot; the historical 3,624-note / 19,954-chunk /
+23,578-vector workload remains unrecovered, was NOT_REPRODUCED, and is not
+directly comparable. The next bounded runtime gate is fresh Phase 5E
+evaluation authoring in a separate invocation; Issue #471 closure awaits the
+signed governance PR post-merge readback. Phase 5E remains OPEN / NOT PASSED and
+Phase 5F remains blocked.
 
 ## GitHub publication policy
 
@@ -515,13 +519,15 @@ Evaluation state: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED /
 UNUSED / INVALIDATED / NOT REUSABLE. Tuning against exposed revisions is
 forbidden. Prospective policy is `SEALED_NOT_SECRET_NO_TUNING`; publication alone
 is not tuning. OpenVINO software integration is CLOSED / MERGED / VERIFIED
-through PR #478; hardware acceptance for Issue #471 is OPEN / NOT VERIFIED.
-Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING
-DEFERRED. R6A.1 development admission and the R6A.2 technical repair are
-CLOSED / MERGED / INTEGRITY VERIFIED; no fresh holdout or one-shot was
-executed. The next action is `OPENVINO_471_HARDWARE_ACCEPTANCE`; fresh
-evaluation authoring remains deferred until that runtime baseline is
-dispositioned. Phase 5F remains BLOCKED.
+through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED
+through PR #481. Current-snapshot hardware acceptance for Issue #471 is PASS
+with sanitized evidence published; the historical 3,624-note / 19,954-chunk /
+23,578-vector workload remains unrecovered, was NOT_REPRODUCED, and is not
+directly comparable. Issue #471 closure is pending the signed
+governance PR post-merge readback. Phase 5E (P38-WP03) remains OPEN / NOT PASSED;
+fresh evaluation authoring is the next separate invocation. R6A.1 development
+admission and the R6A.2 technical repair are CLOSED / MERGED / INTEGRITY
+VERIFIED; no fresh holdout or one-shot was executed. Phase 5F remains BLOCKED.
 
 ### Dense cost and external vector policy
 
@@ -594,8 +600,10 @@ P38-WP01-R1 (PHASE 5C CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #437
 PHASE 5D (P38-WP02): CLOSED / VERIFIED AFTER R1 CORRECTION / PR #439 / PR #440 / PR #441 CORRECTED BY PR #442 / PR #443
 P38-WP02-R1 (PHASE 5D CLOSURE CORRECTION): CLOSED / MERGED / VERIFIED / PR #443
 OPENVINO SOFTWARE INTEGRATION: CLOSED / MERGED / VERIFIED / PR #478
-OPENVINO HARDWARE ACCEPTANCE: OPEN / NOT VERIFIED / ISSUE #471 OPEN
-PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING DEFERRED (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair closed/merged/integrity verified)
+PR #481 SECURITY DEPENDENCY REMEDIATION: CLOSED / MERGED / VERIFIED / merge e68bc4eacd5d49db451d0f1379299c17c9175ad1
+OPENVINO HARDWARE ACCEPTANCE: CLOSED / ACCEPTED FOR THE AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 / 100% COVERAGE
+ISSUE #471: OPEN / CLOSURE PENDING SIGNED GOVERNANCE PR POST-MERGE READBACK
+PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS THE NEXT SEPARATE INVOCATION (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair closed/merged/integrity verified)
 P38-WP03-R1: CLOSED / FAILURE EVIDENCE
 P38-WP03-R2 ATTEMPT: CLOSED / FAILED VERIFICATION (PR #449 runtime + PR #450 governance)
 P38-WP03-R3: CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction; PR-R3B governance rebaseline)
@@ -603,13 +611,13 @@ P38-WP03-R4: CLOSED / FAILED VERIFICATION
 P38-WP03-R5: CLOSED / FAILED VERIFICATION (v1.4 holdout exposed; immutable development evidence)
 P38-WP03-R6A.1: CLOSED / MERGED / DEVELOPMENT ADMITTED (review provenance v2, fixture fidelity, fail-closed development admission, metric semantics, FAST contract; no fresh holdout or one-shot)
 P38-WP03-R6A.2: CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED (technical repair retained; no fresh holdout)
-PHASE 5F (P38-WP04): BLOCKED (Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind OpenVINO hardware acceptance and Phase 5E fresh evaluation admission, not historical R4)
+PHASE 5F (P38-WP04): BLOCKED (Phase 5F Incremental Dense Validity / dirty-set behavior; gated behind Phase 5E fresh evaluation admission, not historical R4)
 ACTIVE EVALUATION: v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; fresh authoring is separate
 PR #453: CLOSED STALE / NOT MERGED
 PR #454: CLOSED STALE / NOT MERGED
 PR #473: CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED
 ISSUE #471: OPEN
-NEXT_ACTION: OPENVINO_471_HARDWARE_ACCEPTANCE
+NEXT_ACTION: COMPLETE_SIGNED_GOVERNANCE_PR_AND_POST_MERGE_READBACK; THEN PHASE_5E_FRESH_EVALUATION_AUTHORING_IN_A_SEPARATE_INVOCATION
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -622,12 +630,15 @@ Gates P38-G0, P38-G1, and P38-G2 are closed and verified. Phase 5C SearchScope
 pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
 (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by
 PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. OpenVINO software
-integration is CLOSED / MERGED / VERIFIED through PR #478; Issue #471 hardware
-acceptance is OPEN / NOT VERIFIED. Phase 5E (P38-WP03) is OPEN / NOT PASSED /
-FRESH EVALUATION AUTHORING DEFERRED; R6A.1 development admission and the R6A.2
-technical repair are CLOSED / MERGED / INTEGRITY VERIFIED. Phase 5F (P38-WP04 / Phase 5F Incremental
-Dense Validity / dirty-set behavior) remains BLOCKED behind hardware acceptance
-and the separate fresh-evaluation admission. Do not start Phase 5F–9, version bumps, tags, releases, release images, or
+integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency
+remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized
+current-KB hardware acceptance is PASS with sanitized evidence. Issue #471
+closure awaits the signed governance PR post-merge readback. Phase 5E (P38-WP03)
+is OPEN / NOT PASSED; fresh evaluation authoring is the next separate invocation.
+R6A.1 development admission and the R6A.2 technical repair are CLOSED / MERGED /
+INTEGRITY VERIFIED. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity /
+dirty-set behavior) remains BLOCKED behind Phase 5E fresh evaluation authoring
+and separate admission. Do not start Phase 5F–9, version bumps, tags, releases, release images, or
 final release notes.
 
 ## R6A.2 post-merge governance reconciliation checkpoint
@@ -731,7 +742,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; Issue #471 hardware acceptance is OPEN / NOT VERIFIED. Phase 5E (P38-WP03) is OPEN / NOT PASSED / FRESH EVALUATION AUTHORING DEFERRED UNTIL OPENVINO_471_HARDWARE_ACCEPTANCE (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind hardware acceptance and the separate Phase 5E fresh evaluation admission, not historical R4.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized current-KB hardware acceptance for Issue #471 is PASS, with closure pending signed governance post-merge readback. Phase 5E (P38-WP03) is OPEN / NOT PASSED; fresh evaluation authoring is the next separate invocation (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind Phase 5E fresh evaluation authoring and separate admission, not historical R4.
 
 ## Cross-links
 
