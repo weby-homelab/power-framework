@@ -207,7 +207,7 @@ PHASE_5D:
 CLOSED / MERGED / VERIFIED / PR #439 / PR #440
 
 PHASE_5E:
-OPEN / NOT PASSED / FRESH EVALUATION AUTHORING DEFERRED (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified; OpenVINO software integration is closed, hardware acceptance is not verified)
+OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE INVOCATION AFTER #471 GOVERNANCE RECONCILIATION (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified; current-snapshot hardware acceptance passed for the explicitly authorized KB snapshot; no fresh evaluation was started)
 
 P38-WP03-R1:
 CLOSED / FAILURE EVIDENCE
@@ -383,7 +383,7 @@ evidence.
 - R6A.2 post-merge reconciliation: **THIS GOVERNANCE PR** records the exact
   PR #472 merge commit, the historical admission-process deviation, and the retained
   security repair; it is not a retroactive approval of PR #472.
-- Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior): **BLOCKED** (Phase 5E remains open; hardware acceptance and the separate fresh-evaluation admission are required).
+- Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior): **BLOCKED** (Phase 5E remains open/not passed; fresh evaluation authoring and separate admission are required; the authorized current-snapshot hardware acceptance is already dispositioned).
 - Phase 5G–5H: **PLANNED / NOT STARTED**.
 - Phases 6–9: **NOT STARTED**.
 - POWER 3.8.0: **NO-GO**.
@@ -714,7 +714,7 @@ OPENVINO SOFTWARE INTEGRATION = CLOSED / MERGED / VERIFIED / PR #478
 PR #481 SECURITY DEPENDENCY REMEDIATION = CLOSED / MERGED / VERIFIED / merge e68bc4eacd5d49db451d0f1379299c17c9175ad1
 OPENVINO HARDWARE ACCEPTANCE = CLOSED / ACCEPTED FOR THE AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 / 100% COVERAGE
 ISSUE #471 = OPEN PENDING THE GPG-SIGNED GOVERNANCE PR POST-MERGE READBACK
-PHASE 5E (P38-WP03) = OPEN / NOT PASSED / FRESH EVALUATION AUTHORING DEFERRED
+PHASE 5E (P38-WP03) = OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS THE NEXT SEPARATE INVOCATION AFTER GOVERNANCE RECONCILIATION
 P38-WP03-R4 = CLOSED / HISTORICAL FAILED VERIFICATION (not reusable)
 P38-WP03-R6A.1 = CLOSED / MERGED / DEVELOPMENT ADMITTED (no fresh holdout or one-shot)
 P38-WP03-R6A.2 = CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED (no fresh revision authored or fresh holdout executed)
