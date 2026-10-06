@@ -24,37 +24,52 @@ DEVELOPMENT_TARGET:
 3.8.0
 
 STATE_STATUS:
-PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / P38-WP01-R1 CLOSED / MERGED / VERIFIED / PHASE 5D (P38-WP02) CLOSED / MERGED / P38-WP02-R1 CLOSED / MERGED / VERIFIED / PHASE 5D EFFECTIVE STATUS: CLOSED / VERIFIED AFTER R1 CORRECTION / P38-WP03-R1 CLOSED / FAILURE EVIDENCE / P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION / P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED / P38-WP03-R4 CLOSED / FAILED VERIFICATION / P38-WP03-R5 CLOSED / FAILED VERIFICATION / R5 ONE-SHOT EPOCH CLOSED / FAILED / P38-WP03-R6A.1 CLOSED / MERGED / DEVELOPMENT ADMITTED / P38-WP03-R6A.2 CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED / PR #475 SOLO-MAINTAINER POLICY CLOSED / MERGED / VERIFIED / OPENVINO SOFTWARE INTEGRATION CLOSED / MERGED / VERIFIED / PR #478 / PR #481 SECURITY DEPENDENCY REMEDIATION CLOSED / MERGED / VERIFIED / OPENVINO HARDWARE ACCEPTANCE ACCEPTED FOR OPERATOR-AUTHORIZED CURRENT KB SNAPSHOT / ISSUE #471 CLOSURE PENDING POST-MERGE GOVERNANCE READBACK / PHASE 5E (P38-WP03) OPEN / NOT PASSED / FRESH EVALUATION AUTHORING NEXT IN SEPARATE INVOCATION / PHASE 5F (P38-WP04) BLOCKED / POWER 3.8.0 NO-GO
+PHASE 5B CLOSED / INFRA-1 CLOSED / PR #420 RECONCILED / PR #422 CLEANUP MERGED / PR #423 CI MERGED / PR #424 TASK INTEGRITY MERGED / P38-G0 CLOSED / P38-G1 CLOSED / P38-G2 CLOSED / PHASE 5C (P38-WP01) CLOSED / MERGED / P38-WP01-R1 CLOSED / MERGED / VERIFIED / PHASE 5D (P38-WP02) CLOSED / MERGED / P38-WP02-R1 CLOSED / MERGED / VERIFIED / PHASE 5D EFFECTIVE STATUS: CLOSED / VERIFIED AFTER R1 CORRECTION / P38-WP03-R1 CLOSED / FAILURE EVIDENCE / P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION / P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED / P38-WP03-R4 CLOSED / FAILED VERIFICATION / P38-WP03-R5 CLOSED / FAILED VERIFICATION / R5 ONE-SHOT EPOCH CLOSED / FAILED / P38-WP03-R6A.1 CLOSED / MERGED / DEVELOPMENT ADMITTED / P38-WP03-R6A.2 CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED / PR #475 SOLO-MAINTAINER POLICY CLOSED / MERGED / VERIFIED / OPENVINO SOFTWARE INTEGRATION CLOSED / MERGED / VERIFIED / PR #478 / PR #481 SECURITY DEPENDENCY REMEDIATION CLOSED / MERGED / VERIFIED / OPENVINO HARDWARE ACCEPTANCE ACCEPTED FOR OPERATOR-AUTHORIZED CURRENT KB SNAPSHOT / PR #483 GOVERNANCE CLOSED / MERGED / VERIFIED / ISSUE #471 CLOSED / COMPLETED / POST-#483 CANONICAL-PLAN RECONCILIATION REQUIRES THIS GATE'S PROTECTED MERGE AND READBACK / PHASE 5E (P38-WP03) OPEN / NOT PASSED / FRESH EVALUATION AUTHORING NEXT IN SEPARATE INVOCATION AFTER POST-#483 PLAN RECONCILIATION AND READBACK / PHASE 5F (P38-WP04) BLOCKED / POWER 3.8.0 NO-GO
 
 SNAPSHOT_BASE_SHA:
-e68bc4eacd5d49db451d0f1379299c17c9175ad1
+f38db3aa0177b027a1e6d435fb930c01936f9a69
 
 SNAPSHOT_BASE_TREE:
-e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b
+ae78f0a4878eb6013719e9f65b6094e93c5f2373
 
 SNAPSHOT_LAST_INCLUDED_PR:
-481 (main)
+483 (main)
 
 LAST_KNOWN_MERGED_PR_AT_SNAPSHOT_START:
-481
+483
 
 CURRENT_LIVE_MAIN:
-e68bc4eacd5d49db451d0f1379299c17c9175ad1
+f38db3aa0177b027a1e6d435fb930c01936f9a69
 
 CURRENT_LIVE_MAIN_TREE:
-e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b
+ae78f0a4878eb6013719e9f65b6094e93c5f2373
 
 CURRENT_LIVE_MAIN_PARENTS:
-22788b17b54b5e9f1a10561e72fbe35ba4e769d4, feccdd2f469a04656c4ee589f8c5f7eb8f349527
+e68bc4eacd5d49db451d0f1379299c17c9175ad1, c17ed415f183e6895782ad4c3d57e1300cd93195
 
 CURRENT_LIVE_MAIN_GPG:
 VERIFIED / reason=valid
 
 CURRENT_LIVE_MAIN_OBSERVED_AT_UTC:
+2026-10-06T09:55:00Z
+
+CURRENT_LIVE_MAIN_BASELINE_SCOPE:
+VERIFIED PRE-CANDIDATE EVIDENCE BASELINE; NOT A CLAIM ABOUT FUTURE H, C, M, OR F
+
+PRIOR_481_SNAPSHOT_SHA:
+e68bc4eacd5d49db451d0f1379299c17c9175ad1
+
+PRIOR_481_SNAPSHOT_TREE:
+e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b
+
+PRIOR_481_SNAPSHOT_PARENTS:
+22788b17b54b5e9f1a10561e72fbe35ba4e769d4, feccdd2f469a04656c4ee589f8c5f7eb8f349527
+
+PRIOR_481_SNAPSHOT_OBSERVED_AT_UTC:
 2026-09-30T20:22:57Z
 
 LATEST_VERIFIED_MERGED_PR:
-#481 / head feccdd2f469a04656c4ee589f8c5f7eb8f349527 / merge e68bc4eacd5d49db451d0f1379299c17c9175ad1
+#483 / head c17ed415f183e6895782ad4c3d57e1300cd93195 / merge f38db3aa0177b027a1e6d435fb930c01936f9a69
 
 REVIEW_MODE:
 SOLO_MAINTAINER
@@ -84,10 +99,10 @@ LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE: PASS for the explicitly authorized frozen current KB snapshot; historical 3,624-note / 19,954-chunk / 23,578-vector workload is unrecovered, NOT_REPRODUCED, and not directly comparable; PR #481 security dependency remediation is merged and verified; signed governance PR and issue close are pending post-merge readback
+OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE: PASS only for the explicitly authorized frozen current KB snapshot (791/791 sources, 5,876 chunks, zero exclusions/errors/retries/duplicates, 100% FTS+dense coverage, integrity PASS); Attempt 1 sync succeeded but collector failed; canonical Attempt 2 was 1794.7842812340023 seconds / 3.375 GiB peak process-tree RSS; GPU utilization NOT_MEASURED and CPU EP graph-fallback statement is limited to session.disable_cpu_ep_fallback=1; PR #481 security remediation and PR #483 governance are merged/verified; Issue #471 is CLOSED / COMPLETED. The post-#483 canonical-plan reconciliation is this separate docs-only gate and still needs its own protected publication/readback.
 
 NEXT_GATE:
-PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation after governance reconciliation; Phase 5E remains OPEN / NOT PASSED and no fresh evaluation is authorized in this handoff); Phase 5F (P38-WP04) stays BLOCKED behind Phase 5E and the separate admission sequence
+PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation only after post-#483 canonical-plan reconciliation and exact protected post-merge readback; Phase 5E remains OPEN / NOT PASSED and no fresh evaluation is authorized in this handoff); Phase 5F (P38-WP04) stays BLOCKED behind Phase 5E and the separate admission sequence
 
 P38-WP01-R1_STATUS:
 CLOSED / MERGED / VERIFIED / PR #437
@@ -105,7 +120,7 @@ PHASE_5D_EFFECTIVE_STATUS:
 CLOSED / VERIFIED AFTER R1 CORRECTION
 
 PHASE_5E_STATUS:
-OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS THE NEXT SEPARATE INVOCATION AFTER GOVERNANCE RECONCILIATION
+OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE INVOCATION AFTER POST-#483 CANONICAL-PLAN RECONCILIATION AND EXACT READBACK
 
 P38-WP03-R1_STATUS:
 CLOSED / FAILURE EVIDENCE
@@ -132,7 +147,7 @@ SECURITY_DEPENDENCY_REMEDIATION_STATUS:
 CLOSED / MERGED / VERIFIED / PR #481 / head feccdd2f469a04656c4ee589f8c5f7eb8f349527 / merge e68bc4eacd5d49db451d0f1379299c17c9175ad1 / tree e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b / security check PASS
 
 OPENVINO_HARDWARE_ACCEPTANCE_STATUS:
-CLOSED / ACCEPTED FOR THE OPERATOR-AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 SOURCES / 100% FTS+DENSE COVERAGE / ISSUE #471 CLOSURE PENDING POST-MERGE GOVERNANCE READBACK
+CLOSED / ACCEPTED ONLY FOR THE OPERATOR-AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 SOURCES / 5,876 CHUNKS / ZERO EXCLUSIONS, ERRORS, RETRIES, DUPLICATES / 100% FTS+DENSE COVERAGE / INTEGRITY PASS / SEMANTIC AND RERANKED SEARCH WITHOUT FALLBACK / GPU UTILIZATION NOT MEASURED / ISSUE #471 CLOSED / COMPLETED
 
 PHASE_5F_STATUS:
 BLOCKED (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior; Phase 5E remains open/not passed and requires separate fresh-evaluation authoring/admission)
@@ -177,10 +192,10 @@ EVALUATION_CORPUS_V1:
 SUPERSEDED FOR FUTURE EVALUATION / RETAINED AS HISTORICAL ERRATUM EVIDENCE
 
 ACTIVE_EVALUATION_REVISION:
-v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; no fresh revision authored; prospective policy is SEALED_NOT_SECRET_NO_TUNING; fresh authoring is the next separate invocation after governance reconciliation
+v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; no fresh revision authored; prospective policy is SEALED_NOT_SECRET_NO_TUNING; fresh authoring is the next separate invocation after post-#483 canonical-plan reconciliation and exact readback
 
 ACTIVE_RETRIEVAL_EVAL_REVISION_NOTE:
-v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; fresh evaluation authoring requires a separate invocation after the #471 governance disposition; publication alone is not the prospective invalidation rule
+v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; fresh evaluation authoring requires a separate invocation after the post-#483 canonical-plan reconciliation and exact readback; publication alone is not the prospective invalidation rule
 
 PHASE_5A_1:
 CLOSED / MERGED / VERIFIED / PR #416
@@ -207,7 +222,7 @@ PHASE_5D:
 CLOSED / MERGED / VERIFIED / PR #439 / PR #440
 
 PHASE_5E:
-OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE INVOCATION AFTER #471 GOVERNANCE RECONCILIATION (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified; current-snapshot hardware acceptance passed for the explicitly authorized KB snapshot; no fresh evaluation was started)
+OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE INVOCATION AFTER POST-#483 CANONICAL-PLAN RECONCILIATION AND EXACT READBACK (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified; current-snapshot hardware acceptance passed only for the explicitly authorized KB snapshot; no fresh evaluation was started)
 
 P38-WP03-R1:
 CLOSED / FAILURE EVIDENCE
@@ -252,7 +267,7 @@ CANONICAL_GOVERNANCE_PR:
 413
 
 LATEST_HANDOFF:
-artifacts/project-state/handoffs/2026-09-30T202257Z_openvino-471-governance-reconciliation.md
+artifacts/project-state/handoffs/2026-10-06T101309Z_canonical-plan-drift-reconciliation-post-483_pre-merge-blocked.md
 
 CONTEXT_MEMORY_ARCHITECTURE_PLAN:
 docs/plans/POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md
@@ -286,7 +301,7 @@ PHASE_ACCEPTANCE_GATES:
 artifacts/project-state/planning/phase5-9-acceptance-gates.md
 
 ARCHITECTURE_STATUS:
-CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / VERIFIED AFTER R1 CORRECTION / PHASE 5D CLOSED / MERGED / VERIFIED / R6A.1 DEVELOPMENT ADMISSION CLOSED / MERGED / R6A.2 EXECUTION MACHINERY CLOSED / MERGED / FROZEN / PR #478 OPENVINO SOFTWARE INTEGRATION CLOSED / MERGED / VERIFIED / PR #481 SECURITY DEPENDENCY REMEDIATION CLOSED / MERGED / VERIFIED / ISSUE #471 HARDWARE ACCEPTANCE ACCEPTED FOR AUTHORIZED CURRENT SNAPSHOT / PHASE 5E OPEN / NOT PASSED / FRESH EVALUATION AUTHORING DEFERRED / PHASE 5F (P38-WP04) BLOCKED / PHASE 5F+ NOT IMPLEMENTED
+CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / VERIFIED AFTER R1 CORRECTION / PHASE 5D CLOSED / MERGED / VERIFIED / R6A.1 DEVELOPMENT ADMISSION CLOSED / MERGED / R6A.2 EXECUTION MACHINERY CLOSED / MERGED / FROZEN / PR #478 OPENVINO SOFTWARE INTEGRATION CLOSED / MERGED / VERIFIED / PR #481 SECURITY DEPENDENCY REMEDIATION CLOSED / MERGED / VERIFIED / PR #483 GOVERNANCE CLOSED / MERGED / VERIFIED / ISSUE #471 CLOSED / COMPLETED / CURRENT-KB HARDWARE ACCEPTANCE ACCEPTED ONLY FOR AUTHORIZED SNAPSHOT / PHASE 5E OPEN / NOT PASSED / FRESH EVALUATION AUTHORING NEXT SEPARATE INVOCATION AFTER POST-#483 CANONICAL-PLAN RECONCILIATION/READBACK / PHASE 5F (P38-WP04) BLOCKED / PHASE 5F+ NOT IMPLEMENTED
 ```
 
 ## Fresh state anchor
@@ -360,7 +375,7 @@ evidence.
 - Phase 5A runtime contracts: **CLOSED / MERGED / VERIFIED** through protected PR #415.
 - Evaluation corpus v1: **HISTORICAL / RETAINED / SEMANTIC ERRATUM**.
 - Phase 5A.1: **CLOSED / MERGED / VERIFIED** through protected PR #416.
-- Active evaluation revision: **v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; NEXT FRESH EVALUATION AUTHORING REQUIRES A SEPARATE INVOCATION AFTER #471 GOVERNANCE RECONCILIATION**. Prospective policy: `SEALED_NOT_SECRET_NO_TUNING`; publication alone is not tuning.
+- Active evaluation revision: **v1.1/v1.2/v1.3/v1.4 HISTORICAL / EXPOSED; v1.5 EXPOSED / UNUSED / INVALIDATED / NOT REUSABLE; NEXT FRESH EVALUATION AUTHORING REQUIRES A SEPARATE INVOCATION AFTER POST-#483 CANONICAL-PLAN RECONCILIATION AND EXACT READBACK**. Prospective policy: `SEALED_NOT_SECRET_NO_TUNING`; publication alone is not tuning.
 - Phase 5B: **CLOSED / MERGED / VERIFIED** through protected PR #418.
 - INFRA-1: **CLOSED / MERGED / VERIFIED** through protected PR #419.
 - INFRA-1 deployment validation: **OPERATOR DEPLOYMENT FOLLOW-UP**; not a generic framework blocker.
@@ -371,7 +386,7 @@ evidence.
 - P38-WP01-R1 (Phase 5C SearchScope Closure Correction): **CLOSED / MERGED / VERIFIED / PR #437**.
 - Phase 5D (P38-WP02): **CLOSED / VERIFIED AFTER R1 CORRECTION** (PR #439, PR #440, corrected by PR #442, PR #443).
 - P38-WP02-R1 (Phase 5D RetrievalPlanner / ContextPack Closure Correction): **CLOSED / MERGED / VERIFIED / PR #443**.
-- Phase 5E (P38-WP03): **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE GATE** (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified without fresh holdout execution; OpenVINO hardware acceptance passed only for the explicitly authorized current KB snapshot; the historical 3,624-note / 19,954-chunk / 23,578-vector workload was NOT_REPRODUCED; no fresh evaluation was started).
+- Phase 5E (P38-WP03): **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE GATE AFTER POST-#483 CANONICAL-PLAN RECONCILIATION AND EXACT READBACK** (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified without fresh holdout execution; OpenVINO hardware acceptance passed only for the explicitly authorized current KB snapshot; the historical 3,624-note / 19,954-chunk / 23,578-vector workload was NOT_REPRODUCED; no fresh evaluation was started).
 - P38-WP03-R1: **CLOSED / FAILURE EVIDENCE**.
 - P38-WP03-R2 attempt: **CLOSED / FAILED VERIFICATION** (PR #449 runtime + PR #450 governance).
 - P38-WP03-R3: **CLOSED / SECURITY CORRECTION VERIFIED** (PR #451 runtime correction; PR-R3B governance rebaseline).
@@ -379,7 +394,7 @@ evidence.
 - P38-WP03-R6A.1: **CLOSED / MERGED / DEVELOPMENT ADMITTED** (review provenance v2, independent ownership/fidelity, fail-closed development admission, metric semantics, FAST contract, q14 forensic trace; no fresh holdout or one-shot).
 - P38-WP03-R6A.2: **CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED** (explicit revision spec, Review-v2 complete verification, query-only execution, raw-output freeze, GT-only scoring, atomic one-shot guard; no fresh holdout).
 - P38-WP03-R6A.2: **CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED** (`phase5e_protocol_r6a2_freeze.json`; no fresh revision authored and no fresh holdout executed).
-- OpenVINO software integration: **CLOSED / MERGED / VERIFIED / PR #478**; PR #481 security dependency remediation: **CLOSED / MERGED / VERIFIED**; current-KB hardware acceptance: **PASS / SANITIZED EVIDENCE PUBLISHED**; Issue #471 closure is pending the signed governance PR post-merge readback.
+- OpenVINO software integration: **CLOSED / MERGED / VERIFIED / PR #478**; PR #481 security dependency remediation: **CLOSED / MERGED / VERIFIED**; current-KB hardware acceptance: **PASS ONLY FOR THE AUTHORIZED SNAPSHOT / SANITIZED EVIDENCE PUBLISHED**; PR #483 governance merge/readback is complete and Issue #471 is **CLOSED / COMPLETED**. The separate post-#483 plan reconciliation still requires its own protected publication/readback.
 - R6A.2 post-merge reconciliation: **THIS GOVERNANCE PR** records the exact
   PR #472 merge commit, the historical admission-process deviation, and the retained
   security repair; it is not a retroactive approval of PR #472.
@@ -713,8 +728,10 @@ P38-WP03-R3 = CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction;
 OPENVINO SOFTWARE INTEGRATION = CLOSED / MERGED / VERIFIED / PR #478
 PR #481 SECURITY DEPENDENCY REMEDIATION = CLOSED / MERGED / VERIFIED / merge e68bc4eacd5d49db451d0f1379299c17c9175ad1
 OPENVINO HARDWARE ACCEPTANCE = CLOSED / ACCEPTED FOR THE AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 / 100% COVERAGE
-ISSUE #471 = OPEN PENDING THE GPG-SIGNED GOVERNANCE PR POST-MERGE READBACK
-PHASE 5E (P38-WP03) = OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS THE NEXT SEPARATE INVOCATION AFTER GOVERNANCE RECONCILIATION
+PR #483 GOVERNANCE = CLOSED / MERGED / VERIFIED
+ISSUE #471 = CLOSED / COMPLETED
+POST-#483 CANONICAL-PLAN RECONCILIATION = THIS DOCS-ONLY GATE / OWN PROTECTED MERGE AND READBACK REQUIRED
+PHASE 5E (P38-WP03) = OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS THE NEXT SEPARATE INVOCATION AFTER THIS PLAN RECONCILIATION AND EXACT READBACK
 P38-WP03-R4 = CLOSED / HISTORICAL FAILED VERIFICATION (not reusable)
 P38-WP03-R6A.1 = CLOSED / MERGED / DEVELOPMENT ADMITTED (no fresh holdout or one-shot)
 P38-WP03-R6A.2 = CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED (no fresh revision authored or fresh holdout executed)
@@ -729,7 +746,7 @@ Real receiver deployment is an operator follow-up. Gates P38-G0 (Governance Reba
 P38-G1 (North-Star Architecture Alignment), and P38-G2 (Product Identity & Documentation Rebaseline)
 are closed and verified. Phase 5C (SearchScope Pushdown, PR #434) is CLOSED /
 VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D (P38-WP02) is CLOSED /
-VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized current-KB hardware acceptance passed with 791/791 coverage and sanitized evidence. Issue #471 closure awaits the signed governance PR post-merge readback. Phase 5E (P38-WP03) remains OPEN / NOT PASSED; fresh evaluation authoring is the next separate invocation, not part of this acceptance (PR #445/#446 historical; R1–R5 historical; R6A.1/R6A.2 technical governance retained). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED behind Phase 5E fresh evaluation authoring and separate admission, not historical R4.
+VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized current-KB hardware acceptance passed only for the 791/791-source, 5,876-chunk snapshot with complete FTS/dense coverage and sanitized evidence. Attempt 1's collector failed after sync succeeded; canonical Attempt 2 measured 1794.7842812340023 seconds and 3.375 GiB peak process-tree RSS. GPU utilization is NOT_MEASURED; `session.disable_cpu_ep_fallback=1` limits the ORT CPU EP graph-fallback claim and does not establish zero total CPU activity. PR #483 governance merge/readback is complete and Issue #471 is CLOSED / COMPLETED. The separate post-#483 plan reconciliation requires its own protected merge/readback. Phase 5E remains OPEN / NOT PASSED; fresh evaluation authoring is the next separate invocation after this reconciliation (PR #445/#446 historical; R1–R5 historical; R6A.1/R6A.2 technical governance retained). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED behind Phase 5E fresh evaluation authoring and separate admission, not historical R4.
 A post-merge Dependabot run failure on main was investigated and dispositioned as Class C (non-required
 dependency update attempt failure, non-blocking).
 POWER 3.8.0 cannot be released from this state.
@@ -808,13 +825,15 @@ repairs are canonical on protected `main`:
 
 ## Next authorized work
 
-1. Complete the signed governance PR and post-merge readback for
-   `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE`; the hardware
-   result is PASS for the explicitly authorized current KB snapshot. The
+1. Complete this post-#483 canonical-plan reconciliation through the signed
+   docs-only candidate's required validations, exact-profile reviews, protected
+   normal merge, and live post-merge readback. PR #483's governance merge and
+   readback are complete; Issue #471 is CLOSED / COMPLETED. The hardware result
+   is PASS only for the explicitly authorized current KB snapshot. The
    historical 3,624-note / 19,954-chunk / 23,578-vector workload remains
-   unrecovered, was NOT_REPRODUCED, and is not directly comparable. After
-   that reconciliation, Phase 5E fresh evaluation authoring is the next
-   separate invocation. v1.5 remains exposed/unused/invalidated/not reusable;
+   unrecovered, was NOT_REPRODUCED, and is not directly comparable. After this
+   plan reconciliation and exact readback, Phase 5E fresh evaluation authoring
+   is the next separate invocation. v1.5 remains exposed/unused/invalidated/not reusable;
    do not reuse it, execute a one-shot, or start Phase 5F in this gate.
    Prospective policy is `SEALED_NOT_SECRET_NO_TUNING`; publication alone is
    not tuning.
