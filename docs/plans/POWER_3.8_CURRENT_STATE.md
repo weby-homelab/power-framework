@@ -335,13 +335,26 @@ CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / VER
   `d0e717a4ad2327f2b02065a6bb45f244421eef13`, tree
   `62e18345dd09a46227638794541452d88b36baa1`, with verified normal-merge
   parents `4951c7536ea31078f92e82ea8f1c6a94d4ebcbf2` and
-  `cc1bcb2bc5d734339c130b47ab93ff46318fb694`. This pre-PR-#481 anchor is
-  historical; the current live-main anchor is `e68bc4eacd5d49db451d0f1379299c17c9175ad1`
-  in the machine-readable recovery header above, observed at
-  `2026-09-30T20:22:57Z`. `LIVE_MAIN_REVALIDATION_REQUIRED` remains `YES` until
-  the replacement governance PR is read back after protected publication.
-- The governance branch/head/merge objects for this PR are resolved from live
-  GitHub after protected publication; no future SHA is written here.
+  `cc1bcb2bc5d734339c130b47ab93ff46318fb694`. That pre-#481 anchor is
+  historical. The #481 snapshot subsequently observed main at
+  `e68bc4eacd5d49db451d0f1379299c17c9175ad1`, tree
+  `e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b`, with parents
+  `22788b17b54b5e9f1a10561e72fbe35ba4e769d4` and
+  `feccdd2f469a04656c4ee589f8c5f7eb8f349527`, at `2026-09-30T20:22:57Z`.
+  That #481 anchor is preserved above as dated history, not the current
+  baseline.
+- Fresh authenticated REST and fetched Git observed protected main for this
+  post-#483 reconciliation at B
+  `f38db3aa0177b027a1e6d435fb930c01936f9a69`, tree
+  `ae78f0a4878eb6013719e9f65b6094e93c5f2373`, with the parents and valid
+  GitHub verification recorded in the recovery header. Observation:
+  `2026-10-06T09:55:00Z`. This is the verified pre-candidate baseline only;
+  it does not assert H/T/C/M/F. `LIVE_MAIN_REVALIDATION_REQUIRED` remains
+  `YES` until this plan reconciliation's own protected publication and exact
+  readback.
+- Candidate-specific head/tree and actual merge/readback values are resolved
+  from live GitHub after publication; no future SHA or readback PASS is written
+  here.
 - HF merge tree:
   `a5f63eb671d3d57dd304d497cef4c03c52ed340b`.
 - HF merge parents:

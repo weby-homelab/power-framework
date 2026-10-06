@@ -637,9 +637,12 @@ pushdown (PR #434) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #437). Phase 5D
 PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. OpenVINO software
 integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency
 remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized
-current-KB hardware acceptance is PASS with sanitized evidence. Issue #471
-closure awaits the signed governance PR post-merge readback. Phase 5E (P38-WP03)
-is OPEN / NOT PASSED; fresh evaluation authoring is the next separate invocation.
+current-KB hardware acceptance is PASS only for its explicitly authorized
+snapshot, with sanitized evidence. PR #483 governance merge/readback is
+complete and Issue #471 is CLOSED / COMPLETED. This post-#483 plan
+reconciliation requires its own protected publication/readback. Phase 5E
+(P38-WP03) is OPEN / NOT PASSED; fresh evaluation authoring is the next
+separate invocation after that exact readback.
 R6A.1 development admission and the R6A.2 technical repair are CLOSED / MERGED /
 INTEGRITY VERIFIED. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity /
 dirty-set behavior) remains BLOCKED behind Phase 5E fresh evaluation authoring
