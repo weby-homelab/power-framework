@@ -99,3 +99,27 @@ ONE_SHOT_CONSUMED_BY_THIS_GATE: NO
 HARDWARE_RERUN_BY_THIS_GATE: NO
 GLOBAL_FRESH_EVALUATION_STATE: UNKNOWN
 GLOBAL_ONE_SHOT_STATE: UNKNOWN
+
+## 2026-10-07 duplicate-provenance erratum
+
+The original acceptance-boundary text above is retained as historical evidence.
+Its assertion that unnamed gate-fixed facts establish zero duplicates is
+withdrawn: neither the linked primary JSON nor public acceptance comment
+[`5914573383`](https://github.com/weby-homelab/power-framework/issues/471#issuecomment-5914573383)
+contains an explicit duplicate count or operational definition. The correct
+statement is **duplicate count UNKNOWN**, not zero. Catalog conflicts and
+source/inventory equality do not establish a duplicate count. Independently
+recorded coverage, counts, errors, exclusions, retries, integrity and performance
+observations remain unchanged; the primary JSON has not been edited.
+
+The JSON blob at the published candidate is
+`329988da7e2ef065e10380448082c9c552049b0d`, SHA-256
+`f1205a1f98c49db3f228ae7036c59775a1fe9865e338e471721265fbae568967`.
+The public comment was read through authenticated GitHub GET; its body SHA-256 is
+`08e49eeda95998af60ba90f912c9ca9b96a17dcffcdc05a954636ba37e2820b1`.
+An actual zero-duplicate acceptance requirement remains unproved by these sources.
+
+This local correction is not a final-head admission, merge, or waiver of an
+acceptance requirement. See the
+[2026-10-07 remediation handoff](2026-10-07T043900Z_canonical-plan-drift-reconciliation-post-483_local-remediation.md)
+for the continuation's gate statuses and remaining publication/review gates.

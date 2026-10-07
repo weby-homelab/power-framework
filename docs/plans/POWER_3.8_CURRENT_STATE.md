@@ -99,7 +99,7 @@ LIVE_MAIN_REVALIDATION_REQUIRED:
 YES
 
 LAST_CLOSED_GATE:
-OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE: PASS only for the explicitly authorized frozen current KB snapshot (791/791 sources, 5,876 chunks, zero exclusions/errors/retries/duplicates, 100% FTS+dense coverage, integrity PASS); Attempt 1 sync succeeded but collector failed; canonical Attempt 2 was 1794.7842812340023 seconds / 3.375 GiB peak process-tree RSS; GPU utilization NOT_MEASURED and CPU EP graph-fallback statement is limited to session.disable_cpu_ep_fallback=1; PR #481 security remediation and PR #483 governance are merged/verified; Issue #471 is CLOSED / COMPLETED. The post-#483 canonical-plan reconciliation is this separate docs-only gate and still needs its own protected publication/readback.
+OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE: PASS only for the explicitly authorized frozen current KB snapshot (791/791 sources, 5,876 chunks, zero exclusions/errors/retries, duplicate count UNKNOWN, 100% FTS+dense coverage, integrity PASS); Attempt 1 sync succeeded but collector failed; canonical Attempt 2 was 1794.7842812340023 seconds / 3.375 GiB peak process-tree RSS; GPU utilization NOT_MEASURED and CPU EP graph-fallback statement is limited to session.disable_cpu_ep_fallback=1; PR #481 security remediation and PR #483 governance are merged/verified; Issue #471 is CLOSED / COMPLETED. The post-#483 canonical-plan reconciliation is this separate docs-only gate and still needs its own protected publication/readback.
 
 NEXT_GATE:
 PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation only after post-#483 canonical-plan reconciliation and exact protected post-merge readback; Phase 5E remains OPEN / NOT PASSED and no fresh evaluation is authorized in this handoff); Phase 5F (P38-WP04) stays BLOCKED behind Phase 5E and the separate admission sequence
@@ -147,7 +147,7 @@ SECURITY_DEPENDENCY_REMEDIATION_STATUS:
 CLOSED / MERGED / VERIFIED / PR #481 / head feccdd2f469a04656c4ee589f8c5f7eb8f349527 / merge e68bc4eacd5d49db451d0f1379299c17c9175ad1 / tree e612557afeaaf7d2f8c08dd8f10d1dc86f2cc61b / security check PASS
 
 OPENVINO_HARDWARE_ACCEPTANCE_STATUS:
-CLOSED / ACCEPTED ONLY FOR THE OPERATOR-AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 SOURCES / 5,876 CHUNKS / ZERO EXCLUSIONS, ERRORS, RETRIES, DUPLICATES / 100% FTS+DENSE COVERAGE / INTEGRITY PASS / SEMANTIC AND RERANKED SEARCH WITHOUT FALLBACK / GPU UTILIZATION NOT MEASURED / ISSUE #471 CLOSED / COMPLETED
+CLOSED / ACCEPTED ONLY FOR THE OPERATOR-AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 SOURCES / 5,876 CHUNKS / ZERO EXCLUSIONS, ERRORS, RETRIES / DUPLICATE COUNT UNKNOWN / 100% FTS+DENSE COVERAGE / INTEGRITY PASS / SEMANTIC AND RERANKED SEARCH WITHOUT FALLBACK / GPU UTILIZATION NOT MEASURED / ISSUE #471 CLOSED / COMPLETED
 
 PHASE_5F_STATUS:
 BLOCKED (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior; Phase 5E remains open/not passed and requires separate fresh-evaluation authoring/admission)

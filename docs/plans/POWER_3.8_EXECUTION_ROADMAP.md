@@ -174,7 +174,7 @@ NO-GO
 | PR #473 | CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED | OpenVINO provenance retained; no feature rejection |
 | Issue #471 | CLOSED / COMPLETED | PR #483 governance merge/readback and issue disposition are complete; this gate does not mutate the issue |
 | Post-#483 canonical-plan drift reconciliation | CURRENT DOCS-ONLY GATE | The candidate's own protected normal merge/readback is a separate live check; the required workspace `./verify.sh` is unresolved and not waived |
-| OpenVINO hardware acceptance | CLOSED / ACCEPTED ONLY FOR AUTHORIZED CURRENT SNAPSHOT | S-Book Intel Iris Xe; 791/791 sources, 5,876 chunks, zero exclusions/errors/retries/duplicates, 100% FTS/dense coverage and integrity PASS; semantic/reranked search had no fallback; GPU utilization NOT_MEASURED; historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable |
+| OpenVINO hardware acceptance | CLOSED / ACCEPTED ONLY FOR AUTHORIZED CURRENT SNAPSHOT | S-Book Intel Iris Xe; 791/791 sources, 5,876 chunks, zero exclusions/errors/retries; duplicate count UNKNOWN, 100% FTS/dense coverage and integrity PASS; semantic/reranked search had no fallback; GPU utilization NOT_MEASURED; historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable |
 | Phase 5F (P38-WP04) | BLOCKED | Phase 5E remains open/not passed; fresh evaluation authoring and separate admission are required before Phase 5F |
 | Phase 5G–5H (P38-WP05–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5E → fresh authoring/admission → 5F → 5G → 5H) |
 | Phases 6–9 (P38-WP07–13) | PLANNED / NOT STARTED | No work authorized |
