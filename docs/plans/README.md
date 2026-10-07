@@ -16,7 +16,9 @@ REST verification:
 - [POWER 3.8 — Development Protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [POWER 3.8 — Context / Memory / Retrieval Architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [OpenVINO #478 post-merge reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-27T230732Z_openvino-471-post-merge-reconciliation_candidate-ready.md) — current software-integration closure and hardware-acceptance next gate.
+- [Post-#483 authorized admission continuation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T122404Z_canonical-plan-drift-reconciliation_authorized-admission.md) — latest pre-final-candidate record; exact final validation, reviews, attestation and protected merge/readback remain live PR facts.
+- Historical: [Post-#483 pre-merge blocked handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-06T101309Z_canonical-plan-drift-reconciliation-post-483_pre-merge-blocked.md) and [local remediation snapshot](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T043900Z_canonical-plan-drift-reconciliation-post-483_local-remediation.md) — dated failures/proposals retained unchanged, not the latest active status.
+- Historical: [OpenVINO #478 post-merge reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-27T230732Z_openvino-471-post-merge-reconciliation_candidate-ready.md) — immutable pre-acceptance snapshot; superseded as the active pointer after #483 and Issue #471 disposition.
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Latest Phase 5A.1 semantic-correction handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-10T190036Z_phase5a1-evaluation-semantic-integrity.md)
 - [Phase 5B domain-policy/router report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5b/PHASE_5B_REPORT.md)
@@ -49,8 +51,8 @@ REST verification:
 > P38-WP01-R1 is **CLOSED / MERGED / VERIFIED**.
 > Phase 5D (P38-WP02) is **CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443)**.
 > P38-WP02-R1 is **CLOSED / MERGED / VERIFIED**.
-> Phase 5E (P38-WP03) is **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE GATE** (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R4/R5 historical failed evidence; R6A.1/R6A.2 closed without fresh holdout execution).
-> OpenVINO software integration is **CLOSED / MERGED / VERIFIED through PR #478** and security dependency remediation is **CLOSED / MERGED / VERIFIED through PR #481**. `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE` passed for the explicitly authorized current private KB snapshot; the historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable. Issue #471 closure is pending the signed governance PR post-merge readback. PR #473 remains **CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED**.
+> Phase 5E (P38-WP03) is **OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS NEXT SEPARATE GATE AFTER POST-#483 CANONICAL-PLAN RECONCILIATION AND EXACT READBACK** (PR #445/#446 historical; P38-WP03-R1 CLOSED / FAILURE EVIDENCE; P38-WP03-R2 ATTEMPT CLOSED / FAILED VERIFICATION PR #449 + PR #450; P38-WP03-R3 CLOSED / SECURITY CORRECTION VERIFIED PR #451; R4/R5 historical failed evidence; R6A.1/R6A.2 closed without fresh holdout execution).
+> OpenVINO software integration is **CLOSED / MERGED / VERIFIED through PR #478** and security dependency remediation is **CLOSED / MERGED / VERIFIED through PR #481**. `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE` passed for the explicitly authorized current private KB snapshot; the historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable. PR #483 governance is **CLOSED / MERGED / VERIFIED**; Issue #471 is **CLOSED / COMPLETED** after its post-merge readback. The current post-#483 canonical-plan reconciliation must itself pass its protected publication and exact readback before the next invocation. PR #473 remains **CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED**.
 > Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is **BLOCKED** behind Phase 5E fresh evaluation authoring and separate admission.
 
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
@@ -77,9 +79,11 @@ To recover the current POWER 3.8 state:
    mutable operational truth. Software integration through PR #478 and
    security dependency remediation through PR #481 are CLOSED / MERGED /
    VERIFIED; the authorized current-KB hardware acceptance passed with
-   sanitized evidence. Issue #471 closure awaits the signed governance PR's
-   post-merge readback. Phase 5E remains OPEN / NOT PASSED, fresh evaluation
-   authoring is the next separate invocation, and Phase 5F stays BLOCKED.
+   sanitized evidence. PR #483's governance merge/readback is complete and
+   Issue #471 is CLOSED / COMPLETED. Verify this post-#483 canonical-plan
+   reconciliation's own protected merge/readback before the separate Phase 5E
+   fresh-evaluation-authoring invocation; Phase 5E remains OPEN / NOT PASSED
+   and Phase 5F stays BLOCKED.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -110,7 +114,7 @@ phase report, release artifact, or authorization to start Phase 5F.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation after signed #471 governance reconciliation; Phase 5E remains OPEN / NOT PASSED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation after post-#483 canonical-plan reconciliation and exact readback; Phase 5E remains OPEN / NOT PASSED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED |
 
 ## HISTORICAL PLAN
 
@@ -154,8 +158,11 @@ R6A.1/R6A.2 closed without fresh holdout execution). P38-WP03-R4 is
 `PASS` for the explicitly authorized current snapshot (791/791 sources, 5,876
 chunks, complete FTS+dense coverage); the historical 3,624-note / 19,954-chunk /
 23,578-vector workload was not reproduced and is not directly comparable.
-Issue #471 closure is pending signed governance post-merge readback. Phase 5F (P38-WP04 / Phase 5F
-Incremental Dense Validity / dirty-set behavior) is `BLOCKED` behind Phase 5E.
+PR #483's signed governance post-merge readback is complete and Issue #471 is
+`CLOSED / COMPLETED`. The post-#483 canonical-plan reconciliation still requires
+its own protected publication and exact live readback before the next separate
+invocation. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set
+behavior) is `BLOCKED` behind Phase 5E.
 
 ## ARCHITECTURAL DECISION
 
@@ -199,7 +206,8 @@ Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B/5C/5D
 gates, the CLOSED / MERGED / VERIFIED OpenVINO software integration through PR
 #478, security dependency remediation through PR #481, the PASS of the explicitly
 authorized current-KB hardware acceptance for Issue #471, the OPEN Phase 5E
-(fresh evaluation authoring is the next separate invocation),
+(fresh evaluation authoring is the next separate invocation after the post-#483
+canonical-plan reconciliation and exact readback),
 the HISTORICAL / CLOSED / FAILED VERIFICATION P38-WP03-R4, the BLOCKED Phase 5F
 (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior),
 and the merged INFRA-1 broker. It does not authorize Actions #396,
