@@ -4,19 +4,37 @@ This directory is the navigation index for POWER 3.8 planning, architecture,
 and execution governance. It does not replace live GitHub state, exact Git
 objects, signed commits, branch protection, or authoritative phase reports.
 
+## Live verification overlay — 2026-10-11 (PROPOSED)
+
+Public GitHub REST and fetched Git objects confirm that live `main` is
+`aa295a4073ba4c0fff0e45721610a4bcdb5489c8`, tree
+`a25c80d6b5a77c4d36ec8373032d1e91ccdb36ac`; PR #485 is merged and GitHub REST
+reports signature verification `valid`. Local GPG fingerprint mapping remains
+`UNVERIFIED` because this host lacks the public key. This local overlay corrects
+the pre-final status below that says the post-#483 reconciliation is still
+pending. Dated handoffs remain immutable. Current branch-protection rules were
+not observable through unauthenticated REST and remain `UNVERIFIED`.
+
+Phase 5E remains `OPEN / NOT PASSED`; fresh evaluation authoring is the next
+separate canonical gate. Phase 5F remains `BLOCKED`, and POWER 3.8.0 remains
+`NO-GO`. The EmbeddingGemma 2 audit, ADR, and plan listed below are
+`PROPOSED / NOT CANONICAL / NOT IMPLEMENTED`; they do not reorder Phase 5 or
+authorize runtime work. The linked state/roadmap/protocol/architecture snapshots
+retain pre-merge #485 wording; this overlay supersedes only those mutable status
+clauses until a bounded protected update is accepted.
+
 ## ACTIVE GOVERNANCE
 
 The following files form the active **post-final-integration governance and
-next-gate projection**. The snapshot is canonical on `main` only after this
-governance PR is protected-merged; mutable GitHub values always require fresh
-REST verification:
+next-gate projection**. Mutable GitHub values always require fresh REST
+verification; the live overlay above records the current #485 merge readback.
 
 - [POWER 3.8 — Current State](POWER_3.8_CURRENT_STATE.md)
 - [POWER 3.8 — Execution Roadmap](POWER_3.8_EXECUTION_ROADMAP.md)
 - [POWER 3.8 — Development Protocol](POWER_3.8_DEVELOPMENT_PROTOCOL.md)
 - [POWER 3.8 — Context / Memory / Retrieval Architecture](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
 - [Project-state handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Post-#483 authorized admission continuation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T122404Z_canonical-plan-drift-reconciliation_authorized-admission.md) — latest pre-final-candidate record; exact final validation, reviews, attestation and protected merge/readback remain live PR facts.
+- Historical: [Post-#483 authorized admission continuation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T122404Z_canonical-plan-drift-reconciliation_authorized-admission.md) — immutable pre-final-candidate record; PR #485 subsequently merged and its exact merge/readback is recorded in the live overlay and EG2-00 audit.
 - Historical: [Post-#483 pre-merge blocked handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-06T101309Z_canonical-plan-drift-reconciliation-post-483_pre-merge-blocked.md) and [local remediation snapshot](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T043900Z_canonical-plan-drift-reconciliation-post-483_local-remediation.md) — dated failures/proposals retained unchanged, not the latest active status.
 - Historical: [OpenVINO #478 post-merge reconciliation handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-09-27T230732Z_openvino-471-post-merge-reconciliation_candidate-ready.md) — immutable pre-acceptance snapshot; superseded as the active pointer after #483 and Issue #471 disposition.
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
@@ -55,6 +73,10 @@ REST verification:
 > OpenVINO software integration is **CLOSED / MERGED / VERIFIED through PR #478** and security dependency remediation is **CLOSED / MERGED / VERIFIED through PR #481**. `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE` passed for the explicitly authorized current private KB snapshot; the historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable. PR #483 governance is **CLOSED / MERGED / VERIFIED**; Issue #471 is **CLOSED / COMPLETED** after its post-merge readback. The current post-#483 canonical-plan reconciliation must itself pass its protected publication and exact readback before the next invocation. PR #473 remains **CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED**.
 > Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is **BLOCKED** behind Phase 5E fresh evaluation authoring and separate admission.
 
+> The pre-final status clauses above that say PR #485 reconciliation is pending
+> are historical snapshot text. The live verification overlay supersedes those
+> clauses; the original handoffs remain unchanged.
+
 > Links to `artifacts/` are GitHub evidence permalinks intentionally outside
 > the MkDocs navigation tree; they are not local documentation targets.
 
@@ -79,11 +101,11 @@ To recover the current POWER 3.8 state:
    mutable operational truth. Software integration through PR #478 and
    security dependency remediation through PR #481 are CLOSED / MERGED /
    VERIFIED; the authorized current-KB hardware acceptance passed with
-   sanitized evidence. PR #483's governance merge/readback is complete and
-   Issue #471 is CLOSED / COMPLETED. Verify this post-#483 canonical-plan
-   reconciliation's own protected merge/readback before the separate Phase 5E
-   fresh-evaluation-authoring invocation; Phase 5E remains OPEN / NOT PASSED
-   and Phase 5F stays BLOCKED.
+    sanitized evidence. PR #483's governance merge/readback is complete and
+    Issue #471 is CLOSED / COMPLETED. PR #485's post-#483 canonical-plan
+    reconciliation is CLOSED / MERGED / VERIFIED; Phase 5E fresh evaluation
+    authoring is now the next separate canonical invocation and remains OPEN /
+    NOT PASSED. Phase 5F stays BLOCKED.
 
 ## CURRENT PLANNING CONTRACTS
 
@@ -91,6 +113,7 @@ The following package is the active POWER 3.8 context, memory, retrieval, and
 evaluation planning direction:
 
 - [Human-readable architecture plan](POWER_3.8_CONTEXT_MEMORY_ARCHITECTURE.md)
+- **PROPOSED / NOT CANONICAL:** [EmbeddingGemma 2 integration plan](2026-10-11-embeddinggemma2-integration-plan.md) and [ADR-0009](../adr/0009-embeddinggemma2-optional-text-retrieval.md). Repository evidence paths outside the MkDocs tree: `artifacts/project-state/evidence/2026-10-11_embeddinggemma2_EG2-00_audit.md` and `artifacts/project-state/handoffs/2026-10-11T155020Z_embeddinggemma2-eg2-00-01_prepared.md`.
 - [Planning artifacts README](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Context/retrieval contracts v2](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/context-retrieval-contracts-v2.schema.json)
 - [Retrieval evaluation manifest v1](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/retrieval-eval-v1.schema.json)
@@ -114,7 +137,7 @@ phase report, release artifact, or authorization to start Phase 5F.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation after post-#483 canonical-plan reconciliation and exact readback; Phase 5E remains OPEN / NOT PASSED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation; Phase 5E remains OPEN / NOT PASSED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED. EG2-02 is proposed, not canonical authorization. |
 
 ## HISTORICAL PLAN
 
@@ -159,8 +182,9 @@ R6A.1/R6A.2 closed without fresh holdout execution). P38-WP03-R4 is
 chunks, complete FTS+dense coverage); the historical 3,624-note / 19,954-chunk /
 23,578-vector workload was not reproduced and is not directly comparable.
 PR #483's signed governance post-merge readback is complete and Issue #471 is
-`CLOSED / COMPLETED`. The post-#483 canonical-plan reconciliation still requires
-its own protected publication and exact live readback before the next separate
+`CLOSED / COMPLETED`. The post-#483 canonical-plan reconciliation is
+`CLOSED / MERGED / VERIFIED` through PR #485. Phase 5E remains `OPEN / NOT
+PASSED` with fresh evaluation authoring as the next separate canonical
 invocation. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set
 behavior) is `BLOCKED` behind Phase 5E.
 
