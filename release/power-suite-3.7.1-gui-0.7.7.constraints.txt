@@ -37,7 +37,7 @@ mcp-types==2.1.0
 mmh3==5.2.1
 numpy==2.4.6
 onnxruntime==1.29.0
-opentelemetry-api==1.44.0
+opentelemetry-api==1.45.2
 packaging==26.3
 pathspec==1.1.1
 pillow==12.3.0
