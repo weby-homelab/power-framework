@@ -557,6 +557,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
                 accept_dense_loss=accept_dense_loss,
+                max_reconcile_rounds=3,
             ),
         )
     except IndexGenerationError as exc:

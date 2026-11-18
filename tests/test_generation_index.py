@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from contextlib import closing
 from typing import TYPE_CHECKING
@@ -799,3 +800,140 @@ def test_nonempty_legacy_dense_migration_rewrites_manifest_from_new_rows(
     assert manifest["chunk_count"] == str(chunk_count)
     assert manifest["embedding_provider"] == "DenseMigrationManager"
     assert manifest["embedding_model"] == "nonempty-migration"
+
+
+def test_concurrent_edit_during_sync_reconciles_without_reembedding_unchanged_notes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A single concurrent edit during embedding must reconcile instead of discarding work."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "reconcile-concurrent", "alpha-token")
+    (vault / "01_Projects" / "Beta.md").write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Beta\n"
+        "description: beta note\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\n"
+        "beta-original-token\n",
+        encoding="utf-8",
+    )
+
+    embedded_texts: list[str] = []
+
+    class SpyEmbedder:
+        dimension = 3
+        model_name = "spy-embedder"
+
+        def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
+            del batch_size
+            embedded_texts.extend(texts)
+            return [[1.0, 0.0, 0.0] for _ in texts]
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: SpyEmbedder())
+
+    original_sync = generation_index._sync_vault_to_db
+    sync_calls = 0
+
+    def sync_with_concurrent_edit(*args: object, **kwargs: object) -> None:
+        nonlocal sync_calls
+        sync_calls += 1
+        original_sync(*args, **kwargs)
+        if sync_calls == 1:
+            beta = vault / "01_Projects" / "Beta.md"
+            beta.write_text(
+                beta.read_text(encoding="utf-8").replace(
+                    "beta-original-token", "beta-updated-token"
+                ),
+                encoding="utf-8",
+            )
+
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_with_concurrent_edit)
+
+    report = sync_vault_atomically(
+        vault, sync_embeddings=True, force_rebuild=True, max_reconcile_rounds=3
+    )
+
+    assert sync_calls == 2
+    assert report.actual_files == 2
+    active = resolve_active_generation(vault)
+    assert active is not None
+    assert active.source_snapshot_hash == report.source_snapshot_hash
+    assert search_vault(vault, "beta-updated-token", mode="fts")
+    assert not search_vault(vault, "beta-original-token", mode="fts")
+    # Pass 1 embedded Test.md + Beta.md (doc + chunk = 4 texts); pass 2 embedded ONLY Beta.md (2 texts).
+    assert len(embedded_texts) == 6
+    assert all("beta-updated-token" in text for text in embedded_texts[4:])
+
+    # Continuous concurrent edits past max_reconcile_rounds must still fail closed.
+    def sync_always_mutating(*args: object, **kwargs: object) -> None:
+        original_sync(*args, **kwargs)
+        beta = vault / "01_Projects" / "Beta.md"
+        beta.write_text(beta.read_text(encoding="utf-8") + "x", encoding="utf-8")
+
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_always_mutating)
+    with pytest.raises(IndexGenerationError, match=r"snapshot changed during sync.*Beta.md"):
+        sync_vault_atomically(vault, sync_embeddings=True, max_reconcile_rounds=3)
+
+
+def test_concurrent_invalidation_same_tick_mtime_and_invalid_max_rounds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Same-tick invalidation reconciles under allow_partial=True and fails closed otherwise."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "reconcile-invalid-same-tick", "alpha-token")
+    beta = vault / "01_Projects" / "Beta.md"
+    beta.write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Beta\n"
+        "description: beta note\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\n"
+        "beta-live-token\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(IndexGenerationError, match=r"max_rounds must be >= 1"):
+        sync_vault_atomically(vault, sync_embeddings=False, max_reconcile_rounds=0)
+
+    original_sync = generation_index._sync_vault_to_db
+    calls = 0
+
+    def invalidate_with_preserved_mtime(*args: object, **kwargs: object) -> None:
+        nonlocal calls
+        calls += 1
+        original_sync(*args, **kwargs)
+        if calls == 1:
+            st = beta.stat()
+            beta.write_text("broken-frontmatter-no-okf\n", encoding="utf-8")
+            os.utime(beta, ns=(st.st_atime_ns, st.st_mtime_ns))
+
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", invalidate_with_preserved_mtime)
+    report = sync_vault_atomically(
+        vault, sync_embeddings=False, allow_partial=True, max_reconcile_rounds=3
+    )
+    assert calls == 2
+    assert report.actual_files == 1
+    assert report.invalid_sources == 1
+    assert not search_vault(vault, "beta-live-token", mode="fts")
+
+    # Under allow_partial=False, concurrent invalidation must fail closed immediately.
+    beta.write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Beta\n"
+        "description: beta restored\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\n"
+        "beta-restored-token\n",
+        encoding="utf-8",
+    )
+    calls = 0
+    with pytest.raises(IndexGenerationError, match=r"sync failed closed.*Beta\.md"):
+        sync_vault_atomically(
+            vault, sync_embeddings=False, allow_partial=False, max_reconcile_rounds=3
+        )
+    assert calls == 1
