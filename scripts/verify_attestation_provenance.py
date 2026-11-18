@@ -230,9 +230,10 @@ def _invocation_run_ids(payload: Any) -> set[str]:
                 match = RUN_ID_RE.search(text)
                 if match:
                     run_ids.add(match.group(1))
-            elif key in {"runId", "run_id", "workflow_run_id", "workflowRunId"}:
-                if re.fullmatch(r"[1-9][0-9]*", text):
-                    run_ids.add(text)
+            elif key in {"runId", "run_id", "workflow_run_id", "workflowRunId"} and re.fullmatch(
+                r"[1-9][0-9]*", text
+            ):
+                run_ids.add(text)
     return run_ids
 
 

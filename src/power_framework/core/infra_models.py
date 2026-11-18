@@ -698,9 +698,11 @@ class InfraResponse(InfraBaseModel):
             )
             if self.status is not expected_status:
                 raise ValueError("block response status does not match its reason")
-        elif self.receipt.exit_category in {InfraExitCategory.SUCCESS, InfraExitCategory.REPLAY}:
-            if self.status is not InfraResponseStatus.OK:
-                raise ValueError("successful receipt requires status=ok")
+        elif (
+            self.receipt.exit_category in {InfraExitCategory.SUCCESS, InfraExitCategory.REPLAY}
+            and self.status is not InfraResponseStatus.OK
+        ):
+            raise ValueError("successful receipt requires status=ok")
         return self
 
 
