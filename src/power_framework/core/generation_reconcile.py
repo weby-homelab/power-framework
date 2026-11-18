@@ -94,6 +94,9 @@ def reconcile_staging_snapshot(
     """
     from . import generation_index as gi
 
+    if max_rounds < 1:
+        raise ValueError("max_rounds must be >= 1")
+
     current_inventory = inventory
     current_hash = snapshot_hash
     for attempt in range(max_rounds):
@@ -121,15 +124,20 @@ def reconcile_staging_snapshot(
                 raise gi.IndexGenerationError(
                     f"sync failed closed: {len(next_inventory.invalid_sources)} source(s) excluded; {details}"
                 ) from exc
-            changed_valid = [
+            stale_paths = [
                 path
                 for path, digest in next_inventory.valid_sources.items()
                 if current_inventory.valid_sources.get(path) != digest
             ]
-            if changed_valid:
+            stale_paths.extend(
+                path
+                for path in current_inventory.valid_sources
+                if path in next_inventory.invalid_sources
+            )
+            if stale_paths:
                 conn.executemany(
                     "UPDATE file_metadata SET mtime = -1 WHERE rel_path = ?",
-                    [(path,) for path in changed_valid],
+                    [(path,) for path in stale_paths],
                 )
                 conn.commit()
             next_hash = gi._snapshot_hash(next_inventory.valid_sources)
@@ -142,7 +150,7 @@ def reconcile_staging_snapshot(
                 generation_id,
                 attempt + 2,
                 max_rounds,
-                len(changed_valid),
+                len(stale_paths),
             )
             current_inventory = next_inventory
             current_hash = next_hash

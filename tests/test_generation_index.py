@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from contextlib import closing
 from typing import TYPE_CHECKING
@@ -874,3 +875,65 @@ def test_concurrent_edit_during_sync_reconciles_without_reembedding_unchanged_no
     monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_always_mutating)
     with pytest.raises(IndexGenerationError, match=r"snapshot changed during sync.*Beta.md"):
         sync_vault_atomically(vault, sync_embeddings=True, max_reconcile_rounds=3)
+
+
+def test_concurrent_invalidation_same_tick_mtime_and_invalid_max_rounds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Same-tick invalidation reconciles under allow_partial=True and fails closed otherwise."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "reconcile-invalid-same-tick", "alpha-token")
+    beta = vault / "01_Projects" / "Beta.md"
+    beta.write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Beta\n"
+        "description: beta note\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\n"
+        "beta-live-token\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(IndexGenerationError, match=r"max_rounds must be >= 1"):
+        sync_vault_atomically(vault, sync_embeddings=False, max_reconcile_rounds=0)
+
+    original_sync = generation_index._sync_vault_to_db
+    calls = 0
+
+    def invalidate_with_preserved_mtime(*args: object, **kwargs: object) -> None:
+        nonlocal calls
+        calls += 1
+        original_sync(*args, **kwargs)
+        if calls == 1:
+            st = beta.stat()
+            beta.write_text("broken-frontmatter-no-okf\n", encoding="utf-8")
+            os.utime(beta, ns=(st.st_atime_ns, st.st_mtime_ns))
+
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", invalidate_with_preserved_mtime)
+    report = sync_vault_atomically(
+        vault, sync_embeddings=False, allow_partial=True, max_reconcile_rounds=3
+    )
+    assert calls == 2
+    assert report.actual_files == 1
+    assert report.invalid_sources == 1
+    assert not search_vault(vault, "beta-live-token", mode="fts")
+
+    # Under allow_partial=False, concurrent invalidation must fail closed immediately.
+    beta.write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Beta\n"
+        "description: beta restored\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\n"
+        "beta-restored-token\n",
+        encoding="utf-8",
+    )
+    calls = 0
+    with pytest.raises(IndexGenerationError, match=r"sync failed closed.*Beta\.md"):
+        sync_vault_atomically(
+            vault, sync_embeddings=False, allow_partial=False, max_reconcile_rounds=3
+        )
+    assert calls == 1
