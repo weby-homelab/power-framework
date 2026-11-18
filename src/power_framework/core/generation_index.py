@@ -962,7 +962,7 @@ def sync_vault_atomically(
                     active_conn.backup(conn)
             _init_db(conn)
             ops = _ReconcileOps(
-                lambda vr, c, **kw: _sync_vault_to_db(vr, c, **kw),
+                _sync_vault_to_db,
                 _assert_source_snapshot_unchanged,
                 _source_inventory,
                 _state_db_path,
