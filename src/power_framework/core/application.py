@@ -794,6 +794,7 @@ class ApplicationService:
                     force_rebuild=force_rebuild,
                     allow_partial=allow_partial,
                     accept_dense_loss=accept_dense_loss,
+                    max_reconcile_rounds=3,
                 )
             except IndexGenerationError as exc:
                 raise RuntimeError(

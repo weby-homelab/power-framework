@@ -17,8 +17,9 @@ from threading import RLock
 
 from .constants import SKIP_FILES, is_catalog_filename
 from .db import _init_db
+from .generation_reconcile import reconcile_staging_snapshot
 from .ignore import should_skip
-from .index_sync import _sync_vault_to_db
+from .index_sync import _sync_vault_to_db as _sync_vault_to_db
 from .parser import read_file_content, validate_metadata
 from .source_projection import scan_projection, write_projection
 from .utils import iter_vault_markdown_files
@@ -913,6 +914,7 @@ def sync_vault_atomically(
     force_rebuild: bool = False,
     allow_partial: bool = True,
     accept_dense_loss: bool = False,
+    max_reconcile_rounds: int = 1,
 ) -> GenerationReport:
     """Build a complete staged generation and atomically publish it on success.
 
@@ -969,13 +971,18 @@ def sync_vault_atomically(
                 ) as active_conn:
                     active_conn.backup(conn)
             _init_db(conn)
-            _sync_vault_to_db(
+            inventory, snapshot_hash = reconcile_staging_snapshot(
                 root,
                 conn,
+                generation_id=generation_id,
+                inventory=inventory,
+                snapshot_hash=snapshot_hash,
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
+                allow_partial=allow_partial,
+                max_rounds=max_reconcile_rounds,
             )
-            _assert_source_snapshot_unchanged(root, inventory)
+            sources = inventory.valid_sources
             actual_files, actual_chunks, provider, model = _validate_staging(
                 conn,
                 set(sources),

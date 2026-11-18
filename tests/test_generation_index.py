@@ -799,3 +799,78 @@ def test_nonempty_legacy_dense_migration_rewrites_manifest_from_new_rows(
     assert manifest["chunk_count"] == str(chunk_count)
     assert manifest["embedding_provider"] == "DenseMigrationManager"
     assert manifest["embedding_model"] == "nonempty-migration"
+
+
+def test_concurrent_edit_during_sync_reconciles_without_reembedding_unchanged_notes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A single concurrent edit during embedding must reconcile instead of discarding work."""
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "reconcile-concurrent", "alpha-token")
+    (vault / "01_Projects" / "Beta.md").write_text(
+        "---\n"
+        "type: Project\n"
+        "title: Beta\n"
+        "description: beta note\n"
+        "timestamp: 2026-07-27T00:00:00+00:00\n"
+        "---\n\n"
+        "beta-original-token\n",
+        encoding="utf-8",
+    )
+
+    embedded_texts: list[str] = []
+
+    class SpyEmbedder:
+        dimension = 3
+        model_name = "spy-embedder"
+
+        def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
+            del batch_size
+            embedded_texts.extend(texts)
+            return [[1.0, 0.0, 0.0] for _ in texts]
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: SpyEmbedder())
+
+    original_sync = generation_index._sync_vault_to_db
+    sync_calls = 0
+
+    def sync_with_concurrent_edit(*args: object, **kwargs: object) -> None:
+        nonlocal sync_calls
+        sync_calls += 1
+        original_sync(*args, **kwargs)
+        if sync_calls == 1:
+            beta = vault / "01_Projects" / "Beta.md"
+            beta.write_text(
+                beta.read_text(encoding="utf-8").replace(
+                    "beta-original-token", "beta-updated-token"
+                ),
+                encoding="utf-8",
+            )
+
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_with_concurrent_edit)
+
+    report = sync_vault_atomically(
+        vault, sync_embeddings=True, force_rebuild=True, max_reconcile_rounds=3
+    )
+
+    assert sync_calls == 2
+    assert report.actual_files == 2
+    active = resolve_active_generation(vault)
+    assert active is not None
+    assert active.source_snapshot_hash == report.source_snapshot_hash
+    assert search_vault(vault, "beta-updated-token", mode="fts")
+    assert not search_vault(vault, "beta-original-token", mode="fts")
+    # Pass 1 embedded Test.md + Beta.md (doc + chunk = 4 texts); pass 2 embedded ONLY Beta.md (2 texts).
+    assert len(embedded_texts) == 6
+    assert all("beta-updated-token" in text for text in embedded_texts[4:])
+
+    # Continuous concurrent edits past max_reconcile_rounds must still fail closed.
+    def sync_always_mutating(*args: object, **kwargs: object) -> None:
+        original_sync(*args, **kwargs)
+        beta = vault / "01_Projects" / "Beta.md"
+        beta.write_text(beta.read_text(encoding="utf-8") + "x", encoding="utf-8")
+
+    monkeypatch.setattr(generation_index, "_sync_vault_to_db", sync_always_mutating)
+    with pytest.raises(IndexGenerationError, match=r"snapshot changed during sync.*Beta.md"):
+        sync_vault_atomically(vault, sync_embeddings=True, max_reconcile_rounds=3)
