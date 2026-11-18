@@ -17,7 +17,12 @@ from threading import RLock
 
 from .constants import SKIP_FILES, is_catalog_filename
 from .db import _init_db
-from .generation_reconcile import reconcile_staging_snapshot
+from .generation_reconcile import (
+    _enforce_partial_policy,
+    _ReconcileOps,
+    _snapshot_hash,
+    reconcile_staging_snapshot,
+)
 from .ignore import should_skip
 from .index_sync import _sync_vault_to_db as _sync_vault_to_db
 from .parser import read_file_content, validate_metadata
@@ -266,16 +271,6 @@ def _source_inventory(vault_dir: Path) -> SourceInventory:
             content.encode("utf-8"), digest_size=32
         ).hexdigest()
     return SourceInventory(valid_sources, invalid_sources, total_scanned)
-
-
-def _snapshot_hash(sources: dict[str, str]) -> str:
-    digest = hashlib.blake2b(digest_size=32)
-    for rel_path, content_hash in sorted(sources.items()):
-        digest.update(rel_path.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(content_hash.encode("ascii"))
-        digest.update(b"\n")
-    return digest.hexdigest()
 
 
 def _assert_source_snapshot_unchanged(vault_dir: Path, expected_inventory: SourceInventory) -> None:
@@ -927,6 +922,8 @@ def sync_vault_atomically(
     """
     root = Path(vault_dir).expanduser().resolve()
     ensure_vault_identity(root)
+    if max_reconcile_rounds < 1:
+        raise IndexGenerationError("max_rounds must be >= 1")
     _reap_stale_build_artifacts(root)
     if not sync_embeddings and not accept_dense_loss:
         existing_chunks = active_dense_chunk_count(root)
@@ -937,14 +934,7 @@ def sync_vault_atomically(
                 "to explicitly discard the embeddings (CLI: --accept-dense-loss)."
             )
     inventory = _source_inventory(root)
-    if inventory.invalid_sources and not allow_partial:
-        details = "; ".join(
-            f"{rel_path} ({reason})"
-            for rel_path, reason in sorted(inventory.invalid_sources.items())
-        )
-        raise IndexGenerationError(
-            f"sync failed closed: {len(inventory.invalid_sources)} source(s) excluded; {details}"
-        )
+    _enforce_partial_policy(inventory, allow_partial, IndexGenerationError)
     sources = inventory.valid_sources
     snapshot_hash = _snapshot_hash(sources)
     migrated = _migrate_legacy_database(
@@ -971,6 +961,14 @@ def sync_vault_atomically(
                 ) as active_conn:
                     active_conn.backup(conn)
             _init_db(conn)
+            ops = _ReconcileOps(
+                lambda vr, c, **kw: _sync_vault_to_db(vr, c, **kw),
+                _assert_source_snapshot_unchanged,
+                _source_inventory,
+                _state_db_path,
+                _init_state_db,
+                IndexGenerationError,
+            )
             inventory, snapshot_hash = reconcile_staging_snapshot(
                 root,
                 conn,
@@ -980,6 +978,7 @@ def sync_vault_atomically(
                 sync_embeddings=sync_embeddings,
                 force_rebuild=force_rebuild,
                 allow_partial=allow_partial,
+                ops=ops,
                 max_rounds=max_reconcile_rounds,
             )
             sources = inventory.valid_sources
