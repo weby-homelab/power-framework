@@ -273,7 +273,7 @@ class TestSemanticSuggestions:
             dimension = 3
 
             def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
-                del batch_size
+                assert batch_size > 0
                 return [[1.0, 0.0, 0.0] if "alpha" in text else [0.0, 1.0, 0.0] for text in texts]
 
         monkeypatch.setattr(
@@ -365,7 +365,7 @@ class TestSemanticSuggestions:
             dimension = 3
 
             def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
-                del batch_size
+                assert batch_size > 0
                 return [[1.0, 0.0, 0.0] for _ in texts]
 
         monkeypatch.setattr(
@@ -436,6 +436,7 @@ class TestSemanticSuggestions:
                 f'description: "{body}"\ntimestamp: 2026-01-01T00:00:00\n---\n\n{body}\n',
                 encoding="utf-8",
             )
+        from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
         from power_framework.core.db import _init_db
         from power_framework.core.vault_storage import vault_db_path
 
@@ -446,7 +447,7 @@ class TestSemanticSuggestions:
             conn.executemany(
                 "INSERT INTO dense_index_manifest(manifest_key, manifest_value) VALUES (?, ?)",
                 [
-                    ("schema_version", "1"),
+                    ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
                     ("embedding_dimension", "2"),
                     ("embedding_provider", "_SyncEmbedder"),
                     ("embedding_model", "fake-bge-m3"),
@@ -511,7 +512,7 @@ class TestSemanticSuggestions:
         # Returning None from embed_batch degrades cleanly to keyword fallback without crashing.
         class _BrokenBatch:
             def embed_batch(self, texts: list[str]):
-                del texts
+                return None if texts else []
 
         monkeypatch.setattr(
             "power_framework.core.embeddings.get_embedding_manager", lambda: _BrokenBatch()
