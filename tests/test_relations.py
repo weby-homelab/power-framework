@@ -6,10 +6,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import pytest
+import pytest
 
 from power_framework.core.models import NoteFile, OKFMetadata, TypedRelation
 from power_framework.core.relations import (
@@ -243,3 +241,83 @@ class TestSemanticSuggestions:
         # Must not raise; degrades to keyword suggestions.
         suggestions = suggest_related_semantic(tmp_path, target_path="01_Projects/Target.md")
         assert isinstance(suggestions, list)
+
+    def test_semantic_uses_stored_doc_embeddings_and_skips_paginated_catalogs(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+        (tmp_path / "01_Projects").mkdir()
+        target = tmp_path / "01_Projects" / "Target.md"
+        note_a = tmp_path / "01_Projects" / "NoteA.md"
+        note_b = tmp_path / "01_Projects" / "NoteB.md"
+        paginated = tmp_path / "01_Projects" / "_index-2.md"
+        for p, body in (
+            (target, "alpha semantic concept target"),
+            (note_a, "alpha semantic concept candidate"),
+            (note_b, "completely unrelated topic"),
+            (paginated, "alpha semantic concept catalog page"),
+        ):
+            p.write_text(
+                "---\ntype: Project\ntitle: T\n"
+                f'description: "{body}"\ntimestamp: 2026-01-01T00:00:00\n---\n\n{body}\n',
+                encoding="utf-8",
+            )
+
+        class _SyncEmbedder:
+            model_name = "fake-bge-m3"
+            dimension = 3
+
+            def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
+                del batch_size
+                return [[1.0, 0.0, 0.0] if "alpha" in text else [0.0, 1.0, 0.0] for text in texts]
+
+        monkeypatch.setattr(
+            "power_framework.core.index_sync._get_embedding_manager", lambda: _SyncEmbedder()
+        )
+        from power_framework.core.generation_index import sync_vault_atomically
+
+        sync_vault_atomically(tmp_path, sync_embeddings=True)
+
+        # Once synced, suggest_related_semantic must use stored doc_embeddings without
+        # loading or calling the embedding manager at all.
+        def _must_not_embed():
+            raise AssertionError("get_embedding_manager must not be called when vectors are stored")
+
+        monkeypatch.setattr(
+            "power_framework.core.embeddings.get_embedding_manager", _must_not_embed
+        )
+        from power_framework.core.relations import suggest_related_semantic
+
+        suggestions = suggest_related_semantic(
+            tmp_path, target_path="01_Projects/Target.md", max_results=5
+        )
+        paths = [s.target_path for s in suggestions]
+        assert paths == ["01_Projects/NoteA.md", "01_Projects/NoteB.md"]
+        assert "01_Projects/_index-2.md" not in paths
+        assert suggestions[0].score == pytest.approx(1.0)
+        assert suggestions[1].score == pytest.approx(0.0)
+
+        # Adding a new unsynced note should only embed the new note, not cached ones.
+        new_note = tmp_path / "01_Projects" / "FreshTarget.md"
+        new_note.write_text(
+            "---\ntype: Project\ntitle: Fresh\n"
+            'description: "fresh target"\ntimestamp: 2026-01-01T00:00:00\n---\n\nfresh target\n',
+            encoding="utf-8",
+        )
+        embedded_calls: list[str] = []
+
+        class _OnlyFresh:
+            def embed(self, text: str) -> list[float]:
+                embedded_calls.append(text)
+                return [1.0, 0.0, 0.0]
+
+        monkeypatch.setattr(
+            "power_framework.core.embeddings.get_embedding_manager", lambda: _OnlyFresh()
+        )
+        fresh_suggestions = suggest_related_semantic(
+            tmp_path, target_path="01_Projects/FreshTarget.md", max_results=5
+        )
+        assert len(embedded_calls) == 1
+        assert "fresh target" in embedded_calls[0]
+        assert fresh_suggestions[0].target_path in {"01_Projects/Target.md", "01_Projects/NoteA.md"}
