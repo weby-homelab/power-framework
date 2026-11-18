@@ -625,6 +625,34 @@ class TestRunGenerateHierarchicalIndex:
         run_generate_hierarchical_index(sample_vault)
         assert "01_Projects" in rendered_folders
 
+    def test_unchanged_run_preserves_index_and_subindex_timestamps(self, sample_vault: Path):
+        run_generate_hierarchical_index(sample_vault)
+        main_index = sample_vault / "index.md"
+        sub_index = sample_vault / "01_Projects" / "_index.md"
+        first_main = main_index.read_text(encoding="utf-8")
+        first_sub = sub_index.read_text(encoding="utf-8")
+
+        run_generate_hierarchical_index(sample_vault)
+        assert main_index.read_text(encoding="utf-8") == first_main
+        assert sub_index.read_text(encoding="utf-8") == first_sub
+
+        # Body-only edit triggers sub-index re-render without catalog metadata changes;
+        # neither index.md nor _index.md should churn its timestamp.
+        note_path = sample_vault / "01_Projects" / "TestProject.md"
+        note_path.write_text(
+            note_path.read_text(encoding="utf-8") + "\nBody-only edit.\n",
+            encoding="utf-8",
+        )
+        run_generate_hierarchical_index(sample_vault)
+        assert main_index.read_text(encoding="utf-8") == first_main
+        assert sub_index.read_text(encoding="utf-8") == first_sub
+
+        # Adding a note changes the navigation map and must update index.md + _index.md.
+        _write_note(sample_vault / "01_Projects" / "AddedNote.md", "Added Note")
+        run_generate_hierarchical_index(sample_vault)
+        assert main_index.read_text(encoding="utf-8") != first_main
+        assert "Added Note" in sub_index.read_text(encoding="utf-8")
+
     def test_overwrites_existing_indexes(self, sample_vault: Path):
         main_index = sample_vault / "index.md"
         main_index.write_text("Old main content")

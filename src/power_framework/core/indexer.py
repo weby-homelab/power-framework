@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .constants import INDEX_FOLDERS, INDEX_MAX_BYTES, is_catalog_filename
 from .ignore import should_skip
+from .index_write import write_index_if_changed
 from .models import MAX_DESCRIPTION_LENGTH, NOTE_TYPE_ORDER, OKFMetadata, TypedRelation
 from .parser import read_file_content, validate_metadata
 from .utils import atomic_write, is_regular_vault_file, iter_vault_markdown_files
@@ -828,7 +829,7 @@ def _write_catalog_pages(
         return False
 
     for filename, content in pages.items():
-        atomic_write(directory / filename, content)
+        write_index_if_changed(directory / filename, content)
     for path in existing:
         if path not in expected and _is_owned_catalog(path, vault_dir):
             path.unlink()
@@ -872,7 +873,7 @@ def run_generate_hierarchical_index(vault_dir: Path) -> str:
 
     main_index_path = vault_dir / "index.md"
     main_content = generate_main_index_content(folder_notes, root_daily_logs)
-    atomic_write(main_index_path, main_content)
+    write_index_if_changed(main_index_path, main_content)
 
     generated_pages = 0
     written_catalogs: set[str] = set()
