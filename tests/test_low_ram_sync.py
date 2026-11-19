@@ -13,6 +13,8 @@ import sqlite3
 from contextlib import closing
 from typing import TYPE_CHECKING
 
+import pytest
+
 from power_framework.core import index_sync, searcher
 from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
 
@@ -275,3 +277,301 @@ def test_fastembed_parallel_is_bounded_not_all_cores(monkeypatch, tmp_path):
         f"expected parallel=2 (bounded), got {captured.get('parallel')}"
     )
     assert captured["parallel"] != 0, "parallel=0 spawns one process per core (OOM risk)"
+
+
+class _SpyBgeM3Manager:
+    """Offline BGE-M3-shaped double recording batch sizes without loading weights."""
+
+    model_name = "BAAI/bge-m3"
+    dimension = 1024
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[int, int]] = []
+
+    def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
+        self.calls.append((len(texts), batch_size))
+        return [[0.1] * 4 for _ in texts]
+
+
+def test_sync_preflight_refuses_undersized_ram_and_force_does_not_bypass(
+    monkeypatch,
+    tmp_path: Path,
+    caplog,
+):
+    """Issue #467: undersized host refuses before loading embedder or calling embed_batch."""
+    from power_framework.core import cli, generation_index, sync_memory
+
+    monkeypatch.delenv("POWER_SYNC_ALLOW_LOW_MEMORY", raising=False)
+    monkeypatch.delenv("POWER_EMBED_PROVIDER", raising=False)
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=4)
+
+    spy = _SpyBgeM3Manager()
+    loader_calls = 0
+
+    def _counting_loader(*_a, **_k):
+        nonlocal loader_calls
+        loader_calls += 1
+        return spy
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", _counting_loader)
+    monkeypatch.setattr(sync_memory, "available_memory_bytes", lambda: 512 * 1024 * 1024)
+
+    with (
+        caplog.at_level("ERROR"),
+        pytest.raises(
+            generation_index.IndexGenerationError,
+            match=r"Dense sync preflight refused: estimated RAM ~\d+ MiB exceeds available ~512 MiB",
+        ),
+    ):
+        generation_index.sync_vault_atomically(vault, sync_embeddings=True)
+
+    assert loader_calls == 0
+    assert spy.calls == []
+
+    # CLI --force must NOT overload low-memory override or load the embedder.
+    exit_force = cli._cmd_sync(
+        type(
+            "Args",
+            (),
+            {
+                "path": str(vault),
+                "fts_only": False,
+                "force": True,
+                "accept_dense_loss": False,
+                "allow_low_memory": False,
+                "allow_partial": False,
+            },
+        )()
+    )
+    assert exit_force == 1
+    assert loader_calls == 0
+    assert spy.calls == []
+
+
+def test_sync_preflight_allows_explicit_allow_low_memory_with_batch_one(
+    monkeypatch,
+    tmp_path: Path,
+    caplog,
+):
+    """Explicit --allow-low-memory logs a warning and runs with batch_size=1."""
+    from power_framework.core import cli, sync_memory
+
+    monkeypatch.delenv("POWER_SYNC_ALLOW_LOW_MEMORY", raising=False)
+    monkeypatch.delenv("POWER_EMBED_PROVIDER", raising=False)
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=3)
+
+    spy = _SpyBgeM3Manager()
+    _patch_manager(monkeypatch, spy)
+    monkeypatch.setattr(sync_memory, "available_memory_bytes", lambda: 512 * 1024 * 1024)
+
+    with caplog.at_level("WARNING"):
+        exit_code = cli._cmd_sync(
+            type(
+                "Args",
+                (),
+                {
+                    "path": str(vault),
+                    "fts_only": False,
+                    "force": False,
+                    "accept_dense_loss": False,
+                    "allow_low_memory": True,
+                    "allow_partial": False,
+                },
+            )()
+        )
+
+    assert exit_code == 0
+    assert spy.calls
+    assert all(bs == 1 and size == 1 for size, bs in spy.calls)
+    assert "low-memory override" in caplog.text
+
+
+def test_sync_shrinks_batch_under_pressure_and_logs_progress_eta(
+    monkeypatch,
+    tmp_path: Path,
+    caplog,
+):
+    """Mid-sync memory pressure shrinks batch_size cleanly and logs progress/ETA."""
+    from power_framework.core import sync_memory
+
+    monkeypatch.delenv("POWER_SYNC_ALLOW_LOW_MEMORY", raising=False)
+    monkeypatch.delenv("POWER_EMBED_PROVIDER", raising=False)
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=12)
+
+    class _PressureSpy:
+        model_name = "BAAI/bge-m3"
+        dimension = 1024
+
+        def __init__(self) -> None:
+            self.calls: list[int] = []
+            self.drop_pressure = False
+
+        def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
+            self.calls.append(batch_size)
+            self.drop_pressure = True
+            return [[0.1] * 4 for _ in texts]
+
+    spy = _PressureSpy()
+    _patch_manager(monkeypatch, spy)
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "8")
+    monkeypatch.setattr(
+        sync_memory,
+        "available_memory_bytes",
+        lambda: 256 * 1024 * 1024 if spy.drop_pressure else 8 * 1024 * 1024 * 1024,
+    )
+
+    db = tmp_path / "power_search.db"
+    with closing(sqlite3.connect(str(db), timeout=30)) as conn, caplog.at_level("INFO"):
+        searcher._init_db(conn)
+        searcher._sync_vault_to_db(vault, conn, sync_embeddings=True)
+
+    assert spy.calls[0] == 8
+    assert 4 in spy.calls
+    assert spy.calls[-1] == 1
+    assert "Embedding progress:" in caplog.text
+    assert "%" in caplog.text
+    assert "eta=" in caplog.text
+
+
+def test_sync_fts_only_ignores_tiny_ram_preflight(monkeypatch, tmp_path: Path):
+    """--fts-only never triggers dense RAM preflight even on a 128 MiB host."""
+    from power_framework.core import generation_index, sync_memory
+
+    monkeypatch.delenv("POWER_SYNC_ALLOW_LOW_MEMORY", raising=False)
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=3)
+
+    monkeypatch.setattr(sync_memory, "available_memory_bytes", lambda: 128 * 1024 * 1024)
+    report = generation_index.sync_vault_atomically(vault, sync_embeddings=False)
+    assert report.actual_files == 3
+    assert report.actual_chunks == 0
+
+
+def test_infer_embedder_dimension_avoids_property_and_remote_side_effects(monkeypatch):
+    """infer_embedder_dimension never evaluates Ollama/FastEmbed @property getters."""
+    from power_framework.core import sync_memory
+    from power_framework.experimental import embeddings
+
+    def _boom(*_a, **_k):
+        raise AssertionError("must not trigger remote HTTP calls or model loading before preflight")
+
+    monkeypatch.setattr(embeddings.OllamaEmbeddingManager, "_get_dim", _boom)
+    monkeypatch.setattr(embeddings.FastEmbedManager, "_lazy_init", _boom)
+
+    ollama_mgr = embeddings.OllamaEmbeddingManager("qwen3-embedding:0.6b")
+    fast_mgr = embeddings.FastEmbedManager("BAAI/bge-small-en-v1.5")
+
+    assert (
+        sync_memory.infer_embedder_dimension(
+            ollama_mgr, "OllamaEmbeddingManager", ollama_mgr.model_name
+        )
+        == 1024
+    )
+    assert (
+        sync_memory.infer_embedder_dimension(fast_mgr, "FastEmbedManager", fast_mgr.model_name)
+        == 384
+    )
+    assert (
+        sync_memory.estimate_model_arena_bytes(
+            "FastEmbedManager", "intfloat/multilingual-e5-large", 1024
+        )
+        == 1536 * 1024 * 1024
+    )
+    assert (
+        sync_memory.estimate_model_arena_bytes("FastEmbedManager", "BAAI/bge-small-en-v1.5", 384)
+        == 512 * 1024 * 1024
+    )
+
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "")
+    assert sync_memory.parse_int_env("POWER_EMBED_BATCH_SIZE", 8, minimum=1) == 8
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "not-an-int")
+    assert sync_memory.parse_int_env("POWER_EMBED_BATCH_SIZE", 8, minimum=1) == 8
+
+
+def test_incremental_noop_sync_skips_embedder_load(monkeypatch, tmp_path: Path):
+    """Unchanged incremental sync with matching manifest must not load the heavy embedder."""
+    from power_framework.core import generation_index, sync_memory
+
+    monkeypatch.delenv("POWER_SYNC_ALLOW_LOW_MEMORY", raising=False)
+    monkeypatch.delenv("POWER_EMBED_PROVIDER", raising=False)
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=2)
+
+    spy = _SpyBgeM3Manager()
+    loader_calls = 0
+
+    def _counting_loader(*_a, **_k):
+        nonlocal loader_calls
+        loader_calls += 1
+        return spy
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", _counting_loader)
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: ("_SpyBgeM3Manager", "BAAI/bge-m3"),
+    )
+    monkeypatch.setattr(sync_memory, "available_memory_bytes", lambda: 8 * 1024 * 1024 * 1024)
+
+    first = generation_index.sync_vault_atomically(vault, sync_embeddings=True)
+    assert first.actual_files == 2
+    assert first.actual_chunks > 0
+    assert loader_calls == 1
+
+    second = generation_index.sync_vault_atomically(vault, sync_embeddings=True)
+    assert second.actual_files == 2
+    assert second.actual_chunks == first.actual_chunks
+    assert loader_calls == 1
+
+
+def test_sync_persists_shrunk_batch_size_after_oom_retry(monkeypatch, tmp_path: Path):
+    """A Runtime MemoryError halving batch_size persists for remaining items."""
+    from power_framework.core import sync_memory
+
+    monkeypatch.delenv("POWER_SYNC_ALLOW_LOW_MEMORY", raising=False)
+    monkeypatch.delenv("POWER_EMBED_PROVIDER", raising=False)
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "4")
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=6)
+
+    class _OomOnceOnFourSpy:
+        model_name = "BAAI/bge-m3"
+        dimension = 1024
+
+        def __init__(self) -> None:
+            self.batch_sizes: list[int] = []
+            self.failed = False
+
+        def embed_batch(self, texts: list[str], batch_size: int = 8) -> list[list[float]]:
+            self.batch_sizes.append(batch_size)
+            if not self.failed and batch_size > 2:
+                self.failed = True
+                raise MemoryError("oom at bs=4")
+            return [[0.1] * 4 for _ in texts]
+
+    spy = _OomOnceOnFourSpy()
+    _patch_manager(monkeypatch, spy)
+    monkeypatch.setattr(sync_memory, "available_memory_bytes", lambda: 8 * 1024 * 1024 * 1024)
+
+    db = tmp_path / "power_search.db"
+    with closing(sqlite3.connect(str(db), timeout=30)) as conn:
+        searcher._init_db(conn)
+        searcher._sync_vault_to_db(vault, conn, sync_embeddings=True)
+
+    assert spy.batch_sizes[:2] == [4, 2]
+    assert all(bs <= 2 for bs in spy.batch_sizes[2:])
