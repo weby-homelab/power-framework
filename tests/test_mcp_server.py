@@ -598,6 +598,261 @@ def test_power_mcp_startup_keeps_stdout_protocol_only(sample_vault: Path) -> Non
     assert stdout == b""
 
 
+def test_power_mcp_raw_stdio_echo_pipe_drains_tool_call_on_eof(sample_vault: Path) -> None:
+    """piped stdin hitting immediate EOF must drain in-flight tools/call responses cleanly."""
+    launcher = [str(Path(sys.executable).with_name("power-mcp"))]
+    env = _mcp_process_env(sample_vault)
+    init_frame = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "raw-pipe-test", "version": "1.0"},
+            },
+        }
+    )
+    initialized_note = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    list_frame = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+
+    # Scenario 1: full 4-frame sequence (initialize -> initialized -> tools/list -> tools/call).
+    call_id3 = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {"name": "get_server_info", "arguments": {}},
+        }
+    )
+    full_run = subprocess.run(  # noqa: S603 - invokes installed test launcher.
+        launcher,
+        input="\n".join((init_frame, initialized_note, list_frame, call_id3)) + "\n",
+        capture_output=True,
+        check=False,
+        env=env,
+        text=True,
+        timeout=15,
+    )
+    assert full_run.returncode == 0, full_run.stderr
+    frames = [json.loads(line) for line in full_run.stdout.splitlines() if line.strip()]
+    by_id = {frame["id"]: frame for frame in frames if "id" in frame}
+    assert set(by_id) == {1, 2, 3}
+    assert "tools" in by_id[2]["result"]
+    assert "error" not in by_id[3]
+    assert by_id[3]["result"].get("isError") is not True
+    server_info = json.loads(by_id[3]["result"]["content"][0]["text"])
+    assert server_info["runtime"]["power_framework"] == __version__
+    assert "power-mcp lifecycle: starting" in full_run.stderr
+    assert "power-mcp lifecycle: stopped" in full_run.stderr
+    assert str(sample_vault) not in full_run.stderr
+
+    # Scenario 2: bare 2-frame pipe (initialize + tools/call) -> immediate EOF.
+    call_id2 = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "get_server_info", "arguments": {}},
+        }
+    )
+    bare_run = subprocess.run(  # noqa: S603 - invokes installed test launcher.
+        launcher,
+        input=f"{init_frame}\n{call_id2}\n",
+        capture_output=True,
+        check=False,
+        env=env,
+        text=True,
+        timeout=15,
+    )
+    assert bare_run.returncode == 0, bare_run.stderr
+    bare_frames = {
+        frame["id"]: frame
+        for frame in (json.loads(line) for line in bare_run.stdout.splitlines() if line.strip())
+        if "id" in frame
+    }
+    assert set(bare_frames) == {1, 2}
+    assert "error" not in bare_frames[2]
+    assert bare_frames[2]["result"].get("isError") is not True
+    bare_info = json.loads(bare_frames[2]["result"]["content"][0]["text"])
+    assert bare_info["runtime"]["power_framework"] == __version__
+
+
+def test_power_mcp_raw_stdio_persistent_pipe_executes_tool_call(sample_vault: Path) -> None:
+    """An open interactive stdio pipe executes sequential requests and shuts down cleanly."""
+    proc = subprocess.Popen(  # noqa: S603 - invokes installed test launcher.
+        [str(Path(sys.executable).with_name("power-mcp"))],
+        env=_mcp_process_env(sample_vault),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert proc.stdin is not None
+    assert proc.stdout is not None
+    try:
+        proc.stdin.write(
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": {},
+                        "clientInfo": {"name": "persistent-pipe-test", "version": "1.0"},
+                    },
+                }
+            )
+            + "\n"
+        )
+        proc.stdin.flush()
+        init_resp = json.loads(proc.stdout.readline())
+        assert init_resp["id"] == 1
+        assert "result" in init_resp
+
+        proc.stdin.write(
+            json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+            + "\n"
+            + json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": "get_server_info", "arguments": {}},
+                }
+            )
+            + "\n"
+        )
+        proc.stdin.flush()
+        call_resp = json.loads(proc.stdout.readline())
+        assert call_resp["id"] == 2
+        assert "error" not in call_resp
+        info = json.loads(call_resp["result"]["content"][0]["text"])
+        assert info["runtime"]["power_framework"] == __version__
+        proc.stdin.close()
+        rest_out, stderr = proc.communicate(timeout=15)
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            proc.communicate(timeout=10)
+
+    assert proc.returncode == 0
+    assert rest_out == ""
+    assert "power-mcp lifecycle: starting" in stderr
+    assert "power-mcp lifecycle: stopped" in stderr
+
+
+def test_power_mcp_raw_stdio_empty_eof_exits_cleanly(sample_vault: Path) -> None:
+    """An immediate empty EOF exits cleanly with zero stdout noise."""
+    result = subprocess.run(  # noqa: S603 - invokes installed test launcher.
+        [str(Path(sys.executable).with_name("power-mcp"))],
+        input="",
+        capture_output=True,
+        check=False,
+        env=_mcp_process_env(sample_vault),
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "power-mcp lifecycle: starting" in result.stderr
+    assert "power-mcp lifecycle: stopped" in result.stderr
+
+
+async def test_drain_stdio_streams_handles_errors_timeout_and_server_requests(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """drain_stdio_streams resolves JSONRPCError, bounded drain timeouts, and server requests."""
+    import anyio
+    from mcp.shared.message import SessionMessage
+    from mcp.types import JSONRPCError, JSONRPCRequest
+
+    from power_framework.mcp.stdio_lifecycle import drain_stdio_streams
+
+    # 1. JSONRPCError clears the pending tracker immediately without waiting for timeout.
+    ext_read_send, ext_read_recv = anyio.create_memory_object_stream[SessionMessage | Exception](4)
+    ext_write_send, ext_write_recv = anyio.create_memory_object_stream[SessionMessage](4)
+    with caplog.at_level("WARNING"):
+        async with (
+            ext_write_recv,
+            drain_stdio_streams(ext_read_recv, ext_write_send, drain_timeout_s=5.0) as (
+                srv_read,
+                srv_write,
+            ),
+        ):
+            await ext_read_send.send(
+                SessionMessage(JSONRPCRequest(jsonrpc="2.0", id=10, method="tools/call"))
+            )
+            await ext_read_send.aclose()
+            received = await srv_read.receive()
+            assert isinstance(received, SessionMessage)
+            await srv_write.send(
+                SessionMessage(
+                    JSONRPCError(jsonrpc="2.0", id=10, error={"code": -32001, "message": "boom"})
+                )
+            )
+            out = await ext_write_recv.receive()
+            assert isinstance(out.message, JSONRPCError)
+            with anyio.fail_after(1.0), pytest.raises(anyio.EndOfStream):
+                await srv_read.receive()
+    assert "drain timed out" not in caplog.text
+
+    # 2. Stalled handler hits bounded timeout and emits warning without hanging.
+    caplog.clear()
+    ext_read_send2, ext_read_recv2 = anyio.create_memory_object_stream[SessionMessage | Exception](
+        4
+    )
+    ext_write_send2, ext_write_recv2 = anyio.create_memory_object_stream[SessionMessage](4)
+    with caplog.at_level("WARNING"):
+        async with (
+            ext_write_recv2,
+            drain_stdio_streams(ext_read_recv2, ext_write_send2, drain_timeout_s=0.05) as (
+                srv_read2,
+                _srv_write2,
+            ),
+        ):
+            await ext_read_send2.send(
+                SessionMessage(JSONRPCRequest(jsonrpc="2.0", id=11, method="tools/call"))
+            )
+            await ext_read_send2.aclose()
+            _ = await srv_read2.receive()
+            with anyio.fail_after(1.0), pytest.raises(anyio.EndOfStream):
+                await srv_read2.receive()
+    assert "drain timed out" in caplog.text
+
+    # 3. Server-initiated request after stdin EOF releases drain wait immediately.
+    caplog.clear()
+    ext_read_send3, ext_read_recv3 = anyio.create_memory_object_stream[SessionMessage | Exception](
+        4
+    )
+    ext_write_send3, ext_write_recv3 = anyio.create_memory_object_stream[SessionMessage](4)
+    with caplog.at_level("WARNING"):
+        async with (
+            ext_write_recv3,
+            drain_stdio_streams(ext_read_recv3, ext_write_send3, drain_timeout_s=5.0) as (
+                srv_read3,
+                srv_write3,
+            ),
+        ):
+            await ext_read_send3.send(
+                SessionMessage(JSONRPCRequest(jsonrpc="2.0", id=12, method="tools/call"))
+            )
+            await ext_read_send3.aclose()
+            _ = await srv_read3.receive()
+            await srv_write3.send(
+                SessionMessage(
+                    JSONRPCRequest(jsonrpc="2.0", id=99, method="sampling/createMessage")
+                )
+            )
+            srv_req = await ext_write_recv3.receive()
+            assert isinstance(srv_req.message, JSONRPCRequest)
+            with anyio.fail_after(1.0), pytest.raises(anyio.EndOfStream):
+                await srv_read3.receive()
+    assert "drain timed out" not in caplog.text
+
+
 async def test_read_sub_index_existing_category(sample_vault: Path) -> None:
     await ensure_sub_index(category="01_Projects", vault_path=str(sample_vault), approved=True)
     result = await read_sub_index(category="01_Projects", vault_path=str(sample_vault))

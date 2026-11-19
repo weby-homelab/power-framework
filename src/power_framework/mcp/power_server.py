@@ -36,7 +36,10 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, InputRequiredResult, TextContent, ToolAnnotations
+
+from .stdio_lifecycle import drain_stdio_streams, power_mcp_lifespan
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -200,6 +203,21 @@ class PowerMCPServer(MCPServer):
         finally:
             _MCP_REQUEST_ID.reset(request_token)
 
+    async def run_stdio_async(self) -> None:
+        """Run stdio transport while draining in-flight client requests on stdin EOF."""
+        async with (
+            stdio_server() as (read_stream, write_stream),
+            drain_stdio_streams(read_stream, write_stream) as (
+                drained_read,
+                drained_write,
+            ),
+        ):
+            await self._lowlevel_server.run(
+                drained_read,
+                drained_write,
+                self._lowlevel_server.create_initialization_options(),
+            )
+
     def run(self, transport: str = "stdio", **kwargs: Any) -> None:
         """Run the official SDK over the one supported native stdio transport."""
         if transport != "stdio":
@@ -211,6 +229,7 @@ mcp = PowerMCPServer(
     "power",
     version=__version__,
     instructions=f"P.O.W.E.R. {__version__} — Local-First Verifiable AI Engineering Control Plane",
+    lifespan=power_mcp_lifespan,
 )
 
 _write_limiter = RateLimiter(max_calls=10, period=60.0)
