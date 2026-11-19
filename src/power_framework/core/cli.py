@@ -739,6 +739,9 @@ def _cmd_heal(args: argparse.Namespace) -> int:
             vault_dir, lambda: heal_vault_report(vault_dir, dry_run=False, limit=limit)
         )
     logger.info(result.format())
+    if dry_run and result.healed:
+        logger.warning("DRY RUN — no changes applied")
+        return result.exit_code or 2
     return result.exit_code
 
 
