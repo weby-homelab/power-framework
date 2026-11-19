@@ -186,12 +186,14 @@ def _escape_yaml(value: str) -> str:
 
 
 def _render_yaml_field(field: str, value: object) -> list[str]:
-    """Render an unrecognized frontmatter field without lossy string coercion."""
+    """Render frontmatter without lossy coercion or wrapping list links."""
     rendered = yaml.safe_dump(
         {field: value},
         allow_unicode=True,
         default_flow_style=False,
+        default_style='"' if isinstance(value, list) else None,
         sort_keys=False,
+        width=2**31 - 1,
     ).strip()
     return rendered.splitlines()
 
@@ -215,11 +217,7 @@ def _format_frontmatter(
         val = fm_data.get(field)
         if val is not None and val != "" and val != []:
             if isinstance(val, list):
-                if field == "tags":
-                    items = ", ".join(f'"{_escape_yaml(str(v))}"' for v in val)
-                else:
-                    items = ", ".join(str(v) for v in val)
-                parts.append(f"{field}: [{items}]")
+                parts.extend(_render_yaml_field(field, val))
             elif isinstance(val, bool):
                 parts.append(f"{field}: {str(val).lower()}")
             else:

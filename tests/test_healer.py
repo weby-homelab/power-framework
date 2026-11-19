@@ -15,6 +15,7 @@ from power_framework.core import (
     healer as healer_module,
 )
 from power_framework.core.cli import _cmd_heal
+from power_framework.core.linter import run_lint_vault
 from power_framework.core.parser import parse_frontmatter, validate_metadata
 
 
@@ -385,3 +386,129 @@ def test_cli_heal_returns_nonzero_for_partial_failure(
 
     assert exit_code == 1
     assert "type: Project" not in note.read_text(encoding="utf-8")
+
+
+def test_healer_preserves_quoted_wikilinks_in_related_and_lint_delta(tmp_path: Path):
+    """Issue #463: healing must quote string items in ``related`` rather than producing [[[Foo]]]."""
+    vault = tmp_path / "vault"
+    (vault / "01_Projects").mkdir(parents=True)
+    foo = vault / "01_Projects" / "Foo.md"
+    targets = ["Bob's", "Long target with spaces " * 5 + "end"]
+    target_content = (
+        "---\n"
+        "type: Project\n"
+        'title: "Foo"\n'
+        'description: "Target note"\n'
+        "timestamp: 2026-01-01T00:00:00+00:00\n"
+        "---\n\nTarget body.\n"
+    )
+    for target in ["Foo", *targets]:
+        foo.with_name(f"{target}.md").write_text(target_content, encoding="utf-8")
+    extra_links = [f"[[{target}]]" for target in targets]
+    note = vault / "01_Projects" / "Note.md"
+    note.write_text(
+        "---\n"
+        'title: "Note"\n'
+        'description: "Links to Foo"\n'
+        'related: ["[[Foo]]", "[[Foo|Foo Alias]]"]\n'
+        f'tags: ["{extra_links[0]}", "{extra_links[1]}"]\n'
+        "timestamp: 2026-01-01T00:00:00+00:00\n"
+        "---\n\nNote body.\n",
+        encoding="utf-8",
+    )
+
+    assert run_lint_vault(vault).broken_links == []
+
+    first_report = heal_vault_report(vault, dry_run=False)
+    assert first_report.failures == []
+    assert first_report.healed == 1
+
+    healed = note.read_text(encoding="utf-8")
+    parsed = parse_frontmatter(healed)
+    assert parsed is not None
+    assert parsed["related"] == ["[[Foo]]", "[[Foo|Foo Alias]]"]
+    assert parsed["tags"] == extra_links
+    assert validate_metadata(healed) is not None
+    lint = run_lint_vault(vault)
+    assert lint.broken_links == []
+    assert {f"01_Projects/{target}.md" for target in targets}.isdisjoint(lint.orphans)
+
+    second_report = heal_vault_report(vault, dry_run=False)
+    assert second_report.failures == []
+    assert second_report.healed == 0
+
+
+def test_healer_preserves_mixed_wikilink_and_typed_relation_dict(tmp_path: Path):
+    """Mixed ``related`` lists containing strings and typed-relation dicts round-trip safely."""
+    vault = tmp_path / "vault"
+    (vault / "01_Projects").mkdir(parents=True)
+    note = vault / "01_Projects" / "MixedRelated.md"
+    content = (
+        "---\n"
+        'title: "Mixed Related"\n'
+        'description: "Mixed list"\n'
+        'tags: ["2026", "tag: value"]\n'
+        "related:\n"
+        '  - "[[Foo]]"\n'
+        "  - path: 01_Projects/Foo.md\n"
+        "    relation: depends_on\n"
+        "timestamp: 2026-01-01T00:00:00+00:00\n"
+        "---\n\nBody.\n"
+    )
+
+    healed, changes = heal_frontmatter(content, note, vault)
+    assert changes == ["Added missing type: Project"]
+
+    parsed = parse_frontmatter(healed)
+    assert parsed is not None
+    assert parsed["tags"] == ["2026", "tag: value"]
+    assert parsed["related"] == [
+        "[[Foo]]",
+        {"path": "01_Projects/Foo.md", "relation": "depends_on"},
+    ]
+    assert validate_metadata(healed) is not None
+
+
+@pytest.mark.parametrize(
+    "related_items",
+    [
+        ["a: b, [c]", "[[Note#Section]]"],
+        ["line one\nline two", "[[Foo]]"],
+    ],
+    ids=["yaml-punctuation", "multiline-item"],
+)
+def test_healer_preserves_special_chars_and_multiline_strings_in_lists(
+    tmp_path: Path,
+    related_items: list[str],
+):
+    vault = tmp_path / "vault"
+    (vault / "01_Projects").mkdir(parents=True)
+    note = vault / "01_Projects" / "SpecialChars.md"
+    note.write_text(
+        "---\n"
+        'title: "Special Chars"\n'
+        'description: "YAML quoting edge case"\n'
+        "timestamp: 2026-01-01T00:00:00+00:00\n"
+        "---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    import yaml
+
+    raw_fm = yaml.safe_dump(
+        {
+            "title": "Special Chars",
+            "description": "YAML quoting edge case",
+            "related": related_items,
+            "timestamp": "2026-01-01T00:00:00+00:00",
+        },
+        allow_unicode=True,
+        sort_keys=False,
+    )
+    content = f"---\n{raw_fm}---\n\nBody.\n"
+
+    healed, changes = heal_frontmatter(content, note, vault)
+    assert any("Added missing type: Project" in c for c in changes)
+    parsed = parse_frontmatter(healed)
+    assert parsed is not None
+    assert parsed["related"] == related_items
+    assert validate_metadata(healed) is not None
