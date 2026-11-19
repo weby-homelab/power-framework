@@ -393,21 +393,25 @@ def test_healer_preserves_quoted_wikilinks_in_related_and_lint_delta(tmp_path: P
     vault = tmp_path / "vault"
     (vault / "01_Projects").mkdir(parents=True)
     foo = vault / "01_Projects" / "Foo.md"
-    foo.write_text(
+    targets = ["Bob's", "Long target with spaces " * 5 + "end"]
+    target_content = (
         "---\n"
         "type: Project\n"
         'title: "Foo"\n'
         'description: "Target note"\n'
         "timestamp: 2026-01-01T00:00:00+00:00\n"
-        "---\n\nTarget body.\n",
-        encoding="utf-8",
+        "---\n\nTarget body.\n"
     )
+    for target in ["Foo", *targets]:
+        foo.with_name(f"{target}.md").write_text(target_content, encoding="utf-8")
+    extra_links = [f"[[{target}]]" for target in targets]
     note = vault / "01_Projects" / "Note.md"
     note.write_text(
         "---\n"
         'title: "Note"\n'
         'description: "Links to Foo"\n'
         'related: ["[[Foo]]", "[[Foo|Foo Alias]]"]\n'
+        f'tags: ["{extra_links[0]}", "{extra_links[1]}"]\n'
         "timestamp: 2026-01-01T00:00:00+00:00\n"
         "---\n\nNote body.\n",
         encoding="utf-8",
@@ -423,8 +427,11 @@ def test_healer_preserves_quoted_wikilinks_in_related_and_lint_delta(tmp_path: P
     parsed = parse_frontmatter(healed)
     assert parsed is not None
     assert parsed["related"] == ["[[Foo]]", "[[Foo|Foo Alias]]"]
+    assert parsed["tags"] == extra_links
     assert validate_metadata(healed) is not None
-    assert run_lint_vault(vault).broken_links == []
+    lint = run_lint_vault(vault)
+    assert lint.broken_links == []
+    assert {f"01_Projects/{target}.md" for target in targets}.isdisjoint(lint.orphans)
 
     second_report = heal_vault_report(vault, dry_run=False)
     assert second_report.failures == []

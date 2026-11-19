@@ -186,12 +186,14 @@ def _escape_yaml(value: str) -> str:
 
 
 def _render_yaml_field(field: str, value: object) -> list[str]:
-    """Render an unrecognized frontmatter field without lossy string coercion."""
+    """Render frontmatter without lossy coercion or wrapping list links."""
     rendered = yaml.safe_dump(
         {field: value},
         allow_unicode=True,
         default_flow_style=False,
+        default_style='"' if isinstance(value, list) else None,
         sort_keys=False,
+        width=2**31 - 1,
     ).strip()
     return rendered.splitlines()
 
