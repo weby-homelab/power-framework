@@ -25,6 +25,13 @@ POWER_VAULT_DIR=/absolute/path/to/vault \
   /absolute/path/to/venv/bin/power-mcp
 ```
 
+`power-mcp` writes JSON-RPC protocol frames only to `stdout` and emits
+content-free, path-free start/drain/stop lifecycle diagnostics to `stderr`.
+Both persistent interactive stdio channels and non-interactive piped inputs
+(for example `printf '%s\n' ... | power-mcp`) are supported: on `stdin` EOF,
+in-flight requests drain cleanly up to `POWER_MCP_EOF_DRAIN_TIMEOUT_S` seconds
+(default `30`) before exiting.
+
 The Web UI container is the only supported HTTP surface. It starts `power-web`
 on port `8080` and does not start or expose MCP. Do not publish an MCP HTTP
 transport through a port mapping, tunnel, or reverse proxy.
