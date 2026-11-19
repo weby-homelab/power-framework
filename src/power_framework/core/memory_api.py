@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from .constants import INDEX_FOLDERS, is_catalog_filename
 from .errors import ConflictError
 from .indexer import run_generate_hierarchical_index
+from .lint_delta import compute_blocking_lint_delta, format_blocking_lint_summary
 from .linter import run_lint_vault
 from .models import PARA_FOLDERS
 from .mutation import execute_vault_mutation
@@ -191,6 +192,7 @@ def commit_note_change(
         if idempotency_fingerprint is not None:
             receipt["idempotency_fingerprint"] = idempotency_fingerprint
 
+        baseline_lint = run_lint_vault(vault_dir)
         store = TaskStore(vault_dir)
         try:
             with store._transaction(
@@ -210,14 +212,9 @@ def commit_note_change(
                     _append_text(log_file, log_entry)
                 index_summary = run_generate_hierarchical_index(vault_dir)
                 lint_result = run_lint_vault(vault_dir)
-                if lint_result.has_blocking_issues:
-                    raise RuntimeError(
-                        "post-mutation lint failed: "
-                        f"metadata={len(lint_result.untyped_files)}, "
-                        f"broken_links={len(lint_result.broken_links)}, "
-                        f"ambiguous_links={len(lint_result.ambiguous_links)}, "
-                        f"stale={len(lint_result.stale_notes)}"
-                    )
+                lint_delta = compute_blocking_lint_delta(baseline_lint, lint_result)
+                if lint_delta.has_new_issues:
+                    raise RuntimeError(f"post-mutation lint failed: {lint_delta.format_counts()}")
 
                 # Keep a dense projection usable when one already exists.  A new
                 # vault without dense state gets a cheap FTS publication and can
@@ -243,6 +240,8 @@ def commit_note_change(
                         "duration_ms": f"{(time.perf_counter() - started_at) * 1000:.3f}",
                     }
                 )
+                if lint_result.has_blocking_issues:
+                    receipt["preexisting_lint_warnings"] = format_blocking_lint_summary(lint_result)
                 _append_receipt(history, receipt)
                 return receipt
         except Exception:
