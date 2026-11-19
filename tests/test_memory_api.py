@@ -32,6 +32,7 @@ def test_memory_transaction_requires_approval_and_records_history(sample_vault):
     assert receipt["search_mode"] == "fts"
     assert receipt["notes_excluded"] == "0"
     assert receipt["receipt_schema"] == "power.receipt.v1"
+    assert "preexisting_lint_warnings" not in receipt
     assert len(receipt["trace_id"]) == 32
     assert len(receipt["span_id"]) == 16
     assert receipt["status"] == "ok"
@@ -251,11 +252,13 @@ def test_memory_transaction_restores_note_when_blocking_lint_fails(
         "01_Projects/LintFailure.md",
         '---\ntype: Project\ntitle: "Lint failure"\ndescription: "lint failure"\ntimestamp: 2026-07-29T00:00:00Z\n---\n',
     )
-    lint_result = LintResult()
-    lint_result.untyped_files.append(("existing.md", "simulated failure"))
-    monkeypatch.setattr(memory_api, "run_lint_vault", lambda _: lint_result)
+    baseline = LintResult()
+    post = LintResult()
+    post.untyped_files.append(("01_Projects/LintFailure.md", "simulated failure"))
+    calls = iter((baseline, post))
+    monkeypatch.setattr(memory_api, "run_lint_vault", lambda _: next(calls))
 
-    with pytest.raises(RuntimeError, match="post-mutation lint failed"):
+    with pytest.raises(RuntimeError, match=r"post-mutation lint failed:.*metadata=1"):
         apply_change(sample_vault, proposal, approved=True)
 
     assert not (sample_vault / "01_Projects" / "LintFailure.md").exists()
@@ -344,3 +347,429 @@ def test_memory_transaction_restores_search_when_receipt_fails(
     assert not (sample_vault / "01_Projects" / "ReceiptFailure.md").exists()
     assert read_history(sample_vault) == []
     assert not search_vault(sample_vault, marker, mode="fts")
+
+
+def test_memory_commit_succeeds_with_preexisting_foreign_lint_debt(sample_vault):
+    """Issue #464: clean writes must not fail due to unrelated pre-existing lint debt."""
+    from power_framework.core.application import ApplicationService, RequestContext
+    from power_framework.core.principal import Principal
+
+    (sample_vault / "03_Resources" / "ForeignUntyped.md").write_text(
+        "Unstructured foreign note without OKF frontmatter.\n",
+        encoding="utf-8",
+    )
+    (sample_vault / "02_Areas" / "Dup.md").write_text(
+        "---\n"
+        "type: Area\n"
+        'title: "Dup Area"\n'
+        'description: "First duplicate basename"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Dup Area.\n",
+        encoding="utf-8",
+    )
+    (sample_vault / "03_Resources" / "Dup.md").write_text(
+        "---\n"
+        "type: Resource\n"
+        'title: "Dup Resource"\n'
+        'description: "Second duplicate basename"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Dup Resource.\n",
+        encoding="utf-8",
+    )
+    (sample_vault / "03_Resources" / "ForeignAmbig.md").write_text(
+        "---\n"
+        "type: Resource\n"
+        'title: "Foreign Ambig"\n'
+        'description: "Pre-existing ambiguous link"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Links ambiguously to [[Dup]].\n",
+        encoding="utf-8",
+    )
+    (sample_vault / "01_Projects" / "ForeignBroken.md").write_text(
+        "---\n"
+        "type: Project\n"
+        'title: "Foreign Broken"\n'
+        'description: "Pre-existing broken link"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Links to [[ForeignMissingTarget]].\n",
+        encoding="utf-8",
+    )
+    (sample_vault / "01_Projects" / "ForeignExpired.md").write_text(
+        "---\n"
+        "type: Project\n"
+        'title: "Foreign Expired"\n'
+        'description: "Pre-existing expired note"\n'
+        "expiry: 2020-01-01\n"
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Expired foreign body.\n",
+        encoding="utf-8",
+    )
+
+    clean_proposal = propose_change(
+        sample_vault,
+        "01_Projects/CleanWrite.md",
+        "---\n"
+        "type: Project\n"
+        'title: "Clean Write"\n'
+        'description: "Valid note written with foreign debt present"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "clean-write-with-foreign-debt\n",
+    )
+    receipt = apply_change(sample_vault, clean_proposal, approved=True)
+
+    assert (sample_vault / "01_Projects" / "CleanWrite.md").exists()
+    assert receipt["notes_excluded"] == "1"
+    assert "preexisting_lint_warnings" in receipt
+    assert "metadata=1" in receipt["preexisting_lint_warnings"]
+    assert "broken_links=1" in receipt["preexisting_lint_warnings"]
+    assert "ambiguous_links=1" in receipt["preexisting_lint_warnings"]
+    assert "stale=1" in receipt["preexisting_lint_warnings"]
+    assert search_vault(sample_vault, "clean-write-with-foreign-debt", mode="fts")
+    history = read_history(sample_vault)
+    assert len(history) == 1
+    assert history[0]["preexisting_lint_warnings"] == receipt["preexisting_lint_warnings"]
+    assert validate_state(sample_vault) is False
+
+    service = ApplicationService(sample_vault)
+    envelope = service.ingest_note(
+        name="01_Projects/IngestCleanWrite.md",
+        note_type="Project",
+        title="Ingest Clean Write",
+        description="Ingested despite foreign untyped, ambiguous, broken, and expired debt",
+        content="Clean body content.",
+        context=RequestContext(authority="apply", principal=Principal.local_cli()),
+    )
+    assert (sample_vault / "01_Projects" / "IngestCleanWrite.md").exists()
+    assert "metadata=1" in envelope.data["receipt"]["preexisting_lint_warnings"]
+    assert "broken_links=1" in envelope.data["receipt"]["preexisting_lint_warnings"]
+
+
+def test_memory_commit_rejects_new_defect_even_when_fixing_old_defect(sample_vault):
+    """Fixing one old broken link must never mask introducing a different broken link."""
+    note_rel = "01_Projects/FixAndBreak.md"
+    original = (
+        "---\n"
+        "type: Project\n"
+        'title: "Fix And Break"\n'
+        'description: "Starts with one broken link"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Existing link [[OldMissing]].\n"
+    )
+    (sample_vault / note_rel).write_text(original, encoding="utf-8")
+
+    replacement = (
+        "---\n"
+        "type: Project\n"
+        'title: "Fix And Break"\n'
+        'description: "Removes old broken link and introduces new one"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Replaced with [[NewMissing]].\n"
+    )
+    proposal = propose_change(sample_vault, note_rel, replacement)
+
+    with pytest.raises(RuntimeError, match=r"post-mutation lint failed:.*broken_links=1"):
+        apply_change(sample_vault, proposal, approved=True)
+
+    assert (sample_vault / note_rel).read_text(encoding="utf-8") == original
+    assert read_history(sample_vault) == []
+
+
+def test_memory_commit_rejects_new_vault_wide_ambiguous_link(sample_vault):
+    """Creating a valid note that causes a vault-wide ambiguous wikilink rolls back."""
+    (sample_vault / "01_Projects" / "Alpha.md").write_text(
+        "---\n"
+        "type: Project\n"
+        'title: "Alpha Project"\n'
+        'description: "Unique Alpha target"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Project Alpha.\n",
+        encoding="utf-8",
+    )
+    (sample_vault / "01_Projects" / "Linker.md").write_text(
+        "---\n"
+        "type: Project\n"
+        'title: "Linker"\n'
+        'description: "Links cleanly to Alpha"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "See [[Alpha]].\n",
+        encoding="utf-8",
+    )
+
+    proposal = propose_change(
+        sample_vault,
+        "02_Areas/Alpha.md",
+        "---\n"
+        "type: Area\n"
+        'title: "Alpha Area"\n'
+        'description: "Creates basename collision"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Area Alpha.\n",
+    )
+
+    with pytest.raises(RuntimeError, match=r"post-mutation lint failed:.*ambiguous_links=1"):
+        apply_change(sample_vault, proposal, approved=True)
+
+    assert not (sample_vault / "02_Areas" / "Alpha.md").exists()
+    assert read_history(sample_vault) == []
+
+    # Already-ambiguous wikilink worsened by adding a 3rd colliding note must also fail.
+    (sample_vault / "02_Areas" / "Alpha.md").write_text(
+        "---\n"
+        "type: Area\n"
+        'title: "Alpha Area Existing"\n'
+        'description: "Existing collision"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Existing Area Alpha.\n",
+        encoding="utf-8",
+    )
+    (sample_vault / "log.md").write_text("Log header\n", encoding="utf-8")
+    third_proposal = propose_change(
+        sample_vault,
+        "03_Resources/Alpha.md",
+        "---\n"
+        "type: Resource\n"
+        'title: "Alpha Resource"\n'
+        'description: "Adds third colliding basename"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Resource Alpha.\n",
+    )
+    with pytest.raises(RuntimeError, match=r"post-mutation lint failed:.*ambiguous_links=1"):
+        memory_api.commit_note_change(
+            sample_vault,
+            "03_Resources/Alpha.md",
+            third_proposal["content"],
+            log_entry="\nShould roll back\n",
+        )
+    assert not (sample_vault / "03_Resources" / "Alpha.md").exists()
+    assert (sample_vault / "log.md").read_text(encoding="utf-8") == "Log header\n"
+
+
+def test_memory_commit_rejects_new_stale_note_and_delta_helper_checks_multiset(sample_vault):
+    """Creating an expired note fails delta check; multiset helper distinguishes findings."""
+    from power_framework.core.lint_delta import compute_blocking_lint_delta
+    from power_framework.core.linter import LintResult
+
+    proposal = propose_change(
+        sample_vault,
+        "01_Projects/AlreadyExpired.md",
+        "---\n"
+        "type: Project\n"
+        'title: "Already Expired"\n'
+        'description: "Introduces a new stale note"\n'
+        "expiry: 2020-01-01\n"
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Expired.\n",
+    )
+    with pytest.raises(RuntimeError, match=r"post-mutation lint failed:.*stale=1"):
+        apply_change(sample_vault, proposal, approved=True)
+    assert not (sample_vault / "01_Projects" / "AlreadyExpired.md").exists()
+
+    baseline = LintResult()
+    baseline.untyped_files = [("old.md", "missing type")]
+    baseline.ambiguous_links = [("a.md", "Foo", ["02_Areas/Foo.md", "01_Projects/Foo.md"])]
+
+    post = LintResult()
+    post.untyped_files = [("new.md", "missing type")]
+    post.ambiguous_links = [("a.md", "Foo", ["01_Projects/Foo.md", "02_Areas/Foo.md"])]
+
+    delta = compute_blocking_lint_delta(baseline, post)
+    assert delta.has_new_issues is True
+    assert delta.metadata == 1
+    assert delta.ambiguous_links == 0
+
+
+def test_memory_commit_rolls_back_cleanly_on_receipt_failure_with_foreign_untyped_note(
+    sample_vault,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Rollback search rebuild after receipt failure must tolerate foreign untyped notes."""
+    (sample_vault / "03_Resources" / "ForeignUntyped.md").write_text(
+        "Unstructured foreign note without frontmatter.\n",
+        encoding="utf-8",
+    )
+    marker = "rollback-foreign-untyped-marker"
+    proposal = propose_change(
+        sample_vault,
+        "01_Projects/RollbackUntyped.md",
+        "---\n"
+        "type: Project\n"
+        'title: "Rollback Untyped"\n'
+        'description: "Rolls back cleanly"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        f"{marker}\n",
+    )
+
+    def fail_receipt(*_args: object, **_kwargs: object) -> None:
+        raise OSError("simulated receipt failure")
+
+    monkeypatch.setattr(memory_api, "_append_receipt", fail_receipt)
+
+    with pytest.raises(OSError, match="simulated receipt failure"):
+        apply_change(sample_vault, proposal, approved=True)
+
+    assert not (sample_vault / "01_Projects" / "RollbackUntyped.md").exists()
+    assert not search_vault(sample_vault, marker, mode="fts")
+    assert read_history(sample_vault) == []
+
+
+def test_memory_commit_rejects_new_invalid_source_even_with_preexisting_invalid_source(
+    sample_vault,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Pre-existing invalid sources must never permit introducing another invalid source."""
+    from power_framework.core import generation_index
+
+    (sample_vault / "03_Resources" / "ForeignUntyped.md").write_text(
+        "Unstructured foreign note.\n",
+        encoding="utf-8",
+    )
+    proposal = propose_change(
+        sample_vault,
+        "01_Projects/CleanCandidate.md",
+        "---\n"
+        "type: Project\n"
+        'title: "Clean Candidate"\n'
+        'description: "Valid note"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Body.\n",
+    )
+
+    original_list_invalid = generation_index.list_invalid_sources
+    calls = 0
+
+    def list_with_new_invalid(vault_dir):
+        nonlocal calls
+        calls += 1
+        found = original_list_invalid(vault_dir)
+        if calls >= 2:
+            found["03_Resources/NewlyUnreadable.md"] = "read_error"
+        return found
+
+    monkeypatch.setattr(generation_index, "list_invalid_sources", list_with_new_invalid)
+
+    with pytest.raises(RuntimeError, match="post-mutation source validation failed"):
+        apply_change(sample_vault, proposal, approved=True)
+
+    assert not (sample_vault / "01_Projects" / "CleanCandidate.md").exists()
+    assert read_history(sample_vault) == []
+
+
+def test_memory_commit_runs_crash_recovery_before_baseline_lint(sample_vault):
+    """Unrecovered crashed writes must be rolled back before capturing lint baseline."""
+    from datetime import UTC, datetime
+
+    from power_framework.core.task_store import TaskStore
+
+    crashed_rel = "01_Projects/CrashedBroken.md"
+    crashed_content = (
+        "---\n"
+        "type: Project\n"
+        'title: "Crashed Broken"\n'
+        'description: "Left by crashed transaction"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "Broken [[MissingCrashTarget]].\n"
+    )
+    crashed_path = sample_vault / crashed_rel
+    crashed_path.write_text(crashed_content, encoding="utf-8")
+
+    store = TaskStore(sample_vault)
+    tx_dir = store.tx_dir / "txcrash1"
+    tx_dir.mkdir(parents=True)
+    manifest = {
+        "tx_id": "txcrash1",
+        "op": "memory_apply",
+        "idempotency_key": "mcrash",
+        "command_sha256": None,
+        "stage": "prepared",
+        "created_at": datetime.now(UTC).isoformat(),
+        "vault": store.vault_dir.as_posix(),
+        "touched": [
+            {"label": "note", "rel": crashed_rel, "preimage_digest": None},
+            {"label": "history", "rel": ".power/memory-history.jsonl", "preimage_digest": None},
+        ],
+    }
+    (tx_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match=r"post-mutation lint failed:.*broken_links=1"):
+        memory_api.commit_note_change(sample_vault, crashed_rel, crashed_content)
+
+    assert not crashed_path.exists()
+    assert read_history(sample_vault) == []
+
+
+def test_memory_commit_rolls_back_published_search_on_toctou_invalid_source(
+    sample_vault,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Search index must roll back when assert_no_new_invalid_sources fails after publication."""
+    from power_framework.core import generation_index
+
+    (sample_vault / "03_Resources" / "ForeignUntyped.md").write_text(
+        "Unstructured foreign note.\n",
+        encoding="utf-8",
+    )
+    old_content = (
+        "---\n"
+        "type: Project\n"
+        'title: "Existing"\n'
+        'description: "Original note"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "toctou-old-marker\n"
+    )
+    new_content = (
+        "---\n"
+        "type: Project\n"
+        'title: "Existing"\n'
+        'description: "Updated note"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "toctou-new-marker\n"
+    )
+    existing_path = sample_vault / "01_Projects" / "Existing.md"
+    existing_path.write_text(old_content, encoding="utf-8")
+
+    orig_sync = generation_index.sync_vault_atomically
+    calls = 0
+
+    def sync_with_toctou(vault_dir, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            (vault_dir / "03_Resources" / "RaceInvalid.md").write_text(
+                "Corrupted mid-sync note without metadata.\n",
+                encoding="utf-8",
+            )
+        return orig_sync(vault_dir, **kwargs)
+
+    monkeypatch.setattr(generation_index, "sync_vault_atomically", sync_with_toctou)
+
+    with pytest.raises(RuntimeError, match="post-mutation source validation failed"):
+        memory_api.commit_note_change(sample_vault, "01_Projects/Existing.md", new_content)
+
+    assert calls == 2
+    assert "toctou-old-marker" in existing_path.read_text(encoding="utf-8")
+    assert search_vault(sample_vault, "toctou-new-marker", mode="fts") == []
+    restored = search_vault(sample_vault, "toctou-old-marker", mode="fts")
+    assert restored
+    assert restored[0].rel_path == "01_Projects/Existing.md"

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from . import lint_delta
 from .constants import INDEX_FOLDERS, is_catalog_filename
 from .errors import ConflictError
 from .indexer import run_generate_hierarchical_index
@@ -134,157 +135,152 @@ def commit_note_change(
             _validate_idempotency_key(idempotency_key)
             if idempotency_fingerprint is not None and not _is_sha256(idempotency_fingerprint):
                 raise ValueError("idempotency_fingerprint must be a SHA-256 hex digest")
-            prior_receipt = _find_idempotent_receipt(vault_dir, idempotency_key)
-            if prior_receipt is not None:
-                if (
-                    idempotency_fingerprint is not None
-                    and prior_receipt.get("idempotency_fingerprint") == idempotency_fingerprint
-                    and prior_receipt.get("operation") == operation
-                    and prior_receipt.get("path") == rel_path
-                ):
-                    return prior_receipt
-                expected_after = hashlib.sha256(content.encode()).hexdigest()
-                if (
-                    prior_receipt.get("operation") == operation
-                    and prior_receipt.get("path") == rel_path
-                    and prior_receipt.get("after_sha256") == expected_after
-                ):
-                    return prior_receipt
-                raise ConflictError("idempotency key was already used for a different mutation")
-        target_snapshot = _capture_file(target)
-        before = target_snapshot.content if target_snapshot.existed else ""
-        before_sha256 = hashlib.sha256(before.encode()).hexdigest()
-        if require_absent and target_snapshot.existed:
-            raise FileExistsError(f"Note already exists at {rel_path}")
-        if expected_before_sha256 is not None and before_sha256 != expected_before_sha256:
-            raise ConflictError("proposal is stale; note changed after proposal")
 
-        # Validate before the first write.  This prevents an approved but
-        # malformed proposal from entering the vault and disappearing from the
-        # next index/sync pass.
-        if validate_metadata(content) is None:
-            raise ValueError("proposal content has invalid or missing OKF metadata")
-
-        snapshots = _capture_projection_snapshot(vault_dir)
-        history = vault_control_dir(vault_dir) / "memory-history.jsonl"
-        history_snapshot = _capture_file(history)
-        log_file = vault_dir / "log.md"
-        log_snapshot = _capture_file(log_file)
-        published_search = False
-        has_dense = False
-        started_at = time.perf_counter()
-        receipt = {
-            "receipt_schema": "power.receipt.v1",
-            "operation": operation,
-            "path": rel_path,
-            "before_sha256": before_sha256,
-            "after_sha256": hashlib.sha256(content.encode()).hexdigest(),
-            "at": datetime.now(UTC).isoformat(),
-            "trace_id": uuid.uuid4().hex,
-            "span_id": uuid.uuid4().hex[:16],
-            "status": "ok",
-        }
-        if proposal_id is not None:
-            receipt["proposal_id"] = proposal_id
-        if idempotency_key is not None:
-            receipt["idempotency_key"] = idempotency_key
-        if idempotency_fingerprint is not None:
-            receipt["idempotency_fingerprint"] = idempotency_fingerprint
+        from . import generation_index
 
         store = TaskStore(vault_dir)
-        try:
-            with store._transaction(
-                "memory_apply",
-                idempotency_key,
-                None,
-                [(target, "note"), (history, "history"), (log_file, "log")],
-                crash_point="memory.apply",
-            ):
-                atomic_write_in_vault(
-                    vault_dir,
-                    rel_path,
-                    content,
-                    allowed_directories=allowed_directories,
-                )
-                if log_entry is not None and log_file.exists():
-                    _append_text(log_file, log_entry)
-                index_summary = run_generate_hierarchical_index(vault_dir)
-                lint_result = run_lint_vault(vault_dir)
-                if lint_result.has_blocking_issues:
-                    raise RuntimeError(
-                        "post-mutation lint failed: "
-                        f"metadata={len(lint_result.untyped_files)}, "
-                        f"broken_links={len(lint_result.broken_links)}, "
-                        f"ambiguous_links={len(lint_result.ambiguous_links)}, "
-                        f"stale={len(lint_result.stale_notes)}"
+        with store.lock():
+            if idempotency_key is not None:
+                prior_receipt = _find_idempotent_receipt(vault_dir, idempotency_key)
+                if prior_receipt is not None:
+                    if (
+                        idempotency_fingerprint is not None
+                        and prior_receipt.get("idempotency_fingerprint") == idempotency_fingerprint
+                        and prior_receipt.get("operation") == operation
+                        and prior_receipt.get("path") == rel_path
+                    ):
+                        return prior_receipt
+                    expected_after = hashlib.sha256(content.encode()).hexdigest()
+                    if (
+                        prior_receipt.get("operation") == operation
+                        and prior_receipt.get("path") == rel_path
+                        and prior_receipt.get("after_sha256") == expected_after
+                    ):
+                        return prior_receipt
+                    raise ConflictError("idempotency key was already used for a different mutation")
+            target_snapshot = _capture_file(target)
+            before = target_snapshot.content if target_snapshot.existed else ""
+            before_sha256 = hashlib.sha256(before.encode()).hexdigest()
+            if require_absent and target_snapshot.existed:
+                raise FileExistsError(f"Note already exists at {rel_path}")
+            if expected_before_sha256 is not None and before_sha256 != expected_before_sha256:
+                raise ConflictError("proposal is stale; note changed after proposal")
+            if validate_metadata(content) is None:
+                raise ValueError("proposal content has invalid or missing OKF metadata")
+
+            snapshots = _capture_projection_snapshot(vault_dir)
+            history = vault_control_dir(vault_dir) / "memory-history.jsonl"
+            history_snapshot = _capture_file(history)
+            log_file = vault_dir / "log.md"
+            log_snapshot = _capture_file(log_file)
+            published_search = False
+            has_dense = False
+            started_at = time.perf_counter()
+            receipt = {
+                "receipt_schema": "power.receipt.v1",
+                "operation": operation,
+                "path": rel_path,
+                "before_sha256": before_sha256,
+                "after_sha256": hashlib.sha256(content.encode()).hexdigest(),
+                "at": datetime.now(UTC).isoformat(),
+                "trace_id": uuid.uuid4().hex,
+                "span_id": uuid.uuid4().hex[:16],
+                "status": "ok",
+            }
+            if proposal_id is not None:
+                receipt["proposal_id"] = proposal_id
+            if idempotency_key is not None:
+                receipt["idempotency_key"] = idempotency_key
+            if idempotency_fingerprint is not None:
+                receipt["idempotency_fingerprint"] = idempotency_fingerprint
+
+            baseline = lint_delta.capture_mutation_baseline(
+                vault_dir, run_lint_vault, generation_index.list_invalid_sources
+            )
+            try:
+                with store._transaction_locked(
+                    "memory_apply",
+                    idempotency_key,
+                    None,
+                    [(target, "note"), (history, "history"), (log_file, "log")],
+                    crash_point="memory.apply",
+                ):
+                    atomic_write_in_vault(
+                        vault_dir,
+                        rel_path,
+                        content,
+                        allowed_directories=allowed_directories,
                     )
-
-                # Keep a dense projection usable when one already exists.  A new
-                # vault without dense state gets a cheap FTS publication and can
-                # later opt into the full embedding sync explicitly.
-                from .generation_index import active_dense_chunk_count, sync_vault_atomically
-
-                has_dense = active_dense_chunk_count(vault_dir) > 0
-                report = sync_vault_atomically(
-                    vault_dir,
-                    sync_embeddings=has_dense,
-                    allow_partial=False,
-                )
-                published_search = True
-                receipt.update(
-                    {
-                        "index_summary": index_summary,
-                        "search_mode": "semantic" if has_dense else "fts",
-                        "search_generation": report.generation_id,
-                        "notes_scanned": str(report.total_scanned),
-                        "notes_indexed": str(report.actual_files),
-                        "notes_excluded": str(report.invalid_sources),
-                        "lint_orphans": str(len(lint_result.orphans)),
-                        "duration_ms": f"{(time.perf_counter() - started_at) * 1000:.3f}",
-                    }
-                )
-                _append_receipt(history, receipt)
-                return receipt
-        except Exception:
-            source_restore_error: Exception | None = None
-            projection_restore_error: Exception | None = None
-            try:
-                _restore_file_snapshot(target, target_snapshot)
-            except Exception as rollback_error:
-                source_restore_error = rollback_error
-            try:
-                _restore_projection_snapshot(vault_dir, snapshots)
-                _restore_file_snapshot(history, history_snapshot)
-                _restore_file_snapshot(log_file, log_snapshot)
-            except Exception as rollback_error:
-                projection_restore_error = rollback_error
-            search_restore_error: Exception | None = None
-            if published_search and source_restore_error is None:
-                try:
-                    # Search generations are immutable.  If a later receipt
-                    # write fails after publication, rebuild against the
-                    # restored source so the active generation cannot retain
-                    # a note that the transaction rolled back.
-                    sync_vault_atomically(
+                    if log_entry is not None and log_file.exists():
+                        _append_text(log_file, log_entry)
+                    index_summary = run_generate_hierarchical_index(vault_dir)
+                    lint_result = run_lint_vault(vault_dir)
+                    allow_partial = lint_delta.verify_mutation_lint_gate(
+                        baseline, lint_result, generation_index.list_invalid_sources(vault_dir)
+                    )
+                    has_dense = generation_index.active_dense_chunk_count(vault_dir) > 0
+                    report = generation_index.sync_vault_atomically(
                         vault_dir,
                         sync_embeddings=has_dense,
-                        allow_partial=False,
+                        allow_partial=allow_partial,
                     )
+                    published_search = True
+                    lint_delta.assert_no_new_invalid_sources(baseline, report.excluded_sources)
+                    receipt.update(
+                        {
+                            "index_summary": index_summary,
+                            "search_mode": "semantic" if has_dense else "fts",
+                            "search_generation": report.generation_id,
+                            "notes_scanned": str(report.total_scanned),
+                            "notes_indexed": str(report.actual_files),
+                            "notes_excluded": str(report.invalid_sources),
+                            "lint_orphans": str(len(lint_result.orphans)),
+                            "duration_ms": f"{(time.perf_counter() - started_at) * 1000:.3f}",
+                        }
+                    )
+                    warnings = lint_delta.format_preexisting_warnings(
+                        lint_result, excluded_sources=report.invalid_sources
+                    )
+                    if warnings is not None:
+                        receipt["preexisting_lint_warnings"] = warnings
+                    _append_receipt(history, receipt)
+                    return receipt
+            except Exception:
+                source_restore_error: Exception | None = None
+                projection_restore_error: Exception | None = None
+                try:
+                    _restore_file_snapshot(target, target_snapshot)
                 except Exception as rollback_error:
-                    search_restore_error = rollback_error
-            if source_restore_error is not None:
-                raise RuntimeError("memory mutation rollback failed for the note") from (
-                    source_restore_error
-                )
-            if projection_restore_error is not None:
-                raise RuntimeError("memory mutation rollback failed for projections") from (
-                    projection_restore_error
-                )
-            if search_restore_error is not None:
-                raise RuntimeError(
-                    "memory mutation rollback failed to restore search projection"
-                ) from search_restore_error
-            raise
+                    source_restore_error = rollback_error
+                try:
+                    _restore_projection_snapshot(vault_dir, snapshots)
+                    _restore_file_snapshot(history, history_snapshot)
+                    _restore_file_snapshot(log_file, log_snapshot)
+                except Exception as rollback_error:
+                    projection_restore_error = rollback_error
+                search_restore_error: Exception | None = None
+                if published_search and source_restore_error is None:
+                    try:
+                        generation_index.sync_vault_atomically(
+                            vault_dir,
+                            sync_embeddings=has_dense,
+                            allow_partial=bool(baseline.invalid_sources),
+                        )
+                    except Exception as rollback_error:
+                        search_restore_error = rollback_error
+                if source_restore_error is not None:
+                    raise RuntimeError("memory mutation rollback failed for the note") from (
+                        source_restore_error
+                    )
+                if projection_restore_error is not None:
+                    raise RuntimeError("memory mutation rollback failed for projections") from (
+                        projection_restore_error
+                    )
+                if search_restore_error is not None:
+                    raise RuntimeError(
+                        "memory mutation rollback failed to restore search projection"
+                    ) from search_restore_error
+                raise
 
     return execute_vault_mutation(vault_dir, mutate)
 
