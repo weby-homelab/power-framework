@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path  # noqa: TC003
 
 import pytest
@@ -625,6 +626,34 @@ class TestRunGenerateHierarchicalIndex:
         run_generate_hierarchical_index(sample_vault)
         assert "01_Projects" in rendered_folders
 
+    def test_unchanged_run_preserves_index_and_subindex_timestamps(self, sample_vault: Path):
+        run_generate_hierarchical_index(sample_vault)
+        main_index = sample_vault / "index.md"
+        sub_index = sample_vault / "01_Projects" / "_index.md"
+        first_main = main_index.read_text(encoding="utf-8")
+        first_sub = sub_index.read_text(encoding="utf-8")
+
+        run_generate_hierarchical_index(sample_vault)
+        assert main_index.read_text(encoding="utf-8") == first_main
+        assert sub_index.read_text(encoding="utf-8") == first_sub
+
+        # Body-only edit triggers sub-index re-render without catalog metadata changes;
+        # neither index.md nor _index.md should churn its timestamp.
+        note_path = sample_vault / "01_Projects" / "TestProject.md"
+        note_path.write_text(
+            note_path.read_text(encoding="utf-8") + "\nBody-only edit.\n",
+            encoding="utf-8",
+        )
+        run_generate_hierarchical_index(sample_vault)
+        assert main_index.read_text(encoding="utf-8") == first_main
+        assert sub_index.read_text(encoding="utf-8") == first_sub
+
+        # Adding a note changes the navigation map and must update index.md + _index.md.
+        _write_note(sample_vault / "01_Projects" / "AddedNote.md", "Added Note")
+        run_generate_hierarchical_index(sample_vault)
+        assert main_index.read_text(encoding="utf-8") != first_main
+        assert "Added Note" in sub_index.read_text(encoding="utf-8")
+
     def test_overwrites_existing_indexes(self, sample_vault: Path):
         main_index = sample_vault / "index.md"
         main_index.write_text("Old main content")
@@ -691,3 +720,98 @@ class TestTruncateForCatalog:
         # Catalog row is truncated to MAX_DESCRIPTION_LENGTH (with ellipsis).
         assert f"**Description:** {'B' * (MAX_DESCRIPTION_LENGTH - 3)}..." in content
         assert len(long_desc) not in [len(line) for line in content.splitlines()]
+
+
+class TestWriteIndexIfChanged:
+    """Direct edge-case coverage for idempotent index writing (#496)."""
+
+    def test_returns_true_then_false_on_timestamp_only_change(self, tmp_path: Path):
+        from power_framework.core.index_write import write_index_if_changed
+
+        target = tmp_path / "index.md"
+        first = "---\ntype: Area\ntimestamp: 2026-01-01T00:00:00+00:00\n---\n\nBody\n"
+        second = "---\ntype: Area\ntimestamp: 2026-01-02T00:00:00+00:00\n---\n\nBody\n"
+
+        assert write_index_if_changed(target, first) is True
+        assert target.read_text(encoding="utf-8") == first
+
+        assert write_index_if_changed(target, second) is False
+        assert target.read_text(encoding="utf-8") == first
+
+    def test_body_timestamp_unclosed_and_missing_frontmatter_rewrite(self, tmp_path: Path):
+        from power_framework.core.index_write import write_index_if_changed
+
+        # timestamp: in markdown body after closed frontmatter must trigger write
+        target = tmp_path / "body_ts.md"
+        base = "---\ntype: Area\n---\n\ntimestamp: 2026-01-01\n"
+        changed = "---\ntype: Area\n---\n\ntimestamp: 2026-01-02\n"
+        target.write_text(base, encoding="utf-8")
+        assert write_index_if_changed(target, changed) is True
+        assert target.read_text(encoding="utf-8") == changed
+
+        # Unclosed frontmatter must not mask timestamp:
+        unclosed = tmp_path / "unclosed.md"
+        u1 = "---\ntimestamp: 2026-01-01\nBody\n"
+        u2 = "---\ntimestamp: 2026-01-02\nBody\n"
+        unclosed.write_text(u1, encoding="utf-8")
+        assert write_index_if_changed(unclosed, u2) is True
+        assert unclosed.read_text(encoding="utf-8") == u2
+
+        # Missing frontmatter compares full text
+        plain = tmp_path / "plain.md"
+        plain.write_text("plain v1\n", encoding="utf-8")
+        assert write_index_if_changed(plain, "plain v2\n") is True
+        assert plain.read_text(encoding="utf-8") == "plain v2\n"
+
+    def test_replaces_corrupt_utf8_crlf_trailing_nl_and_unreadable_file(self, tmp_path: Path):
+        from power_framework.core.index_write import write_index_if_changed
+
+        lf = "---\ntimestamp: 2026-01-01\n---\n\nBody\n"
+
+        corrupt = tmp_path / "corrupt.md"
+        corrupt.write_bytes(b"---\ntype: Area\n---\n\xff\xfe")
+        assert write_index_if_changed(corrupt, lf) is True
+        assert corrupt.read_bytes() == lf.encode("utf-8")
+
+        crlf = tmp_path / "crlf.md"
+        crlf.write_bytes(lf.replace("\n", "\r\n").encode("utf-8"))
+        assert write_index_if_changed(crlf, lf) is True
+        assert crlf.read_bytes() == lf.encode("utf-8")
+
+        lone_cr = tmp_path / "lone_cr.md"
+        lone_cr.write_bytes(b"---\ntimestamp: 2026-01-01\r\n---\n\nBody\n")
+        assert write_index_if_changed(lone_cr, lf) is True
+        assert lone_cr.read_bytes() == lf.encode("utf-8")
+
+        no_nl = tmp_path / "no_nl.md"
+        no_nl.write_bytes(lf.rstrip("\n").encode("utf-8"))
+        assert write_index_if_changed(no_nl, lf) is True
+        assert no_nl.read_bytes() == lf.encode("utf-8")
+
+        if os.geteuid() != 0:
+            unreadable = tmp_path / "unreadable.md"
+            unreadable.write_text(lf, encoding="utf-8")
+            unreadable.chmod(0o000)
+            try:
+                assert write_index_if_changed(unreadable, lf) is True
+                assert unreadable.read_text(encoding="utf-8") == lf
+            finally:
+                if unreadable.exists():
+                    unreadable.chmod(0o644)
+
+    def test_replaces_symlink_instead_of_preserving_it(self, tmp_path: Path):
+        from power_framework.core.index_write import write_index_if_changed
+
+        outside = tmp_path / "outside.md"
+        content = "---\ntimestamp: 2026-01-01\n---\n\nBody\n"
+        outside.write_text(content, encoding="utf-8")
+
+        link = tmp_path / "index.md"
+        try:
+            link.symlink_to(outside)
+        except OSError:
+            pytest.skip("symlinks unavailable")
+
+        assert write_index_if_changed(link, content) is True
+        assert not link.is_symlink()
+        assert link.read_text(encoding="utf-8") == content

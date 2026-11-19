@@ -114,7 +114,7 @@ phase report, release artifact, or authorization to start Phase 5F.
 | HISTORICAL EVIDENCE | Immutable prior gate or stale candidate record | Prior handoffs, closed #407 evidence |
 | PHASE EVIDENCE | Executed proof for a named phase/gate | Phase reports and receipts |
 | ARCHITECTURAL DECISION | Durable decision requiring an ADR | `docs/adr/` records |
-| NEXT RUNTIME GATE | Authorized sequence position, not implementation | PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation after post-#483 canonical-plan reconciliation and exact readback; Phase 5E remains OPEN / NOT PASSED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED |
+| NEXT RUNTIME GATE | Authorized sequence position, not implementation | PHASE_5E_FRESH_EVALUATION_AUTHORING (separate invocation with explicit owner admission on live main; Phase 5E remains OPEN / NOT PASSED); Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED |
 
 ## HISTORICAL PLAN
 
@@ -159,10 +159,11 @@ R6A.1/R6A.2 closed without fresh holdout execution). P38-WP03-R4 is
 chunks, complete FTS+dense coverage); the historical 3,624-note / 19,954-chunk /
 23,578-vector workload was not reproduced and is not directly comparable.
 PR #483's signed governance post-merge readback is complete and Issue #471 is
-`CLOSED / COMPLETED`. The post-#483 canonical-plan reconciliation still requires
-its own protected publication and exact live readback before the next separate
-invocation. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set
-behavior) is `BLOCKED` behind Phase 5E.
+`CLOSED / COMPLETED`. PR #485 (post-#483 canonical-plan reconciliation, merge
+`aa295a4`) and subsequent CI/runtime fixes PR #502, #503, #505, and #506 (merge
+`330f01c`) are `CLOSED / MERGED / VERIFIED`. Fresh Phase 5E evaluation authoring
+requires a separate explicit owner admission. Phase 5F (P38-WP04 / Phase 5F
+Incremental Dense Validity / dirty-set behavior) is `BLOCKED` behind Phase 5E.
 
 ## ARCHITECTURAL DECISION
 
@@ -205,9 +206,9 @@ not runtime completion. This canonical projection records the closed Controlled
 Dependency Refresh, the v2 planning successor, the closed Phase 5A/5A.1/5B/5C/5D
 gates, the CLOSED / MERGED / VERIFIED OpenVINO software integration through PR
 #478, security dependency remediation through PR #481, the PASS of the explicitly
-authorized current-KB hardware acceptance for Issue #471, the OPEN Phase 5E
-(fresh evaluation authoring is the next separate invocation after the post-#483
-canonical-plan reconciliation and exact readback),
+authorized current-KB hardware acceptance for Issue #471, PR #485 canonical-plan
+reconciliation, PR #502/#503/#505/#506 CI and runtime fixes, the OPEN Phase 5E
+(fresh evaluation authoring requires a separate explicit owner admission),
 the HISTORICAL / CLOSED / FAILED VERIFICATION P38-WP03-R4, the BLOCKED Phase 5F
 (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior),
 and the merged INFRA-1 broker. It does not authorize Actions #396,

@@ -10,13 +10,22 @@ Auto-discovers knowledge graph connections between notes using:
 from __future__ import annotations
 
 import logging
+import math
 import re
+import sqlite3
+import struct
 from collections import deque
-from typing import TYPE_CHECKING
+from contextlib import closing
+from typing import TYPE_CHECKING, Any
 
+from power_framework.core.constants import (
+    DENSE_INDEX_SCHEMA_VERSION,
+    SKIP_FILES,
+    is_catalog_filename,
+)
 from power_framework.core.ignore import should_skip
 from power_framework.core.parser import read_file_content, validate_metadata
-from power_framework.core.utils import iter_vault_markdown_files
+from power_framework.core.utils import iter_vault_markdown_files, validate_vault_path
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +33,14 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from power_framework.core.models import NoteFile, OKFMetadata
+
+
+def _is_relation_candidate(vault_dir: Path, filepath: Path, rel_path: str) -> bool:
+    """Return whether *filepath* is a non-catalog note eligible for relation scoring."""
+    if should_skip(vault_dir, rel_path):
+        return False
+    return filepath.name not in SKIP_FILES and not is_catalog_filename(filepath.name)
+
 
 SUGGEST_MIN_KEYWORD_LEN = 3
 SUGGEST_MAX_KEYWORDS = 10
@@ -145,13 +162,12 @@ def suggest_related(
 
     Returns: Sorted list of RelationSuggestion (descending score)
     """
+    resolved_vault = validate_vault_path(str(vault_dir))
     notes: dict[str, tuple[set[str], list[str], str, str]] = {}
 
-    for filepath in iter_vault_markdown_files(vault_dir):
-        rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, rel.as_posix()):
-            continue
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+    for filepath in iter_vault_markdown_files(resolved_vault):
+        rel_path = filepath.relative_to(resolved_vault).as_posix()
+        if not _is_relation_candidate(resolved_vault, filepath, rel_path):
             continue
 
         try:
@@ -163,7 +179,6 @@ def suggest_related(
         if metadata is None:
             continue
 
-        rel_path = rel.as_posix()
         kw_text = f"{metadata.title} {metadata.description} {content}"
         keywords = _extract_keywords(kw_text)
         tags = metadata.tags or []
@@ -444,17 +459,15 @@ def suggest_related_v2(
             considered (SCOPE BEFORE GRAPH BUILD). Out-of-scope paths are never
             read, materialized, queued, traversed, or used as bridges.
     """
+    resolved_vault = validate_vault_path(str(vault_dir))
     # rel_path -> (keywords, tags, explicit_related_paths:set[str])
     notes: dict[str, tuple[set[str], list[str], set[str]]] = {}
     explicit_links: dict[str, set[str]] = {}
 
-    for filepath in iter_vault_markdown_files(vault_dir):
-        rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, rel.as_posix()):
+    for filepath in iter_vault_markdown_files(resolved_vault):
+        rel_path = filepath.relative_to(resolved_vault).as_posix()
+        if not _is_relation_candidate(resolved_vault, filepath, rel_path):
             continue
-        if filepath.name in ("index.md", "log.md", "_index.md"):
-            continue
-        rel_path = rel.as_posix()
         # Scope before read: never read OOS sources for graph construction.
         if allowed_paths is not None and rel_path not in allowed_paths:
             continue
@@ -595,6 +608,151 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return float(dot / (na * nb))
 
 
+_MISSING_EMBED_BATCH_SIZE = 8
+
+
+def _note_embedding_text(filepath: Path) -> str | None:
+    """Build embedding input aligned with index_sync; return None for blank notes."""
+    content = read_file_content(filepath)
+    if not content.strip():
+        return None
+    metadata = validate_metadata(content)
+    if metadata is not None:
+        combined = " ".join(
+            [metadata.title, " ".join(metadata.tags), metadata.description, content]
+        ).strip()
+        if combined:
+            return combined[:2000]
+    return content[:2000]
+
+
+def _validate_vector(raw_vec: Any) -> list[float]:
+    """Convert and validate one non-empty finite float vector."""
+    if raw_vec is None:
+        raise ValueError("embedding vector is None")
+    vec = [float(x) for x in raw_vec]
+    if not vec or not all(math.isfinite(x) for x in vec):
+        raise ValueError("embedding vector is empty or contains non-finite values")
+    return vec
+
+
+def _load_stored_doc_embeddings(vault_dir: Path) -> dict[str, tuple[list[float], float]]:
+    """Read verified precomputed document vectors from active generation or legacy DB."""
+    from power_framework.core.generation_index import (
+        ActiveGenerationError,
+        resolve_active_generation_path,
+    )
+    from power_framework.core.vault_storage import existing_vault_db_path
+    from power_framework.experimental.embeddings import configured_embedding_identity
+
+    try:
+        db_path = resolve_active_generation_path(vault_dir) or existing_vault_db_path(
+            vault_dir, allow_search_db_override=False
+        )
+    except (ActiveGenerationError, OSError, ValueError) as exc:
+        logger.warning("Active generation unavailable for semantic relations (%s).", exc)
+        return {}
+    if db_path is None or not db_path.is_file():
+        return {}
+
+    try:
+        uri = f"{db_path.resolve().as_uri()}?mode=ro"
+        with closing(sqlite3.connect(uri, uri=True, timeout=30)) as conn:
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA query_only=ON")
+            manifest = dict(
+                conn.execute(
+                    "SELECT manifest_key, manifest_value FROM dense_index_manifest"
+                ).fetchall()
+            )
+            expected_provider, expected_model = configured_embedding_identity()
+            if (
+                manifest.get("schema_version") != DENSE_INDEX_SCHEMA_VERSION
+                or manifest.get("embedding_provider") != expected_provider
+                or manifest.get("embedding_model") != expected_model
+            ):
+                logger.debug(
+                    "Dense index manifest missing or mismatched; skipping stored doc_embeddings."
+                )
+                return {}
+            try:
+                expected_dim = int(manifest["embedding_dimension"])
+            except (KeyError, TypeError, ValueError):
+                return {}
+            if expected_dim <= 0:
+                return {}
+            rows = conn.execute("SELECT rel_path, embedding, mtime FROM doc_embeddings").fetchall()
+    except (sqlite3.Error, OSError, ValueError) as exc:
+        logger.debug("Could not read stored doc_embeddings (%s).", exc)
+        return {}
+
+    expected_bytes = expected_dim * 4
+    stored: dict[str, tuple[list[float], float]] = {}
+    for rel_path, blob, mtime in rows:
+        if (
+            not isinstance(rel_path, str)
+            or not isinstance(blob, (bytes, bytearray))
+            or len(blob) != expected_bytes
+            or mtime is None
+        ):
+            continue
+        try:
+            mtime_f = float(mtime)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(mtime_f):
+            continue
+        vec = [float(x) for x in struct.unpack(f"{expected_dim}f", blob)]
+        if not all(math.isfinite(x) for x in vec):
+            continue
+        stored[rel_path] = (vec, mtime_f)
+    return stored
+
+
+def _embed_missing_notes(
+    manager: Any, items: list[tuple[str, Path]]
+) -> tuple[dict[str, list[float]], set[str]]:
+    """Read and embed notes absent from or stale in ``doc_embeddings``.
+
+    Returns ``(vectors_by_rel_path, empty_rel_paths)``.
+    """
+    payloads: list[tuple[str, str]] = []
+    empty_paths: set[str] = set()
+    for rel_path, filepath in items:
+        try:
+            text = _note_embedding_text(filepath)
+        except Exception:  # noqa: S112
+            continue
+        if text is None:
+            empty_paths.add(rel_path)
+        else:
+            payloads.append((rel_path, text))
+    if not payloads:
+        return {}, empty_paths
+
+    batch_fn = getattr(manager, "embed_batch", None)
+    vectors: list[list[float]] = []
+    if callable(batch_fn):
+        for idx in range(0, len(payloads), _MISSING_EMBED_BATCH_SIZE):
+            chunk = [text for _, text in payloads[idx : idx + _MISSING_EMBED_BATCH_SIZE]]
+            raw_batch = batch_fn(chunk)
+            if raw_batch is None:
+                raise ValueError("embed_batch returned None")
+            batch_list = list(raw_batch)
+            if len(batch_list) != len(chunk):
+                raise ValueError(
+                    f"embed_batch returned {len(batch_list)} vectors for {len(chunk)} texts"
+                )
+            vectors.extend(_validate_vector(raw_vec) for raw_vec in batch_list)
+    else:
+        for _, text in payloads:
+            vectors.append(_validate_vector(manager.embed(text)))
+
+    return {
+        rel_path: vec for (rel_path, _), vec in zip(payloads, vectors, strict=True)
+    }, empty_paths
+
+
 def suggest_related_semantic(
     vault_dir: Path,
     target_path: str | None = None,
@@ -603,11 +761,11 @@ def suggest_related_semantic(
 ) -> list[RelationSuggestion]:
     """Semantic relation suggester using dense embeddings (WTF #5).
 
-    Replaces keyword/tag Jaccard overlap with true semantic cosine similarity
-    over BGE-M3 (UA↔EN) embeddings, so lexically-distant but semantically-close
-    notes surface. Falls back to the keyword suggester (with a warning) when the
-    embedding backend or dense index is unavailable, so the tool never fails
-    closed to an empty result set.
+    Reads precomputed document vectors from ``doc_embeddings`` in the active
+    generation database when available and manifest-compatible, embedding only
+    unindexed or stale notes. Falls back to the keyword suggester (with a
+    warning) when the embedding backend or dense index is unavailable, so the
+    tool never fails closed to an empty result set.
     """
     from power_framework.experimental.embeddings import get_embedding_manager
 
@@ -618,42 +776,67 @@ def suggest_related_semantic(
         )
         return suggest_related(vault_dir, target_path=target_path, max_results=max_results)
 
-    try:
-        manager = get_embedding_manager()
-    except Exception as e:
-        logger.warning("Embedding backend unavailable (%s); keyword fallback.", e)
-        return suggest_related(vault_dir, target_path=target_path, max_results=max_results)
-
-    target_text = ""
-    notes: dict[str, str] = {}
-    for filepath in iter_vault_markdown_files(vault_dir):
-        rel = filepath.relative_to(vault_dir)
-        if should_skip(vault_dir, rel.as_posix()):
-            continue
-        if filepath.name in ("index.md", "log.md", "_index.md"):
+    resolved_vault = validate_vault_path(str(vault_dir))
+    disk_files: dict[str, tuple[Path, float]] = {}
+    for filepath in iter_vault_markdown_files(resolved_vault):
+        rel_path = filepath.relative_to(resolved_vault).as_posix()
+        if not _is_relation_candidate(resolved_vault, filepath, rel_path):
             continue
         try:
-            content = read_file_content(filepath)
-        except Exception:  # noqa: S112
+            mtime = filepath.stat().st_mtime
+        except OSError:
             continue
-        rel_path = rel.as_posix()
-        if rel_path == target_path:
-            target_text = content
-            continue
-        notes[rel_path] = content
+        disk_files[rel_path] = (filepath, mtime)
 
-    if not target_text or not notes:
+    if target_path not in disk_files or len(disk_files) <= 1:
         return []
 
+    target_file = disk_files[target_path][0]
     try:
-        target_vec = manager.embed(target_text[:2000])
-        cand_vecs = {p: manager.embed(c[:2000]) for p, c in notes.items()}
-    except Exception as e:
-        logger.warning("Embedding failed (%s); keyword fallback.", e)
-        return suggest_related(vault_dir, target_path=target_path, max_results=max_results)
+        if not read_file_content(target_file).strip():
+            return []
+    except Exception:
+        logger.warning("Target note unavailable (%s); keyword fallback.", target_path)
+        return suggest_related(resolved_vault, target_path=target_path, max_results=max_results)
+
+    stored = _load_stored_doc_embeddings(resolved_vault)
+    target_vec: list[float] | None = None
+    cand_vecs: dict[str, list[float]] = {}
+    missing_items: list[tuple[str, Path]] = []
+
+    for rel_path, (filepath, file_mtime) in disk_files.items():
+        cached = stored.get(rel_path)
+        if cached is not None and cached[1] == file_mtime:
+            if rel_path == target_path:
+                target_vec = cached[0]
+            else:
+                cand_vecs[rel_path] = cached[0]
+        else:
+            missing_items.append((rel_path, filepath))
+
+    if missing_items:
+        try:
+            manager = get_embedding_manager()
+            embedded, empty_paths = _embed_missing_notes(manager, missing_items)
+        except Exception as e:
+            logger.warning("Embedding backend unavailable (%s); keyword fallback.", e)
+            return suggest_related(resolved_vault, target_path=target_path, max_results=max_results)
+        if target_path in empty_paths:
+            return []
+        if target_path in embedded:
+            target_vec = embedded.pop(target_path)
+        cand_vecs.update(embedded)
+
+    if target_vec is None or not cand_vecs:
+        return suggest_related(resolved_vault, target_path=target_path, max_results=max_results)
 
     suggestions: list[RelationSuggestion] = []
+    target_dim = len(target_vec)
+    comparable = 0
     for rel_path, vec in cand_vecs.items():
+        if len(vec) != target_dim:
+            continue
+        comparable += 1
         score = _cosine(target_vec, vec)
         if score >= score_threshold:
             suggestions.append(
@@ -664,5 +847,11 @@ def suggest_related_semantic(
                     reason=f"Semantic cosine similarity ({int(score * 100)}%)",
                 )
             )
+    if comparable == 0:
+        logger.warning(
+            "No dimension-compatible vectors for %s; falling back to keyword relations.",
+            target_path,
+        )
+        return suggest_related(resolved_vault, target_path=target_path, max_results=max_results)
     suggestions.sort(key=lambda s: (-s.score, s.source_path, s.target_path))
     return suggestions[:max_results]
