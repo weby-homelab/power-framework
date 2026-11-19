@@ -27,6 +27,7 @@ from .ignore import should_skip
 from .index_sync import _sync_vault_to_db as _sync_vault_to_db
 from .parser import read_file_content, validate_metadata
 from .source_projection import scan_projection, write_projection
+from .sync_memory import low_memory_override
 from .utils import iter_vault_markdown_files
 from .vault_storage import (
     ensure_vault_identity,
@@ -910,6 +911,7 @@ def sync_vault_atomically(
     allow_partial: bool = True,
     accept_dense_loss: bool = False,
     max_reconcile_rounds: int = 1,
+    allow_low_memory: bool = False,
 ) -> GenerationReport:
     """Build a complete staged generation and atomically publish it on success.
 
@@ -937,80 +939,81 @@ def sync_vault_atomically(
     _enforce_partial_policy(inventory, allow_partial, IndexGenerationError)
     sources = inventory.valid_sources
     snapshot_hash = _snapshot_hash(sources)
-    migrated = _migrate_legacy_database(
-        root, inventory, snapshot_hash, sync_embeddings=sync_embeddings
-    )
-    if migrated is not None:
-        return migrated
-    generation_id = str(uuid.uuid4())
-    _record_building(root, generation_id, snapshot_hash, inventory)
-    staging_dir = vault_cache_dir(root) / "staging"
-    staging_dir.mkdir(parents=True, exist_ok=True)
-    staging_path = staging_dir / f"{generation_id}.db"
-    active_path = resolve_active_generation_path(root)
-
-    try:
-        with closing(sqlite3.connect(staging_path, timeout=30)) as conn:
-            if active_path is not None:
-                # Preserve the previous immutable index as the starting point
-                # for this generation. `_sync_vault_to_db` can then use its
-                # mtime/content cache and rewrite only changed rows instead of
-                # embedding the whole vault on every atomic publication.
-                with closing(
-                    sqlite3.connect(f"file:{active_path}?mode=ro", uri=True, timeout=30)
-                ) as active_conn:
-                    active_conn.backup(conn)
-            _init_db(conn)
-            ops = _ReconcileOps(
-                _sync_vault_to_db,
-                _assert_source_snapshot_unchanged,
-                _source_inventory,
-                _state_db_path,
-                _init_state_db,
-                IndexGenerationError,
-            )
-            inventory, snapshot_hash = reconcile_staging_snapshot(
-                root,
-                conn,
-                generation_id=generation_id,
-                inventory=inventory,
-                snapshot_hash=snapshot_hash,
-                sync_embeddings=sync_embeddings,
-                force_rebuild=force_rebuild,
-                allow_partial=allow_partial,
-                ops=ops,
-                max_rounds=max_reconcile_rounds,
-            )
-            sources = inventory.valid_sources
-            actual_files, actual_chunks, provider, model = _validate_staging(
-                conn,
-                set(sources),
-                sync_embeddings,
-                expected_source_revision=snapshot_hash,
-            )
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        _publish(
-            root,
-            generation_id,
-            staging_path,
-            actual_files,
-            actual_chunks,
-            provider,
-            model,
+    with low_memory_override(allow_low_memory):
+        migrated = _migrate_legacy_database(
+            root, inventory, snapshot_hash, sync_embeddings=sync_embeddings
         )
-        if active_path is None and not os.getenv("POWER_SEARCH_DB"):
-            _archive_legacy_database(root, vault_db_path(root), generation_id)
-    except Exception as exc:
-        _record_failure(root, generation_id, str(exc))
-        for path in (
-            staging_path,
-            staging_path.with_suffix(".db-wal"),
-            staging_path.with_suffix(".db-shm"),
-        ):
-            path.unlink(missing_ok=True)
-        if isinstance(exc, IndexGenerationError):
-            raise
-        raise IndexGenerationError(f"generation {generation_id} failed: {exc}") from exc
+        if migrated is not None:
+            return migrated
+        generation_id = str(uuid.uuid4())
+        _record_building(root, generation_id, snapshot_hash, inventory)
+        staging_dir = vault_cache_dir(root) / "staging"
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        staging_path = staging_dir / f"{generation_id}.db"
+        active_path = resolve_active_generation_path(root)
+
+        try:
+            with closing(sqlite3.connect(staging_path, timeout=30)) as conn:
+                if active_path is not None:
+                    # Preserve the previous immutable index as the starting point
+                    # for this generation. `_sync_vault_to_db` can then use its
+                    # mtime/content cache and rewrite only changed rows instead of
+                    # embedding the whole vault on every atomic publication.
+                    with closing(
+                        sqlite3.connect(f"file:{active_path}?mode=ro", uri=True, timeout=30)
+                    ) as active_conn:
+                        active_conn.backup(conn)
+                _init_db(conn)
+                ops = _ReconcileOps(
+                    _sync_vault_to_db,
+                    _assert_source_snapshot_unchanged,
+                    _source_inventory,
+                    _state_db_path,
+                    _init_state_db,
+                    IndexGenerationError,
+                )
+                inventory, snapshot_hash = reconcile_staging_snapshot(
+                    root,
+                    conn,
+                    generation_id=generation_id,
+                    inventory=inventory,
+                    snapshot_hash=snapshot_hash,
+                    sync_embeddings=sync_embeddings,
+                    force_rebuild=force_rebuild,
+                    allow_partial=allow_partial,
+                    ops=ops,
+                    max_rounds=max_reconcile_rounds,
+                )
+                sources = inventory.valid_sources
+                actual_files, actual_chunks, provider, model = _validate_staging(
+                    conn,
+                    set(sources),
+                    sync_embeddings,
+                    expected_source_revision=snapshot_hash,
+                )
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            _publish(
+                root,
+                generation_id,
+                staging_path,
+                actual_files,
+                actual_chunks,
+                provider,
+                model,
+            )
+            if active_path is None and not os.getenv("POWER_SEARCH_DB"):
+                _archive_legacy_database(root, vault_db_path(root), generation_id)
+        except Exception as exc:
+            _record_failure(root, generation_id, str(exc))
+            for path in (
+                staging_path,
+                staging_path.with_suffix(".db-wal"),
+                staging_path.with_suffix(".db-shm"),
+            ):
+                path.unlink(missing_ok=True)
+            if isinstance(exc, IndexGenerationError):
+                raise
+            raise IndexGenerationError(f"generation {generation_id} failed: {exc}") from exc
 
     return GenerationReport(
         generation_id=generation_id,

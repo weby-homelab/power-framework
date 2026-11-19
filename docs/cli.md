@@ -279,15 +279,16 @@ The broker must be installed and enabled by an operator; absence is reported as
 Build the active search generation atomically.
 
 ```text
-power sync PATH [--fts-only] [--force] [--strict | --allow-partial]
-                [--accept-dense-loss]
+power sync PATH [--fts-only] [--force] [--allow-low-memory]
+                [--strict | --allow-partial] [--accept-dense-loss]
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--fts-only` | Build the lightweight FTS index and skip embeddings. |
 | `--accept-dense-loss` | Allow `--fts-only` to replace an existing dense index. Without it, such a run is refused. |
-| `--force` | Force a full dense rebuild, for example after a model/dimension change. |
+| `--force` | Force a full dense rebuild, for example after a model/dimension change (does not bypass memory pre-flight). |
+| `--allow-low-memory` | Proceed with `batch_size=1` and a warning when available RAM is below the pre-flight estimate. |
 | `--strict` | Explicitly select the default fail-closed coverage policy; the command exits non-zero when notes are excluded. |
 | `--allow-partial` | Explicitly accept excluded notes, continue with a warning, and exit zero with the complete path/reason receipt. Mutually exclusive with `--strict`. |
 

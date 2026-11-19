@@ -9,9 +9,11 @@ import logging
 import os
 import re
 import sqlite3
+import time
 from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
 
+from . import sync_memory
 from .chunker import SemanticChunker
 from .constants import DENSE_INDEX_SCHEMA_VERSION, SKIP_FILES, is_catalog_filename
 from .ignore import should_skip
@@ -79,6 +81,7 @@ def _sync_vault_to_db(
     conn: sqlite3.Connection,
     sync_embeddings: bool = False,
     force_rebuild: bool = False,
+    allow_low_memory: bool | None = None,
 ) -> None:
     """Synchronize the files in the vault with the SQLite database.
 
@@ -91,9 +94,11 @@ def _sync_vault_to_db(
             search actually needs the dense embeddings.
         force_rebuild: Wipe the dense-embedding tables before the pass so every
             note is re-embedded. Required after a provider / dimension change
-            (e.g. MiniLM 384d -> Qwen3 1024d) because the incremental sync
+            (e.g. MiniLM 384d -> BGE-M3 1024d) because the incremental sync
             only revisits files whose ``mtime`` changed and would otherwise keep
             stale vectors of the old dimensionality.
+        allow_low_memory: Optional explicit override for the pre-flight memory
+            estimate check when ``sync_embeddings`` is True.
 
     Memory note (v2.2.0): when ``sync_embeddings`` is True the dense embeddings
     are computed in **batches** via ``embedder.embed_batch`` instead of one
@@ -380,7 +385,26 @@ def _sync_vault_to_db(
         len(chunk_items),
     )
 
-    _embed_and_store(embedder, cursor, conn, doc_items, chunk_items)
+    requested_batch_size = max(1, int(os.getenv("POWER_EMBED_BATCH_SIZE", "8")))
+    provider, model = _embedding_manifest_identity(embedder)
+    preflight_dim = sync_memory.infer_embedder_dimension(embedder, provider, model)
+    estimate = sync_memory.preflight_dense_sync_memory(
+        provider=provider,
+        model=model,
+        item_count=len(doc_items) + len(chunk_items),
+        embedding_dimension=preflight_dim,
+        requested_batch_size=requested_batch_size,
+        allow_low_memory=allow_low_memory,
+    )
+
+    _embed_and_store(
+        embedder,
+        cursor,
+        conn,
+        doc_items,
+        chunk_items,
+        initial_batch_size=estimate.recommended_batch_size,
+    )
     dense_row = cursor.execute(
         "SELECT COUNT(*), MIN(LENGTH(embedding)) FROM chunk_embeddings"
     ).fetchone()
@@ -422,24 +446,30 @@ def _embed_and_store(
     conn: sqlite3.Connection,
     doc_items: list[tuple[str, str, float]],
     chunk_items: list[tuple[str, str, str, float]],
+    *,
+    initial_batch_size: int | None = None,
 ) -> None:
     """Embed document + chunk texts in adaptive batches and stream to the DB.
 
     Peak RAM is bounded by ``batch_size`` and by committing every
     ``POWER_EMBED_COMMIT_EVERY`` items so the SQLite WAL never buffers the whole
-    vault (which previously spiked ZFS write interrupts). If the embedding
-    backend cannot allocate memory for a batch (ONNXRuntime arena failure or
-    Python ``MemoryError``), the batch size is halved and retried — eventually
-    down to a single item — so a sync survives memory pressure instead of
-    crashing the host.
+    vault (which previously spiked ZFS write interrupts). Batch size shrinks
+    proactively when available RAM drops under pressure and also halves on any
+    runtime allocation failure — eventually down to a single item — so a sync
+    survives memory pressure instead of crashing the host.
     """
     import struct
 
-    # Low-RAM default: Qwen3-0.6B on CPU allocates a multi-GB arena per MatMul
-    # node at large batch sizes, so keep the default small. Tune up on bigger
-    # hosts via POWER_EMBED_BATCH_SIZE.
-    batch_size = int(os.getenv("POWER_EMBED_BATCH_SIZE", "8"))
-    commit_every = int(os.getenv("POWER_EMBED_COMMIT_EVERY", "50"))
+    # Keep the default batch size small so CPU activation arenas stay bounded;
+    # memory demand depends on the configured embedding model (e.g. BGE-M3
+    # ~2.2 GB arena). Tune up on larger hosts via POWER_EMBED_BATCH_SIZE.
+    active_batch_size = max(
+        1,
+        initial_batch_size
+        if initial_batch_size is not None
+        else int(os.getenv("POWER_EMBED_BATCH_SIZE", "8")),
+    )
+    commit_every = max(1, int(os.getenv("POWER_EMBED_COMMIT_EVERY", "50")))
 
     def _embed_retry(texts: list[str], bs: int) -> list[list[float]] | None:
         """Embed ``texts`` with adaptive halving on any allocation failure.
@@ -471,9 +501,9 @@ def _embed_and_store(
         )
         return None
 
-    def _store_docs(items: list[tuple[str, str, float]]) -> None:
+    def _store_docs(items: list[tuple[str, str, float]], bs: int) -> None:
         texts = [t for _, t, _ in items]
-        vecs = _embed_retry(texts, batch_size)
+        vecs = _embed_retry(texts, bs)
         if vecs is None:
             return
         for (rel_path, _, mtime), vec in zip(items, vecs, strict=True):
@@ -483,9 +513,9 @@ def _embed_and_store(
                 (rel_path, blob, mtime),
             )
 
-    def _store_chunks(items: list[tuple[str, str, str, float]]) -> None:
+    def _store_chunks(items: list[tuple[str, str, str, float]], bs: int) -> None:
         texts = [t for _, _, t, _ in items]
-        vecs = _embed_retry(texts, batch_size)
+        vecs = _embed_retry(texts, bs)
         if vecs is None:
             return
         for (chunk_id, rel_path, chunk_content, mtime), vec in zip(items, vecs, strict=True):
@@ -520,14 +550,75 @@ def _embed_and_store(
             raise
 
     total = len(doc_items) + len(chunk_items)
-    for i in range(0, len(doc_items), batch_size):
-        _store_docs(doc_items[i : i + batch_size])
-        if (i // batch_size) % commit_every == 0:
-            _safe_commit()
-    for i in range(0, len(chunk_items), batch_size):
-        _store_chunks(chunk_items[i : i + batch_size])
-        if (i // batch_size) % commit_every == 0:
-            _safe_commit()
+    processed = 0
+    started_at = time.monotonic()
+    last_progress_log = started_at
+    items_since_progress_log = 0
+    first_batch = True
+
+    def _maybe_shrink_for_pressure() -> None:
+        nonlocal active_batch_size
+        if active_batch_size <= 1:
+            return
+        avail = sync_memory.available_memory_bytes()
+        if sync_memory.should_shrink_batch_under_pressure(avail):
+            next_bs = max(1, active_batch_size // 2)
+            logger.warning(
+                "Memory pressure detected (available=%d MiB) — shrinking batch size %d -> %d",
+                max(0, (avail or 0) // (1024 * 1024)),
+                active_batch_size,
+                next_bs,
+            )
+            active_batch_size = next_bs
+
+    def _maybe_log_progress(*, final: bool = False) -> None:
+        nonlocal last_progress_log, items_since_progress_log, first_batch
+        if total == 0:
+            return
+        now = time.monotonic()
+        if not (
+            first_batch
+            or final
+            or items_since_progress_log >= commit_every
+            or (now - last_progress_log) >= 5.0
+        ):
+            return
+        elapsed = max(0.001, now - started_at)
+        remaining = max(0, total - processed)
+        rate = processed / elapsed if processed > 0 else 0.0
+        eta = (remaining / rate) if rate > 0 else 0.0
+        logger.info(
+            "Embedding progress: %d/%d (%.1f%%) batch_size=%d elapsed=%.1fs eta=%.1fs",
+            processed,
+            total,
+            (processed / total) * 100.0,
+            active_batch_size,
+            elapsed,
+            eta,
+        )
+        first_batch = False
+        last_progress_log = now
+        items_since_progress_log = 0
+
+    def _run_queue(queue_items: list[Any], store_fn: Any) -> None:
+        nonlocal processed, items_since_progress_log
+        idx = 0
+        batches = 0
+        while idx < len(queue_items):
+            if processed > 0:
+                _maybe_shrink_for_pressure()
+            batch = queue_items[idx : idx + active_batch_size]
+            store_fn(batch, active_batch_size)
+            idx += len(batch)
+            processed += len(batch)
+            items_since_progress_log += len(batch)
+            batches += 1
+            if batches % commit_every == 0:
+                _safe_commit()
+            _maybe_log_progress(final=processed >= total)
+
+    _run_queue(doc_items, _store_docs)
+    _run_queue(chunk_items, _store_chunks)
     _safe_commit()
     logger.info("Embedding pass complete: %d vector(s) written", total)
     rowc = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]

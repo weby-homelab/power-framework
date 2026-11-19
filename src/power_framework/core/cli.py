@@ -19,11 +19,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-try:  # resource is POSIX-only; Windows uses the no-limit path.
-    import resource
-except ImportError:  # pragma: no cover - exercised on Windows
-    resource = None  # type: ignore[assignment]
-
 from power_framework.experimental.relations import (
     format_relation_suggestions,
     suggest_related,
@@ -515,32 +510,10 @@ def _cmd_sync(args: argparse.Namespace) -> int:
         return 1
 
     from .generation_index import IndexGenerationError, sync_vault_atomically
+    from .sync_memory import apply_sync_vmem_cap
 
     sync_embeddings = not getattr(args, "fts_only", False)
-
-    # v2.2.0 low-RAM guard: cap the address space so an over-sized embedding
-    # batch cannot trigger the kernel OOM-killer and take down the host. This is
-    # an OPT-IN backstop (default 0 = disabled) because some backends (e.g.
-    # Qwen3-0.6B ONNX) legitimately need >6 GB for their inference arena. Enable
-    # it on tight 8 GB hosts via POWER_SYNC_VMEM_LIMIT_MB=6144.
-    vmem_limit_mb = int(os.getenv("POWER_SYNC_VMEM_LIMIT_MB", "0"))
-    if (
-        vmem_limit_mb
-        and sync_embeddings
-        and resource is not None
-        and hasattr(resource, "RLIMIT_AS")
-    ):
-        try:
-            getrlimit = getattr(resource, "getrlimit")  # noqa: B009 - optional POSIX module.
-            setrlimit = getattr(resource, "setrlimit")  # noqa: B009 - optional POSIX module.
-            _, hard = getrlimit(resource.RLIMIT_AS)
-            new_soft = (
-                min(vmem_limit_mb * 1024 * 1024, hard) if hard > 0 else vmem_limit_mb * 1024 * 1024
-            )
-            setrlimit(resource.RLIMIT_AS, (new_soft, hard))
-            logger.info("Applied virtual-memory cap: %d MB", vmem_limit_mb)
-        except (ValueError, OSError) as e:  # pragma: no cover
-            logger.warning("Could not apply vmem cap: %s", e)
+    apply_sync_vmem_cap(sync_embeddings)
 
     logger.info(
         "Building %s index for %s ...",
@@ -549,6 +522,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     )
     force_rebuild = getattr(args, "force", False)
     accept_dense_loss = getattr(args, "accept_dense_loss", False)
+    allow_low_memory = getattr(args, "allow_low_memory", False)
     try:
         report = execute_vault_mutation(
             vault_dir,
@@ -558,6 +532,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
                 force_rebuild=force_rebuild,
                 accept_dense_loss=accept_dense_loss,
                 max_reconcile_rounds=3,
+                allow_low_memory=allow_low_memory,
             ),
         )
     except IndexGenerationError as exc:
@@ -1835,6 +1810,12 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Force a full rebuild of dense embeddings (required after changing the embedding model/dimension)",
+    )
+    p_sync.add_argument(
+        "--allow-low-memory",
+        action="store_true",
+        default=False,
+        help="Allow dense sync to continue with batch_size=1 when available RAM is below the pre-flight estimate",
     )
     sync_coverage = p_sync.add_mutually_exclusive_group()
     sync_coverage.add_argument(
