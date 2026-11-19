@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from argparse import Namespace
 from pathlib import Path, PureWindowsPath
 
 import pytest
@@ -386,6 +387,29 @@ def test_cli_heal_returns_nonzero_for_partial_failure(
 
     assert exit_code == 1
     assert "type: Project" not in note.read_text(encoding="utf-8")
+
+
+def test_cli_heal_distinguishes_pending_dry_run_from_success(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    (tmp_path / "01_Projects").mkdir()
+    note = _write_incomplete_note(tmp_path, "pending.md")
+    original = note.read_bytes()
+    args = Namespace(path=str(tmp_path), no_dry_run=False, limit=None)
+
+    assert _cmd_heal(args) == 2
+    assert "DRY RUN — no changes applied" in caplog.text
+    assert note.read_bytes() == original
+
+    caplog.clear()
+    args.no_dry_run = True
+    assert _cmd_heal(args) == 0
+    assert "type: Project" in note.read_text(encoding="utf-8")
+    assert "DRY RUN — no changes applied" not in caplog.text
+
+    args.no_dry_run = False
+    assert _cmd_heal(args) == 0
+    assert "DRY RUN — no changes applied" not in caplog.text
 
 
 def test_healer_preserves_quoted_wikilinks_in_related_and_lint_delta(tmp_path: Path):
