@@ -135,8 +135,6 @@ def commit_note_change(
             _validate_idempotency_key(idempotency_key)
             if idempotency_fingerprint is not None and not _is_sha256(idempotency_fingerprint):
                 raise ValueError("idempotency_fingerprint must be a SHA-256 hex digest")
-        if validate_metadata(content) is None and idempotency_key is None:
-            raise ValueError("proposal content has invalid or missing OKF metadata")
 
         from . import generation_index
 
@@ -226,8 +224,8 @@ def commit_note_change(
                         sync_embeddings=has_dense,
                         allow_partial=allow_partial,
                     )
-                    lint_delta.assert_no_new_invalid_sources(baseline, report.excluded_sources)
                     published_search = True
+                    lint_delta.assert_no_new_invalid_sources(baseline, report.excluded_sources)
                     receipt.update(
                         {
                             "index_summary": index_summary,

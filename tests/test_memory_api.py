@@ -715,3 +715,61 @@ def test_memory_commit_runs_crash_recovery_before_baseline_lint(sample_vault):
 
     assert not crashed_path.exists()
     assert read_history(sample_vault) == []
+
+
+def test_memory_commit_rolls_back_published_search_on_toctou_invalid_source(
+    sample_vault,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Search index must roll back when assert_no_new_invalid_sources fails after publication."""
+    from power_framework.core import generation_index
+
+    (sample_vault / "03_Resources" / "ForeignUntyped.md").write_text(
+        "Unstructured foreign note.\n",
+        encoding="utf-8",
+    )
+    old_content = (
+        "---\n"
+        "type: Project\n"
+        'title: "Existing"\n'
+        'description: "Original note"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "toctou-old-marker\n"
+    )
+    new_content = (
+        "---\n"
+        "type: Project\n"
+        'title: "Existing"\n'
+        'description: "Updated note"\n'
+        "timestamp: 2026-07-29T00:00:00Z\n"
+        "---\n\n"
+        "toctou-new-marker\n"
+    )
+    existing_path = sample_vault / "01_Projects" / "Existing.md"
+    existing_path.write_text(old_content, encoding="utf-8")
+
+    orig_sync = generation_index.sync_vault_atomically
+    calls = 0
+
+    def sync_with_toctou(vault_dir, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            (vault_dir / "03_Resources" / "RaceInvalid.md").write_text(
+                "Corrupted mid-sync note without metadata.\n",
+                encoding="utf-8",
+            )
+        return orig_sync(vault_dir, **kwargs)
+
+    monkeypatch.setattr(generation_index, "sync_vault_atomically", sync_with_toctou)
+
+    with pytest.raises(RuntimeError, match="post-mutation source validation failed"):
+        memory_api.commit_note_change(sample_vault, "01_Projects/Existing.md", new_content)
+
+    assert calls == 2
+    assert "toctou-old-marker" in existing_path.read_text(encoding="utf-8")
+    assert search_vault(sample_vault, "toctou-new-marker", mode="fts") == []
+    restored = search_vault(sample_vault, "toctou-old-marker", mode="fts")
+    assert restored
+    assert restored[0].rel_path == "01_Projects/Existing.md"
