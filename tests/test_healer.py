@@ -440,6 +440,7 @@ def test_healer_preserves_mixed_wikilink_and_typed_relation_dict(tmp_path: Path)
         "---\n"
         'title: "Mixed Related"\n'
         'description: "Mixed list"\n'
+        'tags: ["2026", "tag: value"]\n'
         "related:\n"
         '  - "[[Foo]]"\n'
         "  - path: 01_Projects/Foo.md\n"
@@ -453,6 +454,7 @@ def test_healer_preserves_mixed_wikilink_and_typed_relation_dict(tmp_path: Path)
 
     parsed = parse_frontmatter(healed)
     assert parsed is not None
+    assert parsed["tags"] == ["2026", "tag: value"]
     assert parsed["related"] == [
         "[[Foo]]",
         {"path": "01_Projects/Foo.md", "relation": "depends_on"},
