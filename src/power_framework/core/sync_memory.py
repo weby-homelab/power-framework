@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 from contextlib import contextmanager
@@ -80,13 +81,25 @@ def is_low_memory_allowed(explicit: bool | None = None) -> bool:
     return env_flag in {"1", "true", "yes"}
 
 
+def parse_int_env(name: str, default: int, *, minimum: int = 0) -> int:
+    """Parse an integer environment override without crashing on empty or malformed text."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return max(minimum, default)
+    try:
+        return max(minimum, int(raw))
+    except ValueError:
+        logger.warning("Ignoring invalid integer %s=%r; using %d", name, raw, default)
+        return max(minimum, default)
+
+
 def apply_sync_vmem_cap(sync_embeddings: bool) -> int | None:
     """Apply optional POSIX ``RLIMIT_AS`` backstop from ``POWER_SYNC_VMEM_LIMIT_MB``.
 
     This remains an opt-in safeguard (``0`` = disabled) because dense ONNX
     backends such as BGE-M3 can reserve multi-GB virtual address spaces.
     """
-    vmem_limit_mb = int(os.getenv("POWER_SYNC_VMEM_LIMIT_MB", "0"))
+    vmem_limit_mb = parse_int_env("POWER_SYNC_VMEM_LIMIT_MB", 0, minimum=0)
     if (
         vmem_limit_mb <= 0
         or not sync_embeddings
@@ -100,9 +113,10 @@ def apply_sync_vmem_cap(sync_embeddings: bool) -> int | None:
         _, hard = getrlimit(resource.RLIMIT_AS)
         requested = vmem_limit_mb * _MIB
         new_soft = min(requested, hard) if hard > 0 else requested
+        applied_mb = new_soft // _MIB
         setrlimit(resource.RLIMIT_AS, (new_soft, hard))
-        logger.info("Applied virtual-memory cap: %d MB", vmem_limit_mb)
-        return vmem_limit_mb
+        logger.info("Applied virtual-memory cap: %d MB", applied_mb)
+        return applied_mb
     except (ValueError, OSError) as exc:  # pragma: no cover
         logger.warning("Could not apply vmem cap: %s", exc)
         return None
@@ -139,21 +153,42 @@ def available_memory_bytes() -> int | None:
     return None
 
 
-def infer_embedder_dimension(embedder: object, provider: str, model: str) -> int:
-    """Determine embedding vector width without triggering remote calls or model downloads."""
-    raw_dim = getattr(embedder, "dimension", None)
-    if isinstance(raw_dim, int) and raw_dim > 0:
-        return raw_dim
-    if callable(raw_dim) and "ollama" not in provider.casefold():
-        try:
-            computed = int(raw_dim())
-            if computed > 0:
-                return computed
-        except Exception:  # noqa: S110 - fall back cleanly before preflight
-            pass
+def infer_embedder_dimension(embedder: object | None, provider: str, model: str) -> int:
+    """Determine vector width without triggering remote calls, lazy init, or @property getters."""
+    if embedder is not None:
+        # Use inspect.getattr_static so descriptor properties (OllamaEmbeddingManager.dimension,
+        # FastEmbedManager.dimension) never execute HTTP calls or model loading before preflight.
+        static_dim = inspect.getattr_static(embedder, "dimension", None)
+        if isinstance(static_dim, int) and not isinstance(static_dim, bool) and static_dim > 0:
+            return static_dim
+        cached_dim = inspect.getattr_static(embedder, "_dim", None)
+        if isinstance(cached_dim, int) and not isinstance(cached_dim, bool) and cached_dim > 0:
+            return cached_dim
+        if (
+            not isinstance(static_dim, property)
+            and callable(static_dim)
+            and "ollama" not in provider.casefold()
+            and "fastembed" not in provider.casefold()
+        ):
+            try:
+                bound = (
+                    static_dim.__get__(embedder, type(embedder))
+                    if hasattr(static_dim, "__get__")
+                    else static_dim
+                )
+                computed = int(bound())
+                if computed > 0:
+                    return computed
+            except Exception:  # noqa: S110 - fall back cleanly before preflight
+                pass
     lowered = f"{provider} {model}".casefold()
-    if any(token in lowered for token in ("bge-m3", "bgem3", "qwen3", "large", "embeddinggemma")):
+    if any(
+        token in lowered
+        for token in ("bge-m3", "bgem3", "bge_m3", "qwen3", "qwen", "large", "embeddinggemma")
+    ):
         return 1024
+    if "base" in lowered and "minilm" not in lowered and "small" not in lowered:
+        return 768
     return 384
 
 
@@ -165,6 +200,7 @@ def estimate_model_arena_bytes(provider: str, model: str, embedding_dimension: i
     if (
         "bge-m3" in lowered
         or "bgem3" in lowered
+        or "bge_m3" in lowered
         or ("bge" in lowered and embedding_dimension >= 1024)
     ):
         return 2200 * _MIB
@@ -172,9 +208,7 @@ def estimate_model_arena_bytes(provider: str, model: str, embedding_dimension: i
         return 1400 * _MIB
     if "qwen3" in lowered:
         return 1800 * _MIB
-    if any(token in lowered for token in ("minilm", "granite", "fastembed")) or (
-        0 < embedding_dimension <= 384
-    ):
+    if any(token in lowered for token in ("minilm", "small")) or (0 < embedding_dimension <= 384):
         return 512 * _MIB
     return (1536 if embedding_dimension >= 1024 else 512) * _MIB
 
