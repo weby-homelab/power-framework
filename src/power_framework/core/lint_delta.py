@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+    from pathlib import Path
+
     from .linter import LintResult
 
 
@@ -34,6 +37,14 @@ class BlockingLintDelta:
         )
 
 
+@dataclass(frozen=True)
+class MutationLintBaseline:
+    """Pre-mutation vault health snapshot captured after crash recovery."""
+
+    lint: LintResult
+    invalid_sources: dict[str, str]
+
+
 def _ambiguous_keys(result: LintResult) -> list[tuple[str, str, tuple[str, ...]]]:
     """Normalize ambiguous-link findings to hashable multiset keys."""
     return [
@@ -59,11 +70,70 @@ def compute_blocking_lint_delta(baseline: LintResult, post: LintResult) -> Block
     )
 
 
-def format_blocking_lint_summary(result: LintResult) -> str:
+def new_invalid_sources(
+    baseline_invalid: Mapping[str, str],
+    post_invalid: Mapping[str, str],
+) -> dict[str, str]:
+    """Return excluded sources that were newly added or changed exclusion reason."""
+    return {
+        rel_path: reason
+        for rel_path, reason in post_invalid.items()
+        if baseline_invalid.get(rel_path) != reason
+    }
+
+
+def capture_mutation_baseline(
+    vault_dir: Path,
+    run_lint: Callable[[Path], LintResult],
+    list_invalid: Callable[[Path], dict[str, str]],
+) -> MutationLintBaseline:
+    """Capture lint findings and excluded sources before writing inside the lock."""
+    return MutationLintBaseline(
+        lint=run_lint(vault_dir),
+        invalid_sources=dict(list_invalid(vault_dir)),
+    )
+
+
+def assert_no_new_invalid_sources(
+    baseline: MutationLintBaseline,
+    excluded_sources: Mapping[str, str],
+) -> None:
+    """Fail closed when the mutation introduced any newly excluded source."""
+    added = new_invalid_sources(baseline.invalid_sources, excluded_sources)
+    if added:
+        raise RuntimeError(
+            f"post-mutation source validation failed: new_invalid_sources={len(added)}"
+        )
+
+
+def verify_mutation_lint_gate(
+    baseline: MutationLintBaseline,
+    post_lint: LintResult,
+    post_invalid: Mapping[str, str],
+) -> bool:
+    """Verify no new lint/source defects occurred; return whether partial sync is needed."""
+    delta = compute_blocking_lint_delta(baseline.lint, post_lint)
+    if delta.has_new_issues:
+        raise RuntimeError(f"post-mutation lint failed: {delta.format_counts()}")
+    assert_no_new_invalid_sources(baseline, post_invalid)
+    return bool(post_invalid)
+
+
+def format_blocking_lint_summary(result: LintResult, *, excluded_sources: int = 0) -> str:
     """Format a content-free blocking-debt count string for transaction receipts."""
-    return (
+    summary = (
         f"metadata={len(result.untyped_files)}, "
         f"broken_links={len(result.broken_links)}, "
         f"ambiguous_links={len(result.ambiguous_links)}, "
         f"stale={len(result.stale_notes)}"
     )
+    if excluded_sources > len(result.untyped_files):
+        return f"{summary}, excluded={excluded_sources}"
+    return summary
+
+
+def format_preexisting_warnings(result: LintResult, *, excluded_sources: int = 0) -> str | None:
+    """Return a preexisting warning summary only when vault debt remains."""
+    if result.has_blocking_issues or excluded_sources:
+        return format_blocking_lint_summary(result, excluded_sources=excluded_sources)
+    return None
