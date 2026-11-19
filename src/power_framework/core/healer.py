@@ -215,11 +215,18 @@ def _format_frontmatter(
         val = fm_data.get(field)
         if val is not None and val != "" and val != []:
             if isinstance(val, list):
-                if field == "tags":
+                if field == "tags" and all(
+                    "\n" not in str(v) and "\r" not in str(v) for v in val
+                ):
                     items = ", ".join(f'"{_escape_yaml(str(v))}"' for v in val)
+                    parts.append(f"{field}: [{items}]")
+                elif all(
+                    isinstance(v, str) and "\n" not in v and "\r" not in v for v in val
+                ):
+                    items = ", ".join(f'"{_escape_yaml(v)}"' for v in val)
+                    parts.append(f"{field}: [{items}]")
                 else:
-                    items = ", ".join(str(v) for v in val)
-                parts.append(f"{field}: [{items}]")
+                    parts.extend(_render_yaml_field(field, val))
             elif isinstance(val, bool):
                 parts.append(f"{field}: {str(val).lower()}")
             else:
