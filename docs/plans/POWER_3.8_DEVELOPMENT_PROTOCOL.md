@@ -607,8 +607,9 @@ PR #481 SECURITY DEPENDENCY REMEDIATION: CLOSED / MERGED / VERIFIED / merge e68b
 OPENVINO HARDWARE ACCEPTANCE: CLOSED / ACCEPTED ONLY FOR THE AUTHORIZED CURRENT KB SNAPSHOT / 791 OF 791 SOURCES / 5,876 CHUNKS / ZERO EXCLUSIONS, ERRORS, RETRIES / DUPLICATE COUNT UNKNOWN / 100% FTS+DENSE COVERAGE / INTEGRITY PASS / SEMANTIC AND RERANKED SEARCH WITHOUT FALLBACK / GPU UTILIZATION NOT MEASURED
 PR #483 GOVERNANCE: CLOSED / MERGED / VERIFIED
 ISSUE #471: CLOSED / COMPLETED
-POST-#483 CANONICAL-PLAN RECONCILIATION: THIS DOCS-ONLY GATE / PROTECTED NORMAL MERGE AND EXACT READBACK REQUIRED
-PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING IS THE NEXT SEPARATE INVOCATION AFTER THIS RECONCILIATION AND EXACT READBACK (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair closed/merged/integrity verified)
+POST-#483 CANONICAL-PLAN RECONCILIATION: CLOSED / MERGED / VERIFIED / PR #485 (merge aa295a4073ba4c0fff0e45721610a4bcdb5489c8)
+PR #502 / #503 / #505 / #506 CI & RUNTIME FIXES: CLOSED / MERGED / VERIFIED (merge 330f01c97e4356ad6b8cf49493b3c9f07414041a)
+PHASE 5E (P38-WP03): OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRES SEPARATE EXPLICIT OWNER ADMISSION (historical R1–R5 failures retained; R6A.1 development admission and the R6A.2 technical repair closed/merged/integrity verified)
 P38-WP03-R1: CLOSED / FAILURE EVIDENCE
 P38-WP03-R2 ATTEMPT: CLOSED / FAILED VERIFICATION (PR #449 runtime + PR #450 governance)
 P38-WP03-R3: CLOSED / SECURITY CORRECTION VERIFIED (PR #451 runtime correction; PR-R3B governance rebaseline)
@@ -622,7 +623,7 @@ PR #453: CLOSED STALE / NOT MERGED
 PR #454: CLOSED STALE / NOT MERGED
 PR #473: CLOSED SUPERSEDED AS INTEGRATION VEHICLE / NOT MERGED
 ISSUE #471: CLOSED / COMPLETED
-NEXT_ACTION: COMPLETE_POST_483_CANONICAL_PLAN_RECONCILIATION_AND_EXACT_READBACK; THEN PHASE_5E_FRESH_EVALUATION_AUTHORING_IN_A_SEPARATE_INVOCATION
+NEXT_ACTION: PHASE_5E_FRESH_EVALUATION_AUTHORING_WITH_EXPLICIT_OWNER_ADMISSION
 PUBLIC VERSION: 3.7.13 (release/3.7) / DEVELOPMENT MAIN: 3.7.11
 POWER 3.8.0: NO-GO
 ```
@@ -639,10 +640,11 @@ integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency
 remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized
 current-KB hardware acceptance is PASS only for its explicitly authorized
 snapshot, with sanitized evidence. PR #483 governance merge/readback is
-complete and Issue #471 is CLOSED / COMPLETED. This post-#483 plan
-reconciliation requires its own protected publication/readback. Phase 5E
-(P38-WP03) is OPEN / NOT PASSED; fresh evaluation authoring is the next
-separate invocation after that exact readback.
+complete and Issue #471 is CLOSED / COMPLETED. Post-#483 canonical-plan
+reconciliation is CLOSED / MERGED / VERIFIED through PR #485 (`aa295a4`), and
+CI/runtime fixes PR #502, #503, #505, and #506 are CLOSED / MERGED / VERIFIED
+through `330f01c`. Phase 5E (P38-WP03) remains OPEN / NOT PASSED; fresh
+evaluation authoring requires a separate explicit owner admission.
 R6A.1 development admission and the R6A.2 technical repair are CLOSED / MERGED /
 INTEGRITY VERIFIED. Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity /
 dirty-set behavior) remains BLOCKED behind Phase 5E fresh evaluation authoring
@@ -750,7 +752,7 @@ deployment facts and generic framework invariants:
   credential exposure, zero password fallback, zero direct agent SSH, strict
   receiver lockdown, and secret-free client/agent boundary.
 - Real receiver deployment remains an operator follow-up.
-- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized current-KB hardware acceptance is PASS only for its explicitly authorized snapshot. PR #483 governance merge/readback is complete and Issue #471 is CLOSED / COMPLETED. This post-#483 plan reconciliation requires its own protected merge/readback. Phase 5E (P38-WP03) is OPEN / NOT PASSED; fresh evaluation authoring is the next separate invocation after that exact readback (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind Phase 5E fresh evaluation authoring and separate admission, not historical R4.
+- Phase 5C SearchScope pushdown is closed and verified (PR #434, PR #437). Phase 5D (P38-WP02) is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439, PR #440, corrected by PR #442, PR #443). P38-WP02-R1 is CLOSED / MERGED / VERIFIED. OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized current-KB hardware acceptance is PASS only for its explicitly authorized snapshot. PR #483 governance merge/readback is complete and Issue #471 is CLOSED / COMPLETED. Post-#483 canonical-plan reconciliation is CLOSED / MERGED / VERIFIED through PR #485 (`aa295a4`), and CI/runtime fixes PR #502, #503, #505, and #506 are CLOSED / MERGED / VERIFIED (`330f01c`). Phase 5E (P38-WP03) is OPEN / NOT PASSED; fresh evaluation authoring requires a separate explicit owner admission (PR #445/#446 historical; P38-WP03-R1 FAILURE EVIDENCE; P38-WP03-R2 FAILED VERIFICATION; P38-WP03-R3 SECURITY CORRECTION VERIFIED PR #451; R6A.1 development admission and the R6A.2 technical repair are closed/merged/integrity verified). Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) is BLOCKED behind Phase 5E fresh evaluation authoring and separate admission, not historical R4.
 
 ## Cross-links
 
@@ -762,7 +764,8 @@ deployment facts and generic framework invariants:
 - [INFRA-1 ADR](../adr/0006-infra-1-constrained-execution-broker.md)
 - [Planning artifacts](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/planning/README.md)
 - [Handoff protocol](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/README.md)
-- [Post-#483 authorized admission continuation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T122404Z_canonical-plan-drift-reconciliation_authorized-admission.md) — latest pre-final-candidate record; exact final validation, reviews, attestation and protected merge/readback remain live external facts.
+- [Post-#483 authorized admission continuation](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T122404Z_canonical-plan-drift-reconciliation_authorized-admission.md) — historical pre-final-candidate record for PR #485 (merged as `aa295a4`).
+- [Main 330f01c state rebaseline handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-11-19T182500Z_p38-state-rebaseline-330f01c.md) — rebaseline checkpoint after PR #485 and CI/runtime merges PR #502, #503, #505, and #506 (`330f01c`).
 - Historical: [Post-#483 pre-merge blocked handoff](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-06T101309Z_canonical-plan-drift-reconciliation-post-483_pre-merge-blocked.md) and [local remediation snapshot](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-10-07T043900Z_canonical-plan-drift-reconciliation-post-483_local-remediation.md) — immutable dated failures/proposals, not current admission receipts.
 - [Phase 5C verification report](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_REPORT.md)
 - [Phase 5C baseline reproduction](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/phase-5c/PHASE_5C_BASELINE.md)
