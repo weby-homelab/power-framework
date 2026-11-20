@@ -370,3 +370,116 @@ def test_dense_fallback_tracking(tmp_path: Path) -> None:
     assert result.retrieval_status == "degraded"
     assert "fallback" in result.fallback_reason.lower()
     assert len(result.candidates) >= 1
+
+
+def test_semantic_stage_dispatches_mode_semantic_not_vector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-01 regression: Stage 3 must call executable mode='semantic', never 'vector'."""
+    vault = _make_test_vault(tmp_path)
+    called_modes: list[str] = []
+
+    def search_fn(*_args: object, **kwargs: object) -> list[FakeSearchResult]:
+        mode = str(kwargs.get("mode", ""))
+        called_modes.append(mode)
+        if mode == "semantic":
+            return [FakeSearchResult("01_Projects/proj_alpha.md", "Dense snippet", 0.91)]
+        return []
+
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        lambda: (True, "ready"),
+    )
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.resolve_active_generation",
+        lambda _v: "gen_test",
+    )
+
+    planner = RetrievalPlanner(vault, search_fn=search_fn)
+    intent = QueryIntent(
+        query="Alpha",
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.BALANCED,
+    )
+    result = planner.plan_and_retrieve(intent, access_policy=_make_access_policy())
+
+    assert "semantic" in called_modes
+    assert "vector" not in called_modes
+    assert result.dense_used is True
+    assert result.retrieval_status == "complete"
+    assert any(c.retrieval_stage is RetrievalStage.SEMANTIC for c in result.candidates)
+
+
+def test_semantic_stage_downgraded_result_marks_degraded_and_dense_used_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If search_vault downgrades semantic -> fts, planner must report degraded and dense_used=False."""
+    from power_framework.core.searcher import SearchResults
+
+    vault = _make_test_vault(tmp_path)
+
+    def search_fn(*_args: object, **kwargs: object) -> list[FakeSearchResult]:
+        if kwargs.get("mode") == "semantic":
+            downgraded = FakeSearchResult("01_Projects/proj_alpha.md", "FTS fallback", 0.55)
+            downgraded.actual_mode = "fts"  # type: ignore[attr-defined]
+            downgraded.fallback_reason = "explicit_dense_fallback"  # type: ignore[attr-defined]
+            return SearchResults(  # type: ignore[return-value]
+                [downgraded],
+                actual_mode="fts",
+                fallback_reason="explicit_dense_fallback",
+            )
+        return [FakeSearchResult("01_Projects/proj_alpha.md", "FTS snippet", 0.65)]
+
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        lambda: (True, "ready"),
+    )
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.resolve_active_generation",
+        lambda _v: "gen_test",
+    )
+
+    planner = RetrievalPlanner(vault, search_fn=search_fn)
+    intent = QueryIntent(
+        query="Alpha",
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.BALANCED,
+    )
+    result = planner.plan_and_retrieve(intent, access_policy=_make_access_policy())
+
+    assert result.dense_used is False
+    assert result.retrieval_status == "degraded"
+    assert "explicit_dense_fallback" in result.fallback_reason
+    assert all(c.retrieval_stage is not RetrievalStage.SEMANTIC for c in result.candidates)
+
+
+def test_fast_profile_never_checks_or_invokes_semantic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FAST budget must never check dense readiness or invoke mode='semantic'."""
+    vault = _make_test_vault(tmp_path)
+    called_modes: list[str] = []
+
+    def fail_if_called() -> tuple[bool, str]:
+        raise AssertionError("FAST budget must not probe dense readiness")
+
+    def search_fn(*_args: object, **kwargs: object) -> list[FakeSearchResult]:
+        called_modes.append(str(kwargs.get("mode", "")))
+        return [FakeSearchResult("01_Projects/proj_alpha.md", "FTS snippet", 0.8)]
+
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        fail_if_called,
+    )
+
+    planner = RetrievalPlanner(vault, search_fn=search_fn)
+    intent = QueryIntent(
+        query="Alpha",
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.FAST,
+    )
+    result = planner.plan_and_retrieve(intent, access_policy=_make_access_policy())
+
+    assert called_modes == ["fts"]
+    assert result.dense_used is False
+    assert result.retrieval_status == "complete"

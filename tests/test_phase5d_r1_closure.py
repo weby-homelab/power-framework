@@ -224,7 +224,7 @@ def test_r5_dense_hit_does_not_become_curated(
     dense_note = [DummySearchResult("random_folder/some_doc.md", "dense vector match", 0.92)]
 
     def search_fn(*args: Any, **kwargs: Any) -> list[Any]:
-        if kwargs.get("mode") == "vector":
+        if kwargs.get("mode") == "semantic":
             return dense_note
         return []
 
