@@ -10,7 +10,10 @@ i5-5200U). After the fix, embeddings are produced in batches via
 from __future__ import annotations
 
 import sqlite3
+import struct
+import sys
 from contextlib import closing
+from types import ModuleType, SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -124,6 +127,269 @@ def test_sync_adaptive_batch_on_memory_error(monkeypatch, tmp_path):
     assert len(fake.batch_calls) >= 1
     # And critically: it never fell back to per-item embed().
     assert fake.embed_calls == 0
+
+
+def test_sync_ollama_adapter_uses_bounded_sdk_batches_and_preserves_output_mapping(
+    monkeypatch, tmp_path
+):
+    """The production adapter/indexer path must bound SDK inputs and retain each vector."""
+    from power_framework.experimental.embeddings import OllamaEmbeddingManager
+
+    monkeypatch.delenv("POWER_SYNC_ALLOW_LOW_MEMORY", raising=False)
+    monkeypatch.setenv("POWER_EMBED_PROVIDER", "ollama")
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=3)
+
+    requests: list[tuple[str, ...]] = []
+    vector_ids: dict[str, float] = {}
+
+    def embed(**kwargs) -> SimpleNamespace:
+        model = kwargs["model"]
+        texts = kwargs["input"]
+        keep_alive = kwargs["keep_alive"]
+        options = kwargs["options"]
+        assert model == "synthetic-ollama"
+        assert keep_alive == "2m"
+        assert "num_thread" in options
+        requests.append(tuple(texts))
+        vectors = []
+        for text in texts:
+            if text not in vector_ids:
+                vector_ids[text] = float(len(vector_ids) + 1)
+            vectors.append([vector_ids[text]])
+        return SimpleNamespace(embeddings=vectors)
+
+    fake_ollama = ModuleType("ollama")
+    fake_ollama.embed = embed  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+    monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "2")
+    monkeypatch.setenv("POWER_EMBED_COMMIT_EVERY", "2")
+    _patch_manager(monkeypatch, OllamaEmbeddingManager(model_name="synthetic-ollama"))
+
+    db = tmp_path / "power_search.db"
+    monkeypatch.setenv("POWER_SEARCH_DB", str(db))
+    with closing(sqlite3.connect(db)) as conn:
+        searcher._init_db(conn)
+        searcher._sync_vault_to_db(vault, conn, sync_embeddings=True)
+        documents = conn.execute(
+            "SELECT rel_path, embedding FROM doc_embeddings ORDER BY rel_path"
+        ).fetchall()
+        chunks = conn.execute(
+            "SELECT content, embedding FROM chunk_embeddings ORDER BY content"
+        ).fetchall()
+        sources = conn.execute(
+            "SELECT title, tags, description, content, rel_path FROM fts_notes"
+        ).fetchall()
+
+    document_texts = {
+        rel_path: " ".join((title, tags, description, content))
+        for title, tags, description, content, rel_path in sources
+    }
+    assert len(requests) == 4
+    assert all(0 < len(request) <= 2 for request in requests)
+    assert sum(map(len, requests)) == len(documents) + len(chunks) == 6
+    assert len(documents) == len(chunks) == 3
+    for rel_path, blob in documents:
+        assert struct.unpack("f", blob)[0] == vector_ids[document_texts[rel_path]]
+    for content, blob in chunks:
+        assert struct.unpack("f", blob)[0] == vector_ids[content]
+
+
+def test_embed_retry_splits_actual_requests_after_memory_error(monkeypatch):
+    requests: list[tuple[tuple[str, ...], int]] = []
+
+    class MemorySensitiveEmbedder:
+        def embed_batch(self, texts: list[str], batch_size: int) -> list[list[float]]:
+            requests.append((tuple(texts), batch_size))
+            if len(texts) > 2:
+                raise MemoryError("synthetic allocation pressure")
+            return [[float(text[-1])] for text in texts]
+
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "4")
+    monkeypatch.setenv("POWER_EMBED_COMMIT_EVERY", "50")
+    with closing(sqlite3.connect(":memory:")) as conn:
+        searcher._init_db(conn)
+        index_sync._embed_and_store(
+            MemorySensitiveEmbedder(),
+            conn.cursor(),
+            conn,
+            [(f"note-{index}", f"text-{index}", float(index)) for index in range(4)],
+            [],
+        )
+        rows = conn.execute(
+            "SELECT rel_path, embedding FROM doc_embeddings ORDER BY rel_path"
+        ).fetchall()
+
+    assert requests == [
+        (("text-0", "text-1", "text-2", "text-3"), 4),
+        (("text-0", "text-1"), 2),
+        (("text-2", "text-3"), 2),
+    ]
+    assert [struct.unpack("f", blob)[0] for _, blob in rows] == [0.0, 1.0, 2.0, 3.0]
+
+
+def test_embed_and_store_commits_after_configured_vector_item_count():
+    class FakeEmbedder:
+        def embed_batch(self, texts: list[str], batch_size: int) -> list[list[float]]:
+            del batch_size
+            return [[float(len(text))] for text in texts]
+
+    writes_since_commit = 0
+    committed_write_counts: list[int] = []
+
+    def trace(statement: str) -> None:
+        nonlocal writes_since_commit
+        if statement.startswith("INSERT OR REPLACE INTO doc_embeddings") or statement.startswith(
+            "INSERT OR REPLACE INTO chunk_embeddings"
+        ):
+            writes_since_commit += 1
+        elif statement == "COMMIT":
+            committed_write_counts.append(writes_since_commit)
+            writes_since_commit = 0
+
+    with closing(sqlite3.connect(":memory:")) as conn:
+        searcher._init_db(conn)
+        conn.set_trace_callback(trace)
+        index_sync._embed_and_store(
+            FakeEmbedder(),
+            conn.cursor(),
+            conn,
+            [(f"note-{index}", f"doc-{index}", float(index)) for index in range(5)],
+            [
+                (f"chunk-{index}", f"note-{index}", f"body-{index}", float(index))
+                for index in range(3)
+            ],
+            limits=(4, 3),
+        )
+
+    assert committed_write_counts == [3, 3, 2]
+
+
+@pytest.mark.parametrize(
+    ("limits", "error_code"),
+    [
+        ((129, 3), "invalid_power_embed_batch_size:maximum_is_128"),
+        ((8, 4097), "invalid_power_embed_commit_every:maximum_is_4096"),
+    ],
+    ids=["batch-limit", "commit-limit"],
+)
+def test_embed_and_store_rejects_unbounded_supplied_limits_before_database_mutation(
+    limits, error_code
+):
+    class FakeEmbedder:
+        def embed_batch(self, texts: list[str], batch_size: int) -> list[list[float]]:
+            del batch_size
+            return [[1.0] for _ in texts]
+
+    with closing(sqlite3.connect(":memory:")) as conn:
+        searcher._init_db(conn)
+        changes_before = conn.total_changes
+        with pytest.raises(ValueError, match=error_code):
+            index_sync._embed_and_store(
+                FakeEmbedder(),
+                conn.cursor(),
+                conn,
+                [("note", "text", 0.0)],
+                [],
+                limits=limits,
+            )
+        assert conn.total_changes == changes_before
+
+
+@pytest.mark.parametrize(
+    ("error_type", "message"),
+    [
+        (TypeError, "synthetic SDK type error"),
+        (ValueError, "synthetic invalid-vector protocol error"),
+    ],
+    ids=["sdk-type-error", "protocol-error"],
+)
+def test_embed_retry_propagates_non_memory_errors_without_retry(
+    monkeypatch, caplog, error_type, message
+):
+    calls: list[tuple[str, ...]] = []
+
+    class FailingEmbedder:
+        def embed_batch(self, texts: list[str], batch_size: int) -> list[list[float]]:
+            del batch_size
+            calls.append(tuple(texts))
+            raise error_type(message)
+
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "2")
+    monkeypatch.setenv("POWER_EMBED_COMMIT_EVERY", "50")
+    with closing(sqlite3.connect(":memory:")) as conn, caplog.at_level("WARNING"):
+        searcher._init_db(conn)
+        with pytest.raises(error_type, match=message):
+            index_sync._embed_and_store(
+                FailingEmbedder(),
+                conn.cursor(),
+                conn,
+                [("note-0", "text-0", 0.0), ("note-1", "text-1", 1.0)],
+                [],
+            )
+
+    assert calls == [("text-0", "text-1")]
+    assert message not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("env_name", "value", "error_code"),
+    [
+        ("POWER_EMBED_BATCH_SIZE", "0", "invalid_power_embed_batch_size:must_be_positive"),
+        ("POWER_EMBED_BATCH_SIZE", "-1", "invalid_power_embed_batch_size:must_be_positive"),
+        (
+            "POWER_EMBED_BATCH_SIZE",
+            "not-an-integer",
+            "invalid_power_embed_batch_size:expected_integer",
+        ),
+        ("POWER_EMBED_BATCH_SIZE", "129", "invalid_power_embed_batch_size:maximum_is_128"),
+        ("POWER_EMBED_COMMIT_EVERY", "0", "invalid_power_embed_commit_every:must_be_positive"),
+        ("POWER_EMBED_COMMIT_EVERY", "-1", "invalid_power_embed_commit_every:must_be_positive"),
+        (
+            "POWER_EMBED_COMMIT_EVERY",
+            "not-an-integer",
+            "invalid_power_embed_commit_every:expected_integer",
+        ),
+        ("POWER_EMBED_COMMIT_EVERY", "4097", "invalid_power_embed_commit_every:maximum_is_4096"),
+    ],
+    ids=[
+        "batch-zero",
+        "batch-negative",
+        "batch-noninteger",
+        "batch-over-cap",
+        "commit-zero",
+        "commit-negative",
+        "commit-noninteger",
+        "commit-over-cap",
+    ],
+)
+def test_sync_rejects_invalid_embedding_limits_before_database_mutation(
+    monkeypatch, tmp_path, env_name, value, error_code
+):
+    class FakeEmbedder:
+        dimension = 1
+
+        def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+            del batch_size
+            return [[1.0] for _ in texts]
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    _make_vault(vault, n=1)
+    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "8")
+    monkeypatch.setenv("POWER_EMBED_COMMIT_EVERY", "50")
+    monkeypatch.setenv(env_name, value)
+    _patch_manager(monkeypatch, FakeEmbedder())
+
+    with closing(sqlite3.connect(":memory:")) as conn:
+        searcher._init_db(conn)
+        changes_before = conn.total_changes
+        with pytest.raises(ValueError, match=error_code):
+            searcher._sync_vault_to_db(vault, conn, sync_embeddings=True)
+        assert conn.total_changes == changes_before
 
 
 def test_repeated_sections_get_distinct_chunk_ids(monkeypatch, tmp_path):
@@ -493,10 +759,10 @@ def test_infer_embedder_dimension_avoids_property_and_remote_side_effects(monkey
         == 512 * 1024 * 1024
     )
 
-    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "")
-    assert sync_memory.parse_int_env("POWER_EMBED_BATCH_SIZE", 8, minimum=1) == 8
-    monkeypatch.setenv("POWER_EMBED_BATCH_SIZE", "not-an-int")
-    assert sync_memory.parse_int_env("POWER_EMBED_BATCH_SIZE", 8, minimum=1) == 8
+    monkeypatch.setenv("POWER_SYNC_VMEM_LIMIT_MB", "")
+    assert sync_memory.parse_int_env("POWER_SYNC_VMEM_LIMIT_MB", 0, minimum=0) == 0
+    monkeypatch.setenv("POWER_SYNC_VMEM_LIMIT_MB", "not-an-int")
+    assert sync_memory.parse_int_env("POWER_SYNC_VMEM_LIMIT_MB", 0, minimum=0) == 0
 
 
 def test_incremental_noop_sync_skips_embedder_load(monkeypatch, tmp_path: Path):

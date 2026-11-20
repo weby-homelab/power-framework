@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 _MIB = 1024 * 1024
 DEFAULT_PRESSURE_FLOOR_BYTES = 512 * _MIB
+DEFAULT_EMBED_BATCH_SIZE = 8
+MAX_EMBED_BATCH_SIZE = 128
+DEFAULT_EMBED_COMMIT_EVERY = 50
+MAX_EMBED_COMMIT_EVERY = 4096
 _ALLOW_LOW_MEMORY: ContextVar[bool] = ContextVar("power_sync_allow_low_memory", default=False)
 
 
@@ -91,6 +95,38 @@ def parse_int_env(name: str, default: int, *, minimum: int = 0) -> int:
     except ValueError:
         logger.warning("Ignoring invalid integer %s=%r; using %d", name, raw, default)
         return max(minimum, default)
+
+
+def validate_positive_embedding_limit(name: str, value: int, maximum: int) -> int:
+    """Validate that an embedding/commit limit is a bounded positive integer."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"invalid_{name.lower()}:expected_integer")
+    if value < 1:
+        raise ValueError(f"invalid_{name.lower()}:must_be_positive")
+    if value > maximum:
+        raise ValueError(f"invalid_{name.lower()}:maximum_is_{maximum}")
+    return value
+
+
+def read_positive_embedding_limit(name: str, default: int, maximum: int) -> int:
+    """Read and validate a fail-closed positive integer limit from an environment variable."""
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        raise ValueError(f"invalid_{name.lower()}:expected_integer") from None
+    return validate_positive_embedding_limit(name, value, maximum)
+
+
+def validated_embedding_limits() -> tuple[int, int]:
+    """Validate bounded embedding batch and commit intervals before sync mutation."""
+    return (
+        read_positive_embedding_limit(
+            "POWER_EMBED_BATCH_SIZE", DEFAULT_EMBED_BATCH_SIZE, MAX_EMBED_BATCH_SIZE
+        ),
+        read_positive_embedding_limit(
+            "POWER_EMBED_COMMIT_EVERY", DEFAULT_EMBED_COMMIT_EVERY, MAX_EMBED_COMMIT_EVERY
+        ),
+    )
 
 
 def apply_sync_vmem_cap(sync_embeddings: bool) -> int | None:
