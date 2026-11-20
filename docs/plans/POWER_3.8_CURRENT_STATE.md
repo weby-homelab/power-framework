@@ -354,14 +354,19 @@ CANONICAL PLANNING V2 / PHASE 5B CLOSED / INFRA-1 CLOSED / PHASE 5C CLOSED / VER
   PR #503 (`9904669f32a805edf49da0f271994393f15b11ba`), PR #505
   (`1235ed03fe7d10fa8842d26fc862bde1b60888b7`), and PR #506
   (`330f01c97e4356ad6b8cf49493b3c9f07414041a`) completed protected normal merges.
-- Fresh authenticated REST and fetched Git observed protected `main` for this
-  rebaseline at `330f01c97e4356ad6b8cf49493b3c9f07414041a`, tree
+- Historical receipt for the previous docs-only rebaseline: authenticated REST
+  and fetched Git observed protected `main` at
+  `330f01c97e4356ad6b8cf49493b3c9f07414041a`, tree
   `a78a85e9e3eb6a99b1310feb537312be142fb1fe`, with parents
   `1235ed03fe7d10fa8842d26fc862bde1b60888b7` and
   `1aa93b571195cff5a96d46a10bfee2cc9b99fe59`, and GitHub `verified=true / valid`
-  at `2026-11-19T18:18:00Z`. This is the verified pre-candidate baseline only;
-  it does not assert H/T/C/M/F. `LIVE_MAIN_REVALIDATION_REQUIRED` remains
-  `YES` until this rebaseline's own protected publication and exact readback.
+  at `2026-11-19T18:18:00Z`. This records the prior receipt only; `330f01c` is
+  not this candidate's pre-candidate baseline. The current candidate baseline
+  is PR #514 at `3119d63ebfb98b3f0010f454105b6decef7fb305` (tree
+  `e1a2a0ca772d786f363974a25bede044dd6b7e7b`), as recorded in its handoff. This
+  historical receipt does not assert H/T/C/M/F or replace live-main reads.
+  `LIVE_MAIN_REVALIDATION_REQUIRED` remains `YES` before protected merge and
+  until exact post-merge readback.
 - Candidate-specific head/tree and actual merge/readback values are resolved
   from live GitHub after publication; no future SHA or readback PASS is written
   here.
