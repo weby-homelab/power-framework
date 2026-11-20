@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import os
 import re
 import shutil
@@ -36,7 +35,6 @@ except ImportError:  # pragma: no cover - Windows requires a separate lock adapt
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterator
 
-logger = logging.getLogger(__name__)
 _RECOVERY_LABEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 MAX_TASK_STATE_BYTES = 10_000_000
 _RECOVERY_OPERATION_LABELS: dict[str, frozenset[str]] = {
@@ -203,46 +201,45 @@ class TaskStore:
                 raise RuntimeError(
                     "TaskStore recovery is blocked; repair preserved transaction evidence"
                 )
-            if self._lock_depth == 0:
-                if fcntl is None:
-                    raise RuntimeError("Task writer locking is unavailable")
-                lock_handle: IO[str] = open(lock_file, "a+", encoding="utf-8")  # noqa: SIM115
+            if self._lock_depth > 0:
+                self._lock_depth += 1
+                try:
+                    yield
+                finally:
+                    self._lock_depth -= 1
+                return
+            if fcntl is None:
+                raise RuntimeError("Task writer locking is unavailable")
+            with open(lock_file, "a+", encoding="utf-8") as lock_handle:
                 try:
                     fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
                 except OSError as exc:
-                    lock_handle.close()
                     raise RuntimeError("Unable to acquire task writer lock") from exc
                 self._lock_fd = lock_handle
-                if not self._recovered:
-                    try:
-                        self.recover()
-                        if self._recovery_blocked:
-                            raise RuntimeError(
-                                "TaskStore recovery is blocked; repair preserved transaction evidence"
-                            )
-                    except Exception:
+                try:
+                    if not self._recovered:
+                        try:
+                            self.recover()
+                            if self._recovery_blocked:
+                                raise RuntimeError(
+                                    "TaskStore recovery is blocked; repair preserved transaction evidence"
+                                )
+                        except Exception:
+                            self._lock_fd = None
+                            with suppress(OSError):
+                                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+                            raise
+                        self._recovered = True
+                    self._lock_depth = 1
+                    yield
+                finally:
+                    self._lock_depth = 0
+                    if self._lock_fd is not None:
                         self._lock_fd = None
-                        with suppress(OSError):
+                        try:
                             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-                        lock_handle.close()
-                        raise
-                    self._recovered = True
-            self._lock_depth += 1
-            try:
-                yield
-            finally:
-                self._lock_depth -= 1
-                if self._lock_depth == 0 and self._lock_fd is not None:
-                    lock_handle = self._lock_fd
-                    self._lock_fd = None
-                    try:
-                        if fcntl is None:
-                            raise RuntimeError("Task writer locking is unavailable")
-                        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-                    except OSError as exc:
-                        raise RuntimeError("Unable to release task writer lock") from exc
-                    finally:
-                        lock_handle.close()
+                        except OSError as exc:
+                            raise RuntimeError("Unable to release task writer lock") from exc
 
     def _task_file(self, task_id: str) -> Path:
         ensure_valid_task_id(task_id)

@@ -1049,30 +1049,26 @@ def get_venv_power_framework_version(venv_dir: Path) -> str | None:
         for dist_info in lib_dir.glob("python*/site-packages/power_framework-*.dist-info"):
             metadata_file = dist_info / "METADATA"
             if metadata_file.is_file():
-                try:
+                with contextlib.suppress(OSError):
                     text = metadata_file.read_text(encoding="utf-8", errors="ignore")
                     match = re.search(r"(?m)^Version:\s*([^\s]+)", text)
                     if match:
                         return match.group(1).strip()
-                except OSError:
-                    pass
 
     # Check all site-packages under venv
     for dist_info in venv_dir.glob("**/power_framework-*.dist-info"):
         metadata_file = dist_info / "METADATA"
         if metadata_file.is_file():
-            try:
+            with contextlib.suppress(OSError):
                 text = metadata_file.read_text(encoding="utf-8", errors="ignore")
                 match = re.search(r"(?m)^Version:\s*([^\s]+)", text)
                 if match:
                     return match.group(1).strip()
-            except OSError:
-                pass
 
     # Fallback to executing python in venv with short timeout
     python_bin = find_venv_python(venv_dir)
     if python_bin is not None and python_bin.is_file():
-        try:
+        with contextlib.suppress(subprocess.SubprocessError, OSError):
             res = subprocess.run(  # noqa: S603
                 [
                     str(python_bin),
@@ -1086,8 +1082,6 @@ def get_venv_power_framework_version(venv_dir: Path) -> str | None:
             )
             if res.returncode == 0 and res.stdout.strip():
                 return res.stdout.strip()
-        except (subprocess.SubprocessError, OSError):
-            pass
 
     return None
 

@@ -249,5 +249,5 @@ async def test_canceled_mutation_offload_reports_joined_outcome() -> None:
     running.cancel()
 
     with pytest.raises(PowerCallCompletedAfterCancellationError):
-        await running
+        _ = await running
     assert finished.is_set()

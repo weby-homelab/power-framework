@@ -575,11 +575,10 @@ def test_sync_preflight_refuses_undersized_ram_and_force_does_not_bypass(
     _make_vault(vault, n=4)
 
     spy = _SpyBgeM3Manager()
-    loader_calls = 0
+    loader_calls: list[int] = []
 
     def _counting_loader(*_a, **_k):
-        nonlocal loader_calls
-        loader_calls += 1
+        loader_calls.append(1)
         return spy
 
     monkeypatch.setattr(index_sync, "_get_embedding_manager", _counting_loader)
@@ -594,7 +593,7 @@ def test_sync_preflight_refuses_undersized_ram_and_force_does_not_bypass(
     ):
         generation_index.sync_vault_atomically(vault, sync_embeddings=True)
 
-    assert loader_calls == 0
+    assert len(loader_calls) == 0
     assert spy.calls == []
 
     # CLI --force must NOT overload low-memory override or load the embedder.
@@ -613,7 +612,7 @@ def test_sync_preflight_refuses_undersized_ram_and_force_does_not_bypass(
         )()
     )
     assert exit_force == 1
-    assert loader_calls == 0
+    assert len(loader_calls) == 0
     assert spy.calls == []
 
 
@@ -777,11 +776,10 @@ def test_incremental_noop_sync_skips_embedder_load(monkeypatch, tmp_path: Path):
     _make_vault(vault, n=2)
 
     spy = _SpyBgeM3Manager()
-    loader_calls = 0
+    loader_calls: list[int] = []
 
     def _counting_loader(*_a, **_k):
-        nonlocal loader_calls
-        loader_calls += 1
+        loader_calls.append(1)
         return spy
 
     monkeypatch.setattr(index_sync, "_get_embedding_manager", _counting_loader)
@@ -795,12 +793,12 @@ def test_incremental_noop_sync_skips_embedder_load(monkeypatch, tmp_path: Path):
     first = generation_index.sync_vault_atomically(vault, sync_embeddings=True)
     assert first.actual_files == 2
     assert first.actual_chunks > 0
-    assert loader_calls == 1
+    assert len(loader_calls) == 1
 
     second = generation_index.sync_vault_atomically(vault, sync_embeddings=True)
     assert second.actual_files == 2
     assert second.actual_chunks == first.actual_chunks
-    assert loader_calls == 1
+    assert len(loader_calls) == 1
 
 
 def test_sync_persists_shrunk_batch_size_after_oom_retry(monkeypatch, tmp_path: Path):
