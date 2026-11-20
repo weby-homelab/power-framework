@@ -36,6 +36,7 @@ from power_framework.core.canonical_json import (
     compute_event_hash,
     compute_payload_digest,
 )
+from power_framework.core.fd_io import open_fd_nofollow
 from power_framework.core.lock_tracker import (
     LockHierarchyTracker,
 )
@@ -198,11 +199,10 @@ def project_lock(
             )
 
         try:
-            flags = os.O_RDWR | os.O_CREAT
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            fd = os.open(lock_file, flags, 0o600)
-            try:
+            with open_fd_nofollow(
+                lock_file, "r+b", os.O_RDWR | os.O_CREAT, mode_bits=0o600
+            ) as lock_handle:
+                fd = lock_handle.fileno()
                 deadline = time.monotonic() + timeout
                 locked = False
                 while time.monotonic() < deadline:
@@ -222,11 +222,8 @@ def project_lock(
                     yield project_dir
                 finally:
                     _local_project_locks.held.pop(lock_key, None)
-            finally:
-                with contextlib.suppress(OSError):
-                    fcntl.flock(fd, fcntl.LOCK_UN)
-                with contextlib.suppress(OSError):
-                    os.close(fd)
+                    with contextlib.suppress(OSError):
+                        fcntl.flock(fd, fcntl.LOCK_UN)
         finally:
             thread_lock.release()
 
@@ -251,11 +248,7 @@ def recover_torn_tail(file_path: Path) -> int:
     if file_path.is_symlink():
         raise ValueError(f"Ledger file must not be a symlink: {file_path}")
 
-    flags = os.O_RDONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    fd = os.open(file_path, flags)
-    with open(fd, "rb") as f:
+    with open_fd_nofollow(file_path, "rb", os.O_RDONLY) as f:
         content = f.read()
 
     if not content:
@@ -269,11 +262,7 @@ def recover_torn_tail(file_path: Path) -> int:
         logger.warning(
             f"Truncating unterminated torn tail in {file_path}: discarded {truncated_bytes} bytes from EOF"
         )
-        flags_out = os.O_WRONLY | os.O_TRUNC
-        if hasattr(os, "O_NOFOLLOW"):
-            flags_out |= os.O_NOFOLLOW
-        fd_out = os.open(file_path, flags_out)
-        with open(fd_out, "wb") as f_out:
+        with open_fd_nofollow(file_path, "wb", os.O_WRONLY | os.O_TRUNC) as f_out:
             if valid_len > 0:
                 f_out.write(content[:valid_len])
             f_out.flush()
@@ -557,10 +546,7 @@ class ProjectEventStore:
 
             line = canonical_json_dumps(event.model_dump()) + "\n"
             flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            fd = os.open(self.active_events_file, flags, 0o600)
-            with open(fd, "a", encoding="utf-8") as f:
+            with open_fd_nofollow(self.active_events_file, "a", flags, encoding="utf-8") as f:
                 f.write(line)
                 f.flush()
                 os.fsync(f.fileno())

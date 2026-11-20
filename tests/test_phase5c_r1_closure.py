@@ -365,8 +365,8 @@ def test_r1_graph_suggester_never_reads_oos(tmp_path: Path) -> None:
 
 
 def test_r1_graph_oos_bridge_cannot_connect(tmp_path: Path) -> None:
-    import power_framework.core.searcher as S  # noqa: N812
     import power_framework.experimental.relations as R  # noqa: N812
+    from power_framework.core import searcher as S  # noqa: N812
 
     vault = _make_vault(tmp_path, "r1_bridge")
     (vault / "01_Projects" / "allowed-A.md").write_text(
@@ -457,7 +457,7 @@ beta quantum commonword content
 
 
 def test_r1_graph_oos_hops_zero(tmp_path: Path) -> None:
-    import power_framework.core.searcher as S  # noqa: N812
+    from power_framework.core import searcher as S  # noqa: N812
 
     vault = _make_vault(tmp_path, "r1_hops")
     _write_note(
@@ -500,7 +500,7 @@ def test_r1_graph_oos_hops_zero(tmp_path: Path) -> None:
 
 
 def test_r1_fallback_source_type_no_oos_reads(tmp_path: Path) -> None:
-    import power_framework.core.searcher as S  # noqa: N812
+    from power_framework.core import searcher as S  # noqa: N812
 
     vault = _make_vault(tmp_path, "r1_fb")
     _write_note(vault / "01_Projects" / "project.md", "Project", "P", "hello quantum project")
@@ -533,7 +533,7 @@ def test_r1_fallback_source_type_no_oos_reads(tmp_path: Path) -> None:
 
 
 def test_r1_tf_fallback_source_type_no_oos(tmp_path: Path) -> None:
-    import power_framework.core.searcher as S  # noqa: N812
+    from power_framework.core import searcher as S  # noqa: N812
 
     vault = _make_vault(tmp_path, "r1_tffb")
     _write_note(vault / "01_Projects" / "project.md", "Project", "P", "hello quantum project")
@@ -949,7 +949,7 @@ def test_r1_quarantine_privilege_still_fail_closed(tmp_path: Path) -> None:
 
 def test_r1_semantic_lexical_guard_uses_resolved_scope(tmp_path: Path) -> None:
     """Auxiliary FTS call must receive the identical resolved scope."""
-    import power_framework.core.searcher as S  # noqa: N812
+    from power_framework.core import searcher as S  # noqa: N812
 
     vault = _make_vault(tmp_path, "r1_semguard")
     _write_note(vault / "01_Projects" / "a.md", "Project", "A", "quantum semantic")

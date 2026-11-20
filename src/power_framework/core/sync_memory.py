@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -161,31 +161,26 @@ def apply_sync_vmem_cap(sync_embeddings: bool) -> int | None:
 def available_memory_bytes() -> int | None:
     """Best-effort available physical RAM in bytes without inducing swapping."""
     meminfo_path = "/proc/meminfo"
-    try:
-        with open(meminfo_path, encoding="utf-8") as fh:
-            values: dict[str, int] = {}
-            for line in fh:
-                parts = line.split()
-                if len(parts) >= 2 and parts[0].endswith(":"):
-                    key = parts[0][:-1]
-                    if key in {"MemAvailable", "MemFree", "Buffers", "Cached"}:
-                        values[key] = int(parts[1]) * 1024
-            if "MemAvailable" in values:
-                return values["MemAvailable"]
-            fallback = values.get("MemFree", 0) + values.get("Buffers", 0) + values.get("Cached", 0)
-            if fallback > 0:
-                return fallback
-    except (OSError, ValueError):
-        pass
+    with suppress(OSError, ValueError), open(meminfo_path, encoding="utf-8") as fh:
+        values: dict[str, int] = {}
+        for line in fh:
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].endswith(":"):
+                key = parts[0][:-1]
+                if key in {"MemAvailable", "MemFree", "Buffers", "Cached"}:
+                    values[key] = int(parts[1]) * 1024
+        if "MemAvailable" in values:
+            return values["MemAvailable"]
+        fallback = values.get("MemFree", 0) + values.get("Buffers", 0) + values.get("Cached", 0)
+        if fallback > 0:
+            return fallback
 
     if hasattr(os, "sysconf"):
-        try:
+        with suppress(ValueError, OSError):
             pages = int(os.sysconf("SC_AVPHYS_PAGES"))
             page_size = int(os.sysconf("SC_PAGE_SIZE"))
             if pages > 0 and page_size > 0:
                 return pages * page_size
-        except (ValueError, OSError):
-            pass
     return None
 
 

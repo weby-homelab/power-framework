@@ -210,17 +210,19 @@ def _read_bounded_text(path: Path, *, label: str, max_bytes: int) -> str:
 def _read_bounded_vault_text(root: Path, relative: Path, *, label: str, max_bytes: int) -> str:
     """Read a vault file through descriptor-relative no-follow traversal."""
     directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    directory_fds: list[int] = []
+    current_fd: int | None = None
     file_fd: int | None = None
     try:
         current_fd = os.open(root, directory_flags)
-        directory_fds.append(current_fd)
         parts = relative.parts
         if not parts:
             raise DomainConfigError(f"{label} must name a file")
         for part in parts[:-1]:
-            current_fd = os.open(part, directory_flags, dir_fd=current_fd)
-            directory_fds.append(current_fd)
+            next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+            prev_fd = current_fd
+            current_fd = next_fd
+            with suppress(OSError):
+                os.close(prev_fd)
         file_fd = os.open(
             parts[-1],
             os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
@@ -243,9 +245,9 @@ def _read_bounded_vault_text(root: Path, relative: Path, *, label: str, max_byte
         if file_fd is not None:
             with suppress(OSError):
                 os.close(file_fd)
-        for directory_fd in reversed(directory_fds):
+        if current_fd is not None:
             with suppress(OSError):
-                os.close(directory_fd)
+                os.close(current_fd)
 
 
 def _load_yaml(path: Path, *, label: str, root: Path | None = None) -> object:
@@ -564,21 +566,23 @@ def ensure_domain_placement_path(vault_dir: Path, domain: DomainSpec) -> Path:
         allow_missing=True,
     )
     directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    fds: list[int] = []
+    current_fd: int | None = None
     try:
         current_fd = os.open(root, directory_flags)
-        fds.append(current_fd)
         for part in relative.parts:
             with suppress(FileExistsError):
                 os.mkdir(part, 0o755, dir_fd=current_fd)
-            current_fd = os.open(part, directory_flags, dir_fd=current_fd)
-            fds.append(current_fd)
+            next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+            prev_fd = current_fd
+            current_fd = next_fd
+            with suppress(OSError):
+                os.close(prev_fd)
     except (OSError, ValueError) as exc:
         raise DomainConfigError(f"domain {domain.name} placement cannot be created") from exc
     finally:
-        for fd in reversed(fds):
+        if current_fd is not None:
             with suppress(OSError):
-                os.close(fd)
+                os.close(current_fd)
     return root / relative
 
 

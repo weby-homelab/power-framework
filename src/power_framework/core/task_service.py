@@ -511,8 +511,6 @@ class TaskService:
         The original v1 bytes are copied to a backup directory and never deleted
         by migration (Phase I).
         """
-        import json
-
         control_dir = self.store.power_dir
         v1_dir = control_dir / "work-packets"
         if not v1_dir.is_dir():

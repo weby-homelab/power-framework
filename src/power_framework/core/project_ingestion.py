@@ -29,6 +29,8 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from power_framework.core.fd_io import open_fd_nofollow
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
@@ -588,10 +590,7 @@ def import_project_events(
             ) from exc
 
         flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        fd = os.open(store.active_events_file, flags, 0o600)
-        with open(fd, "a", encoding="utf-8") as f:
+        with open_fd_nofollow(store.active_events_file, "a", flags, encoding="utf-8") as f:
             for line in lines_to_write:
                 f.write(line)
             f.flush()
@@ -1046,10 +1045,7 @@ def materialize_status_markdown(
 - **Last Actor:** {last_event.actor}
 """
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    fd = os.open(status_file, flags, 0o600)
-    with open(fd, "w", encoding="utf-8") as f:
+    with open_fd_nofollow(status_file, "w", flags, encoding="utf-8") as f:
         f.write(content)
         f.flush()
         os.fsync(f.fileno())
