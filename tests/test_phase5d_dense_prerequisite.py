@@ -13,27 +13,41 @@ Exercises runtime `_get_or_build_dense_matrix` and SQLite chunk condition pushdo
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from power_framework.core.context_contracts import SearchScope, TemporalBoundary
+from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
+from power_framework.core.context_contracts import (
+    AccessPolicy,
+    BudgetClass,
+    QueryIntent,
+    QueryIntentKind,
+    RetrievalStage,
+    SearchScope,
+    TemporalBoundary,
+)
 from power_framework.core.generation_index import (
     _file_identity,
     _state_db_path,
     invalidate_active_generation_cache,
     sync_vault_atomically,
 )
+from power_framework.core.retrieval_planner import RetrievalPlanner
 from power_framework.core.search_scope import compile_search_scope
 from power_framework.core.searcher import (
     _get_or_build_dense_matrix,
     _read_db_path,
     _resolve_request_db,
+    configured_embedding_identity,
+    search_vault,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
 
 
 def _tb() -> TemporalBoundary:
@@ -372,3 +386,115 @@ def test_dense_matrix_empty_when_scope_matches_nothing(tmp_path: Path) -> None:
     assert entry.matrix.shape == (0, dim)
     assert entry.rel_paths == ()
     assert entry.chunk_ids == ()
+
+
+def test_retrieval_planner_semantic_stage_executes_real_dense_search(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hermetic F-01 proof: BALANCED planner hits real dense vectors with zero lexical overlap."""
+    vault = _make_vault(tmp_path, "dense_f01_e2e")
+    in_scope_note = vault / "01_Projects" / "canonical_freeze.md"
+    oos_note = vault / "03_Resources" / "unrelated_oos.md"
+    _write_note(in_scope_note, "Project", "Canonical Freeze Policy", "Policy specification body.")
+    _write_note(oos_note, "Resource", "Out Of Scope Resource", "Unrelated external reference.")
+
+    sync_vault_atomically(vault, sync_embeddings=False)
+    db_path = _read_db_path(vault)
+    assert db_path is not None
+
+    dim = 1024
+    target_vec = np.zeros(dim, dtype=np.float32)
+    target_vec[0] = 1.0
+
+    expected_provider, expected_model = configured_embedding_identity()
+    conn = sqlite3.connect(db_path, timeout=30)
+    try:
+        conn.executemany(
+            "INSERT OR REPLACE INTO chunk_embeddings "
+            "(chunk_id, rel_path, embedding, content, mtime) VALUES (?, ?, ?, ?, ?)",
+            [
+                (
+                    "freeze_c0",
+                    "01_Projects/canonical_freeze.md",
+                    target_vec.tobytes(),
+                    "Policy specification body.",
+                    1767225600.0,
+                ),
+                (
+                    "oos_c0",
+                    "03_Resources/unrelated_oos.md",
+                    target_vec.tobytes(),
+                    "Unrelated external reference.",
+                    1767225600.0,
+                ),
+            ],
+        )
+        conn.executemany(
+            "INSERT OR REPLACE INTO dense_index_manifest "
+            "(manifest_key, manifest_value) VALUES (?, ?)",
+            [
+                ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
+                ("embedding_dimension", str(dim)),
+                ("chunk_count", "2"),
+                ("embedding_provider", expected_provider),
+                ("embedding_model", expected_model),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    _rehash_generation(vault, db_path)
+    before_stat = (db_path.stat().st_mtime_ns, _file_identity(db_path))
+
+    embed_calls: list[str] = []
+
+    class _SpyEmbedder:
+        def embed(self, text: str) -> list[float]:
+            embed_calls.append(text)
+            return target_vec.tolist()
+
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        lambda: (True, "ready"),
+    )
+    monkeypatch.setattr(
+        "power_framework.core.searcher.get_embedding_manager",
+        lambda: _SpyEmbedder(),
+    )
+
+    policy = AccessPolicy._from_authorization_boundary(
+        origin="authorization_boundary",
+        actor="test_actor",
+        raw_access="none",
+        quarantine_access="none",
+        redaction="mandatory",
+        capability_id="retrieval_planner",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+    query_text = "остаточна резолюція"
+    intent = QueryIntent(
+        query=query_text,
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.BALANCED,
+        domain_hints=["projects"],
+        temporal_boundary=_tb(),
+    )
+
+    result = RetrievalPlanner(vault).plan_and_retrieve(intent, access_policy=policy)
+
+    assert embed_calls == [query_text]
+    assert result.dense_used is True
+    assert result.retrieval_status == "complete"
+    assert any(
+        c.source_id == "01_Projects/canonical_freeze.md"
+        and c.retrieval_stage is RetrievalStage.SEMANTIC
+        for c in result.candidates
+    )
+    assert all(c.source_id != "03_Resources/unrelated_oos.md" for c in result.candidates)
+
+    # Historical lexical TF mode='vector' must remain untouched and never trigger dense embedder
+    vector_results = search_vault(vault, query_text, mode="vector")
+    assert vector_results == []
+    assert embed_calls == [query_text]
+    assert (db_path.stat().st_mtime_ns, _file_identity(db_path)) == before_stat

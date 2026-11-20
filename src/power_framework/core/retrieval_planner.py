@@ -1168,58 +1168,89 @@ class RetrievalPlanner:
                             self.vault_dir,
                             query_intent.query,
                             max_results=plan.budget.max_candidates,
-                            mode="vector",
+                            mode="semantic",
                             scope=plan.scope,
                             access_policy=access_policy,
                         )
-                        dense_used = True
-                        for r in dense_results:
-                            rel_path = getattr(r, "rel_path", str(r))
-                            content = getattr(r, "snippet", "") or getattr(r, "content", "")
-                            score = float(getattr(r, "score", 0.5))
-                            cost = _deterministic_token_cost(content)
-                            raw_domain = (
-                                plan.domain_matches[0].domain if plan.domain_matches else "general"
+                        container_mode = getattr(dense_results, "actual_mode", None)
+                        container_reason = getattr(dense_results, "fallback_reason", None)
+                        downgraded_reason: str | None = None
+                        if container_mode not in (None, "semantic"):
+                            downgraded_reason = str(
+                                container_reason or f"mode={container_mode} downgrade"
                             )
-                            source_rev = (
-                                hashlib.sha256(content.encode("utf-8")).hexdigest()
-                                if content
-                                else "unknown"
+                        else:
+                            downgraded_reason = next(
+                                (
+                                    str(
+                                        getattr(r, "fallback_reason", "")
+                                        or f"mode={getattr(r, 'actual_mode', 'unknown')} downgrade"
+                                    )
+                                    for r in dense_results
+                                    if getattr(r, "actual_mode", None) not in (None, "semantic")
+                                ),
+                                None,
                             )
-                            (
-                                item_auth,
-                                item_trust,
-                                item_basis,
-                                item_source_type,
-                                freshness,
-                                contradiction_state,
-                                noise_state,
-                            ) = _inspect_vault_note_authority(self.vault_dir, rel_path, content)
-                            collected_items.append(
-                                ContextItem(
-                                    source_id=rel_path,
-                                    source_type=item_source_type,
-                                    authority=item_auth,
-                                    trust_state=item_trust,
-                                    domain=raw_domain,
-                                    domains=[raw_domain],
-                                    score=max(0.0001, score),
-                                    retrieval_stage=RetrievalStage.SEMANTIC,
-                                    provenance=Provenance(
-                                        source_refs=[rel_path],
-                                        source_revision=source_rev,
-                                        authority_basis=item_basis,
-                                    ),
-                                    freshness=freshness,
-                                    contradiction_state=contradiction_state,
-                                    noise_state=noise_state,
-                                    token_cost=cost,
-                                    excerpt=content,
-                                    content_kind="excerpt" if content else "reference",
-                                    redaction_status="verified_safe",
+
+                        if downgraded_reason is not None:
+                            dense_used = False
+                            fallback_reason = (
+                                f"dense search downgraded ({downgraded_reason}); "
+                                "fallback to FTS lexical"
+                            )
+                            retrieval_status = "degraded"
+                            decisions.append(fallback_reason)
+                        else:
+                            dense_used = True
+                            for r in dense_results:
+                                rel_path = getattr(r, "rel_path", str(r))
+                                content = getattr(r, "snippet", "") or getattr(r, "content", "")
+                                score = float(getattr(r, "score", 0.5))
+                                cost = _deterministic_token_cost(content)
+                                raw_domain = (
+                                    plan.domain_matches[0].domain
+                                    if plan.domain_matches
+                                    else "general"
                                 )
-                            )
-                            source_revisions.add(source_rev)
+                                source_rev = (
+                                    hashlib.sha256(content.encode("utf-8")).hexdigest()
+                                    if content
+                                    else "unknown"
+                                )
+                                (
+                                    item_auth,
+                                    item_trust,
+                                    item_basis,
+                                    item_source_type,
+                                    freshness,
+                                    contradiction_state,
+                                    noise_state,
+                                ) = _inspect_vault_note_authority(self.vault_dir, rel_path, content)
+                                collected_items.append(
+                                    ContextItem(
+                                        source_id=rel_path,
+                                        source_type=item_source_type,
+                                        authority=item_auth,
+                                        trust_state=item_trust,
+                                        domain=raw_domain,
+                                        domains=[raw_domain],
+                                        score=max(0.0001, score),
+                                        retrieval_stage=RetrievalStage.SEMANTIC,
+                                        provenance=Provenance(
+                                            source_refs=[rel_path],
+                                            source_revision=source_rev,
+                                            authority_basis=item_basis,
+                                        ),
+                                        freshness=freshness,
+                                        contradiction_state=contradiction_state,
+                                        noise_state=noise_state,
+                                        token_cost=cost,
+                                        excerpt=content,
+                                        content_kind="excerpt" if content else "reference",
+                                        redaction_status="verified_safe",
+                                    )
+                                )
+                                source_revisions.add(source_rev)
                     except Exception as exc:
                         dense_used = False
                         fallback_reason = (
