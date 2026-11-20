@@ -1,0 +1,87 @@
+{
+  "dimension": 1024,
+  "clusters": {
+    "edge_architecture": [
+      "power", "edge", "retrieval", "sqlite", "generation", "context", "pack",
+      "contextpack", "canonical", "архітектур", "контекст", "пошук"
+    ],
+    "incremental_dense": [
+      "dirty", "dirty-set", "incremental", "re-embed", "reembed", "chunk", "chunks",
+      "generation_reconcile", "amplification", "rebuild", "векторн", "відредагован",
+      "фрагмент", "інкрементальн", "перерахунок", "перебору", "перебір", "змінен", "чанк"
+    ],
+    "mcp_pagination": [
+      "mcp", "pagination", "read_note", "get_server_info", "preflight", "bounded",
+      "пагінац", "сторінк", "токен", "сервер", "інфо"
+    ],
+    "ci_gates": [
+      "ruff", "mypy", "pytest", "coverage", "codeql", "strict", "lint",
+      "перевір", "якост", "тест", "покритт"
+    ],
+    "sqlite_fts": [
+      "wal", "busy_timeout", "fts5", "bm25", "unicode61", "mmap", "readonly",
+      "індекс", "таблиц", "транзакц", "запит"
+    ],
+    "igpu_inference": [
+      "openvino", "iris", "onnx", "inference", "igpu", "omp_num_threads",
+      "throttling", "cpu", "accelerator", "нейромереж", "вбудован", "графіц",
+      "графіка", "прискорен", "потоків", "процесор", "інференс"
+    ],
+    "vpn_tunnel": [
+      "wireguard", "mesh", "gateway", "keepalive", "split", "exit", "tunnel",
+      "peer", "peers", "шифрован", "вузлов", "тунел", "міжмережев",
+      "маршрутиз", "віддален", "хост"
+    ],
+    "container_deploy": [
+      "docker", "compose", "rollout", "healthcheck", "image", "images", "pruning",
+      "container", "zero-downtime", "контейнер", "ізольован", "сервісів",
+      "готовност", "прибиранн", "образів", "безперервн"
+    ],
+    "systemd_timers": [
+      "systemd", "timer", "timers", "oncalendar", "journald", "snapshot",
+      "alerts", "scheduled", "планувальник", "фонових", "завдань",
+      "лінукс", "сповіщен", "журнал", "таймер"
+    ],
+    "tls_proxy": [
+      "nginx", "reverse", "proxy", "hsts", "ocsp", "stapling", "certificate",
+      "renewal", "tls", "https", "шифруван", "трафік", "мережев",
+      "сертифікат", "подовжен", "вхідного", "проксі", "цифров"
+    ],
+    "gpg_signing": [
+      "gpg", "signing", "signature", "branch", "protection", "merge", "verified",
+      "signed", "commit", "криптографіч", "засвідчен", "авторств",
+      "репозиторі", "злиття", "гілки", "підпис"
+    ],
+    "retrieval_metrics": [
+      "recall", "mrr", "ndcg", "precision", "ranking", "graded", "relevance",
+      "метрик", "якост", "оцінк"
+    ],
+    "hybrid_rrf": [
+      "rrf", "reciprocal", "fusion", "cosine", "lexical", "hybrid", "guard",
+      "гібридн", "злиття", "косинус"
+    ],
+    "worktree_venv": [
+      "worktree", "editable", "venv", "pythonpath", "isolated", "offline", "hf_hub",
+      "docs-venv", "підміни", "імпорт", "робочого", "дерева", "віртуальн",
+      "середовищ", "пайтон"
+    ],
+    "backup_sync": [
+      "rrsync", "backup", "rotation", "retention", "checksums", "mirror", "offsite",
+      "бекап", "резерв", "ротац", "контрольн", "суми"
+    ],
+    "solo_governance": [
+      "solo", "governance", "holdout", "rituals", "admission", "reconciliation",
+      "соло", "рішен", "регресій", "реформ"
+    ],
+    "dense_fail_closed": [
+      "dense", "semantic", "fallback", "degraded", "actual_mode",
+      "power_allow_dense_fallback", "семантич", "деградац"
+    ],
+    "cloud_storage_negative": [
+      "cloud", "bucket", "multipart", "lifecycle", "object", "archival"
+    ],
+    "injection_quarantine": [
+      "disregard", "instructions", "jailbreak", "credentials", "bypass", "trap"
+    ]
+  }
+}

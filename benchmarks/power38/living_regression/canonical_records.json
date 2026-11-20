@@ -1,0 +1,47 @@
+{
+  "tasks": [
+    {
+      "task_id": "tsk-backup-rotation",
+      "title": "Backup rrsync rotation",
+      "objective": "Verify offsite rrsync backup retention, checksums, and read-only mirror hygiene",
+      "owner": "maintainer",
+      "state": "ready",
+      "priority": "high",
+      "next_action": "audit mirror checksums"
+    },
+    {
+      "task_id": "tsk-mcp-pagination",
+      "title": "MCP note pagination",
+      "objective": "Implement bounded read_note pagination and compact server preflight",
+      "owner": "maintainer",
+      "state": "ready",
+      "priority": "normal",
+      "next_action": "implement Phase 5G server pagination"
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "dec_solo_governance",
+      "task_id": "tsk-backup-rotation",
+      "title": "Solo engineer release governance",
+      "requested_by": "user:maintainer",
+      "description": "Adopt one living regression benchmark and incremental releases without one-shot holdout rituals",
+      "risk_level": "low"
+    },
+    {
+      "decision_id": "dec_dense_fail_closed",
+      "task_id": "tsk-mcp-pagination",
+      "title": "Dense retrieval fail-closed policy",
+      "requested_by": "user:maintainer",
+      "description": "Reject silent dense fallback unless POWER_ALLOW_DENSE_FALLBACK is explicitly enabled",
+      "risk_level": "medium"
+    }
+  ],
+  "projects": [
+    {
+      "project_id": "prj_power_edge",
+      "name": "POWER 3.8 Edge Retrieval and Lean MCP",
+      "owner": "maintainer"
+    }
+  ]
+}
