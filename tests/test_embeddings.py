@@ -200,6 +200,123 @@ class TestEmbeddingManager:
         with pytest.raises(PermissionError, match="Ollama endpoint"):
             embeddings.OllamaEmbeddingManager().embed("synthetic")
 
+    def test_ollama_embed_batch_bounds_sdk_requests_and_preserves_order_and_empty_input(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        requests: list[list[str]] = []
+
+        def fake_embed(**kwargs) -> SimpleNamespace:
+            model = kwargs["model"]
+            texts = kwargs["input"]
+            keep_alive = kwargs["keep_alive"]
+            options = kwargs["options"]
+            assert model == "synthetic-ollama"
+            assert keep_alive == "2m"
+            assert "num_thread" in options
+            requests.append(list(texts))
+            request_id = float(len(requests))
+            return SimpleNamespace(
+                embeddings=[[request_id, float(index)] for index in range(len(texts))]
+            )
+
+        fake_ollama = ModuleType("ollama")
+        fake_ollama.embed = fake_embed  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+        monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+        manager = embeddings.OllamaEmbeddingManager(model_name="synthetic-ollama")
+
+        vectors = manager.embed_batch(["a", "bb", "ccc"], batch_size=2)
+
+        assert requests == [["a", "bb"], ["ccc"]]
+        assert vectors == [[1.0, 0.0], [1.0, 1.0], [2.0, 0.0]]
+        assert manager.embed_batch([], batch_size=2) == []
+        assert requests == [["a", "bb"], ["ccc"]]
+
+    def test_ollama_embed_batch_propagates_sdk_type_error_without_retry(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        calls = 0
+
+        def fake_embed(**_kwargs: object) -> SimpleNamespace:
+            nonlocal calls
+            calls += 1
+            raise TypeError("synthetic SDK type error")
+
+        fake_ollama = ModuleType("ollama")
+        fake_ollama.embed = fake_embed  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+        monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+        manager = embeddings.OllamaEmbeddingManager(model_name="synthetic-ollama")
+
+        with caplog.at_level("WARNING"), pytest.raises(TypeError, match="synthetic SDK type error"):
+            manager.embed_batch(["synthetic"], batch_size=1)
+
+        assert calls == 1
+        assert "synthetic SDK type error" not in caplog.text
+
+    def test_ollama_embed_batch_rejects_wrong_response_count_without_retry(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = 0
+
+        def fake_embed(**_kwargs: object) -> SimpleNamespace:
+            nonlocal calls
+            calls += 1
+            return SimpleNamespace(embeddings=[])
+
+        fake_ollama = ModuleType("ollama")
+        fake_ollama.embed = fake_embed  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+        monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+        manager = embeddings.OllamaEmbeddingManager(model_name="synthetic-ollama")
+
+        with pytest.raises(ValueError, match="ollama_embedding_output_count_mismatch"):
+            manager.embed_batch(["synthetic"], batch_size=1)
+
+        assert calls == 1
+
+    @pytest.mark.parametrize("batch_size", [0, -1])
+    def test_ollama_embed_batch_rejects_nonpositive_batch_size_before_sdk_call(
+        self, monkeypatch: pytest.MonkeyPatch, batch_size: int
+    ) -> None:
+        calls = 0
+
+        def fake_embed(**_kwargs: object) -> SimpleNamespace:
+            nonlocal calls
+            calls += 1
+            return SimpleNamespace(embeddings=[[1.0]])
+
+        fake_ollama = ModuleType("ollama")
+        fake_ollama.embed = fake_embed  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+
+        with pytest.raises(ValueError, match="ollama_embedding_batch_size_invalid"):
+            embeddings.OllamaEmbeddingManager(model_name="synthetic-ollama").embed_batch(
+                ["synthetic"], batch_size=batch_size
+            )
+
+        assert calls == 0
+
+    def test_ollama_safe_call_retries_only_timeouts_without_logging_exception_text(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        manager = embeddings.OllamaEmbeddingManager()
+        attempts = 0
+
+        def fake_attempt(_fn: object) -> tuple[object, Exception | None]:
+            nonlocal attempts
+            attempts += 1
+            if attempts < 3:
+                return None, TimeoutError("synthetic timeout detail")
+            return "complete", None
+
+        monkeypatch.setattr(manager, "_do_attempt", fake_attempt)
+        with caplog.at_level("WARNING"):
+            assert manager._safe_call(lambda: "unused") == "complete"
+
+        assert attempts == 3
+        assert "synthetic timeout detail" not in caplog.text
+
     def test_import_has_no_hardcoded_env_file_side_effect(self):
         assert "/root/geminicli/.env" not in inspect.getsource(embeddings)
 

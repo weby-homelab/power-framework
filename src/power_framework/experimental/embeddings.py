@@ -427,13 +427,13 @@ class OllamaEmbeddingManager:
         return self._dim
 
     def _safe_call(self, fn: Callable[[], Any]) -> Any:
-        last_err: Exception | None = None
         for attempt in range(self._retries + 1):
             result, exc = self._do_attempt(fn)
             if exc is None:
                 return result
-            last_err = exc
-            if isinstance(exc, TimeoutError):
+            if not isinstance(exc, TimeoutError):
+                raise exc
+            if attempt + 1 < self._retries + 1:
                 logger.warning(
                     "Ollama embed attempt %d/%d timed out after %ds",
                     attempt + 1,
@@ -441,13 +441,8 @@ class OllamaEmbeddingManager:
                     self._timeout,
                 )
             else:
-                logger.warning(
-                    "Ollama embed attempt %d/%d failed: %s",
-                    attempt + 1,
-                    self._retries + 1,
-                    exc,
-                )
-        raise RuntimeError(f"Ollama embed failed after retries: {last_err}")
+                raise exc
+        raise RuntimeError("ollama_embed_attempts_exhausted")
 
     def _do_attempt(self, fn: Callable[[], Any]) -> tuple[Any, Exception | None]:
         def _handler(signum, frame):
@@ -496,21 +491,34 @@ class OllamaEmbeddingManager:
 
         return self._safe_call(_do)
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
+            raise ValueError("ollama_embedding_batch_size_invalid")
+        if not texts:
+            return []
+
         import ollama
 
         validate_local_ollama_endpoint(os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434"))
 
-        def _do():
-            result = ollama.embed(
-                model=self.model_name,
-                input=texts,
-                keep_alive="2m",
-                options={"num_thread": int(os.getenv("POWER_OLLAMA_THREADS", "2"))},
-            )
-            return result.embeddings
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), batch_size):
+            request_texts = texts[start : start + batch_size]
 
-        return self._safe_call(_do)
+            def _do(request: list[str] = request_texts) -> list[list[float]]:
+                result = ollama.embed(
+                    model=self.model_name,
+                    input=request,
+                    keep_alive="2m",
+                    options={"num_thread": int(os.getenv("POWER_OLLAMA_THREADS", "2"))},
+                )
+                embeddings = result.embeddings
+                if len(embeddings) != len(request):
+                    raise ValueError("ollama_embedding_output_count_mismatch")
+                return embeddings
+
+            vectors.extend(cast("list[list[float]]", self._safe_call(_do)))
+        return vectors
 
 
 class FastEmbedManager:
