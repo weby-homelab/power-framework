@@ -71,7 +71,7 @@ Phase 5D (P38-WP02) — Multi-Domain Union & Conflict Resolution / ContextPack
 CLOSED / MERGED / VERIFIED (PR #439 / PR #440)
          ↓
 Phase 5E (P38-WP03) — Shadow Benchmark / Legacy Comparison
-OPEN / NOT PASSED / EVALUATION TRUST REPAIRED (P38-WP03-R5 CLOSED / FAILED VERIFICATION; v1.5 exposed/unused/invalidated/not reusable; fresh evaluation authoring requires a separate explicit owner admission; no evaluation was started here)
+OPEN / NOT PASSED / NOT ADMITTED / EVALUATION TRUST REPAIRED (P38-WP03-R5 CLOSED / FAILED VERIFICATION; v1.5 exposed/unused/invalidated/not reusable; fresh evaluation authoring requires a separate explicit owner admission; no evaluation was started here)
            ↓
 P38-WP03-R6A.1 — Evaluation Admission Integrity Repair
 CLOSED / MERGED / DEVELOPMENT ADMITTED (review provenance v2, independent fixture ownership, fail-closed development admission, metric semantics, FAST contract, and historical q14 diagnostic; no fresh holdout and no one-shot)
@@ -100,11 +100,14 @@ CLOSED / MERGED / VERIFIED (PR #485 / merge aa295a4)
 Post-#485 CI & Runtime Fixes (PR #502, #503, #505, #506)
 CLOSED / MERGED / VERIFIED (merge 330f01c)
                 ↓
+Track A runtime/security stabilization (WP-0.5–WP-0.7)
+CLOSED / MERGED / VERIFIED (PR #508–#514; latest pre-candidate main 3119d63e)
+            ↓
 Fresh Phase 5E evaluation authoring
-NEXT SEPARATE INVOCATION WITH EXPLICIT OWNER ADMISSION / Phase 5E remains OPEN / NOT PASSED; no fresh revision or one-shot is authorized here
+NOT ADMITTED / NEXT SEPARATE INVOCATION ONLY AFTER EXPLICIT OWNER ADMISSION / Phase 5E remains OPEN / NOT PASSED; no fresh revision or one-shot is authorized here
             ↓
 Phase 5F (P38-WP04) — Phase 5F Incremental Dense Validity / dirty-set behavior
-BLOCKED (Phase 5E remains OPEN / NOT PASSED; fresh evaluation authoring and separate admission are required)
+BLOCKED (Phase 5E remains OPEN / NOT PASSED / NOT ADMITTED; fresh evaluation authoring and separate admission are required)
           ↓
 Phase 5G–5H (P38-WP05–P38-WP06) — MCP, Closure
 PLANNED / NOT STARTED (gated behind Phase 5F)
@@ -162,7 +165,7 @@ NO-GO
 | P38-WP01-R1 | CLOSED / MERGED / VERIFIED / PR #437 | Phase 5C SearchScope Closure Correction |
 | Phase 5D (P38-WP02) | CLOSED / VERIFIED AFTER R1 CORRECTION | Multi-Domain Union & Conflict Resolution / RetrievalPlanner / ContextPack vertical slice (PR #439, PR #440, PR #441 corrected by PR #442, PR #443) |
 | P38-WP02-R1 | CLOSED / MERGED / VERIFIED / PR #443 | Phase 5D RetrievalPlanner / ContextPack Closure Correction |
-| Phase 5E (P38-WP03) | OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRES EXPLICIT OWNER ADMISSION | Shadow Benchmark / Legacy Comparison; historical R1–R5 failures retained; R6A.1 repaired development admission and R6A.2 technical repair is retained without fresh holdout execution; no fresh evaluation was started |
+| Phase 5E (P38-WP03) | OPEN / NOT PASSED / NOT ADMITTED | Shadow Benchmark / Legacy Comparison; fresh evaluation authoring requires separate explicit owner admission; authoring does not authorize evaluation or holdout/one-shot execution |
 | P38-WP03-R1 | CLOSED / FAILURE EVIDENCE | Phase 5E failure evidence |
 | P38-WP03-R2 attempt | CLOSED / FAILED VERIFICATION | PR #449 runtime + PR #450 governance |
 | P38-WP03-R3 | CLOSED / SECURITY CORRECTION VERIFIED | PR #451 runtime correction; PR-R3B governance rebaseline |
@@ -178,6 +181,7 @@ NO-GO
 | Issue #471 | CLOSED / COMPLETED | PR #483 governance merge/readback and issue disposition are complete; this gate does not mutate the issue |
 | Post-#483 canonical-plan drift reconciliation | CLOSED / MERGED / VERIFIED (PR #485 / merge `aa295a4`) | Protected normal merge `aa295a4073ba4c0fff0e45721610a4bcdb5489c8` and live readback verified; superseded as active gate by post-#485 runtime merges |
 | Post-#485 CI & runtime fixes | CLOSED / MERGED / VERIFIED (PR #502, #503, #505, #506) | CI deps/Ruff (`c9b5a5f`), idempotent index writes (`9904669`), cached semantic relations (`1235ed0`), and sync snapshot reconcile (`330f01c`) verified on protected `main` |
+| Track A runtime/security stabilization (WP-0.5–WP-0.7) | CLOSED / MERGED / VERIFIED | PR #508–#514; all 11 required checks passed on each exact head; merge/signature receipts are in `POWER_3.8_CURRENT_STATE.md` |
 | OpenVINO hardware acceptance | CLOSED / ACCEPTED ONLY FOR AUTHORIZED CURRENT SNAPSHOT | S-Book Intel Iris Xe; 791/791 sources, 5,876 chunks, zero exclusions/errors/retries; duplicate count UNKNOWN, 100% FTS/dense coverage and integrity PASS; semantic/reranked search had no fallback; GPU utilization NOT_MEASURED; historical 3,624-note / 19,954-chunk / 23,578-vector workload remains unrecovered, NOT_REPRODUCED, and not directly comparable |
 | Phase 5F (P38-WP04) | BLOCKED | Phase 5E remains open/not passed; fresh evaluation authoring and separate admission are required before Phase 5F |
 | Phase 5G–5H (P38-WP05–06) | PLANNED / NOT STARTED | Gated by predecessor sequence (5E → fresh authoring/admission → 5F → 5G → 5H) |
@@ -367,17 +371,19 @@ Controlled Dependency Refresh, Phase 5A runtime contracts, Phase 5A.1
 correction, Phase 5B router, and INFRA-1 broker are closed in this snapshot;
 Phase 5C SearchScope pushdown is CLOSED / VERIFIED AFTER R1 CORRECTION
 (PR #437);
-Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443); P38-WP02-R1 is CLOSED / MERGED / VERIFIED; OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized current-KB hardware acceptance is PASS only for its 791/791-source, 5,876-chunk snapshot; PR #483 governance merge/readback is complete and Issue #471 is CLOSED / COMPLETED; post-#483 canonical-plan reconciliation is CLOSED / MERGED / VERIFIED through PR #485 (`aa295a4`), and CI/runtime fixes PR #502, #503, #505, and #506 are CLOSED / MERGED / VERIFIED (`330f01c`); Phase 5E is OPEN / NOT PASSED and fresh evaluation authoring requires a separate explicit owner admission; P38-WP03-R6A.1 is CLOSED / MERGED / DEVELOPMENT ADMITTED; P38-WP03-R6A.2 is CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED; Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED behind Phase 5E fresh evaluation authoring and separate admission.
+Phase 5D is CLOSED / VERIFIED AFTER R1 CORRECTION (PR #439 / PR #440 / PR #441 corrected by PR #442 / PR #443); P38-WP02-R1 is CLOSED / MERGED / VERIFIED; OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; security dependency remediation is CLOSED / MERGED / VERIFIED through PR #481; the authorized current-KB hardware acceptance is PASS only for its 791/791-source, 5,876-chunk snapshot; PR #483 governance merge/readback is complete and Issue #471 is CLOSED / COMPLETED; post-#483 canonical-plan reconciliation is CLOSED / MERGED / VERIFIED through PR #485 (`aa295a4`), and CI/runtime fixes PR #502, #503, #505, and #506 are CLOSED / MERGED / VERIFIED (`330f01c`); Track A runtime/security packages WP-0.5–WP-0.7 are CLOSED / MERGED / VERIFIED through PR #508–#514 (latest pre-candidate main `3119d63`); Phase 5E is OPEN / NOT PASSED / NOT ADMITTED and fresh evaluation authoring requires a separate explicit owner admission; P38-WP03-R6A.1 is CLOSED / MERGED / DEVELOPMENT ADMITTED; P38-WP03-R6A.2 is CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED; Phase 5F (P38-WP04 / Phase 5F Incremental Dense Validity / dirty-set behavior) remains BLOCKED behind Phase 5E fresh evaluation authoring and separate admission.
 
 ### Phase 5 internal gates
 
-Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, Phase 5C, P38-WP01-R1, Phase 5D, P38-WP02-R1, P38-WP03-R6A.1 development admission, and the P38-WP03-R6A.2 technical repair are closed. OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; PR #481 security dependency remediation is CLOSED / MERGED / VERIFIED; current-KB hardware acceptance is PASS only for the authorized current snapshot. PR #483 governance merge/readback is complete and Issue #471 is CLOSED / COMPLETED; post-#483 canonical-plan reconciliation is CLOSED / MERGED / VERIFIED through PR #485 (`aa295a4`), and CI/runtime fixes PR #502, #503, #505, and #506 are CLOSED / MERGED / VERIFIED (`330f01c`). Phase 5E is OPEN / NOT PASSED and fresh evaluation authoring requires a separate explicit owner admission. The following future
+Phase 5A, Phase 5A.1, Phase 5B, INFRA-1, Phase 5C, P38-WP01-R1, Phase 5D, P38-WP02-R1, P38-WP03-R6A.1 development admission, and the P38-WP03-R6A.2 technical repair are closed. OpenVINO software integration is CLOSED / MERGED / VERIFIED through PR #478; PR #481 security dependency remediation is CLOSED / MERGED / VERIFIED; current-KB hardware acceptance is PASS only for the authorized current snapshot. PR #483 governance merge/readback is complete and Issue #471 is CLOSED / COMPLETED; post-#483 canonical-plan reconciliation is CLOSED / MERGED / VERIFIED through PR #485 (`aa295a4`), and CI/runtime fixes PR #502, #503, #505, and #506 are CLOSED / MERGED / VERIFIED (`330f01c`). Track A runtime/security packages WP-0.5–WP-0.7 are CLOSED / MERGED / VERIFIED through PR #508–#514 (latest pre-candidate main `3119d63`). Phase 5E is OPEN / NOT PASSED / NOT ADMITTED and fresh evaluation authoring requires a separate explicit owner admission. The following future
 runtime gates remain `PLANNED / NOT IMPLEMENTED` until their own evidence and
 protected admission; `OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION` is closed and
 verified through PR #478, `OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE`
 is closed / PASS for the authorized current snapshot, PR #483 governance and
 Issue #471 disposition are complete, PR #485 canonical-plan reconciliation and
-PR #502–#506 CI/runtime fixes are merged, and Phase 5F is BLOCKED:
+PR #502–#506 CI/runtime fixes and Track A PR #508–#514 are merged through the
+latest pre-candidate `main` at `3119d63`; Phase 5E is OPEN / NOT PASSED / NOT
+ADMITTED, and Phase 5F is BLOCKED:
 
 ```text
 5A.1 — Evaluation corpus semantic integrity correction (closed)
@@ -387,7 +393,7 @@ INFRA-1 — Constrained Local Infrastructure Execution Broker (closed / merged P
 P38-WP01-R1 — Phase 5C SearchScope Closure Correction (CLOSED / PR #437)
 5D — RetrievalPlanner + ContextPack read-only vertical slice (CLOSED / VERIFIED AFTER R1 CORRECTION)
 P38-WP02-R1 — Phase 5D RetrievalPlanner / ContextPack Closure Correction (CLOSED / PR #443)
-5E — Shadow benchmark / legacy comparison (OPEN / NOT PASSED / FRESH EVALUATION AUTHORING REQUIRES EXPLICIT OWNER ADMISSION; historical R1–R5 failures retained; R6A.1 development admission and R6A.2 technical repair closed)
+5E — Shadow benchmark / legacy comparison (OPEN / NOT PASSED / NOT ADMITTED; fresh evaluation authoring requires separate explicit owner admission; historical R1–R5 failures retained; R6A.1 development admission and R6A.2 technical repair closed)
 P38-WP03-R6A.1 — Evaluation Admission Integrity Repair (CLOSED / MERGED / DEVELOPMENT ADMITTED; no fresh holdout or one-shot)
 P38-WP03-R6A.2 — Final Holdout-Execution Admission Repair (CLOSED / MERGED / EXACT REPAIR TREE PRESENT / INTEGRITY VERIFIED; no fresh holdout)
 OPENVINO_471_SIGNED_UPSTREAM_INTEGRATION — CLOSED / MERGED / VERIFIED / PR #478 (historical integration vehicle #473 remains not merged)
@@ -396,7 +402,8 @@ OPENVINO_471_CURRENT_KNOWLEDGE_BASE_FULL_REBUILD_ACCEPTANCE — CLOSED / PASS FO
 PR #483 governance and Issue #471 disposition — CLOSED / MERGED / VERIFIED; Issue #471 CLOSED / COMPLETED
 Post-#483 canonical-plan drift reconciliation — CLOSED / MERGED / VERIFIED (PR #485 / merge aa295a4)
 Post-#485 CI & runtime fixes — CLOSED / MERGED / VERIFIED (PR #502, #503, #505, #506 / merge 330f01c)
-Fresh Phase 5E evaluation authoring — NEXT SEPARATE INVOCATION WITH EXPLICIT OWNER ADMISSION (Phase 5E remains OPEN / NOT PASSED; v1.5 exposed/unused/invalidated/not reusable; `SEALED_NOT_SECRET_NO_TUNING`; no fresh evaluation or one-shot is authorized here)
+Track A runtime/security stabilization — CLOSED / MERGED / VERIFIED (WP-0.5–WP-0.7 / PR #508–#514 / latest pre-candidate main 3119d63)
+Fresh Phase 5E evaluation authoring — NEXT GATED STEP ONLY AFTER SEPARATE EXPLICIT OWNER ADMISSION (Phase 5E remains OPEN / NOT PASSED / NOT ADMITTED; v1.5 exposed/unused/invalidated/not reusable; `SEALED_NOT_SECRET_NO_TUNING`; no fresh evaluation or one-shot is authorized here)
 5F — Phase 5F Incremental Dense Validity / dirty-set behavior (BLOCKED until the separate Phase 5E evaluation authoring/admission/execution is complete)
 5G — Small MCP read/explainability surfaces
 5H — Phase closure / default decision
