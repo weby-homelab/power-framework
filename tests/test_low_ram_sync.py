@@ -28,6 +28,11 @@ if TYPE_CHECKING:
 # The atomic sync implementation owns the lazy embedding-loader seam.
 def _patch_manager(monkeypatch, fake):
     monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda *a, **k: fake)
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: index_sync._embedding_manifest_identity(fake),
+    )
 
 
 def _make_vault(vault: Path, n: int = 12) -> None:

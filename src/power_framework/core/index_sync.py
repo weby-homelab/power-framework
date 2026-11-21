@@ -438,8 +438,8 @@ def _sync_vault_to_db(
 
     embedder = _get_embedding_manager()
     actual_provider, actual_model = _embedding_manifest_identity(embedder)
-    if not rebuild_dense and (actual_provider, actual_model) != (provider, model):
-        raise RuntimeError("embedding manager identity changed while reusing dense vectors")
+    if (actual_provider, actual_model) != (provider, model):
+        raise RuntimeError("embedding manager identity changed from the configured model")
 
     _embed_and_store(
         embedder,

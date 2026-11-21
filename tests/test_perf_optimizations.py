@@ -60,6 +60,11 @@ def semantic_indexed_vault(sample_vault: Path, monkeypatch, deterministic_embedd
     from power_framework.core.searcher import _sync_vault_to_db
 
     monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: deterministic_embedder)
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: index_sync._embedding_manifest_identity(deterministic_embedder),
+    )
 
     db_path = get_cache_dir() / "power_search.db"
     conn = sqlite3.connect(str(db_path), timeout=30)

@@ -166,6 +166,11 @@ def test_dense_matrix_cache_reuses_exact_rows_for_verified_generation(
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: FakeDenseManager())
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (FakeDenseManager.__name__, FakeDenseManager.model_name),
+    )
     monkeypatch.setattr(searcher, "get_embedding_manager", lambda: FakeDenseManager())
     monkeypatch.setattr(
         searcher,
@@ -217,6 +222,11 @@ def test_dense_matrix_cache_rebuilds_after_generation_publication(
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: FakeDenseManager())
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (FakeDenseManager.__name__, FakeDenseManager.model_name),
+    )
     monkeypatch.setattr(searcher, "get_embedding_manager", lambda: FakeDenseManager())
     monkeypatch.setattr(
         searcher,

@@ -59,15 +59,15 @@ EMBED_NUM_THREADS = get_cpu_worker_limit(
     int(os.getenv("POWER_EMBED_NUM_THREADS", "2")) if os.getenv("POWER_EMBED_NUM_THREADS") else None
 )
 
-OLLAMA_EMBED_MODEL = os.getenv("POWER_OLLAMA_EMBED_MODEL", "qwen3-embedding:0.6b")
+OLLAMA_EMBED_MODEL = os.getenv("POWER_OLLAMA_EMBED_MODEL") or "qwen3-embedding:0.6b"
 
-FASTEMBED_MODEL = os.getenv(
-    "POWER_EMBEDDING_MODEL",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+FASTEMBED_MODEL = (
+    os.getenv("POWER_EMBEDDING_MODEL")
+    or "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )
 
 # Qwen3 ONNX backend (qwen3-embed, no torch / no Ollama) — legacy opt-in.
-QWEN3_EMBED_MODEL = os.getenv("POWER_QWEN3_EMBED_MODEL", "n24q02m/Qwen3-Embedding-0.6B-ONNX")
+QWEN3_EMBED_MODEL = os.getenv("POWER_QWEN3_EMBED_MODEL") or "n24q02m/Qwen3-Embedding-0.6B-ONNX"
 # q4f16 ONNX by default; set to "n24q02m/Qwen3-Embedding-0.6B-ONNX" with
 # POWER_QWEN3_EMBED_VARIANT to control which onnx file is used if needed.
 
@@ -96,8 +96,8 @@ _BGE_M3_INIT_LOCK = threading.Lock()
 def _configured_bge_identity() -> tuple[str, str]:
     """Read the BGE repository and revision at loader/probe time."""
     return (
-        os.getenv("POWER_BGE_M3_ONNX_REPO", BGE_M3_PINNED_REPO),
-        os.getenv("POWER_BGE_M3_ONNX_REVISION", BGE_M3_PINNED_REVISION),
+        os.getenv("POWER_BGE_M3_ONNX_REPO") or BGE_M3_PINNED_REPO,
+        os.getenv("POWER_BGE_M3_ONNX_REVISION") or BGE_M3_PINNED_REVISION,
     )
 
 
@@ -340,10 +340,10 @@ def configured_embedding_identity() -> tuple[str, str]:
         repo, revision = _configured_bge_identity()
         return "BGEM3OnnxManager", f"{repo}@{revision}"
     if provider == "qwen3":
-        return "Qwen3EmbeddingManager", os.getenv("POWER_QWEN3_EMBED_MODEL", QWEN3_EMBED_MODEL)
+        return "Qwen3EmbeddingManager", os.getenv("POWER_QWEN3_EMBED_MODEL") or QWEN3_EMBED_MODEL
     if provider == "ollama":
-        return "OllamaEmbeddingManager", os.getenv("POWER_OLLAMA_EMBED_MODEL", OLLAMA_EMBED_MODEL)
-    return "FastEmbedManager", os.getenv("POWER_EMBEDDING_MODEL", FASTEMBED_MODEL)
+        return "OllamaEmbeddingManager", os.getenv("POWER_OLLAMA_EMBED_MODEL") or OLLAMA_EMBED_MODEL
+    return "FastEmbedManager", os.getenv("POWER_EMBEDDING_MODEL") or FASTEMBED_MODEL
 
 
 def _get_embedding_dim(model_name: str) -> int:
@@ -763,10 +763,9 @@ class BGEM3OnnxManager:
         repo: str | None = None,
         revision: str | None = None,
     ) -> None:
-        self.repo: str = repo or os.getenv("POWER_BGE_M3_ONNX_REPO") or BGE_M3_PINNED_REPO
-        self.revision: str = (
-            revision or os.getenv("POWER_BGE_M3_ONNX_REVISION") or BGE_M3_PINNED_REVISION
-        )
+        configured_repo, configured_revision = _configured_bge_identity()
+        self.repo = repo or configured_repo
+        self.revision = revision or configured_revision
         self.model_name = f"{self.repo}@{self.revision}"
         self._session: Any | None = None
         self._tokenizer: Any | None = None
@@ -933,9 +932,10 @@ def _get_embedding_manager_unlocked(
             ) from e
 
     if effective_provider == "ollama":
-        key = f"ollama:{model_name or OLLAMA_EMBED_MODEL}"
+        configured_model = model_name or os.getenv("POWER_OLLAMA_EMBED_MODEL") or OLLAMA_EMBED_MODEL
+        key = f"ollama:{configured_model}"
         if key not in _EMBED_MANAGER_CACHE:
-            _EMBED_MANAGER_CACHE[key] = OllamaEmbeddingManager(model_name or OLLAMA_EMBED_MODEL)
+            _EMBED_MANAGER_CACHE[key] = OllamaEmbeddingManager(configured_model)
         return _EMBED_MANAGER_CACHE[key]  # type: ignore[return-value]
     if effective_provider == "qwen3":
         configured_model = model_name or os.getenv("POWER_QWEN3_EMBED_MODEL") or QWEN3_EMBED_MODEL

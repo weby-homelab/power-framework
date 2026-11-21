@@ -208,14 +208,20 @@ def test_dense_sync_reuses_only_unchanged_chunk_inputs(
 
 
 @pytest.mark.parametrize(
-    ("model", "dimension", "error"),
+    ("model", "dimension", "error", "force_rebuild"),
     [
-        ("different", 3, "embedding manager identity changed"),
-        ("configured", 2, "dense chunk vectors have inconsistent dimensions"),
+        ("different", 3, "embedding manager identity changed", False),
+        ("different", 3, "embedding manager identity changed", True),
+        ("configured", 2, "dense chunk vectors have inconsistent dimensions", False),
     ],
 )
-def test_incremental_sync_rejects_incompatible_manager_output(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, model: str, dimension: int, error: str
+def test_dense_sync_rejects_incompatible_manager_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    model: str,
+    dimension: int,
+    error: str,
+    force_rebuild: bool,
 ) -> None:
     monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
@@ -249,7 +255,7 @@ def test_incremental_sync_rejects_incompatible_manager_output(
         index_sync, "_get_embedding_manager", lambda: FixtureEmbedder(model, dimension)
     )
     with pytest.raises(IndexGenerationError, match=error):
-        sync_vault_atomically(vault, sync_embeddings=True)
+        sync_vault_atomically(vault, sync_embeddings=True, force_rebuild=force_rebuild)
     assert _active_db(vault) == before
 
 
@@ -921,6 +927,11 @@ def test_empty_legacy_dense_migration_writes_zero_count_manifest(
             return [[0.0, 0.0, 0.0] for _ in texts]
 
     monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: EmptyDenseManager())
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (EmptyDenseManager.__name__, EmptyDenseManager.model_name),
+    )
 
     report = sync_vault_atomically(vault, sync_embeddings=True, force_rebuild=True)
 
@@ -984,6 +995,11 @@ def test_nonempty_legacy_dense_migration_rewrites_manifest_from_new_rows(
             return [[float(index), 1.0, 0.0] for index, _ in enumerate(texts)]
 
     monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: DenseMigrationManager())
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (DenseMigrationManager.__name__, DenseMigrationManager.model_name),
+    )
 
     report = sync_vault_atomically(vault, sync_embeddings=True, force_rebuild=True)
 
