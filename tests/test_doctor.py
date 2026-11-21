@@ -267,21 +267,15 @@ def test_discovery_does_not_recover_a_rollback_journal(
         conn.commit()
 
     # Interrupt a fixed fixture program; the temporary database path is its only argument.
-    subprocess.run(  # noqa: S603
-        [
-            sys.executable,
-            "-c",
-            "import os, sqlite3, sys\n"
-            "db = sqlite3.connect(sys.argv[1])\n"
-            "db.execute('PRAGMA journal_mode=DELETE')\n"
-            "db.execute('PRAGMA cache_size=1')\n"
-            "db.execute('UPDATE journal_fixture SET payload=randomblob(262144)')\n"
-            "os._exit(0)\n",
-            str(database),
-        ],
-        check=True,
-        timeout=10,
+    writer = (
+        "import os, sqlite3, sys\n"
+        "db = sqlite3.connect(sys.argv[1])\n"
+        "db.execute('PRAGMA journal_mode=DELETE')\n"
+        "db.execute('PRAGMA cache_size=1')\n"
+        "db.execute('UPDATE journal_fixture SET payload=randomblob(262144)')\n"
+        "os._exit(0)\n"
     )
+    subprocess.run([sys.executable, "-c", writer, str(database)], check=True, timeout=10)  # noqa: S603
     original = database.read_bytes(), journal.read_bytes()
     control = tmp_path / "control.db"
     control_journal = tmp_path / "control.db-journal"
