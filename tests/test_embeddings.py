@@ -640,6 +640,27 @@ class TestEmbeddingManager:
         with pytest.raises(RuntimeError, match=r"model_sha256_mismatch:model\.onnx"):
             embeddings._verify_sha256(str(artifact), "0" * 64)
 
+    def test_empty_bge_overrides_keep_pinned_identity(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_EMBED_PROVIDER", "bge-m3")
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REPO", "")
+        monkeypatch.setenv("POWER_BGE_M3_ONNX_REVISION", "")
+        manager = embeddings.BGEM3OnnxManager()
+        assert manager.repo == embeddings.BGE_M3_PINNED_REPO
+        assert manager.revision == embeddings.BGE_M3_PINNED_REVISION
+        assert embeddings.configured_embedding_identity() == (
+            "BGEM3OnnxManager",
+            manager.model_name,
+        )
+
+    def test_ollama_manager_uses_current_configured_identity(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("POWER_EMBED_PROVIDER", "ollama")
+        monkeypatch.setenv("POWER_OLLAMA_EMBED_MODEL", "fixture:1")
+        monkeypatch.setattr(embeddings, "_EMBED_MANAGER_CACHE", {})
+        manager = embeddings.get_embedding_manager()
+        assert embeddings.configured_embedding_identity() == ("OllamaEmbeddingManager", "fixture:1")
+        assert isinstance(manager, embeddings.OllamaEmbeddingManager)
+        assert manager.model_name == "fixture:1"
+
     def test_unknown_provider_fails_closed(self, monkeypatch: pytest.MonkeyPatch):
         """WTF #3 remediation: an unknown POWER_EMBED_PROVIDER must raise
         RuntimeError instead of silently falling back to a default backend."""

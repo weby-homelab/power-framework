@@ -1191,6 +1191,11 @@ class TestFtsOnlyDenseGuard:
         from power_framework.core.cli import _cmd_init
 
         monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: deterministic_embedder)
+        monkeypatch.setattr(
+            index_sync,
+            "_configured_embedding_identity",
+            lambda: index_sync._embedding_manifest_identity(deterministic_embedder),
+        )
 
         vault = tmp_path / "vault"
         _cmd_init(argparse.Namespace(path=str(vault)))

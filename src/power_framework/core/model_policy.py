@@ -376,8 +376,13 @@ def acquire_model_files(
     canonical_license: str,
     canonical_hashes: Mapping[str, str],
     custom_license: str | None = None,
+    runtime_directory: Path | None = None,
 ) -> dict[str, str]:
-    """Authorize, acquire, and verify a direct HF model snapshot."""
+    """Acquire verified files, optionally staging symlinked snapshots for ONNX.
+
+    ``runtime_directory`` must be a private, empty temporary directory owned
+    by the caller, which must keep it alive while the loader may reopen the files.
+    """
     spec = resolve_model(
         operation=operation,
         repo=repo,
@@ -391,7 +396,30 @@ def acquire_model_files(
         canonical_hashes=canonical_hashes,
         custom_license=custom_license,
     )
-    return _acquire_resolved_model(spec, operation)
+    paths = _acquire_resolved_model(spec, operation)
+    if runtime_directory is None or all(
+        Path(path).absolute() == Path(path).resolve() for path in paths.values()
+    ):
+        return paths
+
+    # ONNX Runtime may require external data to reside beside the model as
+    # regular files. Copy only the pinned manifest, preserving relative names
+    # and rechecking the bytes actually handed to the loader.
+    if runtime_directory.is_symlink() or not runtime_directory.is_dir():
+        raise ModelIntegrityError("invalid_model_runtime_directory")
+    try:
+        if any(runtime_directory.iterdir()):
+            raise ModelIntegrityError("model_runtime_directory_not_empty")
+        staged = {}
+        for filename, _digest in spec.files:
+            destination = runtime_directory / filename
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with Path(paths[filename]).open("rb") as source, destination.open("xb") as target:
+                shutil.copyfileobj(source, target, length=8 * 1024 * 1024)
+            staged[filename] = str(destination)
+        return verify_model_files(spec, staged)
+    except OSError as exc:
+        raise ModelIntegrityError("model_runtime_staging_failed") from exc
 
 
 def _split_model_reference(model_reference: str) -> tuple[str, str]:

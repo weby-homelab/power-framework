@@ -111,6 +111,56 @@ def _fake_hub(calls: list[str], paths: dict[str, str], *, failure: bool = False)
     return module
 
 
+def test_onnx_runtime_stages_only_pinned_symlinked_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, revision = "org/model", "a" * 40
+    hub = tmp_path / "hub"
+    repo_cache = hub / "models--org--model"
+    snapshot = repo_cache / "snapshots" / revision
+    (snapshot / "onnx").mkdir(parents=True)
+    blobs = repo_cache / "blobs"
+    blobs.mkdir()
+    hashes = {}
+    for filename in ("onnx/model.onnx", "onnx/model.onnx_data", "tokenizer.json"):
+        data = f"synthetic fixture for {filename}".encode()
+        digest = hashlib.sha256(data).hexdigest()
+        hashes[filename] = digest
+        blob = blobs / digest
+        blob.write_bytes(data)
+        (snapshot / filename).symlink_to(blob)
+    (snapshot / "extra.txt").touch()
+    runtime = tmp_path / "private-runtime"
+    runtime.mkdir(mode=0o700)
+    monkeypatch.setenv("HF_HUB_CACHE", str(hub))
+    monkeypatch.setenv("POWER_MODEL_OFFLINE", "1")
+
+    paths = model_policy.acquire_model_files(
+        operation=EgressOperation.EMBEDDINGS,
+        repo=repo,
+        revision=revision,
+        provider="bge-m3-onnx",
+        required_files=tuple(hashes),
+        canonical_repo=repo,
+        canonical_revision=revision,
+        canonical_provider="bge-m3-onnx",
+        canonical_license="MIT",
+        canonical_hashes=hashes,
+        runtime_directory=runtime,
+    )
+
+    assert set(paths) == set(hashes)
+    for name, path in paths.items():
+        materialized = runtime / name
+        assert path == str(materialized)
+        assert not materialized.is_symlink()
+        assert hashlib.sha256(materialized.read_bytes()).hexdigest() == hashes[name]
+        assert (snapshot / name).is_symlink()
+    assert {p.relative_to(runtime).as_posix() for p in runtime.rglob("*") if p.is_file()} == set(
+        hashes
+    )
+
+
 @pytest.mark.parametrize("policy", [None, "deny"])
 def test_default_or_explicit_deny_rejects_before_hf_network(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, policy: str | None

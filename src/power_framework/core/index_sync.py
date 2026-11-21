@@ -99,10 +99,8 @@ def _sync_vault_to_db(
             on every FTS search/index. Set True only when vector or semantic
             search actually needs the dense embeddings.
         force_rebuild: Wipe the dense-embedding tables before the pass so every
-            note is re-embedded. Required after a provider / dimension change
-            (e.g. MiniLM 384d -> BGE-M3 1024d) because the incremental sync
-            only revisits files whose ``mtime`` changed and would otherwise keep
-            stale vectors of the old dimensionality.
+            note is re-embedded. A change in the configured provider or model
+            also triggers a rebuild, even when the files have not changed.
         allow_low_memory: Optional explicit override for the pre-flight memory
             estimate check when ``sync_embeddings`` is True.
 
@@ -114,25 +112,27 @@ def _sync_vault_to_db(
     """
     embedding_limits = sync_memory.validated_embedding_limits() if sync_embeddings else None
     cursor = conn.cursor()
+    rebuild_dense = False
     if sync_embeddings:
+        provider, model = _configured_embedding_identity()
         chunk_cnt = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
         dense_manifest = dict(
             cursor.execute("SELECT manifest_key, manifest_value FROM dense_index_manifest")
         )
         schema_stale = dense_manifest.get("schema_version") != DENSE_INDEX_SCHEMA_VERSION
-        if force_rebuild or chunk_cnt == 0 or schema_stale:
+        identity_stale = (provider, model) != (
+            dense_manifest.get("embedding_provider"),
+            dense_manifest.get("embedding_model"),
+        )
+        rebuild_dense = force_rebuild or chunk_cnt == 0 or schema_stale or identity_stale
+        if rebuild_dense:
             logger.info(
-                "Dense embeddings missing, stale, or force rebuild requested: resetting mtime ..."
+                "Dense embeddings missing, incompatible, or force rebuild requested: rebuilding"
             )
-            try:
-                cursor.execute("DELETE FROM doc_embeddings")
-                cursor.execute("DELETE FROM chunk_embeddings")
-                cursor.execute("DELETE FROM dense_index_manifest")
-                cursor.execute("UPDATE file_metadata SET mtime = 0")
-                conn.commit()
-            except sqlite3.OperationalError:
-                logger.warning("Embedding tables locked (concurrent sync?), skipping reset")
-                conn.rollback()
+            # A failed reset must abort rather than re-label vectors from the old model.
+            cursor.execute("DELETE FROM doc_embeddings")
+            cursor.execute("DELETE FROM chunk_embeddings")
+            cursor.execute("DELETE FROM dense_index_manifest")
 
     disk_files: dict[str, float] = {}
     for filepath in iter_vault_markdown_files(vault_dir):
@@ -175,7 +175,7 @@ def _sync_vault_to_db(
     # have failed mid-embedding (e.g. OOM under a RAM limit). Don't trust the
     # mtime cache in that case — re-embed every file so the index isn't left
     # silently empty. Otherwise semantic search returns [] for valid queries.
-    if sync_embeddings:
+    if sync_embeddings and not rebuild_dense:
         try:
             existing_chunks = cursor.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()[0]
             existing_meta = cursor.execute("SELECT COUNT(*) FROM file_metadata").fetchone()[0]
@@ -184,9 +184,7 @@ def _sync_vault_to_db(
                     "Embedding tables empty but %d files indexed; forcing re-embed",
                     existing_meta,
                 )
-                cursor.execute("UPDATE file_metadata SET mtime = 0")
-                conn.commit()
-                db_files = dict.fromkeys(db_files, 0.0)
+                rebuild_dense = True
         except Exception as e:
             logger.warning("Embedding recovery check failed: %s", e)
 
@@ -197,7 +195,7 @@ def _sync_vault_to_db(
     for idx, (rel_path, mtime) in enumerate(disk_files.items()):
         if idx % 50 == 0:
             logger.info("Sync scan: %d/%d (%s)", idx, len(disk_files), rel_path)
-        if rel_path not in db_files or db_files[rel_path] != mtime:
+        if rebuild_dense or rel_path not in db_files or db_files[rel_path] != mtime:
             filepath = vault_dir / rel_path
             try:
                 content = read_file_content(filepath)
@@ -332,6 +330,11 @@ def _sync_vault_to_db(
     chunker = SemanticChunker()
     files_seen = len(changed)
     files_projected = 0
+    reused_chunks = 0
+    try:
+        reusable_width = 0 if rebuild_dense else 4 * int(dense_manifest["embedding_dimension"])
+    except (KeyError, ValueError):
+        reusable_width = 0
     for rel_path, content, metadata, mtime in changed:
         try:
             full_text = " ".join(
@@ -339,7 +342,6 @@ def _sync_vault_to_db(
             )
             doc_items.append((rel_path, full_text, mtime))
 
-            cursor.execute("DELETE FROM chunk_embeddings WHERE rel_path = ?", (rel_path,))
             # B6 (POWER 3.0): short notes (<200 tokens) get a single whole-document
             # chunk instead of semantic splitting. Splitting a tiny note yields
             # either 0 chunks (lost from dense retrieval) or fragments that lose
@@ -354,21 +356,36 @@ def _sync_vault_to_db(
                 chunks = chunker.chunk(
                     content, title=metadata.title, description=metadata.description
                 )
+            # Reuse only exact embedding input within this note and the
+            # compatible model/schema. Keep the new generation's chunk IDs.
+            reusable: dict[str, bytes] = {}
+            if reusable_width > 0:
+                for old_text, vector in cursor.execute(
+                    "SELECT content, embedding FROM chunk_embeddings "
+                    "WHERE rel_path = ? ORDER BY chunk_id",
+                    (rel_path,),
+                ):
+                    if isinstance(vector, bytes) and len(vector) == reusable_width:
+                        reusable.setdefault(old_text, vector)
+            cursor.execute("DELETE FROM chunk_embeddings WHERE rel_path = ?", (rel_path,))
             source_content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
             for i, chunk_text in enumerate(chunks):
-                chunk_items.append(
-                    (
-                        _stable_chunk_id(
-                            source_content_hash,
-                            _chunk_section_identity(chunk_text, i),
-                            chunk_text,
-                            ordinal=i,
-                        ),
-                        rel_path,
-                        chunk_text,
-                        mtime,
-                    )
+                chunk_id = _stable_chunk_id(
+                    source_content_hash,
+                    _chunk_section_identity(chunk_text, i),
+                    chunk_text,
+                    ordinal=i,
                 )
+                vector = reusable.get(chunk_text)
+                if vector is None:
+                    chunk_items.append((chunk_id, rel_path, chunk_text, mtime))
+                else:
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO chunk_embeddings "
+                        "(chunk_id, rel_path, embedding, content, mtime) VALUES (?, ?, ?, ?, ?)",
+                        (chunk_id, rel_path, vector, chunk_text, mtime),
+                    )
+                    reused_chunks += 1
             files_projected += 1
         except Exception as exc:
             logger.exception(
@@ -384,24 +401,21 @@ def _sync_vault_to_db(
 
     logger.info(
         "Chunk projection complete: files_seen=%d files_projected=%d files_excluded=0 "
-        "projected_chunks=%d",
+        "chunks_to_embed=%d reused_chunks=%d",
         files_seen,
         files_projected,
         len(chunk_items),
+        reused_chunks,
     )
 
-    provider, model = _configured_embedding_identity()
     item_count = len(doc_items) + len(chunk_items)
     if (
         item_count == 0
         and not to_delete
         and not invalid_changed
-        and not force_rebuild
-        and not schema_stale
+        and not rebuild_dense
         and chunk_cnt > 0
         and dense_manifest.get("chunk_count") == str(chunk_cnt)
-        and dense_manifest.get("embedding_provider") == provider
-        and dense_manifest.get("embedding_model") == model
         and dense_manifest.get("embedding_dimension") not in (None, "", "0")
     ):
         logger.info("Dense index already up-to-date (%d chunks); skipping embedder load", chunk_cnt)
@@ -423,6 +437,9 @@ def _sync_vault_to_db(
     )
 
     embedder = _get_embedding_manager()
+    actual_provider, actual_model = _embedding_manifest_identity(embedder)
+    if (actual_provider, actual_model) != (provider, model):
+        raise RuntimeError("embedding manager identity changed from the configured model")
 
     _embed_and_store(
         embedder,
@@ -434,9 +451,11 @@ def _sync_vault_to_db(
         limits=embedding_limits,
     )
     dense_row = cursor.execute(
-        "SELECT COUNT(*), MIN(LENGTH(embedding)) FROM chunk_embeddings"
+        "SELECT COUNT(*), MIN(LENGTH(embedding)), MAX(LENGTH(embedding)) FROM chunk_embeddings"
     ).fetchone()
-    dense_count, embedding_bytes = dense_row
+    dense_count, embedding_bytes, max_embedding_bytes = dense_row
+    if dense_count and embedding_bytes != max_embedding_bytes:
+        raise RuntimeError("dense chunk vectors have inconsistent dimensions")
     if dense_count and embedding_bytes and embedding_bytes % 4 == 0:
         embedding_dimension = embedding_bytes // 4
     elif dense_count == 0:
@@ -452,15 +471,14 @@ def _sync_vault_to_db(
         conn.commit()
         return
 
-    provider, model = _embedding_manifest_identity(embedder)
     cursor.executemany(
         "INSERT OR REPLACE INTO dense_index_manifest (manifest_key, manifest_value) VALUES (?, ?)",
         [
             ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
             ("embedding_dimension", str(embedding_dimension)),
             ("chunk_count", str(dense_count)),
-            ("embedding_provider", provider),
-            ("embedding_model", model),
+            ("embedding_provider", actual_provider),
+            ("embedding_model", actual_model),
         ],
     )
     conn.commit()
