@@ -6,7 +6,10 @@ import math
 import os
 import threading
 import time
-from contextlib import contextmanager
+import weakref
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Protocol
 
 from power_framework.core.egress import EgressOperation
@@ -236,9 +239,10 @@ class BGEM3Reranker:
     def _lazy_init(self) -> None:
         if self._session is not None:
             return
-        with _BGE_RERANKER_INIT_LOCK:
+        with _BGE_RERANKER_INIT_LOCK, ExitStack() as stack:
             if self._session is not None:
                 return
+            runtime = Path(stack.enter_context(TemporaryDirectory(prefix="power-onnx-")))
             model_files = acquire_model_files(
                 operation=EgressOperation.RERANKING,
                 repo=self.repo,
@@ -255,6 +259,7 @@ class BGEM3Reranker:
                     "tokenizer.json": BGE_RERANKER_FILE_SHA256["tokenizer.json"],
                 },
                 custom_license="Apache-2.0",
+                runtime_directory=runtime,
             )
             try:
                 import onnxruntime as ort
@@ -290,6 +295,9 @@ class BGEM3Reranker:
                 probe = self._rerank_raw("probe query", "probe passage")
                 if probe is None or len(probe) != 1:
                     raise RuntimeError("bge_reranker_onnx_probe_failed")
+                if Path(model_path).is_relative_to(runtime):
+                    # ORT can reopen the model path on execution-provider fallback.
+                    weakref.finalize(self, stack.pop_all().close)
             except Exception:
                 self._session = None
                 self._tokenizer = None

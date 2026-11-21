@@ -6,7 +6,10 @@ import logging
 import os
 import signal
 import threading
+import weakref
+from contextlib import ExitStack
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, cast
 
 from power_framework.core.egress import EgressOperation, validate_local_ollama_endpoint
@@ -777,9 +780,10 @@ class BGEM3OnnxManager:
     def _lazy_init(self) -> None:
         if self._session is not None:
             return
-        with _BGE_M3_INIT_LOCK:
+        with _BGE_M3_INIT_LOCK, ExitStack() as stack:
             if self._session is not None:
                 return
+            runtime = Path(stack.enter_context(TemporaryDirectory(prefix="power-onnx-")))
             try:
                 model_files = acquire_model_files(
                     operation=EgressOperation.EMBEDDINGS,
@@ -793,6 +797,7 @@ class BGEM3OnnxManager:
                     canonical_license="MIT",
                     canonical_hashes=BGE_M3_FILE_SHA256,
                     custom_license="MIT",
+                    runtime_directory=runtime,
                 )
                 import onnxruntime as ort
                 from tokenizers import Tokenizer
@@ -830,6 +835,9 @@ class BGEM3OnnxManager:
                 probe = self._embed_raw(["probe"])
                 if probe is None or len(probe) != 1 or len(probe[0]) != self._dim:
                     raise RuntimeError("bge_m3_onnx_probe_failed")
+                if Path(model_path).is_relative_to(runtime):
+                    # ORT can reopen the model path on execution-provider fallback.
+                    weakref.finalize(self, stack.pop_all().close)
             except Exception:
                 self._session = None
                 self._tokenizer = None

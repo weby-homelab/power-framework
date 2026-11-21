@@ -28,6 +28,7 @@ from power_framework.core.searcher import _sync_vault_to_db, search_vault
 from power_framework.core.vault_storage import ensure_vault_identity, vault_db_path
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
 
@@ -52,6 +53,204 @@ def _active_db(vault: Path) -> Path:
     active = resolve_active_generation_path(vault)
     assert active is not None
     return active
+
+
+def test_embedding_model_switch_rebuilds_unchanged_vectors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "model-change", "stable-token")
+    requested_model = "fixture-a"
+    calls: list[tuple[str, ...]] = []
+
+    class FixtureEmbedder:
+        def __init__(self) -> None:
+            self.model_name = requested_model
+
+        def embed_batch(self, texts: Sequence[str], batch_size: int = 8) -> list[list[float]]:
+            calls.append(tuple(texts))
+            vector = [1.0, 0.0, 0.0] if self.model_name == "fixture-a" else [0.0, 1.0, 0.0]
+            return [vector for _ in texts]
+
+    def read_active() -> tuple[str, bytes]:
+        path = _active_db(vault)
+        with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as conn:
+            model = conn.execute(
+                "SELECT manifest_value FROM dense_index_manifest "
+                "WHERE manifest_key = 'embedding_model'"
+            ).fetchone()[0]
+            vector = conn.execute("SELECT embedding FROM chunk_embeddings").fetchone()[0]
+        assert isinstance(model, str)
+        assert isinstance(vector, bytes)
+        return model, vector
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", FixtureEmbedder)
+    monkeypatch.setattr(
+        index_sync, "_configured_embedding_identity", lambda: ("FixtureEmbedder", requested_model)
+    )
+    sync_vault_atomically(vault, sync_embeddings=True)
+    first_model, first_vector = read_active()
+    assert first_model == "fixture-a"
+
+    calls.clear()
+    sync_vault_atomically(vault, sync_embeddings=True)
+    assert not calls
+    assert read_active() == (first_model, first_vector)
+
+    requested_model = "fixture-b"
+    sync_vault_atomically(vault, sync_embeddings=True)
+    next_model, next_vector = read_active()
+    assert next_model == "fixture-b"
+    assert len(next_vector) == len(first_vector)
+    assert next_vector != first_vector
+    assert calls
+
+
+def test_same_mtime_edit_only_reembeds_changed_note(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "same-mtime", "alpha-original-token")
+    changed = vault / "01_Projects" / "Test.md"
+    (changed.parent / "Unchanged.md").write_text(
+        changed.read_text(encoding="utf-8").replace("alpha-original-token", "untouched-token"),
+        encoding="utf-8",
+    )
+    embedded: list[str] = []
+
+    class FixtureEmbedder:
+        model_name = "same-mtime-test"
+
+        def embed_batch(self, texts: Sequence[str], batch_size: int = 8) -> list[list[float]]:
+            embedded.extend(texts)
+            return [[1.0, 0.0, 0.0] for _ in texts]
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", FixtureEmbedder)
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (FixtureEmbedder.__name__, FixtureEmbedder.model_name),
+    )
+    sync_vault_atomically(vault, sync_embeddings=True)
+    embedded.clear()
+    stat = changed.stat()
+    changed.write_text(
+        changed.read_text(encoding="utf-8").replace("alpha-original-token", "bravo-modified-token"),
+        encoding="utf-8",
+    )
+    os.utime(changed, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    assert changed.stat().st_mtime_ns == stat.st_mtime_ns
+    assert changed.stat().st_size == stat.st_size
+
+    sync_vault_atomically(vault, sync_embeddings=True)
+    assert search_vault(vault, "bravo-modified-token", mode="fts")
+    assert not search_vault(vault, "alpha-original-token", mode="fts")
+    assert len(embedded) == 2  # One document and one chunk.
+    assert all("bravo-modified-token" in text for text in embedded)
+
+
+def test_dense_sync_reuses_only_unchanged_chunk_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "chunk-reuse", "preamble")
+    note = vault / "01_Projects" / "Test.md"
+    frontmatter = note.read_text(encoding="utf-8").split("preamble", 1)[0]
+    stable = "## Stable\n" + "stableword " * 220 + "\n\n"
+    original = "## Edited\n" + "originalword " * 10 + "\n\n"
+    revised = original.replace("originalword", "revisionword")
+    removed = "## Removed\n" + "removedword " * 10 + "\n"
+    note.write_text(frontmatter + stable + original + removed, encoding="utf-8")
+    embedded: list[str] = []
+
+    class FixtureEmbedder:
+        model_name = "exact-input-test"
+
+        def embed_batch(self, texts: Sequence[str], batch_size: int = 8) -> list[list[float]]:
+            embedded.extend(texts)
+            return [[float(len(text)), 0.0, 1.0] for text in texts]
+
+    def read_chunks() -> dict[str, tuple[str, bytes]]:
+        path = _active_db(vault)
+        with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as conn:
+            return {
+                content: (chunk_id, vector)
+                for chunk_id, content, vector in conn.execute(
+                    "SELECT chunk_id, content, embedding FROM chunk_embeddings"
+                )
+            }
+
+    monkeypatch.setattr(index_sync, "_get_embedding_manager", FixtureEmbedder)
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (FixtureEmbedder.__name__, FixtureEmbedder.model_name),
+    )
+    sync_vault_atomically(vault, sync_embeddings=True)
+    before = read_chunks()
+    assert len(before) == 3
+    stable_input = next(text for text in before if "stableword" in text)
+    embedded.clear()
+    note.write_text(frontmatter + stable + revised, encoding="utf-8")
+
+    sync_vault_atomically(vault, sync_embeddings=True)
+
+    after = read_chunks()
+    assert len(after) == 2
+    assert all("removedword" not in text and "originalword" not in text for text in after)
+    assert after[stable_input][1] == before[stable_input][1]
+    assert after[stable_input][0] != before[stable_input][0]
+    assert len(embedded) == 2  # Full document and edited chunk only.
+    assert all("revisionword" in text for text in embedded)
+
+
+@pytest.mark.parametrize(
+    ("model", "dimension", "error"),
+    [
+        ("different", 3, "embedding manager identity changed"),
+        ("configured", 2, "dense chunk vectors have inconsistent dimensions"),
+    ],
+)
+def test_incremental_sync_rejects_incompatible_manager_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, model: str, dimension: int, error: str
+) -> None:
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    vault = _vault(tmp_path, "incompatible-output", "stable-token")
+
+    class FixtureEmbedder:
+        def __init__(self, model_name: str, width: int) -> None:
+            self.model_name = model_name
+            self.width = width
+
+        def embed_batch(self, texts: Sequence[str], batch_size: int = 8) -> list[list[float]]:
+            return [[1.0] * self.width for _ in texts]
+
+    monkeypatch.setattr(
+        index_sync, "_get_embedding_manager", lambda: FixtureEmbedder("configured", 3)
+    )
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (FixtureEmbedder.__name__, "configured"),
+    )
+    sync_vault_atomically(vault, sync_embeddings=True)
+    before = _active_db(vault)
+
+    note = vault / "01_Projects" / "Test.md"
+    (note.parent / "Added.md").write_text(
+        note.read_text(encoding="utf-8").replace("stable-token", "added-token"),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        index_sync, "_get_embedding_manager", lambda: FixtureEmbedder(model, dimension)
+    )
+    with pytest.raises(IndexGenerationError, match=error):
+        sync_vault_atomically(vault, sync_embeddings=True)
+    assert _active_db(vault) == before
 
 
 def test_snapshot_hash_matches_projection_for_prefix_colliding_paths(
@@ -832,6 +1031,11 @@ def test_concurrent_edit_during_sync_reconciles_without_reembedding_unchanged_no
             return [[1.0, 0.0, 0.0] for _ in texts]
 
     monkeypatch.setattr(index_sync, "_get_embedding_manager", lambda: SpyEmbedder())
+    monkeypatch.setattr(
+        index_sync,
+        "_configured_embedding_identity",
+        lambda: (SpyEmbedder.__name__, SpyEmbedder.model_name),
+    )
 
     original_sync = generation_index._sync_vault_to_db
     sync_calls = 0
