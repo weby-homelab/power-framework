@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Any
+import os
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from power_framework.core.application import ApplicationService
+from power_framework.core.vault_storage import existing_vault_cache_dir
 from scripts.run_living_benchmark import (
     DEFAULT_DATASET_DIR,
+    _gates_pass,
+    _hash_benchmark_storage,
     load_dataset,
     run_living_benchmark,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _assert_all_invariants_zero(mode_report: dict[str, Any]) -> None:
@@ -74,6 +82,61 @@ def test_living_benchmark_fast_mode_invariants_and_quality() -> None:
     assert summary["mrr"] >= 0.50
     assert summary["ndcg_at_10"] >= 0.55
     assert fast["by_group"]["core"]["recall_at_5"] >= 0.80
+
+
+def test_living_benchmark_detects_query_side_cache_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = tmp_path / "vault"
+    caller_cache = tmp_path / "caller-cache"
+    caller_db = tmp_path / "caller.db"
+    caller_db.write_bytes(b"untouched")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(caller_cache))
+    monkeypatch.setenv("POWER_SEARCH_DB", str(caller_db))
+    original = ApplicationService.compile_context
+    written_files: list[Path] = []
+
+    def compile_with_cache_write(self: ApplicationService, **kwargs: Any) -> Any:
+        result = original(self, **kwargs)
+        cache = existing_vault_cache_dir(vault)
+        assert cache is not None
+        marker = cache / "unexpected-query-write"
+        # The second read restores the original file tree. The first read must
+        # still count as a violation.
+        if marker.exists():
+            marker.unlink()
+        else:
+            marker.write_bytes(b"query wrote outside the vault")
+            written_files.append(marker)
+        return result
+
+    monkeypatch.setattr(ApplicationService, "compile_context", compile_with_cache_write)
+    report = run_living_benchmark(modes=("FAST",), vault_dir=vault)
+
+    assert report["modes"]["FAST"]["invariants"]["query_side_writes"] == report["query_count"]
+    assert _gates_pass(report)[0] is False
+    assert written_files
+    assert not written_files[0].parent.exists()
+    assert not caller_cache.exists()
+    assert caller_db.read_bytes() == b"untouched"
+    assert os.environ["XDG_CACHE_HOME"] == str(caller_cache)
+    assert os.environ["POWER_SEARCH_DB"] == str(caller_db)
+
+
+def test_living_benchmark_hashes_nonempty_sqlite_wal(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    cache = tmp_path / "cache"
+    vault.mkdir()
+    cache.mkdir()
+    (cache / "index.db").write_bytes(b"database")
+    (cache / "index.db-shm").write_bytes(b"read coordination")
+    wal = cache / "index.db-wal"
+    wal.touch()
+
+    before = _hash_benchmark_storage(vault, cache)
+    assert set(before[1]) == {"index.db"}
+    wal.write_bytes(b"pending database writes")
+    assert set(_hash_benchmark_storage(vault, cache)[1]) == {"index.db", "index.db-wal"}
 
 
 def test_living_benchmark_balanced_real_dense_beats_fast_on_semantic_paraphrases() -> None:

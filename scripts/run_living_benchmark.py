@@ -19,6 +19,7 @@ import contextlib
 import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import sqlite3
@@ -56,6 +57,7 @@ from power_framework.core.searcher import (  # noqa: E402
     configured_embedding_identity,
 )
 from power_framework.core.task_service import TaskService  # noqa: E402
+from power_framework.core.vault_storage import existing_vault_cache_dir  # noqa: E402
 
 DEFAULT_DATASET_DIR = _REPO_ROOT / "benchmarks" / "power38" / "living_regression"
 _AUTHORITY_RANK = {
@@ -88,14 +90,31 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _hash_vault_tree(vault_dir: Path) -> dict[str, str]:
-    """Compute a deterministic SHA-256 manifest of all files inside vault_dir."""
-    root = vault_dir.resolve()
+def _hash_tree(root: Path, *, sqlite_cache: bool = False) -> dict[str, str]:
+    """Compute a deterministic SHA-256 manifest of all files inside root."""
     hashes: dict[str, str] = {}
     for path in sorted(root.rglob("*")):
-        if path.is_file():
-            hashes[path.relative_to(root).as_posix()] = _sha256_file(path)
+        if not path.is_file():
+            continue
+        if sqlite_cache and (
+            (path.name.endswith(".db-shm") and path.with_suffix(".db").is_file())
+            or (
+                path.name.endswith(".db-wal")
+                and path.with_suffix(".db").is_file()
+                and path.stat().st_size == 0
+            )
+        ):
+            # Read-only SQLite connections can initialize SHM and an empty WAL.
+            # Keep hashing database files and any WAL that contains data.
+            continue
+        hashes[path.relative_to(root).as_posix()] = _sha256_file(path)
     return hashes
+
+
+def _hash_benchmark_storage(
+    vault_root: Path, cache_root: Path
+) -> tuple[dict[str, str], dict[str, str]]:
+    return _hash_tree(vault_root), _hash_tree(cache_root, sqlite_cache=True)
 
 
 def compute_recall_at_k(retrieved: Sequence[str], relevant: set[str], k: int) -> float:
@@ -403,7 +422,10 @@ def _run_mode(
 ) -> dict[str, Any]:
     app = ApplicationService(vault_dir)
     vault_root = vault_dir.resolve()
-    baseline_tree = _hash_vault_tree(vault_root)
+    cache_root = existing_vault_cache_dir(vault_root)
+    if cache_root is None or not cache_root.is_dir():
+        raise RuntimeError("benchmark vault cache is missing")
+    baseline_storage = _hash_benchmark_storage(vault_root, cache_root)
     default_before = _capture_default_boundary()
 
     query_side_writes = 0
@@ -435,6 +457,7 @@ def _run_mode(
             domain_hints=hints or None,
         )
         latency_ms = (time.perf_counter() - t0) * 1000.0
+        first_read_wrote = _hash_benchmark_storage(vault_root, cache_root) != baseline_storage
 
         data: dict[str, Any] = env.data
         raw_items = data.get("items")
@@ -454,7 +477,7 @@ def _run_mode(
         if json.dumps(items, sort_keys=True) != json.dumps(items2, sort_keys=True):
             determinism_mismatches += 1
 
-        if _hash_vault_tree(vault_root) != baseline_tree:
+        if first_read_wrote or _hash_benchmark_storage(vault_root, cache_root) != baseline_storage:
             query_side_writes += 1
 
         raw_budget = data.get("budget")
@@ -601,9 +624,11 @@ def run_living_benchmark(
     _canonical, _lexicon, queries = load_dataset(dataset_dir)
 
     with contextlib.ExitStack() as stack:
+        scratch = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="power_living_")))
+        stack.enter_context(patch.dict(os.environ, {"XDG_CACHE_HOME": str(scratch / "cache")}))
+        os.environ.pop("POWER_SEARCH_DB", None)
         if vault_dir is None:
-            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(prefix="power_living_"))
-            active_vault = Path(tmp_dir) / "vault"
+            active_vault = scratch / "vault"
         else:
             active_vault = Path(vault_dir).expanduser().resolve()
 
