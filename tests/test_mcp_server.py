@@ -21,6 +21,10 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from power_framework.core import __version__
 from power_framework.core.capabilities import manifest
+from power_framework.core.generation_index import (
+    resolve_active_generation_path,
+    sync_vault_atomically,
+)
 from power_framework.core.mutation import run_blocking
 from power_framework.core.parser import validate_metadata
 from power_framework.mcp import power_server
@@ -246,7 +250,11 @@ async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
     assert result["vault"]["path"] == str(sample_vault.resolve())
     assert result["embedding"]["binding"] == "not_requested"
     assert result["embedding"]["probe_requested"] is False
-    assert any(issue["code"] == "embedding_binding_not_requested" for issue in result["issues"])
+    assert result["provider_probe"] == "not_run"
+    assert result["fts_status"] == "unavailable"
+    assert result["dense_status"] == "unavailable"
+    assert result["index_freshness"] == "unknown"
+    assert not any(issue["code"] == "embedding_binding_not_requested" for issue in result["issues"])
     assert result["mcp"]["transport"] == "stdio"
     assert result["mcp"]["preferred_protocol"] == "2026-07-28"
     assert result["mcp"]["legacy_compatibility"] is True
@@ -270,6 +278,48 @@ async def test_get_server_info_is_read_only_and_does_not_probe_by_default(
     }
     assert not cache_home.exists()
     assert not (sample_vault / ".power").exists()
+
+
+async def test_ready_fts_discovery_is_not_degraded_by_unrequested_probe(
+    sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    sync_vault_atomically(sample_vault, sync_embeddings=False)
+
+    result = json.loads(await get_server_info(vault_path=str(sample_vault)))
+
+    assert result["server_status"] == result["status"] == "ok"
+    assert result["provider_probe"] == "not_run"
+    assert result["fts_status"] == "ready"
+    assert result["dense_status"] == "missing"
+    assert result["write_status"] == "approval_required"
+    assert result["lint_status"] == "not_run"
+    assert result["index_freshness"] == "fresh"
+    assert result["bootstrap"]["degraded"] == []
+
+
+async def test_search_warns_about_critical_index_even_with_no_matches(
+    sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from power_framework.core import index_freshness
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    sync_vault_atomically(sample_vault, sync_embeddings=False)
+    active = resolve_active_generation_path(sample_vault)
+    assert active is not None
+    now = active.stat().st_mtime + index_freshness.CRITICAL_AT_SECONDS
+    monkeypatch.setattr(index_freshness.time, "time", lambda: now)
+
+    result = json.loads(
+        await search_vault_tool("zzznomatchzzz", search_mode="fts", vault_path=str(sample_vault))
+    )
+
+    assert result["results"] == []
+    assert result["index_age_seconds"] == index_freshness.CRITICAL_AT_SECONDS
+    assert result["index_freshness"] == "critical"
+    assert result["index_freshness_warning"] == "index_critically_stale"
 
 
 async def test_mcp_discovery_ignores_external_search_db_override(
@@ -316,6 +366,7 @@ async def test_get_server_info_can_request_the_no_download_provider_probe(
 
     assert result["embedding"]["binding"] == "verified"
     assert result["embedding"]["probe_requested"] is True
+    assert result["provider_probe"] == "verified"
     assert not any(issue["code"] == "embedding_binding_not_requested" for issue in result["issues"])
 
 

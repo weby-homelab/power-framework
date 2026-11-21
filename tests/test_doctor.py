@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import time
+from contextlib import closing
 from pathlib import Path
 
+import pytest
 from jsonschema import validate
 
 from power_framework.core import capabilities, doctor
+from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
+from power_framework.core.db import _init_db
+from power_framework.core.index_diagnostics import read_index_status
 
 
 def _safe_embedding() -> tuple[dict[str, object], list[dict[str, str]]]:
@@ -39,6 +45,16 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
         )
     )
     validate(parsed, schema)
+    assert set(schema["properties"]) >= {
+        "server_status",
+        "provider_probe",
+        "fts_status",
+        "dense_status",
+        "write_status",
+        "lint_status",
+        "index_age_seconds",
+        "index_freshness",
+    }
 
     assert parsed["schema_version"] == doctor.DOCTOR_SCHEMA_VERSION
     assert parsed["command"] == "doctor"
@@ -89,8 +105,30 @@ def test_lightweight_discovery_skips_embedding_probe_and_cache_state(
 
     assert report["embedding"]["binding"] == "not_requested"
     assert report["embedding"]["probe_requested"] is False
-    assert report["issues"][0]["code"] == "embedding_binding_not_requested"
+    assert report["provider_probe"] == "not_run"
+    assert not any(issue["code"] == "embedding_binding_not_requested" for issue in report["issues"])
     assert not cache_home.exists()
+
+
+@pytest.mark.parametrize(
+    ("binding", "issue_code", "probe_status"),
+    [
+        ("failed", "embedding_binding_failed", "failed"),
+        ("not_supported", "embedding_probe_not_supported", "disabled"),
+        ("not_verified", "embedding_model_not_cached", "unavailable"),
+    ],
+)
+def test_doctor_distinguishes_provider_probe_outcomes(
+    monkeypatch: pytest.MonkeyPatch, binding: str, issue_code: str, probe_status: str
+) -> None:
+    monkeypatch.setattr(
+        doctor,
+        "_probe_embedding_binding",
+        lambda: ({"binding": binding}, [{"code": issue_code, "severity": "warning"}]),
+    )
+    report = doctor.run_doctor(probe_embedding=True)
+    assert report["provider_probe"] == probe_status
+    assert report["embedding"]["probe_requested"] is True
 
 
 def test_lightweight_doctor_p95_stays_below_half_second(tmp_path: Path) -> None:
@@ -103,6 +141,36 @@ def test_lightweight_doctor_p95_stays_below_half_second(tmp_path: Path) -> None:
 
     p95 = sorted(durations)[18]
     assert p95 < 0.5, f"lightweight doctor p95 exceeded 500 ms: {p95:.3f}s"
+
+
+def test_discovery_reports_manifest_compatibility_without_claiming_vector_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database = tmp_path / "index.db"
+    monkeypatch.setattr(
+        "power_framework.experimental.embeddings.configured_embedding_identity",
+        lambda: ("FixtureProvider", "fixture-model"),
+    )
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        conn.execute("INSERT INTO chunk_embeddings (chunk_id, embedding) VALUES ('fixture', X'00')")
+        conn.executemany(
+            "INSERT INTO dense_index_manifest VALUES (?, ?)",
+            (
+                ("schema_version", DENSE_INDEX_SCHEMA_VERSION),
+                ("chunk_count", "1"),
+                ("embedding_dimension", "3"),
+                ("embedding_provider", "FixtureProvider"),
+                ("embedding_model", "fixture-model"),
+            ),
+        )
+        conn.commit()
+    assert read_index_status(database) == (0, 1, "manifest_compatible")
+    monkeypatch.setattr(
+        "power_framework.experimental.embeddings.configured_embedding_identity",
+        lambda: ("FixtureProvider", "other-model"),
+    )
+    assert read_index_status(database) == (0, 1, "incompatible")
 
 
 def test_doctor_bootstrap_is_bounded_and_content_free(tmp_path: Path) -> None:

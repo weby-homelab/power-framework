@@ -24,7 +24,7 @@ def test_retrieve_data_is_identical_through_direct_api_and_cli(
     sample_vault: Path, capsys: pytest.CaptureFixture
 ) -> None:
     """CLI JSON is the same application data, not a second storage workflow."""
-    with patch("power_framework.core.searcher.time.time", return_value=2_000_000_000):
+    with patch("power_framework.core.index_freshness.time.time", return_value=2_000_000_000):
         direct = ApplicationService(sample_vault).retrieve(
             "Test",
             max_results=3,
@@ -63,7 +63,7 @@ async def test_retrieve_data_is_identical_through_local_mcp(
     sample_vault: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """MCP keeps the legacy retrieval envelope while delegating to the service."""
-    monkeypatch.setattr("power_framework.core.searcher.time.time", lambda: 2_000_000_000)
+    monkeypatch.setattr("power_framework.core.index_freshness.time.time", lambda: 2_000_000_000)
     monkeypatch.setenv("POWER_VAULT_DIR", str(sample_vault))
     direct = ApplicationService(
         sample_vault,
