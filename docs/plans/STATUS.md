@@ -31,5 +31,6 @@
 Повні результати, вимірювання й пастки середовища: [handoff 2026-11-21](https://github.com/weby-homelab/power-framework/blob/main/artifacts/project-state/handoffs/2026-11-21T002900Z_phase5e_living-benchmark_open-pr520.md).
 
 - **Змерджено:** #518 (реформа), #519 (F-01), #520 (живий бенчмарк), #521 (Phase 5F: інкрементальна dense-індексація та ONNX external data). Герметичний прогін перевіряє dense-шлях та інваріанти; якість перевіряється окремим прогоном із BGE-M3.
-- **Далі, по черзі:** PR 5 (#468/#469/#470) → PR 6 (Phase 5G + #474) → PR 7 (реліз `v3.8.0`, dogfooding 2 тижні).
+- **PR 5 (#522):** discovery (#468), MCP stdio через SSH (#469), свіжість індексу (#470).
+- **Далі після PR 5:** PR 6 (Phase 5G + #474) → PR 7 (реліз `v3.8.0`, dogfooding 2 тижні).
 - **Інваріанти:** 1 задача = 1 PR, GPG-підпис, 11/11 CI + CodeQL, protected normal merge, жодного обходу гейтів.

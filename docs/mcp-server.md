@@ -148,14 +148,21 @@ sanitize instruction-like text.
 | --- | --- |
 | `server_status` | `ok`, `degraded`, or `error` from observed diagnostics; an unrequested probe is not a fault. |
 | `provider_probe` | `not_run` by default; `verified` for a successful binding, `failed` for an attempted check that failed, `unavailable` when the required model is not cached, or `disabled` when that probe is unsupported for the configured provider. |
-| `fts_status` | `ready` when the selected index's FTS table and index counts are readable, otherwise `unavailable`. |
-| `dense_status` | `manifest_compatible` when the stored manifest matches the configured identity, schema and chunk count; `missing` for no stored chunks, `incompatible` for missing or mismatched manifest metadata, or `unavailable` for no readable index. Discovery does not validate stored vector payloads or assert provider binding. |
+| `fts_status` | `ready` when the selected index's FTS table and note count are readable, otherwise `unavailable`. Does not depend on dense tables. |
+| `dense_status` | `manifest_compatible` when the stored manifest matches the configured identity, schema and chunk count; `missing` for an empty chunk table, `incompatible` for missing or mismatched manifest metadata, or `unavailable` when no index or dense chunk count can be read. Discovery does not validate stored vector payloads or assert provider binding. |
 | `write_status` | `approval_required` with a configured vault directory, otherwise `unavailable`. This is not an authorization or filesystem-writability check. |
 | `lint_status` | `not_run` with a configured vault directory, otherwise `unavailable`. Discovery does not run the linter. |
 | `index_age_seconds`, `index_freshness` | See the [searcher freshness policy](api/searcher.md#index-freshness). |
 
 Clients that previously looked for the `embedding_binding_not_requested`
 warning should use `provider_probe: "not_run"` instead.
+
+Discovery does not recover SQLite journals or create WAL coordination files.
+If the selected index or generation state has a nonempty WAL or rollback
+journal, or changes while SQLite or the active generation is being inspected,
+discovery reports it as unavailable rather than returning potentially
+outdated counts. Retry after the writer
+finishes and the store is checkpointed. Discovery does not do the checkpoint.
 
 ## Agent-readable tool contract
 

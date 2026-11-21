@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 from .capabilities import manifest as capability_manifest
-from .coverage import get_index_coverage
+from .coverage import count_vault_notes
 from .generation_index import (
     IndexGenerationError,
     list_invalid_sources,
@@ -275,7 +275,7 @@ def _probe_vault(
         return vault, issues
 
     try:
-        active_generation = resolve_active_generation(root)
+        active_generation = resolve_active_generation(root, inspection_only=True)
         active = active_generation.path if active_generation is not None else None
     except IndexGenerationError as exc:
         vault["index_state"] = "unreadable"
@@ -341,12 +341,21 @@ def _probe_vault(
     if database is not None and database.is_file():
         vault["database_path"] = str(database)
         try:
-            indexed_notes, indexed_chunks, dense_status = read_index_status(database)
+            indexed_notes, indexed_chunks, fts_ready, dense_status = read_index_status(database)
             vault["indexed_notes"] = indexed_notes
             vault["indexed_chunks"] = indexed_chunks
-            vault["fts_status"] = "ready"
+            vault["fts_status"] = "ready" if fts_ready else "unavailable"
             vault["index_age_seconds"] = index_age_seconds(database)
             vault["dense_status"] = dense_status
+            if not fts_ready:
+                issues.append(
+                    _issue(
+                        "fts_index_unavailable",
+                        "error",
+                        "The selected index's FTS table could not be read.",
+                        "Run power sync PATH to rebuild the search index.",
+                    )
+                )
         except (OSError, sqlite3.Error) as exc:
             vault["index_state"] = "unreadable"
             issues.append(
@@ -368,14 +377,9 @@ def _probe_vault(
         )
 
     try:
-        indexed, scanned = get_index_coverage(
-            root,
-            allow_search_db_override=allow_search_db_override,
-        )
-        vault["indexed_notes"] = (
-            indexed if vault["indexed_notes"] is None else vault["indexed_notes"]
-        )
-        vault["scanned_notes"] = scanned
+        vault["scanned_notes"] = count_vault_notes(root)
+        if vault["index_state"] == "missing":
+            vault["indexed_notes"] = 0
     except Exception as exc:  # pragma: no cover - defensive filesystem boundary
         issues.append(
             _issue(

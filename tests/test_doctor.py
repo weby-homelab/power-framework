@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
+import subprocess
+import sys
 import time
 from contextlib import closing
 from pathlib import Path
@@ -12,9 +15,10 @@ from pathlib import Path
 import pytest
 from jsonschema import validate
 
-from power_framework.core import capabilities, doctor
+from power_framework.core import capabilities, doctor, generation_index
 from power_framework.core.constants import DENSE_INDEX_SCHEMA_VERSION
 from power_framework.core.db import _init_db
+from power_framework.core.generation_index import sync_vault_atomically
 from power_framework.core.index_diagnostics import read_index_status
 
 
@@ -45,7 +49,7 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
         )
     )
     validate(parsed, schema)
-    assert set(schema["properties"]) >= {
+    discovery_fields = {
         "server_status",
         "provider_probe",
         "fts_status",
@@ -55,6 +59,8 @@ def test_json_report_is_versioned_and_machine_readable(tmp_path: Path, monkeypat
         "index_age_seconds",
         "index_freshness",
     }
+    assert discovery_fields <= schema["properties"].keys()
+    assert discovery_fields <= parsed.keys()
 
     assert parsed["schema_version"] == doctor.DOCTOR_SCHEMA_VERSION
     assert parsed["command"] == "doctor"
@@ -165,12 +171,213 @@ def test_discovery_reports_manifest_compatibility_without_claiming_vector_valida
             ),
         )
         conn.commit()
-    assert read_index_status(database) == (0, 1, "manifest_compatible")
+    assert read_index_status(database) == (0, 1, True, "manifest_compatible")
     monkeypatch.setattr(
         "power_framework.experimental.embeddings.configured_embedding_identity",
         lambda: ("FixtureProvider", "other-model"),
     )
-    assert read_index_status(database) == (0, 1, "incompatible")
+    assert read_index_status(database) == (0, 1, True, "incompatible")
+
+
+def test_doctor_reads_relative_search_db_override_without_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    database = tmp_path / "relative index.db"
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        conn.commit()
+    before = database.read_bytes()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("POWER_SEARCH_DB", database.name)
+
+    report = doctor.run_doctor(vault)
+
+    assert report["server_status"] == "ok"
+    assert report["vault"]["index_state"] == "legacy_database"
+    assert report["vault"]["database_path"] == database.name
+    assert report["fts_status"] == "ready"
+    assert report["dense_status"] == "missing"
+    assert report["index_age_seconds"] is not None
+    assert database.read_bytes() == before
+    assert not list(tmp_path.glob(f"{database.name}-*"))
+    assert not (vault / ".power").exists()
+
+
+def test_doctor_preserves_fts_readiness_for_legacy_index_without_dense_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    database = tmp_path / "legacy.db"
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        conn.execute("DROP TABLE chunk_embeddings")
+        conn.commit()
+    monkeypatch.setenv("POWER_SEARCH_DB", str(database))
+
+    report = doctor.run_doctor(vault)
+
+    assert report["server_status"] == "ok"
+    assert report["vault"]["index_state"] == "legacy_database"
+    assert report["vault"]["indexed_notes"] == 0
+    assert report["vault"]["indexed_chunks"] is None
+    assert report["fts_status"] == "ready"
+    assert report["dense_status"] == "unavailable"
+    assert report["index_age_seconds"] is not None
+
+
+def test_doctor_preserves_legacy_counts_when_fts_table_is_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    database = tmp_path / "legacy.db"
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        conn.execute("DROP TABLE fts_notes")
+        conn.execute("INSERT INTO chunk_embeddings (chunk_id, embedding) VALUES ('fixture', X'00')")
+        conn.commit()
+    monkeypatch.setenv("POWER_SEARCH_DB", str(database))
+
+    report = doctor.run_doctor(vault)
+
+    assert report["vault"]["index_state"] == "legacy_database"
+    assert report["vault"]["indexed_notes"] == 0
+    assert report["vault"]["indexed_chunks"] == 1
+    assert report["fts_status"] == "unavailable"
+    assert report["dense_status"] == "incompatible"
+    assert report["server_status"] == "error"
+    assert report["exit_code"] == 1
+    assert any(issue["code"] == "fts_index_unavailable" for issue in report["issues"])
+
+
+def test_discovery_does_not_recover_a_rollback_journal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    database = tmp_path / "index.db"
+    journal = tmp_path / "index.db-journal"
+    with closing(sqlite3.connect(database)) as conn:
+        _init_db(conn)
+        conn.execute("CREATE TABLE journal_fixture (payload BLOB)")
+        conn.execute("INSERT INTO journal_fixture VALUES (zeroblob(262144))")
+        conn.commit()
+
+    # Interrupt a fixed fixture program; the temporary database path is its only argument.
+    subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            "import os, sqlite3, sys\n"
+            "db = sqlite3.connect(sys.argv[1])\n"
+            "db.execute('PRAGMA journal_mode=DELETE')\n"
+            "db.execute('PRAGMA cache_size=1')\n"
+            "db.execute('UPDATE journal_fixture SET payload=randomblob(262144)')\n"
+            "os._exit(0)\n",
+            str(database),
+        ],
+        check=True,
+        timeout=10,
+    )
+    original = database.read_bytes(), journal.read_bytes()
+    control = tmp_path / "control.db"
+    control_journal = tmp_path / "control.db-journal"
+    shutil.copyfile(database, control)
+    shutil.copyfile(journal, control_journal)
+    with closing(sqlite3.connect(control)) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM file_metadata").fetchone() == (0,)
+    assert not control_journal.exists(), "control must actually require rollback recovery"
+    monkeypatch.setenv("POWER_SEARCH_DB", str(database))
+
+    report = doctor.run_doctor(vault)
+
+    assert report["fts_status"] == "unavailable"
+    assert (database.read_bytes(), journal.read_bytes()) == original
+
+
+def test_doctor_does_not_inspect_an_uncheckpointed_wal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "example.md").write_text("# Example\n", encoding="utf-8")
+    database = tmp_path / "index.db"
+    monkeypatch.setenv("POWER_SEARCH_DB", str(database))
+    with closing(sqlite3.connect(database)) as writer:
+        _init_db(writer)
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        writer.execute("INSERT INTO file_metadata VALUES ('example.md', 1)")
+        writer.commit()
+        index_files = [database, tmp_path / "index.db-wal", tmp_path / "index.db-shm"]
+        assert writer.execute("SELECT COUNT(*) FROM file_metadata").fetchone() == (1,)
+        assert index_files[1].stat().st_size > 0
+        before = [(p.read_bytes(), p.stat().st_mtime_ns) for p in index_files]
+
+        report = doctor.run_doctor(vault)
+
+        assert report["vault"]["index_state"] == "unreadable"
+        assert report["vault"]["indexed_notes"] is None
+        assert report["fts_status"] == "unavailable"
+        assert [(p.read_bytes(), p.stat().st_mtime_ns) for p in index_files] == before
+
+    assert not list(tmp_path.glob("index.db-*"))
+    assert doctor.run_doctor(vault)["vault"]["indexed_notes"] == 1
+    assert not list(tmp_path.glob("index.db-*"))
+
+
+def test_discovery_does_not_create_or_modify_generation_sidecars(
+    sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = tmp_path / "generation-cache"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache))
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    sync_vault_atomically(sample_vault, sync_embeddings=False)
+
+    def sidecars() -> dict[Path, tuple[bytes, int]]:
+        return {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in cache.rglob("*.db-*")}
+
+    before = sidecars()
+    for _ in range(2):
+        report = doctor.run_doctor(sample_vault)
+        assert report["server_status"] == "ok"
+        assert report["vault"]["index_state"] == "active_generation"
+        assert report["fts_status"] == "ready"
+        assert sidecars() == before
+
+
+@pytest.mark.parametrize("changed_file", ["generation-state.db", "generation"])
+def test_discovery_rejects_a_change_during_generation_verification(
+    sample_vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed_file: str
+) -> None:
+    cache = tmp_path / "generation-cache"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache))
+    monkeypatch.delenv("POWER_SEARCH_DB", raising=False)
+    sync_vault_atomically(sample_vault, sync_embeddings=False)
+    generation_index.invalidate_active_generation_cache(sample_vault)
+    state_db = next(cache.rglob("generation-state.db"))
+    file_identity = generation_index._file_identity
+
+    def touch_during_verification(path: Path) -> tuple[str, int]:
+        digest = file_identity(path)
+        target = path if changed_file == "generation" else state_db
+        stat = target.stat()
+        os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+        return digest
+
+    monkeypatch.setattr(generation_index, "_file_identity", touch_during_verification)
+
+    report = doctor.run_doctor(sample_vault)
+
+    assert report["server_status"] == "error"
+    assert report["vault"]["index_state"] == "unreadable"
+    assert report["vault"]["active_generation"] is None
+    assert report["vault"]["indexed_notes"] is None
+    assert report["fts_status"] == "unavailable"
+    assert any(issue["code"] == "active_generation_unreadable" for issue in report["issues"])
 
 
 def test_doctor_bootstrap_is_bounded_and_content_free(tmp_path: Path) -> None:
