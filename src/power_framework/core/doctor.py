@@ -9,7 +9,7 @@ import platform
 import sqlite3
 import sys
 import time
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
 from pathlib import Path
@@ -19,12 +19,14 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 from .capabilities import manifest as capability_manifest
-from .coverage import get_index_coverage
+from .coverage import count_vault_notes
 from .generation_index import (
     IndexGenerationError,
     list_invalid_sources,
     resolve_active_generation,
 )
+from .index_diagnostics import read_index_status
+from .index_freshness import index_age_seconds, index_freshness
 from .vault_storage import existing_vault_db_path, read_vault_identity
 
 logger = logging.getLogger("power")
@@ -51,27 +53,13 @@ def _status(issues: list[dict[str, str]]) -> str:
     return "ok"
 
 
-def _connect_read_only(database: Path) -> sqlite3.Connection:
-    """Open an existing SQLite database without creating or changing it."""
-    return sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True, timeout=30)
-
-
-def _read_index_counts(database: Path) -> tuple[int, int]:
-    with closing(_connect_read_only(database)) as connection:
-        files_row = connection.execute("SELECT COUNT(*) FROM file_metadata").fetchone()
-        chunks_row = connection.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()
-    if files_row is None or chunks_row is None:
-        raise sqlite3.DatabaseError("index count query returned no rows")
-    return int(files_row[0]), int(chunks_row[0])
-
-
 def _model_is_cached() -> bool:
     """Return whether all canonical BGE files are already in the local HF cache.
 
     Direct snapshot inspection is intentional. This function is part of a
     read-only command and must never turn a diagnostic into a model download.
     """
-    from power_framework.experimental.embeddings import BGE_M3_ONNX_REPO, BGE_M3_ONNX_REVISION
+    from power_framework.experimental.embeddings import _configured_bge_identity
 
     cache_override = os.getenv("HF_HUB_CACHE")
     if cache_override:
@@ -87,12 +75,8 @@ def _model_is_cached() -> bool:
                 if xdg_cache
                 else Path.home() / ".cache" / "huggingface" / "hub"
             )
-    snapshot = (
-        cache_root
-        / f"models--{BGE_M3_ONNX_REPO.replace('/', '--')}"
-        / "snapshots"
-        / BGE_M3_ONNX_REVISION
-    )
+    repo, revision = _configured_bge_identity()
+    snapshot = cache_root / f"models--{repo.replace('/', '--')}" / "snapshots" / revision
     for filename in ("model.onnx", "model.onnx.data", "tokenizer.json"):
         if not (snapshot / filename).is_file():
             raise FileNotFoundError(filename)
@@ -125,8 +109,9 @@ def _probe_embedding_binding() -> tuple[dict[str, Any], list[dict[str, str]]]:
         requested_device,
     )
 
+    provider = os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower()
     embedding: dict[str, Any] = {
-        "provider": EMBED_PROVIDER,
+        "provider": provider,
         "requested_device": requested_device("POWER_EMBED_DEVICE"),
         "available_providers": [],
         "model_cached": False,
@@ -135,6 +120,18 @@ def _probe_embedding_binding() -> tuple[dict[str, Any], list[dict[str, str]]]:
         "probe_seconds": None,
     }
     issues: list[dict[str, str]] = []
+
+    if provider != "bge-m3":
+        embedding["binding"] = "not_supported"
+        issues.append(
+            _issue(
+                "embedding_probe_not_supported",
+                "warning",
+                "The canonical binding probe does not cover the configured provider.",
+                "Use the canonical bge-m3 provider or verify the selected backend separately.",
+            )
+        )
+        return embedding, issues
 
     try:
         import onnxruntime as ort  # type: ignore[import-untyped]
@@ -162,18 +159,6 @@ def _probe_embedding_binding() -> tuple[dict[str, Any], list[dict[str, str]]]:
                 "error",
                 f"onnxruntime providers could not be queried ({type(exc).__name__})",
                 "Repair the ONNX Runtime installation and run power doctor again.",
-            )
-        )
-        return embedding, issues
-
-    if EMBED_PROVIDER != "bge-m3":
-        embedding["binding"] = "not_supported"
-        issues.append(
-            _issue(
-                "embedding_probe_not_supported",
-                "warning",
-                f"The canonical binding probe does not cover POWER_EMBED_PROVIDER={EMBED_PROVIDER!r}.",
-                "Use the canonical bge-m3 provider or verify the selected backend separately.",
             )
         )
         return embedding, issues
@@ -230,7 +215,7 @@ def _probe_embedding_binding() -> tuple[dict[str, Any], list[dict[str, str]]]:
     return embedding, issues
 
 
-def _unprobed_embedding_status() -> tuple[dict[str, Any], list[dict[str, str]]]:
+def _unprobed_embedding_status() -> dict[str, Any]:
     """Describe embedding configuration without loading runtimes or models.
 
     MCP discovery is called by long-lived clients and must be cheap and
@@ -240,8 +225,8 @@ def _unprobed_embedding_status() -> tuple[dict[str, Any], list[dict[str, str]]]:
     """
     from power_framework.experimental.embeddings import EMBED_PROVIDER, requested_device
 
-    embedding: dict[str, Any] = {
-        "provider": EMBED_PROVIDER,
+    return {
+        "provider": os.getenv("POWER_EMBED_PROVIDER", EMBED_PROVIDER).lower(),
         "requested_device": requested_device("POWER_EMBED_DEVICE"),
         "available_providers": [],
         "model_cached": None,
@@ -250,15 +235,6 @@ def _unprobed_embedding_status() -> tuple[dict[str, Any], list[dict[str, str]]]:
         "probe_seconds": None,
         "probe_requested": False,
     }
-    issues = [
-        _issue(
-            "embedding_binding_not_requested",
-            "warning",
-            "The active embedding provider was not probed by this read-only discovery call.",
-            "Call the MCP discovery tool with probe_provider=true or run power doctor --json.",
-        )
-    ]
-    return embedding, issues
 
 
 def _probe_vault(
@@ -279,6 +255,9 @@ def _probe_vault(
         "source_snapshot_hash": None,
         "indexed_notes": None,
         "indexed_chunks": None,
+        "fts_status": "unavailable",
+        "dense_status": "unavailable",
+        "index_age_seconds": None,
         "scanned_notes": None,
         "excluded_notes": [],
     }
@@ -296,7 +275,7 @@ def _probe_vault(
         return vault, issues
 
     try:
-        active_generation = resolve_active_generation(root)
+        active_generation = resolve_active_generation(root, inspection_only=True)
         active = active_generation.path if active_generation is not None else None
     except IndexGenerationError as exc:
         vault["index_state"] = "unreadable"
@@ -362,9 +341,21 @@ def _probe_vault(
     if database is not None and database.is_file():
         vault["database_path"] = str(database)
         try:
-            indexed_notes, indexed_chunks = _read_index_counts(database)
+            indexed_notes, indexed_chunks, fts_ready, dense_status = read_index_status(database)
             vault["indexed_notes"] = indexed_notes
             vault["indexed_chunks"] = indexed_chunks
+            vault["fts_status"] = "ready" if fts_ready else "unavailable"
+            vault["index_age_seconds"] = index_age_seconds(database)
+            vault["dense_status"] = dense_status
+            if not fts_ready:
+                issues.append(
+                    _issue(
+                        "fts_index_unavailable",
+                        "error",
+                        "The selected index's FTS table could not be read.",
+                        "Run power sync PATH to rebuild the search index.",
+                    )
+                )
         except (OSError, sqlite3.Error) as exc:
             vault["index_state"] = "unreadable"
             issues.append(
@@ -386,14 +377,9 @@ def _probe_vault(
         )
 
     try:
-        indexed, scanned = get_index_coverage(
-            root,
-            allow_search_db_override=allow_search_db_override,
-        )
-        vault["indexed_notes"] = (
-            indexed if vault["indexed_notes"] is None else vault["indexed_notes"]
-        )
-        vault["scanned_notes"] = scanned
+        vault["scanned_notes"] = count_vault_notes(root)
+        if vault["index_state"] == "missing":
+            vault["indexed_notes"] = 0
     except Exception as exc:  # pragma: no cover - defensive filesystem boundary
         issues.append(
             _issue(
@@ -492,10 +478,20 @@ def run_doctor(
     if probe_embedding:
         embedding, embedding_issues = _probe_embedding_binding()
         embedding["probe_requested"] = True
+        issues.extend(embedding_issues)
+        if embedding["binding"] == "verified":
+            provider_probe = "verified"
+        elif embedding["binding"] == "not_supported":
+            provider_probe = "disabled"
+        elif any(issue["code"] == "embedding_model_not_cached" for issue in embedding_issues):
+            provider_probe = "unavailable"
+        else:
+            provider_probe = "failed"
     else:
-        embedding, embedding_issues = _unprobed_embedding_status()
+        embedding = _unprobed_embedding_status()
+        provider_probe = "not_run"
     report["embedding"] = embedding
-    issues.extend(embedding_issues)
+    vault: dict[str, Any] = {}
     if vault_dir is not None:
         vault, vault_issues = _probe_vault(
             vault_dir,
@@ -505,6 +501,15 @@ def run_doctor(
         issues.extend(vault_issues)
     report["issues"] = issues
     report["status"] = _status(issues)
+    age_seconds = vault.get("index_age_seconds")
+    report["server_status"] = report["status"]
+    report["provider_probe"] = provider_probe
+    report["fts_status"] = vault.get("fts_status", "unavailable")
+    report["dense_status"] = vault.get("dense_status", "unavailable")
+    report["write_status"] = "approval_required" if vault.get("is_directory") else "unavailable"
+    report["lint_status"] = "not_run" if vault.get("is_directory") else "unavailable"
+    report["index_age_seconds"] = age_seconds
+    report["index_freshness"] = index_freshness(age_seconds)
     report["exit_code"] = 0 if report["status"] == "ok" else 1
     report["bootstrap"] = _build_bootstrap(report)
     return report

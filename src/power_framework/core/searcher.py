@@ -17,7 +17,6 @@ import logging
 import os
 import re
 import sqlite3
-import time
 import warnings
 from collections import OrderedDict
 from contextvars import ContextVar
@@ -39,6 +38,7 @@ from .generation_index import (
     resolve_active_generation_path,
 )
 from .ignore import should_skip
+from .index_freshness import index_age_seconds, index_freshness
 from .index_sync import _compute_tf_vector, _sync_vault_to_db, _tokenize
 from .models import OKFMetadata  # noqa: TC001
 from .parser import FRONTMATTER_PATTERN, validate_metadata
@@ -412,10 +412,12 @@ class SearchResults(list[SearchResult]):
         *,
         actual_mode: str,
         fallback_reason: str | None,
+        age_seconds: float | None = None,
     ) -> None:
         super().__init__(values)
         self.actual_mode = actual_mode
         self.fallback_reason = fallback_reason
+        self.index_age_seconds = age_seconds
 
 
 def _with_runtime_metadata(
@@ -423,12 +425,19 @@ def _with_runtime_metadata(
     *,
     actual_mode: str,
     fallback_reason: str | None,
+    resolved_db: _ResolvedDb | None = None,
 ) -> SearchResults:
-    """Keep auto/fallback metadata available when retrieval returns no hits."""
+    """Attach verified request metadata, even when retrieval returns no hits."""
+    age = index_age_seconds(resolved_db.path) if resolved_db is not None else None
+    if resolved_db is not None:
+        _attach_index_provenance(results, resolved_db)
+        for result in results:
+            result.retrieval_contract = "fts_fallback" if fallback_reason else actual_mode
+            result.actual_mode = actual_mode
+            result.fallback_reason = fallback_reason
+            result.index_age_seconds = age
     return SearchResults(
-        results,
-        actual_mode=actual_mode,
-        fallback_reason=fallback_reason,
+        results, actual_mode=actual_mode, fallback_reason=fallback_reason, age_seconds=age
     )
 
 
@@ -1530,28 +1539,6 @@ def _attach_index_provenance(results: list[SearchResult], resolved_db: _Resolved
         result.index_source_snapshot_hash = resolved_db.source_snapshot_hash
 
 
-def _attach_runtime_contract(
-    results: list[SearchResult],
-    *,
-    actual_mode: str,
-    fallback_reason: str | None,
-    resolved_db: _ResolvedDb,
-) -> None:
-    """Attach the actual profile and bounded index freshness to every hit."""
-    index_age_seconds: float | None = None
-    if resolved_db.path is not None:
-        try:
-            index_age_seconds = max(0.0, time.time() - resolved_db.path.stat().st_mtime)
-        except OSError:
-            index_age_seconds = None
-    retrieval_contract = "fts_fallback" if fallback_reason else actual_mode
-    for result in results:
-        result.retrieval_contract = retrieval_contract
-        result.actual_mode = actual_mode
-        result.fallback_reason = fallback_reason
-        result.index_age_seconds = index_age_seconds
-
-
 def search_vault(
     vault_dir: Path,
     query: str,
@@ -1786,17 +1773,11 @@ def search_vault(
         results = _filter_temporal_results(
             vault_dir, merged, temporal_view, boundary, requested_max_results, resolved_db
         )
-        _attach_runtime_contract(
-            results,
-            actual_mode=mode,
-            fallback_reason=fallback_reason,
-            resolved_db=resolved_db,
-        )
-        _attach_index_provenance(results, resolved_db)
         return _with_runtime_metadata(
             results,
             actual_mode=mode,
             fallback_reason=fallback_reason,
+            resolved_db=resolved_db,
         )
 
     # For non-hybrid modes, gather results, dedup by rel_path keeping max score, and sort
@@ -1873,17 +1854,11 @@ def search_vault(
             allow_search_db_override=allow_search_db_override,
             resolved_scope=resolved_scope,
         )
-    _attach_runtime_contract(
-        final_results,
-        actual_mode=mode,
-        fallback_reason=fallback_reason,
-        resolved_db=resolved_db,
-    )
-    _attach_index_provenance(final_results, resolved_db)
     return _with_runtime_metadata(
         final_results,
         actual_mode=mode,
         fallback_reason=fallback_reason,
+        resolved_db=resolved_db,
     )
 
 
@@ -2341,6 +2316,8 @@ def format_untrusted_search_envelope(
         else getattr(results, "fallback_reason", None)
     )
 
+    age_seconds = max(index_ages) if index_ages else getattr(results, "index_age_seconds", None)
+    freshness = index_freshness(age_seconds)
     envelope = {
         "schema_version": "power.retrieval-envelope.v1",
         "trust": "untrusted",
@@ -2353,7 +2330,9 @@ def format_untrusted_search_envelope(
         "mode": mode,
         "actual_mode": actual_mode,
         "fallback_reason": fallback_reason,
-        "index_age_seconds": max(index_ages) if index_ages else None,
+        "index_age_seconds": age_seconds,
+        "index_freshness": freshness,
+        "index_freshness_warning": "index_critically_stale" if freshness == "critical" else None,
         "temporal_view": temporal_view,
         "as_of": as_of,
         "index_provenance": _format_index_provenance(verified_results),

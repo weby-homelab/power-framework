@@ -37,6 +37,27 @@ the generated reference table is in [Architecture](../architecture.md). The
 deprecated `hybrid_reranked` input alias normalizes to `reranked`; it is not a
 canonical mode. The current default is `auto`, not `reranked`.
 
+## Index freshness
+
+The retrieval envelope and server discovery report the age of the selected
+index file at request time. `index_freshness` uses seconds since its last
+modification:
+
+| Age | `index_freshness` |
+| --- | --- |
+| Less than 1 hour | `fresh` |
+| At least 1 hour and less than 24 hours | `stale` |
+| At least 24 hours | `critical` |
+| No available age (e.g. an unindexed scan) | `unknown` |
+
+On `critical`, the retrieval envelope sets `index_freshness_warning` to
+`index_critically_stale`, even when the query returned no hits. Otherwise the
+warning is `null`. Agents should flag critically stale evidence to the user
+and verify the current source before relying on it. Do not run a sync
+implicitly; request authorization if a rebuild is needed. Age is not proof
+that sources have or have not changed, does not change result ranking, and
+does not override the index integrity checks.
+
 ## Active-generation resolution
 
 When a vault has an immutable generation, POWER verifies the active state and

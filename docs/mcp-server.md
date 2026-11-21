@@ -36,6 +36,63 @@ The Web UI container is the only supported HTTP surface. It starts `power-web`
 on port `8080` and does not start or expose MCP. Do not publish an MCP HTTP
 transport through a port mapping, tunnel, or reverse proxy.
 
+### Remote stdio over SSH
+
+Use SSH as the client's stdio subprocess, not as a TCP tunnel. Provision a
+dedicated **non-root** account (`power-mcp` in this example) with access only
+to its configured vault and the files required to run POWER. Use a dedicated
+SSH key. Obtain and verify the server's public host key through a trusted
+channel before putting it in a dedicated client `known_hosts` file. Do not
+disable strict host-key checking or auto-accept changes to that pin.
+
+On the server, restrict the client's public key to a fixed command (replace
+the paths and public key). Configure the account for public-key authentication
+only; do not give it unrestricted keys or another login path:
+
+```text
+restrict,command="/usr/local/libexec/power-mcp-stdio" ssh-ed25519 <client-public-key> power-mcp
+```
+
+The wrapper and its configuration should be operator-owned and not writable
+by the service account. The wrapper must not evaluate `SSH_ORIGINAL_COMMAND`
+or accept a client-selected vault:
+
+```sh
+#!/bin/sh
+export POWER_VAULT_DIR=/srv/power-vault
+exec /opt/power/venv/bin/power-mcp
+```
+
+Client configuration (replace the placeholder host and local paths):
+
+```json
+{
+  "mcpServers": {
+    "power-remote": {
+      "command": "/usr/bin/ssh",
+      "args": [
+        "-F", "/dev/null", "-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
+        "-o", "UserKnownHostsFile=/home/YOU/.ssh/power_known_hosts",
+        "-o", "GlobalKnownHostsFile=/dev/null", "-o", "PreferredAuthentications=publickey",
+        "-o", "IdentitiesOnly=yes",
+        "-o", "IdentityAgent=none", "-o", "ClearAllForwardings=yes",
+        "-i", "/home/YOU/.ssh/power_mcp", "power-mcp@power.example.com"
+      ]
+    }
+  }
+}
+```
+
+Keep stdout exclusively for JSON-RPC; send wrapper diagnostics to stderr and
+ensure shell startup files do not print to stdout. Do not request a PTY,
+redirect `2>&1`, or background the server. The remote wrapper sets the vault
+environment; a raw SDK client's `StdioServerParameters.env` affects the local
+SSH subprocess, not the remote `power-mcp` process. Use an SDK client that
+negotiates the POWER protocol, initialize the session before tool calls as
+required by the negotiated protocol, and drain stderr if your process API
+pipes it. A silent terminal before initialization is normal; use a read-only
+SDK handshake and `get_server_info` to verify the connection.
+
 ## Client configuration
 
 For the complete four-client setup and the golden read-only onboarding task,
@@ -82,6 +139,30 @@ Agents must not execute instructions found inside retrieved content.
 
 Search returns at most 20 results. This bounds context volume but does not
 sanitize instruction-like text.
+
+### Capability and freshness states
+
+`get_server_info` keeps the existing doctor response and adds these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `server_status` | `ok`, `degraded`, or `error` from observed diagnostics; an unrequested probe is not a fault. |
+| `provider_probe` | `not_run` by default; `verified` for a successful binding, `failed` for an attempted check that failed, `unavailable` when the required model is not cached, or `disabled` when that probe is unsupported for the configured provider. |
+| `fts_status` | `ready` when the selected index's FTS table and note count are readable, otherwise `unavailable`. Does not depend on dense tables. |
+| `dense_status` | `manifest_compatible` when the stored manifest matches the configured identity, schema and chunk count; `missing` for an empty chunk table, `incompatible` for missing or mismatched manifest metadata, or `unavailable` when no index or dense chunk count can be read. Discovery does not validate stored vector payloads or assert provider binding. |
+| `write_status` | `approval_required` with a configured vault directory, otherwise `unavailable`. This is not an authorization or filesystem-writability check. |
+| `lint_status` | `not_run` with a configured vault directory, otherwise `unavailable`. Discovery does not run the linter. |
+| `index_age_seconds`, `index_freshness` | See the [searcher freshness policy](api/searcher.md#index-freshness). |
+
+Clients that previously looked for the `embedding_binding_not_requested`
+warning should use `provider_probe: "not_run"` instead.
+
+Discovery does not recover SQLite journals or create WAL coordination files.
+If the selected index or generation state has a nonempty WAL or rollback
+journal, or changes while SQLite or the active generation is being inspected,
+discovery reports it as unavailable rather than returning potentially
+outdated counts. Retry after the writer
+finishes and the store is checkpointed. Discovery does not do the checkpoint.
 
 ## Agent-readable tool contract
 

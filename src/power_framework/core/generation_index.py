@@ -9,7 +9,7 @@ import os
 import sqlite3
 import uuid
 from collections import Counter
-from contextlib import closing
+from contextlib import AbstractContextManager, closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +27,7 @@ from .ignore import should_skip
 from .index_sync import _sync_vault_to_db as _sync_vault_to_db
 from .parser import read_file_content, validate_metadata
 from .source_projection import scan_projection, write_projection
+from .sqlite_inspection import checkpoint_stamp, inspect_checkpointed_db
 from .sync_memory import low_memory_override
 from .utils import iter_vault_markdown_files
 from .vault_storage import (
@@ -403,31 +404,60 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def _open_generation_db(
+    path: Path, inspection_only: bool
+) -> AbstractContextManager[sqlite3.Connection]:
+    if inspection_only:
+        return inspect_checkpointed_db(path)
+    return closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30))
+
+
 def _verified_generation_path(
     vault_dir: Path,
     generation_id: str,
     expected_sha256: str,
     expected_size: int,
-) -> Path:
+    *,
+    inspection_only: bool = False,
+) -> tuple[Path, _FileFingerprint]:
     path = _existing_generation_path(vault_dir, generation_id)
-    if path is None:
-        raise ActiveGenerationError(f"active generation namespace is missing: {generation_id}")
-    if not path.is_file():
+    fingerprint = _file_fingerprint(path) if path is not None else None
+    if path is None or fingerprint is None:
         raise ActiveGenerationError(f"active generation file is missing: {generation_id}")
-    actual_sha256, actual_size = _file_identity(path)
-    if actual_size != expected_size or actual_sha256 != expected_sha256:
-        raise ActiveGenerationError(f"active generation file identity mismatch: {generation_id}")
     try:
-        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)) as conn:
+        with _open_generation_db(path, inspection_only) as conn:
+            if _file_identity(path) != (expected_sha256, expected_size):
+                raise ActiveGenerationError(
+                    f"active generation file identity mismatch: {generation_id}"
+                )
             integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-    except sqlite3.Error as exc:
+    except (OSError, sqlite3.Error) as exc:
         raise ActiveGenerationError(f"active generation cannot be read: {generation_id}") from exc
     if integrity != "ok":
         raise ActiveGenerationError(f"active generation integrity check failed: {generation_id}")
-    return path
+    return path, fingerprint
 
 
-def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
+def _confirm_generation_checkpoint(
+    state: Path,
+    state_stamp: _FileFingerprint | None,
+    generation: Path,
+    generation_stamp: _FileFingerprint,
+) -> None:
+    try:
+        if (
+            checkpoint_stamp(generation) == generation_stamp
+            and checkpoint_stamp(state) == state_stamp
+        ):
+            return
+    except (OSError, sqlite3.Error) as exc:
+        raise ActiveGenerationError("active index requires a stable checkpoint") from exc
+    raise ActiveGenerationError("active index changed during inspection")
+
+
+def resolve_active_generation(
+    vault_dir: Path, *, inspection_only: bool = False
+) -> ActiveGeneration | None:
     """Resolve and verify the authoritative active generation or fail closed.
 
     ``None`` means this vault still has no generation-state store and callers
@@ -451,11 +481,15 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
             if cached_state == state_fingerprint:
                 current_generation = _file_fingerprint(active.path)
                 if current_generation == cached_generation:
+                    if inspection_only:
+                        _confirm_generation_checkpoint(
+                            state_path, state_fingerprint[0], active.path, cached_generation
+                        )
                     return active
             _active_generation_cache.pop(root, None)
 
     try:
-        with closing(sqlite3.connect(f"file:{state_path}?mode=ro", uri=True, timeout=30)) as conn:
+        with _open_generation_db(state_path, inspection_only) as conn:
             row = conn.execute(
                 """
                 SELECT generation_id, state, source_snapshot_hash, db_sha256, db_size,
@@ -465,7 +499,7 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
                 WHERE generation_id = (SELECT generation_id FROM active_generation WHERE id = 1)
                 """
             ).fetchone()
-    except sqlite3.Error as exc:
+    except (OSError, sqlite3.Error) as exc:
         raise ActiveGenerationError("generation state store is unreadable") from exc
     if row is None:
         return None
@@ -479,7 +513,13 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
         or not activated_at
     ):
         raise ActiveGenerationError(f"active generation is not ready: {generation_id}")
-    verified_path = _verified_generation_path(root, generation_id, str(db_sha256), int(db_size))
+    verified_path, generation_fingerprint = _verified_generation_path(
+        root, generation_id, str(db_sha256), int(db_size), inspection_only=inspection_only
+    )
+    if inspection_only:
+        _confirm_generation_checkpoint(
+            state_path, state_fingerprint[0], verified_path, generation_fingerprint
+        )
     active = ActiveGeneration(
         path=verified_path,
         generation_id=str(generation_id),
@@ -489,9 +529,6 @@ def resolve_active_generation(vault_dir: Path) -> ActiveGeneration | None:
         completed_at=str(completed_at),
         activated_at=str(activated_at),
     )
-    generation_fingerprint = _file_fingerprint(verified_path)
-    if generation_fingerprint is None:  # pragma: no cover - verified path exists above
-        raise ActiveGenerationError(f"active generation file is missing: {generation_id}")
     with _active_generation_cache_lock:
         _active_generation_cache[root] = (state_fingerprint, generation_fingerprint, active)
     return active
