@@ -112,7 +112,6 @@ def _sync_vault_to_db(
     """
     embedding_limits = sync_memory.validated_embedding_limits() if sync_embeddings else None
     cursor = conn.cursor()
-    provider, model = "", ""
     rebuild_dense = False
     if sync_embeddings:
         provider, model = _configured_embedding_identity()
