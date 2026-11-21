@@ -483,3 +483,79 @@ def test_fast_profile_never_checks_or_invokes_semantic(
     assert called_modes == ["fts"]
     assert result.dense_used is False
     assert result.retrieval_status == "complete"
+
+
+def test_semantic_stage_empty_search_results_downgrade_marks_degraded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Empty SearchResults carrying actual_mode != 'semantic' must mark degraded and dense_used=False."""
+    from power_framework.core.searcher import SearchResults
+
+    vault = _make_test_vault(tmp_path)
+
+    def search_fn(*_args: object, **kwargs: object) -> list[FakeSearchResult]:
+        if kwargs.get("mode") == "semantic":
+            return SearchResults(  # type: ignore[return-value]
+                [],
+                actual_mode="fts",
+                fallback_reason="explicit_dense_fallback",
+            )
+        return [FakeSearchResult("01_Projects/proj_alpha.md", "FTS snippet", 0.65)]
+
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        lambda: (True, "ready"),
+    )
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.resolve_active_generation",
+        lambda _v: "gen_test",
+    )
+
+    planner = RetrievalPlanner(vault, search_fn=search_fn)
+    intent = QueryIntent(
+        query="Alpha",
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.BALANCED,
+    )
+    result = planner.plan_and_retrieve(intent, access_policy=_make_access_policy())
+
+    assert result.dense_used is False
+    assert result.retrieval_status == "degraded"
+    assert "explicit_dense_fallback" in result.fallback_reason
+
+
+def test_semantic_stage_plain_list_item_downgrade_marks_degraded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plain list from custom search_fn with downgraded item.actual_mode must mark degraded."""
+    vault = _make_test_vault(tmp_path)
+
+    def search_fn(*_args: object, **kwargs: object) -> list[FakeSearchResult]:
+        if kwargs.get("mode") == "semantic":
+            downgraded = FakeSearchResult("01_Projects/proj_alpha.md", "FTS fallback", 0.55)
+            downgraded.actual_mode = "fts"  # type: ignore[attr-defined]
+            downgraded.fallback_reason = "explicit_dense_fallback"  # type: ignore[attr-defined]
+            return [downgraded]
+        return [FakeSearchResult("01_Projects/proj_alpha.md", "FTS snippet", 0.65)]
+
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        lambda: (True, "ready"),
+    )
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.resolve_active_generation",
+        lambda _v: "gen_test",
+    )
+
+    planner = RetrievalPlanner(vault, search_fn=search_fn)
+    intent = QueryIntent(
+        query="Alpha",
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.BALANCED,
+    )
+    result = planner.plan_and_retrieve(intent, access_policy=_make_access_policy())
+
+    assert result.dense_used is False
+    assert result.retrieval_status == "degraded"
+    assert "explicit_dense_fallback" in result.fallback_reason
+    assert all(c.retrieval_stage is not RetrievalStage.SEMANTIC for c in result.candidates)

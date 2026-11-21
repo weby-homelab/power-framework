@@ -498,3 +498,90 @@ def test_retrieval_planner_semantic_stage_executes_real_dense_search(
     assert vector_results == []
     assert embed_calls == [query_text]
     assert (db_path.stat().st_mtime_ns, _file_identity(db_path)) == before_stat
+
+
+def _unmocked_balanced_policy() -> AccessPolicy:
+    return AccessPolicy._from_authorization_boundary(
+        origin="authorization_boundary",
+        actor="test_actor",
+        raw_access="none",
+        quarantine_access="none",
+        redaction="mandatory",
+        capability_id="retrieval_planner",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+
+
+def test_retrieval_planner_unmocked_dense_fallback_env_downgrades_cleanly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real unmocked search_vault with POWER_ALLOW_DENSE_FALLBACK=1 reports degraded and dense_used=False."""
+    vault = _make_vault(tmp_path, "dense_env_fallback")
+    _write_note(
+        vault / "01_Projects" / "policy.md", "Project", "Freeze Policy", "Canonical policy body."
+    )
+    sync_vault_atomically(vault, sync_embeddings=False)
+    db_path = _read_db_path(vault)
+    assert db_path is not None
+    before_stat = (db_path.stat().st_mtime_ns, _file_identity(db_path))
+
+    monkeypatch.setenv("POWER_ALLOW_DENSE_FALLBACK", "1")
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        lambda: (True, "ready"),
+    )
+
+    intent = QueryIntent(
+        query="Canonical policy",
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.BALANCED,
+        domain_hints=["projects"],
+        temporal_boundary=_tb(),
+    )
+    result = RetrievalPlanner(vault).plan_and_retrieve(
+        intent, access_policy=_unmocked_balanced_policy()
+    )
+
+    assert result.dense_used is False
+    assert result.retrieval_status == "degraded"
+    assert "explicit_dense_fallback" in result.fallback_reason
+    assert any(c.source_id == "01_Projects/policy.md" for c in result.candidates)
+    assert all(c.retrieval_stage is not RetrievalStage.SEMANTIC for c in result.candidates)
+    assert (db_path.stat().st_mtime_ns, _file_identity(db_path)) == before_stat
+
+
+def test_retrieval_planner_unmocked_dense_missing_fails_closed_to_degraded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real unmocked search_vault without dense index or fallback flag fails closed to degraded."""
+    vault = _make_vault(tmp_path, "dense_fail_closed")
+    _write_note(
+        vault / "01_Projects" / "policy.md", "Project", "Freeze Policy", "Canonical policy body."
+    )
+    sync_vault_atomically(vault, sync_embeddings=False)
+    db_path = _read_db_path(vault)
+    assert db_path is not None
+    before_stat = (db_path.stat().st_mtime_ns, _file_identity(db_path))
+
+    monkeypatch.delenv("POWER_ALLOW_DENSE_FALLBACK", raising=False)
+    monkeypatch.setattr(
+        "power_framework.core.retrieval_planner.dense_embedding_ready",
+        lambda: (True, "ready"),
+    )
+
+    intent = QueryIntent(
+        query="Canonical policy",
+        intent=QueryIntentKind.LOOKUP,
+        budget_class=BudgetClass.BALANCED,
+        domain_hints=["projects"],
+        temporal_boundary=_tb(),
+    )
+    result = RetrievalPlanner(vault).plan_and_retrieve(
+        intent, access_policy=_unmocked_balanced_policy()
+    )
+
+    assert result.dense_used is False
+    assert result.retrieval_status == "degraded"
+    assert "DenseIndexUnavailableError" in result.fallback_reason
+    assert any(c.source_id == "01_Projects/policy.md" for c in result.candidates)
+    assert (db_path.stat().st_mtime_ns, _file_identity(db_path)) == before_stat
