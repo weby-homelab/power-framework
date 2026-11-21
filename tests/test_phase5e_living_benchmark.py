@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING, Any
 
@@ -13,7 +14,11 @@ from scripts.run_living_benchmark import (
     DEFAULT_DATASET_DIR,
     _gates_pass,
     _hash_benchmark_storage,
+    _is_vault_contained,
+    compute_ndcg,
+    compute_recall_at_k,
     load_dataset,
+    main,
     run_living_benchmark,
 )
 
@@ -66,22 +71,16 @@ def test_living_dataset_integrity() -> None:
                 assert (corpus_dir / ref_str).is_file(), f"Missing corpus note {ref_str}"
 
 
-def test_living_benchmark_fast_mode_invariants_and_quality() -> None:
+def test_living_benchmark_fast_mode_invariants_and_quality(tmp_path: Path) -> None:
     """FAST lexical + canonical mode passes all hard invariants and baseline recall floors."""
-    report = run_living_benchmark(
-        DEFAULT_DATASET_DIR,
-        modes=("FAST",),
-        embedder_mode="hermetic",
-    )
+    output = tmp_path / "report.json"
+    assert main(["--modes", "FAST", "--enforce-gates", "--output", str(output)]) == 0
+    report = json.loads(output.read_text(encoding="utf-8"))
     fast = report["modes"]["FAST"]
     _assert_all_invariants_zero(fast)
 
-    summary = fast["summary"]
-    assert summary["dense_used_count"] == 0
-    assert summary["recall_at_5"] >= 0.55
-    assert summary["mrr"] >= 0.50
-    assert summary["ndcg_at_10"] >= 0.55
-    assert fast["by_group"]["core"]["recall_at_5"] >= 0.80
+    assert _gates_pass(report) == (True, [])
+    assert fast["summary"]["scored_counts"]["recall_at_5"] == report["query_count"] - 1
 
 
 def test_living_benchmark_detects_query_side_cache_writes(
@@ -139,8 +138,8 @@ def test_living_benchmark_hashes_nonempty_sqlite_wal(tmp_path: Path) -> None:
     assert set(_hash_benchmark_storage(vault, cache)[1]) == {"index.db", "index.db-wal"}
 
 
-def test_living_benchmark_balanced_real_dense_beats_fast_on_semantic_paraphrases() -> None:
-    """BALANCED executes real Stage 3 dense search, preserves invariants, and beats FAST on paraphrases."""
+def test_living_benchmark_balanced_uses_hermetic_dense_path() -> None:
+    """BALANCED exercises Stage 3 with fixture vectors, not production model quality."""
     pytest.importorskip("numpy")
 
     report = run_living_benchmark(
@@ -155,15 +154,82 @@ def test_living_benchmark_balanced_real_dense_beats_fast_on_semantic_paraphrases
     _assert_all_invariants_zero(balanced)
 
     bal_summary = balanced["summary"]
-    fast_summary = fast["summary"]
     assert bal_summary["dense_used_count"] == report["query_count"]
     assert bal_summary["degraded_count"] == 0
-    assert bal_summary["recall_at_5"] >= 0.85
-    assert bal_summary["mrr"] >= 0.80
-    assert bal_summary["ndcg_at_10"] >= 0.85
-    assert bal_summary["recall_at_5"] >= fast_summary["recall_at_5"]
+    assert _gates_pass(report) == (True, [])
 
-    fast_sem = fast["by_group"]["semantic_paraphrase"]["recall_at_5"]
-    bal_sem = balanced["by_group"]["semantic_paraphrase"]["recall_at_5"]
-    assert bal_sem > fast_sem
-    assert bal_sem >= 0.85
+
+def test_balanced_quality_floors_apply_only_to_real_embedder() -> None:
+    report = {
+        "embedder_mode": "hermetic",
+        "query_count": 1,
+        "modes": {
+            "BALANCED": {
+                "all_invariants_zero": True,
+                "summary": {
+                    "dense_used_count": 1,
+                    "degraded_count": 0,
+                    "recall_at_5": 0.0,
+                    "mrr": 0.0,
+                    "ndcg_at_10": 0.0,
+                },
+                "by_group": {"semantic_paraphrase": {"recall_at_5": 1.0}},
+            },
+        },
+    }
+    assert _gates_pass(report) == (True, [])
+    valid, failures = _gates_pass({**report, "embedder_mode": "real"})
+    assert not valid
+    assert len(failures) == 3
+
+
+def test_fast_quality_gates_include_ndcg_and_core_recall() -> None:
+    report = {
+        "embedder_mode": "hermetic",
+        "modes": {
+            "FAST": {
+                "all_invariants_zero": True,
+                "summary": {
+                    "dense_used_count": 0,
+                    "recall_at_5": 1.0,
+                    "mrr": 1.0,
+                    "ndcg_at_10": 0.54,
+                },
+                "by_group": {"core": {"recall_at_5": 0.79}},
+            },
+        },
+    }
+    valid, failures = _gates_pass(report)
+    assert not valid
+    assert len(failures) == 2
+
+
+def test_ranking_metrics_do_not_credit_duplicate_sources() -> None:
+    assert compute_recall_at_k(["a", "a"], {"a", "b"}, 2) == 0.5
+    assert compute_ndcg(["a", "a"], {"a": 1.0}, 2) == 1.0
+
+
+def test_living_benchmark_refuses_existing_vault(tmp_path: Path) -> None:
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    sentinel = existing / "note.md"
+    sentinel.write_text("keep", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        run_living_benchmark(modes=("FAST",), vault_dir=existing)
+    assert sorted(existing.iterdir()) == [sentinel]
+    assert sentinel.read_text(encoding="utf-8") == "keep"
+
+
+def test_scope_matches_relative_and_absolute_vault_paths(tmp_path: Path) -> None:
+    assert _is_vault_contained(tmp_path, "01_Projects/example.md", [])
+    assert _is_vault_contained(tmp_path, str(tmp_path / "01_Projects/example.md"), [])
+    assert not _is_vault_contained(tmp_path, "04_Archive/example.md", [])
+    assert not _is_vault_contained(tmp_path, str(tmp_path / "04_Archive/example.md"), [])
+
+
+def test_scope_accepts_only_seeded_canonical_ids(tmp_path: Path) -> None:
+    canonical = frozenset({"task:sample"})
+    assert _is_vault_contained(tmp_path, "task:sample", ["tasks/sample.json"], canonical)
+    assert not _is_vault_contained(tmp_path, "task:absent", [], canonical)
+    assert not _is_vault_contained(tmp_path, "note:example", [], canonical)
+    assert not _is_vault_contained(tmp_path, "task:sample", ["task:absent"], canonical)
