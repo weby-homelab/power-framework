@@ -79,6 +79,7 @@ CURRENT_DOCUMENTS = {
     "CLI": CLI_DOC,
     "MCP": MCP_DOC,
     "Docs index": DOC_INDEX,
+    "Linux quick start": REPO_ROOT / "docs" / "quick-start-linux.md",
     "Getting Started": GETTING_STARTED,
     "Getting Started UA": GETTING_STARTED_UA,
     "Windows": WINDOWS,
@@ -593,6 +594,7 @@ def check_onboarding(documents: dict[str, str], facts: dict[str, Any]) -> list[s
     onboarding_labels = (
         "README",
         "README.ua",
+        "Linux quick start",
         "Getting Started",
         "Getting Started UA",
         "Windows",
@@ -620,7 +622,9 @@ def check_onboarding(documents: dict[str, str], facts: dict[str, Any]) -> list[s
             if re.search(pattern, documents[label], flags=re.IGNORECASE):
                 errors.append(f"{label} contains a forbidden {description}.")
 
-    for label in ("README", "README.ua", "Getting Started", "Getting Started UA"):
+    if "(docs/quick-start-linux.md)" not in documents["README"]:
+        errors.append("README is missing the link to the Linux quick start.")
+    for label in ("Linux quick start", "README.ua", "Getting Started", "Getting Started UA"):
         document = documents[label]
         errors.extend(
             f"{label} is missing the release installation marker `{marker}`."
