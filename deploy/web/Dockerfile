@@ -20,8 +20,6 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
 COPY skills/ ./skills/
-COPY LICENSES/ ./LICENSES/
-COPY THIRD_PARTY_NOTICES.md ./
 COPY release/ ./release/
 
 RUN set -eux; \
