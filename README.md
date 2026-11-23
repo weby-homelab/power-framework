@@ -641,7 +641,7 @@ The default dense provider is **`bge-m3`** via ONNX Runtime and `tokenizers` (`B
 
 ## License
 
-P.O.W.E.R. Framework is licensed under the [GNU General Public License v3.0 (GPLv3)](LICENSE).
+The P.O.W.E.R. distribution (core and Web) is licensed under [GPL-3.0-only](LICENSE). The [Web attribution notice](src/power_framework/web/NOTICE.md) preserves the original component's copyright and permission notice.
 
 ---
 
