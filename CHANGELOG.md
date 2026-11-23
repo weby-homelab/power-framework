@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No unreleased changes.
 
+## [3.7.14] - Unreleased
+
+### Fixed
+
+- Preserve doctor diagnostics for FTS-only indexes without dense tables and
+  correctly open relative index paths containing SQLite URI special characters.
+  Reject missing or ordinary `fts_notes` tables when dense data is absent.
+
 ## [3.7.11] - 2026-09-02
 
 ### Fixed
