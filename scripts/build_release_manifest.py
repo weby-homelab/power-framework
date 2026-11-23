@@ -262,6 +262,13 @@ def build_manifest(
             "filename": sdist.name,
             "sha256": sha256_file(sdist),
         }
+    if (
+        web_image is None
+        and (repo_root / "release/publication-profile").is_file()
+        and (repo_root / "release/publication-profile").read_bytes() == b"core-cli-mcp-v1\n"
+    ):
+        manifest["publication_profile"] = "core-cli-mcp-v1"
+        manifest["profiles"]["profile_b"]["status"] = "not-published"
     if package_sbom is not None:
         manifest["artifacts"]["package_sbom"] = {
             "filename": package_sbom.name,

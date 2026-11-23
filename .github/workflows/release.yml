@@ -53,6 +53,7 @@ jobs:
     outputs:
       tag_object: ${{ steps.admit.outputs.tag_object }}
       tag_target: ${{ steps.admit.outputs.tag_target }}
+      publication_profile: ${{ steps.profile.outputs.profile }}
     steps:
       - name: Checkout requested tag metadata
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -174,6 +175,21 @@ jobs:
           printf 'tag_object=%s\n' "$remote_tag_object" >> "$GITHUB_OUTPUT"
           printf 'tag_target=%s\n' "$remote_tag_target" >> "$GITHUB_OUTPUT"
           printf '%s\n' "Signed annotated tag admitted before tagged repository code" >&2
+
+      - name: Read the publication contract from the admitted source tree
+        id: profile
+        env:
+          TARGET: ${{ steps.admit.outputs.tag_target }}
+        run: |
+          set -euo pipefail
+          entry="$(git ls-tree "$TARGET" -- release/publication-profile)"
+          if [[ -z "$entry" ]]; then
+            echo 'profile=legacy-unified' >> "$GITHUB_OUTPUT"
+          else
+            expected="$(printf 'core-cli-mcp-v1\n' | git hash-object --stdin)"
+            test "$entry" = "$(printf '100644 blob %s\trelease/publication-profile' "$expected")"
+            echo 'profile=core-cli-mcp-v1' >> "$GITHUB_OUTPUT"
+          fi
 
   validate:
     needs: [release_input, signed_tag_admission]
@@ -300,7 +316,16 @@ jobs:
           PY
 
       - name: Record executed release gates
+        env:
+          PUBLICATION_PROFILE: ${{ needs.signed_tag_admission.outputs.publication_profile }}
         run: |
+          set -euo pipefail
+          web_gates=()
+          if [[ "$PUBLICATION_PROFILE" == legacy-unified ]]; then
+            web_gates=(--pending-mandatory profile-b-web-acceptance
+                       --pending-mandatory web-semantic-acceptance
+                       --pending-mandatory web-rerank-acceptance)
+          fi
           uv run python scripts/generate_release_gate_manifest.py \
              --output "$RUNNER_TEMP/power-release-gates.json" \
             --passed-mandatory locked-dependencies \
@@ -316,9 +341,7 @@ jobs:
              --passed-mandatory phase8-technical \
              --passed-mandatory retention-soak \
              --pending-mandatory profile-a-mcp-stdio \
-             --pending-mandatory profile-b-web-acceptance \
-             --pending-mandatory web-semantic-acceptance \
-             --pending-mandatory web-rerank-acceptance \
+             "${web_gates[@]}" \
              --pending-mandatory public-release-readback \
              --skipped-optional real-vault-quality \
              --skipped-optional deferred-macos-windows
@@ -397,10 +420,15 @@ jobs:
           uv sync --locked --group dev --extra web --extra semantic --extra rerank
 
       - name: Execute the Linux release upgrade matrix on the Ubuntu runner
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           target_version="$(python3 -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
-          from_version="$(git tag --sort=-version:refname --list 'v*.*.*' | TARGET_VERSION="$target_version" python3 -c 'import os, sys; target=os.environ["TARGET_VERSION"]; print(next(tag[1:] for tag in sys.stdin.read().splitlines() if tag[1:] != target))')"
+          previous="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          [[ "$previous" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          from_version="${previous#v}"
+          test "$from_version" != "$target_version"
           uv run python scripts/verify_upgrade_matrix.py \
             --from-version "$from_version" \
             --to-version "$target_version" \
@@ -546,6 +574,7 @@ jobs:
     needs: [release_input, signed_tag_admission, validate, upgrade-matrix-aggregate]
     if: >-
       always() &&
+      needs.signed_tag_admission.outputs.publication_profile == 'legacy-unified' &&
       inputs.export_oci_only != true &&
       needs.signed_tag_admission.result == 'success' &&
       needs.validate.result == 'success' &&
@@ -580,7 +609,8 @@ jobs:
            test -f "$RELEASE_CONTROL_ROOT/verify_attestation_provenance.py"
           printf 'RELEASE_CONTROL_ROOT=%s\n' "$RELEASE_CONTROL_ROOT" >> "$GITHUB_ENV"
 
-      - name: Validate the exact release tag checkout
+      - &validate_tag
+        name: Validate the exact release tag checkout
         env:
           EXPECTED_TAG_OBJECT: ${{ needs.signed_tag_admission.outputs.tag_object }}
           EXPECTED_TAG_TARGET: ${{ needs.signed_tag_admission.outputs.tag_target }}
@@ -602,7 +632,8 @@ jobs:
           printf 'REMOTE_TAG_OBJECT=%s\n' "$remote_tag_object" >> "$GITHUB_ENV"
           printf 'REMOTE_TAG_TARGET=%s\n' "$remote_tag_target" >> "$GITHUB_ENV"
 
-      - name: Verify signed release tag and maintainer fingerprint
+      - &verify_key
+        name: Verify signed release tag and maintainer fingerprint
         env:
           GH_TOKEN: ${{ github.token }}
           GNUPGHOME: ${{ runner.temp }}/power-release-gnupg
@@ -655,7 +686,8 @@ jobs:
           printf '%s\n' "Manual recovery is immutable; tag mutation is forbidden" >&2
           printf '%s\n' "Recovery may publish only the existing signed tag when no Release exists" >&2
 
-      - name: Reject an existing GitHub release for this tag
+      - &reject_existing
+        name: Reject an existing GitHub release for this tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -689,7 +721,8 @@ jobs:
           python -m pip install uv==0.11.33
           uv sync --locked --group dev --extra web --extra semantic --extra rerank
 
-      - name: Pin reproducible build timestamp
+      - &build_epoch
+        name: Pin reproducible build timestamp
         run: |
           set -euo pipefail
           epoch="$(git show -s --format=%ct HEAD)"
@@ -698,19 +731,22 @@ jobs:
           created="$(python3 -c 'from datetime import UTC, datetime; import sys; print(datetime.fromtimestamp(int(sys.argv[1]), UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))' "$epoch")"
           echo "OCI_CREATED=$created" >> "$GITHUB_ENV"
 
-      - name: Download Phase 8 technical receipts
+      - &download_receipts
+        name: Download Phase 8 technical receipts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: power-release-phase8-technical-receipts
           path: ${{ runner.temp }}/power-release-phase8-technical
 
-      - name: Download aggregate upgrade evidence
+      - &download_upgrade
+        name: Download aggregate upgrade evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: power-release-upgrade-aggregate
           path: ${{ runner.temp }}/power-release-upgrade
 
-      - name: Build reproducible package before binding final evidence
+      - &build_packages
+        name: Build reproducible package before binding final evidence
         run: |
           set -euo pipefail
           build_root="$RUNNER_TEMP/power-framework-repro-build"
@@ -750,7 +786,8 @@ jobs:
            find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -delete
            cp -- "${wheels_one[0]}" "${sdists_one[0]}" dist/
 
-      - name: Export hash-pinned native dependency lock
+      - &native_lock
+        name: Export hash-pinned native dependency lock
         run: |
           set -euo pipefail
            uv export --locked --no-dev --extra mcp --no-emit-project --no-annotate \
@@ -759,7 +796,8 @@ jobs:
           test -s dist/power-native-requirements.txt
           grep --quiet -- '--hash=sha256:' dist/power-native-requirements.txt
 
-      - name: Stage the exact package subject for SBOM generation
+      - &stage_wheel
+        name: Stage the exact package subject for SBOM generation
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -767,7 +805,8 @@ jobs:
           test -f "$wheel"
           cp -- "$wheel" "$RUNNER_TEMP/power-framework-package.whl"
 
-      - name: Generate package SPDX SBOM bound to the exact wheel
+      - &package_sbom
+        name: Generate package SPDX SBOM bound to the exact wheel
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           file: ${{ runner.temp }}/power-framework-package.whl
@@ -775,7 +814,8 @@ jobs:
           output-file: dist/power-framework.spdx.json
           upload-release-assets: false
 
-      - name: Normalize package SBOM identity
+      - &normalize_sbom
+        name: Normalize package SBOM identity
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -926,7 +966,8 @@ jobs:
           version="${RELEASE_TAG#v}"
           mv -- dist/power-web.spdx.json "dist/power-web-${version}.spdx.json"
 
-      - name: Attest package artifacts
+      - &attest_packages
+        name: Attest package artifacts
         id: package_attestation
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
@@ -991,7 +1032,8 @@ jobs:
             --attestation "github:${WEB_ATTESTATION_ID}" \
             --output dist/power-release-manifest.json
 
-      - name: Generate and verify tag-bound release baseline
+      - &verify_baseline
+        name: Generate and verify tag-bound release baseline
         env:
           GNUPGHOME: ${{ runner.temp }}/power-release-gnupg
         run: |
@@ -1014,7 +1056,8 @@ jobs:
              --upgrade-matrix-aggregate "$RUNNER_TEMP/power-release-upgrade/power-release-upgrade-aggregate.json" \
              --baseline dist/power-framework.release-baseline.json
 
-      - name: Smoke-test wheel and sdist outside checkout
+      - &smoke_packages
+        name: Smoke-test wheel and sdist outside checkout
         run: |
           uv run python scripts/smoke_package.py \
             --wheel dist/power_framework-*.whl \
@@ -1182,7 +1225,8 @@ jobs:
             *) printf '%s\n' "Unable to prove release absence for $RELEASE_TAG (HTTP $api_status)" >&2; exit 1 ;;
           esac
 
-      - name: Re-read immutable tag objects immediately before publication
+      - &recheck_tag
+        name: Re-read immutable tag objects immediately before publication
         env:
           EXPECTED_TAG_OBJECT: ${{ needs.signed_tag_admission.outputs.tag_object }}
           EXPECTED_TAG_TARGET: ${{ needs.signed_tag_admission.outputs.tag_target }}
@@ -1423,3 +1467,102 @@ jobs:
             ${{ runner.temp }}/power-web-attestation.json
           if-no-files-found: ignore
           retention-days: 14
+
+  publish_core:
+    needs: [release_input, signed_tag_admission, validate, upgrade-matrix-aggregate]
+    if: >-
+      success() && inputs.export_oci_only != true &&
+      needs.signed_tag_admission.outputs.publication_profile == 'core-cli-mcp-v1' &&
+      github.ref == format('refs/tags/{0}', needs.release_input.outputs.release_tag)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ needs.release_input.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.signed_tag_admission.outputs.tag_target }}
+          fetch-depth: 0
+          persist-credentials: false
+      - *validate_tag
+      - *verify_key
+      - *reject_existing
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13"
+      - name: Install native release tooling
+        run: |
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev --extra mcp
+      - *build_epoch
+      - *download_receipts
+      - *download_upgrade
+      - *build_packages
+      - *native_lock
+      - *stage_wheel
+      - *package_sbom
+      - *normalize_sbom
+      - *verify_baseline
+      - *smoke_packages
+      - name: Exercise the installed CLI and MCP stdio search
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/core-proof"
+          p="$RUNNER_TEMP/core-proof/bin"
+          "$p/pip" install --require-hashes --only-binary=:all: --no-deps -r dist/power-native-requirements.txt
+          "$p/pip" install --no-deps dist/*.whl
+          uv run python scripts/core_profile_acceptance.py "$p" "$RUNNER_TEMP/core-vault" "$RELEASE_TAG"
+      - *attest_packages
+      - name: Bind native release manifest and content checksums
+        env:
+          PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          test -n "$PACKAGE_ATTESTATION_ID"
+          uv run python scripts/build_release_manifest.py --version "$version" --commit "$REMOTE_TAG_TARGET" \
+            --wheel "dist/power_framework-${version}-py3-none-any.whl" --sdist "dist/power_framework-${version}.tar.gz" \
+            --package-sbom "dist/power-framework-${version}.spdx.json" --native-dependency-lock dist/power-native-requirements.txt \
+            --profile-evidence dist/power-profile-acceptance.json --attestation "github:$PACKAGE_ATTESTATION_ID" \
+            --output dist/power-release-manifest.json
+          cp "$RUNNER_TEMP/power-release-upgrade/power-release-upgrade-aggregate.json" dist/
+          jq -n --arg commit "$REMOTE_TAG_TARGET" --arg tag_object "$REMOTE_TAG_OBJECT" --arg tag "$RELEASE_TAG" \
+            --arg tree "$(git rev-parse 'HEAD^{tree}')" --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg manifest "$(sha256sum dist/power-release-manifest.json | cut -d' ' -f1)" \
+            '{schema:"power.core.release-receipt.v1",profile:"core-cli-mcp-v1",$tag,$tag_object,$commit,$tree,$run,$attempt,manifest_sha256:$manifest}' \
+            > dist/power-framework.release-receipt.json
+          (cd dist && sha256sum -- * > "$RUNNER_TEMP/core-sums" && cp "$RUNNER_TEMP/core-sums" SHA256SUMS && sha256sum --check --strict SHA256SUMS)
+      - name: Attest the complete core asset set
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        with:
+          subject-path: dist/*
+      - *recheck_tag
+      - name: Publish verified native assets and check the public downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "POWER $RELEASE_TAG — Linux core, CLI and MCP" \
+            --notes-file "docs/release-${version}.md" dist/*
+          dest="$RUNNER_TEMP/core-readback"
+          mkdir "$dest"
+          gh release download "$RELEASE_TAG" --dir "$dest"
+          diff -qr dist "$dest"
+          (cd "$dest" && sha256sum --check --strict SHA256SUMS)
+          for f in "$dest"/*; do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" \
+              --cert-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF" \
+              --source-digest "$REMOTE_TAG_TARGET" --source-ref "$GITHUB_REF"
+          done
+          test "$(git ls-remote origin "refs/tags/$RELEASE_TAG" | cut -f1)" = "$REMOTE_TAG_OBJECT"
+          gh release view "$RELEASE_TAG" --json isDraft,tagName | jq -e \
+            --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true'
+          gh release edit "$RELEASE_TAG" --verify-tag --draft=false --latest
+          gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,tagName | jq -e \
+            --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == false and .isPrerelease == false'
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/core-public"
+          diff -qr dist "$RUNNER_TEMP/core-public"

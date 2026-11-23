@@ -1,12 +1,12 @@
 # Getting Started from a Clean Knowledge Base
 
-This is the clean-install path for P.O.W.E.R. `v3.7.14`. It
+This is the clean-install path for P.O.W.E.R. `v3.7.15`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
 
 > **Release contract:** run the download commands below only when the signed
 > tag and expected immutable assets are visible and verified on the
-> [v3.7.14 release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.14).
+> [v3.7.15 release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.15).
 > Otherwise, see the
 > [latest published release](https://github.com/weby-homelab/power-framework/releases/latest)
 > and use the instructions and artifacts matching that version. Check the
@@ -14,7 +14,7 @@ creates a new vault only. For existing notes, use the
 
 The [Windows installation guide](windows-11-installation.md) is informational
 only. Windows and macOS are deferred indefinitely and are not supported release
-platforms for `v3.7.14`.
+platforms for `v3.7.15`.
 
 ## Choose a supported deployment profile
 
@@ -27,8 +27,8 @@ vault. Docker, Web UI, reverse proxy, and Web cache are not required.
 
 ### Profile B — full human + agent server
 
-Complete Profile A first. Then run the matching `power-web` image from the
-[Profile B deployment contract](architecture/unified-runtime.md). Profile B uses the same
+The 3.7.15 release does **not** publish a Web image. For a separately built
+Web deployment, see the [Profile B deployment contract](architecture/unified-runtime.md). Profile B uses the same
 canonical vault read-write for governed Web proposal/apply operations, a
 rebuildable named Web cache, host loopback `127.0.0.1:8080`, and no MCP service
 inside the container. Provision the container's non-root UID/GID with the
@@ -49,18 +49,18 @@ or relying on `--break-system-packages` for a normal installation.
 On Linux:
 
 ```bash
-POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.14"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.15"
 mkdir -p "$POWER_RELEASE_DIR"
-gh release download v3.7.14 --repo weby-homelab/power-framework \
-  --pattern 'power_framework-3.7.14-py3-none-any.whl' \
+gh release download v3.7.15 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.15-py3-none-any.whl' \
   --pattern 'power-native-requirements.txt' \
   --pattern 'power-release-manifest.json' \
   --dir "$POWER_RELEASE_DIR"
 
-python3 -m venv "$HOME/.cache/power-3.7.14-venv"
-POWER_PYTHON="$HOME/.cache/power-3.7.14-venv/bin/python"
-POWER_CLI="$HOME/.cache/power-3.7.14-venv/bin/power"
-POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.14-py3-none-any.whl"
+python3 -m venv "$HOME/.cache/power-3.7.15-venv"
+POWER_PYTHON="$HOME/.cache/power-3.7.15-venv/bin/python"
+POWER_CLI="$HOME/.cache/power-3.7.15-venv/bin/power"
+POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.15-py3-none-any.whl"
 POWER_LOCK="$POWER_RELEASE_DIR/power-native-requirements.txt"
 POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
 
@@ -82,7 +82,7 @@ Verify the executable, package metadata, and lean import:
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Both version commands must report `3.7.14`; the final command must print
+Both version commands must report `3.7.15`; the final command must print
 `lean FTS import: OK`.
 
 For the canonical managed native launchers, review the dry-run and then apply
@@ -107,7 +107,7 @@ POWER_CLI="$HOME/.local/bin/power"
 
 The Git tag is useful for source inspection, but it is not the public clean-install
 path: dependency resolution from a source URL is not hash-bound. For a reproducible
-`v3.7.14` installation after publication, use the release wheel and native lock above.
+`v3.7.15` installation after publication, use the release wheel and native lock above.
 
 ## 3. Initialize an empty vault
 
@@ -249,7 +249,7 @@ it up before removing either location.
 ## Acceptance checklist
 
 - Python is 3.13 or 3.14 and the selected interpreter is inside the dedicated venv.
-- CLI and distribution metadata both report `3.7.14`.
+- CLI and distribution metadata both report `3.7.15`.
 - `power_framework` imports successfully and the official Profile A includes the MCP extra.
 - MCP preflight validates the configured vault through the public `power-mcp` launcher.
 - `init`, `ingest`, `index --strict`, `lint`, and `markdown-check` exit `0`.

@@ -1,6 +1,7 @@
 {
     "schema": "power.unified.plan.v1",
-    "target_version": "3.7.14",
+    "target_version": "3.7.15",
+    "publication_profile": "core-cli-mcp-v1",
     "base_power_commit": "1a9879ee2353d63d979da5f68e79a6065122343b",
     "gui_migration_source_sha": "0dead07a04d5590e2cf3308b2d289742730a8633",
     "canonical_repository": "weby-homelab/power-framework",
@@ -8,7 +9,7 @@
     "profiles": {
         "native": "supported",
         "mcp_stdio": "supported",
-        "web_container": "supported"
+        "web_container": "not-published"
     },
     "invariants": {
         "single_repo": true,
