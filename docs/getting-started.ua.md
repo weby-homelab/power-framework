@@ -1,18 +1,19 @@
 # Початок роботи з чистою базою знань
 
-Це авторитетний clean-install шлях для P.O.W.E.R. `v3.7.11`. Він створює лише
+Це clean-install шлях для P.O.W.E.R. `v3.7.14`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
-> **Контракт релізу:** використовуйте `v3.7.11` лише після появи signed tag та
-> immutable wheel на [сторінці релізу GitHub](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11).
-> Цей гід називає tag-bound target; сам URL не доводить завершення публікації.
-> Перед установкою на не-Linux host
+> **Контракт релізу:** виконуйте команди завантаження нижче лише коли signed
+> tag та очікувані immutable assets видно й перевірено на
+> [сторінці релізу v3.7.14](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.14).
+> Інакше дивіться [останній опублікований реліз](https://github.com/weby-homelab/power-framework/releases/latest)
+> та використовуйте інструкції й артефакти відповідної версії. Перед установкою
 > перевірте [матрицю підтримки платформ](support-matrix.ua.md).
 
 [Windows-гід](windows-11-installation.ua.md) є лише інформаційним. Windows і
 macOS відкладені на невизначений строк і не є підтримуваними release-платформами
-для `v3.7.11`.
+для `v3.7.14`.
 
 ## 1. Передумови
 
@@ -29,18 +30,18 @@ macOS відкладені на невизначений строк і не є �
 На Linux:
 
 ```bash
-POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.13"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.14"
 mkdir -p "$POWER_RELEASE_DIR"
-gh release download v3.7.13 --repo weby-homelab/power-framework \
-  --pattern 'power_framework-3.7.13-py3-none-any.whl' \
+gh release download v3.7.14 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.14-py3-none-any.whl' \
   --pattern 'power-native-requirements.txt' \
   --pattern 'power-release-manifest.json' \
   --dir "$POWER_RELEASE_DIR"
 
-python3 -m venv "$HOME/.cache/power-3.7.13-venv"
-POWER_PYTHON="$HOME/.cache/power-3.7.13-venv/bin/python"
-POWER_CLI="$HOME/.cache/power-3.7.13-venv/bin/power"
-POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.13-py3-none-any.whl"
+python3 -m venv "$HOME/.cache/power-3.7.14-venv"
+POWER_PYTHON="$HOME/.cache/power-3.7.14-venv/bin/python"
+POWER_CLI="$HOME/.cache/power-3.7.14-venv/bin/power"
+POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.14-py3-none-any.whl"
 POWER_LOCK="$POWER_RELEASE_DIR/power-native-requirements.txt"
 POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
 
@@ -62,7 +63,7 @@ POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Обидві команди версії мають показати `3.7.11`, а остання команда —
+Обидві команди версії мають показати `3.7.14`, а остання команда —
 `lean FTS import: OK`.
 
 Для канонічних managed native launchers спочатку перегляньте dry-run, а потім
@@ -87,7 +88,7 @@ POWER_CLI="$HOME/.local/bin/power"
 
 Git tag придатний для інспекції source, але не є шляхом public clean-install:
 розв'язання залежностей із source URL не має hash binding. Для відтворюваної
-інсталяції `v3.7.11` використовуйте release wheel і native lock вище.
+інсталяції `v3.7.14` після публікації використовуйте release wheel і native lock вище.
 
 ## 3. Ініціалізуйте порожній vault
 
@@ -230,7 +231,7 @@ Vault — це звичайні Markdown-файли, незалежні від P
 ## Acceptance checklist
 
 - Python має версію 3.13 або 3.14, а interpreter належить окремому venv.
-- CLI та distribution metadata повертають `3.7.11`.
+- CLI та distribution metadata повертають `3.7.14`.
 - `power_framework` імпортується, а офіційний Profile A містить extra `mcp`.
 - MCP preflight успішно імпортує `power_framework.mcp` через launcher `power-mcp`.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з

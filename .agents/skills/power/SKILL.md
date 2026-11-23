@@ -1,7 +1,7 @@
 ---
 name: power
-version: 3.7.13
-description: P.O.W.E.R. 3.7.13 — Hybrid Knowledge Management Framework (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules). Provides 20 MCP tools, Python API, and CLI. Zero-loss updates, sub-indexes, semantic search, decay scoring, safe refactoring, and AI safety checks.
+version: 3.7.14
+description: P.O.W.E.R. 3.7.14 — Hybrid Knowledge Management Framework (P.A.R.A. + OKF v0.1 + Graph RAG + LLM-Wiki + Execution Rules). Provides 20 MCP tools, Python API, and CLI. Zero-loss updates, sub-indexes, semantic search, decay scoring, safe refactoring, and AI safety checks.
 ---
 
 # ⚡ P.O.W.E.R. Knowledge Management Skill
