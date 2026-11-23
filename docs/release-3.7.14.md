@@ -15,6 +15,11 @@ to the same protected maintenance commit before publication can be verified.
 - The doctor report remains schema version 1. When the dense chunk table is
   absent, `vault.indexed_chunks` is `null`; existing warnings and exit-code
   behavior remain in effect.
+- Refreshed selected security-relevant versions in `uv.lock`, including MCP and
+  mcp-types 2.2.0 and optional fastembed 0.9.1 / Pillow 13.0.0. Hash-pinned
+  native requirements cover the selected native profile; installing a wheel
+  without that lock can resolve different versions. Audit the environment
+  actually installed rather than assuming every installation uses these pins.
 
 ## Diagnose a legacy FTS-only index
 

@@ -17,6 +17,12 @@ No unreleased changes.
   correctly open relative index paths containing SQLite URI special characters.
   Reject missing or ordinary `fts_notes` tables when dense data is absent.
 
+### Security
+
+- Refresh security-relevant `uv.lock` pins, including MCP/mcp-types 2.2.0 and
+  optional fastembed 0.9.1 / Pillow 13.0.0. Unlocked wheel installations can
+  resolve different versions and require their own audit.
+
 ## [3.7.11] - 2026-09-02
 
 ### Fixed
