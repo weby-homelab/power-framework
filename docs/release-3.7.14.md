@@ -1,6 +1,6 @@
 # POWER 3.7.14 patch release
 
-POWER 3.7.14 is a proposed maintenance patch for the 3.7 release line. Its
+POWER 3.7.14 is a maintenance patch for the 3.7 release line. Its
 signed tag, public assets, attestations, and clean-install evidence must bind
 to the same protected maintenance commit before publication can be verified.
 
@@ -45,8 +45,11 @@ an unreadable index.
 
 ## Installation and verification
 
-After publication, use the immutable public wheel or source distribution and
-the accompanying hash-pinned `power-native-requirements.txt`; follow
+Use the immutable public wheel or source distribution and the accompanying
+hash-pinned `power-native-requirements.txt` only when the signed tag and expected
+assets are visible and verified on the [v3.7.14 release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.14).
+Otherwise, use the [latest published release](https://github.com/weby-homelab/power-framework/releases/latest)
+and its matching instructions. For 3.7.14, follow
 [Getting Started](getting-started.md) and the [CLI reference](cli.md).
 Verify the signed tag, public manifest, checksums, release receipt,
 attestations, and clean-install readback before relying on the release. A local

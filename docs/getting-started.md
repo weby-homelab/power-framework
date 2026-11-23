@@ -1,12 +1,13 @@
 # Getting Started from a Clean Knowledge Base
 
-This is the candidate clean-install path for P.O.W.E.R. `v3.7.14`. It
+This is the clean-install path for P.O.W.E.R. `v3.7.14`. It
 creates a new vault only. For existing notes, use the
 [migration guide](migration-guide.md) instead of running `power init` in place.
 
-> **Candidate notice:** `v3.7.14` assets are not yet available. Do not run the
-> download commands below until its signed tag and immutable release assets
-> are published and verified. For an available release, see the
+> **Release contract:** run the download commands below only when the signed
+> tag and expected immutable assets are visible and verified on the
+> [v3.7.14 release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.14).
+> Otherwise, see the
 > [latest published release](https://github.com/weby-homelab/power-framework/releases/latest)
 > and use the instructions and artifacts matching that version. Check the
 > [platform support matrix](support-matrix.md) before installing.

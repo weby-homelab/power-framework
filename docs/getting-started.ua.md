@@ -1,12 +1,13 @@
 # Початок роботи з чистою базою знань
 
-Це candidate clean-install шлях для P.O.W.E.R. `v3.7.14`. Він створює лише
+Це clean-install шлях для P.O.W.E.R. `v3.7.14`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
-> **Candidate notice:** assets `v3.7.14` ще недоступні. Не виконуйте команди
-> завантаження нижче до публікації й перевірки signed tag та immutable assets.
-> Для доступного релізу дивіться [останній опублікований реліз](https://github.com/weby-homelab/power-framework/releases/latest)
+> **Контракт релізу:** виконуйте команди завантаження нижче лише коли signed
+> tag та очікувані immutable assets видно й перевірено на
+> [сторінці релізу v3.7.14](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.14).
+> Інакше дивіться [останній опублікований реліз](https://github.com/weby-homelab/power-framework/releases/latest)
 > та використовуйте інструкції й артефакти відповідної версії. Перед установкою
 > перевірте [матрицю підтримки платформ](support-matrix.ua.md).
 
