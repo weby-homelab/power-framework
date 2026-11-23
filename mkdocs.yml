@@ -51,6 +51,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
+      - Quick Start (Linux): quick-start-linux.md
       - Clean Install (EN): getting-started.md
       - Чисте встановлення (UA): getting-started.ua.md
       - Windows 11 25H2 (EN): windows-11-installation.md
