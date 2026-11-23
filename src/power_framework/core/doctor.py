@@ -53,16 +53,26 @@ def _status(issues: list[dict[str, str]]) -> str:
 
 def _connect_read_only(database: Path) -> sqlite3.Connection:
     """Open an existing SQLite database without creating or changing it."""
-    return sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True, timeout=30)
+    return sqlite3.connect(f"{database.absolute().as_uri()}?mode=ro", uri=True, timeout=30)
 
 
-def _read_index_counts(database: Path) -> tuple[int, int]:
+def _read_index_counts(database: Path) -> tuple[int, int | None]:
     with closing(_connect_read_only(database)) as connection:
         files_row = connection.execute("SELECT COUNT(*) FROM file_metadata").fetchone()
-        chunks_row = connection.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()
-    if files_row is None or chunks_row is None:
+        dense_table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chunk_embeddings'"
+        ).fetchone()
+        if dense_table is None:
+            # Missing dense data is not a broken FTS index, but FTS must exist.
+            connection.execute("SELECT 1 FROM fts_notes LIMIT 1").fetchone()
+            chunks_row = None
+        else:
+            chunks_row = connection.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()
+            if chunks_row is None:
+                raise sqlite3.DatabaseError("index chunk count query returned no rows")
+    if files_row is None:
         raise sqlite3.DatabaseError("index count query returned no rows")
-    return int(files_row[0]), int(chunks_row[0])
+    return int(files_row[0]), int(chunks_row[0]) if chunks_row is not None else None
 
 
 def _model_is_cached() -> bool:
