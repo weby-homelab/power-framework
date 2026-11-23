@@ -14,6 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PSE Phase 3 Project Semantic Compiler:** Deterministic 44-event dispatch registry, zero-false-verification epistemic invariant constraining model extractions to `proposed`/`unverified`, prompt injection scanning with passive delimiters, regex secret scrubbing, and 5-class contradiction taxonomy.
 - **Authoritative Replay Boundary:** Enforced canonical-ledger verification boundary where only authentic, ordered event streams re-read under a canonical vault root can achieve authoritative `VERIFIED` entity status; untrusted, in-memory, or forged receipt inputs unconditionally fail closed.
 
+- The development line now includes an FTS/dense retrieval regression benchmark
+  ([#520](https://github.com/weby-homelab/power-framework/pull/520)) and reports
+  search capabilities and index freshness ([#522](https://github.com/weby-homelab/power-framework/pull/522)).
+
+### Fixed
+
+- The retrieval planner's semantic stage now runs the dense search it requests
+  ([#519](https://github.com/weby-homelab/power-framework/pull/519)).
+
+## [3.7.13](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.13) - 2026-09-15
+
+### Fixed
+
+- Task mutations stop when the event journal is missing, corrupt or inconsistent
+  with the task. The Web UI still shows the snapshot with an integrity warning
+  and disables mutation controls; direct mutation attempts return HTTP 409
+  (`task_journal_integrity`). See the linked release for artifacts and checksums.
+
 ## [3.7.11] - 2026-09-02
 
 ### Fixed
@@ -211,6 +229,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.6.3] - 2026-08-19
 
+See the [3.6.3 release notes](docs/release-3.6.3.md) for the task and decision contracts.
+
 ### Fixed
 
 - Separated Task revision from event sequence and validated hash-linked event journals.
@@ -218,6 +238,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added durable proposal apply-by-ID boundary.
 
 ## [3.6.1] - 2026-08-17
+
+See the [3.6.1 release notes](docs/release-3.6.1.md) for the concurrency changes.
 
 ### Added
 
@@ -234,6 +256,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated release version across `pyproject.toml`, `models.lock.json`, `SKILL.md`, runtime contracts, and agent guides.
 
 ## [3.6.0] - 2026-08-13
+
+See the [3.6.0 release notes](docs/release-3.6.0.md) for the Linux release scope.
 
 ### Changed
 
@@ -501,6 +525,8 @@ All POWER 3.4+ phases completed (Milestone 3.4.5 — DONE):
   documentation-drift gate.
 
 ## [3.2.1] - 2026-07-24
+
+Historical evidence: [full-sync test report](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md).
 
 ### Fixed
 

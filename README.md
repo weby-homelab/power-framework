@@ -22,12 +22,9 @@ The Obsidian Second Brain is a first-class supported data substrate and memory t
 
 ---
 
-## 🏛️ Release & Architecture Lines
+**Start here:** [Install on Linux](docs/quick-start-linux.md) · [Connect an MCP client](#mcp-server-setup) · [Run the Web UI with Docker](#supported-deployment-profiles).
 
-- **Install a published release:** use [GitHub Releases → Latest](https://github.com/weby-homelab/power-framework/releases/latest). The pinned example below uses `v3.7.13` from `release/3.7`. A Git tag alone does not mean that the Python packages and Web image are available.
-- **Development (`main`, 3.8):** retrieval, incremental indexing and MCP discovery. [ADR-0007](docs/adr/0007-power-3.8-north-star-control-plane-architecture.md) describes the architecture, not a list of features certified in the stable release.
-
----
+For downloads, use the [latest published release](https://github.com/weby-homelab/power-framework/releases/latest). For what changed between versions, read the [changelog](CHANGELOG.md).
 
 ## 🛡️ Core Principles: Proof Chain & Three Authorities
 
@@ -62,24 +59,13 @@ flowchart LR
 
 ---
 
-## ⚡ Feature Matrix across Versions
-
-| Which code are you running? | CLI and MCP interface | Where to check |
-|---|---|---|
-| Published `v3.7.13` | 26 top-level CLI commands; the MCP server registers 20 tools. | [Versioned runtime contract](https://github.com/weby-homelab/power-framework/blob/v3.7.13/skills/power/references/runtime-contract.md) |
-| This `main` checkout | 27 CLI commands, including `infra`; 21 MCP tools. | [CLI reference](docs/cli.md), [MCP reference](docs/mcp-server.md) |
-
-Use `power --version` and `power --help` for the installed CLI. For MCP, call `get_server_info` for the running version and `tools/list` for the tools **that server** exposes.
-
----
-
 ## Why P.O.W.E.R.?
 
 Unlike generic knowledge management tools or naive agent wrappers, P.O.W.E.R. provides an **authoritative, local-first control plane**:
 
 - **Verifiable results** — Use the source revision and verification receipt for a claim. A successful search or a passing unit test is not a release receipt.
 - **AI-native metadata substrate** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`).
-- **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` supports selective agent navigation; the linked historical v1.6.0 report measured scenario-specific savings, not a universal release guarantee.
+- **Selective reading** — use `index.md` to choose a folder, then its `_index.md` to find the note. You don't need to load the whole vault into an agent's context.
 - **Knowledge Graph & Sub-Indexes** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows.
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field.
 - **Approved session notes** — `synthesize_session` takes caller-supplied content and requires explicit approval before writing. Connecting an agent does not automatically save conversations.
@@ -111,43 +97,7 @@ the role-specific guides before touching a vault:
 
 ## Quick Start (Linux)
 
-The commands below are the shortest supported path for Linux. They
-assume Python 3.13 or 3.14 and a terminal shell; `~/my-vault` is the vault directory
-you want POWER to manage.
-
-> **Pinned example:** the following commands require `gh`, Bash and Python 3.13 or 3.14. They use the wheel and hash-pinned dependencies from the [published `v3.7.13` release](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.13). For another version, use its own release assets, checksums and instructions together.
-
-```bash
-set -euo pipefail
-POWER_VERSION=3.7.13
-POWER_RELEASE_DIR="$HOME/.cache/power-release-$POWER_VERSION"
-mkdir -p "$POWER_RELEASE_DIR"
-gh release download "v$POWER_VERSION" --repo weby-homelab/power-framework \
-  --pattern "power_framework-${POWER_VERSION}-py3-none-any.whl" \
-  --pattern 'power-native-requirements.txt' \
-  --pattern 'SHA256SUMS' \
-  --dir "$POWER_RELEASE_DIR"
-(
-  cd "$POWER_RELEASE_DIR"
-  for asset in "power_framework-${POWER_VERSION}-py3-none-any.whl" power-native-requirements.txt; do
-    awk -v name="$asset" '$2 == name { print; found++ } END { exit (found != 1) }' SHA256SUMS |
-      sha256sum --check --strict -
-  done
-)
-python3 -m venv "$POWER_RELEASE_DIR/venv"
-POWER_PYTHON="$POWER_RELEASE_DIR/venv/bin/python"
-"$POWER_PYTHON" -m pip install --require-hashes \
-  -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
-"$POWER_PYTHON" -m pip install --no-deps \
-  "$POWER_RELEASE_DIR/power_framework-${POWER_VERSION}-py3-none-any.whl"
-export PATH="$POWER_RELEASE_DIR/venv/bin:$PATH"
-
-power init ~/my-vault          # Create vault structure
-power lint ~/my-vault          # Check for broken links & missing metadata
-power index ~/my-vault         # Generate catalog index.md
-power heal ~/my-vault          # Preview proposed frontmatter repairs; writes require --no-dry-run
-power markdown-check ~/my-vault  # Check markdown quality issues
-```
+[Follow the Linux quick start](docs/quick-start-linux.md) to install POWER and check a new vault.
 
 ## Supported deployment profiles
 
@@ -217,26 +167,7 @@ made for `v3.7.11`. Windows and macOS have no scheduled release target.
 | **CI/CD**                        | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest.                                                                                                                                                                                                                                                                                                                  |
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
 
-> **Linux release evidence:** publication requires machine validation
-> gates, package/CI provenance, an SBOM, a Linux upgrade matrix executed on the
-> Ubuntu CI runner, and source-bound technical receipts. Real-vault and human
-> evaluation are optional benchmarks, not release secrets or publication
-> blockers. Once published, these
-> receipts apply to the
-> declared release scope. Historical feature-table figures, model comparisons,
-> resource limits, and benchmark recommendations do not become guarantees for
-> an arbitrary host or vault.
-
-## Migration Report
-
-Read the historical v1.6.0 snapshot of the transition from flat to hierarchical
-indexing. Its measured vault counts, token estimates, source paths, test counts,
-and MCP inventory are historical evidence, not the interface of the installed version:
-
-- **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
-- **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
-
-### AI Agent Migration Guide
+## Migrate an existing vault
 
 Six-phase, fail-closed protocol for any AI agent to migrate an existing
 Markdown knowledge base into the canonical P.O.W.E.R. structure with an
@@ -408,9 +339,7 @@ AI agents read the vault efficiently by following this pattern:
 1. **Read `index.md`** — identify the relevant category by note counts
 2. **Call `read_sub_index` MCP tool** — get detailed entries for that category
 3. **Read specific notes** — only when the sub-index indicates relevance
-4. **NEVER glob all `.md` files** — use sub-indexes as a map; the historical
-   v1.6 migration report records scenario-specific measurements, not a current
-   release guarantee
+4. Use the sub-indexes as a map rather than loading every Markdown file.
 
 Every note starts with validated YAML frontmatter. Core fields + optional governance and graph links:
 
@@ -439,7 +368,7 @@ related:
 The framework combines four complementary methodologies:
 
 - **P** — **P.A.R.A.** (Projects, Areas, Resources, Archive) — Organizes files based on actionability into Projects, Areas, Resources, and Archives. P.O.W.E.R. adopts this directory structure to dictate the lifecycle of notes. Information moves organically from raw inbox captures to active project execution, long-term reference areas, and eventual archives.
-- **W** — **LLM-Wiki** (A. Karpathy's philosophy) — Transforms the knowledge base into a hierarchical, AI-readable catalog. By generating top-level `index.md` maps and folder-level `_index.md` sub-catalogs, it provides token-efficient navigation. Historical v1.6 measurements are preserved in the migration report and are not a current release-quality claim.
+- **W** — **LLM-Wiki** — The top-level `index.md` and per-folder `_index.md` files let an agent find a note without loading the entire vault.
 - **E.R.** — **Execution Rules** — Integrates operational rules and guidelines specifically formatted for AI agents (like `RULES.md`, `PROMPTS.md`, and system-level guidelines), enforcing safe, non-destructive editing boundaries and dictating how human and AI actors interact with the system. GPG-signed commits, PR-only workflow, cron-based sync, branch cleanup.
 
 ### 🧠 Second Brain vs P.O.W.E.R. Framework Relationship & Collaboration
@@ -611,18 +540,6 @@ ruff format src/ tests/
 # Type check
 mypy src/power_framework/
 ```
-
-### Test Reports & Benchmarks
-
-For current, reproducible release information and evidence:
-
-- [Historical P.O.W.E.R. 3.6.3 release notes](docs/release-3.6.3.md) — Canonical Task v2, typed decisions, fail-closed persistence, reranked search, and evidence boundaries.
-- [P.O.W.E.R. 3.6.1 release notes](docs/release-3.6.1.md) — Strict 50% CPU throttling mandate, Linux-first architecture, evidence, and upgrade guidance.
-- [P.O.W.E.R. 3.6.0 release notes](docs/release-3.6.0.md) — Linux-first architecture, evidence, and upgrade guidance.
-- [P.O.W.E.R. 3.2.1 TEST-2](docs/tests/P.O.W.E.R.3.2.1-TEST-2.md) — canonical
-  checksum-verified post-merge WS full-sync evidence; extended validation is
-  explicitly tracked in issue #187.
-- [P.O.W.E.R. v3.0.0 — Extended UA↔EN Search-Quality Report](docs/tests/P.O.W.E.R.3.0.0-TEST.md) — historical report; its UDCG naming and real-vault quality claims are not current release evidence.
 
 ## Low-RAM Deployment (8–12 GB)
 
