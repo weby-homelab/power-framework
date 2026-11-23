@@ -4,6 +4,12 @@ Handoffs are concise, timestamped, append-only evidence packets for one POWER
 3.8 gate. They allow a new agent to resume from repository-visible evidence
 without relying on an old chat transcript.
 
+The three pre-merge governance snapshots for #408 and three intermediate
+INFRA-1 snapshots are preserved [in the September archive](../archive/handoffs/2026-09/).
+The [dependency-refresh ledger and inventory](../archive/repository-cleanup-2026-09/)
+record that month's cleanup, not current package versions. For citations using
+the original paths, see the [repository before this move](https://github.com/weby-homelab/power-framework/tree/258cc1a09ee66d88e19af85af3a261c2565f19df/artifacts).
+
 ## Publication model
 
 A handoff may describe a governance gate, an architecture-planning gate, an
