@@ -10,6 +10,11 @@ on:
         description: "Existing signed tag for immutable recovery; never create or move a tag"
         required: true
         type: string
+      export_oci_only:
+        description: "Export and attest the Web image for maintainer staging; do not publish a release"
+        type: boolean
+        required: false
+        default: false
 
 permissions: {}
 
@@ -442,10 +447,101 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  export_web_oci:
+    if: github.event_name == 'workflow_dispatch' && inputs.export_oci_only
+    needs: [release_input, signed_tag_admission, validate, upgrade-matrix-aggregate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ needs.release_input.outputs.release_tag }}
+      TAG_OBJECT: ${{ needs.signed_tag_admission.outputs.tag_object }}
+      TAG_TARGET: ${{ needs.signed_tag_admission.outputs.tag_target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.signed_tag_admission.outputs.tag_target }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Build the tag-bound wheel and export the image without registry access
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TAG_TARGET"
+          test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{tag}")" = "$TAG_OBJECT"
+          test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = "$TAG_TARGET"
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          created="$(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y-%m-%dT%H:%M:%SZ')"
+          python -m pip install uv==0.11.33
+          uv sync --locked --group dev --extra web --extra semantic --extra rerank
+          export_dir="$RUNNER_TEMP/power-oci-export"
+          mkdir -p "$export_dir" "$RUNNER_TEMP/src-one" "$RUNNER_TEMP/src-two"
+          wheel="power_framework-${RELEASE_TAG#v}-py3-none-any.whl"
+          for build in one two; do
+            git archive HEAD | tar -xf - -C "$RUNNER_TEMP/src-$build"
+            uv run python -m build --wheel --no-isolation \
+              --outdir "$RUNNER_TEMP/wheel-$build" "$RUNNER_TEMP/src-$build"
+          done
+          cmp "$RUNNER_TEMP/wheel-one/$wheel" "$RUNNER_TEMP/wheel-two/$wheel"
+          cp "$RUNNER_TEMP/wheel-one/$wheel" "release/$wheel"
+          docker buildx create --name release-export --driver docker-container --use
+          docker buildx build --platform linux/amd64 \
+            --file deploy/web/Dockerfile \
+            --build-arg "POWER_VERSION=${RELEASE_TAG#v}" \
+            --build-arg "POWER_WHEEL_FILE=$wheel" \
+            --build-arg "POWER_SOURCE_REVISION=$TAG_TARGET" \
+            --build-arg "POWER_RELEASE_TAG=$RELEASE_TAG" \
+            --build-arg "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+            --build-arg "OCI_CREATED=$created" \
+            --tag "ghcr.io/weby-homelab/power-framework-web:staging-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --output "type=oci,dest=$RUNNER_TEMP/power-web.oci.tar" .
+          test -s "$RUNNER_TEMP/power-web.oci.tar"
+          printf '%s\n' "$RELEASE_TAG" "$TAG_OBJECT" "$TAG_TARGET" > "$export_dir/tag-binding.txt"
+          sha256sum "release/$wheel" >> "$export_dir/tag-binding.txt"
+      - name: Encrypt private image before uploading to Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GNUPGHOME: ${{ runner.temp }}/power-export-gnupg
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 700 "$GNUPGHOME"
+          keyfile="$GNUPGHOME/maintainer-public.asc"
+          expected=7AF1EDA195FE29FF093FB1CA2D49E810C7F2527E
+          gh api users/weby-homelab/gpg_keys \
+            --jq '.[] | select(.key_id == "2D49E810C7F2527E") | .raw_key' > "$keyfile"
+          actual="$(gpg --batch --with-colons --show-keys "$keyfile" | awk -F: '$1=="fpr" && !seen++ {print $10}')"
+          test "$actual" = "$expected"
+          gpg --batch --import "$keyfile"
+          cd "$RUNNER_TEMP"
+          sha256sum power-web.oci.tar >> power-oci-export/tag-binding.txt
+          gpg --batch --trust-model always --recipient "$expected" --encrypt \
+            --output power-oci-export/power-web.oci.tar.gpg power-web.oci.tar
+          rm -- power-web.oci.tar
+      - name: Attest the exact ciphertext and tag-binding receipt
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            ${{ runner.temp }}/power-oci-export/power-web.oci.tar.gpg
+            ${{ runner.temp }}/power-oci-export/tag-binding.txt
+      - name: Upload immutable staging input, not a release asset
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: power-web-oci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/power-oci-export/
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
+
   release:
     needs: [release_input, signed_tag_admission, validate, upgrade-matrix-aggregate]
     if: >-
       always() &&
+      inputs.export_oci_only != true &&
       needs.signed_tag_admission.result == 'success' &&
       needs.validate.result == 'success' &&
       needs.upgrade-matrix-aggregate.result == 'success' &&

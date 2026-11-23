@@ -552,6 +552,44 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "OCI_CREATED" in release_text
 
 
+def test_oci_recovery_export_cannot_publish_a_release() -> None:
+    workflow = yaml.safe_load((WORKFLOWS_DIR / "release.yml").read_text())
+    triggers = workflow.get("on", workflow.get(True))
+    option = triggers["workflow_dispatch"]["inputs"]["export_oci_only"]
+    assert option["type"] == "boolean"
+    assert option["default"] is False
+    jobs = workflow["jobs"]
+    export = jobs["export_web_oci"]
+    assert set(export["needs"]) == {
+        "release_input",
+        "signed_tag_admission",
+        "validate",
+        "upgrade-matrix-aggregate",
+    }
+    assert export["if"] == "github.event_name == 'workflow_dispatch' && inputs.export_oci_only"
+    assert "inputs.export_oci_only != true" in jobs["release"]["if"]
+    assert export["permissions"] == {
+        "contents": "read",
+        "id-token": "write",
+        "attestations": "write",
+    }
+    checkout = export["steps"][0]["with"]
+    assert checkout["ref"] == "${{ needs.signed_tag_admission.outputs.tag_target }}"
+    assert checkout["persist-credentials"] is False
+    text = yaml.safe_dump(export["steps"])
+    for item in ("--output", "type=oci", "power-web.oci.tar", "subject-path", "upload-artifact@"):
+        assert item in text
+    for forbidden in ("--push", "docker login", "gh release create", "secrets."):
+        assert forbidden not in text
+    assert "type=oci,dest=$RUNNER_TEMP/power-web.oci.tar" in text
+    assert "--output power-oci-export/power-web.oci.tar.gpg" in text
+    assert "type=oci,dest=$export_dir" not in text
+    assert export["steps"][-2]["with"]["subject-path"].splitlines() == [
+        "${{ runner.temp }}/power-oci-export/power-web.oci.tar.gpg",
+        "${{ runner.temp }}/power-oci-export/tag-binding.txt",
+    ]
+
+
 def test_release_uses_job_token_for_all_registry_steps() -> None:
     release_job = yaml.safe_load((WORKFLOWS_DIR / "release.yml").read_text())["jobs"]["release"]
     assert release_job["permissions"]["packages"] == "write"
