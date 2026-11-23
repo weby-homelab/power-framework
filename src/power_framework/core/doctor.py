@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import platform
+import re
 import sqlite3
 import sys
 import time
@@ -63,8 +64,21 @@ def _read_index_counts(database: Path) -> tuple[int, int | None]:
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chunk_embeddings'"
         ).fetchone()
         if dense_table is None:
-            # Missing dense data is not a broken FTS index, but FTS must exist.
-            connection.execute("SELECT 1 FROM fts_notes LIMIT 1").fetchone()
+            # An empty ordinary table with a same-named column can accept a
+            # MATCH query without evaluating it, so also require a virtual table.
+            fts_schema = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'fts_notes'"
+            ).fetchone()
+            if (
+                fts_schema is None
+                or not isinstance(fts_schema[0], str)
+                or re.match(r"^\s*CREATE\s+VIRTUAL\s+TABLE\b", fts_schema[0], re.IGNORECASE) is None
+            ):
+                raise sqlite3.DatabaseError("FTS index is not a virtual table")
+            connection.execute(
+                "SELECT 1 FROM fts_notes WHERE fts_notes MATCH ? LIMIT 1",
+                ('"power_doctor_probe"',),
+            ).fetchone()
             chunks_row = None
         else:
             chunks_row = connection.execute("SELECT COUNT(*) FROM chunk_embeddings").fetchone()
