@@ -15,6 +15,11 @@ on:
         type: boolean
         required: false
         default: false
+      recover_staged_3714:
+        description: "Use the verified v3.7.14 image from export run 45161595113; keep every release gate"
+        type: boolean
+        required: false
+        default: false
 
 permissions: {}
 
@@ -797,6 +802,7 @@ jobs:
       - name: Authenticate and publish Web-only image
         id: web_image
         env:
+          RECOVER_STAGED: ${{ inputs.recover_staged_3714 }}
           GH_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/power-release-docker-config
           IMAGE_REF: ghcr.io/weby-homelab/power-framework-web:${{ env.RELEASE_TAG }}
@@ -813,6 +819,25 @@ jobs:
           source_revision="$(git rev-list -n 1 "$RELEASE_TAG")"
           wheel_name="power_framework-${version}-py3-none-any.whl"
           test -f "dist/$wheel_name"
+          if [[ "$RECOVER_STAGED" == true ]]; then
+            # Immutable recovery binding: export run 45161595113, archive and
+            # receipt attested; the same wheel was measured in the staged image.
+            test "$GITHUB_EVENT_NAME" = workflow_dispatch
+            test "$RELEASE_TAG" = v3.7.14
+            test "$REMOTE_TAG_TARGET" = 802f9651cfc662ac0c288dca7f85e9dd2b4b7bdd
+            test "$REMOTE_TAG_OBJECT" = 8e078770667cfb22f15559da7b19461c9907e1e8
+            digest=sha256:4ae204707c3c5f2ec77cf47d8f3cc96586a96a606b0c84290568e336497dd836
+            wheel_sha=d0e907e517f4c7b579a2962eeb030a8f965ec510dd31c90fa223b976ff74b0f8
+            printf '%s  %s\n' "$wheel_sha" "dist/$wheel_name" | sha256sum --check --strict -
+            staging_image_ref=ghcr.io/weby-homelab/power-framework-web:staging-45161595113-1
+            docker pull "$staging_image_ref@$digest"
+            revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$staging_image_ref@$digest")"
+            test "$revision" = "$REMOTE_TAG_TARGET"
+            printf 'reference=%s\nfinal_reference=%s\ndigest=%s\n' \
+              "$staging_image_ref" "$final_image_ref" "$digest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Ordinary release build
           cp -- "dist/$wheel_name" "release/$wheel_name"
           docker buildx build \
             --file deploy/web/Dockerfile \

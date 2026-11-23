@@ -604,6 +604,35 @@ def test_release_uses_job_token_for_all_registry_steps() -> None:
         assert steps[name]["env"][variable] == "${{ github.token }}"
 
 
+def test_recovery_uses_only_the_reviewed_3714_image_without_skipping_acceptance() -> None:
+    workflow = yaml.safe_load((WORKFLOWS_DIR / "release.yml").read_text())
+    steps = workflow["jobs"]["release"]["steps"]
+    image = next(s for s in steps if s.get("id") == "web_image")
+    run = image["run"]
+    assert image["env"]["RECOVER_STAGED"] == "${{ inputs.recover_staged_3714 }}"
+    recovery, normal = run.split("# Ordinary release build", 1)
+    for required in (
+        'test "$GITHUB_EVENT_NAME" = workflow_dispatch',
+        'test "$RELEASE_TAG" = v3.7.14',
+        'test "$REMOTE_TAG_TARGET" = 802f9651cfc662ac0c288dca7f85e9dd2b4b7bdd',
+        'test "$REMOTE_TAG_OBJECT" = 8e078770667cfb22f15559da7b19461c9907e1e8',
+        "d0e907e517f4c7b579a2962eeb030a8f965ec510dd31c90fa223b976ff74b0f8",
+        "sha256:4ae204707c3c5f2ec77cf47d8f3cc96586a96a606b0c84290568e336497dd836",
+        "sha256sum --check --strict",
+        'docker pull "$staging_image_ref@$digest"',
+    ):
+        assert required in recovery
+    assert "--push" not in recovery
+    assert "--push" in normal
+    for name in (
+        "Prove Profile A/B against the exact Web image",
+        "Attest the published Web image digest",
+        "Promote exact Web image digest to release tag",
+        "Verify public artifact and Web attestations",
+    ):
+        assert "if" not in next(step for step in steps if step.get("name") == name)
+
+
 def test_quarantined_fleet_docs_and_helper_forbid_live_cache_transfer() -> None:
     guide_paths = [
         REPO_ROOT / "docs" / "guides" / "hybrid-fleet-gpu-offloading-guide.md",
