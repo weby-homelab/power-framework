@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No unreleased changes.
 
+## [3.7.15] - Candidate
+
+- Publish the native Linux package, CLI and MCP without building or publishing
+  a Web image. This includes the fixes prepared for the unpublished 3.7.14 tag.
+
 ## [3.7.14] - Unreleased
 
 ### Fixed

@@ -1,19 +1,19 @@
 # Початок роботи з чистою базою знань
 
-Це clean-install шлях для P.O.W.E.R. `v3.7.14`. Він створює лише
+Це clean-install шлях для P.O.W.E.R. `v3.7.15`. Він створює лише
 новий vault. Для наявних нотаток використовуйте
 [гід міграції](migration-guide.ua.md), а не запускайте `power init` поверх них.
 
 > **Контракт релізу:** виконуйте команди завантаження нижче лише коли signed
 > tag та очікувані immutable assets видно й перевірено на
-> [сторінці релізу v3.7.14](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.14).
+> [сторінці релізу v3.7.15](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.15).
 > Інакше дивіться [останній опублікований реліз](https://github.com/weby-homelab/power-framework/releases/latest)
 > та використовуйте інструкції й артефакти відповідної версії. Перед установкою
 > перевірте [матрицю підтримки платформ](support-matrix.ua.md).
 
 [Windows-гід](windows-11-installation.ua.md) є лише інформаційним. Windows і
 macOS відкладені на невизначений строк і не є підтримуваними release-платформами
-для `v3.7.14`.
+для `v3.7.15`.
 
 ## 1. Передумови
 
@@ -30,18 +30,18 @@ macOS відкладені на невизначений строк і не є �
 На Linux:
 
 ```bash
-POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.14"
+POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.15"
 mkdir -p "$POWER_RELEASE_DIR"
-gh release download v3.7.14 --repo weby-homelab/power-framework \
-  --pattern 'power_framework-3.7.14-py3-none-any.whl' \
+gh release download v3.7.15 --repo weby-homelab/power-framework \
+  --pattern 'power_framework-3.7.15-py3-none-any.whl' \
   --pattern 'power-native-requirements.txt' \
   --pattern 'power-release-manifest.json' \
   --dir "$POWER_RELEASE_DIR"
 
-python3 -m venv "$HOME/.cache/power-3.7.14-venv"
-POWER_PYTHON="$HOME/.cache/power-3.7.14-venv/bin/python"
-POWER_CLI="$HOME/.cache/power-3.7.14-venv/bin/power"
-POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.14-py3-none-any.whl"
+python3 -m venv "$HOME/.cache/power-3.7.15-venv"
+POWER_PYTHON="$HOME/.cache/power-3.7.15-venv/bin/python"
+POWER_CLI="$HOME/.cache/power-3.7.15-venv/bin/power"
+POWER_WHEEL="$POWER_RELEASE_DIR/power_framework-3.7.15-py3-none-any.whl"
 POWER_LOCK="$POWER_RELEASE_DIR/power-native-requirements.txt"
 POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
 
@@ -63,7 +63,7 @@ POWER_MANIFEST="$POWER_RELEASE_DIR/power-release-manifest.json"
   'import power_framework; print("lean FTS import: OK")'
 ```
 
-Обидві команди версії мають показати `3.7.14`, а остання команда —
+Обидві команди версії мають показати `3.7.15`, а остання команда —
 `lean FTS import: OK`.
 
 Для канонічних managed native launchers спочатку перегляньте dry-run, а потім
@@ -88,7 +88,7 @@ POWER_CLI="$HOME/.local/bin/power"
 
 Git tag придатний для інспекції source, але не є шляхом public clean-install:
 розв'язання залежностей із source URL не має hash binding. Для відтворюваної
-інсталяції `v3.7.14` після публікації використовуйте release wheel і native lock вище.
+інсталяції `v3.7.15` після публікації використовуйте release wheel і native lock вище.
 
 ## 3. Ініціалізуйте порожній vault
 
@@ -198,7 +198,7 @@ POWER_VAULT_DIR="$POWER_VAULT" "$HOME/.local/share/power/venv/bin/power-mcp" pre
 MCP-клієнт. Повний контракт 20 інструментів і stdio security boundary
 описано в [MCP Server](mcp-server.md).
 
-Web UI не є окремим native-продуктом: він постачається тим самим wheel і
+Реліз 3.7.15 не публікує Web-образ. Код Web UI входить у той самий wheel і
 запускається лише у Web-only контейнері, описаному в
 [контракті розгортання Profile B](architecture/unified-runtime.md).
 
@@ -231,7 +231,7 @@ Vault — це звичайні Markdown-файли, незалежні від P
 ## Acceptance checklist
 
 - Python має версію 3.13 або 3.14, а interpreter належить окремому venv.
-- CLI та distribution metadata повертають `3.7.14`.
+- CLI та distribution metadata повертають `3.7.15`.
 - `power_framework` імпортується, а офіційний Profile A містить extra `mcp`.
 - MCP preflight успішно імпортує `power_framework.mcp` через launcher `power-mcp`.
 - `init`, `ingest`, `index --strict`, `lint` і `markdown-check` завершуються з

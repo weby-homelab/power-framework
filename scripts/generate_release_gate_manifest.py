@@ -23,9 +23,6 @@ MANDATORY_GATES = (
     "phase8-technical",
     "retention-soak",
     "profile-a-mcp-stdio",
-    "profile-b-web-acceptance",
-    "web-semantic-acceptance",
-    "web-rerank-acceptance",
     "public-release-readback",
 )
 OPTIONAL_GATES = {

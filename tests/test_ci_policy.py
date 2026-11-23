@@ -201,6 +201,7 @@ def test_release_publish_is_blocked_by_a_tag_validation_job() -> None:
     assert admission["outputs"] == {
         "tag_object": "${{ steps.admit.outputs.tag_object }}",
         "tag_target": "${{ steps.admit.outputs.tag_target }}",
+        "publication_profile": "${{ steps.profile.outputs.profile }}",
     }
     admission_run = next(
         step["run"]
