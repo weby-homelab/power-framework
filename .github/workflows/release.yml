@@ -701,7 +701,7 @@ jobs:
       - name: Authenticate and publish Web-only image
         id: web_image
         env:
-          GH_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/power-release-docker-config
           IMAGE_REF: ghcr.io/weby-homelab/power-framework-web:${{ env.RELEASE_TAG }}
           STAGING_IMAGE_REF: ghcr.io/weby-homelab/power-framework-web:release-${{ github.run_id }}-${{ github.run_attempt }}
@@ -816,7 +816,7 @@ jobs:
 
       - name: Authenticate GHCR for Web attestation
         env:
-          GHCR_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
+          GHCR_TOKEN: ${{ github.token }}
           HOME: ${{ runner.temp }}/power-release-attestation-home
         run: |
           set -euo pipefail
@@ -987,7 +987,7 @@ jobs:
 
       - name: Promote exact Web image digest to release tag
         env:
-          GH_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/power-release-docker-config
           SOURCE_IMAGE_REF: ${{ steps.web_image.outputs.reference }}
           FINAL_IMAGE_REF: ${{ steps.web_image.outputs.final_reference }}
@@ -1156,7 +1156,7 @@ jobs:
       - name: Verify public asset checksums, manifest bindings, and OCI readback
         env:
           GH_TOKEN: ${{ github.token }}
-          GHCR_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
+          GHCR_TOKEN: ${{ github.token }}
           WEB_IMAGE_REF: ${{ steps.web_image.outputs.final_reference }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
           PACKAGE_ATTESTATION_ID: ${{ steps.package_attestation.outputs.attestation-id }}
@@ -1202,7 +1202,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/power-release-docker-config
-          GHCR_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}
+          GHCR_TOKEN: ${{ github.token }}
           WEB_IMAGE_REF: ${{ steps.web_image.outputs.final_reference }}
           WEB_IMAGE_DIGEST: ${{ steps.web_image.outputs.digest }}
         run: |
