@@ -567,10 +567,23 @@ def test_ci_uses_locked_dependencies_and_clean_package_smoke() -> None:
     assert "pip install build ." not in release_text
     assert "PYTHONPATH: src:." not in release_text
     assert "--system-site-packages" not in release_text
-    assert "GH_TOKEN: ${{ secrets.POWER_RELEASE_GHCR_TOKEN || github.token }}" in release_text
     assert "BUILD_DATE" not in release_text
     assert "SOURCE_DATE_EPOCH" in release_text
     assert "OCI_CREATED" in release_text
+
+
+def test_release_uses_job_token_for_all_registry_steps() -> None:
+    release_job = yaml.safe_load((WORKFLOWS_DIR / "release.yml").read_text())["jobs"]["release"]
+    assert release_job["permissions"]["packages"] == "write"
+    steps = {step["name"]: step for step in release_job["steps"] if "name" in step}
+    for name, variable in (
+        ("Authenticate and publish Web-only image", "GH_TOKEN"),
+        ("Authenticate GHCR for Web attestation", "GHCR_TOKEN"),
+        ("Promote exact Web image digest to release tag", "GH_TOKEN"),
+        ("Verify public asset checksums, manifest bindings, and OCI readback", "GHCR_TOKEN"),
+        ("Verify public artifact and Web attestations", "GHCR_TOKEN"),
+    ):
+        assert steps[name]["env"][variable] == "${{ github.token }}"
 
 
 def test_quarantined_fleet_docs_and_helper_forbid_live_cache_transfer() -> None:
