@@ -581,6 +581,13 @@ def test_oci_recovery_export_cannot_publish_a_release() -> None:
         assert item in text
     for forbidden in ("--push", "docker login", "gh release create", "secrets."):
         assert forbidden not in text
+    assert "type=oci,dest=$RUNNER_TEMP/power-web.oci.tar" in text
+    assert "--output power-oci-export/power-web.oci.tar.gpg" in text
+    assert "type=oci,dest=$export_dir" not in text
+    assert export["steps"][-2]["with"]["subject-path"].splitlines() == [
+        "${{ runner.temp }}/power-oci-export/power-web.oci.tar.gpg",
+        "${{ runner.temp }}/power-oci-export/tag-binding.txt",
+    ]
 
 
 def test_release_uses_job_token_for_all_registry_steps() -> None:
