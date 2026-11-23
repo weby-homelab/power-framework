@@ -1559,10 +1559,9 @@ jobs:
               --source-digest "$REMOTE_TAG_TARGET" --source-ref "$GITHUB_REF"
           done
           test "$(git ls-remote origin "refs/tags/$RELEASE_TAG" | cut -f1)" = "$REMOTE_TAG_OBJECT"
-          id="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" | jq -er \
-            --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true) | .id')"
-          [[ "$id" =~ ^[0-9]+$ ]]
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -f make_latest=true --silent
+          gh release view "$RELEASE_TAG" --json isDraft,tagName | jq -e \
+            --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true'
+          gh release edit "$RELEASE_TAG" --verify-tag --draft=false --latest
           gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,tagName | jq -e \
             --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == false and .isPrerelease == false'
           gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/core-public"
