@@ -4,9 +4,9 @@
 
 # P.O.W.E.R. — Local-First Verifiable AI Engineering Control Plane
 
-**Local-first control plane for verifiable AI-assisted software engineering and Linux operations with structured knowledge substrate.**
+**Search a local Markdown vault, open the source behind a result, and share the same notes with a human or an AI client.**
 
-P.O.W.E.R. bridges autonomous AI agents (Antigravity, OpenCode, Claude Code, Gemini CLI, Codex), local developer tools, and Linux host systems through a cryptographically anchored proof chain, broker-mediated tool authority, and deterministic state governance.
+On Linux, use the `power` CLI or connect a client to `power-mcp` over stdio. For a browser interface, the full deployment adds the matching Docker Web image; both use the same core and vault.
 
 The Obsidian Second Brain is a first-class supported data substrate and memory tier within the control plane, providing structured knowledge retention, OKF frontmatter validation, and hybrid Graph RAG retrieval without usurping canonical authority.
 
@@ -24,8 +24,8 @@ The Obsidian Second Brain is a first-class supported data substrate and memory t
 
 ## 🏛️ Release & Architecture Lines
 
-- **Current Stable Release:** [`v3.7.13`](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.13) (governed maintenance line `release/3.7`). Includes canonical Task v2, typed decision workflows, fail-closed task persistence, Application envelope v2, and consensus-aware reranked search.
-- **Active Development Line:** `3.8` (`main` branch). Focuses on North-Star control plane architecture, EvidenceGraph, ContextPack, ObservationContract, and zero-explanation handoffs. See [ADR-0007: North-Star Control Plane Architecture](docs/adr/0007-power-3.8-north-star-control-plane-architecture.md).
+- **Install a published release:** use [GitHub Releases → Latest](https://github.com/weby-homelab/power-framework/releases/latest). The pinned example below uses `v3.7.13` from `release/3.7`. A Git tag alone does not mean that the Python packages and Web image are available.
+- **Development (`main`, 3.8):** retrieval, incremental indexing and MCP discovery. [ADR-0007](docs/adr/0007-power-3.8-north-star-control-plane-architecture.md) describes the architecture, not a list of features certified in the stable release.
 
 ---
 
@@ -34,11 +34,11 @@ The Obsidian Second Brain is a first-class supported data substrate and memory t
 Autonomous agent operations are governed by two inviolable system invariants:
 
 1. **`LLM OUTPUT NEVER GRANTS AUTHORITY`** — Language model outputs are untrusted proposals. All state transitions, tool invocations, and completion claims require deterministic verification.
-2. **`DERIVED STATE MUST NEVER SILENTLY BECOME CANONICAL AUTHORITY`** — Indexes, embeddings, and cached graphs are rebuildable projections. Canonical truth lives exclusively in immutable Git history, signed commits, and verified CAS artifacts.
+2. **`DERIVED STATE MUST NEVER SILENTLY BECOME CANONICAL AUTHORITY`** — Indexes, embeddings and summaries are derived from sources. Verify a claim against the original note, task record, revision or receipt; a search match is not proof.
 
 ### The POWER Proof Chain
 
-Every lifecycle mutation traverses the end-to-end proof chain:
+The architecture distinguishes the stages of a verified change:
 $$\text{Goal} \longrightarrow \text{Evidence} \longrightarrow \text{Plan} \longrightarrow \text{Authority} \longrightarrow \text{Action} \longrightarrow \text{Verification} \longrightarrow \text{Receipt} \longrightarrow \text{Canonical State}$$
 
 ```mermaid
@@ -56,7 +56,7 @@ flowchart LR
 
 | Authority | Domain | Enforcement Mechanism |
 |---|---|---|
-| **Authority of Truth** | Canonical repository & system state | Git working tree, GPG-signed commits, immutable audit logs (`log.md`), CAS store |
+| **Authority of Truth** | Canonical repository & system state | Source files, recorded revisions and verification receipts; `log.md` is a Markdown change log, not an immutable store |
 | **Authority of Action** | System mutations & tool execution | Tool broker, capability manifest, explicit human approvals, path boundary checks |
 | **Authority of Completion** | Task termination & gate signoff | Tiered verification gates, empirical test/linter receipts, non-empty proof logs |
 
@@ -64,14 +64,12 @@ flowchart LR
 
 ## ⚡ Feature Matrix across Versions
 
-| Capability Area | Available in 3.7.x (Stable v3.7.13) | Merged on Main (`3.8-dev`) | Planned for 3.8 (Roadmap) |
-|---|---|---|---|
-| **Interface Surface** | 27 CLI commands, 21 MCP tools | 27 CLI commands, 21 MCP tools | Extended broker tools, daemon API |
-| **Knowledge Substrate** | P.A.R.A. vault, OKF v0.1 frontmatter, sub-indexes | Strict OKF validation, Application envelope v2 | Reversible vault projection, multi-vault federation |
-| **Retrieval & Reranking** | FTS5 + BAAI/`bge-m3` + `bge-reranker-v2-m3-ONNX` (`auto` mode) | Hybrid retrieval registry, consensus reranking | SearchScope pushdown, AST code-symbol retrieval |
-| **Execution Governance** | Fail-closed task store, 50% CPU throttling | Unified Runtime Envelope v2, Task v2 workflows | Broker sandboxing, approval-driven mutation engine |
-| **Architecture & Evidence** | Ephemeral handoffs, markdown session logs | ADR-0007 North-Star Control Plane, Governance baseline | EvidenceGraph, ExecutionGraph, ContextPack, CAS store |
-| **Cross-Agent Continuity** | File-based handoff CLI / MCP | Typed decision journals, hash-bound handoffs | Zero-Explanation Handoff, Edge-to-Hub sync |
+| Which code are you running? | CLI and MCP interface | Where to check |
+|---|---|---|
+| Published `v3.7.13` | 26 top-level CLI commands; the MCP server registers 20 tools. | [Versioned runtime contract](https://github.com/weby-homelab/power-framework/blob/v3.7.13/skills/power/references/runtime-contract.md) |
+| This `main` checkout | 27 CLI commands, including `infra`; 21 MCP tools. | [CLI reference](docs/cli.md), [MCP reference](docs/mcp-server.md) |
+
+Use `power --version` and `power --help` for the installed CLI. For MCP, call `get_server_info` for the running version and `tools/list` for the tools **that server** exposes.
 
 ---
 
@@ -79,16 +77,16 @@ flowchart LR
 
 Unlike generic knowledge management tools or naive agent wrappers, P.O.W.E.R. provides an **authoritative, local-first control plane**:
 
-- **Verifiable Proof Chain** — Every action is backed by empirical evidence, passing gates, and cryptographic receipts.
+- **Verifiable results** — Use the source revision and verification receipt for a claim. A successful search or a passing unit test is not a release receipt.
 - **AI-native metadata substrate** — Pydantic v2 schemas enforce strict OKF frontmatter, so every note is machine-readable; includes governance fields (`owner`, `status`, `expiry`) and Graph RAG links (`related`).
 - **Token-efficient indexing** — hierarchical `index.md` + per-folder `_index.md` supports selective agent navigation; the linked historical v1.6.0 report measured scenario-specific savings, not a universal release guarantee.
 - **Knowledge Graph & Sub-Indexes** — `related` field connects notes across the vault; visualized in sub-indexes for Graph RAG workflows.
 - **Freshness Monitoring** — linter detects stale/expired notes based on `expiry` metadata field.
-- **Agent Auto-Ingest** — `synthesize_session` MCP tool lets agents autonomously create permanent knowledge artifacts with governance + graph links + full catalog maintenance.
+- **Approved session notes** — `synthesize_session` takes caller-supplied content and requires explicit approval before writing. Connecting an agent does not automatically save conversations.
 - **MCP-native runtime** — expose 21 MCP tools to MCP-compatible AI clients through the official MCP Python SDK v2.
 - **Truthful agent discovery** — call `get_server_info` first to verify the running package version, vault boundary, coverage, and explicit provider binding state; the default discovery call performs no model load or network access.
 - **Windows-safe rename** — `power rename` uses `os.replace()` for the physical move, so renaming onto an existing destination works on Windows instead of raising `FileExistsError`.
-- **Strict 50% CPU Throttling Mandate** — hard concurrency bounds (`max_workers <= max(1, os.cpu_count() // 2)`) and automatic environment throttling (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `POWER_EMBED_NUM_THREADS`) ensure P.O.W.E.R. never starves host resources.
+- **Bounded concurrency** — POWER limits worker counts and supports native-library thread settings. These are not a system-wide CPU or memory quota.
 
 ## For AI Agents
 
@@ -98,8 +96,8 @@ the role-specific guides before touching a vault:
 
 - **[Clean installation](docs/getting-started.md)** — isolated runtime, new vault,
   executable acceptance gate, FTS, and MCP preflight
-- **[Windows 11 25H2](docs/windows-11-installation.md)** — complete PowerShell
-  installation, Visual C++ prerequisite, exact interpreter paths, and checks
+- **[Windows 11 25H2](docs/windows-11-installation.md)** — informational setup
+  notes, not a supported release profile
 - **[CLI reference](docs/cli.md)** — all 27 commands, flags, and actual exit behavior
 - **[MCP server](docs/mcp-server.md)** — all 21 governed tools, rate limits,
   configured-vault boundary, and untrusted retrieval contract
@@ -107,9 +105,9 @@ the role-specific guides before touching a vault:
   migration from any Markdown source methodology into a canonical POWER vault
 - **[Documentation inventory](docs/documentation-inventory.ua.md)** — audited
   entry points, linked documents, corrected drift, and evidence boundaries
-- **[Platform support matrix](docs/support-matrix.md)** — Linux is the
-  `v3.7.11` release platform; CI currently validates it on Ubuntu, while macOS
-  and Windows are deferred indefinitely
+- **[Platform support matrix](docs/support-matrix.md)** — Linux profiles and
+  conditional model support. For an installed release, use its tagged matrix
+  and evidence, not test results from a different version.
 
 ## Quick Start (Linux)
 
@@ -117,34 +115,37 @@ The commands below are the shortest supported path for Linux. They
 assume Python 3.13 or 3.14 and a terminal shell; `~/my-vault` is the vault directory
 you want POWER to manage.
 
-> **`v3.7.11` release contract:** use the signed tag, wheel, source archive,
-> SBOM, and release receipt only after they appear on the
-> [GitHub release page](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.11).
-> The URL below is the tag-bound install target, not evidence that publication
-> has already completed. The release
-> receipt covers the declared Linux release boundary; check the
-> [support matrix](docs/support-matrix.md) before making platform or model
-> claims about another host.
+> **Pinned example:** the following commands require `gh`, Bash and Python 3.13 or 3.14. They use the wheel and hash-pinned dependencies from the [published `v3.7.13` release](https://github.com/weby-homelab/power-framework/releases/tag/v3.7.13). For another version, use its own release assets, checksums and instructions together.
 
 ```bash
-POWER_RELEASE_DIR="$HOME/.cache/power-release-3.7.11"
+set -euo pipefail
+POWER_VERSION=3.7.13
+POWER_RELEASE_DIR="$HOME/.cache/power-release-$POWER_VERSION"
 mkdir -p "$POWER_RELEASE_DIR"
-gh release download v3.7.11 --repo weby-homelab/power-framework \
-  --pattern 'power_framework-3.7.11-py3-none-any.whl' \
+gh release download "v$POWER_VERSION" --repo weby-homelab/power-framework \
+  --pattern "power_framework-${POWER_VERSION}-py3-none-any.whl" \
   --pattern 'power-native-requirements.txt' \
+  --pattern 'SHA256SUMS' \
   --dir "$POWER_RELEASE_DIR"
+(
+  cd "$POWER_RELEASE_DIR"
+  for asset in "power_framework-${POWER_VERSION}-py3-none-any.whl" power-native-requirements.txt; do
+    awk -v name="$asset" '$2 == name { print; found++ } END { exit (found != 1) }' SHA256SUMS |
+      sha256sum --check --strict -
+  done
+)
 python3 -m venv "$POWER_RELEASE_DIR/venv"
 POWER_PYTHON="$POWER_RELEASE_DIR/venv/bin/python"
 "$POWER_PYTHON" -m pip install --require-hashes \
   -r "$POWER_RELEASE_DIR/power-native-requirements.txt"
 "$POWER_PYTHON" -m pip install --no-deps \
-  "$POWER_RELEASE_DIR/power_framework-3.7.11-py3-none-any.whl"
+  "$POWER_RELEASE_DIR/power_framework-${POWER_VERSION}-py3-none-any.whl"
 export PATH="$POWER_RELEASE_DIR/venv/bin:$PATH"
 
 power init ~/my-vault          # Create vault structure
 power lint ~/my-vault          # Check for broken links & missing metadata
 power index ~/my-vault         # Generate catalog index.md
-power heal ~/my-vault          # Auto-fix missing/invalid frontmatter
+power heal ~/my-vault          # Preview proposed frontmatter repairs; writes require --no-dry-run
 power markdown-check ~/my-vault  # Check markdown quality issues
 ```
 
@@ -190,7 +191,7 @@ platform certification.
 No Windows CI, upgrade-matrix, compatibility, performance, or GPU claim is
 made for `v3.7.11`. Windows and macOS have no scheduled release target.
 
-## What's Inside
+## What's inside this development checkout
 
 | Feature                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -199,7 +200,7 @@ made for `v3.7.11`. Windows and macOS have no scheduled release target.
 | **OKF Validation**               | Pydantic v2 schemas enforce strict metadata on every note with governance (`owner`, `status`, `expiry`)                                                                                                                                                                                                                                                                                                                                                                             |
 | **Knowledge Graph (Graph RAG)**  | `related` field in OKF frontmatter supporting `TypedRelation` (path, relation, confidence) with BFS traversal and Mermaid diagram export (`to_mermaid`)                                                                                                                                                                                                                                                                                                                             |
 | **Freshness Monitoring**         | Linter flags stale/expired notes by checking `expiry` dates, ensuring your vault stays current                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Agent Auto-Ingest**            | `synthesize_session` MCP tool — agents autonomously create permanent notes with governance + graph links + full index rebuild                                                                                                                                                                                                                                                                                                                                                       |
+| **Approved session synthesis** | The caller supplies the note content. The MCP tool refuses to write without explicit approval. |
 | **ROT Audit**                    | Detects redundant, outdated, and trivial notes using dense embedding semantic deduplication and LLM fact contradiction checks                                                                                                                                                                                                                                                                                                                                                       |
 | **Auto-Archive**                 | Automatically archives stale notes to `04_Archive/` — `power archive <path>` with dry-run preview                                                                                                                                                                                                                                                                                                                                                                                   |
 | **Healer**                       | Auto-fixes missing/invalid frontmatter fields with per-note failure isolation and foreign-field quarantine — `power heal <path>`                                                                                                                                                                                                                                                                                                                                                                           |
@@ -216,7 +217,7 @@ made for `v3.7.11`. Windows and macOS have no scheduled release target.
 | **CI/CD**                        | Hermetic tests, CodeQL SAST, and automated GitHub Releases; release evidence is validated by the versioned `benchmarks/power31` harness and pinned model manifest.                                                                                                                                                                                                                                                                                                                  |
 | **Documentation**                | Full [mkdocs-material site](https://weby-homelab.github.io/power-framework/) with API reference and guides                                                                                                                                                                                                                                                                                                                                                                          |
 
-> **POWER 3.7.11 evidence contract:** publication requires machine validation
+> **Linux release evidence:** publication requires machine validation
 > gates, package/CI provenance, an SBOM, a Linux upgrade matrix executed on the
 > Ubuntu CI runner, and source-bound technical receipts. Real-vault and human
 > evaluation are optional benchmarks, not release secrets or publication
@@ -230,7 +231,7 @@ made for `v3.7.11`. Windows and macOS have no scheduled release target.
 
 Read the historical v1.6.0 snapshot of the transition from flat to hierarchical
 indexing. Its measured vault counts, token estimates, source paths, test counts,
-and MCP inventory are historical evidence, not the current `v3.7.11` contract:
+and MCP inventory are historical evidence, not the interface of the installed version:
 
 - **[English: Hierarchical Index Migration Report](docs/hierarchical-index-migration.md)** — performance metrics, architecture, insights
 - **[Українська: Звіт міграції на ієрархічний індекс](docs/hierarchical-index-migration.ua.md)** — повний технічний звіт
@@ -296,7 +297,7 @@ dense only when ready and otherwise returns labelled FTS.
 - **Developers** building a structured Second Brain with machine-readable metadata
 - **Teams** that need consistent note formatting and automated quality checks
 
-## Commands
+## Selected CLI commands on `main`
 
 ```
 power init <path>              Create a new vault with P.A.R.A. folder structure
@@ -317,9 +318,9 @@ power status [path]            Show vault status dashboard (statistics & health 
 power control-plane <path>     Preview/materialize the content-free control cockpit
 power maintenance <path>      Preview or explicitly apply hash-bound maintenance
 power migrate-state <path>    Inspect source/control/runtime/evidence state without writes
-power heal <path>              Auto-heal missing/invalid frontmatter
+power heal <path>              Preview frontmatter repairs; --no-dry-run applies them
 power markdown-check <path>    Check markdown quality issues
-power archive <path>           Auto-archive stale notes to 04_Archive/
+power archive <path>           Preview stale-note moves; --no-dry-run applies them
 power cron <path>              Run read-only maintenance plus rebuildable index projection
 power suggest-related <path>   Suggest cross-note relations for Graph RAG
 power synthesize <path>        Auto-ingest a session synthesis note
@@ -330,7 +331,7 @@ power rename <path> --old OLD --new NEW   Rename a note and update related paths
 
 ```bash
 power ingest ~/my-vault --type Project --title "My App" --description "A new project"
-power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Docker best practices" --tags devops,docker --resource "https://docs.docker.com"
+power ingest ~/my-vault --type Resource --title "Docker Guide" --description "Docker best practices" --tags devops docker --resource "https://docs.docker.com"
 power ingest ~/my-vault --type Resource --title "Experiment Notes" --description "Research experiment" --domain research
 ```
 
@@ -372,20 +373,9 @@ install the wheel alone with floating dependency resolution.
 }
 ```
 
-**OpenCode** (`~/.config/opencode/opencode.jsonc`):
-
-```jsonc
-"mcp": {
-  "power": {
-    "type": "local",
-    "command": ["power-mcp"],
-    "environment": {
-      "POWER_VAULT_DIR": "/path/to/your/my-vault"
-    },
-    "enabled": true
-  }
-}
-```
+**OpenCode:** use its [MCP configuration guide](https://opencode.ai/docs/mcp-servers/)
+for your client version. Configure a local stdio server, point it at the
+installed `power-mcp` executable, and set `POWER_VAULT_DIR` to your vault.
 
 ## Vault Structure
 
@@ -454,7 +444,7 @@ The framework combines four complementary methodologies:
 
 ### 🧠 Second Brain vs P.O.W.E.R. Framework Relationship & Collaboration
 
-**Second Brain (Obsidian Vault)** and **P.O.W.E.R. Framework** form an integrated Knowledge Management System where **Second Brain is the passive data store**, and **P.O.W.E.R. Framework is the active AI engine**.
+The vault stores the Markdown notes. P.O.W.E.R. indexes and validates them and serves requests from CLI, MCP and Web clients. An agent or language model is a client, not a requirement for full-text search.
 
 ```mermaid
 graph TD
@@ -467,7 +457,7 @@ graph TD
 
 #### 1. Second Brain (Obsidian Vault) — _Passive Memory Store_
 
-- **What it is:** A file-system knowledge base (`/root/geminicli/brain`) composed of standard Markdown files (`.md`).
+- **What it is:** A directory you choose (for example, `~/my-vault`) containing Markdown files.
 - **Structure:**
     - **P.A.R.A. directories:** `00_Inbox/`, `01_Projects/`, `02_Areas/`, `03_Resources/`, `04_Archive/`, `06_Daily_Logs/`.
     - **OKF Overlay (Open Knowledge Format):** Standardized YAML frontmatter for every note (type, title, description, tags, timestamp).
@@ -477,7 +467,7 @@ graph TD
 
 - **What it is:** The Python engine and MCP server (`power-framework`) engineered specifically for AI agents (Antigravity, OpenCode, Codex) to interact safely and intelligently with the Second Brain.
 - **Key Capabilities:**
-    1. **Hybrid Retrieval (RAG):** Combines SQLite FTS5 (BM25) full-text search, offline dense vector embeddings (**BGE-M3** 1024d), and **BGE Reranker v2 M3** cross-encoder reranking via Reciprocal Rank Fusion (RRF). Provides sub-second precision without overwhelming LLM context windows.
+    1. **Retrieval:** SQLite FTS5 provides full-text search without a model. Dense and reranked modes require compatible model assets and a working provider; latency depends on the host and vault.
     2. **Vault Health & Linting (`power lint`):** Scans for missing OKF metadata, broken wiki-links, orphan notes, and stale content.
     3. **Hierarchical Indexing & GraphRAG (`power index`):** Scans folder structures to automatically generate navigation maps (`index.md`), per-folder sub-catalogs (`_index.md`), and Mermaid graph relations.
     4. **Auto-Healing & ROT audit (`power heal` / `power rot`):** Fixes invalid frontmatter schemas and detects redundant, outdated, or trivial notes.
@@ -608,7 +598,8 @@ All components share `power_framework.core` as the single source of truth.
 git clone https://github.com/weby-homelab/power-framework.git
 cd power-framework
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+python -m pip install uv==0.11.33
+uv sync --locked --group dev
 
 # Run tests
 pytest tests/ -v
@@ -635,18 +626,18 @@ For current, reproducible release information and evidence:
 
 ## Low-RAM Deployment (8–12 GB)
 
-`power sync` builds dense vector embeddings for the knowledge vault. Threading and batching limits are fully configurable and automatically capped to ≤ 50% CPU capacity; test them on target hardware before relying on RAM or latency guarantees. Key configuration knobs:
+For a new vault on a small host, start with `power sync ~/my-vault --fts-only` and `power search ~/my-vault "query" --mode fts`. This path needs no embedding model. For dense indexing, configure threads and batches and measure usage on the target machine:
 
 ```bash
 export POWER_EMBED_PROVIDER=bge-m3           # Default provider (aapot/bge-m3-onnx)
-export POWER_EMBED_NUM_THREADS=2             # Cap CPU execution threads (max 50% CPU)
+export POWER_EMBED_NUM_THREADS=2             # Requested embedding worker/thread limit
 export POWER_EMBED_BATCH_SIZE=8              # Batch size for embedding generation
 # export POWER_SYNC_VMEM_LIMIT_MB=6144       # Opt-in virtual-memory limit (RLIMIT_AS)
 ```
 
-The canonical default provider is **`bge-m3`** via direct ONNX Runtime + `tokenizers` (`BGEM3OnnxManager`), paired with the Apache-2.0 `onnx-community/bge-reranker-v2-m3-ONNX` reranker. Sync and dense search require validated model assets; if assets are missing or corrupted, retrieval fails closed. Run `power sync` to fetch or repair pinned model artifacts.
+The default dense provider is **`bge-m3`** via ONNX Runtime and `tokenizers` (`BGEM3OnnxManager`); the default reranker is `onnx-community/bge-reranker-v2-m3-ONNX`. Explicit dense and reranked searches require validated model assets. FTS-only sync and FTS searches do not.
 
-> **⚠️ Resource note:** Adjust `POWER_EMBED_NUM_THREADS` and `POWER_EMBED_BATCH_SIZE` for host hardware constraints. Current releases enforce strict fail-closed contract checks and hard 50% CPU throttling; peak memory usage and latency remain hardware-dependent.
+> **Resource note:** Thread and batch limits are not a process CPU quota or a peak memory guarantee. Measure before enabling dense retrieval on a constrained host.
 
 ## License
 
@@ -671,10 +662,9 @@ MACHINE-READABLE-METADATA: JSON-LD BELOW
   "url": "https://github.com/weby-homelab/power-framework",
   "downloadUrl": "https://github.com/weby-homelab/power-framework/releases",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Linux (v3.7.11 release boundary)",
+  "operatingSystem": "Linux",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.13–3.14",
-  "softwareVersion": "3.7.11",
   "license": "https://www.gnu.org/licenses/gpl-3.0",
   "keywords": ["ai-agents", "control-plane", "governance", "mcp", "developer-tools", "linux-operations", "knowledge-management", "second-brain"],
   "author": {
@@ -703,8 +693,7 @@ alternateName: power-framework
 description: Local-first control plane for verifiable AI-assisted software engineering and Linux operations with structured knowledge substrate.
 applicationCategory: DeveloperApplication
 applicationSubCategory: ControlPlane
-operatingSystem: Linux (v3.7.11 release boundary)
-softwareVersion: 3.7.11
+operatingSystem: Linux
 keywords: ai-agents, control-plane, governance, mcp, developer-tools, linux-operations, knowledge-management, second-brain
 author: Weby Homelab (https://github.com/weby-homelab)
 codeRepository: https://github.com/weby-homelab/power-framework
